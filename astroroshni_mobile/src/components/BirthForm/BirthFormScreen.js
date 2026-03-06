@@ -286,30 +286,7 @@ export default function BirthFormScreen({ navigation, route }) {
         return;
       }
 
-      // 1) Backend Google Places autocomplete (optional; keep key server-side)
-      let googleSuggestions = [];
-      try {
-        const autocompleteUrl = `${API_BASE_URL}/api/places/autocomplete?q=${encodeURIComponent(queryTrimmed)}`;
-        const res = await fetch(autocompleteUrl, { method: 'GET' });
-        if (res.ok) {
-          const data = await res.json();
-          const list = data.suggestions || [];
-          const ts = Date.now();
-          googleSuggestions = list.map((s, i) => ({
-            id: `google_${ts}_${i}`,
-            name: s.description || '',
-            place_id: s.place_id,
-            source: 'google',
-            latitude: null,
-            longitude: null
-          })).filter(p => p.name);
-        }
-      } catch (e) {
-        console.warn('Places autocomplete (backend) failed:', e?.message);
-      }
-
-      // 2) Hybrid cache: major cities → cache → Photon
-      const cacheResults = await locationCache.searchLocations(queryTrimmed, async (q) => {
+      const photonFallback = async (q) => {
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10`;
         const response = await fetch(url);
         const json = await response.json();
@@ -333,17 +310,44 @@ export default function BirthFormScreen({ navigation, route }) {
             longitude: coords[0]
           };
         });
-      });
+      };
 
-      // Merge: Google first, then cache results; dedupe by name
+      // Run Google and cache in parallel so we always get both; Google is primary for accuracy
+      const [googleSuggestions, cacheResults] = await Promise.all([
+        (async () => {
+          try {
+            const autocompleteUrl = `${API_BASE_URL}/api/places/autocomplete?q=${encodeURIComponent(queryTrimmed)}`;
+            const res = await fetch(autocompleteUrl, { method: 'GET' });
+            if (res.ok) {
+              const data = await res.json();
+              const list = data.suggestions || [];
+              const ts = Date.now();
+              return list.map((s, i) => ({
+                id: `google_${ts}_${i}`,
+                name: s.description || '',
+                place_id: s.place_id,
+                source: 'google',
+                latitude: null,
+                longitude: null
+              })).filter(p => p.name);
+            }
+          } catch (e) {
+            console.warn('Places autocomplete (backend) failed:', e?.message);
+          }
+          return [];
+        })(),
+        locationCache.searchLocations(queryTrimmed, photonFallback)
+      ]);
+
+      // Merge: Google first (so users see Places results on top), then cache/Photon; dedupe by name
       const combined = [...googleSuggestions];
       for (const p of cacheResults) {
-        if (!combined.some(c => c.name === p.name)) {
+        if (!combined.some(c => (c.name || '').trim() === (p.name || '').trim())) {
           combined.push({ ...p, source: p.source || 'cache' });
         }
-        if (combined.length >= 10) break;
+        if (combined.length >= 15) break;
       }
-      const uniquePlaces = combined.slice(0, 10);
+      const uniquePlaces = combined.slice(0, 15);
 
       setSuggestions(uniquePlaces);
       setShowSuggestions(true);

@@ -13,40 +13,63 @@ class LocationCacheService {
    * Search locations with hybrid strategy:
    * 1. Search in bundled major cities (instant)
    * 2. Search in AsyncStorage cache (fast)
-   * 3. Fallback to Photon API (slow)
+   * 3. Fallback to Photon API
+   * For short queries (2–4 chars), we always call Photon too and merge, so users
+   * get Google + cache/major + Photon and aren't stuck with weak cache-only results.
    */
   async searchLocations(query, photonApiFallback) {
     const queryLower = query.toLowerCase().trim();
-    
-    if (queryLower.length < 2) {
+    const queryLen = queryLower.length;
+
+    if (queryLen < 2) {
       return [];
     }
 
-    console.log(`🔍 Location search: "${query}"`);
+    const isShortQuery = queryLen <= 4;
+    console.log(`🔍 Location search: "${query}"${isShortQuery ? ' (short – will merge with Photon)' : ''}`);
 
     // Step 1: Search in bundled major cities
     const majorCityResults = this.searchMajorCities(queryLower);
+
+    // Step 2: Search in AsyncStorage cache
+    const cachedResults = await this.searchCache(queryLower);
+
+    // For short queries: always call Photon and merge with major/cache so we don't
+    // show only a few weak results and never reach Google/Photon
+    if (isShortQuery) {
+      const photonResults = await photonApiFallback(query);
+      if (photonResults.length > 0) {
+        await this.cacheResults(queryLower, photonResults);
+      }
+      const seen = new Set();
+      const merged = [];
+      for (const r of [...majorCityResults, ...cachedResults, ...photonResults]) {
+        const key = (r.name || '').trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          merged.push(r);
+        }
+        if (merged.length >= 10) break;
+      }
+      console.log(`✅ Short query: merged ${majorCityResults.length} major + ${cachedResults.length} cache + ${photonResults.length} Photon → ${merged.length} results`);
+      return merged;
+    }
+
+    // Longer query: use fast path (major → cache → Photon) as before
     if (majorCityResults.length > 0) {
       console.log(`✅ Found ${majorCityResults.length} results in major cities (instant)`);
       return majorCityResults;
     }
-
-    // Step 2: Search in AsyncStorage cache
-    const cachedResults = await this.searchCache(queryLower);
     if (cachedResults.length > 0) {
       console.log(`✅ Found ${cachedResults.length} results in cache (fast)`);
       return cachedResults;
     }
 
-    // Step 3: Fallback to Photon API
-    console.log(`🌐 No cached results, calling Photon API (slow)`);
+    console.log(`🌐 No cached results, calling Photon API`);
     const apiResults = await photonApiFallback(query);
-    
-    // Cache the API results for future use
     if (apiResults.length > 0) {
       await this.cacheResults(queryLower, apiResults);
     }
-    
     return apiResults;
   }
 

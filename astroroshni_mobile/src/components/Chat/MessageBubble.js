@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/constants';
-import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
+import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../../utils/pdfGenerator';
 import { textToSpeech } from '../../utils/textToSpeech';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -156,7 +156,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     try {
       setIsGeneratingPDF(true);
       console.log('📄 Starting PDF generation...');
-      const pdfUri = await generatePDF(message);
+      const logoDataUri = await getLogoDataUriForModule(require('../../../assets/logo.png'));
+      const pdfUri = await generatePDF(message, { logoDataUri });
       console.log('✅ PDF generated:', pdfUri);
       await sharePDFOnWhatsApp(pdfUri);
       console.log('✅ PDF shared');

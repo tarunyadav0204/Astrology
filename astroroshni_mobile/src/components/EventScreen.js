@@ -25,6 +25,7 @@ import MonthlyAccordion from './MonthlyAccordion';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
+import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +54,7 @@ export default function EventScreen({ route }) {
   const [nativeName, setNativeName] = useState('');
   const [birthData, setBirthData] = useState(null);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const yearSliderRef = useRef(null);
   const loadingIntervalRef = useRef(null);
 
@@ -440,6 +442,26 @@ export default function EventScreen({ route }) {
     });
   };
 
+  const handleExportPdf = async () => {
+    if (!monthlyData) return;
+    try {
+      setIsExportingPdf(true);
+      const logoDataUri = await getLogoDataUriForModule(require('../../assets/logo.png'));
+      const pdfUri = await generateEventTimelinePDF({
+        year: selectedYear,
+        nativeName: nativeName || '',
+        monthlyData,
+        logoDataUri,
+      });
+      await sharePDFOnWhatsApp(pdfUri);
+    } catch (error) {
+      console.error('Export PDF error:', error);
+      Alert.alert('Export failed', error?.message || 'Could not generate or share PDF.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handleContinue = async () => {
     try {
       const birthData = await getBirthDetails();
@@ -580,8 +602,16 @@ export default function EventScreen({ route }) {
             </TouchableOpacity>
           )}
           {analysisStarted && (
-            <TouchableOpacity onPress={() => setAnalysisStarted(false)} style={[styles.settingsButton, { backgroundColor: colors.surface }]}>
-              <Ionicons name="settings-outline" size={24} color={colors.accent} />
+            <TouchableOpacity
+              onPress={handleExportPdf}
+              disabled={isExportingPdf || !monthlyData}
+              style={[styles.settingsButton, { backgroundColor: colors.surface }]}
+            >
+              {isExportingPdf ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Ionicons name="document-text-outline" size={24} color={colors.accent} />
+              )}
             </TouchableOpacity>
           )}
         </View>

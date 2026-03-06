@@ -36,7 +36,7 @@ export default function ProfileScreen({ navigation }) {
   const { credits } = useCredits();
   const [userData, setUserData] = useState(null);
   const [birthData, setBirthData] = useState(null);
-  const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, daysActive: 0 });
+  const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, questionsAsked: 0 });
   const [chartData, setChartData] = useState(null);
   const [loadingChart, setLoadingChart] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -110,21 +110,34 @@ export default function ProfileScreen({ navigation }) {
           id: response.data.birth_chart_id // Ensure id is included
         };
         setBirthData(birthDataWithId);
-        // DO NOT update local storage - this would change the selected native
-        // The ProfileScreen should only display the self chart, not change selection
-        setStats({
-          totalChats: 24,
-          chartsViewed: 12,
-          daysActive: 7,
-        });
         loadChartData(birthDataWithId);
         loadDashaData(birthDataWithId);
       } else {
-        // User hasn't set their own birth details
         setBirthData(null);
+      }
+      // Load real profile stats (chats, charts, days)
+      const statsRes = await authAPI.getUserStats();
+      if (statsRes.data) {
+        setStats({
+          totalChats: statsRes.data.total_chat_sessions ?? 0,
+          chartsViewed: statsRes.data.total_birth_charts ?? 0,
+          questionsAsked: statsRes.data.total_questions ?? 0,
+        });
       }
     } catch (error) {
       setBirthData(null);
+      // Still try to load stats on error (e.g. no self chart but user exists)
+      try {
+        const { authAPI } = require('../../services/api');
+        const statsRes = await authAPI.getUserStats();
+        if (statsRes.data) {
+          setStats({
+            totalChats: statsRes.data.total_chat_sessions ?? 0,
+            chartsViewed: statsRes.data.total_birth_charts ?? 0,
+            questionsAsked: statsRes.data.total_questions ?? 0,
+          });
+        }
+      } catch (_) {}
     }
   };
   
@@ -240,13 +253,26 @@ export default function ProfileScreen({ navigation }) {
     outputRange: ['0deg', '360deg'],
   });
 
-  const StatCard = ({ icon, value, label, color }) => (
+  const ChartIconSvg = ({ color = '#9c27b0', size = 32 }) => (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Rect x="2" y="2" width="44" height="44" fill="none" stroke={color} strokeWidth="2" />
+      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={color} strokeWidth="1.5" opacity={0.9} />
+      <Line x1="2" y1="2" x2="46" y2="46" stroke={color} strokeWidth="1" opacity={0.7} />
+      <Line x1="46" y1="2" x2="2" y2="46" stroke={color} strokeWidth="1" opacity={0.7} />
+    </Svg>
+  );
+
+  const StatCard = ({ icon, iconElement, value, label, color }) => (
     <Animated.View style={[styles.statCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <LinearGradient
         colors={[color + '20', color + '10']}
         style={styles.statGradient}
       >
-        <Text style={[styles.statIcon, { color }]}>{icon}</Text>
+        {iconElement != null ? (
+          <View style={styles.statIconWrap}>{iconElement}</View>
+        ) : (
+          <Text style={[styles.statIcon, { color }]}>{icon}</Text>
+        )}
         <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
         <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
       </LinearGradient>
@@ -362,8 +388,8 @@ export default function ProfileScreen({ navigation }) {
 
             <View style={styles.statsGrid}>
               <StatCard icon="💬" value={stats.totalChats} label="Chats" color="#4a90e2" />
-              <StatCard icon="📊" value={stats.chartsViewed} label="Charts" color="#9c27b0" />
-              <StatCard icon="🔥" value={stats.daysActive} label="Days" color="#ff6b35" />
+              <StatCard iconElement={<ChartIconSvg color="#ffd700" size={32} />} value={stats.chartsViewed} label="Charts" color="#9c27b0" />
+              <StatCard icon="❓" value={stats.questionsAsked} label="Questions" color="#ff6b35" />
             </View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
@@ -724,6 +750,7 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, borderRadius: 16, overflow: 'hidden' },
   statGradient: { padding: 16, alignItems: 'center' },
   statIcon: { fontSize: 32, marginBottom: 8 },
+  statIconWrap: { marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
   statValue: { fontSize: 24, fontWeight: '700', color: COLORS.white, marginBottom: 4 },
   statLabel: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)' },
   section: { marginBottom: 24 },

@@ -96,6 +96,7 @@ export const authAPI = {
     return api.put(getEndpoint('/user/self-birth-chart') + params, birthData);
   },
   getSelfBirthChart: () => api.get(getEndpoint('/user/self-birth-chart')),
+  getUserStats: () => api.get(getEndpoint('/user/stats')),
 
 };
 

@@ -1889,6 +1889,8 @@ export default function ChatScreen({ navigation, route }) {
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
           >
             {/* Calibration Card - COMMENTED OUT */}
             {/* {calibrationEvent && !calibrationEvent.verified && (
@@ -2033,6 +2035,7 @@ export default function ChatScreen({ navigation, route }) {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggestionsContent}
+              keyboardShouldPersistTaps="handled"
             >
               {suggestions.slice(0, 3).map((item, index) => (
                 <TouchableOpacity
@@ -2069,6 +2072,7 @@ export default function ChatScreen({ navigation, route }) {
               ]}
             >
               <TextInput
+                key="chat-main-input"
                 style={[styles.modernTextInput, { color: colors.text }]}
                 value={inputText}
                 onChangeText={setInputText}
@@ -2077,6 +2081,7 @@ export default function ChatScreen({ navigation, route }) {
                 maxLength={500}
                 editable={!loading && credits >= chatCost}
                 multiline
+                blurOnSubmit={false}
               />
               
               <TouchableOpacity

@@ -1251,6 +1251,52 @@ async def login(user_data: UserLogin):
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+@app.get("/api/user/stats")
+async def get_user_stats(current_user: User = Depends(get_current_user)):
+    """Return profile stats: total chat sessions, total birth charts, total questions asked."""
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    try:
+        # Chat sessions count (chat_sessions may live in same DB via chat_history)
+        try:
+            cursor.execute(
+                "SELECT COUNT(*) FROM chat_sessions WHERE user_id = ?",
+                (current_user.userid,),
+            )
+            total_chat_sessions = cursor.fetchone()[0] or 0
+        except sqlite3.OperationalError:
+            total_chat_sessions = 0
+
+        # Birth charts count for this user
+        cursor.execute(
+            "SELECT COUNT(*) FROM birth_charts WHERE userid = ?",
+            (current_user.userid,),
+        )
+        total_birth_charts = cursor.fetchone()[0] or 0
+
+        # Total questions asked (user messages across all sessions)
+        total_questions = 0
+        try:
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM chat_messages cm
+                JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                WHERE cs.user_id = ? AND cm.sender = 'user'
+                """,
+                (current_user.userid,),
+            )
+            total_questions = cursor.fetchone()[0] or 0
+        except sqlite3.OperationalError:
+            pass
+
+        return {
+            "total_chat_sessions": total_chat_sessions,
+            "total_birth_charts": total_birth_charts,
+            "total_questions": total_questions,
+        }
+    finally:
+        conn.close()
+
 @app.get("/api/admin/check-password-hashes")
 async def check_password_hashes():
     """Admin endpoint to check password hash integrity"""
