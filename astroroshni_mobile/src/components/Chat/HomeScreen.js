@@ -27,6 +27,8 @@ import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCredits } from '../../credits/CreditContext';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -52,10 +54,12 @@ const ASCENDANT_SIGN_KEYS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virg
 
 export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
   const { t, i18n } = useTranslation();
-  console.log('🌐 HomeScreen current language:', i18n.language);
+  const insets = useSafeAreaInsets();
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
-  
+  const { freeQuestionAvailable } = useCredits();
+  const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
+
   if (!colors) {
     return null;
   }
@@ -65,6 +69,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
   const [pricing, setPricing] = useState({});
+  const [pricingOriginal, setPricingOriginal] = useState({});
   const [loading, setLoading] = useState(true);
   const [scanLoading, setScanLoading] = useState(false);
   const [physicalTraits, setPhysicalTraits] = useState([]);
@@ -160,6 +165,15 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
       loadData();
     }, [])
   );
+
+  // Show first-question-free promo modal when user has free question (once per focus)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!freeQuestionAvailable) return;
+      const timer = setTimeout(() => setShowFirstQuestionFreeModal(true), 400);
+      return () => clearTimeout(timer);
+    }, [freeQuestionAvailable])
+  );
   
   useEffect(() => {
     // Update Panchang daily at midnight
@@ -229,8 +243,10 @@ const loadHomeData = async (nativeData = null) => {
         const pricingResponse = await pricingAPI.getAnalysisPricing();
         if (pricingResponse?.data?.pricing) {
           setPricing(pricingResponse.data.pricing);
+          setPricingOriginal(pricingResponse.data.pricing_original || {});
         } else if (pricingResponse?.data && typeof pricingResponse.data.career !== 'undefined') {
           setPricing(pricingResponse.data);
+          setPricingOriginal({});
         }
       } catch (pricingError) {
       }
@@ -628,21 +644,27 @@ const loadHomeData = async (nativeData = null) => {
       icon: '💬',
       title: t('home.options.question.title', 'Ask Any Question'),
       description: t('home.options.question.description', 'Get insights about your personality, relationships, career, or any astrological topic'),
-      action: 'question'
+      action: 'question',
+      cost: pricing.chat ?? 1,
+      originalCost: pricingOriginal.chat
     },
     {
       id: 'partnership',
       icon: '👥',
       title: t('home.options.partnership.title', 'Partnership Analysis'),
       description: t('home.options.partnership.description', 'Analyze compatibility and relationship dynamics between two people'),
-      action: 'partnership'
+      action: 'partnership',
+      cost: pricing.partnership ?? 2,
+      originalCost: pricingOriginal.partnership
     },
     {
       id: 'mundane',
       icon: '🌍',
       title: t('home.options.mundane.title', 'Global Markets & Events'),
       description: t('home.options.mundane.description', 'Analyze world events, stock markets, politics, and economic trends'),
-      action: 'mundane'
+      action: 'mundane',
+      cost: pricing.chat ?? 1,
+      originalCost: pricingOriginal.chat
     },
     // Commented out in favor of Event Timeline tile for now
     // {
@@ -657,91 +679,23 @@ const loadHomeData = async (nativeData = null) => {
       icon: '📅',
       title: t('home.options.events.title', 'Event Timeline'),
       description: t('home.options.events.description', 'AI-powered yearly predictions with monthly breakdowns and major milestones'),
-      action: 'events'
+      action: 'events',
+      cost: pricing.events ?? 100,
+      originalCost: pricingOriginal.events
     }
   ];
 
   const analysisOptions = [
-    { 
-      id: 'career', 
-      title: t('home.analysis.career.title', 'Career Analysis'), 
-      icon: '💼', 
-      description: t('home.analysis.career.description', 'Professional success & opportunities'),
-      gradient: ['#6366F1', '#8B5CF6'],
-      cost: pricing.career ?? 12
-    },
-    { 
-      id: 'wealth', 
-      title: t('home.analysis.wealth.title', 'Wealth Analysis'), 
-      icon: '💰', 
-      description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'),
-      gradient: ['#0EA5E9', '#38BDF8'],
-      cost: pricing.wealth ?? 5
-    },
-    { 
-      id: 'marriage', 
-      title: t('home.analysis.marriage.title', 'Marriage Analysis'), 
-      icon: '💕', 
-      description: t('home.analysis.marriage.description', 'Relationship compatibility & timing'),
-      gradient: ['#FF69B4', '#DC143C'],
-      cost: pricing.marriage ?? 3
-    },
-    { 
-      id: 'health', 
-      title: t('home.analysis.health.title', 'Health Analysis'), 
-      icon: '🏥', 
-      description: t('home.analysis.health.description', 'Wellness insights & precautions'),
-      gradient: ['#32CD32', '#228B22'],
-      cost: pricing.health ?? 3
-    },
-    { 
-      id: 'education', 
-      title: t('home.analysis.education.title', 'Education Analysis'), 
-      icon: '🎓', 
-      description: t('home.analysis.education.description', 'Learning path & career guidance'),
-      gradient: ['#4169E1', '#1E90FF'],
-      cost: pricing.education ?? 3
-    },
-    { 
-      id: 'progeny', 
-      title: t('home.analysis.progeny.title', 'Progeny Analysis'), 
-      icon: '👨‍👩‍👧‍👦', 
-      description: t('home.analysis.progeny.description', 'Fertility potential & family expansion'),
-      gradient: ['#FF69B4', '#FF1493'],
-      cost: pricing.progeny ?? 15
-    },
-    { 
-      id: 'trading', 
-      title: t('home.analysis.trading.title', 'Trading Forecast'), 
-      icon: '📈', 
-      description: t('home.analysis.trading.description', 'Stock market predictions & timing'),
-      gradient: ['#FFD700', '#FF8C00'],
-      cost: pricing.trading ?? 5
-    },
-    { 
-      id: 'financial', 
-      title: t('home.analysis.financial.title', 'Market Astrology'), 
-      icon: '💹', 
-      description: t('home.analysis.financial.description', 'Sector forecasts & investment timing'),
-      gradient: ['#10b981', '#059669'],
-      cost: 0
-    },
-    { 
-      id: 'childbirth', 
-      title: t('home.analysis.childbirth.title', 'Childbirth Planner'), 
-      icon: '🤱', 
-      description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'),
-      gradient: ['#FF69B4', '#FF1493'],
-      cost: pricing.childbirth ?? 8
-    },
-    { 
-      id: 'muhurat', 
-      title: t('home.analysis.muhurat.title', 'Muhurat Planner'), 
-      icon: '🕉️', 
-      description: t('home.analysis.muhurat.description', 'Auspicious timing for all events'),
-      gradient: ['#9C27B0', '#7B1FA2'],
-      cost: 0
-    }
+    { id: 'career', title: t('home.analysis.career.title', 'Career Analysis'), icon: '💼', description: t('home.analysis.career.description', 'Professional success & opportunities'), gradient: ['#6366F1', '#8B5CF6'], cost: pricing.career ?? 12, originalCost: pricingOriginal.career },
+    { id: 'wealth', title: t('home.analysis.wealth.title', 'Wealth Analysis'), icon: '💰', description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'), gradient: ['#0EA5E9', '#38BDF8'], cost: pricing.wealth ?? 5, originalCost: pricingOriginal.wealth },
+    { id: 'marriage', title: t('home.analysis.marriage.title', 'Marriage Analysis'), icon: '💕', description: t('home.analysis.marriage.description', 'Relationship compatibility & timing'), gradient: ['#FF69B4', '#DC143C'], cost: pricing.marriage ?? 3, originalCost: pricingOriginal.marriage },
+    { id: 'health', title: t('home.analysis.health.title', 'Health Analysis'), icon: '🏥', description: t('home.analysis.health.description', 'Wellness insights & precautions'), gradient: ['#32CD32', '#228B22'], cost: pricing.health ?? 3, originalCost: pricingOriginal.health },
+    { id: 'education', title: t('home.analysis.education.title', 'Education Analysis'), icon: '🎓', description: t('home.analysis.education.description', 'Learning path & career guidance'), gradient: ['#4169E1', '#1E90FF'], cost: pricing.education ?? 3, originalCost: pricingOriginal.education },
+    { id: 'progeny', title: t('home.analysis.progeny.title', 'Progeny Analysis'), icon: '👨‍👩‍👧‍👦', description: t('home.analysis.progeny.description', 'Fertility potential & family expansion'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.progeny ?? 15, originalCost: pricingOriginal.progeny },
+    { id: 'trading', title: t('home.analysis.trading.title', 'Trading Forecast'), icon: '📈', description: t('home.analysis.trading.description', 'Stock market predictions & timing'), gradient: ['#FFD700', '#FF8C00'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
+    { id: 'financial', title: t('home.analysis.financial.title', 'Market Astrology'), icon: '💹', description: t('home.analysis.financial.description', 'Sector forecasts & investment timing'), gradient: ['#10b981', '#059669'], cost: 0, originalCost: null },
+    { id: 'childbirth', title: t('home.analysis.childbirth.title', 'Childbirth Planner'), icon: '🤱', description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
+    { id: 'muhurat', title: t('home.analysis.muhurat.title', 'Muhurat Planner'), icon: '🕉️', description: t('home.analysis.muhurat.description', 'Auspicious timing for all events'), gradient: ['#9C27B0', '#7B1FA2'], cost: 0, originalCost: null },
   ];
 
   const TickerItem = ({ icon, label, value, color, showInfoIcon }) => (
@@ -1029,6 +983,72 @@ const loadHomeData = async (nativeData = null) => {
                   </TouchableOpacity>
                 </LinearGradient>
               </View>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* First question free — exciting promo modal */}
+          <Modal
+            visible={showFirstQuestionFreeModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowFirstQuestionFreeModal(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+              onPress={() => setShowFirstQuestionFreeModal(false)}
+            >
+              <TouchableOpacity
+                activeOpacity={1}
+                style={styles.firstQuestionFreeModalCard}
+                onPress={() => {}}
+              >
+                <LinearGradient
+                  colors={['#b45309', '#d97706', '#f59e0b', '#fbbf24']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.firstQuestionFreeModalGradient}
+                >
+                  <TouchableOpacity
+                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    style={styles.firstQuestionFreeModalClose}
+                    onPress={() => setShowFirstQuestionFreeModal(false)}
+                  >
+                    <Icon name="close" size={22} color="rgba(255,255,255,0.9)" />
+                  </TouchableOpacity>
+                  <View style={styles.firstQuestionFreeModalIconWrap}>
+                    <Text style={styles.firstQuestionFreeModalEmoji}>🎁</Text>
+                  </View>
+                  <Text style={styles.firstQuestionFreeModalTitle}>Your first question is free!</Text>
+                  <Text style={styles.firstQuestionFreeModalSubtext}>
+                    Ask anything — no credits needed. Get personalized astrological guidance right now.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.firstQuestionFreeModalCTA}
+                    onPress={() => {
+                      setShowFirstQuestionFreeModal(false);
+                      onOptionSelect({ action: 'question' });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient
+                      colors={['#fffbeb', '#fef3c7', '#fde68a']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.firstQuestionFreeModalCTAGradient}
+                    >
+                      <Icon name="chatbubble-ellipses" size={20} color="#78350f" />
+                      <Text style={styles.firstQuestionFreeModalCTAText}>Ask your first question free</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowFirstQuestionFreeModal(false)}
+                    style={styles.firstQuestionFreeModalLater}
+                  >
+                    <Text style={styles.firstQuestionFreeModalLaterText}>Maybe later</Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </TouchableOpacity>
             </TouchableOpacity>
           </Modal>
 
@@ -1860,7 +1880,7 @@ const loadHomeData = async (nativeData = null) => {
           styles.fabContainer, 
           androidLightCardFixStyle,
           { 
-            bottom: 90,
+            bottom: 90 + insets.bottom,
             width: fabWidth.interpolate({
               inputRange: [0, 1],
               outputRange: [56, 180], // Icon only vs full width
@@ -1915,8 +1935,15 @@ const loadHomeData = async (nativeData = null) => {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Bottom Tabs */}
-      <View style={styles.bottomTabs}>
+      {/* Bottom Tabs - extend into safe area with same color (opaque) */}
+      <View style={[
+        styles.bottomTabs,
+        {
+          bottom: 0,
+          height: (Platform.OS === 'ios' ? 80 : 70) + insets.bottom,
+          paddingBottom: insets.bottom,
+        },
+      ]}>
         <LinearGradient
           colors={theme === 'dark' ? ['#f97316', '#ea580c'] : ['#ffffff', '#fff5f0']}
           style={StyleSheet.absoluteFill}
@@ -2065,6 +2092,19 @@ function OptionCard({ option, index, onOptionSelect }) {
             <Text style={[styles.optionTitle, { color: colors.text }]}>{option.title}</Text>
             <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{option.description}</Text>
           </View>
+          {option.cost != null && option.cost > 0 && (
+            <View style={styles.costBadge}>
+              <Icon name="flash" size={8} color="#854d0e" />
+              {option.originalCost != null && option.originalCost > option.cost ? (
+                <View style={styles.costWithDiscount}>
+                  <Text style={[styles.costText, styles.costOriginal]}>{option.originalCost}</Text>
+                  <Text style={styles.costText}>{option.cost}</Text>
+                </View>
+              ) : (
+                <Text style={styles.costText}>{option.cost}</Text>
+              )}
+            </View>
+          )}
           <Icon name="chevron-forward" size={24} color={colors.textTertiary} />
         </LinearGradient>
       </TouchableOpacity>
@@ -2109,7 +2149,14 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
           {option.cost > 0 && (
             <View style={styles.costBadge}>
               <Icon name="flash" size={8} color="#854d0e" />
-              <Text style={styles.costText}>{option.cost}</Text>
+              {option.originalCost != null && option.originalCost > option.cost ? (
+                <View style={styles.costWithDiscount}>
+                  <Text style={[styles.costText, styles.costOriginal]}>{option.originalCost}</Text>
+                  <Text style={styles.costText}>{option.cost}</Text>
+                </View>
+              ) : (
+                <Text style={styles.costText}>{option.cost}</Text>
+              )}
             </View>
           )}
 
@@ -2180,6 +2227,19 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
             borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.2)',
           }
         ]}>
+          {option.cost > 0 && (
+            <View style={styles.costBadge}>
+              <Icon name="flash" size={8} color="#854d0e" />
+              {option.originalCost != null && option.originalCost > option.cost ? (
+                <View style={styles.costWithDiscount}>
+                  <Text style={[styles.costText, styles.costOriginal]}>{option.originalCost}</Text>
+                  <Text style={styles.costText}>{option.cost}</Text>
+                </View>
+              ) : (
+                <Text style={styles.costText}>{option.cost}</Text>
+              )}
+            </View>
+          )}
           <View style={styles.ribbonContent}>
             <View style={[styles.ribbonIconContainer, { backgroundColor: (option.gradient?.[0] || colors.primary) + '15' }]}>
               <Text style={styles.ribbonEmoji}>{option.icon}</Text>
@@ -2778,6 +2838,16 @@ const styles = StyleSheet.create({
     color: '#854d0e',
     marginLeft: 2,
   },
+  costWithDiscount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  costOriginal: {
+    textDecorationLine: 'line-through',
+    color: '#854d0e',
+    opacity: 0.8,
+  },
   iconGlow: {
     position: 'absolute',
     width: 60,
@@ -2954,6 +3024,118 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  firstQuestionFreeOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  firstQuestionFreeModalCard: {
+    width: '88%',
+    maxWidth: 360,
+    borderRadius: 28,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#b45309',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.45,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 16,
+      },
+    }),
+  },
+  firstQuestionFreeModalGradient: {
+    paddingTop: 32,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+  },
+  firstQuestionFreeModalClose: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  firstQuestionFreeModalIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  firstQuestionFreeModalEmoji: {
+    fontSize: 40,
+  },
+  firstQuestionFreeModalTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+    marginBottom: 10,
+    paddingHorizontal: 8,
+  },
+  firstQuestionFreeModalSubtext: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.95)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 26,
+    paddingHorizontal: 4,
+    fontWeight: '500',
+  },
+  firstQuestionFreeModalCTA: {
+    alignSelf: 'stretch',
+    borderRadius: 26,
+    overflow: 'hidden',
+    marginBottom: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  firstQuestionFreeModalCTAGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 26,
+    gap: 10,
+  },
+  firstQuestionFreeModalCTAText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#78350f',
+    letterSpacing: 0.2,
+  },
+  firstQuestionFreeModalLater: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  firstQuestionFreeModalLaterText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
   },
   insightModalContent: {
     width: '90%',

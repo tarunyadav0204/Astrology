@@ -3,6 +3,10 @@ import sqlite3
 from datetime import datetime, date, timedelta
 from typing import Optional, Dict, List, Any
 
+# Sentinel: pass this as discount to mean "do not change discount column"
+_DISCOUNT_OMIT = object()
+
+
 class CreditService:
     def __init__(self, db_path: str = 'astrology.db'):
         self.db_path = db_path
@@ -83,6 +87,16 @@ class CreditService:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        # Backward-compatible: add discount column if missing (deploy backend first, app later)
+        try:
+            cursor.execute("SELECT discount FROM credit_settings LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE credit_settings ADD COLUMN discount INTEGER")
+        # Backward-compatible: add free_chat_question_used to user_credits (first question free for new users)
+        try:
+            cursor.execute("SELECT free_chat_question_used FROM user_credits LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE user_credits ADD COLUMN free_chat_question_used INTEGER DEFAULT 0")
         
         # Insert default credit costs
         cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'chat_question_cost'")
@@ -222,6 +236,43 @@ class CreditService:
         result = cursor.fetchone()
         conn.close()
         return result[0] if result else 0
+
+    def get_free_chat_question_used(self, userid: int) -> bool:
+        """True if user has already used their one free standard chat question."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT free_chat_question_used FROM user_credits WHERE userid = ?", (userid,))
+            row = cursor.fetchone()
+        except sqlite3.OperationalError:
+            row = None
+        conn.close()
+        return bool(row and row[0])
+
+    def mark_free_chat_question_used(self, userid: int) -> None:
+        """Mark that the user has used their one free standard chat question. Idempotent."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE user_credits SET free_chat_question_used = 1, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
+                (userid,),
+            )
+            if cursor.rowcount == 0:
+                # No row yet: insert one with 0 credits and flag set (user still has 0 balance)
+                try:
+                    cursor.execute(
+                        "INSERT INTO user_credits (userid, credits, free_chat_question_used, updated_at) VALUES (?, 0, 1, CURRENT_TIMESTAMP)",
+                        (userid,),
+                    )
+                except sqlite3.IntegrityError:
+                    pass  # race: row created by another request
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Column might not exist on very old DBs
+            pass
+        finally:
+            conn.close()
     
     def has_transaction_with_reference(self, userid: int, source: str, reference_id: str) -> bool:
         """Return True if a transaction already exists with this source and reference_id (for idempotency)."""
@@ -484,47 +535,89 @@ class CreditService:
                 conn.close()
     
     def get_credit_setting(self, setting_key: str) -> int:
-        """Get credit cost setting"""
+        """Get effective credit cost (discount if set, else setting_value). Used for deduction."""
+        effective, _, _ = self.get_credit_setting_and_original(setting_key)
+        return effective
+
+    def get_credit_setting_and_original(self, setting_key: str) -> tuple:
+        """Returns (effective_cost, original_value, discount_value). discount_value is None if no discount."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT setting_value FROM credit_settings WHERE setting_key = ?", (setting_key,))
+        try:
+            cursor.execute(
+                "SELECT setting_value, discount FROM credit_settings WHERE setting_key = ?",
+                (setting_key,),
+            )
+        except sqlite3.OperationalError:
+            cursor.execute(
+                "SELECT setting_value FROM credit_settings WHERE setting_key = ?",
+                (setting_key,),
+            )
+            result = cursor.fetchone()
+            conn.close()
+            return (result[0] if result else 1, result[0] if result else 1, None)
         result = cursor.fetchone()
         conn.close()
-        return result[0] if result else 1
+        if not result:
+            return (1, 1, None)
+        value = result[0]
+        discount = result[1] if len(result) > 1 else None
+        effective = discount if (discount is not None and discount >= 0) else value
+        return (effective, value, discount)
     
-    def update_credit_setting(self, setting_key: str, value: int) -> bool:
-        """Update credit cost setting"""
+    def update_credit_setting(self, setting_key: str, value: int, discount: Any = _DISCOUNT_OMIT) -> bool:
+        """Update credit cost setting. discount=_DISCOUNT_OMIT: leave discount column unchanged; None: set to NULL; int: set value."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE credit_settings 
-            SET setting_value = ?, updated_at = CURRENT_TIMESTAMP 
-            WHERE setting_key = ?
-        """, (value, setting_key))
+        if discount is _DISCOUNT_OMIT:
+            cursor.execute("""
+                UPDATE credit_settings 
+                SET setting_value = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE setting_key = ?
+            """, (value, setting_key))
+        else:
+            d = None if discount is None or discount < 0 else int(discount)
+            cursor.execute("""
+                UPDATE credit_settings 
+                SET setting_value = ?, discount = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE setting_key = ?
+            """, (value, d, setting_key))
         success = cursor.rowcount > 0
         conn.commit()
         conn.close()
         return success
     
     def get_all_credit_settings(self) -> List[Dict]:
-        """Get all credit settings"""
+        """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT setting_key, setting_value, description 
-            FROM credit_settings 
-            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost')
-            ORDER BY setting_key
-        """)
-        
+        try:
+            cursor.execute("""
+                SELECT setting_key, setting_value, description, discount 
+                FROM credit_settings 
+                WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost')
+                ORDER BY setting_key
+            """)
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                SELECT setting_key, setting_value, description 
+                FROM credit_settings 
+                WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost')
+                ORDER BY setting_key
+            """)
+            rows = cursor.fetchall()
+            settings = [{"key": r[0], "value": r[1], "description": r[2], "discount": None} for r in rows]
+            conn.close()
+            return settings
+        rows = cursor.fetchall()
         settings = []
-        for row in cursor.fetchall():
+        for row in rows:
             settings.append({
                 "key": row[0],
                 "value": row[1],
-                "description": row[2]
+                "description": row[2],
+                "discount": row[3] if len(row) > 3 else None,
             })
-        
         conn.close()
         return settings
     

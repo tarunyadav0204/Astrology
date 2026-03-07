@@ -335,7 +335,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         'gender': request.get('partner_gender') or request.get('partnerGender')
     } if partnership_mode else None
     
-    # Check credit cost and user balance
+    # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
     if partnership_mode:
         base_cost = credit_service.get_credit_setting('chat_question_cost')
@@ -345,25 +345,29 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
-    
+    is_standard_chat = not partnership_mode and not premium_analysis
+    free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
+    using_free_question = is_standard_chat and free_available
+    effective_cost = 0 if using_free_question else chat_cost
+
     print(f"💳 CREDIT CHECK (chat-v2):")
     print(f"   User ID: {current_user.userid}")
     print(f"   Partnership Mode: {partnership_mode}")
     print(f"   Premium Analysis: {premium_analysis}")
-    print(f"   Chat cost: {chat_cost} credits")
+    print(f"   Chat cost: {chat_cost} credits, effective: {effective_cost} (free_question: {using_free_question})")
     print(f"   User balance: {user_balance} credits")
-    
-    if user_balance < chat_cost:
+
+    if user_balance < effective_cost:
         if partnership_mode:
             analysis_type = "Partnership Analysis"
         elif premium_analysis:
             analysis_type = "Premium Deep Analysis"
         else:
             analysis_type = "Standard Analysis"
-        print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
+        print(f"❌ INSUFFICIENT CREDITS: Need {effective_cost}, have {user_balance}")
         raise HTTPException(
-            status_code=402, 
-            detail=f"Insufficient credits for {analysis_type}. You need {chat_cost} credits but have {user_balance}."
+            status_code=402,
+            detail=f"Insufficient credits for {analysis_type}. You need {effective_cost} credits but have {user_balance}."
         )
     
     conn = sqlite3.connect('astrology.db')
@@ -606,10 +610,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     else:
         chart_insights = [x for x in chart_insights if isinstance(x, dict) and x.get("house_number") and x.get("message")]
     
-    # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save)
+    # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save; using_free_question for first-question-free)
     background_tasks.add_task(
         process_gemini_response,
-        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id
+        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question
     )
     
     print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
@@ -821,7 +825,7 @@ def get_original_user_message_id_for_faq(session_id: str, assistant_message_id: 
     row = cursor.fetchone()
     return row[0] if row else None
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False):
     """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
@@ -1323,19 +1327,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 # Use already parsed terms and glossary from GeminiChatAnalyzer
                 terms = result.get('terms', [])
                 glossary = result.get('glossary', {})
-                
-                # Deduct credits on successful response
+
+                # Deduct credits on successful response (or mark first question free as used)
                 credit_service = CreditService()
-                analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
-                success = credit_service.spend_credits(
-                    user_id, 
-                    chat_cost, 
-                    'chat_question', 
-                    f"{analysis_type}: {question[:50]}..."
-                )
-                
+                if using_free_question:
+                    credit_service.mark_free_chat_question_used(user_id)
+                    print(f"🆓 FREE QUESTION USED for user {user_id} (no credits deducted)")
+                    success = True
+                else:
+                    analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
+                    success = credit_service.spend_credits(
+                        user_id,
+                        chat_cost,
+                        'chat_question',
+                        f"{analysis_type}: {question[:50]}..."
+                    )
+                    if success:
+                        print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
+
                 if success:
-                    print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
                     
                     # Save category + canonical_question on the *original* user question only (not on clarification answers)
                     faq_metadata = result.get('faq_metadata')

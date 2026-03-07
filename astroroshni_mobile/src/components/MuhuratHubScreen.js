@@ -1,11 +1,21 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../utils/constants';
+import { pricingAPI } from '../services/api';
 
 const { width } = Dimensions.get('window');
+
+// Cost key for each card: maps to pricing from API (credits/settings/analysis-pricing)
+const COST_KEYS = {
+  childbirth: 'childbirth',
+  vehicle: 'vehicle',
+  property: 'griha_pravesh',
+  gold: 'gold',
+  business: 'business'
+};
 
 // CONFIGURATION: Add new Muhurats here in the future
 const MUHURAT_TYPES = [
@@ -52,7 +62,26 @@ const MUHURAT_TYPES = [
 ];
 
 export default function MuhuratHubScreen({ navigation }) {
-  
+  const [pricing, setPricing] = useState({});
+  const [pricingOriginal, setPricingOriginal] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await pricingAPI.getAnalysisPricing();
+        const data = res?.data || res;
+        if (!cancelled && data?.pricing) {
+          setPricing(data.pricing);
+          setPricingOriginal(data.pricing_original || {});
+        }
+      } catch (e) {
+        // keep defaults
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const handlePress = (item) => {
     if (item.route) {
       navigation.navigate(item.route);
@@ -78,19 +107,38 @@ export default function MuhuratHubScreen({ navigation }) {
           <Text style={styles.subHeader}>Select an event to plan</Text>
 
           <ScrollView contentContainerStyle={styles.grid}>
-            {MUHURAT_TYPES.map((item, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.card} 
-                onPress={() => handlePress(item)}
-              >
-                <LinearGradient colors={item.gradient} style={styles.iconCircle}>
-                  <Icon name={item.icon} size={28} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
-              </TouchableOpacity>
-            ))}
+            {MUHURAT_TYPES.map((item, index) => {
+              const costKey = COST_KEYS[item.id];
+              const cost = costKey != null ? (pricing[costKey] ?? 0) : 0;
+              const originalCost = costKey != null ? pricingOriginal[costKey] : null;
+              const showCost = cost > 0;
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.card} 
+                  onPress={() => handlePress(item)}
+                >
+                  {showCost && (
+                    <View style={styles.costBadge}>
+                      <Icon name="flash" size={8} color="#854d0e" />
+                      {originalCost != null && originalCost > cost ? (
+                        <View style={styles.costWithDiscount}>
+                          <Text style={[styles.costText, styles.costOriginal]}>{originalCost}</Text>
+                          <Text style={styles.costText}>{cost}</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.costText}>{cost}</Text>
+                      )}
+                    </View>
+                  )}
+                  <LinearGradient colors={item.gradient} style={styles.iconCircle}>
+                    <Icon name={item.icon} size={28} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
         </SafeAreaView>
@@ -120,5 +168,35 @@ const styles = StyleSheet.create({
   },
   iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   cardTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  cardSubtitle: { color: '#888', fontSize: 11, textAlign: 'center' }
+  cardSubtitle: { color: '#888', fontSize: 11, textAlign: 'center' },
+  costBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.95)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fff',
+    zIndex: 1,
+  },
+  costText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#854d0e',
+    marginLeft: 2,
+  },
+  costWithDiscount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  costOriginal: {
+    textDecorationLine: 'line-through',
+    color: '#854d0e',
+    opacity: 0.8,
+  },
 });

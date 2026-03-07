@@ -8,6 +8,7 @@ export const CreditProvider = ({ children }) => {
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(false);
   const [partnershipCost, setPartnershipCost] = useState(2);
+  const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
 
   const fetchBalance = useCallback(async () => {
     try {
@@ -15,6 +16,7 @@ export const CreditProvider = ({ children }) => {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         setCredits(0);
+        setFreeQuestionAvailable(false);
         return;
       }
       
@@ -23,6 +25,7 @@ export const CreditProvider = ({ children }) => {
       const data = response?.data;
       const balance = data?.credits ?? data?.balance ?? 0;
       setCredits(Number(balance) || 0);
+      setFreeQuestionAvailable(Boolean(data?.free_question_available));
     } catch (error) {
       console.error('❌ Error fetching credits:', {
         message: error.message,
@@ -105,6 +108,7 @@ export const CreditProvider = ({ children }) => {
       credits,
       loading,
       partnershipCost,
+      freeQuestionAvailable,
       fetchBalance,
       redeemCode,
       spendCredits,

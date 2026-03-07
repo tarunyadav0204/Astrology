@@ -48,6 +48,7 @@ export default function EventScreen({ route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [analysisStarted, setAnalysisStarted] = useState(false);
   const [creditCost, setCreditCost] = useState(100);
+  const [creditCostOriginal, setCreditCostOriginal] = useState(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const progressIntervalRef = useRef(null);
@@ -134,6 +135,7 @@ export default function EventScreen({ route }) {
         console.log('✅ Credit cost response:', response.data);
         if (response.data.cost) {
           setCreditCost(response.data.cost);
+          setCreditCostOriginal(response.data.original_cost ?? null);
         }
       } catch (error) {
         console.error('❌ Error fetching credit cost:', {
@@ -562,7 +564,13 @@ export default function EventScreen({ route }) {
           <View style={[styles.modalContent, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
             <Ionicons name="refresh-circle" size={48} color={colors.accent} style={styles.modalIcon} />
             <Text style={[styles.modalTitle, { color: colors.accent }]}>Regenerate Predictions?</Text>
-            <Text style={[styles.modalText, { color: colors.textSecondary }]}>This will cost {creditCost} credits to generate fresh predictions for {selectedYear}.</Text>
+            <Text style={[styles.modalText, { color: colors.textSecondary }]}>
+              This will cost {creditCostOriginal != null && creditCostOriginal > creditCost ? (
+                <Text><Text style={styles.modalCostStrikethrough}>{creditCostOriginal}</Text> {creditCost}</Text>
+              ) : (
+                creditCost
+              )}{' '}credits to generate fresh predictions for {selectedYear}.
+            </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonCancel, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]} 
@@ -1066,6 +1074,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 28
+  },
+  modalCostStrikethrough: {
+    textDecorationLine: 'line-through',
+    marginRight: 4
   },
   modalButtons: {
     flexDirection: 'row',

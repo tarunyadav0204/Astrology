@@ -31,6 +31,7 @@ export default function AnalysisHubScreen({ navigation }) {
   const [slideAnim] = useState(new Animated.Value(50));
   const [logoGlow] = useState(new Animated.Value(0));
   const [pricing, setPricing] = useState({});
+  const [pricingOriginal, setPricingOriginal] = useState({});
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [birthData, setBirthData] = useState(null);
 
@@ -85,6 +86,7 @@ export default function AnalysisHubScreen({ navigation }) {
       const response = await pricingAPI.getAnalysisPricing();
       if (response.data && response.data.pricing) {
         setPricing(response.data.pricing);
+        setPricingOriginal(response.data.pricing_original || {});
       }
     } catch (error) {
       console.error('Failed to fetch pricing:', error);
@@ -156,7 +158,8 @@ export default function AnalysisHubScreen({ navigation }) {
     
     return baseTypes.map(type => ({
       ...type,
-      cost: pricing[type.id] || 0
+      cost: pricing[type.id] || 0,
+      originalCost: pricingOriginal[type.id],
     }));
   };
 
@@ -287,7 +290,14 @@ export default function AnalysisHubScreen({ navigation }) {
                             </LinearGradient>
                           </View>
                           <View style={[styles.costBadge, { backgroundColor: colors.primary }]}>
-                            <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
+                            {analysis.originalCost != null && analysis.originalCost > analysis.cost ? (
+                              <View style={styles.costWithDiscount}>
+                                <Text style={[styles.costText, styles.costOriginal, { color: '#fff' }]}>{analysis.originalCost}</Text>
+                                <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
+                              </View>
+                            ) : (
+                              <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
+                            )}
                           </View>
                         </View>
                         <Text style={[styles.cardTitle, { color: colors.text }]}>{analysis.title}</Text>
@@ -485,6 +495,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  costWithDiscount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  costOriginal: {
+    textDecorationLine: 'line-through',
+    opacity: 0.9,
   },
   cardTitle: {
     fontSize: 22,

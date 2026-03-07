@@ -31,7 +31,7 @@ import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
 import { storage } from '../../services/storage';
-import { chatAPI } from '../../services/api';
+import { chatAPI, pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
@@ -56,7 +56,7 @@ export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
-  const { credits, partnershipCost, fetchBalance } = useCredits();
+  const { credits, partnershipCost, freeQuestionAvailable, fetchBalance } = useCredits();
   const insets = useSafeAreaInsets();
   
   // Mundane mode state
@@ -64,15 +64,20 @@ export default function ChatScreen({ navigation, route }) {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [selectedYear, setSelectedYear] = useState(YEARS[0]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [countrySearchQuery, setCountrySearchQuery] = useState('');
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [chatCost, setChatCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
+  const [chatCostOriginal, setChatCostOriginal] = useState(null);
+  const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
+  const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showPremiumTooltip, setShowPremiumTooltip] = useState(true);
   const tooltipResetRef = useRef(true);
+  const freeUsedThisSendRef = useRef(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -522,13 +527,31 @@ export default function ChatScreen({ navigation, route }) {
 
   const fetchChatCost = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/chat-cost')}`);
-      const data = await response.json();
-      setChatCost(data.cost || 1);
-      
+      // Standard chat + optional originals from analysis-pricing
+      let chatVal = 1;
+      let chatOriginal = null;
+      let premiumOriginal = null;
+      try {
+        const res = await pricingAPI.getAnalysisPricing();
+        const data = res?.data || res;
+        const pricing = data?.pricing || {};
+        const orig = data?.pricing_original || {};
+        if (pricing.chat != null) chatVal = Number(pricing.chat) || 1;
+        if (orig.chat != null) chatOriginal = Number(orig.chat);
+        if (orig.premium_chat != null) premiumOriginal = Number(orig.premium_chat);
+      } catch (_) {}
+      setChatCost(chatVal);
+      setChatCostOriginal(Number.isNaN(chatOriginal) ? null : chatOriginal);
+
+      // Premium: always from dedicated endpoint (same source as deduction); use original_cost for strikethrough
       const premiumResponse = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/premium-chat-cost')}`);
       const premiumData = await premiumResponse.json();
-      setPremiumChatCost(premiumData.cost || 3);
+      const premiumVal = Number(premiumData.cost);
+      setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
+      // Support both snake_case (original_cost) and camelCase (originalCost)
+      const rawOriginal = premiumData.original_cost ?? premiumData.originalCost;
+      const premiumOrig = rawOriginal != null && rawOriginal !== '' ? Number(rawOriginal) : premiumOriginal;
+      setPremiumChatCostOriginal(Number.isNaN(premiumOrig) ? null : premiumOrig);
     } catch (error) {
       console.error('Error fetching chat cost:', error);
     }
@@ -699,6 +722,11 @@ export default function ChatScreen({ navigation, route }) {
     
     return unsubscribe;
   }, [currentPersonId, loading, isTyping, showGreeting]);
+
+  // First question free: standard chat only (not partnership, not mundane)
+  const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
+    ? 0
+    : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
 
   const handleGreetingOptionSelect = async (option) => {
     
@@ -1056,6 +1084,14 @@ export default function ChatScreen({ navigation, route }) {
             setIsTyping(false);
             removePendingMessage(messageId);
             fetchBalance();
+            if (freeUsedThisSendRef.current) {
+              freeUsedThisSendRef.current = false;
+              Alert.alert(
+                'Free question used',
+                'You used your free question. Next questions will use credits.',
+                [{ text: 'OK' }]
+              );
+            }
           };
 
           const analysisSteps = status.analysis_steps || [];
@@ -1220,12 +1256,14 @@ export default function ChatScreen({ navigation, route }) {
 
     const attemptSend = async (attempt = 1) => {
       try {
+        // When using first question free, send as standard so backend applies free-question logic
+        const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
         const requestBody = {
           session_id: currentSessionId,
           question: messageText,
           language: language || 'english',
           response_style: 'detailed',
-          premium_analysis: isPremiumAnalysis,
+          premium_analysis: useFreeQuestion ? false : isPremiumAnalysis,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
             name: nativeChart.name,
@@ -1460,6 +1498,11 @@ export default function ChatScreen({ navigation, route }) {
         setLoading(false);
         setIsTyping(false);
         return;
+      }
+
+      // Track if this send uses the free standard question (for post-success toast)
+      if (!partnershipMode && freeQuestionAvailable) {
+        freeUsedThisSendRef.current = true;
       }
 
       await sendChatRequestWithRetry({
@@ -1829,6 +1872,9 @@ export default function ChatScreen({ navigation, route }) {
               >
                 <Text style={[styles.creditText, { color: colors.text }]}>
                   {isPremiumAnalysis ? '⚡' : '💳'} {credits}
+                  {effectiveChatCost === 0 && (
+                    <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · Free</Text>
+                  )}
                 </Text>
               </TouchableOpacity>
               
@@ -2071,62 +2117,115 @@ export default function ChatScreen({ navigation, route }) {
                 }
               ]}
             >
+              {/* Expanded row to the left: Standard | Premium with cost/discount (only when not partnership/mundane) */}
+              {!partnershipMode && !isMundane && showModeSelector && (
+                <View style={styles.modeSelectorExpanded}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeSelectorPill,
+                      !isPremiumAnalysis && styles.modeSelectorPillActive,
+                      !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
+                      isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                    ]}
+                    onPress={() => { setIsPremiumAnalysis(false); setShowModeSelector(false); }}
+                  >
+                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>Standard</Text>
+                    <View style={styles.modeSelectorCostRow}>
+                      {chatCostOriginal != null && chatCostOriginal > chatCost ? (
+                        <>
+                          <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{chatCostOriginal}</Text>
+                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{chatCost}</Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{chatCost}</Text>
+                      )}
+                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{chatCost !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeSelectorPill,
+                      isPremiumAnalysis && styles.modeSelectorPillActivePremium,
+                      isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 215, 0, 0.2)' },
+                      !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                    ]}
+                    onPress={() => { setIsPremiumAnalysis(true); setShowModeSelector(false); }}
+                  >
+                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>Premium</Text>
+                    <View style={styles.modeSelectorCostRow}>
+                      {premiumChatCostOriginal != null && premiumChatCostOriginal > premiumChatCost ? (
+                        <>
+                          <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{premiumChatCostOriginal}</Text>
+                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{premiumChatCost}</Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{premiumChatCost}</Text>
+                      )}
+                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{premiumChatCost !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <TextInput
                 key="chat-main-input"
-                style={[styles.modernTextInput, { color: colors.text }]}
+                style={[
+                  styles.modernTextInput,
+                  { color: colors.text },
+                  showModeSelector && styles.modernTextInputCollapsed
+                ]}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder={loading ? "Analyzing..." : credits < chatCost ? "Insufficient credits" : isMundane ? "Ask about markets, politics, events..." : "Ask me anything..."}
+                placeholder={loading ? "Analyzing..." : credits < effectiveChatCost ? "Insufficient credits" : showModeSelector ? "Type here..." : isMundane ? "Ask about markets, politics, events..." : "Ask me anything..."}
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
                 maxLength={500}
-                editable={!loading && credits >= chatCost}
+                editable={!loading && credits >= effectiveChatCost}
                 multiline
                 blurOnSubmit={false}
               />
-              
-              <TouchableOpacity
-                style={styles.premiumToggleButton}
-                onPress={() => setIsPremiumAnalysis(!isPremiumAnalysis)}
-                onLongPress={() => setShowPremiumModal(true)}
-              >
-                <Animated.View
-                  style={[
-                    styles.premiumToggleIcon,
-                    isPremiumAnalysis && {
-                      transform: [{
-                        scale: glowAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 1.15],
-                        }),
-                      }],
-                    },
-                  ]}
+
+              {!partnershipMode && !isMundane && (
+                <TouchableOpacity
+                  style={styles.premiumToggleButton}
+                  onPress={() => setShowModeSelector(prev => !prev)}
+                  onLongPress={() => setShowPremiumModal(true)}
                 >
-                  {isPremiumAnalysis ? (
-                    <LinearGradient
-                      colors={['#ffd700', '#ff6b35']}
-                      style={styles.premiumIconGradient}
-                    >
-                      <Text style={styles.premiumIconText}>⚡</Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={styles.premiumIconInactive}>
-                      <Text style={styles.premiumIconTextInactive}>⚡</Text>
-                      <View style={styles.premiumBadge}>
-                        <Text style={styles.premiumBadgeText}>?</Text>
+                  <Animated.View
+                    style={[
+                      styles.premiumToggleIcon,
+                      isPremiumAnalysis && {
+                        transform: [{
+                          scale: glowAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.15],
+                          }),
+                        }],
+                      },
+                    ]}
+                  >
+                    {isPremiumAnalysis ? (
+                      <LinearGradient
+                        colors={['#ffd700', '#ff6b35']}
+                        style={styles.premiumIconGradient}
+                      >
+                        <Text style={styles.premiumIconText}>P</Text>
+                      </LinearGradient>
+                    ) : (
+                      <View style={styles.premiumIconInactive}>
+                        <Text style={styles.premiumIconTextInactive}>S</Text>
                       </View>
-                    </View>
-                  )}
-                </Animated.View>
-              </TouchableOpacity>
+                    )}
+                  </Animated.View>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost)) && styles.modernSendButtonDisabled
+                  (loading || !inputText.trim() || credits < effectiveChatCost) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => sendMessage()}
-                disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost)}
+                disabled={loading || !inputText.trim() || credits < effectiveChatCost}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
@@ -2134,8 +2233,10 @@ export default function ChatScreen({ navigation, route }) {
                 >
                   {loading ? (
                     <Text style={styles.modernSendText}>⏳</Text>
-                  ) : credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost) ? (
+                  ) : credits < effectiveChatCost ? (
                     <Text style={styles.modernSendText}>💳</Text>
+                  ) : effectiveChatCost === 0 ? (
+                    <Text style={styles.modernSendText}>Free</Text>
                   ) : (
                     <Ionicons name="send" size={20} color={COLORS.white} />
                   )}
@@ -2143,7 +2244,17 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
             
-            {credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost) && (
+            {effectiveChatCost === 0 && (
+              <View style={styles.firstQuestionFreeBanner}>
+                <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
+                <View style={styles.firstQuestionFreeTextWrap}>
+                  <Text style={styles.firstQuestionFreeTitle}>First question free</Text>
+                  <Text style={styles.firstQuestionFreeSubtext}>Ask anything — no credits needed</Text>
+                </View>
+              </View>
+            )}
+            
+            {credits < effectiveChatCost && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -2184,7 +2295,7 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Quick Actions Bar */}
         {!showGreeting && (
-          <View style={styles.quickActionsBar}>
+          <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, insets.bottom) }]}>
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}
@@ -3180,24 +3291,46 @@ export default function ChatScreen({ navigation, route }) {
           visible={showCountryPicker}
           transparent={true}
           animationType="slide"
-          onRequestClose={() => setShowCountryPicker(false)}
+          onRequestClose={() => { setShowCountryPicker(false); setCountrySearchQuery(''); }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.chartPickerModal}>
               <View style={styles.chartPickerHeader}>
                 <Text style={styles.chartPickerTitle}>Select Country</Text>
-                <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
+                <TouchableOpacity onPress={() => { setShowCountryPicker(false); setCountrySearchQuery(''); }}>
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.chartPickerList}>
-                {COUNTRIES.map((country, index) => (
+              <View style={[styles.chartPickerSearchWrap, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.chartPickerSearchIcon} />
+                <TextInput
+                  style={[styles.chartPickerSearchInput, { color: colors.text }]}
+                  placeholder="Search countries..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={countrySearchQuery}
+                  onChangeText={setCountrySearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {countrySearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setCountrySearchQuery('')} style={styles.chartPickerSearchClear}>
+                    <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <ScrollView style={styles.chartPickerList} keyboardShouldPersistTaps="handled">
+                {COUNTRIES.filter(c => {
+                  const q = countrySearchQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (c.name && c.name.toLowerCase().includes(q)) || (c.capital && c.capital.toLowerCase().includes(q));
+                }).map((country, index) => (
                   <TouchableOpacity
-                    key={index}
+                    key={`${country.name}-${index}`}
                     style={styles.chartPickerItem}
                     onPress={() => {
                       setSelectedCountry(country);
                       setShowCountryPicker(false);
+                      setCountrySearchQuery('');
                     }}
                   >
                     <View style={styles.chartPickerItemContent}>
@@ -3482,6 +3615,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     maxHeight: 100,
   },
+  modernTextInputCollapsed: {
+    height: 44,
+    maxHeight: 44,
+    minHeight: 44,
+  },
   premiumToggleButton: {
     marginHorizontal: 4,
   },
@@ -3545,6 +3683,84 @@ const styles = StyleSheet.create({
   },
   modernSendText: {
     fontSize: 20,
+  },
+  modeSelectorExpanded: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 8,
+    paddingVertical: 4,
+  },
+  modeSelectorPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  modeSelectorPillActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.5)',
+  },
+  modeSelectorPillActivePremium: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.6)',
+  },
+  modeSelectorLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  modeSelectorCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  modeSelectorCost: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  modeSelectorCostOriginal: {
+    fontSize: 11,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
+    marginRight: 4,
+    opacity: 0.8,
+  },
+  modeSelectorCreditLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  firstQuestionFreeBanner: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+  },
+  firstQuestionFreeIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  firstQuestionFreeTextWrap: {
+    flex: 1,
+  },
+  firstQuestionFreeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#22c55e',
+    letterSpacing: 0.3,
+  },
+  firstQuestionFreeSubtext: {
+    fontSize: 12,
+    color: 'rgba(34, 197, 94, 0.9)',
+    marginTop: 2,
+    fontWeight: '500',
   },
   lowCreditBanner: {
     marginTop: 8,
@@ -4137,6 +4353,29 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  chartPickerSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  chartPickerSearchIcon: {
+    marginRight: 10,
+  },
+  chartPickerSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 0,
+  },
+  chartPickerSearchClear: {
+    padding: 4,
   },
   chartPickerTitle: {
     fontSize: 18,

@@ -124,26 +124,31 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
+    # First question free: standard chat only (not partnership, not premium)
+    is_standard_chat = not request.partnership_mode and not request.premium_analysis
+    free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
+    using_free_question = is_standard_chat and free_available
+    effective_cost = 0 if using_free_question else chat_cost
     
     print(f"💳 CREDIT CHECK DEBUG:")
     print(f"   User ID: {current_user.userid}")
     print(f"   Partnership Mode: {request.partnership_mode}")
     print(f"   Premium Analysis: {request.premium_analysis}")
-    print(f"   Chat cost: {chat_cost} credits")
+    print(f"   Chat cost: {chat_cost} credits, effective: {effective_cost} (free_question: {using_free_question})")
     print(f"   User balance: {user_balance} credits")
-    print(f"   Has sufficient credits: {user_balance >= chat_cost}")
+    print(f"   Has sufficient credits: {user_balance >= effective_cost}")
     
-    if user_balance < chat_cost:
+    if user_balance < effective_cost:
         if request.partnership_mode:
             analysis_type = "Partnership Analysis"
         elif request.premium_analysis:
             analysis_type = "Premium Deep Analysis"
         else:
             analysis_type = "Standard Analysis"
-        print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
+        print(f"❌ INSUFFICIENT CREDITS: Need {effective_cost}, have {user_balance}")
         raise HTTPException(
             status_code=402, 
-            detail=f"Insufficient credits for {analysis_type}. You need {chat_cost} credits but have {user_balance}."
+            detail=f"Insufficient credits for {analysis_type}. You need {effective_cost} credits but have {user_balance}."
         )
     """Ask astrological question with streaming response"""
     
@@ -383,26 +388,30 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     if context.get('transit_optimization', {}).get('source') == 'intent_router':
                         print(f"🚀 OPTIMIZATION SUCCESS: Eliminated second Gemini call using Intent Router")
                     
-                    # Deduct credits for successful response
+                    # Deduct credits for successful response (or mark free question used)
                     should_deduct = True
                     
                     if should_deduct:
-                        print(f"💰 DEDUCTING CREDITS: {chat_cost} credits for user {current_user.userid}")
-                        analysis_type = "Premium Deep Analysis" if request.premium_analysis else "Standard Chat"
-                        success = credit_service.spend_credits(
-                            current_user.userid, 
-                            chat_cost, 
-                            'chat_question', 
-                            f"{analysis_type}: {request.question[:50]}..."
-                        )
-                        
-                        if not success:
-                            print(f"❌ CREDIT DEDUCTION FAILED for user {current_user.userid}")
-                            response_text = "Credit deduction failed. Please try again."
+                        if using_free_question:
+                            credit_service.mark_free_chat_question_used(current_user.userid)
+                            print(f"🆓 FREE QUESTION USED for user {current_user.userid} (no credits deducted)")
                         else:
-                            print(f"✅ CREDITS DEDUCTED SUCCESSFULLY")
-                            new_balance = credit_service.get_user_credits(current_user.userid)
-                            print(f"   New balance: {new_balance} credits")
+                            print(f"💰 DEDUCTING CREDITS: {chat_cost} credits for user {current_user.userid}")
+                            analysis_type = "Premium Deep Analysis" if request.premium_analysis else "Standard Chat"
+                            success = credit_service.spend_credits(
+                                current_user.userid, 
+                                chat_cost, 
+                                'chat_question', 
+                                f"{analysis_type}: {request.question[:50]}..."
+                            )
+                            
+                            if not success:
+                                print(f"❌ CREDIT DEDUCTION FAILED for user {current_user.userid}")
+                                response_text = "Credit deduction failed. Please try again."
+                            else:
+                                print(f"✅ CREDITS DEDUCTED SUCCESSFULLY")
+                                new_balance = credit_service.get_user_credits(current_user.userid)
+                                print(f"   New balance: {new_balance} credits")
                     else:
                         print(f"⚠️ NOT DEDUCTING CREDITS due to second AI call failure")
                     

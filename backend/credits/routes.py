@@ -279,7 +279,8 @@ async def verify_google_play_purchase(
 @router.get("/balance")
 async def get_credit_balance(current_user: User = Depends(get_current_user)):
     balance = credit_service.get_user_credits(current_user.userid)
-    return {"credits": balance}
+    free_used = credit_service.get_free_chat_question_used(current_user.userid)
+    return {"credits": balance, "free_question_available": not free_used}
 
 @router.get("/history")
 async def get_credit_history(current_user: User = Depends(get_current_user)):
@@ -621,7 +622,18 @@ async def update_credit_settings(request: dict, current_user: User = Depends(get
         key = setting.get("key")
         value = setting.get("value")
         if key and value is not None:
-            success = credit_service.update_credit_setting(key, int(value))
+            discount = setting.get("discount")
+            if "discount" in setting:
+                if discount is not None and discount != "":
+                    try:
+                        d = int(discount)
+                        success = credit_service.update_credit_setting(key, int(value), discount=d)
+                    except (TypeError, ValueError):
+                        success = credit_service.update_credit_setting(key, int(value), discount=None)
+                else:
+                    success = credit_service.update_credit_setting(key, int(value), discount=None)  # clear discount
+            else:
+                success = credit_service.update_credit_setting(key, int(value))  # leave discount unchanged
             if success:
                 updated_count += 1
     
@@ -662,26 +674,59 @@ async def get_progeny_cost():
     cost = credit_service.get_credit_setting('progeny_analysis_cost')
     return {"cost": cost}
 
+def _get_pricing_with_originals():
+    """Returns effective pricing and original (for display when discount set). Backward compatible."""
+    keys_map = [
+        ("chat", "chat_question_cost"),
+        ("premium_chat", "premium_chat_cost"),
+        ("partnership", "partnership_analysis_cost"),
+        ("events", "event_timeline_cost"),
+        ("career", "career_analysis_cost"),
+        ("wealth", "wealth_analysis_cost"),
+        ("health", "health_analysis_cost"),
+        ("marriage", "marriage_analysis_cost"),
+        ("education", "education_analysis_cost"),
+        ("progeny", "progeny_analysis_cost"),
+        ("childbirth", "childbirth_planner_cost"),
+        ("trading", "trading_daily_cost"),
+        ("vehicle", "vehicle_purchase_cost"),
+        ("griha_pravesh", "griha_pravesh_cost"),
+        ("gold", "gold_purchase_cost"),
+        ("business", "business_opening_cost"),
+    ]
+    pricing = {}
+    pricing_original = {}
+    for short_key, setting_key in keys_map:
+        effective, original, discount = credit_service.get_credit_setting_and_original(setting_key)
+        pricing[short_key] = effective
+        if discount is not None and discount >= 0 and original != discount:
+            pricing_original[short_key] = original
+    return pricing, pricing_original
+
+
 @router.get("/settings/analysis-pricing")
 async def get_analysis_pricing():
-    """Same source as deduction: all analysis costs from credit_settings."""
-    return {
-        "pricing": {
-            "career": credit_service.get_credit_setting("career_analysis_cost"),
-            "wealth": credit_service.get_credit_setting("wealth_analysis_cost"),
-            "health": credit_service.get_credit_setting("health_analysis_cost"),
-            "marriage": credit_service.get_credit_setting("marriage_analysis_cost"),
-            "education": credit_service.get_credit_setting("education_analysis_cost"),
-            "progeny": credit_service.get_credit_setting("progeny_analysis_cost"),
-            "childbirth": credit_service.get_credit_setting("childbirth_planner_cost"),
-            "trading": credit_service.get_credit_setting("trading_daily_cost"),
-        }
-    }
+    """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough)."""
+    pricing, pricing_original = _get_pricing_with_originals()
+    result = {"pricing": pricing}
+    if pricing_original:
+        result["pricing_original"] = pricing_original
+    return result
 
 @router.get("/settings/premium-chat-cost")
 async def get_premium_chat_cost():
-    cost = credit_service.get_credit_setting('premium_chat_cost')
-    return {"cost": cost}
+    effective, original, discount = credit_service.get_credit_setting_and_original('premium_chat_cost')
+    try:
+        cost_int = int(effective)
+        original_int = int(original)
+    except (TypeError, ValueError):
+        cost_int = effective if isinstance(effective, int) else 3
+        original_int = original if isinstance(original, int) else None
+    result = {"cost": cost_int}
+    # Return original_cost when discount is set and original > cost so app can show strikethrough
+    if discount is not None and discount >= 0 and original_int is not None and original_int > cost_int:
+        result["original_cost"] = original_int
+    return result
 
 @router.get("/settings/partnership-cost")
 async def get_partnership_cost():
@@ -715,8 +760,11 @@ async def get_business_cost():
 
 @router.get("/settings/event-timeline-cost")
 async def get_event_timeline_cost():
-    cost = credit_service.get_credit_setting('event_timeline_cost')
-    return {"cost": cost}
+    effective, original, discount = credit_service.get_credit_setting_and_original('event_timeline_cost')
+    result = {"cost": effective}
+    if discount is not None and discount >= 0 and original != discount:
+        result["original_cost"] = original
+    return result
 
 @router.get("/settings/karma-cost")
 async def get_karma_cost():
