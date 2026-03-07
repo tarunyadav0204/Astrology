@@ -69,7 +69,7 @@ export default function MuhuratHubScreen({ navigation }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await pricingAPI.getAnalysisPricing();
+        const res = await pricingAPI.getPricing();
         const data = res?.data || res;
         if (!cancelled && data?.pricing) {
           setPricing(data.pricing);

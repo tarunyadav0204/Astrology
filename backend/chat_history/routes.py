@@ -348,7 +348,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     is_standard_chat = not partnership_mode and not premium_analysis
     free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
     using_free_question = is_standard_chat and free_available
-    effective_cost = 0 if using_free_question else chat_cost
+    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost)
 
     print(f"💳 CREDIT CHECK (chat-v2):")
     print(f"   User ID: {current_user.userid}")
@@ -610,10 +610,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     else:
         chart_insights = [x for x in chart_insights if isinstance(x, dict) and x.get("house_number") and x.get("message")]
     
-    # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save; using_free_question for first-question-free)
+    # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save; using_free_question for first-question-free; effective_cost for deduction)
     background_tasks.add_task(
         process_gemini_response,
-        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question
+        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost
     )
     
     print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
@@ -825,7 +825,7 @@ def get_original_user_message_id_for_faq(session_id: str, assistant_message_id: 
     row = cursor.fetchone()
     return row[0] if row else None
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None):
     """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
@@ -1335,15 +1335,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     print(f"🆓 FREE QUESTION USED for user {user_id} (no credits deducted)")
                     success = True
                 else:
+                    amount_to_deduct = effective_cost if effective_cost is not None else chat_cost
                     analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                     success = credit_service.spend_credits(
                         user_id,
-                        chat_cost,
+                        amount_to_deduct,
                         'chat_question',
                         f"{analysis_type}: {question[:50]}..."
                     )
                     if success:
-                        print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
+                        print(f"✅ CREDITS DEDUCTED: {amount_to_deduct} credits for user {user_id}")
 
                 if success:
                     

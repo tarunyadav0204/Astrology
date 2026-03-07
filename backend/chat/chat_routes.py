@@ -115,7 +115,7 @@ def _smart_chunk_response(response_text: str, max_size: int) -> List[str]:
 async def ask_question(request: ChatRequest, current_user: User = Depends(get_current_user)):
     """Ask astrological question with streaming response - requires credits"""
     
-    # Check credit cost and user balance
+    # Check credit cost and user balance (subscription tier discount applied via get_effective_cost)
     if request.partnership_mode:
         base_cost = credit_service.get_credit_setting('chat_question_cost')
         chat_cost = base_cost * 2  # Partnership mode costs double
@@ -128,7 +128,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     is_standard_chat = not request.partnership_mode and not request.premium_analysis
     free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
     using_free_question = is_standard_chat and free_available
-    effective_cost = 0 if using_free_question else chat_cost
+    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost)
     
     print(f"💳 CREDIT CHECK DEBUG:")
     print(f"   User ID: {current_user.userid}")
@@ -396,12 +396,12 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                             credit_service.mark_free_chat_question_used(current_user.userid)
                             print(f"🆓 FREE QUESTION USED for user {current_user.userid} (no credits deducted)")
                         else:
-                            print(f"💰 DEDUCTING CREDITS: {chat_cost} credits for user {current_user.userid}")
+                            print(f"💰 DEDUCTING CREDITS: {effective_cost} credits for user {current_user.userid}")
                             analysis_type = "Premium Deep Analysis" if request.premium_analysis else "Standard Chat"
                             success = credit_service.spend_credits(
-                                current_user.userid, 
-                                chat_cost, 
-                                'chat_question', 
+                                current_user.userid,
+                                effective_cost,
+                                'chat_question',
                                 f"{analysis_type}: {request.question[:50]}..."
                             )
                             
@@ -876,8 +876,9 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         # Initialize table if needed
         init_event_timeline_table()
         
-        # Check credit cost and user balance
-        event_timeline_cost = credit_service.get_credit_setting('event_timeline_cost')
+        # Check credit cost and user balance (subscription tier discount applied)
+        base_cost = credit_service.get_credit_setting('event_timeline_cost')
+        event_timeline_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
         user_balance = credit_service.get_user_credits(current_user.userid)
         
         if user_balance < event_timeline_cost:

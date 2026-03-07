@@ -354,6 +354,13 @@ export const creditAPI = {
       order_id: orderId,
     }),
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
+  getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
+  verifyGooglePlaySubscription: (purchaseToken, productId, orderId) =>
+    api.post(getEndpoint('/credits/google-play/subscription/verify'), {
+      purchase_token: purchaseToken,
+      product_id: productId,
+      order_id: orderId,
+    }),
 };
 
 export const panchangAPI = {
@@ -420,7 +427,25 @@ export const marriageAPI = {
 };
 
 export const pricingAPI = {
+  /** Base pricing (unauthenticated). */
   getAnalysisPricing: () => api.get(getEndpoint('/credits/settings/analysis-pricing')),
+  /** User's pricing with subscription discount (authenticated). Returns subscription_tier_name, subscription_discount_percent, pricing, pricing_original. */
+  getMyPricing: () => api.get(getEndpoint('/credits/settings/my-pricing')),
+  /**
+   * Best available pricing: when logged in uses my-pricing (discounted); otherwise analysis-pricing.
+   * Use this so VIP users see 30% off and correct costs.
+   */
+  async getPricing() {
+    try {
+      const r = await api.get(getEndpoint('/credits/settings/my-pricing'));
+      return r;
+    } catch (e) {
+      if (e.response?.status === 401 || !e.response) {
+        return api.get(getEndpoint('/credits/settings/analysis-pricing'));
+      }
+      throw e;
+    }
+  },
 };
 
 export const lifeEventsAPI = {

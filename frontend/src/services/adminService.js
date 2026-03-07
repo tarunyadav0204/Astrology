@@ -95,5 +95,20 @@ export const adminService = {
     }
 
     return response.json();
+  },
+
+  async updateSubscriptionPlan(planId, payload) {
+    const response = await fetch(getEndpoint(`/admin/subscription-plans/${planId}`), {
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update subscription plan');
+    }
+
+    return response.json();
   }
 };

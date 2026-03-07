@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { storage } from '../../services/storage';
+import { pricingAPI } from '../../services/api';
 
 const LuckGauge = ({ score, signal }) => {
   const getColor = () => {
@@ -119,17 +120,13 @@ export default function TradingDashboardScreen({ navigation }) {
 
   const fetchCosts = async () => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/credits/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const baseCost = data.trading_daily_cost || 5;
-        const multiplier = data.premium_chat_cost || 10;
-        setDailyCost(baseCost);
-        setPremiumCost(baseCost * multiplier);
-      }
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const pricing = data?.pricing || {};
+      const daily = pricing.trading != null ? Number(pricing.trading) : 5;
+      const premium = pricing.trading_premium != null ? Number(pricing.trading_premium) : daily * 10;
+      setDailyCost(daily);
+      setPremiumCost(premium);
     } catch (error) {
       // Keep default cost if fetch fails
     }

@@ -251,6 +251,103 @@ class CreditService:
         conn.close()
         return result[0] if result else 0
 
+    def get_subscription_discount_percent(self, userid: int) -> int:
+        """Return 0-100 discount percent for user's active subscription tier. 0 if no plan or column missing (backward compat)."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT COALESCE(sp.discount_percent, 0)
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
+                ORDER BY sp.discount_percent DESC
+                LIMIT 1
+            """, (userid,))
+            row = cursor.fetchone()
+        except sqlite3.OperationalError:
+            row = None
+        conn.close()
+        if not row:
+            return 0
+        return max(0, min(100, int(row[0]) if row[0] is not None else 0))
+
+    def get_subscription_tier_name(self, userid: int) -> Optional[str]:
+        """Return tier display name for user's active subscription, or None. Backward compat: returns None if tables/columns missing."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT sp.tier_name
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
+                ORDER BY sp.discount_percent DESC
+                LIMIT 1
+            """, (userid,))
+            row = cursor.fetchone()
+        except sqlite3.OperationalError:
+            row = None
+        conn.close()
+        return (row[0] if row and row[0] else None) or None
+
+    def get_plan_id_by_google_play_product_id(self, product_id: str, platform: str = "astroroshni") -> Optional[int]:
+        """Return plan_id for subscription_plans where google_play_product_id = product_id. None if not found."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT plan_id FROM subscription_plans WHERE google_play_product_id = ? AND platform = ? AND is_active = 1",
+                (product_id.strip(), platform),
+            )
+            row = cursor.fetchone()
+        except sqlite3.OperationalError:
+            row = None
+        conn.close()
+        return row[0] if row else None
+
+    def set_user_subscription(self, userid: int, plan_id: int, start_date: str, end_date: str) -> bool:
+        """Set user's subscription to plan_id (deactivate other plans on same platform, add new active row). Dates YYYY-MM-DD."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT platform FROM subscription_plans WHERE plan_id = ?", (plan_id,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return False
+            platform = row[0]
+            cursor.execute(
+                """
+                UPDATE user_subscriptions SET status = 'inactive'
+                WHERE userid = ? AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                """,
+                (userid, platform),
+            )
+            cursor.execute(
+                """
+                INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
+                VALUES (?, ?, ?, ?, 'active')
+                """,
+                (userid, plan_id, start_date, end_date),
+            )
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_effective_cost(self, userid: int, base_cost: int) -> int:
+        """Return discounted cost for user (subscription tier). base_cost is the credit_settings value; returns rounded int."""
+        if base_cost <= 0:
+            return base_cost
+        discount = self.get_subscription_discount_percent(userid)
+        if discount <= 0:
+            return base_cost
+        return max(1, round(base_cost * (100 - discount) / 100))
+
     def get_free_chat_question_used(self, userid: int) -> bool:
         """True if user has already used their one free standard chat question."""
         conn = sqlite3.connect(self.db_path)

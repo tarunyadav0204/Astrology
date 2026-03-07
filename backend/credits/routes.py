@@ -81,6 +81,17 @@ def _verify_google_play_purchase(package_name: str, product_id: str, purchase_to
     return request.execute()
 
 
+def _verify_google_play_subscription(package_name: str, subscription_id: str, purchase_token: str) -> dict:
+    """Verify subscription with Google Play Developer API. Returns subscription info (expiryTimeMillis, startTimeMillis, etc.) or raises."""
+    service = _get_play_service()
+    request = service.purchases().subscriptions().get(
+        packageName=package_name,
+        subscriptionId=subscription_id,
+        token=purchase_token,
+    )
+    return request.execute()
+
+
 def _credits_from_product_id(product_id: str) -> Optional[int]:
     """Parse product_id per convention credits_N -> N. Returns None if not a credit product."""
     m = CREDITS_PRODUCT_PATTERN.match((product_id or "").strip())
@@ -210,6 +221,11 @@ class GooglePlayVerifyRequest(BaseModel):
     order_id: str
 
 
+class GooglePlaySubscriptionVerifyRequest(BaseModel):
+    purchase_token: str
+    product_id: str  # subscription_vip_silver, subscription_vip_gold, subscription_vip_platinum (tier-based; price set in Play Console)
+
+
 @router.get("/google-play/products")
 async def get_google_play_products(current_user: User = Depends(get_current_user)):
     """List credit products from Google Play (active in-app products with id convention credits_N)."""
@@ -276,11 +292,101 @@ async def verify_google_play_purchase(
     return {"success": True, "message": "Credits added", "credits_added": amount}
 
 
+@router.post("/google-play/subscription/verify")
+async def verify_google_play_subscription(
+    request: GooglePlaySubscriptionVerifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Verify a Google Play subscription and set user's tier (VIP Silver/Gold/Platinum). Idempotent: re-calling extends/updates end_date. Product ID is tier-based (subscription_vip_silver etc.); price is set in Play Console."""
+    product_id = (request.product_id or "").strip()
+    plan_id = credit_service.get_plan_id_by_google_play_product_id(product_id)
+    if not plan_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown subscription product_id (must match google_play_product_id in subscription_plans): {product_id}",
+        )
+    if not (request.purchase_token or "").strip():
+        raise HTTPException(status_code=400, detail="purchase_token is required")
+    token = request.purchase_token.strip()
+    try:
+        purchase = _verify_google_play_subscription(PACKAGE_NAME, product_id, token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid or expired subscription: {str(e)}")
+    payment_state = purchase.get("paymentState")
+    if payment_state not in (0, 1):
+        raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
+    expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
+    start_ms = purchase.get("startTimeMillis") or expiry_ms
+    from datetime import datetime
+    start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
+    end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
+    success = credit_service.set_user_subscription(current_user.userid, plan_id, start_date, end_date)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update subscription")
+    tier_name = credit_service.get_subscription_tier_name(current_user.userid)
+    return {
+        "success": True,
+        "message": "Subscription active",
+        "subscription_tier_name": tier_name or product_id,
+        "end_date": end_date,
+    }
+
+
+@router.get("/google-play/subscription-plans")
+async def get_google_play_subscription_plans(current_user: User = Depends(get_current_user)):
+    """List VIP subscription plans available for in-app purchase (platform=astroroshni, with google_play_product_id). For mobile to show and purchase."""
+    conn = sqlite3.connect(credit_service.db_path)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT plan_id, tier_name, discount_percent, google_play_product_id, price
+            FROM subscription_plans
+            WHERE platform = 'astroroshni' AND is_active = 1 AND google_play_product_id IS NOT NULL AND google_play_product_id != ''
+            ORDER BY COALESCE(discount_percent, 0) ASC
+        """)
+        rows = cursor.fetchall()
+    except sqlite3.OperationalError:
+        cursor.execute("""
+            SELECT plan_id, plan_name, 0, NULL, price
+            FROM subscription_plans
+            WHERE platform = 'astroroshni' AND is_active = 1
+            ORDER BY plan_name
+        """)
+        rows = [(r[0], r[1], 0, None, r[4]) for r in cursor.fetchall()]
+    conn.close()
+    plans = []
+    for r in rows:
+        plan_id, name, discount, product_id, price = r[0], r[1], r[2] or 0, r[3], float(r[4]) if r[4] is not None else 0
+        if not product_id:
+            continue
+        plans.append({
+            "plan_id": plan_id,
+            "tier_name": name or f"Plan {plan_id}",
+            "discount_percent": discount,
+            "google_play_product_id": product_id,
+            "price": price,
+        })
+    return {"plans": plans}
+
+
 @router.get("/balance")
 async def get_credit_balance(current_user: User = Depends(get_current_user)):
     balance = credit_service.get_user_credits(current_user.userid)
     free_used = credit_service.get_free_chat_question_used(current_user.userid)
-    return {"credits": balance, "free_question_available": not free_used}
+    result = {"credits": balance, "free_question_available": not free_used}
+    # Optional: subscription tier for app to show "VIP Silver" etc. (backward compat: new keys)
+    try:
+        discount = credit_service.get_subscription_discount_percent(current_user.userid)
+        if discount > 0:
+            result["subscription_discount_percent"] = discount
+            tier = credit_service.get_subscription_tier_name(current_user.userid)
+            if tier:
+                result["subscription_tier_name"] = tier
+    except Exception:
+        pass
+    return result
 
 @router.get("/history")
 async def get_credit_history(current_user: User = Depends(get_current_user)):
@@ -302,6 +408,8 @@ async def redeem_promo_code(request: PromoCodeRequest, current_user: User = Depe
 
 @router.post("/spend")
 async def spend_credits(request: dict, current_user: User = Depends(get_current_user)):
+    """Deduct credits for a feature. Amount must match the user's effective cost (VIP discount applied).
+    App should send the same amount returned by GET /credits/settings/my-pricing for that feature."""
     amount = request.get("amount")
     feature = request.get("feature")
     description = request.get("description")
@@ -706,9 +814,75 @@ def _get_pricing_with_originals():
 
 @router.get("/settings/analysis-pricing")
 async def get_analysis_pricing():
-    """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough)."""
+    """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough). Unauthenticated; base/admin pricing."""
     pricing, pricing_original = _get_pricing_with_originals()
     result = {"pricing": pricing}
+    if pricing_original:
+        result["pricing_original"] = pricing_original
+    return result
+
+
+# Keys map for user-tier discounted pricing (same as _get_pricing_with_originals)
+_PRICING_KEYS_MAP = [
+    ("chat", "chat_question_cost"),
+    ("premium_chat", "premium_chat_cost"),
+    ("partnership", "partnership_analysis_cost"),
+    ("events", "event_timeline_cost"),
+    ("career", "career_analysis_cost"),
+    ("wealth", "wealth_analysis_cost"),
+    ("health", "health_analysis_cost"),
+    ("marriage", "marriage_analysis_cost"),
+    ("education", "education_analysis_cost"),
+    ("progeny", "progeny_analysis_cost"),
+    ("childbirth", "childbirth_planner_cost"),
+    ("trading", "trading_daily_cost"),
+    ("trading_monthly", "trading_monthly_cost"),
+    ("vehicle", "vehicle_purchase_cost"),
+    ("griha_pravesh", "griha_pravesh_cost"),
+    ("gold", "gold_purchase_cost"),
+    ("business", "business_opening_cost"),
+    ("karma", "karma_analysis_cost"),
+]
+
+
+@router.get("/settings/my-pricing")
+async def get_my_pricing(current_user: User = Depends(get_current_user)):
+    """Authenticated: returns pricing with subscription tier discount applied. For app to show user's actual cost. Backward compat: old app keeps using analysis-pricing."""
+    discount_percent = credit_service.get_subscription_discount_percent(current_user.userid)
+    tier_name = credit_service.get_subscription_tier_name(current_user.userid)
+    pricing = {}
+    pricing_original = {}
+    for short_key, setting_key in _PRICING_KEYS_MAP:
+        base = credit_service.get_credit_setting(setting_key)
+        effective = credit_service.get_effective_cost(current_user.userid, base)
+        pricing[short_key] = effective
+        if discount_percent and effective < base:
+            pricing_original[short_key] = base
+    # Computed: trading premium daily (daily_base * premium_multiplier, then discount)
+    try:
+        daily_base = credit_service.get_credit_setting('trading_daily_cost')
+        mult = credit_service.get_credit_setting('premium_chat_cost')
+        if daily_base is not None and mult is not None:
+            raw = int(daily_base) * int(mult)
+            pricing["trading_premium"] = credit_service.get_effective_cost(current_user.userid, raw)
+            if discount_percent and raw > 0:
+                pricing_original["trading_premium"] = raw
+    except (TypeError, ValueError):
+        pass
+    # Computed: trading premium monthly
+    try:
+        monthly_base = credit_service.get_credit_setting('trading_monthly_cost')
+        mult = credit_service.get_credit_setting('premium_chat_cost')
+        if monthly_base is not None and mult is not None:
+            raw = int(monthly_base) * int(mult)
+            pricing["trading_monthly_premium"] = credit_service.get_effective_cost(current_user.userid, raw)
+            if discount_percent and raw > 0:
+                pricing_original["trading_monthly_premium"] = raw
+    except (TypeError, ValueError):
+        pass
+    result = {"pricing": pricing, "subscription_discount_percent": discount_percent}
+    if tier_name:
+        result["subscription_tier_name"] = tier_name
     if pricing_original:
         result["pricing_original"] = pricing_original
     return result

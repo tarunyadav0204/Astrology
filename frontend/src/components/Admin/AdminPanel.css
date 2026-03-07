@@ -240,6 +240,10 @@
   box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
 }
 
+.setting-input-small {
+  width: 4.5rem;
+}
+
 .setting-row-inputs input::placeholder {
   color: #adb5bd;
 }
@@ -561,6 +565,76 @@ tr:hover {
 .edit-btn:hover,
 .delete-btn:hover {
   opacity: 0.8;
+}
+
+/* Subscription plan discounts: 4-column table and aligned buttons */
+.subscription-plan-table .subscription-plan-header {
+  grid-template-columns: 1fr 100px 100px 1fr;
+}
+
+.subscription-plan-table .subscription-plan-header .settings-th-actions {
+  text-align: center;
+}
+
+.subscription-plan-table .subscription-plan-row {
+  grid-template-columns: 1fr 100px 100px 1fr;
+}
+
+.subscription-plan-platform {
+  font-size: 14px;
+  color: #495057;
+}
+
+.subscription-plan-discount-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.subscription-plan-discount-cell input.setting-input-small {
+  width: 4.5rem;
+  padding: 6px 8px;
+  font-size: 14px;
+  min-height: 36px;
+}
+
+.plan-discount-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.subscription-plan-discounts .plan-discount-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.subscription-plan-discounts .plan-discount-actions .save-btn.plan-discount-btn,
+.subscription-plan-discounts .plan-discount-actions .cancel-btn.plan-discount-btn {
+  padding: 6px 12px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  min-height: unset !important;
+  height: auto !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+  min-width: unset !important;
+  width: auto !important;
+  appearance: none !important;
+  box-sizing: border-box !important;
+}
+
+.subscription-plan-discounts .plan-discount-actions .cancel-btn.plan-discount-btn {
+  background: #f44336 !important;
+  color: white !important;
+  border: none !important;
+}
+
+.subscription-plan-discounts .plan-discount-actions .cancel-btn.plan-discount-btn:hover {
+  background: #da190b !important;
 }
 
 /* Terms tab: search */

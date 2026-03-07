@@ -48,9 +48,10 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
         year_match = re.search(r'\b(20\d{2})\b', request.question)
         year = int(year_match.group(1)) if year_match else datetime.now().year
     
-    # Check credits
+    # Check credits (subscription tier discount applied)
     credit_service = CreditService()
-    chat_cost = credit_service.get_credit_setting('chat_question_cost')
+    base_cost = credit_service.get_credit_setting('chat_question_cost')
+    chat_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < chat_cost:

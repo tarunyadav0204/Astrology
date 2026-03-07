@@ -240,7 +240,7 @@ const loadHomeData = async (nativeData = null) => {
       
       // Load pricing from same API as deduction (credits/settings/analysis-pricing)
       try {
-        const pricingResponse = await pricingAPI.getAnalysisPricing();
+        const pricingResponse = await pricingAPI.getPricing();
         if (pricingResponse?.data?.pricing) {
           setPricing(pricingResponse.data.pricing);
           setPricingOriginal(pricingResponse.data.pricing_original || {});

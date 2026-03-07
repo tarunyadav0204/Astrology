@@ -162,6 +162,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not initialize additional databases: {e}")
     try:
+        from subscription_tier_migration import ensure_subscription_tier_schema
+        ensure_subscription_tier_schema()
+        print("Subscription tier schema ready")
+    except Exception as e:
+        print(f"Warning: Subscription tier migration skipped: {e}")
+    try:
         conn = nudge_db.get_conn()
         try:
             nudge_db.init_nudge_tables(conn)
@@ -3661,18 +3667,76 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
     
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT platform, plan_name FROM subscription_plans WHERE is_active = 1 ORDER BY platform, plan_name")
-    rows = cursor.fetchall()
+    try:
+        cursor.execute("""
+            SELECT plan_id, platform, plan_name, price, duration_months, features, is_active,
+                   tier_name, discount_percent, google_play_product_id
+            FROM subscription_plans
+            WHERE is_active = 1
+            ORDER BY platform, COALESCE(discount_percent, 0) DESC, plan_name
+        """)
+        rows = cursor.fetchall()
+    except sqlite3.OperationalError:
+        cursor.execute("SELECT plan_id, platform, plan_name, price, duration_months, features, is_active FROM subscription_plans WHERE is_active = 1 ORDER BY platform, plan_name")
+        rows = [(*r, None, None, None) for r in cursor.fetchall()]
     conn.close()
     
     plans = []
     for row in rows:
-        plans.append({
-            'platform': row[0],
-            'plan_name': row[1]
-        })
+        plan = {
+            'plan_id': row[0],
+            'platform': row[1],
+            'plan_name': row[2],
+            'price': float(row[3]) if row[3] is not None else 0,
+            'duration_months': row[4],
+            'features': row[5],
+            'is_active': row[6],
+        }
+        if len(row) > 7:
+            plan['tier_name'] = row[7]
+            plan['discount_percent'] = row[8] if row[8] is not None else 0
+            plan['google_play_product_id'] = row[9]
+        else:
+            plan['tier_name'] = plan.get('plan_name') or ''
+            plan['discount_percent'] = 0
+            plan['google_play_product_id'] = None
+        plans.append(plan)
     
     return {'plans': plans}
+
+
+@app.put("/api/admin/subscription-plans/{plan_id}")
+async def update_admin_subscription_plan(plan_id: int, body: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    discount_percent = body.get('discount_percent')
+    if discount_percent is not None:
+        discount_percent = int(discount_percent)
+        if discount_percent < 0 or discount_percent > 100:
+            raise HTTPException(status_code=400, detail="discount_percent must be 0-100")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_id = ?", (plan_id,))
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan not found")
+        if discount_percent is not None:
+            try:
+                cursor.execute(
+                    "UPDATE subscription_plans SET discount_percent = ? WHERE plan_id = ?",
+                    (discount_percent, plan_id),
+                )
+            except sqlite3.OperationalError:
+                conn.close()
+                raise HTTPException(status_code=400, detail="discount_percent column not available")
+        conn.commit()
+    finally:
+        conn.close()
+    
+    return {"message": "Subscription plan updated", "plan_id": plan_id}
 
 @app.post("/api/admin/fix-timezones")
 async def fix_database_timezones(current_user: User = Depends(get_current_user)):

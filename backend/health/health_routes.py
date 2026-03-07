@@ -38,8 +38,9 @@ credit_service = CreditService()
 async def analyze_health(request: HealthAnalysisRequest, current_user: User = Depends(get_current_user)):
     """Analyze health prospects with AI - requires credits"""
     
-    # Check credit cost and user balance
-    health_cost = credit_service.get_credit_setting('health_analysis_cost')
+    # Check credit cost and user balance (subscription tier discount applied)
+    base_cost = credit_service.get_credit_setting('health_analysis_cost')
+    health_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < health_cost:

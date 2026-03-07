@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ const CreditScreen = ({ navigation }) => {
   useAnalytics('CreditScreen');
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
-  const { credits, loading, redeemCode, fetchBalance } = useCredits();
+  const { credits, loading, redeemCode, fetchBalance, subscriptionTierName, subscriptionDiscountPercent } = useCredits();
   const [promoCode, setPromoCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [history, setHistory] = useState([]);
@@ -48,6 +48,9 @@ const CreditScreen = ({ navigation }) => {
   const [iapReady, setIapReady] = useState(false);
   const [googlePlayProducts, setGooglePlayProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+  const [subscriptionPlansLoading, setSubscriptionPlansLoading] = useState(false);
+  const [purchasingSubscriptionId, setPurchasingSubscriptionId] = useState(null);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -88,6 +91,35 @@ const CreditScreen = ({ navigation }) => {
   };
 
   const closePurchaseModal = () => setPurchaseModal((prev) => ({ ...prev, visible: false }));
+
+  /** Call this after a successful Google Play subscription purchase. */
+  const handleGooglePlaySubscriptionSuccess = async (purchaseToken, productId, orderId) => {
+    if (!purchaseToken || !productId || !orderId) return;
+    setPurchasingSubscriptionId(productId);
+    try {
+      const { data } = await creditAPI.verifyGooglePlaySubscription(purchaseToken, productId, orderId);
+      await fetchBalance();
+      const tierName = data?.tier_name || 'VIP';
+      setPurchaseModal({
+        visible: true,
+        type: 'success',
+        title: 'Subscribed!',
+        message: `You're now on ${tierName}. You'll get a discount on all credit purchases.`,
+        creditsAdded: 0,
+      });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Failed to activate subscription';
+      setPurchaseModal({
+        visible: true,
+        type: 'error',
+        title: 'Subscription verification failed',
+        message: msg,
+        creditsAdded: 0,
+      });
+    } finally {
+      setPurchasingSubscriptionId(null);
+    }
+  };
 
   useEffect(() => {
     fetchHistory();
@@ -150,17 +182,43 @@ const CreditScreen = ({ navigation }) => {
     fetchProducts();
   }, []);
 
-  // Google Play IAP: init connection and purchase listener (Android only)
-  const productIds = googlePlayProducts.map((p) => p.product_id);
+  // Fetch subscription plans (Android only)
   useEffect(() => {
-    if (Platform.OS !== 'android' || !RNIap || productIds.length === 0) return;
+    if (Platform.OS !== 'android') return;
+    let mounted = true;
+    const fetchPlans = async () => {
+      setSubscriptionPlansLoading(true);
+      try {
+        const { data } = await creditAPI.getSubscriptionPlans();
+        if (mounted && Array.isArray(data?.plans)) setSubscriptionPlans(data.plans);
+      } catch (e) {
+        if (mounted) setSubscriptionPlans([]);
+        console.warn('Failed to load subscription plans:', e?.message);
+      } finally {
+        if (mounted) setSubscriptionPlansLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
+
+  const productIds = googlePlayProducts.map((p) => p.product_id);
+  const subscriptionProductIds = useMemo(
+    () => subscriptionPlans.map((p) => p.google_play_product_id).filter(Boolean),
+    [subscriptionPlans]
+  );
+  const hasAnyIapProducts = productIds.length > 0 || subscriptionProductIds.length > 0;
+
+  // Google Play IAP: init connection and purchase listener (Android only)
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !RNIap || !hasAnyIapProducts) return;
     let mounted = true;
     const initIap = async () => {
       try {
         await RNIap.initConnection();
         if (!mounted) return;
         await RNIap.flushFailedPurchasesCachedAsPendingAndroid?.();
-        await RNIap.getProducts({ skus: productIds });
+        if (productIds.length > 0) await RNIap.getProducts({ skus: productIds });
+        if (subscriptionProductIds.length > 0) await RNIap.getSubscriptions({ skus: subscriptionProductIds });
         if (!mounted) return;
         setIapReady(true);
       } catch (e) {
@@ -174,7 +232,12 @@ const CreditScreen = ({ navigation }) => {
         const token = purchase.purchaseToken ?? purchase.purchaseTokenAndroid;
         const productId = purchase.productId ?? purchase.productIds?.[0];
         const orderId = purchase.transactionId ?? purchase.transactionIdAndroid ?? purchase.purchaseToken;
-        if (token && productId && orderId) {
+        if (!token || !productId || !orderId) return;
+        const isSubscription = subscriptionProductIds.includes(productId);
+        if (isSubscription) {
+          await handleGooglePlaySubscriptionSuccess(token, productId, orderId);
+          await RNIap.finishTransaction({ purchase, isConsumable: false });
+        } else {
           await handleGooglePlayPurchaseSuccess(token, productId, orderId);
           await RNIap.finishTransaction({ purchase, isConsumable: true });
         }
@@ -184,6 +247,7 @@ const CreditScreen = ({ navigation }) => {
     });
     const errorSub = RNIap.purchaseErrorListener?.((error) => {
       setPurchasingProductId(null);
+      setPurchasingSubscriptionId(null);
       if (error?.code !== 'E_USER_CANCELLED') {
         console.warn('Purchase error:', error?.message);
       }
@@ -199,7 +263,7 @@ const CreditScreen = ({ navigation }) => {
         console.warn('IAP cleanup:', e?.message);
       }
     };
-  }, [productIds.join(',')]);
+  }, [productIds.join(','), subscriptionProductIds.join(',')]);
 
   const fetchHistory = async () => {
     try {
@@ -286,6 +350,29 @@ const CreditScreen = ({ navigation }) => {
         Alert.alert('Purchase failed', e?.message ?? 'Could not start purchase. Try again.');
       }
       setPurchasingProductId(null);
+    }
+  };
+
+  const handleSubscribePress = async (plan) => {
+    if (Platform.OS !== 'android') return;
+    if (!RNIap) {
+      Alert.alert('Not available', 'In-app purchase is not available on this device.');
+      return;
+    }
+    if (!iapReady) {
+      Alert.alert('Loading…', 'Store is loading. Please try again in a moment.');
+      return;
+    }
+    const productId = plan.google_play_product_id;
+    if (!productId) return;
+    setPurchasingSubscriptionId(productId);
+    try {
+      await RNIap.requestSubscription({ sku: productId });
+    } catch (e) {
+      if (e?.code !== 'E_USER_CANCELLED') {
+        Alert.alert('Subscription failed', e?.message ?? 'Could not start subscription. Try again.');
+      }
+      setPurchasingSubscriptionId(null);
     }
   };
 
@@ -417,6 +504,53 @@ const CreditScreen = ({ navigation }) => {
                 </View>
               </LinearGradient>
             </Animated.View>
+
+            {/* VIP subscription tier — where user sees their discount */}
+            {subscriptionTierName && subscriptionDiscountPercent > 0 && (
+              <View style={[styles.vipBadge, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(255,193,7,0.2)', borderColor: isDark ? 'rgba(255,215,0,0.4)' : 'rgba(255,193,7,0.5)' }]}>
+                <Ionicons name="shield-checkmark" size={20} color={colors.primary} style={styles.vipBadgeIcon} />
+                <Text style={[styles.vipBadgeText, { color: colors.text }]}>
+                  {subscriptionTierName} — {subscriptionDiscountPercent}% off on all features
+                </Text>
+              </View>
+            )}
+
+            {/* VIP subscription plans — subscribe for discount (Android only) */}
+            {Platform.OS === 'android' && (
+              <View style={styles.buySection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>VIP Plans</Text>
+                {subscriptionPlansLoading ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading plans…</Text>
+                ) : subscriptionPlans.length === 0 ? null : (
+                  <View style={styles.buyProductGrid}>
+                    {subscriptionPlans.map((plan) => {
+                      const productId = plan.google_play_product_id;
+                      const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
+                      const isPurchasing = purchasingSubscriptionId === productId;
+                      return (
+                        <TouchableOpacity
+                          key={plan.plan_id ?? productId}
+                          style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
+                          onPress={() => handleSubscribePress(plan)}
+                          disabled={isCurrentPlan || isPurchasing}
+                        >
+                          <Text style={[styles.buyProductLabel, { color: colors.text }]}>{plan.tier_name || 'VIP'}</Text>
+                          <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{plan.discount_percent ?? 0}% off</Text>
+                          {plan.price != null && plan.price !== '' && (
+                            <Text style={[styles.buyProductCredits, { color: colors.textSecondary, fontSize: 14 }]}>{plan.price}</Text>
+                          )}
+                          <View style={[styles.buyProductButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
+                            <Text style={styles.buyProductButtonText}>
+                              {isCurrentPlan ? 'Current plan' : isPurchasing ? 'Processing…' : 'Subscribe'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
             {Platform.OS === 'android' && (
@@ -675,6 +809,24 @@ const styles = StyleSheet.create({
   balanceCreditsText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  vipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  vipBadgeIcon: {
+    marginRight: 10,
+  },
+  vipBadgeText: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
   },
   balanceDecoration: {
     position: 'absolute',

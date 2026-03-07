@@ -86,8 +86,9 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
     else:
         print(f"🔄 [DEBUG] Progeny API: Force regenerate requested - bypassing cache")
 
-    # 2. Check Credits
-    analysis_cost = credit_service.get_credit_setting('progeny_analysis_cost') or 15
+    # 2. Check Credits (subscription tier discount applied)
+    base_cost = credit_service.get_credit_setting('progeny_analysis_cost') or 15
+    analysis_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < analysis_cost:

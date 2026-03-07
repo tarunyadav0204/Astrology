@@ -139,7 +139,8 @@ async def analyze_karma(request: KarmaAnalysisRequest, background_tasks: Backgro
     print(f"{'='*80}\n")
     
     try:
-        karma_cost = credit_service.get_credit_setting('karma_analysis_cost') or 25
+        base_cost = credit_service.get_credit_setting('karma_analysis_cost') or 25
+        karma_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
         user_balance = credit_service.get_user_credits(current_user.userid)
         
         print(f"💳 Credits check: User has {user_balance}, needs {karma_cost}")

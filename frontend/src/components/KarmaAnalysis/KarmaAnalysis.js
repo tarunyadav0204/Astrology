@@ -41,9 +41,19 @@ const KarmaAnalysis = () => {
   const loadInitialData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const costResponse = await axios.get('/api/credits/settings/karma-cost', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      if (token) {
+        try {
+          const res = await axios.get('/api/credits/settings/my-pricing', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const cost = res.data?.pricing?.karma;
+          if (cost != null) {
+            setKarmaCost(Number(cost) || 25);
+            return;
+          }
+        } catch (_) {}
+      }
+      const costResponse = await axios.get('/api/credits/settings/karma-cost');
       setKarmaCost(costResponse.data.cost || 25);
     } catch (err) {
       console.error('Error loading initial data:', err);

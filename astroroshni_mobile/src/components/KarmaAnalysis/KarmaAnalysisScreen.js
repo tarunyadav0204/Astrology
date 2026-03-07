@@ -20,6 +20,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
+import { pricingAPI } from '../../services/api';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent } from '../../utils/analytics';
 
@@ -69,16 +70,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   const fetchKarmaCost = async () => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/karma-cost')}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setKarmaCost(data.cost || 25);
-      }
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const cost = data?.pricing?.karma != null ? Number(data.pricing.karma) : 25;
+      setKarmaCost(cost);
     } catch (err) {
       console.error('Error fetching karma cost:', err);
     }

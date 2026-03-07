@@ -83,7 +83,7 @@ export default function AnalysisHubScreen({ navigation }) {
   
   const fetchPricing = async () => {
     try {
-      const response = await pricingAPI.getAnalysisPricing();
+      const response = await pricingAPI.getPricing();
       if (response.data && response.data.pricing) {
         setPricing(response.data.pricing);
         setPricingOriginal(response.data.pricing_original || {});

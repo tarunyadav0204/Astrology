@@ -9,6 +9,7 @@ import { storage } from '../services/storage';
 import { API_BASE_URL, getEndpoint, COLORS } from '../utils/constants';
 import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
+import { pricingAPI } from '../services/api';
 
 export default function UniversalMuhuratScreen({ route, navigation }) {
   const { config } = route.params; 
@@ -67,35 +68,26 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
 
   const loadCreditInfo = async () => {
     try {
-      const token = await storage.getAuthToken();
-      
-      const costEndpointMap = {
-        'childbirth-planner': '/credits/settings/childbirth-cost',
-        'childbirth': '/credits/settings/childbirth-cost',
-        'vehicle-purchase': '/credits/settings/vehicle-cost',
-        'griha-pravesh': '/credits/settings/griha-pravesh-cost',
-        'gold-purchase': '/credits/settings/gold-cost',
-        'business-opening': '/credits/settings/business-cost'
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const pricing = data?.pricing || {};
+      const configToKey = {
+        'childbirth-planner': 'childbirth',
+        'childbirth': 'childbirth',
+        'vehicle-purchase': 'vehicle',
+        'griha-pravesh': 'griha_pravesh',
+        'gold-purchase': 'gold',
+        'business-opening': 'business'
       };
-      
       const featureName = config.endpoint ? config.endpoint.split('/').pop() : config.id;
-      const costEndpoint = costEndpointMap[featureName] || costEndpointMap[config.id];
-      
-      if (costEndpoint) {
-        const response = await fetch(`${API_BASE_URL}${getEndpoint(costEndpoint)}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const costData = await response.json();
-        const cost = costData.cost || 0;
-        
-        setCreditInfo(prev => ({
-          ...prev,
-          cost: cost,
-          current_credits: credits,
-          can_afford: credits >= cost
-        }));
-      }
+      const pricingKey = configToKey[featureName] || configToKey[config.id];
+      const cost = pricingKey != null && pricing[pricingKey] != null ? Number(pricing[pricingKey]) : 0;
+      setCreditInfo(prev => ({
+        ...prev,
+        cost,
+        current_credits: credits,
+        can_afford: credits >= cost
+      }));
     } catch(e) {
       console.error('Failed to load credit info:', e);
     }

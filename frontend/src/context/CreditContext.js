@@ -19,6 +19,7 @@ export const CreditProvider = ({ children }) => {
     const [marriageCost, setMarriageCost] = useState(3);
     const [healthCost, setHealthCost] = useState(3);
     const [educationCost, setEducationCost] = useState(3);
+    const [careerCost, setCareerCost] = useState(12);
     const [loading, setLoading] = useState(true);
 
     const fetchBalance = async () => {
@@ -60,73 +61,34 @@ export const CreditProvider = ({ children }) => {
 
     const fetchCosts = async () => {
         try {
-            const response = await fetch('/api/credits/settings/chat-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setChatCost(data.cost || 1);
+            const token = localStorage.getItem('token');
+            let pricing = {};
+            if (token) {
+                const response = await fetch('/api/credits/settings/my-pricing', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    pricing = data.pricing || {};
+                }
             }
-        } catch (error) {
-            console.error('Error fetching chat cost:', error);
-        }
-        
-        try {
-            const response = await fetch('/api/credits/settings/wealth-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setWealthCost(data.cost || 5);
+            if (Object.keys(pricing).length === 0) {
+                const response = await fetch('/api/credits/settings/analysis-pricing');
+                if (response.ok) {
+                    const data = await response.json();
+                    pricing = data.pricing || {};
+                }
             }
+            if (pricing.chat != null) setChatCost(Number(pricing.chat) || 1);
+            if (pricing.premium_chat != null) setPremiumChatCost(Number(pricing.premium_chat) || 10);
+            if (pricing.partnership != null) setPartnershipCost(Number(pricing.partnership) || 2);
+            if (pricing.wealth != null) setWealthCost(Number(pricing.wealth) || 5);
+            if (pricing.marriage != null) setMarriageCost(Number(pricing.marriage) || 3);
+            if (pricing.health != null) setHealthCost(Number(pricing.health) || 3);
+            if (pricing.education != null) setEducationCost(Number(pricing.education) || 3);
+            if (pricing.career != null) setCareerCost(Number(pricing.career) || 12);
         } catch (error) {
-            console.error('Error fetching wealth cost:', error);
-        }
-        
-        try {
-            const response = await fetch('/api/credits/settings/marriage-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setMarriageCost(data.cost || 3);
-            }
-        } catch (error) {
-            console.error('Error fetching marriage cost:', error);
-        }
-        
-        try {
-            const response = await fetch('/api/credits/settings/health-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setHealthCost(data.cost || 3);
-            }
-        } catch (error) {
-            console.error('Error fetching health cost:', error);
-        }
-        
-        try {
-            const response = await fetch('/api/credits/settings/education-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setEducationCost(data.cost || 3);
-            }
-        } catch (error) {
-            console.error('Error fetching education cost:', error);
-        }
-        
-        try {
-            const response = await fetch('/api/credits/settings/premium-chat-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setPremiumChatCost(data.cost || 10);
-            }
-        } catch (error) {
-            console.error('Error fetching premium chat cost:', error);
-        }
-        
-        try {
-            const response = await fetch('/api/credits/settings/partnership-cost');
-            if (response.ok) {
-                const data = await response.json();
-                setPartnershipCost(data.cost || 2);
-            }
-        } catch (error) {
-            console.error('Error fetching partnership cost:', error);
+            console.error('Error fetching pricing:', error);
         }
     };
 
@@ -171,13 +133,15 @@ export const CreditProvider = ({ children }) => {
     useEffect(() => {
         const handleCreditUpdate = () => {
             fetchBalance();
+            fetchCosts();
         };
         
         const handleFocus = () => {
-            // Refresh balance when user returns to tab
+            // Refresh balance and pricing when user returns to tab
             const token = localStorage.getItem('token');
             if (token) {
                 fetchBalance();
+                fetchCosts();
             }
         };
         
@@ -200,6 +164,7 @@ export const CreditProvider = ({ children }) => {
             marriageCost,
             healthCost,
             educationCost,
+            careerCost,
             loading,
             fetchBalance,
             refreshBalance,

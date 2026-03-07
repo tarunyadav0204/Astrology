@@ -242,8 +242,9 @@ async def get_overall_wealth_assessment(request: BirthDetailsRequest, current_us
 async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
     """Enhanced wealth insights using chat context builder with 9 key questions - requires credits"""
     
-    # Check credit cost and user balance
-    wealth_cost = credit_service.get_credit_setting('wealth_analysis_cost')
+    # Check credit cost and user balance (subscription tier discount applied)
+    base_cost = credit_service.get_credit_setting('wealth_analysis_cost')
+    wealth_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     print(f"💳 WEALTH CREDIT CHECK:")

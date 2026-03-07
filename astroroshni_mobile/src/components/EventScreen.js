@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { chatAPI, creditAPI } from '../services/api';
+import { chatAPI, creditAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
@@ -126,16 +126,17 @@ export default function EventScreen({ route }) {
     loadBirthData();
   }, []);
 
-  // Fetch credit cost on component mount
+  // Fetch credit cost (user-discounted via my-pricing when logged in)
   useEffect(() => {
     const fetchCreditCost = async () => {
       try {
-        // console.log('💰 Fetching credit cost from:', API_BASE_URL + '/api/credits/settings/event-timeline-cost');
-        const response = await creditAPI.getEventTimelineCost();
-        console.log('✅ Credit cost response:', response.data);
-        if (response.data.cost) {
-          setCreditCost(response.data.cost);
-          setCreditCostOriginal(response.data.original_cost ?? null);
+        const response = await pricingAPI.getPricing();
+        const data = response?.data || response;
+        const cost = data?.pricing?.events;
+        const original = data?.pricing_original?.events;
+        if (cost != null) {
+          setCreditCost(Number(cost));
+          setCreditCostOriginal(original != null ? Number(original) : null);
         }
       } catch (error) {
         console.error('❌ Error fetching credit cost:', {

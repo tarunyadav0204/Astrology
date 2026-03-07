@@ -9,6 +9,7 @@ import { storage } from '../services/storage';
 import { API_BASE_URL, getEndpoint, COLORS } from '../utils/constants';
 import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
+import { pricingAPI } from '../services/api';
 
 
 export default function ChildbirthPlannerScreen({ navigation }) {
@@ -82,15 +83,13 @@ export default function ChildbirthPlannerScreen({ navigation }) {
 
   const loadCreditInfo = async () => {
     try {
-      const token = await storage.getAuthToken();
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/childbirth-cost')}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const cost = data?.pricing?.childbirth != null ? Number(data.pricing.childbirth) : 0;
       setCreditInfo({
-        cost: data.cost || 0,
+        cost,
         current_credits: credits,
-        can_afford: credits >= (data.cost || 0)
+        can_afford: credits >= cost
       });
     } catch(e) {
       console.error('Failed to load credit info:', e);

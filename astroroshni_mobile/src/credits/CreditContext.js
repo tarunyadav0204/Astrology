@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { creditAPI } from './creditService';
+import { pricingAPI } from '../services/api';
 
 const CreditContext = createContext();
 
@@ -9,6 +10,8 @@ export const CreditProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [partnershipCost, setPartnershipCost] = useState(2);
   const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
+  const [subscriptionTierName, setSubscriptionTierName] = useState(null);
+  const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
 
   const fetchBalance = useCallback(async () => {
     try {
@@ -17,6 +20,8 @@ export const CreditProvider = ({ children }) => {
       if (!token) {
         setCredits(0);
         setFreeQuestionAvailable(false);
+        setSubscriptionTierName(null);
+        setSubscriptionDiscountPercent(0);
         return;
       }
       
@@ -26,6 +31,8 @@ export const CreditProvider = ({ children }) => {
       const balance = data?.credits ?? data?.balance ?? 0;
       setCredits(Number(balance) || 0);
       setFreeQuestionAvailable(Boolean(data?.free_question_available));
+      setSubscriptionTierName(data?.subscription_tier_name ?? null);
+      setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
     } catch (error) {
       console.error('❌ Error fetching credits:', {
         message: error.message,
@@ -39,6 +46,8 @@ export const CreditProvider = ({ children }) => {
       });
       if (error.response?.status === 401) {
         setCredits(0);
+        setSubscriptionTierName(null);
+        setSubscriptionDiscountPercent(0);
       }
     } finally {
       setLoading(false);
@@ -87,12 +96,10 @@ export const CreditProvider = ({ children }) => {
 
   const fetchPartnershipCost = async () => {
     try {
-      const { API_BASE_URL, getEndpoint } = require('../utils/constants');
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/partnership-cost')}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPartnershipCost(data.cost || 2);
-      }
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const cost = data?.pricing?.partnership != null ? Number(data.pricing.partnership) : 2;
+      setPartnershipCost(cost);
     } catch (error) {
       console.error('Error fetching partnership cost:', error);
     }
@@ -109,6 +116,8 @@ export const CreditProvider = ({ children }) => {
       loading,
       partnershipCost,
       freeQuestionAvailable,
+      subscriptionTierName,
+      subscriptionDiscountPercent,
       fetchBalance,
       redeemCode,
       spendCredits,

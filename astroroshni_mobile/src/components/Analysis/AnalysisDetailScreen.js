@@ -60,23 +60,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     return () => backHandler.remove();
   }, []);
 
+  // Use cost from route params (already user-discounted from AnalysisHubScreen getPricing()). Do not overwrite with base cost from /settings/*-cost endpoints.
   useEffect(() => {
-    const costPath = {
-      career: '/credits/settings/career-cost',
-      wealth: '/credits/settings/wealth-cost',
-      health: '/credits/settings/health-cost',
-      marriage: '/credits/settings/marriage-cost',
-      education: '/credits/settings/education-cost',
-      progeny: '/credits/settings/progeny-cost',
-    }[analysisType];
-    if (!costPath) return;
-    let cancelled = false;
-    fetch(`${API_BASE_URL}${getEndpoint(costPath)}`)
-      .then((res) => res.json())
-      .then((data) => { if (!cancelled && data?.cost != null) setCost(Number(data.cost)); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [analysisType]);
+    if (costFromParams != null && costFromParams !== undefined) {
+      setCost(costFromParams);
+    }
+  }, [costFromParams]);
 
   useEffect(() => {
     if (birthData) {

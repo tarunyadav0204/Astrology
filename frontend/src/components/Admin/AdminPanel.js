@@ -41,6 +41,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [pendingSubscription, setPendingSubscription] = useState(null);
+  const [editingPlanId, setEditingPlanId] = useState(null);
+  const [editingPlanDiscount, setEditingPlanDiscount] = useState('');
+  const [savingPlanDiscount, setSavingPlanDiscount] = useState(false);
   const [promoCodes, setPromoCodes] = useState([]);
   const [creditStats, setCreditStats] = useState({});
   const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1, max_uses_per_user: 1 });
@@ -168,6 +171,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         fetchPromoCodes();
         fetchCreditStats();
         fetchCreditSettings();
+        fetchSubscriptionPlans();
       } else if (activeSubTab === 'requests') {
         fetchCreditRequests();
       }
@@ -416,6 +420,26 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const handleCancelSubscription = () => {
     setEditingSubscription(null);
     setPendingSubscription(null);
+  };
+
+  const handleSavePlanDiscount = async (planId) => {
+    const value = parseInt(editingPlanDiscount, 10);
+    if (isNaN(value) || value < 0 || value > 100) {
+      alert('Discount must be 0–100');
+      return;
+    }
+    setSavingPlanDiscount(true);
+    try {
+      await adminService.updateSubscriptionPlan(planId, { discount_percent: value });
+      setEditingPlanId(null);
+      setEditingPlanDiscount('');
+      fetchSubscriptionPlans();
+    } catch (error) {
+      console.error('Error updating plan discount:', error);
+      alert(error.message || 'Failed to update discount');
+    } finally {
+      setSavingPlanDiscount(false);
+    }
   };
 
   const handleDeleteChart = async (chartId) => {
@@ -1268,6 +1292,82 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <button onClick={handleUpdateSettings} className="update-settings-btn">
                   Update Costs
                 </button>
+              </div>
+            </div>
+
+            <div className="subscription-plan-discounts credit-settings">
+              <h3>Subscription plan discounts</h3>
+              <p className="credit-settings-hint">Discount % applied to all feature costs for users on that plan. 0 = full price.</p>
+              <div className="settings-form settings-form-table subscription-plan-table">
+                <div className="settings-table-header subscription-plan-header">
+                  <span className="settings-th-feature">Plan</span>
+                  <span className="settings-th-platform">Platform</span>
+                  <span className="settings-th-discount">Discount %</span>
+                  <span className="settings-th-actions">Actions</span>
+                </div>
+                {(subscriptionPlans || []).map((plan, index) => {
+                  const planId = plan.plan_id ?? plan.id;
+                  const rowKey = planId != null ? String(planId) : `plan-${plan.platform}-${plan.tier_name || plan.plan_name || index}-${index}`;
+                  const isEditingThis = editingPlanId != null && (planId != null ? editingPlanId == planId : editingPlanId === rowKey);
+                  return (
+                    <div key={rowKey} className="setting-row subscription-plan-row">
+                      <label className="setting-row-label" title={plan.google_play_product_id || ''}>
+                        {plan.tier_name || plan.plan_name}
+                      </label>
+                      <span className="subscription-plan-platform">{plan.platform}</span>
+                      <div className="subscription-plan-discount-cell">
+                        {isEditingThis ? (
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={editingPlanDiscount}
+                            onChange={(e) => setEditingPlanDiscount(e.target.value)}
+                            className="setting-input-small"
+                            aria-label={`Discount for ${plan.tier_name || plan.plan_name}`}
+                          />
+                        ) : (
+                          <span>{plan.discount_percent ?? 0}%</span>
+                        )}
+                      </div>
+                      <div className="plan-discount-actions">
+                        {isEditingThis ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleSavePlanDiscount(planId != null ? planId : rowKey)}
+                              className="save-btn plan-discount-btn"
+                              disabled={savingPlanDiscount}
+                            >
+                              {savingPlanDiscount ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setEditingPlanId(null); setEditingPlanDiscount(''); }}
+                              className="cancel-btn plan-discount-btn"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPlanId(planId ?? rowKey);
+                              setEditingPlanDiscount(String(plan.discount_percent ?? 0));
+                            }}
+                            className="edit-btn plan-discount-btn"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!subscriptionPlans || subscriptionPlans.length === 0) && (
+                  <p className="credit-settings-hint">No subscription plans found. Run backend migration to seed VIP plans.</p>
+                )}
               </div>
             </div>
 

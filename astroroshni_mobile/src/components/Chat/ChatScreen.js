@@ -527,31 +527,20 @@ export default function ChatScreen({ navigation, route }) {
 
   const fetchChatCost = async () => {
     try {
-      // Standard chat + optional originals from analysis-pricing
-      let chatVal = 1;
-      let chatOriginal = null;
-      let premiumOriginal = null;
-      try {
-        const res = await pricingAPI.getAnalysisPricing();
-        const data = res?.data || res;
-        const pricing = data?.pricing || {};
-        const orig = data?.pricing_original || {};
-        if (pricing.chat != null) chatVal = Number(pricing.chat) || 1;
-        if (orig.chat != null) chatOriginal = Number(orig.chat);
-        if (orig.premium_chat != null) premiumOriginal = Number(orig.premium_chat);
-      } catch (_) {}
+      const res = await pricingAPI.getPricing();
+      const data = res?.data || res;
+      const pricing = data?.pricing || {};
+      const orig = data?.pricing_original || {};
+      // Standard chat (user-discounted when VIP)
+      const chatVal = pricing.chat != null ? Number(pricing.chat) || 1 : 1;
+      const chatOriginal = orig.chat != null ? Number(orig.chat) : null;
       setChatCost(chatVal);
       setChatCostOriginal(Number.isNaN(chatOriginal) ? null : chatOriginal);
-
-      // Premium: always from dedicated endpoint (same source as deduction); use original_cost for strikethrough
-      const premiumResponse = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/premium-chat-cost')}`);
-      const premiumData = await premiumResponse.json();
-      const premiumVal = Number(premiumData.cost);
+      // Premium chat (user-discounted when VIP; same source as standard)
+      const premiumVal = pricing.premium_chat != null ? Number(pricing.premium_chat) : 3;
+      const premiumOriginal = orig.premium_chat != null ? Number(orig.premium_chat) : null;
       setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
-      // Support both snake_case (original_cost) and camelCase (originalCost)
-      const rawOriginal = premiumData.original_cost ?? premiumData.originalCost;
-      const premiumOrig = rawOriginal != null && rawOriginal !== '' ? Number(rawOriginal) : premiumOriginal;
-      setPremiumChatCostOriginal(Number.isNaN(premiumOrig) ? null : premiumOrig);
+      setPremiumChatCostOriginal(Number.isNaN(premiumOriginal) ? null : premiumOriginal);
     } catch (error) {
       console.error('Error fetching chat cost:', error);
     }

@@ -41,9 +41,10 @@ async def get_daily_forecast(request: TradingRequest, current_user: User = Depen
     if request.premium_analysis:
         base_cost = credit_service.get_credit_setting('trading_daily_cost')
         multiplier = credit_service.get_credit_setting('premium_chat_cost')
-        cost = base_cost * multiplier
+        raw_cost = base_cost * multiplier
     else:
-        cost = credit_service.get_credit_setting('trading_daily_cost')
+        raw_cost = credit_service.get_credit_setting('trading_daily_cost')
+    cost = credit_service.get_effective_cost(current_user.userid, raw_cost)
     
     # Check cache first
     import sqlite3
@@ -225,9 +226,10 @@ async def get_monthly_calendar(request: TradingRequest, year: int, month: int, c
     if request.premium_analysis:
         base_cost = credit_service.get_credit_setting('trading_monthly_cost')
         multiplier = credit_service.get_credit_setting('premium_chat_cost')
-        cost = base_cost * multiplier
+        raw_cost = base_cost * multiplier
     else:
-        cost = credit_service.get_credit_setting('trading_monthly_cost')
+        raw_cost = credit_service.get_credit_setting('trading_monthly_cost')
+    cost = credit_service.get_effective_cost(current_user.userid, raw_cost)
     
     # Check cache first
     import sqlite3

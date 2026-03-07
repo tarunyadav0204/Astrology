@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCredits } from '../../credits/CreditContext';
 import { API_BASE_URL } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { pricingAPI } from '../../services/api';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -27,17 +28,13 @@ export default function TradingCalendarScreen({ navigation }) {
 
   const fetchCosts = async () => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/credits/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const baseCost = data.trading_monthly_cost || 20;
-        const multiplier = data.premium_chat_cost || 10;
-        setMonthlyCost(baseCost);
-        setPremiumCost(baseCost * multiplier);
-      }
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const pricing = data?.pricing || {};
+      const monthly = pricing.trading_monthly != null ? Number(pricing.trading_monthly) : 20;
+      const premium = pricing.trading_monthly_premium != null ? Number(pricing.trading_monthly_premium) : monthly * 10;
+      setMonthlyCost(monthly);
+      setPremiumCost(premium);
     } catch (error) {
       // Keep default cost if fetch fails
     }

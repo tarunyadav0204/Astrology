@@ -88,8 +88,9 @@ async def analyze_education(
 async def analyze_education_ai(request: EducationAnalysisRequest, current_user: User = Depends(get_current_user)):
     """Analyze education prospects with AI - requires credits"""
     
-    # Check credit cost and user balance
-    education_cost = credit_service.get_credit_setting('education_analysis_cost')
+    # Check credit cost and user balance (subscription tier discount applied)
+    base_cost = credit_service.get_credit_setting('education_analysis_cost')
+    education_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < education_cost:
