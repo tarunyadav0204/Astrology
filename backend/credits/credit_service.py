@@ -97,7 +97,21 @@ class CreditService:
             cursor.execute("SELECT free_chat_question_used FROM user_credits LIMIT 1")
         except sqlite3.OperationalError:
             cursor.execute("ALTER TABLE user_credits ADD COLUMN free_chat_question_used INTEGER DEFAULT 0")
-        
+
+        # Backfill: users who have ever paid for a chat question should not get "first question free"
+        try:
+            cursor.execute("""
+                UPDATE user_credits SET free_chat_question_used = 1, updated_at = CURRENT_TIMESTAMP
+                WHERE userid IN (
+                    SELECT DISTINCT userid FROM credit_transactions
+                    WHERE source = 'feature_usage' AND reference_id = 'chat_question'
+                )
+            """)
+            if cursor.rowcount:
+                conn.commit()
+        except sqlite3.OperationalError:
+            pass  # credit_transactions might not have reference_id in old DBs
+
         # Insert default credit costs
         cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'chat_question_cost'")
         if cursor.fetchone()[0] == 0:
