@@ -1,21 +1,30 @@
 from google.cloud import storage
 import os
-import json
 from datetime import datetime
 from PIL import Image
 import io
 from google.oauth2 import service_account
 
+from utils.env_json import parse_json_from_env
+
 class CloudStorageManager:
     def __init__(self):
-        # Try environment variable first, then JSON file
-        gcp_key_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_KEY')
-        if gcp_key_json:
-            credentials_info = json.loads(gcp_key_json)
-            credentials = service_account.Credentials.from_service_account_info(credentials_info)
-            self.client = storage.Client(credentials=credentials)
+        # Same as before: use GOOGLE_SERVICE_ACCOUNT_KEY (inline JSON or file path), else default credentials
+        gcp_key = os.getenv('GOOGLE_SERVICE_ACCOUNT_KEY')
+        if gcp_key:
+            gcp_key = gcp_key.strip()
+            credentials_info = parse_json_from_env(gcp_key)
+            if credentials_info:
+                credentials = service_account.Credentials.from_service_account_info(credentials_info)
+                self.client = storage.Client(credentials=credentials)
+            elif os.path.isfile(gcp_key):
+                credentials = service_account.Credentials.from_service_account_file(gcp_key)
+                self.client = storage.Client(credentials=credentials)
+            else:
+                raise ValueError(
+                    "GOOGLE_SERVICE_ACCOUNT_KEY is set but could not be parsed as JSON and is not a valid file path"
+                )
         else:
-            # Fallback to JSON file or default credentials
             self.client = storage.Client()
         
         self.images_bucket = self.client.bucket('astroroshni-blog-images')

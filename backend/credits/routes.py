@@ -3,17 +3,78 @@ from pydantic import BaseModel
 from typing import Optional, List
 import json
 import logging
+import os
 import re
 import sqlite3
 from auth import get_current_user, User
 from .credit_service import CreditService
 from .admin.promo_manager import PromoCodeManager
+from utils.env_json import parse_json_from_env
 
 router = APIRouter()
 credit_service = CreditService()
 promo_manager = PromoCodeManager()
 
 logger = logging.getLogger(__name__)
+
+# Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback
+def _get_play_credentials_path():
+    return os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON") or os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
+
+
+def _get_play_credentials():
+    """
+    Return Google service account credentials from env.
+    Supports (1) file path to JSON, or (2) inline JSON string in the env var.
+    """
+    from google.oauth2 import service_account
+    _ensure_play_env_loaded()
+    raw = _get_play_credentials_path()
+    if not raw or not raw.strip():
+        return None
+    raw = raw.strip()
+    scopes = ["https://www.googleapis.com/auth/androidpublisher"]
+    # Inline JSON: value starts with { (or is wrapped in quotes by .env)
+    info = parse_json_from_env(raw)
+    if info:
+        try:
+            return service_account.Credentials.from_service_account_info(info, scopes=scopes)
+        except (ValueError, TypeError) as e:
+            logger.warning("Google Play: invalid inline JSON credentials: %s", e)
+            return None
+    # File path
+    if os.path.isfile(raw):
+        return service_account.Credentials.from_service_account_file(raw, scopes=scopes)
+    logger.warning("Google Play: credentials value is neither a valid file path nor JSON (starts with %r)", raw[:50] if len(raw) > 50 else raw)
+    return None
+
+# Load backend/.env when credentials path is missing (e.g. gunicorn/workers or import order)
+def _ensure_play_env_loaded():
+    if _get_play_credentials_path():
+        return
+    try:
+        from dotenv import load_dotenv
+        # __file__ is backend/credits/routes.py -> backend_dir = backend
+        _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _env_path = os.path.join(_backend_dir, ".env")
+        logger.info("Google Play: env var not set, trying .env at %s (exists=%s)", _env_path, os.path.isfile(_env_path))
+        if os.path.isfile(_env_path):
+            # override=True so we replace any empty/wrong value already in os.environ
+            load_dotenv(_env_path, override=True)
+            val = _get_play_credentials_path()
+            if val:
+                logger.info("Google Play: loaded credentials path from .env (length=%s)", len(val))
+            else:
+                # Show which keys in .env look related (for debugging typo in var name)
+                try:
+                    with open(_env_path, "r") as f:
+                        keys = [line.split("=")[0].strip() for line in f if line.strip() and "=" in line and not line.strip().startswith("#")]
+                    play_keys = [k for k in keys if "GOOGLE" in k.upper() or "PLAY" in k.upper() or "CREDENTIAL" in k.upper()]
+                    logger.warning("Google Play: .env loaded but no credentials path. Use GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY. Found: %s", play_keys)
+                except Exception:
+                    logger.warning("Google Play: .env loaded but no credentials path (GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY)")
+    except Exception as e:
+        logger.warning("Google Play: could not load .env in credits route: %s", e, exc_info=True)
 
 # Product ID convention for credit packs: credits_N -> N credits (used when fetching from Play or when no map)
 CREDITS_PRODUCT_PATTERN = re.compile(r"^credits_(\d+)$")
@@ -49,53 +110,93 @@ PACKAGE_NAME = "com.astroroshni.mobile"
 
 
 def _get_play_service():
-    """Build Android Publisher API service with service account credentials."""
+    """Build Android Publisher API service with service account credentials (file path or inline JSON)."""
     try:
-        from google.oauth2 import service_account
         from googleapiclient.discovery import build
-        import os
-    except ImportError:
+    except ImportError as e:
+        logger.error("Google Play: missing dependency: %s", e)
         raise HTTPException(
             status_code=503,
             detail="Google Play not configured (install google-api-python-client and google-auth).",
         )
-    credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
-    if not credentials_path or not os.path.isfile(credentials_path):
+    credentials = _get_play_credentials()
+    if not credentials:
+        logger.error("Google Play: credentials not available (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY to a file path or inline JSON)")
         raise HTTPException(
             status_code=503,
-            detail="Google Play service account JSON not configured (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON).",
+            detail="Google Play service account JSON not configured (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY).",
         )
-    scopes = ["https://www.googleapis.com/auth/androidpublisher"]
-    credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
     return build("androidpublisher", "v3", credentials=credentials)
 
 
 def _verify_google_play_purchase(package_name: str, product_id: str, purchase_token: str) -> dict:
     """Verify purchase with Google Play Developer API. Returns purchase info or raises."""
-    service = _get_play_service()
-    request = service.purchases().products().get(
-        packageName=package_name,
-        productId=product_id,
-        token=purchase_token,
-    )
-    return request.execute()
+    logger.info("Google Play: verifying product purchase package=%s productId=%s", package_name, product_id)
+    try:
+        service = _get_play_service()
+        request = service.purchases().products().get(
+            packageName=package_name,
+            productId=product_id,
+            token=purchase_token,
+        )
+        result = request.execute()
+        logger.info("Google Play: product verify response keys=%s", list(result.keys()) if isinstance(result, dict) else type(result))
+        return result
+    except Exception as e:
+        logger.error("Google Play: product verify error: %s", e, exc_info=True)
+        raise
 
 
 def _verify_google_play_subscription(package_name: str, subscription_id: str, purchase_token: str) -> dict:
     """Verify subscription with Google Play Developer API. Returns subscription info (expiryTimeMillis, startTimeMillis, etc.) or raises."""
-    service = _get_play_service()
-    request = service.purchases().subscriptions().get(
-        packageName=package_name,
-        subscriptionId=subscription_id,
-        token=purchase_token,
-    )
-    return request.execute()
+    logger.info("Google Play: verifying subscription package=%s subscriptionId=%s", package_name, subscription_id)
+    try:
+        service = _get_play_service()
+        request = service.purchases().subscriptions().get(
+            packageName=package_name,
+            subscriptionId=subscription_id,
+            token=purchase_token,
+        )
+        result = request.execute()
+        logger.info("Google Play: subscription verify response keys=%s", list(result.keys()) if isinstance(result, dict) else type(result))
+        return result
+    except Exception as e:
+        logger.error("Google Play: subscription verify error: %s", e, exc_info=True)
+        raise
 
 
 def _credits_from_product_id(product_id: str) -> Optional[int]:
     """Parse product_id per convention credits_N -> N. Returns None if not a credit product."""
     m = CREDITS_PRODUCT_PATTERN.match((product_id or "").strip())
     return int(m.group(1)) if m else None
+
+
+def _price_from_play_money(price_obj: dict) -> Optional[tuple]:
+    """
+    Extract (amount, currency_code) from Play Money object.
+    Supports: priceAmountMicros + currencyCode, or units + nanos + currencyCode.
+    """
+    if not price_obj or not isinstance(price_obj, dict):
+        return None
+    currency = price_obj.get("currencyCode")
+    micros = price_obj.get("priceAmountMicros")
+    if micros is not None:
+        try:
+            amount = int(micros) / 1_000_000
+            return (amount, currency)
+        except (TypeError, ValueError):
+            pass
+    units = price_obj.get("units")
+    nanos = price_obj.get("nanos")
+    if units is not None:
+        try:
+            u = int(units)
+            n = int(nanos) if nanos is not None else 0
+            amount = u + n / 1_000_000_000
+            return (amount, currency)
+        except (TypeError, ValueError):
+            pass
+    return None
 
 
 def _format_play_money(price_amount_micros: Optional[str], currency_code: Optional[str]) -> Optional[str]:
@@ -107,6 +208,11 @@ def _format_play_money(price_amount_micros: Optional[str], currency_code: Option
     except (TypeError, ValueError):
         return None
     amount = micros / 1_000_000
+    return _format_amount_currency(amount, currency_code)
+
+
+def _format_amount_currency(amount: float, currency_code: Optional[str]) -> str:
+    """Format amount + currency to display string e.g. '₹399', '$4.99'."""
     if currency_code == "INR":
         return f"₹{int(amount)}" if amount == int(amount) else f"₹{amount:.2f}"
     if currency_code == "USD":
@@ -124,43 +230,76 @@ def _get_subscription_price_from_play(package_name: str, product_id: str) -> Opt
     a formatted price string from the first base plan's first regional config (or otherRegionsConfig).
     """
     try:
-        from google.oauth2 import service_account
         from google.auth.transport.requests import AuthorizedSession
-        import os
 
-        credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
-        if not credentials_path or not os.path.isfile(credentials_path):
+        credentials = _get_play_credentials()
+        if not credentials:
             return None
-        scopes = ["https://www.googleapis.com/auth/androidpublisher"]
-        credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
         session = AuthorizedSession(credentials)
         url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/subscriptions/{product_id}"
+        logger.info("Google Play: fetching subscription price GET %s", url)
         resp = session.get(url)
         if resp.status_code != 200:
-            logger.warning("Google Play subscription get %s/%s: %s %s", package_name, product_id, resp.status_code, resp.text[:200])
+            logger.warning(
+                "Google Play subscription get %s/%s: status=%s body=%s",
+                package_name, product_id, resp.status_code, resp.text[:500] if resp.text else "(empty)"
+            )
             return None
         data = resp.json()
+        logger.info("Google Play subscription get %s: basePlans count=%s", product_id, len(data.get("basePlans") or []))
+        # Log response structure for debugging price extraction
+        try:
+            struct = {k: (list(v[0].keys()) if isinstance(v, list) and v and isinstance(v[0], dict) else type(v).__name__) for k, v in data.items()}
+            logger.info("Google Play subscription response keys: %s", list(data.keys()))
+            for i, bp in enumerate(data.get("basePlans") or []):
+                bp_keys = list(bp.keys()) if isinstance(bp, dict) else []
+                logger.info("Google Play basePlan[%s] keys: %s state=%s", i, bp_keys, bp.get("state") if isinstance(bp, dict) else "?")
+                reg = bp.get("regionalConfigs") or [] if isinstance(bp, dict) else []
+                if reg and isinstance(reg, list):
+                    rc0 = reg[0] if reg else {}
+                    logger.info("Google Play basePlan[%s] regionalConfigs[0] keys: %s price=%s", i, list(rc0.keys()) if isinstance(rc0, dict) else [], rc0.get("price") if isinstance(rc0, dict) else None)
+                other = bp.get("otherRegionsConfig") or {} if isinstance(bp, dict) else {}
+                if other:
+                    logger.info("Google Play basePlan[%s] otherRegionsConfig keys: %s", i, list(other.keys()) if isinstance(other, dict) else [])
+            full_json = json.dumps(data, indent=2, default=str)
+            logger.info("Google Play subscription full response (first 3000 chars): %s", full_json[:3000])
+        except Exception as le:
+            logger.warning("Google Play subscription log structure: %s", le)
         base_plans = data.get("basePlans") or []
         for bp in base_plans:
             if bp.get("state") == "INACTIVE":
                 continue
             regional = (bp.get("regionalConfigs") or [])
+            # Prefer INR, then USD, then EUR, then first regional
+            for region_code in ("IN", "US", "GB", "AE", "AT"):
+                rc = next((r for r in regional if r.get("regionCode") == region_code), None)
+                if rc:
+                    parsed = _price_from_play_money(rc.get("price") or {})
+                    if parsed:
+                        amount, currency = parsed
+                        formatted = _format_amount_currency(amount, currency)
+                        logger.info("Google Play subscription price %s: %s (region %s)", product_id, formatted, region_code)
+                        return formatted
+            # Fallback: first regional config
             for rc in regional:
-                price_obj = rc.get("price") or {}
-                micros = price_obj.get("priceAmountMicros")
-                currency = price_obj.get("currencyCode")
-                if micros is not None:
-                    return _format_play_money(str(micros), currency)
+                parsed = _price_from_play_money(rc.get("price") or {})
+                if parsed:
+                    amount, currency = parsed
+                    formatted = _format_amount_currency(amount, currency)
+                    logger.info("Google Play subscription price %s: %s (from regionalConfig)", product_id, formatted)
+                    return formatted
             other = bp.get("otherRegionsConfig") or {}
             for key in ("usdPrice", "eurPrice"):
-                price_obj = other.get(key) or {}
-                micros = price_obj.get("priceAmountMicros")
-                currency = price_obj.get("currencyCode") or ("USD" if key == "usdPrice" else "EUR")
-                if micros is not None:
-                    return _format_play_money(str(micros), currency)
+                parsed = _price_from_play_money(other.get(key) or {})
+                if parsed:
+                    amount, currency = parsed
+                    formatted = _format_amount_currency(amount, currency or ("USD" if key == "usdPrice" else "EUR"))
+                    logger.info("Google Play subscription price %s: %s (from %s)", product_id, formatted, key)
+                    return formatted
+        logger.info("Google Play subscription price %s: no price found in basePlans", product_id)
         return None
     except Exception as e:
-        logger.warning("Google Play subscription price for %s: %s", product_id, e)
+        logger.warning("Google Play subscription price for %s: %s", product_id, e, exc_info=True)
         return None
 
 
@@ -173,26 +312,22 @@ def _list_google_play_products(package_name: str) -> List[dict]:
     try:
         # Use google-auth directly because the installed google-api-python-client
         # may not yet expose monetization.onetimeproducts on the discovery stub.
-        from google.oauth2 import service_account
         from google.auth.transport.requests import AuthorizedSession
-        import os
 
-        credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
-        if not credentials_path or not os.path.isfile(credentials_path):
+        credentials = _get_play_credentials()
+        if not credentials:
+            logger.error("Google Play products: credentials not available (file path or inline JSON)")
             raise HTTPException(
                 status_code=503,
-                detail="Google Play service account JSON not configured (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON).",
+                detail="Google Play service account JSON not configured (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY).",
             )
-
-        scopes = ["https://www.googleapis.com/auth/androidpublisher"]
-        credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
         session = AuthorizedSession(credentials)
 
         all_products: List[dict] = []
         # Use the new one-time products REST endpoint:
         # GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{packageName}/oneTimeProducts
         base_url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/oneTimeProducts"
-        logger.info("Google Play: listing one-time products via REST oneTimeProducts list")
+        logger.info("Google Play: listing one-time products GET %s", base_url)
 
         page_token: Optional[str] = None
         while True:
@@ -200,12 +335,18 @@ def _list_google_play_products(package_name: str) -> List[dict]:
             if page_token:
                 params["pageToken"] = page_token
             resp = session.get(base_url, params=params)
+            if resp.status_code != 200:
+                logger.error(
+                    "Google Play oneTimeProducts list: status=%s body=%s",
+                    resp.status_code, resp.text[:1000] if resp.text else "(empty)"
+                )
             if resp.status_code == 403:
                 # Surface the body so we can see the exact permission error.
                 logger.error("Google Play: 403 from monetization.onetimeproducts.list: %s", resp.text)
                 raise HTTPException(status_code=403, detail=resp.text)
             resp.raise_for_status()
             data = resp.json()
+            logger.info("Google Play oneTimeProducts response: oneTimeProducts count=%s nextPageToken=%s", len(data.get("oneTimeProducts") or []), bool(data.get("nextPageToken")))
             for p in data.get("oneTimeProducts", []):
                 sku = (p.get("productId") or "").strip()
                 credits = _credits_from_product_id(sku)
@@ -252,7 +393,7 @@ def _list_google_play_products(package_name: str) -> List[dict]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Google Play: unexpected error while listing products: %s", str(e))
+        logger.error("Google Play: unexpected error while listing products: %s", str(e), exc_info=True)
         raise HTTPException(status_code=503, detail=f"Failed to list Google Play products: {str(e)}")
 
 
@@ -298,10 +439,15 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
     try:
         products = _list_google_play_products(PACKAGE_NAME)
         return {"products": products}
-    except HTTPException:
+    except HTTPException as e:
+        # When Play is not configured (e.g. local dev without GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), return empty list so app still works
+        if e.status_code == 503:
+            logger.warning("Google Play products: returning empty list due to 503 (detail=%s)", e.detail)
+            return {"products": []}
         raise
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to fetch products: {str(e)}")
+        logger.warning("Google Play products unavailable: %s", e, exc_info=True)
+        return {"products": []}
 
 
 @router.post("/google-play/verify")

@@ -119,11 +119,17 @@ signal.signal(signal.SIGINT, signal_handler)
 atexit.register(lambda: logger.critical("Server shutdown completed"))
 
 
-# Load environment variables explicitly
+# Load environment variables explicitly (CWD first, then backend/.env so it works when run from repo root)
 try:
     from dotenv import load_dotenv
     load_dotenv()
-    print("Loaded environment variables from .env file")
+    _backend_dir = os.path.dirname(os.path.abspath(__file__))
+    _env_path = os.path.join(_backend_dir, ".env")
+    if os.path.isfile(_env_path):
+        load_dotenv(_env_path)
+        print("Loaded environment variables from .env file")
+    else:
+        print("Loaded environment variables from .env file")
 except ImportError:
     print("python-dotenv not installed, using system environment variables")
 except Exception as e:

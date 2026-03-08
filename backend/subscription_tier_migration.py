@@ -97,6 +97,17 @@ def ensure_subscription_tier_schema(db_path: str = None) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass  # discount_percent column may not exist on very old DBs; step 3 adds it
+
+        # 7) Sync google_play_product_id to Play Console IDs (subscription_vip_silver, subscription_vip_gold, subscription_vip_platinum)
+        try:
+            for tier_name, _discount, product_id, _price in vip_plans:
+                cursor.execute(
+                    "UPDATE subscription_plans SET google_play_product_id = ? WHERE platform = ? AND tier_name = ?",
+                    (product_id, PLATFORM_ASTROROSHNI, tier_name),
+                )
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
     finally:
         conn.close()
 
