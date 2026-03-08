@@ -291,6 +291,39 @@ class CreditService:
         conn.close()
         return (row[0] if row and row[0] else None) or None
 
+    def get_user_subscription_details(self, userid: int) -> Optional[dict]:
+        """Return full details of user's active subscription: tier_name, discount_percent, start_date, end_date, features. None if no active subscription."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT sp.tier_name, sp.discount_percent, us.start_date, us.end_date, sp.features
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
+                ORDER BY sp.discount_percent DESC
+                LIMIT 1
+            """, (userid,))
+            row = cursor.fetchone()
+        except sqlite3.OperationalError:
+            row = None
+        conn.close()
+        if not row:
+            return None
+        features = row[4]
+        if isinstance(features, str):
+            try:
+                features = json.loads(features) if features else {}
+            except (ValueError, TypeError):
+                features = {}
+        return {
+            "tier_name": row[0] or "VIP",
+            "discount_percent": max(0, min(100, int(row[1]) if row[1] is not None else 0)),
+            "start_date": row[2] or "",
+            "end_date": row[3] or "",
+            "features": features,
+        }
+
     def get_plan_id_by_google_play_product_id(self, product_id: str, platform: str = "astroroshni") -> Optional[int]:
         """Return plan_id for subscription_plans where google_play_product_id = product_id. None if not found."""
         conn = sqlite3.connect(self.db_path)

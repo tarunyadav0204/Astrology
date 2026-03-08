@@ -14,6 +14,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +25,17 @@ import { creditAPI } from './creditService';
 import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
+
+function formatSubscriptionDate(isoDate) {
+  if (!isoDate || typeof isoDate !== 'string') return isoDate || '—';
+  const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return isoDate;
+  const day = d.getDate();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day} ${month} ${year}`;
+}
 
 // Lazy-load IAP only on Android to avoid iOS/build issues
 let RNIap = null;
@@ -52,6 +64,7 @@ const CreditScreen = ({ navigation }) => {
   const [subscriptionPlansLoading, setSubscriptionPlansLoading] = useState(false);
   const [iapSubscriptions, setIapSubscriptions] = useState([]); // from getSubscriptions (productId + subscriptionOfferDetails for offerToken)
   const [purchasingSubscriptionId, setPurchasingSubscriptionId] = useState(null);
+  const [subscriptionDetails, setSubscriptionDetails] = useState(null);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -100,6 +113,7 @@ const CreditScreen = ({ navigation }) => {
     try {
       const { data } = await creditAPI.verifyGooglePlaySubscription(purchaseToken, productId, orderId);
       await fetchBalance();
+      await fetchSubscriptionDetails();
       const tierName = data?.tier_name || 'VIP';
       setPurchaseModal({
         visible: true,
@@ -124,7 +138,8 @@ const CreditScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchHistory();
-    
+    fetchSubscriptionDetails();
+
     // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -156,13 +171,18 @@ const CreditScreen = ({ navigation }) => {
       ])
     ).start();
     
-    // Refresh credits when screen comes into focus
+    // Refresh credits and subscription when screen comes into focus. On Android, sync with Google Play first so we reflect upgrades/cancels/renewals.
     const unsubscribe = navigation.addListener('focus', () => {
       fetchBalance();
+      if (Platform.OS === 'android' && iapReady && subscriptionProductIds.length > 0 && RNIap) {
+        syncSubscriptionWithPlay().then(fetchSubscriptionDetails).catch(() => fetchSubscriptionDetails());
+      } else {
+        fetchSubscriptionDetails();
+      }
     });
-    
+
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, iapReady, subscriptionProductIds]);
 
   // Fetch Google Play products from backend (Android only)
   useEffect(() => {
@@ -278,6 +298,36 @@ const CreditScreen = ({ navigation }) => {
     };
   }, [productIds.join(','), subscriptionProductIds.join(',')]);
 
+  const fetchSubscriptionDetails = async () => {
+    try {
+      const { data } = await creditAPI.getSubscriptionDetails();
+      setSubscriptionDetails(data?.subscription ?? null);
+    } catch (e) {
+      setSubscriptionDetails(null);
+    }
+  };
+
+  /** On Android: get current subscription from Play and sync to our backend so we stay in sync if user changed/cancelled/renewed on Play. */
+  const syncSubscriptionWithPlay = async () => {
+    if (Platform.OS !== 'android' || !RNIap || subscriptionProductIds.length === 0) return;
+    try {
+      const purchases = await RNIap.getAvailablePurchases();
+      const subscriptionPurchases = (purchases || []).filter(
+        (p) => p.productId && subscriptionProductIds.includes(p.productId)
+      );
+      for (const p of subscriptionPurchases) {
+        const token = p.purchaseToken ?? p.purchaseTokenAndroid;
+        const productId = p.productId ?? p.productIds?.[0];
+        if (token && productId) {
+          await creditAPI.syncSubscription(token, productId);
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('Subscription sync with Play failed:', e?.message);
+    }
+  };
+
   const fetchHistory = async () => {
     try {
       const response = await creditAPI.getHistory();
@@ -340,7 +390,12 @@ const CreditScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchBalance(), fetchHistory()]);
+    await fetchBalance();
+    await fetchHistory();
+    if (Platform.OS === 'android' && iapReady && subscriptionProductIds.length > 0 && RNIap) {
+      await syncSubscriptionWithPlay();
+    }
+    await fetchSubscriptionDetails();
     setRefreshing(false);
   };
 
@@ -533,15 +588,46 @@ const CreditScreen = ({ navigation }) => {
               </LinearGradient>
             </Animated.View>
 
-            {/* VIP subscription tier — where user sees their discount */}
-            {subscriptionTierName && subscriptionDiscountPercent > 0 && (
+            {/* Your subscription — full details when user has an active subscription */}
+            {subscriptionDetails ? (
+              <View style={[styles.subscriptionCard, { backgroundColor: promoCardBg, borderColor: colors.cardBorder, borderWidth: isDark ? 1 : 0 }]}>
+                <View style={styles.subscriptionCardHeader}>
+                  <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+                  <Text style={[styles.subscriptionCardTitle, { color: colors.text }]}>{subscriptionDetails.tier_name}</Text>
+                </View>
+                <Text style={[styles.subscriptionCardBenefit, { color: colors.textSecondary }]}>
+                  {subscriptionDetails.discount_percent}% off on all features — Career, Marriage, Health, Event Timeline, and every paid analysis.
+                </Text>
+                <View style={[styles.subscriptionCardDates, { borderTopColor: colors.cardBorder }]}>
+                  {subscriptionDetails.start_date ? (
+                    <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
+                      Subscribed on {formatSubscriptionDate(subscriptionDetails.start_date)}
+                    </Text>
+                  ) : null}
+                  {subscriptionDetails.end_date ? (
+                    <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
+                      Renews on {formatSubscriptionDate(subscriptionDetails.end_date)}
+                    </Text>
+                  ) : null}
+                </View>
+                {Platform.OS === 'android' && (
+                  <TouchableOpacity
+                    style={[styles.manageSubscriptionButton, { borderColor: colors.cardBorder }]}
+                    onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
+                  >
+                    <Ionicons name="open-outline" size={18} color={colors.primary} />
+                    <Text style={[styles.manageSubscriptionButtonText, { color: colors.primary }]}>Manage or cancel subscription</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : subscriptionTierName && subscriptionDiscountPercent > 0 ? (
               <View style={[styles.vipBadge, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(255,193,7,0.2)', borderColor: isDark ? 'rgba(255,215,0,0.4)' : 'rgba(255,193,7,0.5)' }]}>
                 <Ionicons name="shield-checkmark" size={20} color={colors.primary} style={styles.vipBadgeIcon} />
                 <Text style={[styles.vipBadgeText, { color: colors.text }]}>
                   {subscriptionTierName} — {subscriptionDiscountPercent}% off on all features
                 </Text>
               </View>
-            )}
+            ) : null}
 
             {/* VIP subscription plans — subscribe for discount (Android only) */}
             {Platform.OS === 'android' && (
@@ -859,6 +945,50 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     flex: 1,
+  },
+  subscriptionCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 18,
+    borderRadius: 16,
+  },
+  subscriptionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  subscriptionCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  subscriptionCardBenefit: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  subscriptionCardDates: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    gap: 4,
+  },
+  subscriptionCardDateLabel: {
+    fontSize: 13,
+  },
+  manageSubscriptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  manageSubscriptionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   balanceDecoration: {
     position: 'absolute',

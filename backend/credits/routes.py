@@ -297,41 +297,92 @@ async def verify_google_play_subscription(
     request: GooglePlaySubscriptionVerifyRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Verify a Google Play subscription and set user's tier (VIP Silver/Gold/Platinum). Idempotent: re-calling extends/updates end_date. Product ID is tier-based (subscription_vip_silver etc.); price is set in Play Console."""
-    product_id = (request.product_id or "").strip()
-    plan_id = credit_service.get_plan_id_by_google_play_product_id(product_id)
-    if not plan_id:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown subscription product_id (must match google_play_product_id in subscription_plans): {product_id}",
-        )
+    """Verify a Google Play subscription and set user's tier (VIP Silver/Gold/Platinum). Idempotent: re-calling extends/updates end_date."""
     if not (request.purchase_token or "").strip():
         raise HTTPException(status_code=400, detail="purchase_token is required")
-    token = request.purchase_token.strip()
+    product_id = (request.product_id or "").strip()
+    if not product_id:
+        raise HTTPException(status_code=400, detail="product_id is required")
     try:
-        purchase = _verify_google_play_subscription(PACKAGE_NAME, product_id, token)
+        result = _sync_subscription_from_play(
+            current_user.userid,
+            product_id,
+            request.purchase_token.strip(),
+            accept_any_payment_state=False,
+        )
+        return {
+            "success": True,
+            "message": "Subscription active",
+            "subscription_tier_name": result["tier_name"],
+            "end_date": result["end_date"],
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid or expired subscription: {str(e)}")
-    payment_state = purchase.get("paymentState")
-    if payment_state not in (0, 1):
-        raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
+
+
+def _sync_subscription_from_play(
+    userid: int,
+    product_id: str,
+    purchase_token: str,
+    *,
+    accept_any_payment_state: bool = False,
+) -> dict:
+    """Verify subscription with Google Play and update our DB. Used by both verify and sync.
+    If accept_any_payment_state is True (sync), we update DB even when cancelled/expired so our record matches Play."""
+    plan_id = credit_service.get_plan_id_by_google_play_product_id(product_id)
+    if not plan_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown subscription product_id: {product_id}",
+        )
+    purchase = _verify_google_play_subscription(PACKAGE_NAME, product_id, purchase_token)
+    if not accept_any_payment_state:
+        payment_state = purchase.get("paymentState")
+        if payment_state not in (0, 1):
+            raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
     expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
     start_ms = purchase.get("startTimeMillis") or expiry_ms
     from datetime import datetime
     start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
     end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
-    success = credit_service.set_user_subscription(current_user.userid, plan_id, start_date, end_date)
+    success = credit_service.set_user_subscription(userid, plan_id, start_date, end_date)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
-    tier_name = credit_service.get_subscription_tier_name(current_user.userid)
-    return {
-        "success": True,
-        "message": "Subscription active",
-        "subscription_tier_name": tier_name or product_id,
-        "end_date": end_date,
-    }
+    tier_name = credit_service.get_subscription_tier_name(userid)
+    return {"tier_name": tier_name or product_id, "end_date": end_date}
+
+
+@router.post("/google-play/subscription/sync")
+async def sync_google_play_subscription(
+    request: GooglePlaySubscriptionVerifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Re-verify subscription with Google Play and update our DB. Call this when the app opens or user visits Credits
+    so we stay in sync if they changed/cancelled/renewed on Play. Accepts any payment state so we can update end_date."""
+    if not (request.purchase_token or "").strip():
+        raise HTTPException(status_code=400, detail="purchase_token is required")
+    product_id = (request.product_id or "").strip()
+    if not product_id:
+        raise HTTPException(status_code=400, detail="product_id is required")
+    try:
+        result = _sync_subscription_from_play(
+            current_user.userid,
+            product_id,
+            request.purchase_token.strip(),
+            accept_any_payment_state=True,
+        )
+        return {
+            "success": True,
+            "message": "Subscription synced",
+            "subscription_tier_name": result["tier_name"],
+            "end_date": result["end_date"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not sync subscription: {str(e)}")
 
 
 @router.get("/google-play/subscription-plans")
@@ -387,6 +438,18 @@ async def get_credit_balance(current_user: User = Depends(get_current_user)):
     except Exception:
         pass
     return result
+
+
+@router.get("/subscription")
+async def get_subscription_details(current_user: User = Depends(get_current_user)):
+    """Return full subscription details for the current user: tier_name, discount_percent, start_date, end_date (renewal), features. None if no active subscription."""
+    try:
+        details = credit_service.get_user_subscription_details(current_user.userid)
+        if details is None:
+            return {"subscription": None}
+        return {"subscription": details}
+    except Exception:
+        return {"subscription": None}
 
 @router.get("/history")
 async def get_credit_history(current_user: User = Depends(get_current_user)):

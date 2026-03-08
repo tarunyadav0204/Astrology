@@ -16,6 +16,7 @@ import {
   Animated,
   Dimensions,
   InteractionManager,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -30,6 +31,7 @@ import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
+import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import { storage } from '../../services/storage';
 import { chatAPI, pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -186,7 +188,26 @@ export default function ChatScreen({ navigation, route }) {
   const [showChartPicker, setShowChartPicker] = useState(false);
   const [selectingFor, setSelectingFor] = useState(null); // 'native' or 'partner'
   const [savedCharts, setSavedCharts] = useState([]);
-  
+  const [showPartnershipModal, setShowPartnershipModal] = useState(false);
+  const [partnershipModalCost, setPartnershipModalCost] = useState(2);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Move input into view when keyboard opens (does not change tab bar layout)
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   // Pending message management (like web app)
   const addPendingMessage = async (messageId) => {
     const key = `pendingChatMessages_${currentPersonId}`;
@@ -717,25 +738,24 @@ export default function ChatScreen({ navigation, route }) {
     ? 0
     : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
 
+  const openPartnershipModal = (cost) => {
+    setPartnershipModalCost((cost != null && cost > 0) ? cost : partnershipCost);
+    setShowPartnershipModal(true);
+  };
+
+  const confirmPartnershipMode = () => {
+    setShowPartnershipModal(false);
+    setPartnershipMode(true);
+    setNativeChart(birthData);
+    setShowGreeting(false);
+    setShowMenu(false);
+    setShowChartPicker(true);
+  };
+
   const handleGreetingOptionSelect = async (option) => {
     
     if (option.action === 'partnership') {
-      Alert.alert(
-        'Partnership Mode',
-        `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Continue', 
-            onPress: () => {
-              setPartnershipMode(true);
-              setNativeChart(birthData);
-              setShowGreeting(false);
-              setShowChartPicker(true);
-            }
-          }
-        ]
-      );
+      openPartnershipModal(option.cost);
     } else if (option.action === 'mundane') {
       setIsMundane(true);
       setShowGreeting(false);
@@ -2063,6 +2083,16 @@ export default function ChatScreen({ navigation, route }) {
 
 
 
+        {/* Suggestions + Input: translate up when keyboard is open so input stays visible */}
+        <View style={[
+          { transform: [{ translateY: -keyboardHeight }] },
+          keyboardHeight > 0 && {
+            backgroundColor: colors.background,
+            paddingTop: 12,
+            marginHorizontal: -12,
+            paddingHorizontal: 12,
+          },
+        ]}>
         {/* Suggestions (only show when not loading and not showing greeting) */}
         {!loading && !showGreeting && messages.length > 0 && (
           <View style={styles.suggestionsContainer}>
@@ -2281,6 +2311,7 @@ export default function ChatScreen({ navigation, route }) {
             )}
           </View>
         )}
+        </View>
 
         {/* Quick Actions Bar */}
         {!showGreeting && (
@@ -2313,21 +2344,7 @@ export default function ChatScreen({ navigation, route }) {
               style={[styles.quickActionButton, partnershipMode && styles.quickActionButtonActive]}
               onPress={() => {
                 if (!partnershipMode) {
-                  Alert.alert(
-                    'Partnership Mode',
-                    `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Continue', 
-                        onPress: () => {
-                          setPartnershipMode(true);
-                          setNativeChart(birthData);
-                          setShowChartPicker(true);
-                        }
-                      }
-                    ]
-                  );
+                  openPartnershipModal(partnershipCost);
                 } else {
                   setPartnershipMode(false);
                   setNativeChart(null);
@@ -2912,28 +2929,12 @@ export default function ChatScreen({ navigation, route }) {
                       style={getMenuOptionStyle()}
                       onPress={() => {
                         if (!partnershipMode) {
-                          Alert.alert(
-                            'Partnership Mode',
-                            `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-                            [
-                              { text: 'Cancel', style: 'cancel' },
-                              { 
-                                text: 'Continue', 
-                                onPress: () => {
-                                  setPartnershipMode(true);
-                                  setNativeChart(birthData);
-                                  Animated.timing(drawerAnim, {
-                                    toValue: 300,
-                                    duration: 250,
-                                    useNativeDriver: true,
-                                  }).start(() => {
-                                    setShowMenu(false);
-                                    setShowChartPicker(true);
-                                  });
-                                }
-                              }
-                            ]
-                          );
+                          openPartnershipModal(partnershipCost);
+                          Animated.timing(drawerAnim, {
+                            toValue: 300,
+                            duration: 250,
+                            useNativeDriver: true,
+                          }).start(() => setShowMenu(false));
                         } else {
                           setPartnershipMode(false);
                           setNativeChart(null);
@@ -3377,6 +3378,16 @@ export default function ChatScreen({ navigation, route }) {
         onClose={() => setShowPremiumModal(false)}
         premiumCost={premiumChatCost}
         standardCost={chatCost}
+      />
+      <ConfirmCreditsModal
+        visible={showPartnershipModal}
+        onClose={() => setShowPartnershipModal(false)}
+        onConfirm={confirmPartnershipMode}
+        title="Partnership Mode"
+        description="Partnership mode uses credits per question for comprehensive compatibility analysis between two charts."
+        cost={partnershipModalCost}
+        credits={credits}
+        confirmLabel="Continue"
       />
       </LinearGradient>
     </View>

@@ -336,6 +336,7 @@ export const nudgeAPI = {
 
 export const creditAPI = {
   getBalance: () => api.get(getEndpoint('/credits/balance')),
+  getSubscriptionDetails: () => api.get(getEndpoint('/credits/subscription')),
   getHistory: () => api.get(getEndpoint('/credits/history')),
   redeemPromoCode: (code) => 
     api.post(getEndpoint('/credits/redeem'), { code: code.toString() }, {
@@ -355,6 +356,11 @@ export const creditAPI = {
     }),
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
+  syncSubscription: (purchaseToken, productId) =>
+    api.post(getEndpoint('/credits/google-play/subscription/sync'), {
+      purchase_token: purchaseToken,
+      product_id: productId,
+    }),
   verifyGooglePlaySubscription: (purchaseToken, productId, orderId) =>
     api.post(getEndpoint('/credits/google-play/subscription/verify'), {
       purchase_token: purchaseToken,
