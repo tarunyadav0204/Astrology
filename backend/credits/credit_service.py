@@ -372,6 +372,28 @@ class CreditService:
         finally:
             conn.close()
 
+    def expire_user_subscription_for_platform(self, userid: int, platform: str = "astroroshni") -> bool:
+        """Set end_date to yesterday for the user's active subscription on this platform, so they no longer appear subscribed. Used when app has no purchase token to sync (e.g. after cancel, device may not return the purchase)."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                UPDATE user_subscriptions
+                SET end_date = date('now', '-1 day')
+                WHERE userid = ? AND status = 'active'
+                  AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                """,
+                (userid, platform),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
     def get_effective_cost(self, userid: int, base_cost: int, setting_key: str = None) -> int:
         """Return cost for user. Non-VIP: returns base_cost (site effective/discounted price).
         VIP: applies subscription % off the original price (from setting_key), not the discounted price."""

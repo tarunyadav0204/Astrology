@@ -98,6 +98,72 @@ def _credits_from_product_id(product_id: str) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
+def _format_play_money(price_amount_micros: Optional[str], currency_code: Optional[str]) -> Optional[str]:
+    """Format Google Play Money (priceAmountMicros, currencyCode) to a display string e.g. '₹399' or '$4.99'."""
+    if price_amount_micros is None:
+        return None
+    try:
+        micros = int(price_amount_micros)
+    except (TypeError, ValueError):
+        return None
+    amount = micros / 1_000_000
+    if currency_code == "INR":
+        return f"₹{int(amount)}" if amount == int(amount) else f"₹{amount:.2f}"
+    if currency_code == "USD":
+        return f"${amount:.2f}"
+    if currency_code == "EUR":
+        return f"€{amount:.2f}"
+    if currency_code:
+        return f"{amount:.2f} {currency_code}"
+    return f"{amount:.2f}"
+
+
+def _get_subscription_price_from_play(package_name: str, product_id: str) -> Optional[str]:
+    """
+    Fetch subscription product from Google Play (monetization.subscriptions.get) and return
+    a formatted price string from the first base plan's first regional config (or otherRegionsConfig).
+    """
+    try:
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import AuthorizedSession
+        import os
+
+        credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+        if not credentials_path or not os.path.isfile(credentials_path):
+            return None
+        scopes = ["https://www.googleapis.com/auth/androidpublisher"]
+        credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
+        session = AuthorizedSession(credentials)
+        url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/subscriptions/{product_id}"
+        resp = session.get(url)
+        if resp.status_code != 200:
+            logger.warning("Google Play subscription get %s/%s: %s %s", package_name, product_id, resp.status_code, resp.text[:200])
+            return None
+        data = resp.json()
+        base_plans = data.get("basePlans") or []
+        for bp in base_plans:
+            if bp.get("state") == "INACTIVE":
+                continue
+            regional = (bp.get("regionalConfigs") or [])
+            for rc in regional:
+                price_obj = rc.get("price") or {}
+                micros = price_obj.get("priceAmountMicros")
+                currency = price_obj.get("currencyCode")
+                if micros is not None:
+                    return _format_play_money(str(micros), currency)
+            other = bp.get("otherRegionsConfig") or {}
+            for key in ("usdPrice", "eurPrice"):
+                price_obj = other.get(key) or {}
+                micros = price_obj.get("priceAmountMicros")
+                currency = price_obj.get("currencyCode") or ("USD" if key == "usdPrice" else "EUR")
+                if micros is not None:
+                    return _format_play_money(str(micros), currency)
+        return None
+    except Exception as e:
+        logger.warning("Google Play subscription price for %s: %s", product_id, e)
+        return None
+
+
 def _list_google_play_products(package_name: str) -> List[dict]:
     """
     Fetch in-app products from Google Play and return credit products only.
@@ -342,11 +408,15 @@ def _sync_subscription_from_play(
         payment_state = purchase.get("paymentState")
         if payment_state not in (0, 1):
             raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
+    from datetime import datetime
     expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
     start_ms = purchase.get("startTimeMillis") or expiry_ms
-    from datetime import datetime
     start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
-    end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
+    # If user cancelled on Play, stop showing them as subscribed immediately (end_date = today)
+    if accept_any_payment_state and purchase.get("userCancellationTimeMillis"):
+        end_date = datetime.utcnow().strftime("%Y-%m-%d")
+    else:
+        end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
     success = credit_service.set_user_subscription(userid, plan_id, start_date, end_date)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
@@ -385,6 +455,16 @@ async def sync_google_play_subscription(
         raise HTTPException(status_code=400, detail=f"Could not sync subscription: {str(e)}")
 
 
+@router.post("/google-play/subscription/clear")
+async def clear_subscription_no_purchase(current_user: User = Depends(get_current_user)):
+    """Clear subscription status when the app could not get any purchase token from the device (e.g. after user cancelled, getAvailablePurchases may return empty). Expires the user's subscription so the UI stops showing 'Current plan'. Call this only when the user has a subscription in our DB but the device returns no subscription purchase to sync."""
+    try:
+        updated = credit_service.expire_user_subscription_for_platform(current_user.userid, "astroroshni")
+        return {"success": True, "cleared": updated, "message": "Subscription status updated." if updated else "No active subscription to clear."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/google-play/subscription-plans")
 async def get_google_play_subscription_plans(current_user: User = Depends(get_current_user)):
     """List VIP subscription plans available for in-app purchase (platform=astroroshni, with google_play_product_id). For mobile to show and purchase."""
@@ -412,12 +492,15 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
         plan_id, name, discount, product_id, price = r[0], r[1], r[2] or 0, r[3], float(r[4]) if r[4] is not None else 0
         if not product_id:
             continue
+        # Fetch live price from Google Play so app shows same price as Play Store
+        formatted_price = _get_subscription_price_from_play(PACKAGE_NAME, product_id)
         plans.append({
             "plan_id": plan_id,
             "tier_name": name or f"Plan {plan_id}",
             "discount_percent": discount,
             "google_play_product_id": product_id,
             "price": price,
+            "formatted_price": formatted_price,
         })
     return {"plans": plans}
 

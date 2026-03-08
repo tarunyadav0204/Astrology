@@ -37,6 +37,24 @@ function formatSubscriptionDate(isoDate) {
   return `${day} ${month} ${year}`;
 }
 
+/** Get subscription price: prefer backend formatted_price (from Google Play), then iapSubscriptions, then plan.price. */
+function getSubscriptionDisplayPrice(plan, iapSubscriptions) {
+  if (plan.formatted_price != null && plan.formatted_price !== '') return plan.formatted_price;
+  const productId = plan.google_play_product_id || plan.productId;
+  if (!productId || !Array.isArray(iapSubscriptions)) return plan.price;
+  const iap = iapSubscriptions.find((s) => (s.productId || s.product_id) === productId);
+  if (!iap) return plan.price;
+  // Android: price is in subscriptionOfferDetails[].pricingPhases.pricingPhaseList[].formattedPrice
+  const offers = iap.subscriptionOfferDetails || iap.subscriptionOfferDetailsList;
+  const firstOffer = Array.isArray(offers) ? offers[0] : null;
+  const phases = firstOffer?.pricingPhases?.pricingPhaseList ?? firstOffer?.pricingPhaseList;
+  const firstPhase = Array.isArray(phases) ? phases[0] : null;
+  const formatted = firstPhase?.formattedPrice ?? firstPhase?.price;
+  if (formatted != null && formatted !== '') return formatted;
+  // iOS or legacy: top-level localizedPrice / price
+  return iap.localizedPrice ?? iap.price ?? plan.price;
+}
+
 // Lazy-load IAP only on Android to avoid iOS/build issues
 let RNIap = null;
 if (Platform.OS === 'android') {
@@ -65,6 +83,7 @@ const CreditScreen = ({ navigation }) => {
   const [iapSubscriptions, setIapSubscriptions] = useState([]); // from getSubscriptions (productId + subscriptionOfferDetails for offerToken)
   const [purchasingSubscriptionId, setPurchasingSubscriptionId] = useState(null);
   const [subscriptionDetails, setSubscriptionDetails] = useState(null);
+  const [refreshSubscriptionStatusLoading, setRefreshSubscriptionStatusLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -307,24 +326,74 @@ const CreditScreen = ({ navigation }) => {
     }
   };
 
-  /** On Android: get current subscription from Play and sync to our backend so we stay in sync if user changed/cancelled/renewed on Play. */
+  /** On Android: get current subscription from Play and sync to our backend. If no purchase found (e.g. after cancel) but we still have tier, clear our DB so UI updates. */
   const syncSubscriptionWithPlay = async () => {
     if (Platform.OS !== 'android' || !RNIap || subscriptionProductIds.length === 0) return;
     try {
-      const purchases = await RNIap.getAvailablePurchases();
-      const subscriptionPurchases = (purchases || []).filter(
+      let subscriptionPurchases = [];
+      const available = await RNIap.getAvailablePurchases().catch(() => []);
+      subscriptionPurchases = (available || []).filter(
         (p) => p.productId && subscriptionProductIds.includes(p.productId)
       );
+      if (subscriptionPurchases.length === 0 && typeof RNIap.getPurchaseHistory === 'function') {
+        const history = await RNIap.getPurchaseHistory().catch(() => []);
+        subscriptionPurchases = (history || []).filter(
+          (p) => p.productId && subscriptionProductIds.includes(p.productId)
+        );
+      }
+      let synced = false;
       for (const p of subscriptionPurchases) {
         const token = p.purchaseToken ?? p.purchaseTokenAndroid;
         const productId = p.productId ?? p.productIds?.[0];
         if (token && productId) {
           await creditAPI.syncSubscription(token, productId);
+          synced = true;
           break;
         }
       }
+      if (!synced) {
+        await creditAPI.clearSubscriptionNoPurchase();
+      }
+      await fetchBalance();
+      await fetchSubscriptionDetails();
     } catch (e) {
       console.warn('Subscription sync with Play failed:', e?.message);
+      try {
+        await creditAPI.clearSubscriptionNoPurchase();
+        await fetchBalance();
+        await fetchSubscriptionDetails();
+      } catch (clearErr) {
+        console.warn('Clear subscription failed:', clearErr?.message);
+      }
+    }
+  };
+
+  /** Force-clear subscription status and refetch (e.g. after user cancelled on Play and app still shows subscribed). */
+  const handleRefreshSubscriptionStatus = async () => {
+    if (refreshSubscriptionStatusLoading) return;
+    setRefreshSubscriptionStatusLoading(true);
+    try {
+      await creditAPI.clearSubscriptionNoPurchase();
+      await fetchBalance();
+      await fetchSubscriptionDetails();
+      setPurchaseModal({
+        visible: true,
+        type: 'success',
+        title: 'Subscription status updated',
+        message: 'If you cancelled on Google Play, your status has been updated.',
+        creditsAdded: 0,
+      });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Could not refresh';
+      setPurchaseModal({
+        visible: true,
+        type: 'error',
+        title: 'Refresh failed',
+        message: msg,
+        creditsAdded: 0,
+      });
+    } finally {
+      setRefreshSubscriptionStatusLoading(false);
     }
   };
 
@@ -611,21 +680,56 @@ const CreditScreen = ({ navigation }) => {
                   ) : null}
                 </View>
                 {Platform.OS === 'android' && (
-                  <TouchableOpacity
-                    style={[styles.manageSubscriptionButton, { borderColor: colors.cardBorder }]}
-                    onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
-                  >
-                    <Ionicons name="open-outline" size={18} color={colors.primary} />
-                    <Text style={[styles.manageSubscriptionButtonText, { color: colors.primary }]}>Manage or cancel subscription</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      style={[styles.manageSubscriptionButton, { borderColor: colors.cardBorder }]}
+                      onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
+                    >
+                      <Ionicons name="open-outline" size={18} color={colors.primary} />
+                      <Text style={[styles.manageSubscriptionButtonText, { color: colors.primary }]}>Manage or cancel subscription</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 8 }]}
+                      onPress={handleRefreshSubscriptionStatus}
+                      disabled={refreshSubscriptionStatusLoading}
+                    >
+                      <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
+                        {refreshSubscriptionStatusLoading ? 'Refreshing…' : 'Refresh subscription status'}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
                 )}
               </View>
             ) : subscriptionTierName && subscriptionDiscountPercent > 0 ? (
-              <View style={[styles.vipBadge, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(255,193,7,0.2)', borderColor: isDark ? 'rgba(255,215,0,0.4)' : 'rgba(255,193,7,0.5)' }]}>
-                <Ionicons name="shield-checkmark" size={20} color={colors.primary} style={styles.vipBadgeIcon} />
-                <Text style={[styles.vipBadgeText, { color: colors.text }]}>
-                  {subscriptionTierName} — {subscriptionDiscountPercent}% off on all features
-                </Text>
+              <View style={styles.vipBadgeWithManage}>
+                <View style={[styles.vipBadge, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(255,193,7,0.2)', borderColor: isDark ? 'rgba(255,215,0,0.4)' : 'rgba(255,193,7,0.5)' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color={colors.primary} style={styles.vipBadgeIcon} />
+                  <Text style={[styles.vipBadgeText, { color: colors.text }]}>
+                    {subscriptionTierName} — {subscriptionDiscountPercent}% off on all features
+                  </Text>
+                </View>
+                {Platform.OS === 'android' && (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder }]}
+                      onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
+                    >
+                      <Ionicons name="open-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Manage or cancel subscription</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
+                      onPress={handleRefreshSubscriptionStatus}
+                      disabled={refreshSubscriptionStatusLoading}
+                    >
+                      <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
+                        {refreshSubscriptionStatusLoading ? 'Refreshing…' : 'Refresh subscription status'}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             ) : null}
 
@@ -640,32 +744,58 @@ const CreditScreen = ({ navigation }) => {
                     <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No subscription plans available from the store.</Text>
                   ) : null
                 ) : (
-                  <View style={styles.buyProductGrid}>
-                    {subscriptionPlansFromPlay.map((plan) => {
-                      const productId = plan.google_play_product_id;
-                      const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
-                      const isPurchasing = purchasingSubscriptionId === productId;
-                      return (
+                  <>
+                    <View style={styles.buyProductGrid}>
+                      {subscriptionPlansFromPlay.map((plan) => {
+                        const productId = plan.google_play_product_id;
+                        const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
+                        const isPurchasing = purchasingSubscriptionId === productId;
+                        return (
+                          <TouchableOpacity
+                            key={plan.plan_id ?? productId}
+                            style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
+                            onPress={() => handleSubscribePress(plan)}
+                            disabled={isCurrentPlan || isPurchasing}
+                          >
+                            <Text style={[styles.buyProductLabel, { color: colors.text }]}>{plan.tier_name || 'VIP'}</Text>
+                            <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{plan.discount_percent ?? 0}% off</Text>
+                            {(() => {
+                              const displayPrice = getSubscriptionDisplayPrice(plan, iapSubscriptions);
+                              return displayPrice != null && displayPrice !== '' ? (
+                                <Text style={[styles.buyProductCredits, { color: colors.textSecondary, fontSize: 14 }]}>{displayPrice}</Text>
+                              ) : null;
+                            })()}
+                            <View style={[styles.buyProductButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
+                              <Text style={styles.buyProductButtonText}>
+                                {isCurrentPlan ? 'Current plan' : isPurchasing ? 'Processing…' : 'Subscribe'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {Platform.OS === 'android' && subscriptionTierName && (
+                      <>
                         <TouchableOpacity
-                          key={plan.plan_id ?? productId}
-                          style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
-                          onPress={() => handleSubscribePress(plan)}
-                          disabled={isCurrentPlan || isPurchasing}
+                          style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}
+                          onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
                         >
-                          <Text style={[styles.buyProductLabel, { color: colors.text }]}>{plan.tier_name || 'VIP'}</Text>
-                          <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{plan.discount_percent ?? 0}% off</Text>
-                          {plan.price != null && plan.price !== '' && (
-                            <Text style={[styles.buyProductCredits, { color: colors.textSecondary, fontSize: 14 }]}>{plan.price}</Text>
-                          )}
-                          <View style={[styles.buyProductButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
-                            <Text style={styles.buyProductButtonText}>
-                              {isCurrentPlan ? 'Current plan' : isPurchasing ? 'Processing…' : 'Subscribe'}
-                            </Text>
-                          </View>
+                          <Ionicons name="open-outline" size={16} color={colors.primary} />
+                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Manage or cancel subscription</Text>
                         </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                        <TouchableOpacity
+                          style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
+                          onPress={handleRefreshSubscriptionStatus}
+                          disabled={refreshSubscriptionStatusLoading}
+                        >
+                          <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
+                            {refreshSubscriptionStatusLoading ? 'Refreshing…' : 'Refresh subscription status'}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </>
                 )}
               </View>
             )}
@@ -928,11 +1058,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  vipBadgeWithManage: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
   vipBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 20,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
@@ -987,6 +1119,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   manageSubscriptionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  manageSubscriptionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  manageSubscriptionLinkText: {
     fontSize: 14,
     fontWeight: '600',
   },

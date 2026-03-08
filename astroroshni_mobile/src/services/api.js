@@ -361,6 +361,8 @@ export const creditAPI = {
       purchase_token: purchaseToken,
       product_id: productId,
     }),
+  clearSubscriptionNoPurchase: () =>
+    api.post(getEndpoint('/credits/google-play/subscription/clear')),
   verifyGooglePlaySubscription: (purchaseToken, productId, orderId) =>
     api.post(getEndpoint('/credits/google-play/subscription/verify'), {
       purchase_token: purchaseToken,
