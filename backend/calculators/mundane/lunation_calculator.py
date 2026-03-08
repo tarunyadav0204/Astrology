@@ -81,8 +81,12 @@ class LunationCalculator:
             if abs(error) < 0.001:
                 lunation_type = 'New Moon' if target_diff == 0 else 'Full Moon'
                 chart = self._calculate_lunation_chart(search_date, latitude, longitude)
-                
-                return {
+                jd = swe.julday(search_date.year, search_date.month, search_date.day,
+                               search_date.hour + search_date.minute/60.0)
+                eclipse_visibility = self._get_eclipse_visibility(
+                    jd, latitude, longitude, lunation_type
+                )
+                out = {
                     'type': lunation_type,
                     'datetime': search_date.isoformat(),
                     'sun_longitude': round(sun_pos, 4),
@@ -92,6 +96,9 @@ class LunationCalculator:
                     'paksha': 'Shukla' if lunation_type == 'New Moon' else 'Krishna',
                     'valid_until': (search_date + timedelta(days=14)).isoformat()
                 }
+                if eclipse_visibility:
+                    out['eclipse_visibility'] = eclipse_visibility
+                return out
             
             # Adjust time: Error / Relative Speed
             search_date += timedelta(days=error / 12.19)
@@ -153,3 +160,48 @@ class LunationCalculator:
             'name': nakshatras[nak_index % 27],
             'pada': pada
         }
+
+    def _get_eclipse_visibility(self, jd: float, lat: float, lon: float, lunation_type: str) -> Dict[str, Any]:
+        """Check if this lunation is an eclipse and whether it is visible from the given location."""
+        try:
+            geopos = (float(lon), float(lat), 0.0)
+            if lunation_type == 'New Moon':
+                res = swe.sol_eclipse_when_glob(jd - 1, swe.FLG_SWIEPH)
+                if res[0] < 0:
+                    return {}
+                jd_max = res[1][0]
+                if abs(jd_max - jd) > 1.5:
+                    return {}
+                how = swe.sol_eclipse_how(jd_max, geopos)
+                if how[0] < 0:
+                    return {'is_eclipse': True, 'visible_from_location': False, 'reason': 'solar_eclipse_not_visible'}
+                attr = how[1] if len(how) > 1 else ()
+                magn = attr[8] if len(attr) > 8 else (attr[0] if attr else 0)
+                return {
+                    'is_eclipse': True,
+                    'eclipse_type': 'solar',
+                    'visible_from_location': how[0] != 0 or (magn > 0.001 if isinstance(magn, (int, float)) else False),
+                    'magnitude_at_location': round(magn, 4) if isinstance(magn, (int, float)) else 0,
+                    'note': 'Effect lasts up to 6 months; interpret mainly for regions where visible.'
+                }
+            else:
+                res = swe.lun_eclipse_when(jd - 1, swe.FLG_SWIEPH)
+                if res[0] < 0:
+                    return {}
+                jd_max = res[1][0]
+                if abs(jd_max - jd) > 1.5:
+                    return {}
+                how = swe.lun_eclipse_how(jd_max, geopos)
+                if how[0] < 0:
+                    return {'is_eclipse': True, 'visible_from_location': False, 'reason': 'lunar_eclipse_how_failed'}
+                attr = how[1] if len(how) > 1 else ()
+                magn = attr[0] if attr else 0
+                return {
+                    'is_eclipse': True,
+                    'eclipse_type': 'lunar',
+                    'visible_from_location': how[0] != 0 or (magn > 0.001 if isinstance(magn, (int, float)) else False),
+                    'magnitude_at_location': round(magn, 4) if isinstance(magn, (int, float)) else 0,
+                    'note': 'Lunar eclipse visible where Moon is above horizon; interpret for visible regions.'
+                }
+        except (AttributeError, TypeError, Exception):
+            return {}

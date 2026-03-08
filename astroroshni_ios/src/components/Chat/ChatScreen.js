@@ -772,7 +772,7 @@ export default function ChatScreen({ navigation, route }) {
         navigation.navigate('AnalysisDetail', { 
           analysisType: option.type,
           title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
-          cost: 5
+          cost: option.cost
         });
       }
     } else {

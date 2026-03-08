@@ -17,6 +17,7 @@ import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
 import { storage } from '../../services/storage';
+import { pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cleanupStorage } from '../../services/storageCleanup';
 import * as Print from 'expo-print';
@@ -30,7 +31,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const isDark = theme === 'dark';
   const { analysisType, title, cost: costFromParams } = route.params;
   const { credits, fetchBalance } = useCredits();
-  const [cost, setCost] = useState(costFromParams ?? 5);
+  const [cost, setCost] = useState(costFromParams ?? 0);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -64,8 +65,22 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   useEffect(() => {
     if (costFromParams != null && costFromParams !== undefined) {
       setCost(costFromParams);
+    } else if (cost === 0) {
+      // Fallback: fetch current pricing if cost is missing
+      const fetchCurrentCost = async () => {
+        try {
+          const res = await pricingAPI.getPricing();
+          const pricing = res.data?.pricing || res.data || {};
+          if (pricing[analysisType]) {
+            setCost(Number(pricing[analysisType]));
+          }
+        } catch (error) {
+          console.error('Error fetching cost fallback:', error);
+        }
+      };
+      fetchCurrentCost();
     }
-  }, [costFromParams]);
+  }, [costFromParams, analysisType]);
 
   useEffect(() => {
     if (birthData) {

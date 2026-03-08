@@ -51,11 +51,11 @@ BPHS gives fixed values:
 - Venus: 42.85 points
 - Saturn: 8.57 points
 
-✅ Our code (line 467-475 in classical_shadbala.py):
+✅ Our code (classical_shadbala.py):
 ```python
 NAISARGIKA_BALA = {
-    'Sun': 60.0, 'Moon': 51.43, 'Venus': 42.0,
-    'Jupiter': 34.0, 'Mercury': 25.0, 'Mars': 17.0, 'Saturn': 8.57
+    'Sun': 60.0, 'Moon': 51.43, 'Mars': 17.14, 'Mercury': 25.71,
+    'Jupiter': 34.29, 'Venus': 42.86, 'Saturn': 8.57
 }
 ```
 
@@ -140,6 +140,8 @@ Then: total_points / 60 = total_rupas
 ❌ **Timezone Issues**: Not accounting for local time properly  
 ❌ **Rahu/Ketu**: Including shadow planets (not in classical Shadbala)
 ❌ **Rounding Errors**: Using integer math instead of float
+❌ **Wrong weekday order**: Dina/Hora lords must be Sunday=Sun, Monday=Moon, Tuesday=Mars, Wednesday=Mercury, Thursday=Jupiter, Friday=Venus, Saturday=Saturn (Swiss Ephemeris `day_of_week` 0=Sunday)
+❌ **Vedic day at midnight**: Dina Bala must use the weekday of the sunrise that started the current Vedic day (day starts at sunrise, not midnight)
 
 ### 7. Our Implementation Advantages
 

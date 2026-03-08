@@ -1,8 +1,18 @@
 from typing import Dict, Any, List
 
+# Nakshatra list in order (index 0..26) for Vedha calculation
+NAKSHATRAS_ORDER = [
+    'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu',
+    'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta',
+    'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha',
+    'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
+    'Uttara Bhadrapada', 'Revati'
+]
+
+
 class MundaneYogaCalculator:
     """Detects specialized yogas for war, famine, inflation, and economic events"""
-    
+
     def __init__(self):
         # Sarvatobhadra Chakra: Nakshatra-Commodity mapping
         self.commodity_nakshatras = {
@@ -13,39 +23,73 @@ class MundaneYogaCalculator:
             'Metals': ['Mrigashira', 'Chitra', 'Dhanishta'],  # Mars-ruled
             'Technology': ['Ashlesha', 'Jyeshtha', 'Revati']  # Mercury-ruled
         }
-    
+
     def analyze_chart(self, chart_data: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze mundane chart for economic and political yogas"""
         yogas = []
-        
+
+        # Graha Yuddha (Planetary War): within 1° - high-priority trigger
+        graha_yuddhas = self._check_graha_yuddha(chart_data)
+        yogas.extend(graha_yuddhas)
+
         # War Yoga: Mars-Saturn conjunction or aspect
         war_yoga = self._check_war_yoga(chart_data)
         if war_yoga:
             yogas.append(war_yoga)
-        
+
         # Famine Yoga: Afflicted Moon and Jupiter
         famine_yoga = self._check_famine_yoga(chart_data)
         if famine_yoga:
             yogas.append(famine_yoga)
-        
+
         # Inflation Yoga: Venus-Rahu in 2nd/11th house
         inflation_yoga = self._check_inflation_yoga(chart_data)
         if inflation_yoga:
             yogas.append(inflation_yoga)
-        
+
         # Revolution Yoga: Uranus-Pluto hard aspect
         revolution_yoga = self._check_revolution_yoga(chart_data)
         if revolution_yoga:
             yogas.append(revolution_yoga)
-        
-        # Commodity impacts
+
+        # Commodity impacts (direct + Vedha)
         commodity_impacts = self._check_commodity_impacts(chart_data)
-        
+
         return {
             'yogas': yogas,
             'commodity_impacts': commodity_impacts,
             'overall_assessment': self._generate_assessment(yogas, commodity_impacts)
         }
+
+    def _check_graha_yuddha(self, chart_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Graha Yuddha: two planets within 1° - sudden shocks, leadership events, market crashes."""
+        results = []
+        planets = chart_data.get('planets', {})
+        planet_names = [p for p in planets if p not in ('Rahu', 'Ketu') or True]
+        # Pairs that matter for mundane (all classical + nodes)
+        pairs = [
+            ('Mars', 'Saturn'), ('Sun', 'Mars'), ('Sun', 'Mercury'), ('Mars', 'Mercury'),
+            ('Jupiter', 'Saturn'), ('Venus', 'Saturn'), ('Venus', 'Mars'),
+            ('Sun', 'Venus'), ('Mercury', 'Jupiter'), ('Moon', 'Mars'), ('Moon', 'Saturn'),
+            ('Rahu', 'Mars'), ('Rahu', 'Saturn'), ('Rahu', 'Jupiter'), ('Ketu', 'Mars'), ('Ketu', 'Saturn'),
+        ]
+        for p1, p2 in pairs:
+            a, b = planets.get(p1), planets.get(p2)
+            if not a or not b:
+                continue
+            long1 = a.get('longitude', 0)
+            long2 = b.get('longitude', 0)
+            diff = abs((long1 - long2 + 180) % 360 - 180)
+            if diff <= 1.0:
+                results.append({
+                    'name': f'Graha Yuddha ({p1}-{p2})',
+                    'type': 'planetary_war',
+                    'severity': 'critical',
+                    'graha_yuddha': True,
+                    'description': f'{p1} and {p2} within 1° (Graha Yuddha). High-intensity trigger for sudden shocks, leadership events, or market volatility.',
+                    'planets': [p1, p2],
+                })
+        return results
     
     def _check_war_yoga(self, chart_data: Dict[str, Any]) -> Dict[str, Any]:
         """Check for war indicators"""
@@ -149,32 +193,56 @@ class MundaneYogaCalculator:
         return None
     
     def _check_commodity_impacts(self, chart_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Check Sarvatobhadra Chakra for commodity price impacts"""
+        """Sarvatobhadra Chakra: direct (planet in nakshatra) + Vedha (aspect to commodity nakshatra)."""
         impacts = []
         planets = chart_data.get('planets', {})
-        
-        # Check malefics (Mars, Saturn, Rahu, Ketu) in commodity nakshatras
         malefics = ['Mars', 'Saturn', 'Rahu', 'Ketu']
-        
+
         for planet_name in malefics:
             planet = planets.get(planet_name, {})
             if not planet:
                 continue
-            
-            nakshatra = planet.get('nakshatra', {}).get('name', '')
-            
+            nakshatra = planet.get('nakshatra', {}).get('name', '') or self._nakshatra_from_longitude(planet.get('longitude', 0))
+            if not nakshatra:
+                continue
+            try:
+                nak_index = NAKSHATRAS_ORDER.index(nakshatra)
+            except ValueError:
+                continue
+            # Direct: planet in commodity nakshatra
             for commodity, nakshatras in self.commodity_nakshatras.items():
                 if nakshatra in nakshatras:
                     impacts.append({
                         'commodity': commodity,
                         'planet': planet_name,
                         'nakshatra': nakshatra,
+                        'impact_type': 'direct',
                         'impact': 'price_volatility',
                         'prediction': f"{planet_name} in {nakshatra} suggests volatility in {commodity} prices"
                     })
-        
+            # Vedha: 7th aspect in SBC = nakshatra (index + 14) mod 27
+            vedha_index = (nak_index + 14) % 27
+            vedha_nakshatra = NAKSHATRAS_ORDER[vedha_index]
+            for commodity, nakshatras in self.commodity_nakshatras.items():
+                if vedha_nakshatra in nakshatras:
+                    impacts.append({
+                        'commodity': commodity,
+                        'planet': planet_name,
+                        'nakshatra': nakshatra,
+                        'vedha_nakshatra': vedha_nakshatra,
+                        'impact_type': 'vedha',
+                        'impact': 'price_affliction_by_aspect',
+                        'prediction': f"{planet_name} in {nakshatra} aspects (Vedha) {vedha_nakshatra} → {commodity} afflicted"
+                    })
         return impacts
     
+    def _nakshatra_from_longitude(self, longitude: float) -> str:
+        if longitude is None:
+            return ''
+        span = 360 / 27
+        idx = int(longitude / span) % 27
+        return NAKSHATRAS_ORDER[idx]
+
     def _generate_assessment(self, yogas: List[Dict], commodity_impacts: List[Dict]) -> str:
         """Generate overall mundane assessment"""
         if not yogas and not commodity_impacts:

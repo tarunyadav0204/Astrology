@@ -764,11 +764,11 @@ export default function ChatScreen({ navigation, route }) {
       } else if (option.type === 'childbirth') {
         navigation.navigate('ChildbirthPlanner');
       } else {
-        navigation.navigate('AnalysisDetail', { 
-          analysisType: option.type,
-          title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
-          cost: 5
-        });
+            navigation.navigate('AnalysisDetail', { 
+              analysisType: option.type,
+              title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
+              cost: option.cost
+            });
       }
     } else {
       

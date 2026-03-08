@@ -2130,7 +2130,7 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
       ]}
     >
       <TouchableOpacity
-        onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
+        onPress={() => onOptionSelect({ action: 'analysis', type: option.id, cost: option.cost })}
         activeOpacity={0.9}
       >
         <LinearGradient
@@ -2213,7 +2213,7 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
           if (option.id === 'muhurat') {
             onOptionSelect({ action: 'muhurat' });
           } else {
-            onOptionSelect({ action: 'analysis', type: option.id });
+            onOptionSelect({ action: 'analysis', type: option.id, cost: option.cost });
           }
         }}
         activeOpacity={0.9}
@@ -2276,7 +2276,7 @@ function AnalysisCard({ option, index, onOptionSelect }) {
           if (option.id === 'muhurat') {
             onOptionSelect({ action: 'muhurat' });
           } else {
-            onOptionSelect({ action: 'analysis', type: option.id });
+            onOptionSelect({ action: 'analysis', type: option.id, cost: option.cost });
           }
         }}
         activeOpacity={0.9}

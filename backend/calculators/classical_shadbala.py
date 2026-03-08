@@ -755,9 +755,10 @@ def get_hora_lord(jd: float, birth_data: Dict) -> str:
         hours_from_sunrise = (jd - sunrise_jd) * 24
         hora_index_from_sunrise = int(hours_from_sunrise)
         
-        # Get Vedic weekday
+        # Get Vedic weekday (Swiss Ephemeris: 0=Sunday, 1=Monday, ... 6=Saturday)
+        # BPHS: Sunday=Sun, Monday=Moon, Tuesday=Mars, Wednesday=Mercury, Thursday=Jupiter, Friday=Venus, Saturday=Saturn
         vedic_weekday = int(swe.day_of_week(sunrise_jd))
-        day_lords = ['Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Sun']
+        day_lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         day_lord = day_lords[vedic_weekday]
         
         # Find starting hora index
@@ -765,34 +766,32 @@ def get_hora_lord(jd: float, birth_data: Dict) -> str:
         hora_index = (start_index + hora_index_from_sunrise) % 7
         return hora_sequence[hora_index]
     except:
-        # Fallback to calendar-based
+        # Fallback to calendar-based (0=Sunday=Sun, 1=Monday=Moon, ...)
         weekday = int(swe.day_of_week(jd))
-        day_lords = ['Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Sun']
+        day_lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         return day_lords[weekday]
 
 def get_dina_lord(jd: float, birth_data: Dict) -> str:
     """Calculate Vedic day lord (weekday ruler).
-    CRITICAL: Vedic day starts at sunrise, not midnight.
+    CRITICAL: Vedic day starts at sunrise, not midnight. Use the weekday of the
+    sunrise that began the current Vedic day.
+    BPHS: Sunday=Sun, Monday=Moon, Tuesday=Mars, Wednesday=Mercury, Thursday=Jupiter, Friday=Venus, Saturday=Saturn.
     """
     try:
         lat = float(birth_data.get('latitude', 0))
         lon = float(birth_data.get('longitude', 0))
         
-        # Get sunrise for current calendar day
+        # Sunrise for this calendar day
         sunrise_jd = swe.rise_trans(jd, swe.SUN, lon, lat, 0, 0, 0, 0)[1][0]
-        
-        # If birth before sunrise, use previous day
+        # If birth is before today's sunrise, current Vedic day started at previous sunrise
         if jd < sunrise_jd:
-            vedic_weekday = int(swe.day_of_week(jd - 1))
-        else:
-            vedic_weekday = int(swe.day_of_week(jd))
-        
-        day_lords = ['Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Sun']
+            sunrise_jd = swe.rise_trans(jd - 1, swe.SUN, lon, lat, 0, 0, 0, 0)[1][0]
+        vedic_weekday = int(swe.day_of_week(sunrise_jd))
+        day_lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         return day_lords[vedic_weekday]
-    except:
-        # Fallback
+    except Exception:
         weekday = int(swe.day_of_week(jd))
-        day_lords = ['Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Sun']
+        day_lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         return day_lords[weekday]
 
 def get_maasa_lord(jd: float) -> str:
@@ -815,7 +814,7 @@ def get_varsha_lord(jd: float, birth_data: Dict) -> str:
     sun_sign = int(sun_long / 30)
     return SIGN_LORDS[sun_sign]
 
-def calculate_kala_bala(planet: str, jd: float, birth_data: Dict) -> float:
+def calculate_kala_bala(planet: str, jd: float, birth_data: Dict):
     """
     Calculates complete Temporal Strength (Kala Bala):
     - Nathonniya Bala (60 points max) - Diurnal/Nocturnal
@@ -827,7 +826,13 @@ def calculate_kala_bala(planet: str, jd: float, birth_data: Dict) -> float:
     - Hora Lord (60 points)
     - Ayana Bala (60 points max) - INCLUDED per DrikPanchang
     Total: 390 points maximum
+    Returns: (total_kala, kala_components_dict) for API breakdown display.
     """
+    default_components = {
+        'nathonniya_bala': 0.0, 'paksha_bala': 0.0, 'tribhaga_bala': 0.0,
+        'varsha_bala': 0.0, 'maasa_bala': 0.0, 'dina_bala': 0.0,
+        'hora_bala': 0.0, 'ayana_bala': 0.0
+    }
     try:
         sun_long = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH | swe.FLG_SIDEREAL)[0][0]
         moon_long = swe.calc_ut(jd, swe.MOON, swe.FLG_SWIEPH | swe.FLG_SIDEREAL)[0][0]
@@ -867,10 +872,20 @@ def calculate_kala_bala(planet: str, jd: float, birth_data: Dict) -> float:
         # Total Kala Bala (includes Ayana)
         total_kala = nathonniya_bala + paksha_bala + tribhaga_bala + varsha_bala + maasa_bala + dina_bala + hora_bala + ayana_bala
         
-        return round(total_kala, 2)
+        kala_components = {
+            'nathonniya_bala': round(nathonniya_bala, 2),
+            'paksha_bala': round(paksha_bala, 2),
+            'tribhaga_bala': round(tribhaga_bala, 2),
+            'varsha_bala': round(varsha_bala, 2),
+            'maasa_bala': round(maasa_bala, 2),
+            'dina_bala': round(dina_bala, 2),
+            'hora_bala': round(hora_bala, 2),
+            'ayana_bala': round(ayana_bala, 2),
+        }
+        return round(total_kala, 2), kala_components
     except Exception as e:
         print(f"Error in calculate_kala_bala for {planet}: {e}")
-        return 120.0  # Default average
+        return 120.0, default_components
 
 def calculate_chesta_bala(planet: str, jd: float) -> float:
     """
@@ -994,7 +1009,7 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
                 ayan_bala = calculate_ayan_bala(planet_name, jd)
                 
                 dig_bala = calculate_dig_bala(planet_name, longitude, house_cusps)
-                kala_bala = calculate_kala_bala(planet_name, jd, birth_dict)
+                kala_bala, kala_components = calculate_kala_bala(planet_name, jd, birth_dict)
                 chesta_bala = calculate_chesta_bala(planet_name, jd)
                 naisargika_bala = NAISARGIKA_BALA.get(planet_name, 30.0)
                 drik_bala = calculate_drik_bala(planet_name, longitude, planets, house_cusps)
@@ -1033,7 +1048,7 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
                             'drekkana_bala': drekkana_bala
                         },
                         'ayan_bala': ayan_bala,
-                        'kala_components': {}
+                        'kala_components': kala_components
                     }
                 }
                 print(f"🔍 BACKEND: Storing {planet_name} ojha_yugma_bala={ojha_yugma_bala} in results")

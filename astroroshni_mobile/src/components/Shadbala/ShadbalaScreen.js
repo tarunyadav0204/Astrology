@@ -61,6 +61,21 @@ const ShadbalaScreen = ({ route, navigation }) => {
     return colors.error;
   };
 
+  const getBhavBalaGradeColor = (grade) => {
+    if (!grade) return colors.textTertiary;
+    if (['A+', 'A'].includes(grade)) return colors.success;
+    if (['B+', 'B'].includes(grade)) return '#8BC34A';
+    if (['C+', 'C'].includes(grade)) return colors.warning;
+    return colors.error;
+  };
+
+  const bhavBala = shadbalaData?.bhav_bala || {};
+  const houseNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const houseLabels = {
+    1: 'Self', 2: 'Wealth', 3: 'Siblings', 4: 'Home', 5: 'Children', 6: 'Health',
+    7: 'Partner', 8: 'Transformation', 9: 'Fortune', 10: 'Career', 11: 'Gains', 12: 'Losses'
+  };
+
   const getPlanetIcon = (planet) => {
     const icons = {
       Sun: '☉', Moon: '☽', Mars: '♂', Mercury: '☿',
@@ -192,16 +207,46 @@ const ShadbalaScreen = ({ route, navigation }) => {
 
                 <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('kalaBalaBreakdown', 'Kala Bala Breakdown')}</Text>
-                  {Object.entries(selected.detailed_breakdown.kala_components).map(([key, value]) => (
+                  {Object.entries(selected.detailed_breakdown.kala_components || {}).map(([key, value]) => (
                     <View key={key} style={styles.detailRow}>
                       <Text style={[styles.detailName, { color: colors.textSecondary }]}>{t(`components.${key}`, formatComponentName(key))}</Text>
-                      <Text style={[styles.detailValue, { color: colors.text }]}>{value.toFixed(1)}</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>{typeof value === 'number' ? value.toFixed(1) : value}</Text>
                     </View>
                   ))}
                 </View>
               </>
             )}
           </>
+        )}
+
+        {Object.keys(bhavBala).length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('bhavBala', 'Bhav Bala (House Strength)')}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary, marginBottom: 12, textAlign: 'left' }]}>
+              {t('bhavBalaDescription', 'Strength of each house based on lord, occupants, aspects and position.')}
+            </Text>
+            <View style={styles.bhavGrid}>
+              {houseNumbers.map((num) => {
+                const key = String(num);
+                const data = bhavBala[key];
+                if (!data) return null;
+                const grade = data.grade || '–';
+                const strength = typeof data.total_strength === 'number' ? data.total_strength.toFixed(0) : (data.total_strength ?? '–');
+                return (
+                  <View key={key} style={[styles.bhavCell, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                    <Text style={[styles.bhavHouseNum, { color: colors.text }]}>{num}</Text>
+                    <Text style={[styles.bhavHouseLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {t(`house.${num}`, houseLabels[num] || `House ${num}`)}
+                    </Text>
+                    <Text style={[styles.bhavStrength, { color: colors.text }]}>{strength}</Text>
+                    <View style={[styles.bhavGradeBadge, { backgroundColor: getBhavBalaGradeColor(grade) }]}>
+                      <Text style={styles.bhavGradeText}>{grade}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
         )}
       </ScrollView>
       </SafeAreaView>
@@ -262,7 +307,26 @@ const styles = StyleSheet.create({
   componentValue: { fontSize: 16, fontWeight: '600' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
   detailName: { fontSize: 13, flex: 1 },
-  detailValue: { fontSize: 14, fontWeight: '500' }
+  detailValue: { fontSize: 14, fontWeight: '500' },
+  bhavGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  bhavCell: {
+    width: '31%',
+    marginHorizontal: '1%',
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  bhavHouseNum: { fontSize: 16, fontWeight: 'bold' },
+  bhavHouseLabel: { fontSize: 10, marginTop: 2 },
+  bhavStrength: { fontSize: 14, fontWeight: '600', marginTop: 4 },
+  bhavGradeBadge: { marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  bhavGradeText: { fontSize: 11, color: '#fff', fontWeight: 'bold' },
 });
 
 export default ShadbalaScreen;

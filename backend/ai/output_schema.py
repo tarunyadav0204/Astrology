@@ -161,13 +161,17 @@ Your response must be a chronological analysis of the specific event requested a
 # Special Template for Mundane Astrology
 TEMPLATE_MUNDANE = """
 RESPONSE FORMAT - MUNDANE MODE:
-<div class="quick-answer-card">**Executive Summary**: [Risk assessment & market outlook]</div>
-### Key Risk Factors
+Adapt structure to the question. For specific events (match, election, concert): omit Economic & Market and Geopolitical sections. For nation/market outlook: include all.
+
+<div class="quick-answer-card">**Executive Summary**: [Risk assessment or event outcome]</div>
+### Key Risk Factors / Key Influences
 [Bullet points]
-### Economic & Market Analysis
-[Detailed analysis]
-### Geopolitical Outlook
-[Political stability, conflicts]
+### Economic & Market Analysis (nation/market questions only)
+[Include only when question relates to markets, economy, or betting]
+### Geopolitical Outlook (nation/market questions only)
+[Include only when question relates to politics or geopolitics]
+### Event-Specific Analysis (specific events only)
+[For matches, elections, etc.: toss, key phases, outcome, timing]
 <div class="final-thoughts-card">**Strategic Outlook**: [Conclusion]</div>
 """
 
@@ -255,14 +259,13 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     """
     Builds the final, consolidated prompt for the Gemini AI.
     """
-    # Get the mode directly from the intent context when available.
+    analysis_type = context.get('analysis_type', 'birth')
     intent_block = context.get('intent', {}) or {}
     intent_mode = intent_block.get('mode', mode)
-    # Lab mode override: when intent carries an explicit lab flag, force LAB_EDUCATION
+    if analysis_type == 'mundane':
+        intent_mode = 'MUNDANE'
     if intent_block.get('lab_mode'):
         intent_mode = 'LAB_EDUCATION'
-    
-    # Handle None or empty intent_mode
     if not intent_mode:
         intent_mode = mode or 'DEFAULT'
 
@@ -315,13 +318,14 @@ Your full response MUST be at least 12,000 characters. Short or summary-style an
     response_format_instruction = get_response_schema_for_mode(intent_mode, premium_analysis=premium_analysis)
     
     from chat.system_instruction_config import build_system_instruction
-    
-    analysis_type = context.get('analysis_type', 'birth')
-    
+    from calculators.mundane.mundane_context_builder import MundaneContextBuilder
+
     if analysis_type == 'synastry':
         native_name = context.get('native', {}).get('birth_details', {}).get('name', 'Native')
         partner_name = context.get('partner', {}).get('birth_details', {}).get('name', 'Partner')
         system_instruction = SYNASTRY_SYSTEM_INSTRUCTION.replace('{native_name}', native_name).replace('{partner_name}', partner_name)
+    elif analysis_type == 'mundane':
+        system_instruction = MundaneContextBuilder.MUNDANE_SYSTEM_INSTRUCTION
     else:
         analysis_type_from_intent = context.get('intent', {}).get('analysis_type')
         intent_category = context.get('intent', {}).get('category', 'general')
