@@ -339,13 +339,18 @@ class CreditService:
         finally:
             conn.close()
 
-    def get_effective_cost(self, userid: int, base_cost: int) -> int:
-        """Return discounted cost for user (subscription tier). base_cost is the credit_settings value; returns rounded int."""
+    def get_effective_cost(self, userid: int, base_cost: int, setting_key: str = None) -> int:
+        """Return cost for user. Non-VIP: returns base_cost (site effective/discounted price).
+        VIP: applies subscription % off the original price (from setting_key), not the discounted price."""
         if base_cost <= 0:
             return base_cost
         discount = self.get_subscription_discount_percent(userid)
         if discount <= 0:
-            return base_cost
+            return base_cost  # Non-VIP: effective (discounted) price
+        # VIP: apply discount on original price, not on already-discounted base_cost
+        if setting_key:
+            _, original, _ = self.get_credit_setting_and_original(setting_key)
+            base_cost = original
         return max(1, round(base_cost * (100 - discount) / 100))
 
     def get_free_chat_question_used(self, userid: int) -> bool:

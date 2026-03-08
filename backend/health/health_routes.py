@@ -40,7 +40,7 @@ async def analyze_health(request: HealthAnalysisRequest, current_user: User = De
     
     # Check credit cost and user balance (subscription tier discount applied)
     base_cost = credit_service.get_credit_setting('health_analysis_cost')
-    health_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+    health_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'health_analysis_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < health_cost:

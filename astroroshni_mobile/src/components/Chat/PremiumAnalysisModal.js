@@ -1,6 +1,8 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) => {
   return (
@@ -11,8 +13,12 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={[styles.modalContainer, { maxHeight: screenHeight * 0.9 }]}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+          >
             {/* Header */}
             <LinearGradient
               colors={['#ff6b35', '#ffd700']}
@@ -168,8 +174,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: '100%',
     maxWidth: 500,
-    maxHeight: '90%',
     overflow: 'hidden',
+  },
+  scrollView: {
+    maxHeight: screenHeight * 0.85,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   header: {
     padding: 24,

@@ -244,7 +244,7 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
     
     # Check credit cost and user balance (subscription tier discount applied)
     base_cost = credit_service.get_credit_setting('wealth_analysis_cost')
-    wealth_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+    wealth_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'wealth_analysis_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     print(f"💳 WEALTH CREDIT CHECK:")

@@ -179,6 +179,61 @@
 .settings-th-price,
 .settings-th-discount { text-align: center; }
 
+/* Feature costs table - ensures header/column alignment */
+.feature-costs-table {
+  width: 100%;
+  max-width: 720px;
+  min-width: 540px;
+  border-collapse: collapse;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.feature-costs-table th {
+  padding: 10px 12px;
+  background: #e9ecef;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #495057;
+  text-align: center;
+}
+.feature-costs-table th.feature-costs-th-name {
+  text-align: left;
+}
+.feature-costs-table td {
+  padding: 12px;
+  border-top: 1px solid #e9ecef;
+  background: #fff;
+  text-align: center;
+  vertical-align: middle;
+}
+.feature-costs-table td.feature-costs-td-name {
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: #212529;
+}
+.feature-costs-table .feature-costs-input {
+  width: 70px;
+  padding: 8px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 15px;
+  text-align: center;
+}
+.feature-costs-table .feature-costs-input:focus {
+  border-color: #28a745;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+.feature-costs-table .feature-costs-td-vip {
+  background: #f8f9fa;
+  font-size: 13px;
+  color: #495057;
+}
+
 .setting-row {
   display: grid;
   grid-template-columns: 1fr 90px 90px;
@@ -276,6 +331,11 @@
     font-size: 15px;
     padding-bottom: 4px;
     border-bottom: 1px solid #f1f3f5;
+  }
+
+  .feature-costs-table {
+    display: block;
+    overflow-x: auto;
   }
 
   .setting-row-inputs {

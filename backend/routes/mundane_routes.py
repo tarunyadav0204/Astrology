@@ -51,7 +51,7 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
     # Check credits (subscription tier discount applied)
     credit_service = CreditService()
     base_cost = credit_service.get_credit_setting('chat_question_cost')
-    chat_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+    chat_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < chat_cost:

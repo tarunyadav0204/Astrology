@@ -566,6 +566,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     );
   };
 
+  const vipTiers = ['Silver', 'Gold', 'Platinum'].map(name => {
+    const plan = (subscriptionPlans || []).find(
+      p => (p.tier_name || p.plan_name || '').toLowerCase().includes(name.toLowerCase())
+    );
+    return { name, discount: plan ? (plan.discount_percent ?? 0) : 0 };
+  });
+
+  const calcVipPrice = (price, discountPercent) => {
+    const p = Number(price);
+    if (!p || p <= 0) return '—';
+    return Math.max(1, Math.round(p * (100 - discountPercent) / 100));
+  };
+
   const handleSettingDiscountChange = (key, discountValue) => {
     const parsed = discountValue === '' || discountValue === undefined ? null : parseInt(discountValue, 10);
     setCreditSettings(prev =>
@@ -1251,44 +1264,56 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             
             <div className="credit-settings">
               <h3>Feature Costs</h3>
-              <p className="credit-settings-hint">Set original price and optional discounted price (credits). Leave discount empty for no discount.</p>
+              <p className="credit-settings-hint">Set original price and optional discounted price (credits). VIP columns show auto-calculated price for plan holders (updates as you type).</p>
               <div className="settings-form settings-form-table">
-                <div className="settings-table-header">
-                  <span className="settings-th-feature">Feature</span>
-                  <span className="settings-th-price">Price</span>
-                  <span className="settings-th-discount">Discount</span>
-                </div>
-                {creditSettings.map(setting => (
-                  <div key={setting.key} className="setting-row">
-                    <label className="setting-row-label" title={setting.key}>{setting.description}</label>
-                    <div className="setting-row-inputs">
-                      <span className="setting-input-wrap">
-                        <span className="setting-input-label">Price</span>
-                        <input
-                          type="number"
-                          value={setting.value}
-                          onChange={(e) => handleSettingChange(setting.key, e.target.value)}
-                          min="1"
-                          placeholder="—"
-                          title="Original cost (credits)"
-                          aria-label={`${setting.description} price`}
-                        />
-                      </span>
-                      <span className="setting-input-wrap">
-                        <span className="setting-input-label">Discount</span>
-                        <input
-                          type="number"
-                          value={setting.discount ?? ''}
-                          onChange={(e) => handleSettingDiscountChange(setting.key, e.target.value)}
-                          min="0"
-                          placeholder="—"
-                          title="Discounted cost (empty = no discount)"
-                          aria-label={`${setting.description} discount`}
-                        />
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                <table className="feature-costs-table">
+                  <thead>
+                    <tr>
+                      <th className="feature-costs-th-name">Feature</th>
+                      <th className="feature-costs-th">Price</th>
+                      <th className="feature-costs-th">Discount</th>
+                      {vipTiers.map(t => (
+                        <th key={t.name} className="feature-costs-th" title={`${t.name}: ${t.discount}% off`}>{t.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditSettings.map(setting => (
+                      <tr key={setting.key}>
+                        <td className="feature-costs-td-name" title={setting.key}>{setting.description}</td>
+                        <td className="feature-costs-td">
+                          <input
+                            type="number"
+                            value={setting.value}
+                            onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                            min="1"
+                            placeholder="—"
+                            title="Original cost (credits)"
+                            aria-label={`${setting.description} price`}
+                            className="feature-costs-input"
+                          />
+                        </td>
+                        <td className="feature-costs-td">
+                          <input
+                            type="number"
+                            value={setting.discount ?? ''}
+                            onChange={(e) => handleSettingDiscountChange(setting.key, e.target.value)}
+                            min="0"
+                            placeholder="—"
+                            title="Discounted cost (empty = no discount)"
+                            aria-label={`${setting.description} discount`}
+                            className="feature-costs-input"
+                          />
+                        </td>
+                        {vipTiers.map(t => (
+                          <td key={t.name} className="feature-costs-td-vip" title={`${t.name} (${t.discount}% off): ${calcVipPrice(setting.value, t.discount)} credits`}>
+                            {calcVipPrice(setting.value, t.discount)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 <button onClick={handleUpdateSettings} className="update-settings-btn">
                   Update Costs
                 </button>

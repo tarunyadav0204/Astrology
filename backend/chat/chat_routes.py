@@ -128,7 +128,8 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     is_standard_chat = not request.partnership_mode and not request.premium_analysis
     free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
     using_free_question = is_standard_chat and free_available
-    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost)
+    chat_key = 'premium_chat_cost' if request.premium_analysis else ('chat_question_cost' if not request.partnership_mode else None)
+    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     
     print(f"💳 CREDIT CHECK DEBUG:")
     print(f"   User ID: {current_user.userid}")
@@ -878,7 +879,7 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         
         # Check credit cost and user balance (subscription tier discount applied)
         base_cost = credit_service.get_credit_setting('event_timeline_cost')
-        event_timeline_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+        event_timeline_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'event_timeline_cost')
         user_balance = credit_service.get_user_credits(current_user.userid)
         
         if user_balance < event_timeline_cost:

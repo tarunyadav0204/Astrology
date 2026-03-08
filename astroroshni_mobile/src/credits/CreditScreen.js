@@ -50,6 +50,7 @@ const CreditScreen = ({ navigation }) => {
   const [productsLoading, setProductsLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [subscriptionPlansLoading, setSubscriptionPlansLoading] = useState(false);
+  const [iapSubscriptions, setIapSubscriptions] = useState([]); // from getSubscriptions (productId + subscriptionOfferDetails for offerToken)
   const [purchasingSubscriptionId, setPurchasingSubscriptionId] = useState(null);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
@@ -206,6 +207,15 @@ const CreditScreen = ({ navigation }) => {
     () => subscriptionPlans.map((p) => p.google_play_product_id).filter(Boolean),
     [subscriptionPlans]
   );
+  // Only show plans that actually exist in Google Play (returned by getSubscriptions)
+  const subscriptionPlansFromPlay = useMemo(
+    () =>
+      subscriptionPlans.filter((plan) =>
+        plan.google_play_product_id &&
+        iapSubscriptions.some((s) => (s.productId || s.product_id) === plan.google_play_product_id)
+      ),
+    [subscriptionPlans, iapSubscriptions]
+  );
   const hasAnyIapProducts = productIds.length > 0 || subscriptionProductIds.length > 0;
 
   // Google Play IAP: init connection and purchase listener (Android only)
@@ -218,7 +228,10 @@ const CreditScreen = ({ navigation }) => {
         if (!mounted) return;
         await RNIap.flushFailedPurchasesCachedAsPendingAndroid?.();
         if (productIds.length > 0) await RNIap.getProducts({ skus: productIds });
-        if (subscriptionProductIds.length > 0) await RNIap.getSubscriptions({ skus: subscriptionProductIds });
+        if (subscriptionProductIds.length > 0) {
+          const subs = await RNIap.getSubscriptions({ skus: subscriptionProductIds });
+          if (mounted && Array.isArray(subs)) setIapSubscriptions(subs);
+        }
         if (!mounted) return;
         setIapReady(true);
       } catch (e) {
@@ -365,9 +378,24 @@ const CreditScreen = ({ navigation }) => {
     }
     const productId = plan.google_play_product_id;
     if (!productId) return;
+    // Google Play requires subscriptionOffers with offerToken (from getSubscriptions)
+    const subscription = iapSubscriptions.find(
+      (s) => (s.productId || s.product_id) === productId
+    );
+    const offerDetails = subscription?.subscriptionOfferDetails;
+    const offerToken = offerDetails?.[0]?.offerToken;
+    if (!offerToken) {
+      Alert.alert(
+        'Subscription unavailable',
+        'This plan could not be loaded from the store. Please try again later or pull to refresh.'
+      );
+      return;
+    }
     setPurchasingSubscriptionId(productId);
     try {
-      await RNIap.requestSubscription({ sku: productId });
+      await RNIap.requestSubscription({
+        subscriptionOffers: [{ sku: productId, offerToken }],
+      });
     } catch (e) {
       if (e?.code !== 'E_USER_CANCELLED') {
         Alert.alert('Subscription failed', e?.message ?? 'Could not start subscription. Try again.');
@@ -521,9 +549,13 @@ const CreditScreen = ({ navigation }) => {
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>VIP Plans</Text>
                 {subscriptionPlansLoading ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading plans…</Text>
-                ) : subscriptionPlans.length === 0 ? null : (
+                ) : subscriptionPlansFromPlay.length === 0 ? (
+                  subscriptionPlans.length > 0 && iapReady ? (
+                    <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No subscription plans available from the store.</Text>
+                  ) : null
+                ) : (
                   <View style={styles.buyProductGrid}>
-                    {subscriptionPlans.map((plan) => {
+                    {subscriptionPlansFromPlay.map((plan) => {
                       const productId = plan.google_play_product_id;
                       const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
                       const isPurchasing = purchasingSubscriptionId === productId;

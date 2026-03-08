@@ -90,7 +90,7 @@ async def analyze_education_ai(request: EducationAnalysisRequest, current_user: 
     
     # Check credit cost and user balance (subscription tier discount applied)
     base_cost = credit_service.get_credit_setting('education_analysis_cost')
-    education_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+    education_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'education_analysis_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < education_cost:

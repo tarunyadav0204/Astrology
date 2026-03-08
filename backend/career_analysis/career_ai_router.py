@@ -40,7 +40,7 @@ async def get_career_ai_insights(request: CareerAnalysisRequest, current_user: U
     
     # Check credit cost and user balance
     base_cost = credit_service.get_credit_setting('career_analysis_cost')
-    career_cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+    career_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'career_analysis_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     if user_balance < career_cost:

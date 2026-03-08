@@ -348,7 +348,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     is_standard_chat = not partnership_mode and not premium_analysis
     free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
     using_free_question = is_standard_chat and free_available
-    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost)
+    chat_key = 'premium_chat_cost' if premium_analysis else ('chat_question_cost' if not partnership_mode else None)
+    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
 
     print(f"💳 CREDIT CHECK (chat-v2):")
     print(f"   User ID: {current_user.userid}")

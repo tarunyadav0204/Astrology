@@ -854,10 +854,13 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
     pricing_original = {}
     for short_key, setting_key in _PRICING_KEYS_MAP:
         base = credit_service.get_credit_setting(setting_key)
-        effective = credit_service.get_effective_cost(current_user.userid, base)
+        effective = credit_service.get_effective_cost(current_user.userid, base, setting_key)
         pricing[short_key] = effective
-        if discount_percent and effective < base:
-            pricing_original[short_key] = base
+        # VIP: show true original price struck through, subscription price as displayed
+        if discount_percent:
+            _, original_val, _ = credit_service.get_credit_setting_and_original(setting_key)
+            if original_val is not None and effective < original_val:
+                pricing_original[short_key] = original_val
     # Computed: trading premium daily (daily_base * premium_multiplier, then discount)
     try:
         daily_base = credit_service.get_credit_setting('trading_daily_cost')

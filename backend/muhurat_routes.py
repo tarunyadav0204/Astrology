@@ -40,7 +40,7 @@ class GeneralMuhuratRequest(BaseModel):
 async def _process_muhurat(request, current_user, feature_name, calc_method):
     # 1. Get cost from settings and check credits (subscription tier discount applied)
     base_cost = credit_service.get_credit_setting(f'{feature_name}_cost')
-    cost = credit_service.get_effective_cost(current_user.userid, base_cost)
+    cost = credit_service.get_effective_cost(current_user.userid, base_cost, f'{feature_name}_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     if user_balance < cost:
         raise HTTPException(status_code=402, detail=f"Insufficient credits. Need {cost}.")
