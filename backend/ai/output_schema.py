@@ -63,7 +63,13 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
 GLOSSARY_BLOCK_INSTRUCTION = ""  # Glossary is now handled entirely by backend term matcher
 
 FOLLOW_UP_BLOCK_INSTRUCTION = """
-<div class="follow-up-questions">[Generate 3-4 follow-up questions. Each question MUST be on a new line and start with a hyphen (-). DO NOT wrap each question in its own `<div>` tag.]</div>
+<div class="follow-up-questions">
+- [Question 1]
+- [Question 2]
+- [Question 3]
+- [Question 4]
+</div>
+🚨 CRITICAL FORMATTING RULE: You MUST wrap the ENTIRE list of follow-up questions inside a single <div class="follow-up-questions"> block exactly as shown above. Each question MUST start with a hyphen (-). Do not add any other HTML tags inside this block.
 """
 
 # FAQ metadata: LLM must output this exact line at the very end (for categorization + FAQs). Not shown to user.
@@ -160,19 +166,29 @@ Your response must be a chronological analysis of the specific event requested a
 
 # Special Template for Mundane Astrology
 TEMPLATE_MUNDANE = """
-RESPONSE FORMAT - MUNDANE MODE:
-Adapt structure to the question. For specific events (match, election, concert): omit Economic & Market and Geopolitical sections. For nation/market outlook: include all.
+### 🏛️ MUNDANE ELITE ANALYSIS (MANDATORY)
+Your response MUST follow this exact sequence and adhere to the strict technical rules below:
 
-<div class="quick-answer-card">**Executive Summary**: [Risk assessment or event outcome]</div>
-### Key Risk Factors / Key Influences
-[Bullet points]
-### Economic & Market Analysis (nation/market questions only)
-[Include only when question relates to markets, economy, or betting]
-### Geopolitical Outlook (nation/market questions only)
-[Include only when question relates to politics or geopolitics]
-### Event-Specific Analysis (specific events only)
-[For matches, elections, etc.: toss, key phases, outcome, timing]
-<div class="final-thoughts-card">**Strategic Outlook**: [Conclusion]</div>
+1. <div class="quick-answer-card">**Executive Prediction & Probability**: [Direct verdict with a specific probability percentage (e.g. 80%). No ambiguity.]</div>
+
+2. ### Key Astrological Triggers & Macro Trends: [Cite 3-4 high-impact triggers from the event chart. You MUST also explicitly state the Nav Nayak (King of the Year) and the impact of the Aries Ingress from the `ingress_data`.]
+
+3. ### Panchang & Event Synergy:
+   - [Analyze the `Tithi`, `Nakshatra`, and `Yoga` from `event_panchang`. Explain how this specific combination influences the "auspiciousness" or "volatility" of the event start.]
+
+4. ### Battle of the Charts (Side-by-Side Analysis):
+   - #### Entity Dashas: [Detail the exact Vimshottari Mahadasha/Antardasha for EACH nation involved. Cite them by name. If data is unavailable for an entity, state it clearly.]
+   - #### Locational Analysis: [Contrast the Lagna/House placements for the capitals of each entity from `locational_analysis`.]
+
+5. ### Regional & Geographic Citations:
+   - #### Strategic Impacts: [You MUST cite specific provinces or regions by name from the `geographic_impacts` data (e.g. "Gilan", "Kurdistan"). Generic regional terms are forbidden.]
+
+6. ### Market & Commodity Precision:
+   - #### Vedha Analysis: [Detail the exact triggers for Oil, Silver, or Grains from `commodity_impacts`. Specify the triggering planet and if it is a 'direct' or 'vedha' impact.]
+
+7. ### Critical Timing & Tipping Points: [Exact dates/hours of peak volatility.]
+
+8. <div class="final-thoughts-card">**Strategic Verdict**: [Final authoritative conclusion and warning.]</div>
 """
 
 # Developer-focused, high-density event log
@@ -306,12 +322,10 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     
     elaborate_instruction = """
 CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):
-Your full response MUST be at least 12,000 characters. Short or summary-style answers are FORBIDDEN.
-- If your draft is under 12,000 characters, you MUST expand every section: add more planetary reasoning, more house significations, more timing detail, more remedies, and more practical guidance until the total length exceeds 12,000 characters.
-- Expand Astrological Analysis with full explanations for each point; mention house lordships, placements, aspects, and classical references.
-- Quick Answer and Key Insights must be comprehensive (multiple sentences and bullets), not minimal.
-- Nakshatra Insights, Timing & Guidance, and Divisional Chart Analysis must be fully developed.
-- Prioritize depth and clarity. Users expect detailed, thorough astrological guidance. Output at least 12,000 characters.
+Your full response MUST be comprehensive. Short or summary-style answers are FORBIDDEN.
+- For Birth Chart queries: Aim for 12,000 characters. Expand every section with planetary reasoning, classical references, and technical detail.
+- For Mundane/Event queries: Aim for 3,000-5,000 characters. Focus on precision, house comparison (1st vs 7th), dasha synchronization, and critical timing.
+- Prioritize depth and clarity. Output sufficient detail to justify the prediction.
 """
     
     # Use the new centralized schema selection function, using the reliable intent_mode

@@ -63,6 +63,12 @@ export default function ChatScreen({ navigation, route }) {
   
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
+  const isMundaneRef = useRef(false);
+  useEffect(() => { isMundaneRef.current = isMundane; }, [isMundane]);
+
+  const [mundaneContext, setMundaneContext] = useState(null);
+  const mundaneContextRef = useRef(null);
+  useEffect(() => { mundaneContextRef.current = mundaneContext; }, [mundaneContext]);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [selectedYear, setSelectedYear] = useState(YEARS[0]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -190,6 +196,8 @@ export default function ChatScreen({ navigation, route }) {
   const [savedCharts, setSavedCharts] = useState([]);
   const [showPartnershipModal, setShowPartnershipModal] = useState(false);
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
+  const [showMundaneModal, setShowMundaneModal] = useState(false);
+  const [mundaneModalCost, setMundaneModalCost] = useState(1);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Move input into view when keyboard opens (does not change tab bar layout)
@@ -525,7 +533,24 @@ export default function ChatScreen({ navigation, route }) {
     // Handle mundane mode param
     if (route.params?.mode === 'mundane') {
       setIsMundane(true);
-      navigation.setParams({ mode: undefined });
+      if (route.params?.mundaneContext) {
+        setMundaneContext(route.params.mundaneContext);
+        
+        // Sync selected country if provided in context
+        if (route.params.mundaneContext.country) {
+          const countryMatch = COUNTRIES.find(c => c.name === route.params.mundaneContext.country);
+          if (countryMatch) {
+            setSelectedCountry(countryMatch);
+          }
+        }
+        
+        // Sync selected year if provided in context (event_date)
+        if (route.params.mundaneContext.event_date) {
+          const year = new Date(route.params.mundaneContext.event_date).getFullYear();
+          setSelectedYear(year);
+        }
+      }
+      navigation.setParams({ mode: undefined, mundaneContext: undefined });
     }
     
     // Handle back button
@@ -752,20 +777,24 @@ export default function ChatScreen({ navigation, route }) {
     setShowChartPicker(true);
   };
 
+  const openMundaneModal = (cost) => {
+    // Use passed cost from HomeScreen option, fallback to chatCost
+    const finalCost = (cost != null && cost > 0) ? cost : chatCost;
+    setMundaneModalCost(finalCost);
+    setShowMundaneModal(true);
+  };
+
+  const confirmMundaneMode = () => {
+    setShowMundaneModal(false);
+    navigation.navigate('MundaneHub');
+  };
+
   const handleGreetingOptionSelect = async (option) => {
     
     if (option.action === 'partnership') {
       openPartnershipModal(option.cost);
     } else if (option.action === 'mundane') {
-      setIsMundane(true);
-      setShowGreeting(false);
-      const welcomeMsg = {
-        id: Date.now().toString(),
-        content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI can help you understand:\n\n• Economic trends and market movements\n• Political developments and elections\n• Natural events and their timing\n• Country-specific forecasts\n• Global financial markets\n\nSelect a country and year, then ask your question.`,
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-      setMessagesWithStorage([welcomeMsg]);
+      openMundaneModal(option.cost);
     } else if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
@@ -820,12 +849,23 @@ export default function ChatScreen({ navigation, route }) {
         // Always show fresh welcome message when explicitly starting chat
         const nativeName = birthData?.name || 'there';
         
-        const welcomeMessage = {
-          id: Date.now().toString(),
-          content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-        };
+        let welcomeMessage;
+        
+        if (isMundaneRef.current) {
+          welcomeMessage = {
+            id: Date.now().toString(),
+            content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
+            role: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+        } else {
+          welcomeMessage = {
+            id: Date.now().toString(),
+            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+            role: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+        }
         
         // If no stored messages, show welcome. If stored messages exist, prepend welcome if it's not already there
         if (storedMessages.length === 0) {
@@ -1466,7 +1506,12 @@ export default function ChatScreen({ navigation, route }) {
           year: selectedYear,
           latitude: selectedCountry.lat,
           longitude: selectedCountry.lng,
-          question: messageText
+          question: messageText,
+          // NEW: Specialized mundane context
+          category: mundaneContext?.category || 'general',
+          event_date: mundaneContext?.event_date,
+          event_time: mundaneContext?.event_time,
+          entities: mundaneContext?.entities
         };
         
         const response = await fetch(`${API_BASE_URL}${getEndpoint('/mundane/analyze')}`, {
@@ -1957,8 +2002,8 @@ export default function ChatScreen({ navigation, route }) {
               />
             )} */}
             
-            {/* Signs Display */}
-            {birthData && (
+            {/* Signs Display – only for native-centric chat, not Global Markets (mundane) */}
+            {birthData && !isMundane && (
               <View style={styles.signsContainer}>
                 <LinearGradient
                   colors={Platform.OS === 'android'
@@ -3387,6 +3432,16 @@ export default function ChatScreen({ navigation, route }) {
         title="Partnership Mode"
         description="Partnership mode uses credits per question for comprehensive compatibility analysis between two charts."
         cost={partnershipModalCost}
+        credits={credits}
+        confirmLabel="Continue"
+      />
+      <ConfirmCreditsModal
+        visible={showMundaneModal}
+        onClose={() => setShowMundaneModal(false)}
+        onConfirm={confirmMundaneMode}
+        title="Global Markets & Events"
+        description="Global Markets & Events analysis uses credits per question for deep mundane astrology of nations, markets, and world events."
+        cost={mundaneModalCost}
         credits={credits}
         confirmLabel="Continue"
       />

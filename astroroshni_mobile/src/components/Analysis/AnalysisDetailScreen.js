@@ -1115,7 +1115,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       <TouchableOpacity
                         key={index}
                         style={styles.followUpButton}
-                        onPress={() => navigation.navigate('Home')}
+                        onPress={() =>
+                          navigation.navigate('Home', {
+                            startChat: true,
+                            initialMessage: question,
+                          })
+                        }
                       >
                         <LinearGradient
                           colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}

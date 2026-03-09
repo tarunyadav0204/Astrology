@@ -437,6 +437,39 @@ class GeodeticCalculator:
                 'Southeast': ['Donetsk', 'Luhansk', 'Zaporizhzhia', 'Dnipropetrovsk (south)', 'Sea of Azov'],
                 'Southwest': ['Odessa (west)', 'Vinnytsia (south)', 'Moldova border', 'Romania border', 'Black Sea']
             },
+            'Russia': {
+                'North': ['Murmansk', 'Arkhangelsk', 'Yamal', 'Arctic regions', 'Karelia'],
+                'South': ['Krasnodar', 'Rostov', 'Stavropol', 'North Caucasus', 'Crimea'],
+                'East': ['Vladivostok', 'Khabarovsk', 'Kamchatka', 'Sakhalin', 'Far East'],
+                'West': ['Kaliningrad', 'Smolensk', 'Pskov', 'Bryansk', 'Belarus border'],
+                'Central': ['Moscow', 'Tula', 'Ryazan', 'Vladimir', 'Yaroslavl'],
+                'Northeast': ['Yakutia (Sakha)', 'Magadan', 'Chukotka'],
+                'Northwest': ['Saint Petersburg', 'Leningrad Region', 'Vologda', 'Novgorod'],
+                'Southeast': ['Primorsky Krai', 'Jewish Autonomous Oblast', 'Amur'],
+                'Southwest': ['Belgorod', 'Kursk', 'Voronezh', 'Ukraine border']
+            },
+            'Iran': {
+                'North': ['Gilan', 'Mazandaran', 'Golestan', 'Alborz', 'Qazvin', 'Tehran (north)'],
+                'South': ['Hormozgan', 'Bushehr', 'Fars', 'Kerman (south)', 'Persian Gulf'],
+                'East': ['South Khorasan', 'Razavi Khorasan', 'Sistan and Baluchestan (east)'],
+                'West': ['Kurdistan', 'Kermanshah', 'Ilam', 'West Azerbaijan', 'Lorestan'],
+                'Central': ['Isfahan', 'Yazd', 'Qom', 'Markazi', 'Semnan'],
+                'Northeast': ['North Khorasan', 'Razavi Khorasan (north)', 'Turkmenistan border'],
+                'Northwest': ['East Azerbaijan', 'Ardabil', 'Zanjan', 'Turkey border'],
+                'Southeast': ['Sistan and Baluchestan', 'Chabahar', 'Makran coast'],
+                'Southwest': ['Khuzestan', 'Ahvaz', 'Iraqi border', 'Abadan']
+            },
+            'Israel': {
+                'North': ['Galilee', 'Haifa', 'Golan Heights', 'Lebanon border', 'Safed'],
+                'South': ['Negev', 'Eilat', 'Beer Sheva', 'Mitzpe Ramon', 'Dead Sea (south)'],
+                'East': ['Jerusalem', 'Judea', 'Samaria', 'Jordan Valley', 'Dead Sea'],
+                'West': ['Tel Aviv', 'Coastal Plain', 'Netanya', 'Ashdod', 'Mediterranean'],
+                'Central': ['Gush Dan', 'Petah Tikva', 'Rehovot', 'Lod'],
+                'Northeast': ['Upper Galilee', 'Golan Heights (north)', 'Mount Hermon'],
+                'Northwest': ['Western Galilee', 'Nahariya', 'Acre'],
+                'Southeast': ['Arava', 'Eilat (east)', 'Jordan border'],
+                'Southwest': ['Gaza border', 'Eshkol', 'Egypt border']
+            },
         }
     
     def get_affected_regions(self, nakshatra: str, country: str = 'India') -> Dict[str, Any]:

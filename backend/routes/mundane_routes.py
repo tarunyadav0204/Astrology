@@ -16,6 +16,10 @@ class MundaneRequest(BaseModel):
     latitude: float
     longitude: float
     question: str
+    category: Optional[str] = "general" # e.g., "sports", "markets", "wars", "general"
+    event_date: Optional[str] = None    # YYYY-MM-DD
+    event_time: Optional[str] = None    # HH:MM:SS
+    entities: Optional[list[str]] = None # list of countries/teams/indices
 
 @router.post("/api/mundane/session")
 async def create_mundane_session(request: dict, current_user = Depends(get_current_user)):
@@ -90,7 +94,8 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
     background_tasks.add_task(
         process_mundane_response,
         message_id, request.session_id, request.question, request.country, year,
-        request.latitude, request.longitude, current_user.userid, chat_cost
+        request.latitude, request.longitude, current_user.userid, chat_cost,
+        request.category, request.event_date, request.event_time, request.entities
     )
     
     return {
@@ -101,11 +106,12 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
 
 async def process_mundane_response(
     message_id: int, session_id: str, question: str, country: str, year: int,
-    latitude: float, longitude: float, user_id: int, chat_cost: int
+    latitude: float, longitude: float, user_id: int, chat_cost: int,
+    category: str = "general", event_date: str = None, event_time: str = None, entities: list = None
 ):
     """Background task to process mundane analysis"""
     try:
-        print(f"\n📅 Analyzing for Year: {year} (User asked: '{question}')")
+        print(f"\n📅 Analyzing {category} for {country} (User asked: '{question}')")
 
         # Build lightweight conversation history (last 3 Q&A) for this mundane session
         history = []
@@ -155,7 +161,11 @@ async def process_mundane_response(
             country_name=country,
             year=year,
             latitude=latitude,
-            longitude=longitude
+            longitude=longitude,
+            category=category,
+            event_date=event_date,
+            event_time=event_time,
+            entities=entities
         )
         context['analysis_type'] = 'mundane'
         

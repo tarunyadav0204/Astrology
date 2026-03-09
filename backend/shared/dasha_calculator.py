@@ -111,13 +111,21 @@ class DashaCalculator:
             else:
                 birth_datetime = datetime.strptime(f"{birth_data['date']} {time_str}", "%Y-%m-%d %H:%M")
             
+            # Solar year length used by high-precision Panchangs
+            YEAR_LEN = 365.242199
+            TOTAL_DASHA_CYCLE_YEARS = 120
+            
+            # Advance cycles if current_date is far in the future (e.g., for nations)
+            years_diff = (current_date - birth_datetime).days / 365.25
+            if years_diff > TOTAL_DASHA_CYCLE_YEARS:
+                cycles = int(years_diff / TOTAL_DASHA_CYCLE_YEARS)
+                # Advance birth_datetime by full cycles to start from the correct 120-year block
+                birth_datetime = birth_datetime + relativedelta(years=cycles * TOTAL_DASHA_CYCLE_YEARS)
+
             # Calculate all mahadashas
             maha_dashas = []
             current_maha_date = birth_datetime
             start_index = self.PLANET_ORDER.index(moon_lord)
-            
-            # Solar year length used by high-precision Panchangs
-            YEAR_LEN = 365.242199
             
             for i in range(9):
                 planet = self.PLANET_ORDER[(start_index + i) % 9]

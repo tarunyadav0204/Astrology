@@ -1370,7 +1370,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     
                     # Get summary image from result if available (store as string, not JSON)
                     summary_image = result.get('summary_image', None)
-                    follow_up_questions = result.get('follow_up_questions', [])
+
+                    # Normalize follow-up questions to a simple list of plain strings.
+                    # The model may sometimes return objects like {"icon": "💡", "question": "Ask about ..."}.
+                    # We strip any icon metadata here so the mobile client always receives clean text.
+                    raw_follow_ups = result.get('follow_up_questions') or []
+                    follow_up_questions: list[str] = []
+                    if isinstance(raw_follow_ups, list):
+                        for item in raw_follow_ups:
+                            if isinstance(item, str):
+                                follow_up_questions.append(sanitize_text(item))
+                            elif isinstance(item, dict):
+                                # Prefer explicit question/text field; ignore icon or other extras
+                                q = item.get('question') or item.get('text') or ''
+                                if q:
+                                    follow_up_questions.append(sanitize_text(q))
+                    else:
+                        # Fallback: single string or unexpected type
+                        if isinstance(raw_follow_ups, str):
+                            follow_up_questions.append(sanitize_text(raw_follow_ups))
                     
                     cursor.execute(
                         "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, follow_up_questions = ?, status = ?, message_type = ?, completed_at = ?, language = ?, intent_router_ms = ? WHERE message_id = ?",

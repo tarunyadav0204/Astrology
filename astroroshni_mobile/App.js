@@ -44,6 +44,7 @@ import KPScreen from './src/screens/KPScreen';
 import SadeSatiScreen from './src/components/SadeSati/SadeSatiScreen';
 import NakshatraCalendarScreen from './src/components/NakshatraCalendar/NakshatraCalendarScreen';
 import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
+import MundaneHubScreen from './src/components/Chat/MundaneHubScreen';
 import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -344,6 +345,11 @@ export default function App() {
           <Stack.Screen 
             name="ChatView" 
             component={ChatViewScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="MundaneHub" 
+            component={MundaneHubScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

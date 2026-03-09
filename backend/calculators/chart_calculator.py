@@ -5,6 +5,10 @@ from utils.timezone_service import parse_timezone_offset
 class ChartCalculator(BaseCalculator):
     """Extract chart calculation logic from main.py"""
     
+    # CRITICAL constants for consistent calculation across methods
+    D1_CORRECTION = -0.0006
+    SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+
     def __init__(self, *args, **kwargs):
         """Initialize with Lahiri Ayanamsa as default"""
         super().__init__(*args, **kwargs)
@@ -78,7 +82,6 @@ class ChartCalculator(BaseCalculator):
         # Target for 1980-04-02 14:55 IST: 8° 27' 07" (8.4519°)
         # Calculated: 8.4513°
         # Correction = Calculated - Target = 8.4513 - 8.4519 = -0.0006
-        D1_CORRECTION = -0.0006
         
         # Normalize date to YYYY-MM-DD (accept ISO datetime e.g. 2026-03-01T16:40:44.425Z from clients)
         date_str = str(birth_data.date).split('T')[0] if birth_data.date else ''
@@ -110,7 +113,7 @@ class ChartCalculator(BaseCalculator):
                 pos = swe.calc_ut(jd, node_flag, flags)
             
             pos_array = pos[0]
-            longitude = (pos_array[0] - D1_CORRECTION) % 360
+            longitude = (pos_array[0] - self.D1_CORRECTION) % 360
             speed = pos_array[3] if len(pos_array) > 3 else 0.0
             
             if planet == 12:  # Ketu
@@ -122,9 +125,11 @@ class ChartCalculator(BaseCalculator):
             if planet in [11, 12] and node_type == 'mean':
                 is_retrograde = True
             
+            planet_sign = int(longitude / 30)
             planets[planet_names[i]] = {
                 'longitude': longitude,
-                'sign': int(longitude / 30),
+                'sign': planet_sign,
+                'sign_name': self.SIGN_NAMES[planet_sign],
                 'degree': longitude % 30,
                 'retrograde': is_retrograde
             }
@@ -145,7 +150,7 @@ class ChartCalculator(BaseCalculator):
         # print(f"📅 JD: {jd:.6f}, Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°")
         for planet_name in planet_names:
             planet_data = planets[planet_name]
-            sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][planet_data['sign']]
+            sign_name = self.SIGN_NAMES[planet_data['sign']]
             print(f"  {planet_name:8}: {planet_data['longitude']:8.4f}° = {planet_data['degree']:6.2f}° {sign_name} (Sign {planet_data['sign']}) {'R' if planet_data['retrograde'] else 'D'}")
         # print(f"🔚 End Swiss Ephemeris Data\n")
 
@@ -155,7 +160,7 @@ class ChartCalculator(BaseCalculator):
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
         ascendant_tropical = houses_data[1][0]
-        ascendant_sidereal = (ascendant_tropical - ayanamsa - D1_CORRECTION) % 360
+        ascendant_sidereal = (ascendant_tropical - ayanamsa - self.D1_CORRECTION) % 360
         houses_end = time.time()
         # print(f"[CALC] Houses calculation took {houses_end - houses_start:.3f}s")
         
@@ -169,7 +174,7 @@ class ChartCalculator(BaseCalculator):
         
         asc_deg, asc_min, asc_sec = decimal_to_dms(ascendant_sidereal % 30)
         # print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}")
-        asc_sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][int(ascendant_sidereal / 30)]
+        asc_sign_name = self.SIGN_NAMES[int(ascendant_sidereal / 30)]
         # print(f"ASCENDANT: {asc_deg}d {asc_min}m {asc_sec:.0f}s {asc_sign_name}")
         
         # Whole Sign houses based on sidereal ascendant
@@ -181,7 +186,8 @@ class ChartCalculator(BaseCalculator):
             house_longitude = (house_sign * 30) + (ascendant_sidereal % 30)
             houses.append({
                 'longitude': house_longitude % 360,
-                'sign': house_sign
+                'sign': house_sign,
+                'sign_name': self.SIGN_NAMES[house_sign]
             })
         
         # Calculate Gulika and Mandi using accurate sunrise/sunset
@@ -240,12 +246,12 @@ class ChartCalculator(BaseCalculator):
             cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
             
             # Convert tropical cusps to sidereal - ensure we have 12 cusps
-            sidereal_cusps = [(cusp - ayanamsa - D1_CORRECTION) % 360 for cusp in cusps[1:13]]  # Take exactly 12 cusps
+            sidereal_cusps = [(cusp - ayanamsa - self.D1_CORRECTION) % 360 for cusp in cusps[1:13]]  # Take exactly 12 cusps
             
             # Ensure we have exactly 12 cusps
             if len(sidereal_cusps) < 12:
                 # Fallback to equal houses if cusps are incomplete
-                asc_sidereal = (ascmc[0] - ayanamsa) % 360
+                asc_sidereal = (ascmc[0] - ayanamsa - self.D1_CORRECTION) % 360
                 sidereal_cusps = [(asc_sidereal + i * 30) % 360 for i in range(12)]
             
             bhav_planets = {}
@@ -272,15 +278,18 @@ class ChartCalculator(BaseCalculator):
                 bhav_planets[planet_name] = {
                     'longitude': planet_longitude,
                     'sign': planet_data['sign'],
+                    'sign_name': planet_data.get('sign_name'),
                     'degree': planet_data['degree'],
                     'house': planet_house,
                     'retrograde': planet_data.get('retrograde', False)
                 }
             
+            asc_val = (ascmc[0] - ayanamsa - self.D1_CORRECTION) % 360
             return {
                 'planets': bhav_planets,
                 'cusps': sidereal_cusps,
-                'ascendant': (ascmc[0] - ayanamsa - D1_CORRECTION) % 360
+                'ascendant': asc_val,
+                'ascendant_sign_name': self.SIGN_NAMES[int(asc_val / 30)]
             }
         except Exception as e:
             # Fallback to whole sign houses if Bhav Chalit fails
@@ -292,7 +301,8 @@ class ChartCalculator(BaseCalculator):
             return {
                 'planets': bhav_planets,
                 'cusps': [(i * 30) for i in range(12)],
-                'ascendant': asc_sidereal
+                'ascendant': asc_sidereal,
+                'ascendant_sign_name': self.SIGN_NAMES[int(asc_sidereal / 30)]
             }
     
     def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa):
@@ -331,12 +341,12 @@ class ChartCalculator(BaseCalculator):
             
             # Calculate Gulika longitude at Saturn's segment start
             houses_gulika = swe.houses(start_time_jd, lat, lon, b'P')
-            gulika_long = (houses_gulika[1][0] - ayanamsa - D1_CORRECTION) % 360
+            gulika_long = (houses_gulika[1][0] - ayanamsa - self.D1_CORRECTION) % 360
             
             # Mandi at middle of Saturn's segment
             mandi_time_jd = start_time_jd + (part_length / 2)
             houses_mandi = swe.houses(mandi_time_jd, lat, lon, b'P')
-            mandi_long = (houses_mandi[1][0] - ayanamsa - D1_CORRECTION) % 360
+            mandi_long = (houses_mandi[1][0] - ayanamsa - self.D1_CORRECTION) % 360
             
         except Exception:
             # Fallback to approximate calculation if sunrise/sunset fails

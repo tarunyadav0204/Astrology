@@ -728,6 +728,7 @@ const loadHomeData = async (nativeData = null) => {
         style={[styles.scrollView, { zIndex: 1 }]} 
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
@@ -927,9 +928,11 @@ const loadHomeData = async (nativeData = null) => {
           </Text>
           <ScrollView
             horizontal
+            nestedScrollEnabled
             showsHorizontalScrollIndicator={false}
             snapToInterval={width * 0.72 + 16}
             decelerationRate="fast"
+            scrollEventThrottle={16}
             contentContainerStyle={styles.ribbonScrollContent}
           >
             {analysisOptions.slice(6).map((option, index) => (
