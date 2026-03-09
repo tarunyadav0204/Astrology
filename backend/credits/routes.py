@@ -554,13 +554,13 @@ def _sync_subscription_from_play(
         payment_state = purchase.get("paymentState")
         if payment_state not in (0, 1):
             raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
-    from datetime import datetime
+    from datetime import datetime, timedelta
     expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
     start_ms = purchase.get("startTimeMillis") or expiry_ms
     start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
-    # If user cancelled on Play, stop showing them as subscribed immediately (end_date = today)
+    # If user cancelled on Play, set end_date to yesterday so they stop appearing as subscribed immediately
     if accept_any_payment_state and purchase.get("userCancellationTimeMillis"):
-        end_date = datetime.utcnow().strftime("%Y-%m-%d")
+        end_date = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
     else:
         end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
     success = credit_service.set_user_subscription(userid, plan_id, start_date, end_date)

@@ -620,7 +620,33 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
-        # Always insert new chart (allow duplicates)
+        # Dedupe: same user + same name/date/time/place within 60s (e.g. double-tap) -> return existing chart
+        try:
+            cursor.execute('''
+                SELECT id FROM birth_charts
+                WHERE userid = ? AND name = ? AND date = ? AND time = ? AND place = ?
+                AND datetime(created_at) >= datetime('now', '-60 seconds')
+                ORDER BY id DESC LIMIT 1
+            ''', (current_user.userid, enc_name, enc_date, enc_time, enc_place))
+            dup = cursor.fetchone()
+            if dup:
+                new_chart_id = dup[0]
+                print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (same native within 60s)")
+                conn.close()
+                # Calculate and return chart data with existing id (no second insert)
+                from calculators.chart_calculator import ChartCalculator
+                from calculators.divisional_chart_calculator import DivisionalChartCalculator
+                calculator = ChartCalculator({})
+                chart_data = calculator.calculate_chart(birth_data, node_type)
+                div_calculator = DivisionalChartCalculator(chart_data)
+                chart_data['d3_chart'] = div_calculator.calculate_divisional_chart(3)
+                chart_data['d9_chart'] = div_calculator.calculate_divisional_chart(9)
+                chart_data['d10_chart'] = div_calculator.calculate_divisional_chart(10)
+                chart_data['birth_chart_id'] = new_chart_id
+                return chart_data
+        except Exception as dedupe_err:
+            print(f"🔍 [CHART_DEBUG] Dedupe check skipped: {dedupe_err}")
+
         print(f"🔍 [CHART_DEBUG] About to insert chart for user {current_user.userid}:")
         print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
         print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")

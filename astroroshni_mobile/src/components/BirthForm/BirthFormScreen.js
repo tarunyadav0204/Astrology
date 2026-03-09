@@ -89,6 +89,8 @@ export default function BirthFormScreen({ navigation, route }) {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const stableDateRef = useRef(null);
+  /** Guard against double-tap: second submit within same flow is ignored (prevents duplicate birth charts). */
+  const submittingRef = useRef(false);
   const confettiAnims = useRef([...Array(20)].map(() => ({
     x: new Animated.Value(0),
     y: new Animated.Value(0),
@@ -426,10 +428,15 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const handleSubmit = async () => {
+    // Prevent double submission (React state update is async; second tap can fire before disabled takes effect)
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     // Final validation before submission
     if (!formData.latitude || !formData.longitude) {
       Alert.alert(t('birthForm.alerts.invalidLocation.title', 'Invalid Location'), t('birthForm.alerts.invalidLocation.noSelection', 'Please select a location from the suggestions.'));
       setLoading(false);
+      submittingRef.current = false;
       return;
     }
     
@@ -543,6 +550,7 @@ export default function BirthFormScreen({ navigation, route }) {
       Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
