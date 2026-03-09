@@ -620,18 +620,17 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
-        # Dedupe: same user + same name/date/time/place within 60s (e.g. double-tap) -> return existing chart
+        # Dedupe: same user + same name/date/time/place (exact duplicate native) -> return existing chart
         try:
             cursor.execute('''
                 SELECT id FROM birth_charts
                 WHERE userid = ? AND name = ? AND date = ? AND time = ? AND place = ?
-                AND datetime(created_at) >= datetime('now', '-60 seconds')
                 ORDER BY id DESC LIMIT 1
             ''', (current_user.userid, enc_name, enc_date, enc_time, enc_place))
             dup = cursor.fetchone()
             if dup:
                 new_chart_id = dup[0]
-                print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (same native within 60s)")
+                print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (exact native match)")
                 conn.close()
                 # Calculate and return chart data with existing id (no second insert)
                 from calculators.chart_calculator import ChartCalculator

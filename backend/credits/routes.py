@@ -1148,11 +1148,12 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         base = credit_service.get_credit_setting(setting_key)
         effective = credit_service.get_effective_cost(current_user.userid, base, setting_key)
         pricing[short_key] = effective
-        # VIP: show true original price struck through, subscription price as displayed
-        if discount_percent:
-            _, original_val, _ = credit_service.get_credit_setting_and_original(setting_key)
-            if original_val is not None and effective < original_val:
-                pricing_original[short_key] = original_val
+        # Show true original price struck through whenever effective < original
+        # This uses the same sources as /settings/analysis-pricing so feature-level discounts
+        # (from credit_settings) still show original vs discounted even before subscriptions launch.
+        _, original_val, _ = credit_service.get_credit_setting_and_original(setting_key)
+        if original_val is not None and effective < original_val:
+            pricing_original[short_key] = original_val
     # Computed: trading premium daily (daily_base * premium_multiplier, then discount)
     try:
         daily_base = credit_service.get_credit_setting('trading_daily_cost')
@@ -1160,7 +1161,8 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         if daily_base is not None and mult is not None:
             raw = int(daily_base) * int(mult)
             pricing["trading_premium"] = credit_service.get_effective_cost(current_user.userid, raw)
-            if discount_percent and raw > 0:
+            # Always expose original when effective < raw (same logic as other keys)
+            if raw > 0 and pricing["trading_premium"] < raw:
                 pricing_original["trading_premium"] = raw
     except (TypeError, ValueError):
         pass
@@ -1171,7 +1173,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         if monthly_base is not None and mult is not None:
             raw = int(monthly_base) * int(mult)
             pricing["trading_monthly_premium"] = credit_service.get_effective_cost(current_user.userid, raw)
-            if discount_percent and raw > 0:
+            if raw > 0 and pricing["trading_monthly_premium"] < raw:
                 pricing_original["trading_monthly_premium"] = raw
     except (TypeError, ValueError):
         pass

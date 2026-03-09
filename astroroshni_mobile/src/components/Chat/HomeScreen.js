@@ -2130,7 +2130,7 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
       ]}
     >
       <TouchableOpacity
-        onPress={() => onOptionSelect({ action: 'analysis', type: option.id, cost: option.cost })}
+        onPress={() => onOptionSelect({ action: 'analysis', type: option.id, cost: option.cost, originalCost: option.originalCost })}
         activeOpacity={0.9}
       >
         <LinearGradient
@@ -2819,24 +2819,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(255, 215, 0, 0.95)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
+    backgroundColor: 'rgba(255, 215, 0, 0.98)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    elevation: 3,
+    shadowOpacity: 0.25,
+    elevation: 4,
   },
   costText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '800',
     color: '#854d0e',
-    marginLeft: 2,
+    marginLeft: 3,
   },
   costWithDiscount: {
     flexDirection: 'row',
@@ -2844,9 +2844,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   costOriginal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+    opacity: 1,
     textDecorationLine: 'line-through',
-    color: '#854d0e',
-    opacity: 0.8,
+    textDecorationStyle: 'solid',
+    textDecorationColor: '#000000',
+    marginRight: 4,
   },
   iconGlow: {
     position: 'absolute',

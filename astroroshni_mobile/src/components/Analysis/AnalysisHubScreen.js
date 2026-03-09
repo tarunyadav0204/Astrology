@@ -172,7 +172,8 @@ export default function AnalysisHubScreen({ navigation }) {
     navigation.navigate('AnalysisDetail', { 
       analysisType: analysisType.id,
       title: analysisType.title,
-      cost: analysisType.cost
+      cost: analysisType.cost,
+      originalCost: analysisType.originalCost,
     });
   };
 

@@ -29,9 +29,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   useAnalytics('AnalysisDetailScreen');
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
-  const { analysisType, title, cost: costFromParams } = route.params;
+  const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
   const { credits, fetchBalance } = useCredits();
   const [cost, setCost] = useState(costFromParams ?? 0);
+  const [originalCost, setOriginalCost] = useState(
+    typeof originalCostFromParams === 'number' ? originalCostFromParams : null
+  );
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -70,9 +73,14 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       const fetchCurrentCost = async () => {
         try {
           const res = await pricingAPI.getPricing();
-          const pricing = res.data?.pricing || res.data || {};
-          if (pricing[analysisType]) {
+          const data = res?.data || res;
+          const pricing = data?.pricing || {};
+          const pricingOriginal = data?.pricing_original || {};
+          if (pricing[analysisType] != null) {
             setCost(Number(pricing[analysisType]));
+          }
+          if (pricingOriginal[analysisType] != null) {
+            setOriginalCost(Number(pricingOriginal[analysisType]));
           }
         } catch (error) {
           console.error('Error fetching cost fallback:', error);
@@ -941,6 +949,27 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                   </View>
                 )}
 
+                {/* Pricing + credits card (same visual language as home / partnership analysis) */}
+                <View style={[styles.pricingCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface, borderColor: colors.cardBorder }]}>
+                  <View style={styles.pricingLeft}>
+                    <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>Credits required</Text>
+                    {originalCost != null && originalCost > cost ? (
+                      <View style={styles.costWithDiscount}>
+                        <Text style={[styles.costText, styles.costOriginal, { color: colors.textSecondary }]}>{originalCost}</Text>
+                        <Text style={[styles.costText, { color: colors.text }]}>{cost}</Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.costText, { color: colors.text }]}>{cost} credits</Text>
+                    )}
+                  </View>
+                  <View style={styles.pricingRight}>
+                    <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>Credits left</Text>
+                    <Text style={[styles.creditsLeftText, { color: credits >= cost ? colors.primary : '#b91c1c' }]}>
+                      {credits}
+                    </Text>
+                  </View>
+                </View>
+
                 {loading ? (
                   <View style={styles.loadingSection}>
                     <Animated.View style={[styles.cosmicLoadingOrb, {
@@ -1349,6 +1378,48 @@ const styles = StyleSheet.create({
     marginRight: 8,
     textAlign: 'center',
     flex: 1,
+  },
+  pricingCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  pricingLeft: {
+    flexDirection: 'column',
+    flex: 1,
+  },
+  pricingRight: {
+    marginLeft: 16,
+    alignItems: 'flex-end',
+  },
+  pricingLabel: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  costText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  costWithDiscount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  costOriginal: {
+    textDecorationLine: 'line-through',
+    opacity: 0.8,
+    marginRight: 4,
+  },
+  creditsLeftText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   loadingSection: {
     alignItems: 'center',
