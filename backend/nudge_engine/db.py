@@ -91,6 +91,22 @@ def get_device_tokens_for_user(conn: sqlite3.Connection, userid: int) -> List[Tu
         return []
 
 
+def get_all_device_tokens(conn: sqlite3.Connection) -> List[Tuple[int, str, str]]:
+    """
+    Return list of (userid, token, platform) for all users who have a device token.
+    Used by admin blog notifications to broadcast or target multiple users.
+    """
+    try:
+        cur = conn.execute(
+            "SELECT userid, token, platform FROM device_tokens"
+        )
+        rows = cur.fetchall()
+        return list(rows) if rows else []
+    except sqlite3.Error as e:
+        logger.warning("Could not fetch all device tokens: %s", e)
+        return []
+
+
 def save_device_token(
     conn: sqlite3.Connection, userid: int, token: str, platform: str
 ) -> None:
