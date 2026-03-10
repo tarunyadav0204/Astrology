@@ -318,6 +318,9 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipStep, setPartnershipStep] = useState(0); // 0: select first, 1: select second, 2: describe relation, 3: done
   const [partnershipSubStep, setPartnershipSubStep] = useState(0);
   const [partnershipRelation, setPartnershipRelation] = useState('');
+  const [isTypingOtherRelation, setIsTypingOtherRelation] = useState(false);
+  const [otherRelationText, setOtherRelationText] = useState('');
+  const [nativeSearchQuery, setNativeSearchQuery] = useState('');
   const [showPartnershipSetupModal, setShowPartnershipSetupModal] = useState(false);
   const [nativeChart, setNativeChart] = useState(null);
   const [partnerChart, setPartnerChart] = useState(null);
@@ -699,6 +702,9 @@ export default function ChatScreen({ navigation, route }) {
           setNativeChart(null);
           setPartnerChart(null);
           setPartnershipRelation('');
+          setIsTypingOtherRelation(false);
+          setOtherRelationText('');
+          setNativeSearchQuery('');
         }
         setIsPremiumAnalysis(false);
         setShowModeSelector(false);
@@ -921,6 +927,9 @@ export default function ChatScreen({ navigation, route }) {
     setPartnershipStep(0);
     setPartnershipSubStep(0);
     setPartnershipRelation('');
+    setIsTypingOtherRelation(false);
+    setOtherRelationText('');
+    setNativeSearchQuery('');
     setNativeChart(null);
     setPartnerChart(null);
     setShowGreeting(false);
@@ -941,6 +950,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const handlePartnershipChartSelect = (chart) => {
+    setNativeSearchQuery('');
     if (partnershipStep === 0) {
       setNativeChart(chart);
       setPartnershipStep(1);
@@ -953,9 +963,8 @@ export default function ChatScreen({ navigation, route }) {
 
   const handleRelationshipSelect = (selection) => {
     if (selection === 'Other...') {
-      setPartnershipRelation('');
-      setPartnershipStep(2); // Stay in step 2 to allow typing
-      setPartnershipSubStep(0);
+      setIsTypingOtherRelation(true);
+      setOtherRelationText('');
       return;
     }
 
@@ -1035,6 +1044,7 @@ export default function ChatScreen({ navigation, route }) {
                     setPartnerChart(null);
                     setPartnershipRelation('');
                     setPartnershipSubStep(0);
+                    setNativeSearchQuery('');
                   }}
                 >
                   <View style={styles.setupSlotIcon}>
@@ -1063,6 +1073,7 @@ export default function ChatScreen({ navigation, route }) {
                       setPartnerChart(null);
                       setPartnershipRelation('');
                       setPartnershipSubStep(0);
+                      setNativeSearchQuery('');
                     }
                   }}
                   disabled={!isNativeSet}
@@ -1092,6 +1103,7 @@ export default function ChatScreen({ navigation, route }) {
                       setPartnershipStep(2);
                       setPartnershipRelation('');
                       setPartnershipSubStep(0);
+                      setNativeSearchQuery('');
                     }
                   }}
                   disabled={!isPartnerSet}
@@ -1110,49 +1122,157 @@ export default function ChatScreen({ navigation, route }) {
               </View>
 
               {/* Action Buttons based on current step */}
-              {partnershipStep === 0 && (
-                <View style={styles.setupSelectorContainer}>
-                  <GHFlatList
-                    horizontal
-                    data={savedCharts.length > 0 ? savedCharts : [{ id: 'add-new', name: 'Add New Profile', isNew: true }]}
-                    keyExtractor={(chart) => chart.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.setupSelectorScroll}
-                    renderItem={({ item: chart }) => (
-                      <TouchableOpacity
-                        style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
-                        onPress={() => chart.isNew ? navigation.navigate('BirthForm') : handlePartnershipChartSelect(chart)}
-                      >
-                        <Text style={[styles.setupSelectorText, { color: colors.text }]}>{chart.isNew ? '➕ ' : '👤 '} {chart.name}</Text>
+              {(partnershipStep === 0 || partnershipStep === 1) && savedCharts.length > 5 && (
+                <View style={styles.modalSearchContainer}>
+                  <View style={[styles.modalSearchWrapper, { backgroundColor: colors.border + '40' }]}>
+                    <Ionicons name="search" size={18} color={colors.textSecondary} />
+                    <TextInput
+                      style={[styles.modalSearchInput, { color: colors.text }]}
+                      placeholder={`Search ${partnershipStep === 0 ? 'first person' : 'partner'}...`}
+                      placeholderTextColor={colors.textSecondary + '80'}
+                      value={nativeSearchQuery}
+                      onChangeText={setNativeSearchQuery}
+                      autoCorrect={false}
+                    />
+                    {nativeSearchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setNativeSearchQuery('')}>
+                        <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
                       </TouchableOpacity>
                     )}
-                  />
+                  </View>
+                </View>
+              )}
+
+              {partnershipStep === 0 && (
+                <View style={styles.setupSelectorContainer}>
+                  {(() => {
+                    const filtered = nativeSearchQuery 
+                      ? savedCharts.filter(c => c.name.toLowerCase().includes(nativeSearchQuery.toLowerCase()))
+                      : savedCharts;
+                    
+                    return (
+                      <GHFlatList
+                        horizontal
+                        data={filtered.length > 0 ? filtered : [{ id: 'add-new', name: nativeSearchQuery ? 'No results found' : 'Add New Profile', isNew: true, isEmpty: !nativeSearchQuery }]}
+                        keyExtractor={(chart) => chart.id}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.setupSelectorScroll}
+                        renderItem={({ item: chart }) => (
+                          <TouchableOpacity
+                            style={[
+                              styles.setupSelectorChip, 
+                              { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
+                              chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
+                            ]}
+                            onPress={() => {
+                              if (chart.id === 'add-new') {
+                                if (chart.isEmpty) navigation.navigate('BirthForm');
+                              } else {
+                                handlePartnershipChartSelect(chart);
+                              }
+                            }}
+                            disabled={chart.id === 'add-new' && !chart.isEmpty}
+                          >
+                            <Text style={[styles.setupSelectorText, { color: colors.text }]}>
+                              {chart.id === 'add-new' ? (chart.isEmpty ? '➕ ' : '🔍 ') : '👤 '}
+                              {chart.name}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    );
+                  })()}
                 </View>
               )}
 
               {partnershipStep === 1 && (
                 <View style={styles.setupSelectorContainer}>
-                  <GHFlatList
-                    horizontal
-                    data={savedCharts.filter(c => c.id !== nativeChart?.id).length > 0 ? savedCharts.filter(c => c.id !== nativeChart?.id) : [{ id: 'add-new', name: 'Add New Profile', isNew: true }]}
-                    keyExtractor={(chart) => chart.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.setupSelectorScroll}
-                    renderItem={({ item: chart }) => (
-                      <TouchableOpacity
-                        style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
-                        onPress={() => chart.isNew ? navigation.navigate('BirthForm') : handlePartnershipChartSelect(chart)}
-                      >
-                        <Text style={[styles.setupSelectorText, { color: colors.text }]}>{chart.isNew ? '➕ ' : '👤 '} {chart.name}</Text>
-                      </TouchableOpacity>
-                    )}
-                  />
+                  {(() => {
+                    const otherCharts = savedCharts.filter(c => c.id !== nativeChart?.id);
+                    const filtered = nativeSearchQuery 
+                      ? otherCharts.filter(c => c.name.toLowerCase().includes(nativeSearchQuery.toLowerCase()))
+                      : otherCharts;
+
+                    return (
+                      <GHFlatList
+                        horizontal
+                        data={filtered.length > 0 ? filtered : [{ id: 'add-new', name: nativeSearchQuery ? 'No results found' : 'Add New Profile', isNew: true, isEmpty: !nativeSearchQuery }]}
+                        keyExtractor={(chart) => chart.id}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.setupSelectorScroll}
+                        renderItem={({ item: chart }) => (
+                          <TouchableOpacity
+                            style={[
+                              styles.setupSelectorChip, 
+                              { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
+                              chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
+                            ]}
+                            onPress={() => {
+                              if (chart.id === 'add-new') {
+                                if (chart.isEmpty) navigation.navigate('BirthForm');
+                              } else {
+                                handlePartnershipChartSelect(chart);
+                              }
+                            }}
+                            disabled={chart.id === 'add-new' && !chart.isEmpty}
+                          >
+                            <Text style={[styles.setupSelectorText, { color: colors.text }]}>
+                              {chart.id === 'add-new' ? (chart.isEmpty ? '➕ ' : '🔍 ') : '👤 '}
+                              {chart.name}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    );
+                  })()}
                 </View>
               )}
 
               {partnershipStep === 2 && (
                 <View style={styles.setupSelectorContainer}>
-                  {(() => {
+                  {isTypingOtherRelation ? (
+                    <View style={styles.otherRelationContainer}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
+                          Describe Relationship
+                        </Text>
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setIsTypingOtherRelation(false);
+                            setOtherRelationText('');
+                          }}
+                        >
+                          <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← Back</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.otherInputWrapper}>
+                        <TextInput
+                          style={[styles.otherTextInput, { color: colors.text }]}
+                          value={otherRelationText}
+                          onChangeText={setOtherRelationText}
+                          placeholder="e.g. Mentor, Distant Cousin, etc."
+                          placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                          autoFocus
+                        />
+                        <TouchableOpacity 
+                          style={[
+                            styles.otherDoneButton,
+                            !otherRelationText.trim() && { opacity: 0.5 }
+                          ]}
+                          onPress={() => {
+                            if (otherRelationText.trim()) {
+                              setPartnershipRelation(otherRelationText.trim());
+                              setPartnershipStep(3);
+                              setIsTypingOtherRelation(false);
+                            }
+                          }}
+                          disabled={!otherRelationText.trim()}
+                        >
+                          <Ionicons name="checkmark" size={20} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (() => {
                     const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
                     
                     if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
@@ -1325,6 +1445,9 @@ export default function ChatScreen({ navigation, route }) {
         setNativeChart(null);
         setPartnerChart(null);
         setPartnershipRelation('');
+        setIsTypingOtherRelation(false);
+        setOtherRelationText('');
+        setNativeSearchQuery('');
       }
       if (isMundane) {
         setIsMundane(false);
@@ -1813,9 +1936,15 @@ export default function ChatScreen({ navigation, route }) {
       try {
         // When using first question free, send as standard so backend applies free-question logic
         const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+        
+        // Prepend relationship info to question for better backend context/logging
+        const finalQuestion = (partnershipMode && partnershipRelation)
+          ? `[Relationship: ${partnershipRelation}] ${messageText}`
+          : messageText;
+
         const requestBody = {
           session_id: currentSessionId,
-          question: messageText,
+          question: finalQuestion,
           language: language || 'english',
           response_style: 'detailed',
           premium_analysis: useFreeQuestion ? false : isPremiumAnalysis,
@@ -2366,6 +2495,9 @@ export default function ChatScreen({ navigation, route }) {
                     setNativeChart(null);
                     setPartnerChart(null);
                     setPartnershipRelation('');
+                    setIsTypingOtherRelation(false);
+                    setOtherRelationText('');
+                    setNativeSearchQuery('');
                   }
                   setIsPremiumAnalysis(false);
                   setShowModeSelector(false);
@@ -2530,6 +2662,9 @@ export default function ChatScreen({ navigation, route }) {
                     setNativeChart(null);
                     setPartnerChart(null);
                     setPartnershipRelation('');
+                    setIsTypingOtherRelation(false);
+                    setOtherRelationText('');
+                    setNativeSearchQuery('');
                   }}
                 >
                   <Ionicons name="close" size={18} color="#f472b6" />
@@ -5218,6 +5353,22 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
   },
+  modalSearchContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  modalSearchWrapper: {
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  modalSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+  },
   setupResetButton: {
     marginTop: 12,
     alignItems: 'center',
@@ -5376,5 +5527,37 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  otherRelationContainer: {
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  otherInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  otherTextInput: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#ff6b35',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+  },
+  otherDoneButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ff6b35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });

@@ -102,6 +102,7 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [selectedProfileForMenu, setSelectedProfileForMenu] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -408,7 +409,29 @@ export default function SelectNativeScreen({ navigation, route }) {
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : returnTo === 'KarmaAnalysis' ? 'Select native for karma analysis' : 'Choose a profile for astrological analysis'}
             </Text>
-            {profiles.map((profile) => (
+
+            {profiles.length > 5 && (
+              <View style={[styles.localSearchContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.localSearchIcon} />
+                <TextInput
+                  style={[styles.localSearchInput, { color: colors.text }]}
+                  placeholder="Search by name..."
+                  placeholderTextColor={colors.textSecondary + '80'}
+                  value={localSearchQuery}
+                  onChangeText={setLocalSearchQuery}
+                  autoCorrect={false}
+                />
+                {localSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setLocalSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {profiles
+              .filter(p => p.name.toLowerCase().includes(localSearchQuery.toLowerCase()))
+              .map((profile) => (
               <ProfileCard
                 key={profile.id}
                 profile={profile}
@@ -645,6 +668,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  localSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+    height: 48,
+  },
+  localSearchIcon: {
+    marginRight: 8,
+  },
+  localSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 8,
   },
   profileWrapper: {
     position: 'relative',
