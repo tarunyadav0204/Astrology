@@ -12,15 +12,7 @@ from auth import User, get_current_user
 from .service import run_nudge_scan
 from . import db
 from . import push as push_module
-import sqlite3
-import os
-
-BLOG_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "blog", "blog_database.db")
-
-
-def get_blog_conn():
-    """Lightweight helper to open the blog SQLite DB."""
-    return sqlite3.connect(BLOG_DB_PATH)
+from blog.routes import get_db_connection as get_blog_conn
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +216,9 @@ async def admin_send_blog_notification(
 
         conn = db.get_conn()
         try:
+            # Ensure nudge tables (including device_tokens) exist
+            db.init_nudge_tables(conn)
+
             # Get all distinct user IDs that have at least one device token
             all_tokens: List[tuple] = db.get_all_device_tokens(conn)
             if not all_tokens:
