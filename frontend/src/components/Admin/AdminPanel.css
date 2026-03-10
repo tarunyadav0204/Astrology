@@ -1172,9 +1172,26 @@ input:checked + .toggle-slider:before {
   padding: 20px;
 }
 
-.notifications-admin h2 {
-  color: #e91e63;
-  margin-bottom: 10px;
+.notifications-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.notifications-tabs .sub-tab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: #f9fafb;
+  font-size: 13px;
+  cursor: pointer;
+  color: #374151;
+}
+
+.notifications-tabs .sub-tab.active {
+  background: #ff6b35;
+  border-color: #ff6b35;
+  color: #fff;
 }
 
 .notifications-description {
@@ -1188,6 +1205,101 @@ input:checked + .toggle-slider:before {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.notif-user-list {
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.notif-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.notif-user-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #111827;
+  box-shadow: 0 1px 0 0 #1f2937;
+}
+
+.notif-user-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.notif-th-checkbox {
+  width: 44px;
+  min-width: 44px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.notif-th-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.notif-th-name {
+  width: 40%;
+}
+
+.notif-th-phone {
+  width: auto;
+}
+
+.notif-user-table tbody tr:nth-child(odd) {
+  background: #f9fafb;
+}
+
+.notif-user-table tbody tr:hover {
+  background: #f3f4f6;
+}
+
+.notif-user-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  vertical-align: middle;
+}
+
+.notif-td-checkbox {
+  width: 44px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.notif-td-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.notif-td-name {
+  font-weight: 500;
+}
+
+.notif-td-phone {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.notif-user-summary {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .notifications-form .form-field label {

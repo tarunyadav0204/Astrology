@@ -66,6 +66,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
+  const [blogPosts, setBlogPosts] = useState([]);
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
   const [notifBody, setNotifBody] = useState('');
@@ -73,6 +74,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifNativeId, setNotifNativeId] = useState('');
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
+  const [selectedNotifUserIds, setSelectedNotifUserIds] = useState([]); // multi-select
+  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog'
+  const [blogNotifSelectedId, setBlogNotifSelectedId] = useState('');
+  const [blogNotifAudience, setBlogNotifAudience] = useState('all'); // 'all' | 'eligible'
+  const [selectedBlogNotifUserIds, setSelectedBlogNotifUserIds] = useState([]); // multi-select for blog tab
+  const [blogNotifSending, setBlogNotifSending] = useState(false);
+  const [blogNotifResult, setBlogNotifResult] = useState(null);
   const [redditDrafts, setRedditDrafts] = useState([]);
   const [redditDraftsLoading, setRedditDraftsLoading] = useState(false);
   const [redditCollecting, setRedditCollecting] = useState(false);
@@ -185,6 +193,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       fetchRedditDrafts();
     } else if (activeTab === 'notifications') {
       fetchUsers();
+      fetchBlogPosts();
     }
   }, [activeTab, activeSubTab]);
 
@@ -207,6 +216,28 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
+    }
+  };
+
+  const fetchBlogPosts = async () => {
+    try {
+      const response = await fetch('/api/blog/posts?status=published&limit=100', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (!response.ok) {
+        console.error('Failed to fetch blog posts for notifications:', response.status);
+        return;
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setBlogPosts(data);
+      } else if (Array.isArray(data.posts)) {
+        setBlogPosts(data.posts);
+      }
+    } catch (e) {
+      console.error('Error fetching blog posts for notifications:', e);
     }
   };
 
@@ -665,29 +696,92 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
 
   const handleSendNotification = async () => {
-    const userId = notifUserId ? parseInt(notifUserId, 10) : 0;
-    if (!userId || !notifTitle.trim() || !notifBody.trim()) {
-      const msg = 'Please select a user and enter both title and body.';
+    const userIds = selectedNotifUserIds.map((id) => parseInt(id, 10)).filter(Boolean);
+    if (!userIds.length || !notifTitle.trim() || !notifBody.trim()) {
+      const msg = 'Please select at least one user and enter both title and body.';
       setNotifResult({ ok: false, message: msg });
       console.warn('[Admin Notifications] Validation failed:', msg);
       return;
     }
     setNotifSending(true);
     setNotifResult(null);
-    console.log('[Admin Notifications] Sending to user_id=', userId, 'title=', notifTitle.trim().slice(0, 50));
+    console.log('[Admin Notifications] Sending to user_ids=', userIds, 'title=', notifTitle.trim().slice(0, 50));
     try {
-      const response = await fetch('/api/nudge/admin/send', {
+      let totalSent = 0;
+      let totalTokensFound = 0;
+      for (const userId of userIds) {
+        const response = await fetch('/api/nudge/admin/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            title: notifTitle.trim().slice(0, 100),
+            body: notifBody.trim().slice(0, 200),
+            ...(notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
+            ...(notifNativeId && userIds.length === 1 && { native_id: parseInt(notifNativeId, 10) }),
+          }),
+        });
+        let data;
+        try {
+          data = await response.json();
+        } catch (_) {
+          const text = await response.text();
+          console.error('[Admin Notifications] Non-JSON response:', response.status, text?.slice(0, 200));
+          setNotifResult({ ok: false, message: `Server error ${response.status}: ${text?.slice(0, 100) || 'Invalid response'}` });
+          return;
+        }
+        if (!response.ok) {
+          const message = data.detail || data.message || 'Failed to send';
+          console.error('[Admin Notifications] Failed for user_id=', userId, response.status, data);
+          setNotifResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
+          return;
+        }
+        totalSent += data.sent || 0;
+        totalTokensFound += data.tokens_found || 0;
+      }
+      const summary = {
+        ok: true,
+        sent: totalSent,
+        tokens_found: totalTokensFound,
+        message: `Notifications sent. Devices reached: ${totalSent} of ${totalTokensFound}.`,
+      };
+      console.log('[Admin Notifications] Success batch:', summary);
+      setNotifResult(summary);
+      setNotifTitle('');
+      setNotifBody('');
+      setNotifQuestion('');
+      setNotifNativeId('');
+    } catch (err) {
+      console.error('[Admin Notifications] Request error:', err);
+      setNotifResult({ ok: false, message: err.message || 'Request failed' });
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
+  const handleSendBlogNotification = async () => {
+    const blogId = blogNotifSelectedId ? parseInt(blogNotifSelectedId, 10) : 0;
+    if (!blogId) {
+      setBlogNotifResult({ ok: false, message: 'Please select a blog post.' });
+      return;
+    }
+    setBlogNotifSending(true);
+    setBlogNotifResult(null);
+    console.log('[Admin Blog Notifications] Sending blog_id=', blogId, 'audience=', blogNotifAudience);
+    try {
+      const response = await fetch('/api/nudge/admin/send-blog', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
-          user_id: userId,
-          title: notifTitle.trim().slice(0, 100),
-          body: notifBody.trim().slice(0, 200),
-          ...(notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
-          ...(notifNativeId && { native_id: parseInt(notifNativeId, 10) }),
+          blog_id: blogId,
+          audience: blogNotifAudience, // 'all' or 'eligible'
+          user_ids: selectedBlogNotifUserIds,
         }),
       });
       let data;
@@ -695,29 +789,26 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         data = await response.json();
       } catch (_) {
         const text = await response.text();
-        console.error('[Admin Notifications] Non-JSON response:', response.status, text?.slice(0, 200));
-        setNotifResult({ ok: false, message: `Server error ${response.status}: ${text?.slice(0, 100) || 'Invalid response'}` });
+        console.error('[Admin Blog Notifications] Non-JSON response:', response.status, text?.slice(0, 200));
+        setBlogNotifResult({ ok: false, message: `Server error ${response.status}: ${text?.slice(0, 100) || 'Invalid response'}` });
         return;
       }
       if (!response.ok) {
         const message = data.detail || data.message || 'Failed to send';
-        console.error('[Admin Notifications] Failed:', response.status, data);
-        setNotifResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
+        console.error('[Admin Blog Notifications] Failed:', response.status, data);
+        setBlogNotifResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
         return;
       }
-      console.log('[Admin Notifications] Success:', data);
-      setNotifResult(data);
+      console.log('[Admin Blog Notifications] Success:', data);
+      setBlogNotifResult(data);
       if (data.ok) {
-        setNotifTitle('');
-        setNotifBody('');
-        setNotifQuestion('');
-        setNotifNativeId('');
+        setBlogNotifSelectedId('');
       }
     } catch (err) {
-      console.error('[Admin Notifications] Request error:', err);
-      setNotifResult({ ok: false, message: err.message || 'Request failed' });
+      console.error('[Admin Blog Notifications] Request error:', err);
+      setBlogNotifResult({ ok: false, message: err.message || 'Request failed' });
     } finally {
-      setNotifSending(false);
+      setBlogNotifSending(false);
     }
   };
 
@@ -1724,96 +1815,269 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'notifications' && (
           <div className="notifications-admin">
-            <h2>Send Push Notification</h2>
-            <p className="notifications-description">
-              Send a custom push notification to a user&apos;s mobile device. They must have the app installed and have allowed notifications.
-            </p>
-            <div className="notifications-form">
-              <div className="form-field">
-                <label>User</label>
-                <select
-                  value={notifUserId}
-                  onChange={(e) => setNotifUserId(e.target.value)}
-                  disabled={loading}
-                >
-                  <option value="">Select user...</option>
-                  {users.map((u) => (
-                    <option key={u.userid} value={u.userid}>
-                      {u.name || 'No name'} ({u.phone})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Title (max 100 chars)</label>
-                <input
-                  type="text"
-                  placeholder="Notification title"
-                  value={notifTitle}
-                  onChange={(e) => setNotifTitle(e.target.value)}
-                  maxLength={100}
-                />
-              </div>
-              <div className="form-field">
-                <label>Body (max 200 chars)</label>
-                <textarea
-                  placeholder="Message body"
-                  value={notifBody}
-                  onChange={(e) => setNotifBody(e.target.value)}
-                  maxLength={200}
-                  rows={3}
-                />
-              </div>
-              <div className="form-field">
-                <label>Question (optional, max 500 chars)</label>
-                <input
-                  type="text"
-                  placeholder="Pre-fill chat when user taps notification"
-                  value={notifQuestion}
-                  onChange={(e) => setNotifQuestion(e.target.value)}
-                  maxLength={500}
-                />
-              </div>
-              <div className="form-field">
-                <label>For native (optional)</label>
-                <select
-                  value={notifNativeId}
-                  onChange={(e) => setNotifNativeId(e.target.value)}
-                  disabled={loading || !notifUserId}
-                >
-                  <option value="">Any — use user&apos;s current selection</option>
-                  {(charts || [])
-                    .filter((c) => Number(c.userid) === Number(notifUserId))
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name || 'Unnamed'} (id: {c.id})
-                      </option>
-                    ))}
-                </select>
-                <small className="form-hint">When user taps, app will switch to this native before opening chat.</small>
-              </div>
-              <div className="form-buttons">
-                <button
-                  type="button"
-                  onClick={handleSendNotification}
-                  disabled={notifSending || !notifUserId || !notifTitle.trim() || !notifBody.trim()}
-                  className="create-btn"
-                >
-                  {notifSending ? 'Sending...' : 'Send Notification'}
-                </button>
-              </div>
+            <h2>Notifications</h2>
+            <div className="notifications-tabs">
+              <button
+                type="button"
+                className={`sub-tab ${notifSubTab === 'custom' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('custom')}
+              >
+                Custom notifications
+              </button>
+              <button
+                type="button"
+                className={`sub-tab ${notifSubTab === 'blog' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('blog')}
+              >
+                Blog notifications
+              </button>
             </div>
-            {notifResult && (
-              <div className={`notif-result ${notifResult.ok ? 'success' : 'error'}`}>
-                {notifResult.ok ? (
-                  <>
-                    <strong>Done.</strong> {notifResult.message}
-                    {notifResult.tokens_found === 0 && ' User has no registered devices.'}
-                  </>
-                ) : (
-                  <strong>{notifResult.message}</strong>
+
+            {notifSubTab === 'custom' && (
+              <>
+                <p className="notifications-description">
+                  Send a custom push notification to selected users. They must have the app installed and have allowed notifications.
+                </p>
+                <div className="notifications-form">
+                  <div className="form-field">
+                    <label>Recipients</label>
+                    <div className="notif-user-list">
+                      <table className="notif-user-table">
+                        <thead>
+                          <tr>
+                            <th className="notif-th-checkbox">
+                              <input
+                                type="checkbox"
+                                id="notif-select-all"
+                                checked={users.length > 0 && selectedNotifUserIds.length === users.length}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedNotifUserIds(users.map((u) => u.userid));
+                                  } else {
+                                    setSelectedNotifUserIds([]);
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th className="notif-th-name">Name</th>
+                            <th className="notif-th-phone">Phone</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users.map((u) => {
+                            const id = u.userid;
+                            const checked = selectedNotifUserIds.includes(id);
+                            return (
+                              <tr key={id} className="notif-user-row">
+                                <td className="notif-td-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedNotifUserIds((prev) => [...prev, id]);
+                                      } else {
+                                        setSelectedNotifUserIds((prev) => prev.filter((v) => v !== id));
+                                      }
+                                    }}
+                                  />
+                                </td>
+                                <td className="notif-td-name">{u.name || 'No name'}</td>
+                                <td className="notif-td-phone">{u.phone}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="notif-user-summary">{selectedNotifUserIds.length} selected</div>
+                    <small className="form-hint">
+                      Only users with registered device tokens will actually receive a push notification.
+                    </small>
+                  </div>
+                  <div className="form-field">
+                    <label>Title (max 100 chars)</label>
+                    <input
+                      type="text"
+                      placeholder="Notification title"
+                      value={notifTitle}
+                      onChange={(e) => setNotifTitle(e.target.value)}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Body (max 200 chars)</label>
+                    <textarea
+                      placeholder="Message body"
+                      value={notifBody}
+                      onChange={(e) => setNotifBody(e.target.value)}
+                      maxLength={200}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Question (optional, max 500 chars)</label>
+                    <input
+                      type="text"
+                      placeholder="Pre-fill chat when user taps notification"
+                      value={notifQuestion}
+                      onChange={(e) => setNotifQuestion(e.target.value)}
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>For native (optional)</label>
+                    <select
+                      value={notifNativeId}
+                      onChange={(e) => setNotifNativeId(e.target.value)}
+                      disabled={loading || selectedNotifUserIds.length !== 1}
+                    >
+                      <option value="">Any — use user&apos;s current selection</option>
+                      {(charts || [])
+                        .filter((c) => Number(c.userid) === Number(selectedNotifUserIds[0]))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name || 'Unnamed'} (id: {c.id})
+                          </option>
+                        ))}
+                    </select>
+                    <small className="form-hint">When user taps, app will switch to this native before opening chat.</small>
+                  </div>
+                  <div className="form-buttons">
+                    <button
+                      type="button"
+                      onClick={handleSendNotification}
+                      disabled={notifSending || selectedNotifUserIds.length === 0 || !notifTitle.trim() || !notifBody.trim()}
+                      className="create-btn"
+                    >
+                      {notifSending ? 'Sending...' : 'Send Notification'}
+                    </button>
+                  </div>
+                </div>
+                {notifResult && (
+                  <div className={`notif-result ${notifResult.ok ? 'success' : 'error'}`}>
+                    {notifResult.ok ? (
+                      <>
+                        <strong>Done.</strong> {notifResult.message}
+                        {notifResult.tokens_found === 0 && ' User has no registered devices.'}
+                      </>
+                    ) : (
+                      <strong>{notifResult.message}</strong>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
+            )}
+
+            {notifSubTab === 'blog' && (
+              <>
+                <p className="notifications-description">
+                  Send a notification for a published blog post. The blog&apos;s title and image will be used in the notification.
+                </p>
+                <div className="notifications-form">
+                  <div className="form-field">
+                    <label>Recipients</label>
+                    <div className="notif-user-list">
+                      <table className="notif-user-table">
+                        <thead>
+                          <tr>
+                            <th className="notif-th-checkbox">
+                              <input
+                                type="checkbox"
+                                id="blog-notif-select-all"
+                                checked={users.length > 0 && selectedBlogNotifUserIds.length === users.length}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedBlogNotifUserIds(users.map((u) => u.userid));
+                                  } else {
+                                    setSelectedBlogNotifUserIds([]);
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th className="notif-th-name">Name</th>
+                            <th className="notif-th-phone">Phone</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users.map((u) => {
+                            const id = u.userid;
+                            const checked = selectedBlogNotifUserIds.includes(id);
+                            return (
+                              <tr key={id} className="notif-user-row">
+                                <td className="notif-td-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedBlogNotifUserIds((prev) => [...prev, id]);
+                                      } else {
+                                        setSelectedBlogNotifUserIds((prev) => prev.filter((v) => v !== id));
+                                      }
+                                    }}
+                                  />
+                                </td>
+                                <td className="notif-td-name">{u.name || 'No name'}</td>
+                                <td className="notif-td-phone">{u.phone}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="notif-user-summary">{selectedBlogNotifUserIds.length} selected</div>
+                    <small className="form-hint">
+                      If no users are selected, the notification will be sent based on the audience setting below.
+                    </small>
+                  </div>
+                  <div className="form-field">
+                    <label>Blog post</label>
+                    <select
+                      value={blogNotifSelectedId}
+                      onChange={(e) => setBlogNotifSelectedId(e.target.value)}
+                      disabled={loading || !blogPosts.length}
+                    >
+                      <option value="">Select blog…</option>
+                      {blogPosts
+                        .filter((p) => p.status === 'published')
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title}
+                          </option>
+                        ))}
+                    </select>
+                    <small className="form-hint">
+                      Only published blog posts are shown. Manage blogs in the Blog tab.
+                    </small>
+                  </div>
+                  <div className="form-field">
+                    <label>Audience</label>
+                    <select
+                      value={blogNotifAudience}
+                      onChange={(e) => setBlogNotifAudience(e.target.value)}
+                    >
+                      <option value="all">All users</option>
+                      <option value="eligible">Only users with registered push tokens</option>
+                    </select>
+                  </div>
+                  <div className="form-buttons">
+                    <button
+                      type="button"
+                      onClick={handleSendBlogNotification}
+                      disabled={blogNotifSending || !blogNotifSelectedId}
+                      className="create-btn"
+                    >
+                      {blogNotifSending ? 'Sending…' : 'Send Blog Notification'}
+                    </button>
+                  </div>
+                </div>
+                {blogNotifResult && (
+                  <div className={`notif-result ${blogNotifResult.ok ? 'success' : 'error'}`}>
+                    <strong>{blogNotifResult.message}</strong>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

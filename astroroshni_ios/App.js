@@ -44,6 +44,8 @@ import KPScreen from './src/screens/KPScreen';
 import SadeSatiScreen from './src/components/SadeSati/SadeSatiScreen';
 import NakshatraCalendarScreen from './src/components/NakshatraCalendar/NakshatraCalendarScreen';
 import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
+import BlogListScreen from './src/components/Blog/BlogListScreen';
+import BlogPostDetailScreen from './src/components/Blog/BlogPostDetailScreen';
 import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -485,6 +487,16 @@ export default function App() {
           <Stack.Screen 
             name="CosmicRing"
             component={CosmicRingScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="BlogList" 
+            component={BlogListScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="BlogPostDetail" 
+            component={BlogPostDetailScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

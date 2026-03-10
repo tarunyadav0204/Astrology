@@ -489,4 +489,15 @@ export const kpAPI = {
   getRulingPlanets: (birthData) => api.post(getEndpoint('/kp/ruling-planets'), birthData),
 };
 
+export const blogAPI = {
+  getPosts: (status = 'published', category = null, limit = 10, offset = 0) => {
+    let url = `/blog/posts?status=${status}&limit=${limit}&offset=${offset}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    return api.get(getEndpoint(url));
+  },
+  getPostById: (id) => api.get(getEndpoint(`/blog/posts/${id}`)),
+  getPostBySlug: (slug) => api.get(getEndpoint(`/blog/posts/slug/${slug}`)),
+  getBlogCategories: () => api.get(getEndpoint('/blog/categories')),
+};
+
 export default api;

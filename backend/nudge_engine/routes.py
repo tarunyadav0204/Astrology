@@ -3,7 +3,7 @@ HTTP endpoints: daily nudge scan (cron), device token registration (app), admin 
 """
 import logging
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -12,6 +12,15 @@ from auth import User, get_current_user
 from .service import run_nudge_scan
 from . import db
 from . import push as push_module
+import sqlite3
+import os
+
+BLOG_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "blog", "blog_database.db")
+
+
+def get_blog_conn():
+    """Lightweight helper to open the blog SQLite DB."""
+    return sqlite3.connect(BLOG_DB_PATH)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +38,12 @@ class AdminSendNotificationRequest(BaseModel):
     body: str
     question: Optional[str] = None  # optional; when user taps notification, prefill chat input with this
     native_id: Optional[int] = None  # optional; birth_chart id — app will set this native as selected when user taps
+
+
+class AdminSendBlogNotificationRequest(BaseModel):
+    blog_id: int
+    audience: str = "all"  # "all" or "eligible"
+    user_ids: Optional[List[int]] = None  # optional explicit user selection
 
 
 @router.post("/scan")
@@ -169,3 +184,121 @@ async def admin_send_notification(
     except Exception as e:
         logger.exception("Admin send notification failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to send notification") from e
+
+
+@router.post("/admin/send-blog")
+async def admin_send_blog_notification(
+    body: AdminSendBlogNotificationRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Send a push notification for a specific blog post to many users.
+    The notification uses the blog's title and featured image; the app can open the blog detail screen.
+    """
+    if current_user.role != "admin":
+        logger.warning("Admin send blog notification rejected: user role=%s", current_user.role)
+        raise HTTPException(status_code=403, detail="Admin only")
+    if not body.blog_id:
+        raise HTTPException(status_code=400, detail="blog_id required")
+
+    try:
+        # Fetch blog post
+        blog_conn = get_blog_conn()
+        try:
+            cur = blog_conn.cursor()
+            cur.execute(
+                "SELECT id, title, slug, featured_image, status FROM blog_posts WHERE id = ?",
+                (body.blog_id,),
+            )
+            row = cur.fetchone()
+        finally:
+            blog_conn.close()
+        if not row:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+        blog_id, title, slug, featured_image, status = row
+        if status != "published":
+            raise HTTPException(status_code=400, detail="Blog post must be published")
+
+        notif_title = (title or "").strip()[:100] or "New blog on AstroRoshni"
+        notif_body = "Tap to read this new article on AstroRoshni."
+
+        conn = db.get_conn()
+        try:
+            # Get all distinct user IDs that have at least one device token
+            all_tokens: List[tuple] = db.get_all_device_tokens(conn)
+            if not all_tokens:
+                return {
+                    "ok": False,
+                    "sent": 0,
+                    "tokens_found": 0,
+                    "message": "No device tokens registered",
+                }
+
+            # Group tokens by user_id
+            tokens_by_user = {}
+            for userid, token, platform in all_tokens:
+                tokens_by_user.setdefault(userid, []).append((token, platform))
+
+            # If explicit user_ids provided, restrict to those
+            target_user_ids: Optional[List[int]] = None
+            if body.user_ids:
+                target_user_ids = [int(u) for u in body.user_ids if isinstance(u, int) or str(u).isdigit()]
+
+            sent = 0
+            total_tokens = 0
+            for userid, tokens in tokens_by_user.items():
+                if target_user_ids is not None and userid not in target_user_ids:
+                    continue
+
+                # audience == "eligible" is same as "all" here since all have tokens for these users,
+                # but we keep the parameter for future filtering.
+                push_data = {
+                    "trigger_id": "blog",
+                    "cta": "astroroshni://blog",
+                    "blog_id": str(blog_id),
+                    "slug": slug,
+                }
+                if featured_image:
+                    push_data["image"] = featured_image
+                user_sent = 0
+                for token, platform in tokens:
+                    total_tokens += 1
+                    if push_module.send_expo_push(
+                        token,
+                        notif_title,
+                        notif_body,
+                        data=push_data,
+                    ):
+                        sent += 1
+                        user_sent += 1
+                channel = "push" if user_sent else "stored"
+                db.insert_delivery(
+                    conn,
+                    userid=userid,
+                    trigger_id="blog_admin",
+                    title=notif_title,
+                    body=notif_body,
+                    sent_at=date.today(),
+                    event_params=f'{{"blog_id": {blog_id}, "slug": "{slug}"}}',
+                    channel=channel,
+                )
+        finally:
+            conn.close()
+
+        logger.info(
+            "Admin send blog notification success: blog_id=%s users=%s tokens_sent=%s",
+            blog_id,
+            len(tokens_by_user),
+            sent,
+        )
+        return {
+            "ok": True,
+            "sent": sent,
+            "tokens_found": total_tokens,
+            "message": f"Notification sent to {sent} of {total_tokens} device(s)",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Admin send blog notification failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to send blog notification") from e

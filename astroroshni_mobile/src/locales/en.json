@@ -28,6 +28,7 @@
     "chatHistory": "Chat History",
     "partnershipOn": "Partnership On",
     "partnershipOff": "Partnership Off",
+    "blog": "Blog & Knowledge",
     "credits": "Credits",
     "logout": "Logout"
   },
@@ -236,7 +237,8 @@
       "cosmicDashboard": "✨ Your Cosmic Dashboard",
       "currentDasha": "⏰ Current Dasha Periods",
       "astrologyTools": "🔧 Astrology Tools",
-      "planetaryTransits": "🪐 Current Planetary Transits"
+      "planetaryTransits": "🪐 Current Planetary Transits",
+      "blog": "Blog & Knowledge"
     },
     "options": {
       "question": {

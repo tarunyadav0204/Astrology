@@ -16,7 +16,9 @@ import {
   Animated,
   Dimensions,
   InteractionManager,
+  Keyboard,
 } from 'react-native';
+import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,8 +32,9 @@ import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
+import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import { storage } from '../../services/storage';
-import { chatAPI } from '../../services/api';
+import { chatAPI, pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
@@ -44,7 +47,6 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
-import { IS_ASTROLOGY_ONLY } from '../../config/appVariant';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -53,29 +55,163 @@ const cardWidth = screenWidth * 0.3;
 const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
+const RELATIONSHIP_PRESETS = [
+  {
+    label: 'Husband & Wife',
+    subSteps: [
+      {
+        prompt: 'Who is who?',
+        options: (n, p) => [
+          { label: `${n.name} (H) & ${p.name} (W)`, value: `${n.name} is husband and ${p.name} is wife` },
+          { label: `${n.name} (W) & ${p.name} (H)`, value: `${n.name} is wife and ${p.name} is husband` }
+        ]
+      },
+      {
+        prompt: 'Marriage details?',
+        options: () => [
+          { label: 'First Marriage', value: '1st Marriage' },
+          { label: 'Second Marriage', value: '2nd Marriage' },
+          { label: 'Third Marriage', value: '3rd Marriage' }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Parent & Child',
+    subSteps: [
+      {
+        prompt: 'Relationship roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Parent`, value: `${n.name} is parent and ${p.name} is child` },
+          { label: `${p.name} is Parent`, value: `${p.name} is parent and ${n.name} is child` }
+        ]
+      },
+      {
+        prompt: 'Specify child details?',
+        options: () => [
+          { label: '1st Son', value: '1st son' },
+          { label: '2nd Son', value: '2nd son' },
+          { label: '3rd Son', value: '3rd son' },
+          { label: '1st Daughter', value: '1st daughter' },
+          { label: '2nd Daughter', value: '2nd daughter' },
+          { label: '3rd Daughter', value: '3rd daughter' }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Siblings',
+    subSteps: [
+      {
+        prompt: 'Who is elder?',
+        options: (n, p) => [
+          { label: `${n.name} is Elder`, value: `${n.name} is elder sibling and ${p.name} is younger` },
+          { label: `${p.name} is Elder`, value: `${p.name} is elder sibling and ${n.name} is younger` }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'In-Laws',
+    subSteps: [
+      {
+        prompt: 'Who is the In-Law?',
+        options: (n, p) => [
+          { label: `${n.name} is In-Law`, value: `${n.name} is in-law of ${p.name}` },
+          { label: `${p.name} is In-Law`, value: `${p.name} is in-law of ${n.name}` }
+        ]
+      },
+      {
+        prompt: 'Specific relationship?',
+        options: () => [
+          { label: 'Mother-in-law & Daughter-in-law', value: 'Mother-in-law and Daughter-in-law' },
+          { label: 'Mother-in-law & Son-in-law', value: 'Mother-in-law and Son-in-law' },
+          { label: 'Father-in-law & Daughter-in-law', value: 'Father-in-law and Daughter-in-law' },
+          { label: 'Father-in-law & Son-in-law', value: 'Father-in-law and Son-in-law' },
+          { label: 'Brother-in-law', value: 'Brother-in-law relation' },
+          { label: 'Sister-in-law', value: 'Sister-in-law relation' }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Grandparent & Grandchild',
+    subSteps: [
+      {
+        prompt: 'Roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Grandparent`, value: `${n.name} is grandparent and ${p.name} is grandchild` },
+          { label: `${p.name} is Grandparent`, value: `${p.name} is grandparent and ${n.name} is grandchild` }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Uncle/Aunt & Nephew/Niece',
+    subSteps: [
+      {
+        prompt: 'Roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Uncle/Aunt`, value: `${n.name} is uncle/aunt and ${p.name} is nephew/niece` },
+          { label: `${p.name} is Uncle/Aunt`, value: `${p.name} is uncle/aunt and ${n.name} is nephew/niece` }
+        ]
+      }
+    ]
+  },
+  { label: 'Cousins' },
+  { label: 'Guru & Disciple' },
+  { label: 'Business Partners' },
+  { label: 'Close Friends' },
+  { label: 'Boyfriend & Girlfriend' },
+  {
+    label: 'Manager & Employee',
+    subSteps: [
+      {
+        prompt: 'Work roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Manager`, value: `${n.name} is manager and ${p.name} is employee` },
+          { label: `${p.name} is Manager`, value: `${p.name} is manager and ${n.name} is employee` }
+        ]
+      }
+    ]
+  },
+  { label: 'Colleague' },
+  { label: 'Teacher & Student' },
+  { label: 'Other...' }
+];
+
 export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
-  const isClassic = theme === 'classic';
-  const { credits, partnershipCost, fetchBalance } = useCredits();
+  const { credits, partnershipCost, freeQuestionAvailable, fetchBalance } = useCredits();
   const insets = useSafeAreaInsets();
   
-  // Lab / Mundane mode state
-  const [isLabMode, setIsLabMode] = useState(false);
+  // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
+  const isMundaneRef = useRef(false);
+  useEffect(() => { isMundaneRef.current = isMundane; }, [isMundane]);
+
+  const [mundaneContext, setMundaneContext] = useState(null);
+  const mundaneContextRef = useRef(null);
+  useEffect(() => { mundaneContextRef.current = mundaneContext; }, [mundaneContext]);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [selectedYear, setSelectedYear] = useState(YEARS[0]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [countrySearchQuery, setCountrySearchQuery] = useState('');
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [chatCost, setChatCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
+  const [chatCostOriginal, setChatCostOriginal] = useState(null);
+  const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
+  const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showPremiumTooltip, setShowPremiumTooltip] = useState(true);
   const tooltipResetRef = useRef(true);
+  const freeUsedThisSendRef = useRef(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -179,12 +315,40 @@ export default function ChatScreen({ navigation, route }) {
   
   // Partnership mode state
   const [partnershipMode, setPartnershipMode] = useState(false);
+  const [partnershipStep, setPartnershipStep] = useState(0); // 0: select first, 1: select second, 2: describe relation, 3: done
+  const [partnershipSubStep, setPartnershipSubStep] = useState(0);
+  const [partnershipRelation, setPartnershipRelation] = useState('');
+  const [isTypingOtherRelation, setIsTypingOtherRelation] = useState(false);
+  const [otherRelationText, setOtherRelationText] = useState('');
+  const [nativeSearchQuery, setNativeSearchQuery] = useState('');
+  const [showPartnershipSetupModal, setShowPartnershipSetupModal] = useState(false);
   const [nativeChart, setNativeChart] = useState(null);
   const [partnerChart, setPartnerChart] = useState(null);
   const [showChartPicker, setShowChartPicker] = useState(false);
   const [selectingFor, setSelectingFor] = useState(null); // 'native' or 'partner'
   const [savedCharts, setSavedCharts] = useState([]);
-  
+  const [showPartnershipModal, setShowPartnershipModal] = useState(false);
+  const [partnershipModalCost, setPartnershipModalCost] = useState(2);
+  const [showMundaneModal, setShowMundaneModal] = useState(false);
+  const [mundaneModalCost, setMundaneModalCost] = useState(1);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Move input into view when keyboard opens (does not change tab bar layout)
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   // Pending message management (like web app)
   const addPendingMessage = async (messageId) => {
     const key = `pendingChatMessages_${currentPersonId}`;
@@ -338,13 +502,13 @@ export default function ChatScreen({ navigation, route }) {
   ];
 
   const suggestions = [
-    "How do we read the 10th house in Vedic astrology?",
-    "How does D9 combine with D1 in the method?",
-    "What are yogas and how do we identify them from positions?",
-    "What is the step-by-step order to analyze a D1 chart?",
-    "How do we interpret a planet in exaltation in a house?",
-    "Which house lords rule what in this chart?",
-    "How do we read planets in different houses in Vedic method?"
+    "What does my birth chart say about my career?",
+    "When is a good time for marriage?",
+    "What are my health vulnerabilities?",
+    "Tell me about my current dasha period",
+    "What do the current transits mean for me?",
+    "Show me significant periods in my life",
+    "What are my strengths and weaknesses?"
   ];
 
   const getSignName = (signNumber) => {
@@ -369,23 +533,18 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const getPlanetColor = (planetName) => {
-    // In classic mode, keep dashas neutral (use theme colors),
-    // otherwise fall back to legacy per‑planet colors.
-    if (isClassic) {
-      return colors.surface;
-    }
-    const palette = {
-      Sun: '#ff6b35',
-      Moon: '#e0e0e0',
-      Mars: '#d32f2f',
-      Mercury: '#4caf50',
-      Jupiter: '#ffd700',
-      Venus: '#e91e63',
-      Saturn: '#2196f3',
-      Rahu: '#9e9e9e',
-      Ketu: '#795548',
+    const colors = {
+      'Sun': '#ff6b35',
+      'Moon': '#e0e0e0',
+      'Mars': '#d32f2f',
+      'Mercury': '#4caf50',
+      'Jupiter': '#ffd700',
+      'Venus': '#e91e63',
+      'Saturn': '#2196f3',
+      'Rahu': '#9e9e9e',
+      'Ketu': '#795548',
     };
-    return palette[planetName] || '#ffffff';
+    return colors[planetName] || '#ffffff';
   };
 
   const loadChartData = async (birth) => {
@@ -496,7 +655,7 @@ export default function ChatScreen({ navigation, route }) {
           }
         }
         setTimeout(() => {
-          if (!IS_ASTROLOGY_ONLY) handleGreetingOptionSelect({ action: 'question' });
+          handleGreetingOptionSelect({ action: 'question' });
           if (initialMsg) {
             setInputText(initialMsg);
           }
@@ -507,14 +666,48 @@ export default function ChatScreen({ navigation, route }) {
     // Handle mundane mode param
     if (route.params?.mode === 'mundane') {
       setIsMundane(true);
-      navigation.setParams({ mode: undefined });
+      setIsPremiumAnalysis(false); // No premium in mundane
+      setShowModeSelector(false);
+      if (route.params?.mundaneContext) {
+        setMundaneContext(route.params.mundaneContext);
+        
+        // Sync selected country if provided in context
+        if (route.params.mundaneContext.country) {
+          const countryMatch = COUNTRIES.find(c => c.name === route.params.mundaneContext.country);
+          if (countryMatch) {
+            setSelectedCountry(countryMatch);
+          }
+        }
+        
+        // Sync selected year if provided in context (event_date)
+        if (route.params.mundaneContext.event_date) {
+          const year = new Date(route.params.mundaneContext.event_date).getFullYear();
+          setSelectedYear(year);
+        }
+      }
+      navigation.setParams({ mode: undefined, mundaneContext: undefined });
     }
     
     // Handle back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!showGreeting) {
-        // In chat mode, show greeting screen
+        // In chat mode, show greeting screen and reset special modes
         setShowGreeting(true);
+        if (isMundane) {
+          setIsMundane(false);
+          setMundaneContext(null);
+        }
+        if (partnershipMode) {
+          setPartnershipMode(false);
+          setNativeChart(null);
+          setPartnerChart(null);
+          setPartnershipRelation('');
+          setIsTypingOtherRelation(false);
+          setOtherRelationText('');
+          setNativeSearchQuery('');
+        }
+        setIsPremiumAnalysis(false);
+        setShowModeSelector(false);
         return true;
       }
       return false;
@@ -530,13 +723,20 @@ export default function ChatScreen({ navigation, route }) {
 
   const fetchChatCost = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/chat-cost')}`);
-      const data = await response.json();
-      setChatCost(data.cost || 1);
-      
-      const premiumResponse = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/premium-chat-cost')}`);
-      const premiumData = await premiumResponse.json();
-      setPremiumChatCost(premiumData.cost || 3);
+      const res = await pricingAPI.getPricing();
+      const data = res?.data || res;
+      const pricing = data?.pricing || {};
+      const orig = data?.pricing_original || {};
+      // Standard chat (user-discounted when VIP)
+      const chatVal = pricing.chat != null ? Number(pricing.chat) || 1 : 1;
+      const chatOriginal = orig.chat != null ? Number(orig.chat) : null;
+      setChatCost(chatVal);
+      setChatCostOriginal(Number.isNaN(chatOriginal) ? null : chatOriginal);
+      // Premium chat (user-discounted when VIP; same source as standard)
+      const premiumVal = pricing.premium_chat != null ? Number(pricing.premium_chat) : 3;
+      const premiumOriginal = orig.premium_chat != null ? Number(orig.premium_chat) : null;
+      setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
+      setPremiumChatCostOriginal(Number.isNaN(premiumOriginal) ? null : premiumOriginal);
     } catch (error) {
       console.error('Error fetching chat cost:', error);
     }
@@ -708,49 +908,504 @@ export default function ChatScreen({ navigation, route }) {
     return unsubscribe;
   }, [currentPersonId, loading, isTyping, showGreeting]);
 
+  // First question free: standard chat only (not partnership, not mundane)
+  const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
+    ? 0
+    : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
+
+  const openPartnershipModal = (cost) => {
+    setPartnershipModalCost((cost != null && cost > 0) ? cost : partnershipCost);
+    setShowPartnershipModal(true);
+  };
+
+  const confirmPartnershipMode = () => {
+    loadSavedCharts(); // Refresh charts when starting partnership mode
+    setShowPartnershipModal(false);
+    setPartnershipMode(true);
+    setIsPremiumAnalysis(false); // No premium in partnership
+    setShowModeSelector(false);
+    setPartnershipStep(0);
+    setPartnershipSubStep(0);
+    setPartnershipRelation('');
+    setIsTypingOtherRelation(false);
+    setOtherRelationText('');
+    setNativeSearchQuery('');
+    setNativeChart(null);
+    setPartnerChart(null);
+    setShowGreeting(false);
+    setShowMenu(false);
+    setShowPartnershipSetupModal(true); // Open the new setup modal
+    
+    // Add initial assistant message for partnership setup (the summarized bubble)
+    const setupMessage = {
+      id: `setup_${Date.now()}`,
+      content: "🤝 Partnership Setup",
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      isSetup: true,
+      setupType: 'partnership'
+    };
+    
+    setMessagesWithStorage([setupMessage]);
+  };
+
+  const handlePartnershipChartSelect = (chart) => {
+    setNativeSearchQuery('');
+    if (partnershipStep === 0) {
+      setNativeChart(chart);
+      setPartnershipStep(1);
+    } else if (partnershipStep === 1) {
+      setPartnerChart(chart);
+      setPartnershipStep(2);
+      setPartnershipSubStep(0);
+    }
+  };
+
+  const handleRelationshipSelect = (selection) => {
+    if (selection === 'Other...') {
+      setIsTypingOtherRelation(true);
+      setOtherRelationText('');
+      return;
+    }
+
+    // selection can be a string (label) or an option object from a sub-step
+    const selectionLabel = typeof selection === 'object' ? selection.label : selection;
+    const activePreset = RELATIONSHIP_PRESETS.find(p => p.label === selectionLabel);
+    
+    if (activePreset && activePreset.subSteps && partnershipRelation !== activePreset.label) {
+      // Starting a complex preset flow
+      setPartnershipRelation(activePreset.label);
+      setPartnershipSubStep(0);
+    } else {
+      // Continuing a sub-step or selecting a simple preset
+      const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
+      
+      if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
+        // We are in the middle of sub-steps
+        const valueToUse = typeof selection === 'object' ? selection.value : selection;
+        const newRelation = (partnershipRelation === currentPreset.label)
+          ? `${currentPreset.label}: ${valueToUse}`
+          : `${partnershipRelation}, ${valueToUse}`;
+        
+        setPartnershipRelation(newRelation);
+        
+        if (partnershipSubStep + 1 < currentPreset.subSteps.length) {
+          setPartnershipSubStep(partnershipSubStep + 1);
+        } else {
+          setPartnershipStep(3); // Done with sub-steps
+        }
+      } else {
+        // Simple preset or final string
+        setPartnershipRelation(selectionLabel);
+        setPartnershipStep(3);
+      }
+    }
+  };
+
+  const renderPartnershipSetupModal = () => {
+    const isNativeSet = !!nativeChart;
+    const isPartnerSet = !!partnerChart;
+    const isRelationSet = !!partnershipRelation;
+    
+    return (
+      <Modal
+        visible={showPartnershipSetupModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPartnershipSetupModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.partnershipModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 20 }}>🤝</Text>
+                <Text style={[styles.modalTitle, { color: colors.text, fontSize: 18 }]}>Partnership Setup</Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowPartnershipSetupModal(false)}
+                style={{ backgroundColor: colors.border, padding: 6, borderRadius: 20 }}
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <GHScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+              <View style={styles.setupSlotsContainer}>
+                {/* Slot 1: Native */}
+                <TouchableOpacity 
+                  style={[
+                    styles.setupSlot, 
+                    partnershipStep === 0 && styles.setupSlotActive,
+                    isNativeSet && styles.setupSlotFilled
+                  ]}
+                  onPress={() => {
+                    setPartnershipStep(0);
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                    setPartnershipSubStep(0);
+                    setNativeSearchQuery('');
+                  }}
+                >
+                  <View style={styles.setupSlotIcon}>
+                    <Text>{isNativeSet ? '👤' : '1️⃣'}</Text>
+                  </View>
+                  <View style={styles.setupSlotContent}>
+                    <Text style={styles.setupSlotLabel}>First Person</Text>
+                    <Text style={isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                      {isNativeSet ? nativeChart.name : 'Select from list below...'}
+                    </Text>
+                  </View>
+                  {isNativeSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                </TouchableOpacity>
+
+                {/* Slot 2: Partner */}
+                <TouchableOpacity 
+                  style={[
+                    styles.setupSlot, 
+                    partnershipStep === 1 && styles.setupSlotActive,
+                    isPartnerSet && styles.setupSlotFilled,
+                    !isNativeSet && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (isNativeSet) {
+                      setPartnershipStep(1);
+                      setPartnerChart(null);
+                      setPartnershipRelation('');
+                      setPartnershipSubStep(0);
+                      setNativeSearchQuery('');
+                    }
+                  }}
+                  disabled={!isNativeSet}
+                >
+                  <View style={styles.setupSlotIcon}>
+                    <Text>{isPartnerSet ? '👫' : '2️⃣'}</Text>
+                  </View>
+                  <View style={styles.setupSlotContent}>
+                    <Text style={styles.setupSlotLabel}>Partner / Family / Friend</Text>
+                    <Text style={isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                      {isPartnerSet ? partnerChart.name : (isNativeSet ? 'Select from list below...' : 'Complete Step 1 first')}
+                    </Text>
+                  </View>
+                  {isPartnerSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                </TouchableOpacity>
+
+                {/* Slot 3: Relationship */}
+                <TouchableOpacity 
+                  style={[
+                    styles.setupSlot, 
+                    partnershipStep === 2 && styles.setupSlotActive,
+                    isRelationSet && styles.setupSlotFilled,
+                    !isPartnerSet && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (isPartnerSet) {
+                      setPartnershipStep(2);
+                      setPartnershipRelation('');
+                      setPartnershipSubStep(0);
+                      setNativeSearchQuery('');
+                    }
+                  }}
+                  disabled={!isPartnerSet}
+                >
+                  <View style={styles.setupSlotIcon}>
+                    <Text>{isRelationSet ? '💍' : '3️⃣'}</Text>
+                  </View>
+                  <View style={styles.setupSlotContent}>
+                    <Text style={styles.setupSlotLabel}>Relationship Status</Text>
+                    <Text style={isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                      {isRelationSet ? partnershipRelation : (isPartnerSet ? 'Select or describe relationship...' : 'Complete Step 2 first')}
+                    </Text>
+                  </View>
+                  {isRelationSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                </TouchableOpacity>
+              </View>
+
+              {/* Action Buttons based on current step */}
+              {(partnershipStep === 0 || partnershipStep === 1) && savedCharts.length > 5 && (
+                <View style={styles.modalSearchContainer}>
+                  <View style={[styles.modalSearchWrapper, { backgroundColor: colors.border + '40' }]}>
+                    <Ionicons name="search" size={18} color={colors.textSecondary} />
+                    <TextInput
+                      style={[styles.modalSearchInput, { color: colors.text }]}
+                      placeholder={`Search ${partnershipStep === 0 ? 'first person' : 'partner'}...`}
+                      placeholderTextColor={colors.textSecondary + '80'}
+                      value={nativeSearchQuery}
+                      onChangeText={setNativeSearchQuery}
+                      autoCorrect={false}
+                    />
+                    {nativeSearchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setNativeSearchQuery('')}>
+                        <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {partnershipStep === 0 && (
+                <View style={styles.setupSelectorContainer}>
+                  {(() => {
+                    const filtered = nativeSearchQuery 
+                      ? savedCharts.filter(c => c.name.toLowerCase().includes(nativeSearchQuery.toLowerCase()))
+                      : savedCharts;
+                    
+                    return (
+                      <GHFlatList
+                        horizontal
+                        data={filtered.length > 0 ? filtered : [{ id: 'add-new', name: nativeSearchQuery ? 'No results found' : 'Add New Profile', isNew: true, isEmpty: !nativeSearchQuery }]}
+                        keyExtractor={(chart) => chart.id}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.setupSelectorScroll}
+                        renderItem={({ item: chart }) => (
+                          <TouchableOpacity
+                            style={[
+                              styles.setupSelectorChip, 
+                              { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
+                              chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
+                            ]}
+                            onPress={() => {
+                              if (chart.id === 'add-new') {
+                                if (chart.isEmpty) navigation.navigate('BirthForm');
+                              } else {
+                                handlePartnershipChartSelect(chart);
+                              }
+                            }}
+                            disabled={chart.id === 'add-new' && !chart.isEmpty}
+                          >
+                            <Text style={[styles.setupSelectorText, { color: colors.text }]}>
+                              {chart.id === 'add-new' ? (chart.isEmpty ? '➕ ' : '🔍 ') : '👤 '}
+                              {chart.name}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    );
+                  })()}
+                </View>
+              )}
+
+              {partnershipStep === 1 && (
+                <View style={styles.setupSelectorContainer}>
+                  {(() => {
+                    const otherCharts = savedCharts.filter(c => c.id !== nativeChart?.id);
+                    const filtered = nativeSearchQuery 
+                      ? otherCharts.filter(c => c.name.toLowerCase().includes(nativeSearchQuery.toLowerCase()))
+                      : otherCharts;
+
+                    return (
+                      <GHFlatList
+                        horizontal
+                        data={filtered.length > 0 ? filtered : [{ id: 'add-new', name: nativeSearchQuery ? 'No results found' : 'Add New Profile', isNew: true, isEmpty: !nativeSearchQuery }]}
+                        keyExtractor={(chart) => chart.id}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.setupSelectorScroll}
+                        renderItem={({ item: chart }) => (
+                          <TouchableOpacity
+                            style={[
+                              styles.setupSelectorChip, 
+                              { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
+                              chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
+                            ]}
+                            onPress={() => {
+                              if (chart.id === 'add-new') {
+                                if (chart.isEmpty) navigation.navigate('BirthForm');
+                              } else {
+                                handlePartnershipChartSelect(chart);
+                              }
+                            }}
+                            disabled={chart.id === 'add-new' && !chart.isEmpty}
+                          >
+                            <Text style={[styles.setupSelectorText, { color: colors.text }]}>
+                              {chart.id === 'add-new' ? (chart.isEmpty ? '➕ ' : '🔍 ') : '👤 '}
+                              {chart.name}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    );
+                  })()}
+                </View>
+              )}
+
+              {partnershipStep === 2 && (
+                <View style={styles.setupSelectorContainer}>
+                  {isTypingOtherRelation ? (
+                    <View style={styles.otherRelationContainer}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
+                          Describe Relationship
+                        </Text>
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setIsTypingOtherRelation(false);
+                            setOtherRelationText('');
+                          }}
+                        >
+                          <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← Back</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.otherInputWrapper}>
+                        <TextInput
+                          style={[styles.otherTextInput, { color: colors.text }]}
+                          value={otherRelationText}
+                          onChangeText={setOtherRelationText}
+                          placeholder="e.g. Mentor, Distant Cousin, etc."
+                          placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                          autoFocus
+                        />
+                        <TouchableOpacity 
+                          style={[
+                            styles.otherDoneButton,
+                            !otherRelationText.trim() && { opacity: 0.5 }
+                          ]}
+                          onPress={() => {
+                            if (otherRelationText.trim()) {
+                              setPartnershipRelation(otherRelationText.trim());
+                              setPartnershipStep(3);
+                              setIsTypingOtherRelation(false);
+                            }
+                          }}
+                          disabled={!otherRelationText.trim()}
+                        >
+                          <Ionicons name="checkmark" size={20} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (() => {
+                    const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
+                    
+                    if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
+                      const subStep = currentPreset.subSteps[partnershipSubStep];
+                      const options = subStep.options(nativeChart, partnerChart);
+                      
+                      return (
+                        <View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
+                              {subStep.prompt}
+                            </Text>
+                            <TouchableOpacity 
+                              onPress={() => {
+                                setPartnershipRelation('');
+                                setPartnershipSubStep(0);
+                              }}
+                            >
+                              <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← Back</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <GHFlatList
+                            horizontal
+                            data={options}
+                            keyExtractor={(item, idx) => idx.toString()}
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.setupSelectorScroll}
+                            renderItem={({ item }) => (
+                              <TouchableOpacity
+                                style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35', minWidth: 100 }]}
+                                onPress={() => handleRelationshipSelect(item)}
+                              >
+                                <Text style={[styles.setupSelectorText, { color: colors.text }]}>{item.label}</Text>
+                              </TouchableOpacity>
+                            )}
+                          />
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <View>
+                        <GHFlatList
+                          horizontal
+                          data={RELATIONSHIP_PRESETS}
+                          keyExtractor={(item, idx) => idx.toString()}
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.setupSelectorScroll}
+                          renderItem={({ item: relation }) => (
+                            <TouchableOpacity
+                              style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
+                              onPress={() => handleRelationshipSelect(relation.label)}
+                            >
+                              <Text style={[styles.setupSelectorText, { color: colors.text }]}>{relation.label}</Text>
+                            </TouchableOpacity>
+                          )}
+                        />
+                        <Text style={[styles.setupHelperText, { color: colors.textSecondary, marginTop: 8 }]}>
+                          Pick a preset or type your own relationship in the chat box after closing this modal.
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+
+              {partnershipStep === 3 && (
+                <TouchableOpacity 
+                  style={styles.setupConfirmButton}
+                  onPress={() => {
+                    // Add confirmation message to chat
+                    const confirmMsg = {
+                      id: `confirm_${Date.now()}`,
+                      content: `Everything set! Analysis for **${nativeChart.name}** & **${partnerChart.name}** (${partnershipRelation}) is ready.\n\nAsk any question about your compatibility!`,
+                      role: 'assistant',
+                      timestamp: new Date().toISOString(),
+                    };
+                    setMessagesWithStorage(prev => [...prev, confirmMsg]);
+                    setPartnershipStep(4); // Setup done
+                    setShowPartnershipSetupModal(false); // Close modal
+                    
+                    // Scroll to bottom
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
+                >
+                  <LinearGradient colors={['#ff6b35', '#f97316']} style={styles.setupConfirmGradient}>
+                    <Text style={styles.setupConfirmText}>Ready for Analysis ✨</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
+              {partnershipStep < 4 && (
+                <TouchableOpacity 
+                  style={styles.setupResetButton}
+                  onPress={() => {
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                    setPartnershipStep(0);
+                    setPartnershipSubStep(0);
+                  }}
+                >
+                  <Text style={styles.setupResetText}>Reset Setup</Text>
+                </TouchableOpacity>
+              )}
+            </GHScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const openMundaneModal = (cost) => {
+    // Use passed cost from HomeScreen option, fallback to chatCost
+    const finalCost = (cost != null && cost > 0) ? cost : chatCost;
+    setMundaneModalCost(finalCost);
+    setShowMundaneModal(true);
+  };
+
+  const confirmMundaneMode = () => {
+    setShowMundaneModal(false);
+    navigation.navigate('MundaneHub');
+  };
+
   const handleGreetingOptionSelect = async (option) => {
-    if (IS_ASTROLOGY_ONLY && (option.action === 'question' || option.action === 'events')) return;
+    
     if (option.action === 'partnership') {
-      Alert.alert(
-        'Partnership Mode',
-        `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Continue', 
-            onPress: () => {
-              setPartnershipMode(true);
-              setNativeChart(birthData);
-              setShowGreeting(false);
-              setShowChartPicker(true);
-            }
-          }
-        ]
-      );
-    } else if (option.action === 'lab') {
-      // Chart Lab: educational, research-focused analysis using the native's chart
-      setIsLabMode(true);
-      setIsMundane(false);
-      setShowGreeting(false);
-      const nativeName = birthData?.name || 'there';
-      const labWelcome = {
-        id: Date.now().toString(),
-        content: `🧪 Welcome to Chart Lab, ${nativeName}!\n\nWe use your chart to practice the Vedic method: houses, planets, divisional charts, yogas—the system, not predictions.\n\nYou can ask things like:\n\n• How do we read the D1 chart step by step in the classical order?\n• What does the 10th house mean in Vedic astrology and how is it read here?\n• How does D9 combine with D1 in the method?\n• Which yogas can we identify from planetary positions and house lords in this chart?\n\nI focus on the rules and the method, not specific events or dates.`,
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-      setMessagesWithStorage([labWelcome]);
+      openPartnershipModal(option.cost);
     } else if (option.action === 'mundane') {
-      setIsMundane(true);
-      setIsLabMode(false);
-      setShowGreeting(false);
-      const welcomeMsg = {
-        id: Date.now().toString(),
-        content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI can help you understand:\n\n• Economic trends and market movements\n• Political developments and elections\n• Natural events and their timing\n• Country-specific forecasts\n• Global financial markets\n\nSelect a country and year, then ask your question.`,
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-      setMessagesWithStorage([welcomeMsg]);
+      openMundaneModal(option.cost);
     } else if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
@@ -772,7 +1427,8 @@ export default function ChatScreen({ navigation, route }) {
         navigation.navigate('AnalysisDetail', { 
           analysisType: option.type,
           title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
-          cost: option.cost
+          cost: option.cost,
+          originalCost: option.originalCost,
         });
       }
     } else {
@@ -782,6 +1438,23 @@ export default function ChatScreen({ navigation, route }) {
       
       // Switch to chat mode immediately
       setShowGreeting(false);
+      
+      // Reset special modes when starting standard chat
+      if (partnershipMode) {
+        setPartnershipMode(false);
+        setNativeChart(null);
+        setPartnerChart(null);
+        setPartnershipRelation('');
+        setIsTypingOtherRelation(false);
+        setOtherRelationText('');
+        setNativeSearchQuery('');
+      }
+      if (isMundane) {
+        setIsMundane(false);
+        setMundaneContext(null);
+      }
+      setIsPremiumAnalysis(false);
+      setShowModeSelector(false);
       
       // Set flag to scroll when content renders
       setTimeout(() => {
@@ -804,12 +1477,23 @@ export default function ChatScreen({ navigation, route }) {
         // Always show fresh welcome message when explicitly starting chat
         const nativeName = birthData?.name || 'there';
         
-        const welcomeMessage = {
-          id: Date.now().toString(),
-          content: t('chat.welcomeMessage', "📐 Welcome {{name}}! Here we apply the Vedic method to your chart: houses, planets, divisional charts (D1, D9), and yogas—no predictions, just the system.\n\nYou can ask method-style questions, for example:\n\n• What is the 10th house in Vedic astrology and how do we read it in a chart?\n• How does the D9 (navamsa) combine with D1 in the classical method?\n• How do we identify yogas from planetary positions and house lords?\n• What are the steps to analyze a chart in Vedic order (lagna, planets, houses, dashas)?\n• Which planets rule which houses in this chart and what does that mean?\n• How do we interpret a planet in exaltation vs debilitation in a given house?\n\nAsk about the rules and the method—I'll use your chart as the example.", { name: nativeName }),
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-        };
+        let welcomeMessage;
+        
+        if (isMundaneRef.current) {
+          welcomeMessage = {
+            id: Date.now().toString(),
+            content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
+            role: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+        } else {
+          welcomeMessage = {
+            id: Date.now().toString(),
+            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+            role: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+        }
         
         // If no stored messages, show welcome. If stored messages exist, prepend welcome if it's not already there
         if (storedMessages.length === 0) {
@@ -1078,6 +1762,14 @@ export default function ChatScreen({ navigation, route }) {
             setIsTyping(false);
             removePendingMessage(messageId);
             fetchBalance();
+            if (freeUsedThisSendRef.current) {
+              freeUsedThisSendRef.current = false;
+              Alert.alert(
+                'Free question used',
+                'You used your free question. Next questions will use credits.',
+                [{ text: 'OK' }]
+              );
+            }
           };
 
           const analysisSteps = status.analysis_steps || [];
@@ -1231,16 +1923,166 @@ export default function ChatScreen({ navigation, route }) {
     pollForResponse(messageId, null, sessionId, userMessage?.content || '', true);
   };
 
+  const sendChatRequestWithRetry = async ({
+    messageText,
+    currentSessionId,
+    processingMessageId,
+    userMessageId,
+    clientRequestId,
+  }) => {
+    const token = await AsyncStorage.getItem('authToken');
+
+    const attemptSend = async (attempt = 1) => {
+      try {
+        // When using first question free, send as standard so backend applies free-question logic
+        const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+        
+        // Prepend relationship info to question for better backend context/logging
+        const finalQuestion = (partnershipMode && partnershipRelation)
+          ? `[Relationship: ${partnershipRelation}] ${messageText}`
+          : messageText;
+
+        const requestBody = {
+          session_id: currentSessionId,
+          question: finalQuestion,
+          language: language || 'english',
+          response_style: 'detailed',
+          premium_analysis: useFreeQuestion ? false : isPremiumAnalysis,
+          native_name: partnershipMode ? nativeChart?.name : birthData?.name,
+          birth_details: partnershipMode ? {
+            name: nativeChart.name,
+            date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
+            time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
+            latitude: parseFloat(nativeChart.latitude),
+            longitude: parseFloat(nativeChart.longitude),
+            place: nativeChart.place || '',
+            gender: nativeChart.gender || ''
+          } : {
+            name: birthData.name,
+            date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+            time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+            latitude: parseFloat(birthData.latitude),
+            longitude: parseFloat(birthData.longitude),
+            place: birthData.place || '',
+            gender: birthData.gender || ''
+          },
+          // Partnership mode fields
+          partnership_mode: partnershipMode,
+          ...(partnershipMode && partnerChart && {
+            partner_name: partnerChart.name,
+            partner_date: typeof partnerChart.date === 'string' ? partnerChart.date.split('T')[0] : partnerChart.date,
+            partner_time: typeof partnerChart.time === 'string' ? partnerChart.time.split('T')[1]?.slice(0, 5) || partnerChart.time : partnerChart.time,
+            partner_place: partnerChart.place || '',
+            partner_latitude: parseFloat(partnerChart.latitude),
+            partner_longitude: parseFloat(partnerChart.longitude),
+            partner_gender: partnerChart.gender || '',
+            partnership_relationship: partnershipRelation
+          }),
+          client_request_id: clientRequestId,
+        };
+
+        console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()} (attempt ${attempt})`);
+
+        const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log(`📡 [API RESPONSE] Received response at: ${new Date().toISOString()}, status: ${response.status}`);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights } = result;
+
+        console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+        console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
+        console.log(`🏠 [CHART INSIGHTS] Received ${chart_insights?.length || 0} chart insights from backend`);
+
+        if (!assistantMessageId) {
+          throw new Error('No message ID received from server');
+        }
+
+        // Use dynamic loading messages from backend if available
+        if (loading_messages && loading_messages.length > 0) {
+          setDynamicLoadingMessages(loading_messages);
+        }
+
+        console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+
+        // Start polling IMMEDIATELY before state updates to avoid delay
+        pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
+
+        // Update user message with real DB ID (async, non-blocking)
+        if (user_message_id) {
+          setMessagesWithStorage(prev => {
+            const updated = prev.map(msg => {
+              if (msg.id === userMessageId) {
+                const updatedMsg = { ...msg, messageId: user_message_id };
+                return updatedMsg;
+              }
+              return msg;
+            });
+            return updated;
+          });
+        }
+
+        // Update processing message with messageId and chart insights
+        setMessagesWithStorage(prev => {
+          const updated = prev.map(msg => {
+            if (msg.id === processingMessageId) {
+              const updatedMsg = { ...msg, messageId: assistantMessageId, chartInsights: chart_insights, showSendRetryButton: false };
+              return updatedMsg;
+            }
+            return msg;
+          });
+          return updated;
+        });
+      } catch (error) {
+        // Only auto-retry for network-level errors
+        if ((error.message?.includes('Network') || error.message?.includes('fetch')) && attempt < 3) {
+          console.warn(`⚠️ Network error on attempt ${attempt}, retrying...`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          return attemptSend(attempt + 1);
+        }
+        throw error;
+      }
+    };
+
+    await attemptSend();
+  };
+
   const sendMessage = async (messageText = inputText) => {
     if (!messageText.trim() || !birthData) {
       return;
     }
 
+    // Partnership Step 2: Relationship description
+    if (partnershipMode && partnershipStep === 2) {
+      setPartnershipRelation(messageText);
+      setPartnershipStep(3);
+      setInputText('');
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      return;
+    } else {
+      // Normal flow
+      setInputText('');
+    }
+
     // Reset dynamic messages for the new question
     setDynamicLoadingMessages(null);
 
-    // Clear input and set states immediately
-    setInputText('');
     setLoading(true);
     setIsTyping(true);
     setShowGreeting(false);
@@ -1269,6 +2111,7 @@ export default function ChatScreen({ navigation, route }) {
     const loadingMessages = getLoadingMessages(messageText);
 
     // Add processing message immediately
+    const clientRequestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const processingMessageId = Date.now() + '_processing';
     const processingMessage = {
       id: processingMessageId,
@@ -1277,6 +2120,8 @@ export default function ChatScreen({ navigation, route }) {
       timestamp: new Date().toISOString(),
       isTyping: true,
       userMessageId: userMessageId,
+      clientRequestId,
+      failedQuestion: messageText,
     };
     
     setMessagesWithStorage(prev => {
@@ -1310,7 +2155,12 @@ export default function ChatScreen({ navigation, route }) {
           year: selectedYear,
           latitude: selectedCountry.lat,
           longitude: selectedCountry.lng,
-          question: messageText
+          question: messageText,
+          // NEW: Specialized mundane context
+          category: mundaneContext?.category || 'general',
+          event_date: mundaneContext?.event_date,
+          event_time: mundaneContext?.event_time,
+          entities: mundaneContext?.entities
         };
         
         const response = await fetch(`${API_BASE_URL}${getEndpoint('/mundane/analyze')}`, {
@@ -1353,114 +2203,18 @@ export default function ChatScreen({ navigation, route }) {
         setIsTyping(false);
         return;
       }
-      
-      const requestBody = {
-        session_id: currentSessionId,
-        question: messageText,
-        language: language || 'english',
-        response_style: 'detailed',
-        premium_analysis: isPremiumAnalysis,
-        native_name: partnershipMode ? nativeChart?.name : birthData?.name,
-        birth_details: partnershipMode ? {
-          name: nativeChart.name,
-          date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
-          time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
-          latitude: parseFloat(nativeChart.latitude),
-          longitude: parseFloat(nativeChart.longitude),
-          place: nativeChart.place || '',
-          gender: nativeChart.gender || ''
-        } : {
-          name: birthData.name,
-          date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
-          time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
-          latitude: parseFloat(birthData.latitude),
-          longitude: parseFloat(birthData.longitude),
-          place: birthData.place || '',
-          gender: birthData.gender || ''
-        },
-        // Partnership mode fields
-        partnership_mode: partnershipMode,
-        ...(partnershipMode && partnerChart && {
-          partner_name: partnerChart.name,
-          partner_date: typeof partnerChart.date === 'string' ? partnerChart.date.split('T')[0] : partnerChart.date,
-          partner_time: typeof partnerChart.time === 'string' ? partnerChart.time.split('T')[1]?.slice(0, 5) || partnerChart.time : partnerChart.time,
-          partner_place: partnerChart.place || '',
-          partner_latitude: parseFloat(partnerChart.latitude),
-          partner_longitude: parseFloat(partnerChart.longitude),
-          partner_gender: partnerChart.gender || ''
-        })
-      };
-      
-      // Astrology-only app or Chart Lab: tell backend to use teacher/educational instructions (no prediction style)
-      if (IS_ASTROLOGY_ONLY || isLabMode) {
-        requestBody.mode = 'lab';
-      }
-      
 
-      
-      console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()}`);
-      
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log(`📡 [API RESPONSE] Received response at: ${new Date().toISOString()}, status: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      // Track if this send uses the free standard question (for post-success toast)
+      if (!partnershipMode && freeQuestionAvailable) {
+        freeUsedThisSendRef.current = true;
       }
 
-      const result = await response.json();
-      const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights } = result;
-
-      console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
-      console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
-      console.log(`🏠 [CHART INSIGHTS] Received ${chart_insights?.length || 0} chart insights from backend`);
-
-      if (!assistantMessageId) {
-        throw new Error('No message ID received from server');
-      }
-
-      // Use dynamic loading messages from backend if available
-      if (loading_messages && loading_messages.length > 0) {
-        setDynamicLoadingMessages(loading_messages);
-      }
-
-      console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
-      
-      // Start polling IMMEDIATELY before state updates to avoid delay
-      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
-
-      // Update user message with real DB ID (async, non-blocking)
-      if (user_message_id) {
-        setMessagesWithStorage(prev => {
-          const updated = prev.map(msg => {
-            if (msg.id === userMessageId) {
-              const updatedMsg = { ...msg, messageId: user_message_id };
-              return updatedMsg;
-            }
-            return msg;
-          });
-          return updated;
-        });
-      }
-
-      // Update processing message with messageId and chart insights
-      setMessagesWithStorage(prev => {
-        const updated = prev.map(msg => {
-          if (msg.id === processingMessageId) {
-            const updatedMsg = { ...msg, messageId: assistantMessageId, chartInsights: chart_insights };
-            return updatedMsg;
-          }
-          return msg;
-        });
-        return updated;
+      await sendChatRequestWithRetry({
+        messageText,
+        currentSessionId,
+        processingMessageId,
+        userMessageId,
+        clientRequestId,
       });
 
     } catch (error) {
@@ -1491,10 +2245,80 @@ export default function ChatScreen({ navigation, route }) {
         userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
       }
       
-      // Replace processing message with error
+      // Replace processing message with error and show retry button
       setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 
-          ? { ...msg, content: userMessage, isTyping: false }
+          ? { ...msg, content: userMessage, isTyping: false, showSendRetryButton: true, failedQuestion: messageText }
+          : msg
+      ));
+      setLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const handleSendRetry = async (failedMessage) => {
+    const { clientRequestId, userMessageId, failedQuestion } = failedMessage || {};
+    if (!clientRequestId || !failedQuestion) {
+      return;
+    }
+
+    setLoading(true);
+    setIsTyping(true);
+
+    // Reset the failed message to typing state
+    setMessagesWithStorage(prev => prev.map(msg =>
+      msg.id === failedMessage.id
+        ? { ...msg, isTyping: true, showSendRetryButton: false }
+        : msg
+    ));
+
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = await createSession();
+      if (!currentSessionId) {
+        setLoading(false);
+        setIsTyping(false);
+        return;
+      }
+    }
+
+    try {
+      await sendChatRequestWithRetry({
+        messageText: failedQuestion,
+        currentSessionId,
+        processingMessageId: failedMessage.id,
+        userMessageId,
+        clientRequestId,
+      });
+    } catch (error) {
+      console.error('❌ Error retrying message:', error);
+
+      // Log error to backend for developer monitoring
+      try {
+        const { chatErrorAPI } = require('../../services/api');
+        await chatErrorAPI.logError(
+          error.name || 'ChatRetryError',
+          error.message || 'Unknown retry error',
+          failedQuestion,
+          error.stack
+        );
+      } catch (logError) {
+        console.error('Failed to log retry error:', logError);
+      }
+
+      // Show user-friendly error message based on error type
+      let userMessage = 'I apologize, but I\'m still having trouble sending your question. Please check your connection and try again.';
+      if (error.message?.includes('DeadlineExceeded') || error.message?.includes('504') || error.message?.includes('timeout')) {
+        userMessage = 'Your question is quite complex and is taking longer than usual to analyze. Please try asking a more specific question or try again later.';
+      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+        userMessage = 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
+      } else if (error.message?.includes('HTTP 500')) {
+        userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
+      }
+
+      setMessagesWithStorage(prev => prev.map(msg =>
+        msg.id === failedMessage.id
+          ? { ...msg, content: userMessage, isTyping: false, showSendRetryButton: true, failedQuestion }
           : msg
       ));
       setLoading(false);
@@ -1611,7 +2435,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const renderMessage = ({ item }) => (
-    <MessageBubble message={item} language={language} isLabMode={isLabMode} />
+    <MessageBubble message={item} language={language} />
   );
 
   const renderSuggestion = ({ item }) => (
@@ -1628,13 +2452,11 @@ export default function ChatScreen({ navigation, route }) {
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <LinearGradient
         colors={
-          isClassic
-            ? [colors.background, colors.backgroundSecondary]
-            : theme === 'dark'
-              ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
-              : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]
+          theme === 'dark'
+            ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
+            : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]
         }
-        style={[styles.gradientBg, isClassic && { backgroundColor: colors.background }]}
+        style={styles.gradientBg}
       >
       <SafeAreaView
         style={styles.safeArea}
@@ -1648,23 +2470,37 @@ export default function ChatScreen({ navigation, route }) {
         {/* Header */}
         <View style={styles.headerContainer}>
           <LinearGradient
-            colors={isClassic ? [colors.background, colors.backgroundSecondary] : (theme === 'dark' 
+            colors={theme === 'dark' 
               ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-              : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)'])}
+              : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
             style={[
               styles.header,
               {
-                borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'),
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)',
                 elevation: getCardElevation(3),
               }
             ]}
           >
             {!showGreeting && (
               <TouchableOpacity
-                style={[styles.backButton, { backgroundColor: isClassic ? 'rgba(0,0,0,0.08)' : (theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)') }]}
+                style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
                 onPress={() => {
                   setShowGreeting(true);
-                  if (isMundane) setIsMundane(false);
+                  if (isMundane) {
+                    setIsMundane(false);
+                    setMundaneContext(null);
+                  }
+                  if (partnershipMode) {
+                    setPartnershipMode(false);
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                    setIsTypingOtherRelation(false);
+                    setOtherRelationText('');
+                    setNativeSearchQuery('');
+                  }
+                  setIsPremiumAnalysis(false);
+                  setShowModeSelector(false);
                 }}
               >
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
@@ -1749,15 +2585,14 @@ export default function ChatScreen({ navigation, route }) {
             
             <View style={styles.headerRight}>
               <TouchableOpacity
-                style={[
-                  styles.creditButton,
-                  isPremiumAnalysis && styles.creditButtonPremium,
-                  isClassic && { backgroundColor: colors.surface, borderColor: colors.cardBorder }
-                ]}
+                style={[styles.creditButton, isPremiumAnalysis && styles.creditButtonPremium]}
                 onPress={() => navigation.navigate('Credits')}
               >
                 <Text style={[styles.creditText, { color: colors.text }]}>
                   {isPremiumAnalysis ? '⚡' : '💳'} {credits}
+                  {effectiveChatCost === 0 && (
+                    <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · Free</Text>
+                  )}
                 </Text>
               </TouchableOpacity>
               
@@ -1795,29 +2630,55 @@ export default function ChatScreen({ navigation, route }) {
         ) : (
           <>
           {partnershipMode && (
-            <TouchableOpacity 
-              style={styles.floatingPartnershipBadge}
-              onPress={() => {
-                setPartnershipMode(false);
-                setNativeChart(null);
-                setPartnerChart(null);
-              }}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#ec4899', '#f472b6']}
-                style={styles.partnershipBadgeGradient}
+            <View style={styles.floatingBadgesContainer}>
+              <TouchableOpacity 
+                style={styles.floatingChangeBadge}
+                onPress={() => {
+                  setShowPartnershipSetupModal(true);
+                }}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.partnershipBadgeText, { color: colors.text }]}>👥 Partnership Mode</Text>
-                <Ionicons name="close-circle" size={16} color={COLORS.white} style={styles.partnershipBadgeIcon} />
-              </LinearGradient>
-            </TouchableOpacity>
+                <Ionicons name="create-outline" size={14} color="#ff6b35" />
+                <Text style={styles.changeBadgeText}>Change Partnership</Text>
+              </TouchableOpacity>
+
+              <View style={styles.floatingPartnershipBadge}>
+                <View style={styles.partnershipBadgeTextContent}>
+                  <LinearGradient
+                    colors={['#ec4899', '#f472b6']}
+                    style={styles.partnershipBadgeGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={[styles.partnershipBadgeText, { color: COLORS.white }]}>👥 Partnership Mode</Text>
+                  </LinearGradient>
+                </View>
+                <TouchableOpacity 
+                  style={styles.partnershipBadgeClose}
+                  onPress={() => {
+                    setPartnershipMode(false);
+                    setIsPremiumAnalysis(false);
+                    setShowModeSelector(false);
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                    setIsTypingOtherRelation(false);
+                    setOtherRelationText('');
+                    setNativeSearchQuery('');
+                  }}
+                >
+                  <Ionicons name="close" size={18} color="#f472b6" />
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
-          <ScrollView 
+          <GHScrollView 
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
           >
             {/* Calibration Card - COMMENTED OUT */}
             {/* {calibrationEvent && !calibrationEvent.verified && (
@@ -1828,25 +2689,14 @@ export default function ChatScreen({ navigation, route }) {
               />
             )} */}
             
-            {/* Signs Display */}
-            {birthData && (
+            {/* Signs Display – only for native-centric chat, not Global Markets (mundane) */}
+            {birthData && !isMundane && (
               <View style={styles.signsContainer}>
                 <LinearGradient
-                  colors={
-                    isClassic
-                      ? [colors.surface, colors.backgroundSecondary]
-                      : Platform.OS === 'android'
-                        ? (theme === 'dark'
-                            ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)']
-                            : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
-                        : (theme === 'dark'
-                            ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
-                            : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])
-                  }
-                  style={[
-                    styles.signsGradient,
-                    isClassic && { borderColor: colors.cardBorder }
-                  ]}
+                  colors={Platform.OS === 'android'
+                    ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
+                    : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
+                  style={styles.signsGradient}
                 >
                   <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
                   <View style={styles.signsRow}>
@@ -1873,7 +2723,7 @@ export default function ChatScreen({ navigation, route }) {
                   {/* Current Running Dashas */}
                   {dashaData && (
                     <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-                      <FlatList
+                      <GHFlatList
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         data={[
@@ -1895,29 +2745,16 @@ export default function ChatScreen({ navigation, route }) {
                             <TouchableOpacity 
                               style={[
                                 styles.dashaChip,
-                                isClassic
-                                  ? {
-                                      backgroundColor: colors.surface,
-                                      borderColor: colors.cardBorder,
-                                      borderWidth: 1,
-                                    }
-                                  : {
-                                      backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
-                                      borderColor: planetColor,
-                                      borderWidth: 2,
-                                    },
+                                {
+                                  backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
+                                  borderColor: planetColor,
+                                  borderWidth: 2,
+                                },
                               ]}
                               onPress={() => setShowDashaBrowser(true)}
                               activeOpacity={0.8}
                             >
-                              <Text
-                                style={[
-                                  styles.dashaChipPlanet,
-                                  { color: isClassic ? colors.text : (theme === 'dark' ? planetColor : '#1a1a1a') }
-                                ]}
-                              >
-                                {t(`home.planet_names.${dasha.planet}`, dasha.planet)}
-                              </Text>
+                              <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                             </TouchableOpacity>
@@ -1951,6 +2788,34 @@ export default function ChatScreen({ navigation, route }) {
                 );
               }
 
+              // Render Partnership Setup Card
+              if (item.setupType === 'partnership' && partnershipMode) {
+                return (
+                  <View key={item.id} style={{ marginBottom: 16 }}>
+                    <LinearGradient
+                      colors={['rgba(255, 107, 53, 0.1)', 'rgba(249, 115, 22, 0.05)']}
+                      style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.2)' }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <View style={{ backgroundColor: '#ff6b3520', padding: 8, borderRadius: 12 }}>
+                          <Text style={{ fontSize: 18 }}>🤝</Text>
+                        </View>
+                        <View>
+                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Partnership Analysis</Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Setup complete</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#ff6b3520', paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 8 }}
+                        onPress={() => setShowPartnershipSetupModal(true)}
+                      >
+                        <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>Edit Setup ✏️</Text>
+                      </TouchableOpacity>
+                    </LinearGradient>
+                  </View>
+                );
+              }
+
               return (
                 <View key={item.id}>
                   <View ref={isLastMessage ? lastMessageRef : null}>
@@ -1961,8 +2826,10 @@ export default function ChatScreen({ navigation, route }) {
                       partnership={partnershipMode}
                       onDelete={handleDeleteMessage}
                       onRestart={restartPolling}
-                      isLabMode={isLabMode}
+                      onSendRetry={handleSendRetry}
                     />
+                    
+                    {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
                   </View>
                   <FeedbackComponent 
                     message={item} 
@@ -1973,19 +2840,30 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               );
             })}
-          </ScrollView>
+          </GHScrollView>
           </>
         )}
 
 
 
+        {/* Suggestions + Input: translate up when keyboard is open so input stays visible */}
+        <View style={[
+          { transform: [{ translateY: -keyboardHeight }] },
+          keyboardHeight > 0 && {
+            backgroundColor: colors.background,
+            paddingTop: 12,
+            marginHorizontal: -12,
+            paddingHorizontal: 12,
+          },
+        ]}>
         {/* Suggestions (only show when not loading and not showing greeting) */}
         {!loading && !showGreeting && messages.length > 0 && (
           <View style={styles.suggestionsContainer}>
-            <ScrollView
+            <GHScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggestionsContent}
+              keyboardShouldPersistTaps="handled"
             >
               {suggestions.slice(0, 3).map((item, index) => (
                 <TouchableOpacity
@@ -1994,28 +2872,14 @@ export default function ChatScreen({ navigation, route }) {
                   onPress={() => setInputText(item)}
                 >
                   <LinearGradient
-                    colors={
-                      isClassic
-                        ? [colors.surface, colors.backgroundSecondary]
-                        : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']
-                    }
-                    style={[
-                      styles.suggestionChipGradient,
-                      isClassic && { borderColor: colors.cardBorder }
-                    ]}
+                    colors={['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']}
+                    style={styles.suggestionChipGradient}
                   >
-                    <Text
-                      style={[
-                        styles.suggestionChipText,
-                        { color: colors.text }
-                      ]}
-                    >
-                      {item}
-                    </Text>
+                    <Text style={[styles.suggestionChipText, { color: colors.text }]}>{item}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </GHScrollView>
           </View>
         )}
 
@@ -2025,70 +2889,134 @@ export default function ChatScreen({ navigation, route }) {
         {!showGreeting && (
           <View style={styles.unifiedInputContainer}>
             <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#ffffff'] : (Platform.OS === 'android'
+                      colors={Platform.OS === 'android'
                         ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.1)'] : ['rgba(249, 115, 22, 0.08)', 'rgba(249, 115, 22, 0.04)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)'])}
               style={[
                 styles.inputBarGradient,
                 {
-                  borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)'),
+                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
                 }
               ]}
             >
+              {/* Expanded row to the left: Standard | Premium with cost/discount (only when not partnership/mundane) */}
+              {!partnershipMode && !isMundane && showModeSelector && (
+                <View style={styles.modeSelectorExpanded}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeSelectorPill,
+                      !isPremiumAnalysis && styles.modeSelectorPillActive,
+                      !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
+                      isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                    ]}
+                    onPress={() => { setIsPremiumAnalysis(false); setShowModeSelector(false); }}
+                  >
+                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>Standard</Text>
+                    <View style={styles.modeSelectorCostRow}>
+                      {chatCostOriginal != null && chatCostOriginal > chatCost ? (
+                        <>
+                          <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{chatCostOriginal}</Text>
+                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{chatCost}</Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{chatCost}</Text>
+                      )}
+                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{chatCost !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeSelectorPill,
+                      isPremiumAnalysis && styles.modeSelectorPillActivePremium,
+                      isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 215, 0, 0.2)' },
+                      !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                    ]}
+                    onPress={() => { setIsPremiumAnalysis(true); setShowModeSelector(false); }}
+                  >
+                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>Premium</Text>
+                    <View style={styles.modeSelectorCostRow}>
+                      {premiumChatCostOriginal != null && premiumChatCostOriginal > premiumChatCost ? (
+                        <>
+                          <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{premiumChatCostOriginal}</Text>
+                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{premiumChatCost}</Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{premiumChatCost}</Text>
+                      )}
+                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{premiumChatCost !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <TextInput
-                style={[styles.modernTextInput, { color: colors.text }]}
+                key="chat-main-input"
+                style={[
+                  styles.modernTextInput,
+                  { color: colors.text },
+                  showModeSelector && styles.modernTextInputCollapsed
+                ]}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder={loading ? "Analyzing..." : credits < chatCost ? "Insufficient credits" : isMundane ? "Ask about markets, politics, events..." : "Ask me anything..."}
+                placeholder={
+                  loading ? "Analyzing..." : 
+                  credits < effectiveChatCost ? "Insufficient credits" : 
+                  partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
+                  partnershipMode && partnershipStep === 2 ? "Describe the relationship..." :
+                  partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
+                  showModeSelector ? "Type here..." : 
+                  isMundane ? "Ask about markets, politics, events..." : 
+                  "Ask me anything..."
+                }
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
                 maxLength={500}
-                editable={!loading && credits >= chatCost}
+                editable={!loading && credits >= effectiveChatCost && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
                 multiline
+                blurOnSubmit={false}
               />
-              
-              <TouchableOpacity
-                style={styles.premiumToggleButton}
-                onPress={() => setIsPremiumAnalysis(!isPremiumAnalysis)}
-                onLongPress={() => setShowPremiumModal(true)}
-              >
-                <Animated.View
-                  style={[
-                    styles.premiumToggleIcon,
-                    isPremiumAnalysis && {
-                      transform: [{
-                        scale: glowAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 1.15],
-                        }),
-                      }],
-                    },
-                  ]}
+
+              {!partnershipMode && !isMundane && (
+                <TouchableOpacity
+                  style={styles.premiumToggleButton}
+                  onPress={() => setShowModeSelector(prev => !prev)}
+                  onLongPress={() => setShowPremiumModal(true)}
                 >
-                  {isPremiumAnalysis ? (
-                    <LinearGradient
-                      colors={['#ffd700', '#ff6b35']}
-                      style={styles.premiumIconGradient}
-                    >
-                      <Text style={styles.premiumIconText}>⚡</Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={styles.premiumIconInactive}>
-                      <Text style={styles.premiumIconTextInactive}>⚡</Text>
-                      <View style={styles.premiumBadge}>
-                        <Text style={styles.premiumBadgeText}>?</Text>
+                  <Animated.View
+                    style={[
+                      styles.premiumToggleIcon,
+                      isPremiumAnalysis && {
+                        transform: [{
+                          scale: glowAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.15],
+                          }),
+                        }],
+                      },
+                    ]}
+                  >
+                    {isPremiumAnalysis ? (
+                      <LinearGradient
+                        colors={['#ffd700', '#ff6b35']}
+                        style={styles.premiumIconGradient}
+                      >
+                        <Text style={styles.premiumIconText}>P</Text>
+                      </LinearGradient>
+                    ) : (
+                      <View style={styles.premiumIconInactive}>
+                        <Text style={styles.premiumIconTextInactive}>S</Text>
                       </View>
-                    </View>
-                  )}
-                </Animated.View>
-              </TouchableOpacity>
+                    )}
+                  </Animated.View>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost)) && styles.modernSendButtonDisabled
+                  (loading || !inputText.trim() || credits < effectiveChatCost || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => sendMessage()}
-                disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost)}
+                disabled={loading || !inputText.trim() || credits < effectiveChatCost || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
@@ -2096,8 +3024,10 @@ export default function ChatScreen({ navigation, route }) {
                 >
                   {loading ? (
                     <Text style={styles.modernSendText}>⏳</Text>
-                  ) : credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost) ? (
+                  ) : credits < effectiveChatCost ? (
                     <Text style={styles.modernSendText}>💳</Text>
+                  ) : effectiveChatCost === 0 ? (
+                    <Text style={styles.modernSendText}>Free</Text>
                   ) : (
                     <Ionicons name="send" size={20} color={COLORS.white} />
                   )}
@@ -2105,7 +3035,17 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
             
-            {credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost) && (
+            {effectiveChatCost === 0 && (
+              <View style={styles.firstQuestionFreeBanner}>
+                <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
+                <View style={styles.firstQuestionFreeTextWrap}>
+                  <Text style={styles.firstQuestionFreeTitle}>First question free</Text>
+                  <Text style={styles.firstQuestionFreeSubtext}>Ask anything — no credits needed</Text>
+                </View>
+              </View>
+            )}
+            
+            {credits < effectiveChatCost && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -2114,7 +3054,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             
-            {showPremiumTooltip && !isPremiumAnalysis && (
+            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && (
               <View style={styles.premiumTooltip}>
                 <TouchableOpacity 
                   style={styles.tooltipClose}
@@ -2143,10 +3083,11 @@ export default function ChatScreen({ navigation, route }) {
             )}
           </View>
         )}
+        </View>
 
         {/* Quick Actions Bar */}
         {!showGreeting && (
-          <View style={styles.quickActionsBar}>
+          <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, insets.bottom) }]}>
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}
@@ -2175,21 +3116,7 @@ export default function ChatScreen({ navigation, route }) {
               style={[styles.quickActionButton, partnershipMode && styles.quickActionButtonActive]}
               onPress={() => {
                 if (!partnershipMode) {
-                  Alert.alert(
-                    'Partnership Mode',
-                    `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Continue', 
-                        onPress: () => {
-                          setPartnershipMode(true);
-                          setNativeChart(birthData);
-                          setShowChartPicker(true);
-                        }
-                      }
-                    ]
-                  );
+                  openPartnershipModal(partnershipCost);
                 } else {
                   setPartnershipMode(false);
                   setNativeChart(null);
@@ -2282,7 +3209,7 @@ export default function ChatScreen({ navigation, route }) {
               onStartShouldSetResponder={() => true}
             >
               <LinearGradient
-                colors={isClassic ? [colors.background, colors.backgroundSecondary, colors.backgroundSecondary] : (theme === 'dark' ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35'] : ['#fefcfb', '#fefcfb', '#fefcfb', '#fefcfb'])}
+                colors={theme === 'dark' ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35'] : ['#fefcfb', '#fefcfb', '#fefcfb', '#fefcfb']}
                 style={styles.drawerGradient}
               >
                 <View style={styles.drawerHeader}>
@@ -2308,11 +3235,11 @@ export default function ChatScreen({ navigation, route }) {
                       resizeMode="contain"
                     />
                   </Animated.View>
-                  <Text style={[styles.drawerTitle, { color: colors.text }]}>{t('menu.title')}</Text>
-                  <Text style={[styles.drawerSubtitle, { color: colors.textSecondary }]}>{t('menu.subtitle')}</Text>
+                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.title')}</Text>
+                  <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
                 </View>
 
-                <ScrollView 
+                <GHScrollView 
                   ref={menuScrollViewRef}
                   style={styles.menuScrollView}
                   contentContainerStyle={styles.menuScrollContent}
@@ -2333,21 +3260,21 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>✨</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.myProfile')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.myProfile')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2365,21 +3292,21 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>👤</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.selectNative')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.selectNative')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2397,21 +3324,21 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>➕</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.newNative')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.newNative')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2429,21 +3356,21 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>📊</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.viewChart')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.viewChart')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2461,21 +3388,21 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>⏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.dashaBrowser')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.dashaBrowser')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2493,10 +3420,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2506,8 +3433,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⊞</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.ashtakvarga')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.ashtakvarga')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -2524,10 +3451,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2537,8 +3464,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⚖️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.shadbala')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.shadbala')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2557,10 +3484,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2570,8 +3497,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.kotaChakra')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kotaChakra')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2589,10 +3516,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2602,8 +3529,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.yogas')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.yogas')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2623,10 +3550,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2636,12 +3563,11 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🔢</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.kpSystem')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kpSystem')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  {!IS_ASTROLOGY_ONLY && (
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -2656,26 +3582,24 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.lifeAnalysis')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.lifeAnalysis')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
-                  )}
 
-                  {!IS_ASTROLOGY_ONLY && (
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -2690,10 +3614,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2703,13 +3627,11 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🕉️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.pastLifeRegression')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.pastLifeRegression')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
-                  )}
 
-                  {!IS_ASTROLOGY_ONLY && (
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -2724,10 +3646,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2737,13 +3659,11 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🔢</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.numerology')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.numerology')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
-                  )}
 
-                  {!IS_ASTROLOGY_ONLY && (
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -2758,10 +3678,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2771,39 +3691,22 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>💬</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.chatHistory')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.chatHistory')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
-                  )}
 
-                  {!IS_ASTROLOGY_ONLY && !isMundane && !showGreeting && (
+                  {!isMundane && !showGreeting && (
                     <TouchableOpacity
                       style={getMenuOptionStyle()}
                       onPress={() => {
                         if (!partnershipMode) {
-                          Alert.alert(
-                            'Partnership Mode',
-                            `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-                            [
-                              { text: 'Cancel', style: 'cancel' },
-                              { 
-                                text: 'Continue', 
-                                onPress: () => {
-                                  setPartnershipMode(true);
-                                  setNativeChart(birthData);
-                                  Animated.timing(drawerAnim, {
-                                    toValue: 300,
-                                    duration: 250,
-                                    useNativeDriver: true,
-                                  }).start(() => {
-                                    setShowMenu(false);
-                                    setShowChartPicker(true);
-                                  });
-                                }
-                              }
-                            ]
-                          );
+                          openPartnershipModal(partnershipCost);
+                          Animated.timing(drawerAnim, {
+                            toValue: 300,
+                            duration: 250,
+                            useNativeDriver: true,
+                          }).start(() => setShowMenu(false));
                         } else {
                           setPartnershipMode(false);
                           setNativeChart(null);
@@ -2821,11 +3724,11 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <LinearGradient
                         colors={partnershipMode 
-                          ? (isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)']))
-                          : (isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android' 
-                            ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                            : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)'])))}
-                        style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                          ? (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'])
+                          : (Platform.OS === 'android' 
+                            ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                            : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
+                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
@@ -2835,13 +3738,44 @@ export default function ChatScreen({ navigation, route }) {
                             <Text style={styles.menuEmoji}>👥</Text>
                           </LinearGradient>
                         </View>
-                        <Text style={[styles.menuText, { color: colors.text }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
-                        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
+                        <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
 
-                  {!IS_ASTROLOGY_ONLY && (
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('BlogList');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#6366f1', '#8b5cf6']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>📚</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.blog')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -2856,24 +3790,23 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                          colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>💳</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.credits')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.credits')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
-                  )}
 
                   <TouchableOpacity
                     style={[getMenuOptionStyle(), styles.menuOptionLast]}
@@ -2889,22 +3822,22 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : ['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)') }]}
+                      colors={['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff3b30', '#ff6b60']}
+                          colors={['#ff3b30', '#ff6b60']}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🚪</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: isClassic ? colors.text : (theme === 'dark' ? '#ff6b60' : '#dc2626') }]}>{t('menu.logout')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ff6b60' : '#dc2626' }]}>{t('menu.logout')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 107, 96, 0.6)" />
                     </LinearGradient>
                   </TouchableOpacity>
-                </ScrollView>
+                </GHScrollView>
               </LinearGradient>
             </Animated.View>
           </TouchableOpacity>
@@ -2978,7 +3911,7 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               </View>
               
-              <ScrollView 
+              <GHScrollView 
                 style={styles.popupContent}
                 contentContainerStyle={styles.popupContentContainer}
                 showsVerticalScrollIndicator={false}
@@ -2990,7 +3923,7 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
-                      colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                      colors={['#ff6b35', '#ff8c5a']}
                       style={styles.benefitIconGradient}
                     >
                       <Text style={styles.benefitIcon}>☀️</Text>
@@ -3082,13 +4015,13 @@ export default function ChatScreen({ navigation, route }) {
                   onPress={() => setShowEnhancedPopup(false)}
                 >
                   <LinearGradient
-                    colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#ff6b35', '#ff8c5a']}
+                    colors={['#ff6b35', '#ff8c5a']}
                     style={styles.popupButtonGradient}
                   >
                     <Text style={styles.popupButtonText}>Got it!</Text>
                   </LinearGradient>
                 </TouchableOpacity>
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3111,7 +4044,7 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.chartPickerList}>
+              <GHScrollView style={styles.chartPickerList}>
                 {savedCharts.map((chart, index) => (
                   <TouchableOpacity
                     key={index}
@@ -3142,7 +4075,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.emptyChartSubtext}>Please save charts first</Text>
                   </View>
                 )}
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3152,24 +4085,46 @@ export default function ChatScreen({ navigation, route }) {
           visible={showCountryPicker}
           transparent={true}
           animationType="slide"
-          onRequestClose={() => setShowCountryPicker(false)}
+          onRequestClose={() => { setShowCountryPicker(false); setCountrySearchQuery(''); }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.chartPickerModal}>
               <View style={styles.chartPickerHeader}>
                 <Text style={styles.chartPickerTitle}>Select Country</Text>
-                <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
+                <TouchableOpacity onPress={() => { setShowCountryPicker(false); setCountrySearchQuery(''); }}>
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.chartPickerList}>
-                {COUNTRIES.map((country, index) => (
+              <View style={[styles.chartPickerSearchWrap, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.chartPickerSearchIcon} />
+                <TextInput
+                  style={[styles.chartPickerSearchInput, { color: colors.text }]}
+                  placeholder="Search countries..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={countrySearchQuery}
+                  onChangeText={setCountrySearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {countrySearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setCountrySearchQuery('')} style={styles.chartPickerSearchClear}>
+                    <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <GHScrollView style={styles.chartPickerList} keyboardShouldPersistTaps="handled">
+                {COUNTRIES.filter(c => {
+                  const q = countrySearchQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (c.name && c.name.toLowerCase().includes(q)) || (c.capital && c.capital.toLowerCase().includes(q));
+                }).map((country, index) => (
                   <TouchableOpacity
-                    key={index}
+                    key={`${country.name}-${index}`}
                     style={styles.chartPickerItem}
                     onPress={() => {
                       setSelectedCountry(country);
                       setShowCountryPicker(false);
+                      setCountrySearchQuery('');
                     }}
                   >
                     <View style={styles.chartPickerItemContent}>
@@ -3179,7 +4134,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3199,7 +4154,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.chartPickerList}>
+              <GHScrollView style={styles.chartPickerList}>
                 {YEARS.map((year, index) => (
                   <TouchableOpacity
                     key={index}
@@ -3215,7 +4170,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3228,6 +4183,27 @@ export default function ChatScreen({ navigation, route }) {
         premiumCost={premiumChatCost}
         standardCost={chatCost}
       />
+      <ConfirmCreditsModal
+        visible={showPartnershipModal}
+        onClose={() => setShowPartnershipModal(false)}
+        onConfirm={confirmPartnershipMode}
+        title="Partnership Mode"
+        description="Partnership mode uses credits per question for comprehensive compatibility analysis between two charts."
+        cost={partnershipModalCost}
+        credits={credits}
+        confirmLabel="Continue"
+      />
+      <ConfirmCreditsModal
+        visible={showMundaneModal}
+        onClose={() => setShowMundaneModal(false)}
+        onConfirm={confirmMundaneMode}
+        title="Global Markets & Events"
+        description="Global Markets & Events analysis uses credits per question for deep mundane astrology of nations, markets, and world events."
+        cost={mundaneModalCost}
+        credits={credits}
+        confirmLabel="Continue"
+      />
+      {renderPartnershipSetupModal()}
       </LinearGradient>
     </View>
   );
@@ -3454,6 +4430,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     maxHeight: 100,
   },
+  modernTextInputCollapsed: {
+    height: 44,
+    maxHeight: 44,
+    minHeight: 44,
+  },
   premiumToggleButton: {
     marginHorizontal: 4,
   },
@@ -3517,6 +4498,84 @@ const styles = StyleSheet.create({
   },
   modernSendText: {
     fontSize: 20,
+  },
+  modeSelectorExpanded: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 8,
+    paddingVertical: 4,
+  },
+  modeSelectorPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  modeSelectorPillActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.5)',
+  },
+  modeSelectorPillActivePremium: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.6)',
+  },
+  modeSelectorLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  modeSelectorCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  modeSelectorCost: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  modeSelectorCostOriginal: {
+    fontSize: 11,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
+    marginRight: 4,
+    opacity: 0.8,
+  },
+  modeSelectorCreditLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  firstQuestionFreeBanner: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+  },
+  firstQuestionFreeIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  firstQuestionFreeTextWrap: {
+    flex: 1,
+  },
+  firstQuestionFreeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#22c55e',
+    letterSpacing: 0.3,
+  },
+  firstQuestionFreeSubtext: {
+    fontSize: 12,
+    color: 'rgba(34, 197, 94, 0.9)',
+    marginTop: 2,
+    fontWeight: '500',
   },
   lowCreditBanner: {
     marginTop: 8,
@@ -3658,9 +4717,36 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.98)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  partnershipModalContent: {
+    borderRadius: 32,
+    width: '100%',
+    maxHeight: '90%',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    elevation: 20,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 107, 53, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
   },
   modalContent: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -3808,7 +4894,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
@@ -4111,6 +5196,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  chartPickerSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  chartPickerSearchIcon: {
+    marginRight: 10,
+  },
+  chartPickerSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 0,
+  },
+  chartPickerSearchClear: {
+    padding: 4,
+  },
   chartPickerTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -4146,6 +5254,164 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
   },
+  setupSelectorContainer: {
+    width: screenWidth - 32, // Width of parent minus horizontal padding of messagesContent (16*2)
+    paddingVertical: 12,
+    marginTop: 8,
+    alignSelf: 'center',
+  },
+  setupSelectorScroll: {
+    paddingLeft: 4,
+    paddingRight: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  setupSelectorChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    flexShrink: 0,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  setupSelectorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  setupHelperText: {
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingHorizontal: 20,
+    width: '100%',
+  },
+  partnershipSetupCard: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 24,
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  partnershipSetupTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  setupSlotsContainer: {
+    gap: 12,
+  },
+  setupSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  setupSlotActive: {
+    borderColor: '#ff6b35',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+  },
+  setupSlotFilled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  setupSlotIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  setupSlotContent: {
+    flex: 1,
+  },
+  setupSlotLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  setupSlotValue: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  setupSlotPlaceholder: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.3)',
+    fontWeight: '500',
+  },
+  setupConfirmButton: {
+    marginTop: 24,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  setupConfirmGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  setupConfirmText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  modalSearchContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  modalSearchWrapper: {
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  modalSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  setupResetButton: {
+    marginTop: 12,
+    alignItems: 'center',
+    padding: 8,
+  },
+  setupResetText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
   emptyChartList: {
     padding: 32,
     alignItems: 'center',
@@ -4160,34 +5426,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
   },
-  floatingPartnershipBadge: {
+  floatingBadgesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 8,
+    gap: 8,
+  },
+  floatingChangeBadge: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
     borderRadius: 20,
-    overflow: 'hidden',
-    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  changeBadgeText: {
+    color: '#ff6b35',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  floatingPartnershipBadge: {
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 114, 182, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(244, 114, 182, 0.3)',
     shadowColor: '#ec4899',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  partnershipBadgeTextContent: {
+    overflow: 'hidden',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
   },
   partnershipBadgeGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
   },
   partnershipBadgeText: {
     color: COLORS.white,
     fontSize: 11,
     fontWeight: '700',
   },
-  partnershipBadgeIcon: {
-    marginLeft: 2,
+  partnershipBadgeClose: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(244, 114, 182, 0.2)',
+    backgroundColor: 'rgba(244, 114, 182, 0.05)',
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
   },
   premiumTooltip: {
     position: 'absolute',
@@ -4255,5 +5559,37 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  otherRelationContainer: {
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  otherInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  otherTextInput: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#ff6b35',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+  },
+  otherDoneButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ff6b35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });

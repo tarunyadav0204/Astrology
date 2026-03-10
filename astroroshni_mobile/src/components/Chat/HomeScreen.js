@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Animated,
+  Image,
 } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
@@ -85,6 +86,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     nakshatra: null,
     loading: true
   });
+  const [latestBlogPosts, setLatestBlogPosts] = useState([]);
   const [isFABCollapsed, setIsFABCollapsed] = useState(false);
   const lastScrollY = useRef(0);
   const fabWidth = useRef(new Animated.Value(1)).current; // 1 for full, 0 for collapsed
@@ -162,10 +164,21 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
       const loadData = async () => {
         const nativeData = await loadCurrentNative();
         await loadHomeData(nativeData);
+        fetchLatestBlogPosts();
       };
       loadData();
     }, [])
   );
+
+  const fetchLatestBlogPosts = async () => {
+    try {
+      const { blogAPI } = require('../../services/api');
+      const response = await blogAPI.getPosts('published', null, 3);
+      setLatestBlogPosts(response.data);
+    } catch (error) {
+      console.log('Error fetching latest blog posts:', error);
+    }
+  };
 
   // Show first-question-free promo modal when user has free question (once per focus)
   useFocusEffect(
@@ -947,7 +960,47 @@ const loadHomeData = async (nativeData = null) => {
           </GHScrollView>
         </View>
 
-
+        {/* Blog & Articles Section */}
+        {latestBlogPosts.length > 0 && (
+          <View style={[styles.blogSection, { marginTop: 30, marginBottom: 30 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 }}>
+              <Text style={[styles.analysisTitle, { color: colors.text, marginBottom: 0 }]}>
+                📖 {t('home.sections.blog', 'Blog & Knowledge')}
+              </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('BlogList')}>
+                <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            <GHScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}
+            >
+              {latestBlogPosts.map((post) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={[styles.blogCard, { backgroundColor: colors.surface, width: width * 0.7 }]}
+                  onPress={() => navigation.navigate('BlogPostDetail', { slug: post.slug })}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.blogCardImageContainer}>
+                    {post.featured_image ? (
+                      <Image source={{ uri: post.featured_image }} style={styles.blogCardImage} />
+                    ) : (
+                      <LinearGradient colors={['#ff6b35', '#ec4899']} style={styles.blogCardPlaceholder}>
+                        <Icon name="newspaper-outline" size={32} color="#fff" />
+                      </LinearGradient>
+                    )}
+                  </View>
+                  <View style={styles.blogCardContent}>
+                    <Text style={[styles.blogCardCategory, { color: '#ff6b35' }]}>{post.category || 'Astrology'}</Text>
+                    <Text style={[styles.blogCardTitle, { color: colors.text }]} numberOfLines={2}>{post.title}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </GHScrollView>
+          </View>
+        )}
 
         {/* Magical Dashboard Cards - Moved to Bottom */}
         <View style={styles.dashboardContainer}>
@@ -2868,6 +2921,46 @@ const styles = StyleSheet.create({
   // Dashboard Cards Styles
   dashboardContainer: {
     marginBottom: 30,
+  },
+  blogSection: {
+    marginBottom: 20,
+  },
+  blogCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  blogCardImageContainer: {
+    width: '100%',
+    height: 120,
+  },
+  blogCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  blogCardPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blogCardContent: {
+    padding: 12,
+  },
+  blogCardCategory: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  blogCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   dashboardTitle: {
     fontSize: 18,
