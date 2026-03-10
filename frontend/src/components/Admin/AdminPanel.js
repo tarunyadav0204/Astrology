@@ -172,7 +172,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       } else if (activeSubTab === 'facts') {
         fetchUserFacts();
       }
-    } else if (activeTab === 'charts' || activeTab === 'notifications') {
+    } else if (activeTab === 'charts') {
       fetchCharts();
     } else if (activeTab === 'credits') {
       if (activeSubTab === 'management') {
@@ -2036,7 +2036,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <select
                       value={blogNotifSelectedId}
                       onChange={(e) => setBlogNotifSelectedId(e.target.value)}
-                      disabled={loading || !blogPosts.length}
+                      disabled={!blogPosts.length}
                     >
                       <option value="">Select blog…</option>
                       {blogPosts
