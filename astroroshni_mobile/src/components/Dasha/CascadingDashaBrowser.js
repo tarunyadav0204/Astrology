@@ -11,6 +11,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
@@ -756,7 +757,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     const tabTextStyle = (key) => ({ color: tabActive(key) ? '#fff' : colors.textSecondary });
     return (
       <View style={[styles.dashaTypeSelector, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
+        <GHScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
           <TouchableOpacity
             style={tabStyle('vimshottari')}
             onPress={() => {
@@ -812,7 +813,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
               {t('dasha.chara')}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </GHScrollView>
       </View>
     );
   };
@@ -955,7 +956,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
         {breadcrumbItems.length === 0 ? (
           <Text style={[styles.breadcrumbText, vimTheme && { color: colors.textSecondary }]}>{t('dasha.selectDashasHierarchy')}</Text>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.breadcrumbScroll}>
+          <GHScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.breadcrumbScroll}>
             {breadcrumbItems.map((item, index) => (
               <View key={`breadcrumb-${item.planet}-${index}`} style={styles.breadcrumbRow}>
                 <View style={[styles.breadcrumbCard, vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
@@ -974,7 +975,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                 )}
               </View>
             ))}
-          </ScrollView>
+          </GHScrollView>
         )}
       </View>
     );
@@ -1035,7 +1036,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
 
     return (
       <View style={styles.predictionCardsSection}>
-        <ScrollView style={styles.cardsContainer} showsVerticalScrollIndicator={false}>
+        <GHScrollView style={styles.cardsContainer} showsVerticalScrollIndicator={false}>
           {/* Status Card */}
           {jaiminiData.cards.status_card && (
             <View style={styles.statusCard}>
@@ -1158,7 +1159,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
               </View>
             </View>
           )}
-        </ScrollView>
+        </GHScrollView>
       </View>
     );
   };
@@ -1262,7 +1263,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
         
         <View style={styles.selectorContainer}>
           <Text style={styles.selectorLabel}>{t('dasha.jaiminiKalchakraMahadasha')}</Text>
-          <ScrollView 
+          <GHScrollView 
             ref={scrollRefs.jaimini_maha}
             horizontal 
             showsHorizontalScrollIndicator={false} 
@@ -1336,13 +1337,13 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </GHScrollView>
         </View>
         
         {jaiminiAntarData?.antar_periods && (
           <View style={styles.selectorContainer}>
             <Text style={styles.selectorLabel}>{t('dasha.jaiminiAntardasha')} ({jaiminiAntarData.maha_sign})</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
+            <GHScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
               {jaiminiAntarData.antar_periods.map((period, index) => {
                 const isActuallyCurrent = period.current;
                 const progress = calculateProgress(period.start_date, period.end_date);
@@ -1399,7 +1400,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </GHScrollView>
           </View>
         )}
         
@@ -1921,7 +1922,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           <React.Fragment>
             <View style={[styles.selectorContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
               <Text style={[styles.selectorLabel, { color: colors.text }]}>{t('dasha.kalchakraMahadasha')}</Text>
-              <ScrollView 
+              <GHScrollView 
                 ref={scrollRefs.kalchakra_maha}
                 horizontal 
                 showsHorizontalScrollIndicator={false} 
@@ -1964,13 +1965,13 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                     );
                   })
                 )}
-              </ScrollView>
+              </GHScrollView>
             </View>
             
             {selectedDashas.kalchakra_maha && antarOptions.length > 0 && (
               <View style={[styles.selectorContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
                 <Text style={[styles.selectorLabel, { color: colors.text }]}>{t('dasha.kalchakraAntardasha')} ({tSign(selectedDashas.kalchakra_maha)})</Text>
-                <ScrollView 
+                <GHScrollView 
                   ref={scrollRefs.kalchakra_antar}
                   horizontal 
                   showsHorizontalScrollIndicator={false} 
@@ -2014,7 +2015,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                       </TouchableOpacity>
                     );
                   })}
-                </ScrollView>
+                </GHScrollView>
               </View>
             )}
           </React.Fragment>
@@ -2035,7 +2036,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           </View>
           
           {kalchakraSystemInfo && (
-            <ScrollView style={styles.systemInfoContent}>
+            <GHScrollView style={styles.systemInfoContent}>
               <Text style={[styles.systemInfoSubtitle, { color: colors.text }]}>{kalchakraSystemInfo.system_name}</Text>
               <Text style={[styles.systemInfoDescription, { color: colors.textSecondary }]}>{kalchakraSystemInfo.specialty}</Text>
               
@@ -2056,7 +2057,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                 <Text style={[styles.systemInfoSectionTitle, { color: colors.primary }]}>{t('dasha.authenticity')}</Text>
                 <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>{kalchakraSystemInfo.authenticity}</Text>
               </View>
-            </ScrollView>
+            </GHScrollView>
           )}
         </View>
       </View>
@@ -2071,7 +2072,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     return (
       <View style={[styles.selectorContainer, vimTheme && { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
         <Text style={[styles.selectorLabel, vimTheme && { color: colors.text }]}>{title}</Text>
-        <ScrollView ref={scrollRefs[dashaLevel]} horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
+        <GHScrollView ref={scrollRefs[dashaLevel]} horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
           {options.length === 0 ? (
             <View style={[styles.optionCard, styles.disabledOption, vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
               <Text style={[styles.disabledOptionText, vimTheme && { color: colors.textSecondary }]}>{t('dasha.noOptions')}</Text>
@@ -2125,7 +2126,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
               );
             })
           )}
-        </ScrollView>
+        </GHScrollView>
       </View>
     );
   };
@@ -2226,7 +2227,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           <View style={styles.placeholder} />
         </View>
         
-        <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
+        <GHScrollView style={[styles.content, { backgroundColor: colors.background }]}>
           {renderDashaTypeSelector()}
           {dashaType === 'vimshottari' && renderDateNavigation()}
           {renderBreadcrumb()}
@@ -2250,7 +2251,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
               <CharaDashaTab birthData={birthData} />
             ) : null}
           </View>
-        </ScrollView>
+        </GHScrollView>
         
         {renderSystemInfoModal()}
       </View>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -432,19 +433,19 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
           {/* Tab Bar */}
           <View style={[styles.tabBar, { borderBottomColor: colors.cardBorder }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
+            <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
               <TabButton label="Planets" emoji="🪐" value="planets" active={activeTab === 'planets'} />
               <TabButton label="Karakas" emoji="🔱" value="karakas" active={activeTab === 'karakas'} />
               <TabButton label="Lagnas" emoji="🎯" value="lagnas" active={activeTab === 'lagnas'} />
               <TabButton label="Special" emoji="✨" value="special" active={activeTab === 'special'} />
-            </ScrollView>
+            </GHScrollView>
           </View>
 
           {/* Tab Content */}
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <GHScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
             {renderTabContent()}
             <View style={{ height: 20 }} />
-          </ScrollView>
+          </GHScrollView>
         </SafeAreaView>
       </LinearGradient>
     </View>

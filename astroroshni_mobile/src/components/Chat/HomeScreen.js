@@ -13,6 +13,7 @@ import {
   Modal,
   Animated,
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -511,7 +512,7 @@ const loadHomeData = async (nativeData = null) => {
             : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a']}
           style={styles.gradient}
         >
-          <ScrollView
+          <GHScrollView
             style={[styles.scrollView, { zIndex: 1 }]}
             contentContainerStyle={[styles.content, styles.emptyStateContent]}
             showsVerticalScrollIndicator={false}
@@ -554,7 +555,7 @@ const loadHomeData = async (nativeData = null) => {
                 </Text>
               </View>
             )}
-          </ScrollView>
+          </GHScrollView>
         </LinearGradient>
       </View>
     );
@@ -724,7 +725,7 @@ const loadHomeData = async (nativeData = null) => {
         style={styles.gradient}
       >
         
-      <ScrollView 
+      <GHScrollView 
         style={[styles.scrollView, { zIndex: 1 }]} 
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
@@ -828,7 +829,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* At-a-Glance Ticker */}
         <View style={[styles.tickerContainer, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <ScrollView 
+          <GHScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tickerContent}
@@ -881,7 +882,7 @@ const loadHomeData = async (nativeData = null) => {
                 </TouchableOpacity>
               </>
             )}
-          </ScrollView>
+          </GHScrollView>
         </View>
 
 
@@ -926,7 +927,7 @@ const loadHomeData = async (nativeData = null) => {
           <Text style={[styles.analysisTitle, { color: colors.text, paddingHorizontal: 20 }]}>
             {t('home.sections.timingPlanners', '⏰ Timing Planners')}
           </Text>
-          <ScrollView
+          <GHScrollView
             horizontal
             nestedScrollEnabled
             showsHorizontalScrollIndicator={false}
@@ -943,7 +944,7 @@ const loadHomeData = async (nativeData = null) => {
                 onOptionSelect={onOptionSelect}
               />
             ))}
-          </ScrollView>
+          </GHScrollView>
         </View>
 
 
@@ -1124,7 +1125,7 @@ const loadHomeData = async (nativeData = null) => {
           {/* Astrology Tools Section */}
           <View style={styles.toolsSection}>
             <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '🔧 Astrology Tools')}</Text>
-            <ScrollView 
+            <GHScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.toolsScrollContent}
@@ -1317,7 +1318,7 @@ const loadHomeData = async (nativeData = null) => {
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.cosmicRing', 'Cosmic\nRing')}</Text>
                 </View>
               </TouchableOpacity>
-            </ScrollView>
+            </GHScrollView>
           </View>
 
           {/* Cosmic Weather - Transits & Mini Zodiac */}
@@ -1453,7 +1454,7 @@ const loadHomeData = async (nativeData = null) => {
                   </View>
 
                 {/* Horizontal Transit Strip */}
-                <ScrollView 
+                <GHScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.transitScrollContent}
@@ -1502,7 +1503,7 @@ const loadHomeData = async (nativeData = null) => {
                             </View>
                           );
                   })}
-                </ScrollView>
+                </GHScrollView>
               </View>
             )}
           </View>
@@ -1864,7 +1865,7 @@ const loadHomeData = async (nativeData = null) => {
           )}
 
         </View>
-      </ScrollView>
+      </GHScrollView>
       
       {/* Physical Traits Modal */}
       <PhysicalTraitsModal

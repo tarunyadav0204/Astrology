@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -33,7 +34,7 @@ const IntradayTimeline = ({ timings }) => {
   return (
     <View style={styles.timelineContainer}>
       <Text style={styles.sectionHeader}>MARKET TIMING (09:15 - 15:30)</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timelineScroll}>
+      <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timelineScroll}>
         {timings.map((slot, index) => {
           let borderColor = '#FFD600';
           let bgColor = 'rgba(255, 214, 0, 0.1)';
@@ -54,7 +55,7 @@ const IntradayTimeline = ({ timings }) => {
             </View>
           );
         })}
-      </ScrollView>
+      </GHScrollView>
     </View>
   );
 };
@@ -432,7 +433,7 @@ export default function TradingDashboardScreen({ navigation }) {
     <View style={styles.container}>
       <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.bg}>
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView>
+          <GHScrollView>
             
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -497,7 +498,7 @@ export default function TradingDashboardScreen({ navigation }) {
               <Ionicons name="calendar" size={20} color="#fff" />
             </TouchableOpacity>
 
-          </ScrollView>
+          </GHScrollView>
 
           <Modal visible={showRegenerateModal} transparent animationType="slide">
             <View style={styles.modalOverlay}>
@@ -549,7 +550,7 @@ export default function TradingDashboardScreen({ navigation }) {
                         </TouchableOpacity>
                     </View>
                     
-                    <ScrollView contentContainerStyle={styles.modalScroll}>
+                    <GHScrollView contentContainerStyle={styles.modalScroll}>
                         
                         <View style={styles.reportSection}>
                             <Text style={styles.reportLabel}>EXECUTIVE SUMMARY</Text>
@@ -570,7 +571,7 @@ export default function TradingDashboardScreen({ navigation }) {
                             </View>
                         )}
 
-                    </ScrollView>
+                    </GHScrollView>
                 </View>
             </View>
           </Modal>

@@ -18,6 +18,7 @@ import {
   InteractionManager,
   Keyboard,
 } from 'react-native';
+import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +54,131 @@ const isSmallScreen = screenWidth < 375;
 const cardWidth = screenWidth * 0.3;
 const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
+
+const RELATIONSHIP_PRESETS = [
+  {
+    label: 'Husband & Wife',
+    subSteps: [
+      {
+        prompt: 'Who is who?',
+        options: (n, p) => [
+          { label: `${n.name} (H) & ${p.name} (W)`, value: `${n.name} is husband and ${p.name} is wife` },
+          { label: `${n.name} (W) & ${p.name} (H)`, value: `${n.name} is wife and ${p.name} is husband` }
+        ]
+      },
+      {
+        prompt: 'Marriage details?',
+        options: () => [
+          { label: 'First Marriage', value: '1st Marriage' },
+          { label: 'Second Marriage', value: '2nd Marriage' },
+          { label: 'Third Marriage', value: '3rd Marriage' }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Parent & Child',
+    subSteps: [
+      {
+        prompt: 'Relationship roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Parent`, value: `${n.name} is parent and ${p.name} is child` },
+          { label: `${p.name} is Parent`, value: `${p.name} is parent and ${n.name} is child` }
+        ]
+      },
+      {
+        prompt: 'Specify child details?',
+        options: () => [
+          { label: '1st Son', value: '1st son' },
+          { label: '2nd Son', value: '2nd son' },
+          { label: '3rd Son', value: '3rd son' },
+          { label: '1st Daughter', value: '1st daughter' },
+          { label: '2nd Daughter', value: '2nd daughter' },
+          { label: '3rd Daughter', value: '3rd daughter' }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Siblings',
+    subSteps: [
+      {
+        prompt: 'Who is elder?',
+        options: (n, p) => [
+          { label: `${n.name} is Elder`, value: `${n.name} is elder sibling and ${p.name} is younger` },
+          { label: `${p.name} is Elder`, value: `${p.name} is elder sibling and ${n.name} is younger` }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'In-Laws',
+    subSteps: [
+      {
+        prompt: 'Who is the In-Law?',
+        options: (n, p) => [
+          { label: `${n.name} is In-Law`, value: `${n.name} is in-law of ${p.name}` },
+          { label: `${p.name} is In-Law`, value: `${p.name} is in-law of ${n.name}` }
+        ]
+      },
+      {
+        prompt: 'Specific relationship?',
+        options: () => [
+          { label: 'Mother-in-law & Daughter-in-law', value: 'Mother-in-law and Daughter-in-law' },
+          { label: 'Mother-in-law & Son-in-law', value: 'Mother-in-law and Son-in-law' },
+          { label: 'Father-in-law & Daughter-in-law', value: 'Father-in-law and Daughter-in-law' },
+          { label: 'Father-in-law & Son-in-law', value: 'Father-in-law and Son-in-law' },
+          { label: 'Brother-in-law', value: 'Brother-in-law relation' },
+          { label: 'Sister-in-law', value: 'Sister-in-law relation' }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Grandparent & Grandchild',
+    subSteps: [
+      {
+        prompt: 'Roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Grandparent`, value: `${n.name} is grandparent and ${p.name} is grandchild` },
+          { label: `${p.name} is Grandparent`, value: `${p.name} is grandparent and ${n.name} is grandchild` }
+        ]
+      }
+    ]
+  },
+  {
+    label: 'Uncle/Aunt & Nephew/Niece',
+    subSteps: [
+      {
+        prompt: 'Roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Uncle/Aunt`, value: `${n.name} is uncle/aunt and ${p.name} is nephew/niece` },
+          { label: `${p.name} is Uncle/Aunt`, value: `${p.name} is uncle/aunt and ${n.name} is nephew/niece` }
+        ]
+      }
+    ]
+  },
+  { label: 'Cousins' },
+  { label: 'Guru & Disciple' },
+  { label: 'Business Partners' },
+  { label: 'Close Friends' },
+  { label: 'Boyfriend & Girlfriend' },
+  {
+    label: 'Manager & Employee',
+    subSteps: [
+      {
+        prompt: 'Work roles?',
+        options: (n, p) => [
+          { label: `${n.name} is Manager`, value: `${n.name} is manager and ${p.name} is employee` },
+          { label: `${p.name} is Manager`, value: `${p.name} is manager and ${n.name} is employee` }
+        ]
+      }
+    ]
+  },
+  { label: 'Colleague' },
+  { label: 'Teacher & Student' },
+  { label: 'Other...' }
+];
 
 export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
@@ -189,6 +315,10 @@ export default function ChatScreen({ navigation, route }) {
   
   // Partnership mode state
   const [partnershipMode, setPartnershipMode] = useState(false);
+  const [partnershipStep, setPartnershipStep] = useState(0); // 0: select first, 1: select second, 2: describe relation, 3: done
+  const [partnershipSubStep, setPartnershipSubStep] = useState(0);
+  const [partnershipRelation, setPartnershipRelation] = useState('');
+  const [showPartnershipSetupModal, setShowPartnershipSetupModal] = useState(false);
   const [nativeChart, setNativeChart] = useState(null);
   const [partnerChart, setPartnerChart] = useState(null);
   const [showChartPicker, setShowChartPicker] = useState(false);
@@ -533,6 +663,8 @@ export default function ChatScreen({ navigation, route }) {
     // Handle mundane mode param
     if (route.params?.mode === 'mundane') {
       setIsMundane(true);
+      setIsPremiumAnalysis(false); // No premium in mundane
+      setShowModeSelector(false);
       if (route.params?.mundaneContext) {
         setMundaneContext(route.params.mundaneContext);
         
@@ -556,8 +688,20 @@ export default function ChatScreen({ navigation, route }) {
     // Handle back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!showGreeting) {
-        // In chat mode, show greeting screen
+        // In chat mode, show greeting screen and reset special modes
         setShowGreeting(true);
+        if (isMundane) {
+          setIsMundane(false);
+          setMundaneContext(null);
+        }
+        if (partnershipMode) {
+          setPartnershipMode(false);
+          setNativeChart(null);
+          setPartnerChart(null);
+          setPartnershipRelation('');
+        }
+        setIsPremiumAnalysis(false);
+        setShowModeSelector(false);
         return true;
       }
       return false;
@@ -769,12 +913,359 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const confirmPartnershipMode = () => {
+    loadSavedCharts(); // Refresh charts when starting partnership mode
     setShowPartnershipModal(false);
     setPartnershipMode(true);
-    setNativeChart(birthData);
+    setIsPremiumAnalysis(false); // No premium in partnership
+    setShowModeSelector(false);
+    setPartnershipStep(0);
+    setPartnershipSubStep(0);
+    setPartnershipRelation('');
+    setNativeChart(null);
+    setPartnerChart(null);
     setShowGreeting(false);
     setShowMenu(false);
-    setShowChartPicker(true);
+    setShowPartnershipSetupModal(true); // Open the new setup modal
+    
+    // Add initial assistant message for partnership setup (the summarized bubble)
+    const setupMessage = {
+      id: `setup_${Date.now()}`,
+      content: "🤝 Partnership Setup",
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      isSetup: true,
+      setupType: 'partnership'
+    };
+    
+    setMessagesWithStorage([setupMessage]);
+  };
+
+  const handlePartnershipChartSelect = (chart) => {
+    if (partnershipStep === 0) {
+      setNativeChart(chart);
+      setPartnershipStep(1);
+    } else if (partnershipStep === 1) {
+      setPartnerChart(chart);
+      setPartnershipStep(2);
+      setPartnershipSubStep(0);
+    }
+  };
+
+  const handleRelationshipSelect = (selection) => {
+    if (selection === 'Other...') {
+      setPartnershipRelation('');
+      setPartnershipStep(2); // Stay in step 2 to allow typing
+      setPartnershipSubStep(0);
+      return;
+    }
+
+    // selection can be a string (label) or an option object from a sub-step
+    const selectionLabel = typeof selection === 'object' ? selection.label : selection;
+    const activePreset = RELATIONSHIP_PRESETS.find(p => p.label === selectionLabel);
+    
+    if (activePreset && activePreset.subSteps && partnershipRelation !== activePreset.label) {
+      // Starting a complex preset flow
+      setPartnershipRelation(activePreset.label);
+      setPartnershipSubStep(0);
+    } else {
+      // Continuing a sub-step or selecting a simple preset
+      const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
+      
+      if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
+        // We are in the middle of sub-steps
+        const valueToUse = typeof selection === 'object' ? selection.value : selection;
+        const newRelation = (partnershipRelation === currentPreset.label)
+          ? `${currentPreset.label}: ${valueToUse}`
+          : `${partnershipRelation}, ${valueToUse}`;
+        
+        setPartnershipRelation(newRelation);
+        
+        if (partnershipSubStep + 1 < currentPreset.subSteps.length) {
+          setPartnershipSubStep(partnershipSubStep + 1);
+        } else {
+          setPartnershipStep(3); // Done with sub-steps
+        }
+      } else {
+        // Simple preset or final string
+        setPartnershipRelation(selectionLabel);
+        setPartnershipStep(3);
+      }
+    }
+  };
+
+  const renderPartnershipSetupModal = () => {
+    const isNativeSet = !!nativeChart;
+    const isPartnerSet = !!partnerChart;
+    const isRelationSet = !!partnershipRelation;
+    
+    return (
+      <Modal
+        visible={showPartnershipSetupModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPartnershipSetupModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.partnershipModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 20 }}>🤝</Text>
+                <Text style={[styles.modalTitle, { color: colors.text, fontSize: 18 }]}>Partnership Setup</Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowPartnershipSetupModal(false)}
+                style={{ backgroundColor: colors.border, padding: 6, borderRadius: 20 }}
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <GHScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+              <View style={styles.setupSlotsContainer}>
+                {/* Slot 1: Native */}
+                <TouchableOpacity 
+                  style={[
+                    styles.setupSlot, 
+                    partnershipStep === 0 && styles.setupSlotActive,
+                    isNativeSet && styles.setupSlotFilled
+                  ]}
+                  onPress={() => {
+                    setPartnershipStep(0);
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                    setPartnershipSubStep(0);
+                  }}
+                >
+                  <View style={styles.setupSlotIcon}>
+                    <Text>{isNativeSet ? '👤' : '1️⃣'}</Text>
+                  </View>
+                  <View style={styles.setupSlotContent}>
+                    <Text style={styles.setupSlotLabel}>First Person</Text>
+                    <Text style={isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                      {isNativeSet ? nativeChart.name : 'Select from list below...'}
+                    </Text>
+                  </View>
+                  {isNativeSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                </TouchableOpacity>
+
+                {/* Slot 2: Partner */}
+                <TouchableOpacity 
+                  style={[
+                    styles.setupSlot, 
+                    partnershipStep === 1 && styles.setupSlotActive,
+                    isPartnerSet && styles.setupSlotFilled,
+                    !isNativeSet && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (isNativeSet) {
+                      setPartnershipStep(1);
+                      setPartnerChart(null);
+                      setPartnershipRelation('');
+                      setPartnershipSubStep(0);
+                    }
+                  }}
+                  disabled={!isNativeSet}
+                >
+                  <View style={styles.setupSlotIcon}>
+                    <Text>{isPartnerSet ? '👫' : '2️⃣'}</Text>
+                  </View>
+                  <View style={styles.setupSlotContent}>
+                    <Text style={styles.setupSlotLabel}>Partner / Family / Friend</Text>
+                    <Text style={isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                      {isPartnerSet ? partnerChart.name : (isNativeSet ? 'Select from list below...' : 'Complete Step 1 first')}
+                    </Text>
+                  </View>
+                  {isPartnerSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                </TouchableOpacity>
+
+                {/* Slot 3: Relationship */}
+                <TouchableOpacity 
+                  style={[
+                    styles.setupSlot, 
+                    partnershipStep === 2 && styles.setupSlotActive,
+                    isRelationSet && styles.setupSlotFilled,
+                    !isPartnerSet && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (isPartnerSet) {
+                      setPartnershipStep(2);
+                      setPartnershipRelation('');
+                      setPartnershipSubStep(0);
+                    }
+                  }}
+                  disabled={!isPartnerSet}
+                >
+                  <View style={styles.setupSlotIcon}>
+                    <Text>{isRelationSet ? '💍' : '3️⃣'}</Text>
+                  </View>
+                  <View style={styles.setupSlotContent}>
+                    <Text style={styles.setupSlotLabel}>Relationship Status</Text>
+                    <Text style={isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                      {isRelationSet ? partnershipRelation : (isPartnerSet ? 'Select or describe relationship...' : 'Complete Step 2 first')}
+                    </Text>
+                  </View>
+                  {isRelationSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                </TouchableOpacity>
+              </View>
+
+              {/* Action Buttons based on current step */}
+              {partnershipStep === 0 && (
+                <View style={styles.setupSelectorContainer}>
+                  <GHFlatList
+                    horizontal
+                    data={savedCharts.length > 0 ? savedCharts : [{ id: 'add-new', name: 'Add New Profile', isNew: true }]}
+                    keyExtractor={(chart) => chart.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.setupSelectorScroll}
+                    renderItem={({ item: chart }) => (
+                      <TouchableOpacity
+                        style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
+                        onPress={() => chart.isNew ? navigation.navigate('BirthForm') : handlePartnershipChartSelect(chart)}
+                      >
+                        <Text style={[styles.setupSelectorText, { color: colors.text }]}>{chart.isNew ? '➕ ' : '👤 '} {chart.name}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+
+              {partnershipStep === 1 && (
+                <View style={styles.setupSelectorContainer}>
+                  <GHFlatList
+                    horizontal
+                    data={savedCharts.filter(c => c.id !== nativeChart?.id).length > 0 ? savedCharts.filter(c => c.id !== nativeChart?.id) : [{ id: 'add-new', name: 'Add New Profile', isNew: true }]}
+                    keyExtractor={(chart) => chart.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.setupSelectorScroll}
+                    renderItem={({ item: chart }) => (
+                      <TouchableOpacity
+                        style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
+                        onPress={() => chart.isNew ? navigation.navigate('BirthForm') : handlePartnershipChartSelect(chart)}
+                      >
+                        <Text style={[styles.setupSelectorText, { color: colors.text }]}>{chart.isNew ? '➕ ' : '👤 '} {chart.name}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+
+              {partnershipStep === 2 && (
+                <View style={styles.setupSelectorContainer}>
+                  {(() => {
+                    const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
+                    
+                    if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
+                      const subStep = currentPreset.subSteps[partnershipSubStep];
+                      const options = subStep.options(nativeChart, partnerChart);
+                      
+                      return (
+                        <View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
+                              {subStep.prompt}
+                            </Text>
+                            <TouchableOpacity 
+                              onPress={() => {
+                                setPartnershipRelation('');
+                                setPartnershipSubStep(0);
+                              }}
+                            >
+                              <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← Back</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <GHFlatList
+                            horizontal
+                            data={options}
+                            keyExtractor={(item, idx) => idx.toString()}
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.setupSelectorScroll}
+                            renderItem={({ item }) => (
+                              <TouchableOpacity
+                                style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35', minWidth: 100 }]}
+                                onPress={() => handleRelationshipSelect(item)}
+                              >
+                                <Text style={[styles.setupSelectorText, { color: colors.text }]}>{item.label}</Text>
+                              </TouchableOpacity>
+                            )}
+                          />
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <View>
+                        <GHFlatList
+                          horizontal
+                          data={RELATIONSHIP_PRESETS}
+                          keyExtractor={(item, idx) => idx.toString()}
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.setupSelectorScroll}
+                          renderItem={({ item: relation }) => (
+                            <TouchableOpacity
+                              style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
+                              onPress={() => handleRelationshipSelect(relation.label)}
+                            >
+                              <Text style={[styles.setupSelectorText, { color: colors.text }]}>{relation.label}</Text>
+                            </TouchableOpacity>
+                          )}
+                        />
+                        <Text style={[styles.setupHelperText, { color: colors.textSecondary, marginTop: 8 }]}>
+                          Pick a preset or type your own relationship in the chat box after closing this modal.
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+
+              {partnershipStep === 3 && (
+                <TouchableOpacity 
+                  style={styles.setupConfirmButton}
+                  onPress={() => {
+                    // Add confirmation message to chat
+                    const confirmMsg = {
+                      id: `confirm_${Date.now()}`,
+                      content: `Everything set! Analysis for **${nativeChart.name}** & **${partnerChart.name}** (${partnershipRelation}) is ready.\n\nAsk any question about your compatibility!`,
+                      role: 'assistant',
+                      timestamp: new Date().toISOString(),
+                    };
+                    setMessagesWithStorage(prev => [...prev, confirmMsg]);
+                    setPartnershipStep(4); // Setup done
+                    setShowPartnershipSetupModal(false); // Close modal
+                    
+                    // Scroll to bottom
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
+                >
+                  <LinearGradient colors={['#ff6b35', '#f97316']} style={styles.setupConfirmGradient}>
+                    <Text style={styles.setupConfirmText}>Ready for Analysis ✨</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
+              {partnershipStep < 4 && (
+                <TouchableOpacity 
+                  style={styles.setupResetButton}
+                  onPress={() => {
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                    setPartnershipStep(0);
+                    setPartnershipSubStep(0);
+                  }}
+                >
+                  <Text style={styles.setupResetText}>Reset Setup</Text>
+                </TouchableOpacity>
+              )}
+            </GHScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   const openMundaneModal = (cost) => {
@@ -827,6 +1318,20 @@ export default function ChatScreen({ navigation, route }) {
       
       // Switch to chat mode immediately
       setShowGreeting(false);
+      
+      // Reset special modes when starting standard chat
+      if (partnershipMode) {
+        setPartnershipMode(false);
+        setNativeChart(null);
+        setPartnerChart(null);
+        setPartnershipRelation('');
+      }
+      if (isMundane) {
+        setIsMundane(false);
+        setMundaneContext(null);
+      }
+      setIsPremiumAnalysis(false);
+      setShowModeSelector(false);
       
       // Set flag to scroll when content renders
       setTimeout(() => {
@@ -1341,7 +1846,8 @@ export default function ChatScreen({ navigation, route }) {
             partner_place: partnerChart.place || '',
             partner_latitude: parseFloat(partnerChart.latitude),
             partner_longitude: parseFloat(partnerChart.longitude),
-            partner_gender: partnerChart.gender || ''
+            partner_gender: partnerChart.gender || '',
+            partnership_relationship: partnershipRelation
           }),
           client_request_id: clientRequestId,
         };
@@ -1429,11 +1935,25 @@ export default function ChatScreen({ navigation, route }) {
       return;
     }
 
+    // Partnership Step 2: Relationship description
+    if (partnershipMode && partnershipStep === 2) {
+      setPartnershipRelation(messageText);
+      setPartnershipStep(3);
+      setInputText('');
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      return;
+    } else {
+      // Normal flow
+      setInputText('');
+    }
+
     // Reset dynamic messages for the new question
     setDynamicLoadingMessages(null);
 
-    // Clear input and set states immediately
-    setInputText('');
     setLoading(true);
     setIsTyping(true);
     setShowGreeting(false);
@@ -1837,7 +2357,18 @@ export default function ChatScreen({ navigation, route }) {
                 style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
                 onPress={() => {
                   setShowGreeting(true);
-                  if (isMundane) setIsMundane(false);
+                  if (isMundane) {
+                    setIsMundane(false);
+                    setMundaneContext(null);
+                  }
+                  if (partnershipMode) {
+                    setPartnershipMode(false);
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                  }
+                  setIsPremiumAnalysis(false);
+                  setShowModeSelector(false);
                 }}
               >
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
@@ -1967,25 +2498,46 @@ export default function ChatScreen({ navigation, route }) {
         ) : (
           <>
           {partnershipMode && (
-            <TouchableOpacity 
-              style={styles.floatingPartnershipBadge}
-              onPress={() => {
-                setPartnershipMode(false);
-                setNativeChart(null);
-                setPartnerChart(null);
-              }}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#ec4899', '#f472b6']}
-                style={styles.partnershipBadgeGradient}
+            <View style={styles.floatingBadgesContainer}>
+              <TouchableOpacity 
+                style={styles.floatingChangeBadge}
+                onPress={() => {
+                  setShowPartnershipSetupModal(true);
+                }}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.partnershipBadgeText, { color: colors.text }]}>👥 Partnership Mode</Text>
-                <Ionicons name="close-circle" size={16} color={COLORS.white} style={styles.partnershipBadgeIcon} />
-              </LinearGradient>
-            </TouchableOpacity>
+                <Ionicons name="create-outline" size={14} color="#ff6b35" />
+                <Text style={styles.changeBadgeText}>Change Partnership</Text>
+              </TouchableOpacity>
+
+              <View style={styles.floatingPartnershipBadge}>
+                <View style={styles.partnershipBadgeTextContent}>
+                  <LinearGradient
+                    colors={['#ec4899', '#f472b6']}
+                    style={styles.partnershipBadgeGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={[styles.partnershipBadgeText, { color: COLORS.white }]}>👥 Partnership Mode</Text>
+                  </LinearGradient>
+                </View>
+                <TouchableOpacity 
+                  style={styles.partnershipBadgeClose}
+                  onPress={() => {
+                    setPartnershipMode(false);
+                    setIsPremiumAnalysis(false);
+                    setShowModeSelector(false);
+                    setNativeChart(null);
+                    setPartnerChart(null);
+                    setPartnershipRelation('');
+                  }}
+                >
+                  <Ionicons name="close" size={18} color="#f472b6" />
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
-          <ScrollView 
+          <GHScrollView 
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
@@ -2036,7 +2588,7 @@ export default function ChatScreen({ navigation, route }) {
                   {/* Current Running Dashas */}
                   {dashaData && (
                     <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-                      <FlatList
+                      <GHFlatList
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         data={[
@@ -2101,6 +2653,34 @@ export default function ChatScreen({ navigation, route }) {
                 );
               }
 
+              // Render Partnership Setup Card
+              if (item.setupType === 'partnership' && partnershipMode) {
+                return (
+                  <View key={item.id} style={{ marginBottom: 16 }}>
+                    <LinearGradient
+                      colors={['rgba(255, 107, 53, 0.1)', 'rgba(249, 115, 22, 0.05)']}
+                      style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.2)' }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <View style={{ backgroundColor: '#ff6b3520', padding: 8, borderRadius: 12 }}>
+                          <Text style={{ fontSize: 18 }}>🤝</Text>
+                        </View>
+                        <View>
+                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Partnership Analysis</Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Setup complete</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#ff6b3520', paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 8 }}
+                        onPress={() => setShowPartnershipSetupModal(true)}
+                      >
+                        <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>Edit Setup ✏️</Text>
+                      </TouchableOpacity>
+                    </LinearGradient>
+                  </View>
+                );
+              }
+
               return (
                 <View key={item.id}>
                   <View ref={isLastMessage ? lastMessageRef : null}>
@@ -2113,6 +2693,8 @@ export default function ChatScreen({ navigation, route }) {
                       onRestart={restartPolling}
                       onSendRetry={handleSendRetry}
                     />
+                    
+                    {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
                   </View>
                   <FeedbackComponent 
                     message={item} 
@@ -2123,7 +2705,7 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               );
             })}
-          </ScrollView>
+          </GHScrollView>
           </>
         )}
 
@@ -2142,7 +2724,7 @@ export default function ChatScreen({ navigation, route }) {
         {/* Suggestions (only show when not loading and not showing greeting) */}
         {!loading && !showGreeting && messages.length > 0 && (
           <View style={styles.suggestionsContainer}>
-            <ScrollView
+            <GHScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggestionsContent}
@@ -2162,7 +2744,7 @@ export default function ChatScreen({ navigation, route }) {
                   </LinearGradient>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </GHScrollView>
           </View>
         )}
 
@@ -2241,10 +2823,19 @@ export default function ChatScreen({ navigation, route }) {
                 ]}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder={loading ? "Analyzing..." : credits < effectiveChatCost ? "Insufficient credits" : showModeSelector ? "Type here..." : isMundane ? "Ask about markets, politics, events..." : "Ask me anything..."}
+                placeholder={
+                  loading ? "Analyzing..." : 
+                  credits < effectiveChatCost ? "Insufficient credits" : 
+                  partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
+                  partnershipMode && partnershipStep === 2 ? "Describe the relationship..." :
+                  partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
+                  showModeSelector ? "Type here..." : 
+                  isMundane ? "Ask about markets, politics, events..." : 
+                  "Ask me anything..."
+                }
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
                 maxLength={500}
-                editable={!loading && credits >= effectiveChatCost}
+                editable={!loading && credits >= effectiveChatCost && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
                 multiline
                 blurOnSubmit={false}
               />
@@ -2287,10 +2878,10 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  (loading || !inputText.trim() || credits < effectiveChatCost) && styles.modernSendButtonDisabled
+                  (loading || !inputText.trim() || credits < effectiveChatCost || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => sendMessage()}
-                disabled={loading || !inputText.trim() || credits < effectiveChatCost}
+                disabled={loading || !inputText.trim() || credits < effectiveChatCost || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
@@ -2328,7 +2919,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             
-            {showPremiumTooltip && !isPremiumAnalysis && (
+            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && (
               <View style={styles.premiumTooltip}>
                 <TouchableOpacity 
                   style={styles.tooltipClose}
@@ -2513,7 +3104,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
                 </View>
 
-                <ScrollView 
+                <GHScrollView 
                   ref={menuScrollViewRef}
                   style={styles.menuScrollView}
                   contentContainerStyle={styles.menuScrollContent}
@@ -3079,7 +3670,7 @@ export default function ChatScreen({ navigation, route }) {
                       <Ionicons name="chevron-forward" size={20} color="rgba(255, 107, 96, 0.6)" />
                     </LinearGradient>
                   </TouchableOpacity>
-                </ScrollView>
+                </GHScrollView>
               </LinearGradient>
             </Animated.View>
           </TouchableOpacity>
@@ -3153,7 +3744,7 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               </View>
               
-              <ScrollView 
+              <GHScrollView 
                 style={styles.popupContent}
                 contentContainerStyle={styles.popupContentContainer}
                 showsVerticalScrollIndicator={false}
@@ -3263,7 +3854,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.popupButtonText}>Got it!</Text>
                   </LinearGradient>
                 </TouchableOpacity>
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3286,7 +3877,7 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.chartPickerList}>
+              <GHScrollView style={styles.chartPickerList}>
                 {savedCharts.map((chart, index) => (
                   <TouchableOpacity
                     key={index}
@@ -3317,7 +3908,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.emptyChartSubtext}>Please save charts first</Text>
                   </View>
                 )}
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3354,7 +3945,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
                 )}
               </View>
-              <ScrollView style={styles.chartPickerList} keyboardShouldPersistTaps="handled">
+              <GHScrollView style={styles.chartPickerList} keyboardShouldPersistTaps="handled">
                 {COUNTRIES.filter(c => {
                   const q = countrySearchQuery.trim().toLowerCase();
                   if (!q) return true;
@@ -3376,7 +3967,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3396,7 +3987,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.chartPickerList}>
+              <GHScrollView style={styles.chartPickerList}>
                 {YEARS.map((year, index) => (
                   <TouchableOpacity
                     key={index}
@@ -3412,7 +4003,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
         </Modal>
@@ -3445,6 +4036,7 @@ export default function ChatScreen({ navigation, route }) {
         credits={credits}
         confirmLabel="Continue"
       />
+      {renderPartnershipSetupModal()}
       </LinearGradient>
     </View>
   );
@@ -3958,9 +4550,36 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.98)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  partnershipModalContent: {
+    borderRadius: 32,
+    width: '100%',
+    maxHeight: '90%',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    elevation: 20,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 107, 53, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
   },
   modalContent: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -4468,6 +5087,148 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
   },
+  setupSelectorContainer: {
+    width: screenWidth - 32, // Width of parent minus horizontal padding of messagesContent (16*2)
+    paddingVertical: 12,
+    marginTop: 8,
+    alignSelf: 'center',
+  },
+  setupSelectorScroll: {
+    paddingLeft: 4,
+    paddingRight: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  setupSelectorChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    flexShrink: 0,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  setupSelectorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  setupHelperText: {
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingHorizontal: 20,
+    width: '100%',
+  },
+  partnershipSetupCard: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 24,
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  partnershipSetupTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  setupSlotsContainer: {
+    gap: 12,
+  },
+  setupSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  setupSlotActive: {
+    borderColor: '#ff6b35',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+  },
+  setupSlotFilled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  setupSlotIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  setupSlotContent: {
+    flex: 1,
+  },
+  setupSlotLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  setupSlotValue: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  setupSlotPlaceholder: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.3)',
+    fontWeight: '500',
+  },
+  setupConfirmButton: {
+    marginTop: 24,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  setupConfirmGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  setupConfirmText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  setupResetButton: {
+    marginTop: 12,
+    alignItems: 'center',
+    padding: 8,
+  },
+  setupResetText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
   emptyChartList: {
     padding: 32,
     alignItems: 'center',
@@ -4482,34 +5243,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
   },
-  floatingPartnershipBadge: {
+  floatingBadgesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 8,
+    gap: 8,
+  },
+  floatingChangeBadge: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
     borderRadius: 20,
-    overflow: 'hidden',
-    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  changeBadgeText: {
+    color: '#ff6b35',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  floatingPartnershipBadge: {
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 114, 182, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(244, 114, 182, 0.3)',
     shadowColor: '#ec4899',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  partnershipBadgeTextContent: {
+    overflow: 'hidden',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
   },
   partnershipBadgeGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
   },
   partnershipBadgeText: {
     color: COLORS.white,
     fontSize: 11,
     fontWeight: '700',
   },
-  partnershipBadgeIcon: {
-    marginLeft: 2,
+  partnershipBadgeClose: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(244, 114, 182, 0.2)',
+    backgroundColor: 'rgba(244, 114, 182, 0.05)',
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
   },
   premiumTooltip: {
     position: 'absolute',

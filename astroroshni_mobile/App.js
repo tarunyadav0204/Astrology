@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
@@ -284,8 +285,9 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider initialTheme={initialTheme}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider initialTheme={initialTheme}>
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <ErrorProvider>
             <CreditProvider>
@@ -501,5 +503,6 @@ export default function App() {
         </Animated.View>
       </ThemeProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
