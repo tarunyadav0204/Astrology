@@ -10,6 +10,7 @@ from auth import get_current_user, User
 from .credit_service import CreditService
 from .admin.promo_manager import PromoCodeManager
 from utils.env_json import parse_json_from_env
+from activity.publisher import publish_activity
 
 router = APIRouter()
 credit_service = CreditService()
@@ -500,6 +501,14 @@ async def verify_google_play_purchase(
         reference_id=order_id,
         description=f"Google Play: {product_id}",
         metadata=purchase_metadata,
+    )
+    publish_activity(
+        "credits_purchased",
+        user_id=current_user.userid,
+        user_phone=current_user.phone,
+        resource_type="order",
+        resource_id=order_id,
+        metadata={"credits_added": amount, "product_id": product_id},
     )
     return {"success": True, "message": "Credits added", "credits_added": amount}
 

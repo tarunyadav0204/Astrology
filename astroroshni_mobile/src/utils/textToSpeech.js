@@ -109,7 +109,13 @@ export const textToSpeech = {
       await sound.playAsync();
       if (onStart) onStart();
     } catch (e) {
-      console.error('[TTS] playPodcast error', e);
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      if (status >= 500 && detail) {
+        console.error('[TTS] playPodcast error', status, detail, e);
+      } else {
+        console.error('[TTS] playPodcast error', e);
+      }
       podcastCallbacks = null;
       if (onError) onError(e);
     }

@@ -14,6 +14,7 @@ from credits.credit_service import CreditService
 from credits.routes import _get_play_credentials
 from tts.podcast_narrator import generate_podcast_script
 from tts.podcast_cache import get_cached_audio, put_cached_audio
+from activity.publisher import publish_activity
 
 credit_service = CreditService()
 
@@ -293,96 +294,114 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
   If message_id is provided and PODCAST_CACHE_BUCKET is set, cached audio is returned when available;
   on first generation the audio is stored in GCS and credits are deducted.
   """
-  text = (request.message_content or "").strip()
-  if not text:
-    raise HTTPException(status_code=400, detail="message_content is required")
+  try:
+    text = (request.message_content or "").strip()
+    if not text:
+      raise HTTPException(status_code=400, detail="message_content is required")
 
-  lang = (request.language or "en").lower()
-  raw_id = request.message_id
-  message_id = str(raw_id).strip() if raw_id is not None else None
+    lang = (request.language or "en").lower()
+    raw_id = request.message_id
+    message_id = str(raw_id).strip() if raw_id is not None else None
 
-  if message_id:
-    cached = get_cached_audio(message_id, lang)
-    if cached:
-      audio_b64 = base64.b64encode(cached).decode("ascii")
-      return JSONResponse({"audio": audio_b64, "cached": True})
+    if message_id:
+      cached = get_cached_audio(message_id, lang)
+      if cached:
+        audio_b64 = base64.b64encode(cached).decode("ascii")
+        return JSONResponse({"audio": audio_b64, "cached": True})
 
-  # Cache miss: will generate and deduct. Check balance first.
-  base_cost = credit_service.get_credit_setting("podcast_cost")
-  effective_cost = credit_service.get_effective_cost(
-    current_user.userid, base_cost or 2, "podcast_cost"
-  )
-  effective_cost = max(1, int(effective_cost)) if effective_cost else 2
-  balance = credit_service.get_user_credits(current_user.userid)
-  if balance < effective_cost:
-    raise HTTPException(
-      status_code=402,
-      detail=f"Insufficient credits. Need {effective_cost}, have {balance}.",
+    # Cache miss: will generate and deduct. Check balance first.
+    base_cost = credit_service.get_credit_setting("podcast_cost")
+    effective_cost = credit_service.get_effective_cost(
+      current_user.userid, base_cost or 2, "podcast_cost"
+    )
+    effective_cost = max(1, int(effective_cost)) if effective_cost else 2
+    balance = credit_service.get_user_credits(current_user.userid)
+    if balance < effective_cost:
+      raise HTTPException(
+        status_code=402,
+        detail=f"Insufficient credits. Need {effective_cost}, have {balance}.",
+      )
+
+    script = generate_podcast_script(text, lang)
+    if not script or not script.strip():
+      raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
+
+    segments = _parse_podcast_script(script)
+    if not segments:
+      raise HTTPException(status_code=500, detail="Podcast script had no parseable FEMALE:/MALE: lines")
+
+    script_chars = len(script)
+    script_words = len(script.split())
+    logger.info(
+      "Podcast script size: chars=%d words=%d segments=%d (TTS billed by character; ~₹2,490/1M chars after free tier)",
+      script_chars,
+      script_words,
+      len(segments),
     )
 
-  script = generate_podcast_script(text, lang)
-  if not script or not script.strip():
-    raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
+    try:
+      creds = _get_google_credentials()
+      client = texttospeech.TextToSpeechClient(credentials=creds)
+    except HTTPException:
+      raise
+    except Exception as e:
+      logger.exception("TTS: Error initializing TextToSpeechClient for podcast")
+      raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
-  segments = _parse_podcast_script(script)
-  if not segments:
-    raise HTTPException(status_code=500, detail="Podcast script had no parseable FEMALE:/MALE: lines")
+    female_name, male_name = _podcast_voices(lang)
+    language_code = "en-GB"  # Podcast uses UK English Chirp3-HD (Gacrux, Algenib)
+    audio_config = texttospeech.AudioConfig(
+      audio_encoding=texttospeech.AudioEncoding.MP3,
+      speaking_rate=0.95,
+    )
+    audio_parts: list[bytes] = []
+    try:
+      for role, segment_text in segments:
+        if not segment_text or not segment_text.strip():
+          continue
+        voice_name = female_name if role == "female" else male_name
+        voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
+        ssml = _segment_text_to_ssml(segment_text, role)
+        segment_bytes = await _synthesize_ssml(client, voice, audio_config, ssml)
+        audio_parts.append(segment_bytes)
+    except Exception as e:
+      logger.exception("TTS: podcast synthesis failed")
+      raise HTTPException(status_code=500, detail=f"Podcast TTS failed: {e}")
 
-  script_chars = len(script)
-  script_words = len(script.split())
-  logger.info(
-    "Podcast script size: chars=%d words=%d segments=%d (TTS billed by character; ~₹2,490/1M chars after free tier)",
-    script_chars,
-    script_words,
-    len(segments),
-  )
+    audio_bytes = b"".join(audio_parts)
+    if not audio_bytes:
+      raise HTTPException(status_code=500, detail="Podcast produced no audio")
 
-  try:
-    creds = _get_google_credentials()
-    client = texttospeech.TextToSpeechClient(credentials=creds)
+    if message_id:
+      put_cached_audio(message_id, lang, audio_bytes)
+
+    # Deduct (we already checked balance above)
+    success = credit_service.spend_credits(
+      current_user.userid,
+      effective_cost,
+      "podcast",
+      f"Podcast for message {message_id or 'chat'}",
+    )
+    if not success:
+      logger.warning("Podcast: credit deduction failed (insufficient balance?) for user %s", current_user.userid)
+
+    publish_activity(
+      "podcast_generated",
+      user_id=current_user.userid,
+      user_phone=current_user.phone,
+      resource_type="message",
+      resource_id=message_id,
+      metadata={"cached": False},
+    )
+    audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+    return JSONResponse({"audio": audio_b64, "cached": False})
+
   except HTTPException:
     raise
   except Exception as e:
-    logger.exception("TTS: Error initializing TextToSpeechClient for podcast")
-    raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
-
-  female_name, male_name = _podcast_voices(lang)
-  language_code = "en-GB"  # Podcast uses UK English Chirp3-HD (Gacrux, Algenib)
-  audio_config = texttospeech.AudioConfig(
-    audio_encoding=texttospeech.AudioEncoding.MP3,
-    speaking_rate=0.95,
-  )
-  audio_parts: list[bytes] = []
-  try:
-    for role, segment_text in segments:
-      if not segment_text or not segment_text.strip():
-        continue
-      voice_name = female_name if role == "female" else male_name
-      voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
-      ssml = _segment_text_to_ssml(segment_text, role)
-      segment_bytes = await _synthesize_ssml(client, voice, audio_config, ssml)
-      audio_parts.append(segment_bytes)
-  except Exception as e:
-    logger.exception("TTS: podcast synthesis failed")
-    raise HTTPException(status_code=500, detail=f"Podcast TTS failed: {e}")
-
-  audio_bytes = b"".join(audio_parts)
-  if not audio_bytes:
-    raise HTTPException(status_code=500, detail="Podcast produced no audio")
-
-  if message_id:
-    put_cached_audio(message_id, lang, audio_bytes)
-
-  # Deduct (we already checked balance above)
-  success = credit_service.spend_credits(
-    current_user.userid,
-    effective_cost,
-    "podcast",
-    f"Podcast for message {message_id or 'chat'}",
-  )
-  if not success:
-    logger.warning("Podcast: credit deduction failed (insufficient balance?) for user %s", current_user.userid)
-
-  audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
-  return JSONResponse({"audio": audio_b64, "cached": False})
+    logger.exception("Podcast endpoint unexpected error: %s", e)
+    raise HTTPException(
+      status_code=500,
+      detail="Podcast generation failed. Check server logs for details.",
+    )
 

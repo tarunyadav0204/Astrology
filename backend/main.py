@@ -78,6 +78,13 @@ from kota_chakra.routes import router as kota_chakra_router
 from user_facts.routes import router as user_facts_router
 from nudge_engine.routes import router as nudge_engine_router
 from nudge_engine import db as nudge_db
+try:
+    from activity.middleware import ActivityMiddleware
+    _activity_middleware_available = True
+except Exception as e:
+    _activity_middleware_available = False
+    import logging
+    logging.getLogger(__name__).info("Activity middleware not loaded: %s", e)
 import math
 from datetime import timedelta
 import signal
@@ -277,6 +284,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
+if _activity_middleware_available:
+    app.add_middleware(ActivityMiddleware)
 
 # CORS configuration for multiple domains
 allowed_origins = [
