@@ -27,8 +27,32 @@ def _get_topic() -> Optional[str]:
     return topic
 
 
+def _get_pubsub_credentials():
+    """
+    Build credentials that include the Pub/Sub scope. The same key used for Play may be
+    loaded elsewhere with only androidpublisher scope, causing ACCESS_TOKEN_SCOPE_INSUFFICIENT.
+    We explicitly request pubsub scope here.
+    """
+    from google.oauth2 import service_account
+    from utils.env_json import parse_json_from_env
+
+    scopes = ["https://www.googleapis.com/auth/pubsub"]
+    key = os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "")
+    if not key or not str(key).strip():
+        return None
+    key = key.strip()
+    # Inline JSON
+    info = parse_json_from_env(key)
+    if info and isinstance(info, dict):
+        return service_account.Credentials.from_service_account_info(info, scopes=scopes)
+    # File path
+    if os.path.isfile(key):
+        return service_account.Credentials.from_service_account_file(key, scopes=scopes)
+    return None
+
+
 def _get_client():
-    """Lazy init Pub/Sub publisher client. Uses GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_KEY."""
+    """Lazy init Pub/Sub publisher client with credentials that have Pub/Sub scope."""
     global _pubsub_client
     if _pubsub_client is not None:
         return _pubsub_client
@@ -37,12 +61,10 @@ def _get_client():
         return None
     try:
         from google.cloud import pubsub_v1
-        from google.oauth2 import service_account
-        from utils.env_json import parse_json_from_env
 
         project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID", "").strip()
         if not project:
-            # Try to get from credentials
+            from utils.env_json import parse_json_from_env
             key = os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "")
             if key:
                 info = parse_json_from_env(key.strip()) if isinstance(key, str) else None
@@ -50,7 +72,12 @@ def _get_client():
                     project = info.get("project_id", "")
             if not project:
                 logger.warning("Activity: GOOGLE_CLOUD_PROJECT / GCP_PROJECT_ID not set; Pub/Sub publish may fail")
-        publisher = pubsub_v1.PublisherClient()
+
+        creds = _get_pubsub_credentials()
+        if creds is not None:
+            publisher = pubsub_v1.PublisherClient(credentials=creds)
+        else:
+            publisher = pubsub_v1.PublisherClient()
         _pubsub_client = publisher
         return _pubsub_client
     except Exception as e:
