@@ -252,8 +252,8 @@
         "description": "ప్రపంచ సంఘటనలు, స్టాక్ మార్కెట్లు, రాజకీయాలు మరియు ఆర్థిక ధోరణులను విశ్లేషించండి"
       },
       "events": {
-        "title": "ఈవెంట్ టైమ్‌లైన్",
-        "description": "నెలవారీ విశ్లేషణలు మరియు ప్రధాన మైలురాళ్లతో AI-ఆధారిత వార్షిక అంచనాలు"
+        "title": "ఏమి అవతరిస్తుంది",
+        "description": "సంవత్సరం ఏమి తెచ్చుకొస్తుందో చూడండి — కెరీర్, ప్రేమ, డబ్బు, ఆరోగ్యం — నెలనెలా."
       }
     },
     "analysis": {
@@ -425,11 +425,54 @@
     "tabs": {
       "ask": "అడగండి",
       "charts": "చార్ట్స్",
-      "events": "ఈవెంట్స్",
+      "events": "అంచనాలు",
       "dashas": "దశలు",
       "you": "మీరు"
     },
     "askFAB": "AstroRoshni ని అడగండి"
+  },
+  "eventScreen": {
+    "headerTitle": "ప్రధాన జీవిత సంఘటనలు",
+    "headerPredictions": "{{year}} అంచనాలు",
+    "monthlyGuide": "నెలవారీ మార్గదర్శి",
+    "selectYear": "మీ సంవత్సరాన్ని ఎంచుకోండి",
+    "selectYearSubtitle": "మీరు ఏ సంవత్సరాన్ని అన్వేషించాలనుకుంటున్నారు?",
+    "continue": "కొనసాగించు",
+    "regenerateTitle": "అంచనాలను మళ్లీ రూపొందించాలా?",
+    "regenerateMessage": "{{year}}కు తాజా అంచనాల కోసం {{cost}} క్రెడిట్లు అవసరం.",
+    "cancel": "రద్దు చేయి",
+    "confirm": "నిర్ధారించండి",
+    "whatsIncluded": "ఏమి చేర్చబడింది:",
+    "monthlyForecasts": "12 నెలవారీ పూర్వానుమానాలు",
+    "majorLifeEvents": "ప్రధాన జీవిత సంఘటనలు",
+    "timingGuidance": "సమయ మార్గదర్శన",
+    "aiInsights": "AI-ఆధారిత అంతర్దృష్టులు",
+    "thisYear": "ఈ సంవత్సరం",
+    "nextYear": "తదుపరి సంవత్సరం",
+    "noPredictions": "అంచనాలు రూపొందించబడలేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    "almostThere": "దాదాపు పూర్తయింది..."
+  },
+  "monthlyAccordion": {
+    "focus": "ఫోకస్:",
+    "possibleScenarios": "సాధ్యమైన దృశ్యాలు ({{count}})",
+    "askQuestions": "ప్రశ్నలు అడగండి",
+    "diveDeep": "ఈ నెలలో లోతుగా దిగండి",
+    "why": "ఎందుకు:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "లోడ్ అవుతోంది...",
+    "headerDeepDive": "{{monthYear}} — లోతైన డైవ్",
+    "headerMonthlyDeepDive": "నెలవారీ లోతైన డైవ్",
+    "emptyTitle": "{{monthYear}}లో లోతుగా దిగండి",
+    "emptyDesc": "ఈ నెలకు ప్రతి ట్రిగ్గర్ మరియు అన్ని సాధ్యమైన అభివ్యక్తులను పొందండి. {{cost}} క్రెడిట్లు వాడుతుంది.",
+    "generateDeepDive": "లోతైన డైవ్ రూపొందించండి",
+    "generateConfirmTitle": "లోతైన డైవ్ రూపొందించండి",
+    "generateConfirmMessage": "{{monthYear}}కు అన్ని అభివ్యక్తులను రూపొందించడానికి {{cost}} క్రెడిట్లు అవసరం.",
+    "cancel": "రద్దు చేయి",
+    "continue": "కొనసాగించు",
+    "loadingAnalyzing": "ఈ నెలను లోతుగా విశ్లేషిస్తోంది...",
+    "loadingMapping": "ప్రతి ట్రిగ్గర్ మరియు అభివ్యక్తిని మ్యాప్ చేస్తోంది...",
+    "loadingExamining": "అన్ని ఇంటి యాక్టివేషన్లను పరిశీలిస్తోంది..."
   },
   "birthForm": {
     "headerTitle": {

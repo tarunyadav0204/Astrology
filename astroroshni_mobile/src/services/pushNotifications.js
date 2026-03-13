@@ -133,11 +133,17 @@ async function processNotificationResponse(response, navigationRef) {
   const data = response?.notification?.request?.content?.data;
   if (!data) return;
   const cta = data?.cta;
+  const slug = data?.slug != null ? String(data.slug).trim() : null;
   const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
   const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
   const { storage } = require('./storage');
   const { chartAPI } = require('./api');
   try {
+    // Blog notification: open BlogPostDetail with slug
+    if ((cta === 'astroroshni://blog' || data?.trigger_id === 'blog') && slug && navigationRef?.current) {
+      navigationRef.current.navigate('BlogPostDetail', { slug });
+      return;
+    }
     if (nativeId) {
       // Native-specific event: switch to the chart this notification is for
       let profiles = await storage.getBirthProfiles();

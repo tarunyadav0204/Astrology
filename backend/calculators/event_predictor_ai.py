@@ -26,8 +26,9 @@ class EventPredictor:
         if api_key:
             genai.configure(api_key=api_key)
             try:
-                from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
-                name = get_gemini_analysis_model()
+                # Use the same premium model selection as chat (defaults to Gemini 3.1 Pro)
+                from utils.admin_settings import get_gemini_premium_model, GEMINI_MODEL_OPTIONS
+                name = get_gemini_premium_model()
                 fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
                 for model_name in [name] + fallbacks:
                     try:
@@ -77,6 +78,193 @@ class EventPredictor:
             import traceback
             traceback.print_exc()
             return {"year": year, "status": "error", "error": str(e), "macro_trends": [], "monthly_predictions": []}
+
+    async def predict_monthly_deep(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
+        """Generate exhaustive predictions for a single month (all triggers, all manifestations)."""
+        try:
+            print("\n" + "#"*100)
+            print(f"🎯 MONTHLY DEEP DIVE FOR {year} MONTH {month}")
+            print("#"*100)
+            birth_year = int(birth_data['date'].split('-')[0])
+            current_age = year - birth_year
+            raw_data = self._prepare_yearly_data(birth_data, year)
+            transit_facts = self._get_transit_facts_for_month(birth_data, year, month)
+            dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
+            prompt = self._create_monthly_deep_prompt(raw_data, year, month, current_age, transit_facts, dasha_facts)
+            ai_response = await self._get_ai_prediction_async(prompt)
+            # Always attach backend-calculated facts so frontend can trust them
+            final_response = {
+                "year": year,
+                "status": "success",
+                "dasha_facts": dasha_facts,
+                "transit_facts": transit_facts,
+                **ai_response,
+            }
+            print(f"\n✅ MONTHLY DEEP COMPLETE FOR {year}-{month}")
+            print("#"*100 + "\n")
+            return final_response
+        except Exception as e:
+            print(f"\n❌ ERROR IN predict_monthly_deep: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"year": year, "status": "error", "error": str(e), "macro_trends": [], "monthly_predictions": []}
+
+    def _create_monthly_deep_prompt(self, raw_data: str, year: int, month: int, age: int, transit_facts: Dict[str, Any], dasha_facts: Dict[str, Any]) -> str:
+        """Prompt for single-month exhaustive analysis (all triggers, all manifestations)."""
+        month_names = ["", "January", "February", "March", "April", "May", "June",
+                       "July", "August", "September", "October", "November", "December"]
+        month_name = month_names[month] if 1 <= month <= 12 else f"Month {month}"
+        return f"""You are an expert Vedic Astrologer. For {month_name} {year} ONLY, produce an EXHAUSTIVE deep-dive analysis.
+
+**DASHA FACTS (GROUND TRUTH — DO NOT CHANGE):**
+These are the computed Vimshottari dashas for the native for this month. You MUST copy these exactly into activation_overview.dasha_focus.
+If any level is missing, say "Not provided" — do NOT guess.
+```json
+{json.dumps(dasha_facts, indent=2)}
+```
+
+**TRANSIT FACTS (GROUND TRUTH — DO NOT CHANGE):**
+These are the computed whole-sign transit houses for the native for this month. You are STRICTLY FORBIDDEN from stating a different transit house for these planets.
+If you cannot find a planet here, say "not provided" — do NOT guess.
+```json
+{json.dumps(transit_facts, indent=2)}
+```
+
+**ASTROLOGICAL CONTEXT (FULL JSON FROM CHAT CONTEXT BUILDER):**
+```json
+{raw_data}
+```
+
+**ASTROLOGICAL SYNTHESIS ENGINE (HOW TO PREDICT EVENTS):**
+To predict specific events for the requested timeframe (e.g., "{month_name} {year}"), you MUST execute the following 5-step analytical process. Do not skip any steps.
+
+**Step 1: Map the Active Dasha Network (The Promise)**
+* Extract the active Dasha lords (Mahadasha, Antardasha, Pratyantardasha, Sookshma) from `current_dashas` in the JSON above or from DASHA FACTS.
+* Look at `d1_chart` and `planetary_analysis` to define their NATAL baseline:
+  - Which houses do these planets rule? (use `house_lordships`)
+  - Which house do they sit in?
+  - Crucial: What are their natal relationships? (Which planets are they conjunct with or aspecting in the birth chart?)
+
+**Step 2: The Golden Trigger Rule (Transit Activation)**
+Do not predict events based on transits alone. Transiting planets will ONLY trigger major events if they form a specific relationship with the active Dasha lords. You MUST scan `transit_facts` and `macro_transits_timeline` in the JSON for the following triggers:
+  1. Natal Return: Is a transiting Dasha lord passing exactly over its natal sign/position?
+  2. Relationship Recreation: Is a transiting Dasha lord moving over or aspecting a planet it has a relationship with in the NATAL chart? (e.g., If Natal Saturn aspects Natal Venus, look for Transit Saturn aspecting Transit/Natal Venus).
+  3. Nakshatra Return: Is the transiting planet passing through its natal Nakshatra?
+* Priority Logic: Dasha planets that meet ANY of these three conditions are the FIRST to activate. They will immediately "fire" and manifest the results of the houses they rule and the house they are currently transiting.
+
+**Step 3: Filter Through Precision Checks (The Catalyst)**
+Before finalizing the event, cross-reference the activated planets with the warning systems:
+* Navatara Warnings: Use `navatara_warnings`. If the transiting activated planet is in a dangerous Tara (Vipat, Pratyari, Naidhana), the event will involve sudden obstacles.
+* Sniper Points: Use `sniper_points`. If the transiting planet hits Bhrigu Bindu, 64th Navamsa, or 22nd Drekkana, predict a sudden, highly karmic/fated event.
+* Age Activation: Check `nadi_age_activation`. If the activated planet matches the age-activated planet, the event is guaranteed to be a major life milestone.
+
+**Step 4: Validate Event Quality (Ashtakavarga)**
+* For the houses activated in Step 2, check their scores in `ashtakavarga` → `sarvashtakavarga`.
+* Rule: If the activated house has high bindus (28+), the event manifests easily and successfully. If it has low bindus (<25), the event will bring friction, delays, or stress.
+
+**Step 5: Event Synthesis & Output (House Combinations)**
+Combine the significations of the activated houses to form specific, real-world events. Do not use vague astrology jargon.
+* Example: If AD lord Mercury rules the 4th (Home) and transits the 10th (Career), AND recreates a natal aspect with the MD lord -> Predict: "Relocation due to a major career promotion or working from a new home office."
+* Example: If PD lord is Mars (ruling 6th - Health), and transits over its natal position in the 2nd (Face/Throat) with low Ashtakavarga bindus -> Predict: "Acute health flare-up related to teeth, throat, or speech requiring immediate medical attention."
+* CRITICAL COVERAGE RULE: You MUST consider **all significations of ALL activated houses** and systematically combine them. Your goal is to produce a **holistic, exhaustive list of distinct real-world events**, not just 2–3 highlights.
+
+**OUTPUT REQUIREMENTS (JSON ONLY):**
+1. Return ONLY ONE month object in `monthly_predictions` with `month_id = {month}`.
+2. For that month, include an `activation_overview` object that:
+   - Copies MD/AD/PD/Sookshma exactly from DASHA FACTS / `current_dashas` into `dasha_focus`.
+   - Summarizes the key natal links of these planets.
+   - Lists the key transit triggers (Natal Return, Relationship Recreation, Nakshatra Return) you used.
+   - Lists the activated houses and why they are activated.
+3. CRITICAL: Under `events`, create **at least 20 event objects** (more if many activation patterns exist). You MUST keep generating events until you have covered **all meaningful combinations of the activated houses and planets**. For EVERY event:
+   - Provide `activation_reasoning` showing your work (e.g., "Because AD lord Rahu is transiting over its natal position in the 8th house, recreating its natal aspect with Saturn...").
+   - Fill `prediction` with a clear, real-world scenario (Finance, Health, Career, Family, Real Estate, etc.).
+   - Fill `possible_manifestations` as an array of objects with `scenario` and `reasoning`, linking back to houses and planets explicitly.
+   - Use `start_date` and `end_date` when you can infer them from the dasha/transit periods; otherwise leave them as empty strings.
+
+**STRICT ANTI-HALLUCINATION RULES:**
+* When you state a dasha planet, it must come from `current_dashas` or DASHA FACTS.
+* When you state a transit house for Jupiter/Saturn/Rahu/Ketu, it must come from `macro_transits_timeline` or TRANSIT FACTS.
+* When you mention aspects, you must follow the standard Vedic aspect table from the main instructions (Saturn 3/7/10, Jupiter 5/7/9, Mars 4/7/8, others 7th only). Do not invent aspect patterns.
+
+Now return a single JSON object with this structure:
+{{
+    "macro_trends": [],
+    "monthly_predictions": [
+        {{
+            "month_id": {month},
+            "activation_overview": {{
+                "dasha_focus": {{
+                    "mahadasha": "PlanetName or 'Unknown'",
+                    "antardasha": "PlanetName or 'Unknown'",
+                    "pratyantardasha": "PlanetName or 'Unknown'",
+                    "sookshma": "PlanetName or 'Not provided'"
+                }},
+                "dasha_lords_natal_links": [
+                    "Describe key natal links for the active dasha lords (lordship + conjunction/aspect links + varga checks when relevant)"
+                ],
+                "transit_recreation": [
+                    "Describe concrete transit→natal hits / nakshatra returns supported by the JSON data (do not guess transit houses)"
+                ],
+                "activated_houses": [1, 2, 7],
+                "why_these_houses": "Explain WHY these houses are activated (dasha -> natal links -> transit recreation)."
+            }},
+            "focus_areas": ["list all focus areas for this month"],
+            "events": [
+                {{
+                    "type": "Event Type",
+                    "activation_reasoning": "FULL ACTIVATION LOGIC for THIS event: explicitly list MD/AD/PD(+Sookshma), their natal houses & lordships, the exact transit trigger (from macro_transits_timeline/transit_facts), and ALL houses activated before listing manifestations.",
+                    "prediction": "Narrative description of the concrete life event.",
+                    "possible_manifestations": [{{"scenario": "...", "reasoning": "..."}}, ...],
+                    "trigger_logic": "Summarize the key dasha + transit pattern used.",
+                    "start_date": "YYYY-MM-DD",
+                    "end_date": "YYYY-MM-DD",
+                    "intensity": "High|Medium|Low"
+                }}
+            ]
+        }}
+    ]
+}}"""
+
+    def _get_transit_facts_for_month(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
+        """
+        Compute ground-truth transit houses (whole sign) for key planets for the given month.
+        We anchor to the 1st day of the month at 12:00 UTC to avoid timezone edge cases.
+        """
+        try:
+            sample_date = datetime(year, month, 1, 12, 0, 0)
+            natal_positions = self.transit_calc._calculate_natal_positions(birth_data)  # uses Swiss Ephemeris + Lahiri
+            asc_lon = float(natal_positions.get('ascendant_longitude', 0.0)) if natal_positions else 0.0
+
+            def calc_house(planet: str):
+                lon = self.transit_calc.get_planet_position(sample_date, planet)
+                if lon is None:
+                    return None
+                return int(self.transit_calc.calculate_house_from_longitude(lon, asc_lon))
+
+            planets = ['Saturn', 'Rahu', 'Ketu', 'Jupiter', 'Mars', 'Sun', 'Moon', 'Mercury', 'Venus']
+            facts = {
+                "sample_date_utc": sample_date.strftime('%Y-%m-%d %H:%M'),
+                "ascendant_longitude": asc_lon,
+                "transit_houses": {p: calc_house(p) for p in planets},
+            }
+            return facts
+        except Exception as e:
+            return {"error": str(e), "transit_houses": {}}
+
+    def _get_dasha_facts_for_month(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
+        """Compute Vimshottari MD/AD/PD/Sookshma for the selected month (ground truth)."""
+        try:
+            sample_date = datetime(year, month, 1, 12, 0, 0)
+            dashas = self.dasha_calc.calculate_current_dashas(birth_data, sample_date)
+            return {
+                "sample_date_local": sample_date.strftime('%Y-%m-%d %H:%M'),
+                "mahadasha": (dashas.get('mahadasha') or {}).get('planet'),
+                "antardasha": (dashas.get('antardasha') or {}).get('planet'),
+                "pratyantardasha": (dashas.get('pratyantardasha') or {}).get('planet'),
+                "sookshma": (dashas.get('sookshma') or {}).get('planet'),
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
     def _prepare_yearly_data(self, birth_data: Dict, year: int) -> str:
         """
@@ -664,18 +852,19 @@ Each item in possible_manifestations MUST be an object with TWO fields:
                      ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", 
                       "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]]
             
-            # print(f"\n📤 FULL REQUEST TO GEMINI:")
-            # print("="*100)
-            # print("PROMPT START")
-            # print("="*100)
-            # print(prompt)
-            # print("="*100)
-            # print("PROMPT END")
-            # print("="*100)
-            # print(f"Prompt length: {len(prompt)} characters")
-            # print(f"Safety settings: {len(safety)} categories")
-            # print(f"Response format: application/json")
-            # print("="*100)
+            # Debug: print full prompt going to Gemini
+            print(f"\n📤 FULL REQUEST TO GEMINI:")
+            print("="*100)
+            print("PROMPT START")
+            print("="*100)
+            print(prompt)
+            print("="*100)
+            print("PROMPT END")
+            print("="*100)
+            print(f"Prompt length: {len(prompt)} characters")
+            print(f"Safety settings: {len(safety)} categories")
+            print(f"Response format: application/json")
+            print("="*100)
             
             print("\n⏳ Calling Gemini API...")
             resp = self.model.generate_content(
@@ -687,6 +876,7 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             
             response_text = resp.text
             
+            # Debug: print full raw response from Gemini
             print("\n📥 FULL RESPONSE FROM GEMINI:")
             print("="*100)
             print("RESPONSE START")
@@ -705,7 +895,17 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             resp_text = await asyncio.to_thread(run_sync_gemini)
             
             print("\n🔄 Parsing JSON response...")
-            parsed_response = json.loads(resp_text)
+            # Gemini sometimes returns valid JSON plus trailing text.
+            # Use raw_decode to parse the first JSON value and ignore the rest.
+            cleaned = (resp_text or "").lstrip()
+            try:
+                parsed_response, end_idx = json.JSONDecoder().raw_decode(cleaned)
+                if end_idx < len(cleaned):
+                    trailing = cleaned[end_idx:].strip()
+                    if trailing:
+                        print(f"⚠️ WARNING: Trailing non-JSON content ignored (len={len(trailing)})")
+            except json.JSONDecodeError:
+                parsed_response = json.loads(cleaned)
             print(f"✅ JSON parsed successfully")
             
             # Handle if Gemini returns a list instead of dict

@@ -20,10 +20,12 @@ def send_expo_push(
     body: str,
     data: Optional[Dict[str, Any]] = None,
     sound: str = "default",
+    image_url: Optional[str] = None,
 ) -> bool:
     """
     Send one notification to an Expo push token.
     Returns True if the request was accepted by Expo (HTTP 200), False otherwise.
+    image_url: optional URL for rich notification image (Android shows it; iOS needs Notification Service Extension).
     """
     token = (token or "").strip()
     if not token or not token.startswith("ExponentPushToken["):
@@ -36,6 +38,8 @@ def send_expo_push(
         "sound": sound,
         "data": data or {},
     }
+    if image_url and isinstance(image_url, str) and image_url.strip().startswith("http"):
+        payload["richContent"] = {"image": image_url.strip()}
     try:
         req = urllib.request.Request(
             EXPO_PUSH_URL,

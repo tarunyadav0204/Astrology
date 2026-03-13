@@ -118,6 +118,18 @@ export const chatAPI = {
     feature: 'event_timeline', 
     description: 'Cosmic Timeline Analysis' 
   }),
+  tts: (text, lang = 'en', voiceName) =>
+    api.post(getEndpoint('/tts/synthesize'), null, {
+      params: { text, lang, voice_name: voiceName },
+    }),
+  getTtsVoices: () =>
+    api.get(getEndpoint('/tts/voices')),
+  getPodcastAudio: (messageContent, language = 'en', messageId = null) =>
+    api.post(getEndpoint('/tts/podcast'), {
+      message_content: messageContent,
+      language,
+      ...(messageId ? { message_id: messageId } : {}),
+    }),
 };
 
 export const wealthAPI = {

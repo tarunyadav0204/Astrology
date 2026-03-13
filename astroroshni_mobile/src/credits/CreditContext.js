@@ -9,6 +9,7 @@ export const CreditProvider = ({ children }) => {
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(false);
   const [partnershipCost, setPartnershipCost] = useState(2);
+  const [podcastCost, setPodcastCost] = useState(2);
   const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
   const [subscriptionTierName, setSubscriptionTierName] = useState(null);
   const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
@@ -94,20 +95,21 @@ export const CreditProvider = ({ children }) => {
     }
   };
 
-  const fetchPartnershipCost = async () => {
+  const fetchPricingCosts = async () => {
     try {
       const response = await pricingAPI.getPricing();
       const data = response?.data || response;
-      const cost = data?.pricing?.partnership != null ? Number(data.pricing.partnership) : 2;
-      setPartnershipCost(cost);
+      const pricing = data?.pricing || {};
+      if (pricing.partnership != null) setPartnershipCost(Number(pricing.partnership));
+      if (pricing.podcast != null) setPodcastCost(Number(pricing.podcast));
     } catch (error) {
-      console.error('Error fetching partnership cost:', error);
+      console.error('Error fetching pricing costs:', error);
     }
   };
 
   useEffect(() => {
     fetchBalance();
-    fetchPartnershipCost();
+    fetchPricingCosts();
   }, []);
 
   return (
@@ -115,6 +117,7 @@ export const CreditProvider = ({ children }) => {
       credits,
       loading,
       partnershipCost,
+      podcastCost,
       freeQuestionAvailable,
       subscriptionTierName,
       subscriptionDiscountPercent,

@@ -25,6 +25,8 @@ import MonthlyAccordion from './MonthlyAccordion';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
+import ConfirmCreditsModal from './ConfirmCreditsModal';
+import { useTranslation } from 'react-i18next';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
 
 const { width } = Dimensions.get('window');
@@ -38,6 +40,7 @@ const SIDE_PADDING = (width - ITEM_WIDTH) / 2;
 
 export default function EventScreen({ route }) {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
   const { theme, colors } = useTheme();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -58,6 +61,8 @@ export default function EventScreen({ route }) {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const yearSliderRef = useRef(null);
   const loadingIntervalRef = useRef(null);
+  const [showEventCreditsModal, setShowEventCreditsModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'generate' | 'regenerate' | null
 
   const loadingMessages = [
     { icon: '🌟', text: 'Analyzing planetary positions...' },
@@ -484,7 +489,7 @@ export default function EventScreen({ route }) {
         // Cached data exists - proceed directly
         setAnalysisStarted(true);
       } else {
-        // No cache - show credit confirmation modal
+        // No cache - show credit confirmation modal using shared ConfirmCreditsModal
         await fetchBalance();
         const freshBalance = await creditAPI.getBalance();
         const actualCredits = freshBalance.data.balance;
@@ -496,16 +501,8 @@ export default function EventScreen({ route }) {
           ]);
           return;
         }
-        
-        // Show confirmation modal
-        Alert.alert(
-          'Generate Predictions',
-          `This will cost ${creditCost} credits to generate predictions for ${selectedYear}. Continue?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Continue', onPress: () => setAnalysisStarted(true) }
-          ]
-        );
+        setPendingAction('generate');
+        setShowEventCreditsModal(true);
       }
     } catch (error) {
       console.error('❌ Cache Check Error Details:', {
@@ -548,8 +545,19 @@ export default function EventScreen({ route }) {
       return;
     }
     
-    setMonthlyData(null);
-    fetchMonthlyGuide(selectedYear);
+    setPendingAction('regenerate');
+    setShowEventCreditsModal(true);
+  };
+
+  const handleEventCreditsConfirm = () => {
+    setShowEventCreditsModal(false);
+    if (pendingAction === 'generate') {
+      setAnalysisStarted(true);
+    } else if (pendingAction === 'regenerate') {
+      setMonthlyData(null);
+      fetchMonthlyGuide(selectedYear);
+    }
+    setPendingAction(null);
   };
 
   return (
@@ -564,26 +572,22 @@ export default function EventScreen({ route }) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
             <Ionicons name="refresh-circle" size={48} color={colors.accent} style={styles.modalIcon} />
-            <Text style={[styles.modalTitle, { color: colors.accent }]}>Regenerate Predictions?</Text>
+            <Text style={[styles.modalTitle, { color: colors.accent }]}>{t('eventScreen.regenerateTitle', 'Regenerate Predictions?')}</Text>
             <Text style={[styles.modalText, { color: colors.textSecondary }]}>
-              This will cost {creditCostOriginal != null && creditCostOriginal > creditCost ? (
-                <Text><Text style={styles.modalCostStrikethrough}>{creditCostOriginal}</Text> {creditCost}</Text>
-              ) : (
-                creditCost
-              )}{' '}credits to generate fresh predictions for {selectedYear}.
+              {t('eventScreen.regenerateMessage', { cost: creditCost, year: selectedYear })}
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonCancel, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]} 
                 onPress={() => setShowRegenerateModal(false)}
               >
-                <Text style={[styles.modalButtonTextCancel, { color: colors.text }]}>Cancel</Text>
+                <Text style={[styles.modalButtonTextCancel, { color: colors.text }]}>{t('eventScreen.cancel', 'Cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.accent }]} 
                 onPress={handleRegenerateConfirm}
               >
-                <Text style={[styles.modalButtonTextConfirm, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>Confirm</Text>
+                <Text style={[styles.modalButtonTextConfirm, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>{t('eventScreen.confirm', 'Confirm')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -595,7 +599,7 @@ export default function EventScreen({ route }) {
           <Ionicons name="arrow-back" size={24} color={colors.accent} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.accent }]}>{analysisStarted ? `${selectedYear} Predictions` : 'Major Life Events'}</Text>
+          <Text style={[styles.headerTitle, { color: colors.accent }]}>{analysisStarted ? t('eventScreen.headerPredictions', { year: selectedYear }) : t('eventScreen.headerTitle', 'Major Life Events')}</Text>
           {birthData && (
             <NativeSelectorChip 
               birthData={birthData}
@@ -629,8 +633,8 @@ export default function EventScreen({ route }) {
 
       {!analysisStarted ? (
         <View style={[styles.selectionContainer, { backgroundColor: colors.background }]}>
-          <Text style={[styles.selectionTitle, { color: colors.accent }]}>🌟 Select Your Year</Text>
-          <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>Which year would you like to explore?</Text>
+          <Text style={[styles.selectionTitle, { color: colors.accent }]}>🌟 {t('eventScreen.selectYear', 'Select Your Year')}</Text>
+          <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>{t('eventScreen.selectYearSubtitle', 'Which year would you like to explore?')}</Text>
           
           {/* Year Picker - Horizontal Chips */}
           <View style={styles.yearChipsContainer}>
@@ -687,34 +691,34 @@ export default function EventScreen({ route }) {
               style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
               onPress={() => handleYearChange(new Date().getFullYear())}
             >
-              <Text style={[styles.quickSelectText, { color: colors.accent }]}>This Year</Text>
+              <Text style={[styles.quickSelectText, { color: colors.accent }]}>{t('eventScreen.thisYear', 'This Year')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
               onPress={() => handleYearChange(new Date().getFullYear() + 1)}
             >
-              <Text style={[styles.quickSelectText, { color: colors.accent }]}>Next Year</Text>
+              <Text style={[styles.quickSelectText, { color: colors.accent }]}>{t('eventScreen.nextYear', 'Next Year')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* What's Included */}
           <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.featuresTitle, { color: colors.accent }]}>What's Included:</Text>
+            <Text style={[styles.featuresTitle, { color: colors.accent }]}>{t('eventScreen.whatsIncluded', "What's Included:")}</Text>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.text }]}>12 Monthly Forecasts</Text>
+              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.monthlyForecasts', '12 Monthly Forecasts')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.text }]}>Major Life Events</Text>
+              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.majorLifeEvents', 'Major Life Events')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.text }]}>Timing Guidance</Text>
+              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.timingGuidance', 'Timing Guidance')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.text }]}>AI-Powered Insights</Text>
+              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.aiInsights', 'AI-Powered Insights')}</Text>
             </View>
           </View>
 
@@ -722,7 +726,7 @@ export default function EventScreen({ route }) {
           <View style={styles.unlockButtonContainer}>
             <TouchableOpacity style={styles.unlockButton} onPress={handleContinue}>
               <LinearGradient colors={[colors.accent, colors.primary]} style={styles.unlockGradient}>
-                <Text style={[styles.unlockButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>Continue</Text>
+                <Text style={[styles.unlockButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>{t('eventScreen.continue', 'Continue')}</Text>
                 <Ionicons name="arrow-forward" size={22} color={theme === 'dark' ? colors.background : '#1a1a1a'} />
               </LinearGradient>
             </TouchableOpacity>
@@ -770,7 +774,7 @@ export default function EventScreen({ route }) {
                     <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.accent }]} />
                   </View>
                   <Text style={[styles.progressPercentText, { color: colors.accent }]}>
-                    {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : 'Almost there...'}
+                    {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : t('eventScreen.almostThere', 'Almost there...')}
                   </Text>
                 </View>
               ) : (
@@ -780,13 +784,14 @@ export default function EventScreen({ route }) {
           </View>
         ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.accent }]}>📅 Monthly Guide</Text>
+            <Text style={[styles.sectionTitle, { color: colors.accent }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Guide')}</Text>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
-                <MonthlyAccordion 
-                  key={index} 
-                  data={{...month, month: getMonthName(month.month_id)}} 
-                  onChatPress={() => navigateToChat({...month, month: getMonthName(month.month_id)}, 'monthly')}
+                <MonthlyAccordion
+                  key={index}
+                  data={{ ...month, month: getMonthName(month.month_id) }}
+                  onChatPress={() => navigateToChat({ ...month, month: getMonthName(month.month_id) }, 'monthly')}
+                  onDiveDeepPress={(data) => navigation.navigate('MonthlyDeepScreen', { year: selectedYear, month: data.month_id })}
                 />
               ))}
             </View>
@@ -794,13 +799,26 @@ export default function EventScreen({ route }) {
         ) : monthlyData ? (
           <View style={styles.section}>
             <View style={styles.loadingContainer}>
-              <Text style={[styles.loadingText, { color: colors.text }]}>⚠️ No predictions generated. Please try regenerating.</Text>
+              <Text style={[styles.loadingText, { color: colors.text }]}>⚠️ {t('eventScreen.noPredictions', 'No predictions generated. Please try regenerating.')}</Text>
             </View>
           </View>
         ) : null}
 
       </ScrollView>
       )}
+      <ConfirmCreditsModal
+        visible={showEventCreditsModal}
+        onClose={() => { setShowEventCreditsModal(false); setPendingAction(null); }}
+        onConfirm={handleEventCreditsConfirm}
+        title={t('home.options.events.title', 'What Will Manifest')}
+        description={t(
+          'credits.eventTimeline.description',
+          'We will deeply analyze all your divisional charts using Parashari, Nadi, and Jaimini methods, and map all high‑probability events that may manifest over this period.'
+        )}
+        cost={creditCost}
+        credits={credits}
+        confirmLabel={t('eventScreen.continue', 'Continue')}
+      />
     </SafeAreaView>
   );
 }

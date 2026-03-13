@@ -32,6 +32,7 @@ import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
 import MuhuratHubScreen from './src/components/MuhuratHubScreen';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
+import MonthlyDeepScreen from './src/components/MonthlyDeepScreen';
 import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
 import NumerologyScreen from './src/components/Numerology/NumerologyScreen';
 import FinancialDashboard from './src/components/Financial/FinancialDashboard';
@@ -419,6 +420,11 @@ export default function App() {
           <Stack.Screen 
             name="EventScreen" 
             component={EventScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="MonthlyDeepScreen" 
+            component={MonthlyDeepScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

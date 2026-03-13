@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -19,27 +20,43 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/constants';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../../utils/pdfGenerator';
 import { textToSpeech } from '../../utils/textToSpeech';
+import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import { useCredits } from '../../credits/CreditContext';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
+  const { podcastCost } = useCredits();
+  const navigation = useNavigation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showVoicePicker, setShowVoicePicker] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [isLoadingPodcast, setIsLoadingPodcast] = useState(false);
+  const [isPlayingPodcast, setIsPlayingPodcast] = useState(false);
+  const [isPausedPodcast, setIsPausedPodcast] = useState(false);
+  const [isSharingPodcast, setIsSharingPodcast] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const skeletonAnim = useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        textToSpeech.stopPodcast();
+        setIsPlayingPodcast(false);
+        setIsPausedPodcast(false);
+      };
+    }, [])
+  );
 
   useEffect(() => {
     if (message.summary_image && isImageLoading) {
@@ -110,45 +127,147 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       }),
     ]).start();
   }, []);
-  const speak = async () => {
-    if (isSpeaking) {
+  const getCleanMessageText = () =>
+    message.content
+      .replace(/<[^>]*>/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+
+  const playPodcast = async () => {
+    if (isPlayingPodcast) {
       textToSpeech.stop();
-      setIsSpeaking(false);
+      setIsPlayingPodcast(false);
       return;
     }
+    if (isLoadingPodcast) return;
+
+    const cleanText = getCleanMessageText();
+    if (!cleanText) return;
 
     try {
-      setIsSpeaking(true);
-      const cleanText = message.content
-        .replace(/<[^>]*>/g, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ')
-        .trim();
-
-      textToSpeech.speak(cleanText, {
-        voice: selectedVoice?.identifier,
-        onDone: () => setIsSpeaking(false),
-        onError: () => setIsSpeaking(false),
+      setIsLoadingPodcast(true);
+      setIsPlayingPodcast(false);
+      await textToSpeech.playPodcast(cleanText, {
+        language,
+        messageId: message.messageId || null,
+        onStart: () => {
+          setIsLoadingPodcast(false);
+          setIsPlayingPodcast(true);
+          setIsPausedPodcast(false);
+        },
+        onDone: () => {
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(false);
+        },
+        onPause: () => {
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(true);
+        },
+        onResume: () => {
+          setIsPlayingPodcast(true);
+          setIsPausedPodcast(false);
+        },
+        onStop: () => {
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(false);
+        },
+        onError: (err) => {
+          setIsLoadingPodcast(false);
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(false);
+          if (err?.response?.status === 402) {
+            const cost = podcastCost ?? 2;
+            Alert.alert(
+              t('credits.insufficient', 'Insufficient Credits'),
+              t('credits.insufficientPodcast', 'You need {{cost}} credits to listen to this as a podcast. Please purchase more credits.', { cost }),
+              [
+                { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+                { text: t('credits.buyCredits', 'Buy Credits'), onPress: () => navigation.navigate('Credits') },
+              ]
+            );
+          }
+        },
       });
     } catch (error) {
-      setIsSpeaking(false);
+      console.error('[Podcast] error', error);
+      setIsLoadingPodcast(false);
+      setIsPlayingPodcast(false);
+      setIsPausedPodcast(false);
+      const status = error?.response?.status;
+      const cost = podcastCost ?? 2;
+      if (status === 402) {
+        Alert.alert(
+          t('credits.insufficient', 'Insufficient Credits'),
+          t('credits.insufficientPodcast', 'You need {{cost}} credits to listen to this as a podcast. Please purchase more credits.', { cost }),
+          [
+            { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+            { text: t('credits.buyCredits', 'Buy Credits'), onPress: () => navigation.navigate('Credits') },
+          ]
+        );
+        return;
+      }
+      Alert.alert('Error', 'Could not generate podcast. Please try again.');
     }
   };
 
-  const showVoiceSelector = async () => {
+  const onPodcastButtonPress = () => {
+    if (isPausedPodcast) {
+      textToSpeech.resumePodcast();
+      return;
+    }
+    if (isPlayingPodcast) return; // Pause/Stop are separate buttons
+    if (isLoadingPodcast) return;
+    const cleanText = getCleanMessageText();
+    if (!cleanText) return;
+    playPodcast();
+  };
+
+  const handlePausePodcast = () => {
+    textToSpeech.pausePodcast();
+  };
+
+  const handleStopPodcast = () => {
+    textToSpeech.stopPodcast();
+  };
+
+  const sharePodcastAudio = async () => {
+    const cleanText = getCleanMessageText();
+    if (!cleanText) return;
     try {
-      const voices = await textToSpeech.getAvailableVoices();
-      const filteredVoices = voices.filter(v => v.language.startsWith('en') || v.language.startsWith('hi'));
-      setAvailableVoices(filteredVoices);
-      setShowVoicePicker(true);
+      setIsSharingPodcast(true);
+      const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
+      const response = await chatAPI.getPodcastAudio(cleanText, lang, message.messageId || null);
+      const base64Audio = response?.data?.audio;
+      if (!base64Audio || typeof base64Audio !== 'string') {
+        Alert.alert('Error', 'Could not get podcast audio to share.');
+        return;
+      }
+      const filename = `AstroRoshni-Podcast-${Date.now()}.mp3`;
+      const path = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(path, base64Audio, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(path, {
+        mimeType: 'audio/mpeg',
+        dialogTitle: 'Share Podcast',
+      });
     } catch (error) {
-      Alert.alert('Error', 'Could not load voices');
+      console.error('[Podcast] share error', error);
+      Alert.alert('Error', 'Could not share podcast. Please try again.');
+    } finally {
+      setIsSharingPodcast(false);
     }
   };
 
@@ -993,6 +1112,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   };
 
   return (
+    <>
     <Animated.View style={[
       styles.container,
       message.role === 'user' ? styles.userContainer : styles.assistantContainer,
@@ -1046,7 +1166,119 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             </Text>
           </View>
         )}
-        
+
+        {/* Quick action buttons under disclaimer (for long messages) */}
+        {!message.isTyping && message.messageId && message.role === 'assistant' && (
+          <View style={styles.actionButtons}>
+            {message.showRestartButton && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restartButton]}
+                onPress={() => onRestart && onRestart(message.messageId)}
+              >
+                <Ionicons name="refresh" size={16} color="#ff6b35" />
+              </TouchableOpacity>
+            )}
+            {message.showSendRetryButton && !message.messageId && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restartButton]}
+                onPress={() => onSendRetry && onSendRetry(message)}
+              >
+                <Ionicons name="refresh" size={16} color="#ff6b35" />
+              </TouchableOpacity>
+            )}
+            <>
+              {!(isPlayingPodcast || isPausedPodcast) && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={onPodcastButtonPress}
+                  disabled={isLoadingPodcast}
+                >
+                  {isLoadingPodcast ? (
+                    <ActivityIndicator size="small" color="#ff6b35" />
+                  ) : (
+                    <Ionicons name="radio-outline" size={16} color="#666" />
+                  )}
+                </TouchableOpacity>
+              )}
+              {(isPlayingPodcast || isPausedPodcast) && (
+                <>
+                  {isPlayingPodcast && (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={handlePausePodcast}
+                    >
+                      <Ionicons name="pause" size={16} color="#ff6b35" />
+                    </TouchableOpacity>
+                  )}
+                  {isPausedPodcast && (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={onPodcastButtonPress}
+                    >
+                      <Ionicons name="play" size={16} color="#666" />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={handleStopPodcast}
+                  >
+                    <Ionicons name="stop-circle" size={16} color="#666" />
+                  </TouchableOpacity>
+                </>
+              )}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={sharePodcastAudio}
+                disabled={isSharingPodcast || isLoadingPodcast}
+              >
+                {isSharingPodcast ? (
+                  <ActivityIndicator size="small" color="#666" />
+                ) : (
+                  <Ionicons name="share-outline" size={16} color="#666" />
+                )}
+              </TouchableOpacity>
+            </>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={copyToClipboard}
+            >
+              <Ionicons name="copy-outline" size={16} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={shareMessage}
+            >
+              <Ionicons name="share-social-outline" size={16} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.pdfButton]}
+              onPress={sharePDF}
+              disabled={isGeneratingPDF}
+            >
+              {isGeneratingPDF ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Ionicons name="document-text-outline" size={16} color="#666" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Message',
+                  'Are you sure you want to delete this message?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: deleteMessage }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="trash-outline" size={16} color="#666" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Summary Image */}
         {message.summary_image && (
           <TouchableOpacity 
@@ -1151,17 +1383,55 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             )}
             {message.role === 'assistant' && (
               <>
+                {!(isPlayingPodcast || isPausedPodcast) && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={onPodcastButtonPress}
+                    disabled={isLoadingPodcast}
+                  >
+                    {isLoadingPodcast ? (
+                      <ActivityIndicator size="small" color="#ff6b35" />
+                    ) : (
+                      <Ionicons name="radio-outline" size={16} color="#666" />
+                    )}
+                  </TouchableOpacity>
+                )}
+                {(isPlayingPodcast || isPausedPodcast) && (
+                  <>
+                    {isPlayingPodcast && (
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={handlePausePodcast}
+                      >
+                        <Ionicons name="pause" size={16} color="#ff6b35" />
+                      </TouchableOpacity>
+                    )}
+                    {isPausedPodcast && (
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={onPodcastButtonPress}
+                      >
+                        <Ionicons name="play" size={16} color="#666" />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={handleStopPodcast}
+                    >
+                      <Ionicons name="stop-circle" size={16} color="#666" />
+                    </TouchableOpacity>
+                  </>
+                )}
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={speak}
+                  onPress={sharePodcastAudio}
+                  disabled={isSharingPodcast || isLoadingPodcast}
                 >
-                  <Ionicons name={isSpeaking ? "stop-circle" : "volume-medium"} size={16} color={isSpeaking ? "#ff6b35" : "#666"} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={showVoiceSelector}
-                >
-                  <Ionicons name="settings" size={16} color="#666" />
+                  {isSharingPodcast ? (
+                    <ActivityIndicator size="small" color="#666" />
+                  ) : (
+                    <Ionicons name="share-outline" size={16} color="#666" />
+                  )}
                 </TouchableOpacity>
               </>
             )}
@@ -1244,48 +1514,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         )}
       </BubbleWrapper>
       
-      {/* Voice Picker Modal */}
-      <Modal
-        visible={showVoicePicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowVoicePicker(false)}
-      >
-        <View style={styles.voiceModalOverlay}>
-          <View style={styles.voiceModalContent}>
-            <Text style={styles.voiceModalTitle}>Choose Voice</Text>
-            <ScrollView style={styles.voiceScrollView} showsVerticalScrollIndicator={true}>
-              {availableVoices.map((voice, index) => (
-                <TouchableOpacity
-                  key={voice.identifier}
-                  style={[
-                    styles.voiceOption,
-                    selectedVoice?.identifier === voice.identifier && styles.selectedVoiceOption
-                  ]}
-                  onPress={() => {
-                    setSelectedVoice(voice);
-                    setShowVoicePicker(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.voiceOptionText,
-                    selectedVoice?.identifier === voice.identifier && styles.selectedVoiceText
-                  ]}>
-                    {voice.name} ({voice.language})
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.voiceModalClose}
-              onPress={() => setShowVoicePicker(false)}
-            >
-              <Text style={styles.voiceModalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      
       {/* Tooltip Modal */}
       <Modal
         visible={tooltipModal.show}
@@ -1357,6 +1585,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         </TouchableOpacity>
       </Modal>
     </Animated.View>
+    </>
   );
 };
 
@@ -2021,67 +2250,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
     paddingHorizontal: 4,
-  },
-  voiceModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  voiceModalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    maxWidth: '90%',
-    maxHeight: '70%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  voiceModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ff6b35',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  voiceScrollView: {
-    maxHeight: 300,
-    marginBottom: 15,
-  },
-  voiceOption: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
-  },
-  selectedVoiceOption: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderColor: '#ff6b35',
-  },
-  voiceOptionText: {
-    fontSize: 15,
-    color: '#333',
-  },
-  selectedVoiceText: {
-    color: '#ff6b35',
-    fontWeight: '600',
-  },
-  voiceModalClose: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignSelf: 'center',
-    marginTop: 15,
-  },
-  voiceModalCloseText: {
-    color: 'white',
-    fontWeight: '600',
   },
   betaNotice: {
     backgroundColor: 'rgba(255, 152, 0, 0.1)',

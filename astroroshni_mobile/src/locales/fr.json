@@ -252,8 +252,8 @@
           "description": "Analysez les événements mondiaux, les marchés boursiers, la politique et les tendances économiques"
         },
         "events": {
-          "title": "Chronologie des événements",
-          "description": "Prédictions annuelles par IA avec répartitions mensuelles et étapes majeures"
+          "title": "Ce qui se manifestera",
+          "description": "Voyez ce que l'année réserve — carrière, amour, argent, santé — mois par mois."
         }
       },
       "analysis": {
@@ -425,11 +425,54 @@
       "tabs": {
         "ask": "Demander",
         "charts": "Thèmes",
-        "events": "Événements",
+        "events": "Prédictions",
         "dashas": "Dashas",
         "you": "Profil"
       },
       "askFAB": "Demander à AstroRoshni"
+    },
+    "eventScreen": {
+      "headerTitle": "Événements majeurs de la vie",
+      "headerPredictions": "Prédictions {{year}}",
+      "monthlyGuide": "Guide mensuel",
+      "selectYear": "Choisissez votre année",
+      "selectYearSubtitle": "Quelle année souhaitez-vous explorer ?",
+      "continue": "Continuer",
+      "regenerateTitle": "Régénérer les prédictions ?",
+      "regenerateMessage": "Cela coûtera {{cost}} crédits pour générer des prédictions pour {{year}}.",
+      "cancel": "Annuler",
+      "confirm": "Confirmer",
+      "whatsIncluded": "Ce qui est inclus :",
+      "monthlyForecasts": "12 prévisions mensuelles",
+      "majorLifeEvents": "Événements majeurs de la vie",
+      "timingGuidance": "Conseils de timing",
+      "aiInsights": "Analyses par IA",
+      "thisYear": "Cette année",
+      "nextYear": "L'année prochaine",
+      "noPredictions": "Aucune prédiction générée. Veuillez régénérer.",
+      "almostThere": "Presque terminé..."
+    },
+    "monthlyAccordion": {
+      "focus": "FOCUS :",
+      "possibleScenarios": "Scénarios possibles ({{count}})",
+      "askQuestions": "Poser des questions",
+      "diveDeep": "Approfondir ce mois",
+      "why": "Pourquoi :"
+    },
+    "monthlyDeepScreen": {
+      "loading": "Chargement...",
+      "headerDeepDive": "{{monthYear}} — Analyse approfondie",
+      "headerMonthlyDeepDive": "Analyse mensuelle approfondie",
+      "emptyTitle": "Approfondir {{monthYear}}",
+      "emptyDesc": "Obtenez chaque déclencheur et toutes les manifestations possibles pour ce mois. Utilise {{cost}} crédits.",
+      "generateDeepDive": "Générer l'analyse approfondie",
+      "generateConfirmTitle": "Générer l'analyse approfondie",
+      "generateConfirmMessage": "Cela coûtera {{cost}} crédits pour générer toutes les manifestations pour {{monthYear}}.",
+      "cancel": "Annuler",
+      "continue": "Continuer",
+      "loadingAnalyzing": "Analyse approfondie de ce mois...",
+      "loadingMapping": "Cartographie de chaque déclencheur et manifestation...",
+      "loadingExamining": "Examen de toutes les activations..."
     },
     "birthForm": {
       "headerTitle": {

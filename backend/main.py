@@ -51,6 +51,7 @@ from festivals.routes import router as festivals_router
 from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
 from credits.routes import router as credits_router
+from tts.routes import router as tts_router
 from credits.credit_request_routes import router as credit_request_router
 from blank_chart.routes import router as blank_chart_router
 from education.routes import router as education_router
@@ -333,6 +334,7 @@ app.include_router(festivals_router, prefix="/api")
 app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
+app.include_router(tts_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")
 app.include_router(blank_chart_router, prefix="/api")
 app.include_router(education_router, prefix="/api")

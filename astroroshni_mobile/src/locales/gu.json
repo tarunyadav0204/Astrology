@@ -252,8 +252,8 @@
         "description": "વિશ્વની ઘટનાઓ, સ્ટોક માર્કેટ, રાજકારણ અને આર્થિક વલણોનું વિશ્લેષણ કરો"
       },
       "events": {
-        "title": "ઇવેન્ટ ટાઇમલાઇન",
-        "description": "માસિક વિગતો અને મુખ્ય સીમાચિહ્નો સાથે AI-આધારિત વાર્ષિક આગાહીઓ"
+        "title": "શું પ્રગટ થશે",
+        "description": "જુઓ વર્ષ શું લાવશે — કારકિર્દી, પ્રેમ, પૈસો, સ્વાસ્થ્ય — મહિનાદરમહિને."
       }
     },
     "analysis": {
@@ -425,11 +425,54 @@
     "tabs": {
       "ask": "પૂછો",
       "charts": "કુંડળીઓ",
-      "events": "ઘટનાઓ",
+      "events": "ભવિષ્યવાણી",
       "dashas": "દશાઓ",
       "you": "તમે"
     },
     "askFAB": "AstroRoshni ને પૂછો"
+  },
+  "eventScreen": {
+    "headerTitle": "મુખ્ય જીવન ઘટનાઓ",
+    "headerPredictions": "{{year}} ભવિષ્યવાણી",
+    "monthlyGuide": "માસિક માર્ગદર્શન",
+    "selectYear": "તમારું વર્ષ પસંદ કરો",
+    "selectYearSubtitle": "તમે કયું વર્ષ જોવા માંગો છો?",
+    "continue": "ચાલુ રાખો",
+    "regenerateTitle": "ભવિષ્યવાણી ફરી બનાવો?",
+    "regenerateMessage": "{{year}} માટે તાજી ભવિષ્યવાણી બનાવવામાં {{cost}} ક્રેડિટ લાગશે.",
+    "cancel": "રદ કરો",
+    "confirm": "ખાતરી કરો",
+    "whatsIncluded": "શું સામેલ છે:",
+    "monthlyForecasts": "12 માસિક પૂર્વાનુમાન",
+    "majorLifeEvents": "મુખ્ય જીવન ઘટનાઓ",
+    "timingGuidance": "સમય માર્ગદર્શન",
+    "aiInsights": "AI-ચાલિત અંતર્દૃષ્ટિ",
+    "thisYear": "આ વર્ષ",
+    "nextYear": "આગામી વર્ષ",
+    "noPredictions": "કોઈ ભવિષ્યવાણી જનરેટ થઈ નથી. કૃપા કરીને ફરી બનાવો.",
+    "almostThere": "લગભગ થઈ ગયું..."
+  },
+  "monthlyAccordion": {
+    "focus": "ફોકસ:",
+    "possibleScenarios": "શક્ય દૃશ્યો ({{count}})",
+    "askQuestions": "પ્રશ્નો પૂછો",
+    "diveDeep": "આ મહિનામાં ઊંડાણમાં જાઓ",
+    "why": "શા માટે:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "લોડ થઈ રહ્યું છે...",
+    "headerDeepDive": "{{monthYear}} — ઊંડો ડાઇવ",
+    "headerMonthlyDeepDive": "માસિક ઊંડો ડાઇવ",
+    "emptyTitle": "{{monthYear}} માં ઊંડાણમાં જાઓ",
+    "emptyDesc": "આ મહિનાના દરેક ટ્રિગર અને બધી શક્ય અભિવ્યક્તિઓ મેળવો. {{cost}} ક્રેડિટ વાપરે છે.",
+    "generateDeepDive": "ઊંડો ડાઇવ બનાવો",
+    "generateConfirmTitle": "ઊંડો ડાઇવ બનાવો",
+    "generateConfirmMessage": "{{monthYear}} માટે બધી અભિવ્યક્તિઓ બનાવવામાં {{cost}} ક્રેડિટ લાગશે.",
+    "cancel": "રદ કરો",
+    "continue": "ચાલુ રાખો",
+    "loadingAnalyzing": "આ મહિનાનું ઊંડાણથી વિશ્લેષણ થઈ રહ્યું છે...",
+    "loadingMapping": "દરેક ટ્રિગર અને અભિવ્યક્તિ મેપ થઈ રહ્યાં છે...",
+    "loadingExamining": "બધા ઘર સક્રિયકરણો તપાસાઈ રહ્યાં છે..."
   },
   "birthForm": {
     "headerTitle": {

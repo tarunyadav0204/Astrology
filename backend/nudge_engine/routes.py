@@ -251,10 +251,8 @@ async def admin_send_blog_notification(
                     "trigger_id": "blog",
                     "cta": "astroroshni://blog",
                     "blog_id": str(blog_id),
-                    "slug": slug,
+                    "slug": slug or "",
                 }
-                if featured_image:
-                    push_data["image"] = featured_image
                 user_sent = 0
                 for token, platform in tokens:
                     total_tokens += 1
@@ -263,6 +261,7 @@ async def admin_send_blog_notification(
                         notif_title,
                         notif_body,
                         data=push_data,
+                        image_url=featured_image if featured_image else None,
                     ):
                         sent += 1
                         user_sent += 1

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, ScrollView, Platform, UIManager } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 
 // Enable LayoutAnimation on Android
@@ -8,9 +9,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function MonthlyAccordion({ data, onChatPress }) {
-  const [expanded, setExpanded] = useState(false);
-  const { colors } = useTheme();
+export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, defaultExpanded = false, hideDiveDeep = false }) {
+  const [expanded, setExpanded] = useState(!!defaultExpanded);
+  const { t } = useTranslation();
+  const { theme, colors } = useTheme();
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -59,7 +61,7 @@ export default function MonthlyAccordion({ data, onChatPress }) {
         <View style={[styles.content, { borderTopColor: colors.cardBorder }]}>
           {/* Theme Header */}
           <View style={styles.themeRow}>
-            <Text style={[styles.label, { color: colors.textTertiary }]}>FOCUS:</Text>
+            <Text style={[styles.label, { color: colors.textTertiary }]}>{t('monthlyAccordion.focus', 'FOCUS:')}</Text>
             <View style={styles.expandedTagContainer}>
               {tags.map((tag, i) => (
                 <View key={i} style={[styles.fullTag, { backgroundColor: colors.surface }]}>
@@ -81,7 +83,7 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                     <View style={styles.manifestationsContainer}>
                       <View style={styles.manifestationsHeader}>
                         <Ionicons name="git-network-outline" size={14} color={colors.accent} />
-                        <Text style={[styles.manifestationsLabel, { color: colors.accent }]}>Possible Scenarios ({event.possible_manifestations.length})</Text>
+                        <Text style={[styles.manifestationsLabel, { color: colors.accent }]}>{t('monthlyAccordion.possibleScenarios', { count: event.possible_manifestations.length, defaultValue: `Possible Scenarios (${event.possible_manifestations.length})` })}</Text>
                       </View>
                       <View style={styles.manifestationsList}>
                         {event.possible_manifestations.map((item, idx) => {
@@ -99,7 +101,7 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                                   {scenario ? <Text style={[styles.manifestationText, { color: colors.text }]}>{scenario}</Text> : null}
                                   {reasoning && (
                                     <View style={styles.reasoningContainer}>
-                                      <Text style={[styles.reasoningLabel, { color: colors.accent }]}>Why:</Text>
+                                      <Text style={[styles.reasoningLabel, { color: colors.accent }]}>{t('monthlyAccordion.why', 'Why:')}</Text>
                                       <Text style={[styles.reasoningText, { color: colors.textSecondary }]}>{reasoning}</Text>
                                     </View>
                                   )}
@@ -126,11 +128,22 @@ export default function MonthlyAccordion({ data, onChatPress }) {
             ))}
           </View>
 
-          {/* CTA Button */}
-          <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary }]} onPress={onChatPress}>
-            <Ionicons name="chatbubbles-outline" size={18} color="white" />
-            <Text style={styles.chatButtonText}>Analyze {data.month}</Text>
-          </TouchableOpacity>
+          {/* CTA Buttons */}
+          {onDiveDeepPress && !hideDiveDeep && (
+            <TouchableOpacity
+              style={[styles.chatButton, styles.diveDeepButton, { backgroundColor: colors.accent }]}
+              onPress={() => onDiveDeepPress(data)}
+            >
+              <Ionicons name="arrow-down-circle-outline" size={18} color={theme === 'dark' ? colors.background : '#1a1a1a'} />
+              <Text style={[styles.chatButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>{t('monthlyAccordion.diveDeep', 'Dive deep into this month')}</Text>
+            </TouchableOpacity>
+          )}
+          {onChatPress ? (
+            <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary }]} onPress={onChatPress}>
+              <Ionicons name="chatbubbles-outline" size={18} color="white" />
+              <Text style={styles.chatButtonText}>{t('monthlyAccordion.askQuestions', 'Ask Questions')}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       )}
     </View>
@@ -220,6 +233,7 @@ const styles = StyleSheet.create({
   eventDates: { fontSize: 12, fontWeight: '600', marginTop: 6 },
   triggerLogic: { fontSize: 11, fontStyle: 'italic', marginTop: 4, lineHeight: 16 },
   
+  diveDeepButton: { marginTop: 0, marginBottom: 10 },
   chatButton: {
     flexDirection: 'row',
     padding: 14,

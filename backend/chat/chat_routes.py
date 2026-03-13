@@ -66,6 +66,7 @@ class ClearChatRequest(BaseModel):
     timezone: Optional[str] = None
     gender: Optional[str] = None
     selectedYear: Optional[int] = None
+    selectedMonth: Optional[int] = None  # 1-12 for monthly dive deep
     birth_chart_id: Optional[int] = None
     id: Optional[int] = None
     
@@ -861,8 +862,12 @@ def init_event_timeline_table():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_user_id ON event_timeline_jobs (user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_birth_chart ON event_timeline_jobs (birth_chart_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_status ON event_timeline_jobs (status)')
-    
-    conn.commit()
+    # Add selected_month for monthly dive deep (nullable; NULL = yearly run)
+    try:
+        cursor.execute('ALTER TABLE event_timeline_jobs ADD COLUMN selected_month INTEGER')
+        conn.commit()
+    except Exception:
+        pass  # column may already exist
     conn.close()
 
 @router.post("/monthly-events")
@@ -904,6 +909,9 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         }
         
         target_year = request.selectedYear or datetime.now().year
+        target_month = request.selectedMonth  # 1-12 for monthly dive deep, None for yearly
+        if target_month is not None and (target_month < 1 or target_month > 12):
+            raise HTTPException(status_code=400, detail="selectedMonth must be 1-12")
         
         # Create job
         job_id = str(uuid.uuid4())
@@ -929,8 +937,9 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
             )
         
         cursor.execute(
-            "INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, status) VALUES (?, ?, ?, ?, ?)",
-            (job_id, current_user.userid, birth_chart_id, target_year, 'pending')
+            """INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, selected_month, status)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (job_id, current_user.userid, birth_chart_id, target_year, target_month, 'pending')
         )
         
         conn.commit()
@@ -939,13 +948,13 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         # Start background processing
         background_tasks.add_task(
             process_event_timeline,
-            job_id, birth_chart_id, target_year, current_user.userid, event_timeline_cost
+            job_id, birth_chart_id, target_year, current_user.userid, event_timeline_cost, target_month
         )
         
         return {
             "job_id": job_id,
             "status": "pending",
-            "message": "Generating your cosmic timeline..."
+            "message": "Generating your cosmic timeline..." if target_month is None else "Generating deep dive for this month..."
         }
         
     except HTTPException:
@@ -1023,14 +1032,24 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
             print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
             return {"cached": False}
         
-        # Find most recent completed job for this user/birth_chart/year
-        cursor.execute('''
-            SELECT result_data, completed_at, job_id
-            FROM event_timeline_jobs
-            WHERE user_id = ? AND birth_chart_id = ? AND selected_year = ? AND status = 'completed'
-            ORDER BY completed_at DESC
-            LIMIT 1
-        ''', (current_user.userid, birth_chart_id, target_year))
+        # Find most recent completed job for this user/birth_chart/year (and month if monthly deep)
+        target_month = request.selectedMonth
+        if target_month is not None:
+            cursor.execute('''
+                SELECT result_data, completed_at, job_id
+                FROM event_timeline_jobs
+                WHERE user_id = ? AND birth_chart_id = ? AND selected_year = ? AND selected_month = ? AND status = 'completed'
+                ORDER BY completed_at DESC
+                LIMIT 1
+            ''', (current_user.userid, birth_chart_id, target_year, target_month))
+        else:
+            cursor.execute('''
+                SELECT result_data, completed_at, job_id
+                FROM event_timeline_jobs
+                WHERE user_id = ? AND birth_chart_id = ? AND selected_year = ? AND (selected_month IS NULL OR selected_month = 0) AND status = 'completed'
+                ORDER BY completed_at DESC
+                LIMIT 1
+            ''', (current_user.userid, birth_chart_id, target_year))
         
         result = cursor.fetchone()
         conn.close()
@@ -1052,8 +1071,8 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
         traceback.print_exc()
         return {"cached": False}
 
-async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: int, user_id: int, cost: int):
-    """Background task to process event timeline"""
+async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: int, user_id: int, cost: int, target_month: int = None):
+    """Background task to process event timeline (yearly or monthly dive deep)."""
     import sqlite3
     
     print("\n" + "*"*100)
@@ -1061,6 +1080,7 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
     print(f"   - Job ID: {job_id}")
     print(f"   - Birth Chart ID: {birth_chart_id}")
     print(f"   - Target Year: {target_year}")
+    print(f"   - Target Month (dive deep): {target_month}")
     print(f"   - User ID: {user_id}")
     print(f"   - Cost: {cost} credits")
     print("*"*100 + "\n")
@@ -1130,8 +1150,12 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         
         predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
         
-        print(f"\n🚀 Calling predict_yearly_events for year {target_year}...")
-        predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
+        if target_month is not None:
+            print(f"\n🚀 Calling predict_monthly_deep for year {target_year} month {target_month}...")
+            predictions = await predictor.predict_monthly_deep(birth_data_dict, target_year, target_month)
+        else:
+            print(f"\n🚀 Calling predict_yearly_events for year {target_year}...")
+            predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
         
         print(f"\n📦 Predictions received:")
         print(f"   - Status: {predictions.get('status')}")

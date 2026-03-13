@@ -252,8 +252,8 @@
         "description": "Analiza eventos mundiales, mercados de valores, política y tendencias económicas"
       },
       "events": {
-        "title": "Línea de Tiempo de Eventos",
-        "description": "Predicciones anuales impulsadas por IA con desgloses mensuales y hitos importantes"
+        "title": "Qué se manifestará",
+        "description": "Descubre qué trae el año — carrera, amor, dinero, salud — mes a mes."
       }
     },
     "analysis": {
@@ -425,11 +425,54 @@
     "tabs": {
       "ask": "Preguntar",
       "charts": "Cartas",
-      "events": "Eventos",
+      "events": "Predicciones",
       "dashas": "Dashas",
       "you": "Tú"
     },
     "askFAB": "Preguntar a AstroRoshni"
+  },
+  "eventScreen": {
+    "headerTitle": "Grandes acontecimientos vitales",
+    "headerPredictions": "Predicciones {{year}}",
+    "monthlyGuide": "Guía mensual",
+    "selectYear": "Elige tu año",
+    "selectYearSubtitle": "¿Qué año te gustaría explorar?",
+    "continue": "Continuar",
+    "regenerateTitle": "¿Regenerar predicciones?",
+    "regenerateMessage": "Costará {{cost}} créditos generar predicciones nuevas para {{year}}.",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "whatsIncluded": "Qué incluye:",
+    "monthlyForecasts": "12 pronósticos mensuales",
+    "majorLifeEvents": "Grandes acontecimientos vitales",
+    "timingGuidance": "Orientación temporal",
+    "aiInsights": "Información con IA",
+    "thisYear": "Este año",
+    "nextYear": "Próximo año",
+    "noPredictions": "No se generaron predicciones. Intenta regenerar.",
+    "almostThere": "Casi listo..."
+  },
+  "monthlyAccordion": {
+    "focus": "ENFOQUE:",
+    "possibleScenarios": "Escenarios posibles ({{count}})",
+    "askQuestions": "Preguntar",
+    "diveDeep": "Profundizar en este mes",
+    "why": "Por qué:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "Cargando...",
+    "headerDeepDive": "{{monthYear}} — Análisis profundo",
+    "headerMonthlyDeepDive": "Análisis mensual profundo",
+    "emptyTitle": "Profundizar en {{monthYear}}",
+    "emptyDesc": "Obtén cada detonante y todas las manifestaciones posibles de este mes. Usa {{cost}} créditos.",
+    "generateDeepDive": "Generar análisis profundo",
+    "generateConfirmTitle": "Generar análisis profundo",
+    "generateConfirmMessage": "Costará {{cost}} créditos generar todas las manifestaciones para {{monthYear}}.",
+    "cancel": "Cancelar",
+    "continue": "Continuar",
+    "loadingAnalyzing": "Analizando este mes en profundidad...",
+    "loadingMapping": "Mapeando cada detonante y manifestación...",
+    "loadingExamining": "Examinando todas las activaciones..."
   },
   "birthForm": {
     "headerTitle": {

@@ -252,8 +252,8 @@
           "description": "Analysiere Weltereignisse, Aktienmärkte, Politik und wirtschaftliche Trends"
         },
         "events": {
-          "title": "Ereignis-Zeitachse",
-          "description": "KI-gestützte Jahresvorhersagen mit monatlichen Aufschlüsselungen und wichtigen Meilensteinen"
+          "title": "Was sich manifestieren wird",
+          "description": "Sieh, was das Jahr bringt — Karriere, Liebe, Geld, Gesundheit — Monat für Monat."
         }
       },
       "analysis": {
@@ -425,11 +425,54 @@
       "tabs": {
         "ask": "Fragen",
         "charts": "Horoskope",
-        "events": "Ereignisse",
+        "events": "Vorhersagen",
         "dashas": "Dashas",
         "you": "Du"
       },
       "askFAB": "AstroRoshni fragen"
+    },
+    "eventScreen": {
+      "headerTitle": "Wichtige Lebensereignisse",
+      "headerPredictions": "{{year}} Vorhersagen",
+      "monthlyGuide": "Monatliche Übersicht",
+      "selectYear": "Wähle dein Jahr",
+      "selectYearSubtitle": "Welches Jahr möchtest du erkunden?",
+      "continue": "Weiter",
+      "regenerateTitle": "Vorhersagen neu erstellen?",
+      "regenerateMessage": "Das kostet {{cost}} Credits für frische Vorhersagen für {{year}}.",
+      "cancel": "Abbrechen",
+      "confirm": "Bestätigen",
+      "whatsIncluded": "Was enthalten ist:",
+      "monthlyForecasts": "12 monatliche Vorhersagen",
+      "majorLifeEvents": "Wichtige Lebensereignisse",
+      "timingGuidance": "Zeitliche Orientierung",
+      "aiInsights": "KI-gestützte Einblicke",
+      "thisYear": "Dieses Jahr",
+      "nextYear": "Nächstes Jahr",
+      "noPredictions": "Keine Vorhersagen erstellt. Bitte erneut versuchen.",
+      "almostThere": "Fast fertig..."
+    },
+    "monthlyAccordion": {
+      "focus": "FOKUS:",
+      "possibleScenarios": "Mögliche Szenarien ({{count}})",
+      "askQuestions": "Fragen stellen",
+      "diveDeep": "In diesen Monat eintauchen",
+      "why": "Warum:"
+    },
+    "monthlyDeepScreen": {
+      "loading": "Laden...",
+      "headerDeepDive": "{{monthYear}} — Tiefenanalyse",
+      "headerMonthlyDeepDive": "Monatliche Tiefenanalyse",
+      "emptyTitle": "Tief in {{monthYear}} eintauchen",
+      "emptyDesc": "Jeden Auslöser und alle möglichen Manifestationen für diesen Monat. Kostet {{cost}} Credits.",
+      "generateDeepDive": "Tiefenanalyse erstellen",
+      "generateConfirmTitle": "Tiefenanalyse erstellen",
+      "generateConfirmMessage": "Das kostet {{cost}} Credits, um alle Manifestationen für {{monthYear}} zu erstellen.",
+      "cancel": "Abbrechen",
+      "continue": "Weiter",
+      "loadingAnalyzing": "Dieser Monat wird vertieft analysiert...",
+      "loadingMapping": "Jeder Auslöser und jede Manifestation wird erfasst...",
+      "loadingExamining": "Alle Hausaktivierungen werden geprüft..."
     },
     "birthForm": {
       "headerTitle": {

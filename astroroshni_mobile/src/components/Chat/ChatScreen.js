@@ -47,6 +47,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
+import { textToSpeech } from '../../utils/textToSpeech';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -348,6 +349,19 @@ export default function ChatScreen({ navigation, route }) {
       hideSub.remove();
     };
   }, []);
+
+  // Stop any ongoing TTS playback when leaving the chat screen
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        try {
+          textToSpeech.stop();
+        } catch (e) {
+          // ignore
+        }
+      };
+    }, [])
+  );
 
   // Pending message management (like web app)
   const addPendingMessage = async (messageId) => {
@@ -1014,7 +1028,10 @@ export default function ChatScreen({ navigation, route }) {
         transparent={true}
         onRequestClose={() => setShowPartnershipSetupModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={[styles.partnershipModalContent, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1029,7 +1046,11 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
 
-            <GHScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+            <GHScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 30 }}
+              keyboardShouldPersistTaps="always"
+            >
               <View style={styles.setupSlotsContainer}>
                 {/* Slot 1: Native */}
                 <TouchableOpacity 
@@ -1156,6 +1177,7 @@ export default function ChatScreen({ navigation, route }) {
                         data={filtered.length > 0 ? filtered : [{ id: 'add-new', name: nativeSearchQuery ? 'No results found' : 'Add New Profile', isNew: true, isEmpty: !nativeSearchQuery }]}
                         keyExtractor={(chart) => chart.id}
                         showsHorizontalScrollIndicator={false}
+                        keyboardShouldPersistTaps="always"
                         contentContainerStyle={styles.setupSelectorScroll}
                         renderItem={({ item: chart }) => (
                           <TouchableOpacity
@@ -1199,6 +1221,7 @@ export default function ChatScreen({ navigation, route }) {
                         data={filtered.length > 0 ? filtered : [{ id: 'add-new', name: nativeSearchQuery ? 'No results found' : 'Add New Profile', isNew: true, isEmpty: !nativeSearchQuery }]}
                         keyExtractor={(chart) => chart.id}
                         showsHorizontalScrollIndicator={false}
+                        keyboardShouldPersistTaps="always"
                         contentContainerStyle={styles.setupSelectorScroll}
                         renderItem={({ item: chart }) => (
                           <TouchableOpacity
@@ -1383,7 +1406,7 @@ export default function ChatScreen({ navigation, route }) {
               )}
             </GHScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     );
   };

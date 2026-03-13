@@ -30,6 +30,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCredits } from '../../credits/CreditContext';
 
 const { width, height: windowHeight } = Dimensions.get('window');
@@ -61,6 +62,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const { freeQuestionAvailable } = useCredits();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
+  const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
 
   if (!colors) {
     return null;
@@ -188,7 +190,60 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
       return () => clearTimeout(timer);
     }, [freeQuestionAvailable])
   );
-  
+
+  // Target month for monthly modal: after 10th of current month we promote next month.
+  const getMonthlyWelcomeTarget = useCallback(() => {
+    const now = new Date();
+    const day = now.getDate();
+    if (day > 10) {
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return { year: next.getFullYear(), month: next.getMonth() + 1, monthName: MONTH_NAMES[next.getMonth()] };
+    }
+    return { year: now.getFullYear(), month: now.getMonth() + 1, monthName: MONTH_NAMES[now.getMonth()] };
+  }, []);
+
+  // Smart monthly predictions welcome modal – shown when user is on Home (greeting) view,
+  // once per native per (year, month) with a 7-day cooldown so it doesn’t show every time.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const timer = setTimeout(async () => {
+        try {
+          if (!birthData?.id) return;
+          const { year, month } = getMonthlyWelcomeTarget();
+          const key = `monthly_welcome:${birthData.id}:${year}:${month}`;
+          const lastShown = await AsyncStorage.getItem(key);
+          if (lastShown) {
+            const last = new Date(lastShown);
+            const diffDays = (new Date().getTime() - last.getTime()) / (1000 * 60 * 60 * 24);
+            if (diffDays < 7) return;
+          }
+          if (!cancelled) setShowMonthlyWelcomeModal(true);
+        } catch (e) {
+          // fail silently
+        }
+      }, 600);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }, [birthData?.id, getMonthlyWelcomeTarget])
+  );
+
+  // Whenever the modal is dismissed (any way), persist cooldown so it won't show again for 7 days.
+  const closeMonthlyWelcomeModal = useCallback(async () => {
+    try {
+      if (birthData?.id) {
+        const { year, month } = getMonthlyWelcomeTarget();
+        const key = `monthly_welcome:${birthData.id}:${year}:${month}`;
+        await AsyncStorage.setItem(key, new Date().toISOString());
+      }
+    } catch (e) {
+      // ignore
+    }
+    setShowMonthlyWelcomeModal(false);
+  }, [birthData?.id, getMonthlyWelcomeTarget]);
+
   useEffect(() => {
     // Update Panchang daily at midnight
     const now = new Date();
@@ -691,8 +746,8 @@ const loadHomeData = async (nativeData = null) => {
     {
       id: 'events',
       icon: '📅',
-      title: t('home.options.events.title', 'Event Timeline'),
-      description: t('home.options.events.description', 'AI-powered yearly predictions with monthly breakdowns and major milestones'),
+      title: t('home.options.events.title', 'What Will Manifest'),
+      description: t('home.options.events.description', 'See what the year holds — career, love, money, health — month by month.'),
       action: 'events',
       cost: pricing.events ?? 100,
       originalCost: pricingOriginal.events
@@ -1920,6 +1975,97 @@ const loadHomeData = async (nativeData = null) => {
         </View>
       </GHScrollView>
       
+      {/* Monthly Predictions Welcome Modal */}
+      <Modal
+        visible={showMonthlyWelcomeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeMonthlyWelcomeModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.65)' }]}
+          onPress={closeMonthlyWelcomeModal}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.monthlyWelcomeModalCard}
+            onPress={() => {}}
+          >
+            <LinearGradient
+              colors={['#1f2937', '#4b5563', '#6b21a8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.monthlyWelcomeModalGradient}
+            >
+              <TouchableOpacity
+                hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                style={styles.monthlyWelcomeModalClose}
+                onPress={closeMonthlyWelcomeModal}
+              >
+                <Icon name="close" size={22} color="rgba(255,255,255,0.9)" />
+              </TouchableOpacity>
+              <View style={styles.monthlyWelcomeModalIconWrap}>
+                <Text style={styles.monthlyWelcomeModalEmoji}>🔮</Text>
+              </View>
+              <Text style={styles.monthlyWelcomeModalTitle}>
+                {`Hello${currentNativeData?.name ? `, ${currentNativeData.name}` : ''} 👋`}
+              </Text>
+              <Text style={styles.monthlyWelcomeModalSubtitle}>
+                {`Ready to explore what ${getMonthlyWelcomeTarget().monthName} has in store for you?`}
+              </Text>
+              <Text style={styles.monthlyWelcomeModalSubtext}>
+                We&apos;ll deeply analyze your divisional charts, dashas, and transits using Parashari, Nadi, and Jaimini methods — and reveal high‑probability events and timelines that could manifest in {getMonthlyWelcomeTarget().monthName}.
+              </Text>
+              <View style={styles.monthlyWelcomeHighlights}>
+                <View style={styles.monthlyWelcomeHighlightRow}>
+                  <Text style={styles.monthlyWelcomeHighlightEmoji}>📅</Text>
+                  <Text style={styles.monthlyWelcomeHighlightText}>Career, love, money &amp; health event timelines.</Text>
+                </View>
+                <View style={styles.monthlyWelcomeHighlightRow}>
+                  <Text style={styles.monthlyWelcomeHighlightEmoji}>🔍</Text>
+                  <Text style={styles.monthlyWelcomeHighlightText}>See exactly which dashas and houses are firing.</Text>
+                </View>
+                <View style={styles.monthlyWelcomeHighlightRow}>
+                  <Text style={styles.monthlyWelcomeHighlightEmoji}>✨</Text>
+                  <Text style={styles.monthlyWelcomeHighlightText}>Multiple scenarios so you can prepare with clarity.</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.monthlyWelcomeModalCTA}
+                activeOpacity={0.9}
+                onPress={async () => {
+                  const { year, month } = getMonthlyWelcomeTarget();
+                  await closeMonthlyWelcomeModal();
+                  navigation.navigate('MonthlyDeepScreen', { year, month });
+                }}
+              >
+                <LinearGradient
+                  colors={['#fbbf24', '#f97316']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.monthlyWelcomeModalCTAGradient}
+                >
+                  <Icon name="calendar" size={20} color="#78350f" />
+                  <Text style={styles.monthlyWelcomeModalCTAText}>
+                    {`Explore ${getMonthlyWelcomeTarget().monthName} predictions`}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={closeMonthlyWelcomeModal}
+                style={styles.monthlyWelcomeModalLater}
+              >
+                <Text style={styles.monthlyWelcomeModalLaterText}>Maybe later</Text>
+              </TouchableOpacity>
+              <Text style={styles.monthlyWelcomeDisclaimer}>
+                For guidance only — not medical, legal or financial advice.
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+      
       {/* Physical Traits Modal */}
       <PhysicalTraitsModal
         visible={showTraitsModal}
@@ -2045,7 +2191,7 @@ const loadHomeData = async (nativeData = null) => {
             />
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'events' ? '800' : '600' }]}>
-            {t('home.tabs.events', 'Events')}
+            {t('home.tabs.events', 'Predictions')}
           </Text>
         </TouchableOpacity>
 
@@ -2148,6 +2294,9 @@ function OptionCard({ option, index, onOptionSelect }) {
           <View style={styles.optionContent}>
             <Text style={[styles.optionTitle, { color: colors.text }]}>{option.title}</Text>
             <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{option.description}</Text>
+            {option.teaser ? (
+              <Text style={[styles.optionTeaser, { color: colors.accent }]}>{option.teaser}</Text>
+            ) : null}
           </View>
           {option.cost != null && option.cost > 0 && (
             <View style={styles.costBadge}>
@@ -2644,6 +2793,13 @@ const styles = StyleSheet.create({
   optionDescription: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  optionTeaser: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 6,
+    fontWeight: '600',
+    fontStyle: 'italic',
   },
   quickQuestionsContainer: {
     alignItems: 'center',
@@ -3238,6 +3394,116 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '600',
+  },
+  monthlyWelcomeModalCard: {
+    width: '88%',
+    maxWidth: 380,
+    borderRadius: 24,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6b21a8',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.4,
+        shadowRadius: 24,
+      },
+      android: { elevation: 16 },
+    }),
+  },
+  monthlyWelcomeModalGradient: {
+    padding: 24,
+    paddingTop: 28,
+    alignItems: 'center',
+  },
+  monthlyWelcomeModalClose: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 2,
+  },
+  monthlyWelcomeModalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(251, 191, 36, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  monthlyWelcomeModalEmoji: {
+    fontSize: 34,
+  },
+  monthlyWelcomeModalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fef9c3',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  monthlyWelcomeModalSubtitle: {
+    fontSize: 16,
+    color: '#fefce8',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  monthlyWelcomeModalSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  monthlyWelcomeHighlights: {
+    width: '100%',
+    marginBottom: 16,
+    gap: 6,
+  },
+  monthlyWelcomeHighlightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  monthlyWelcomeHighlightEmoji: {
+    fontSize: 18,
+  },
+  monthlyWelcomeHighlightText: {
+    flex: 1,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.92)',
+  },
+  monthlyWelcomeModalCTA: {
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  monthlyWelcomeModalCTAGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 999,
+    gap: 8,
+  },
+  monthlyWelcomeModalCTAText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#78350f',
+  },
+  monthlyWelcomeModalLater: {
+    marginTop: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  monthlyWelcomeModalLaterText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+  },
+  monthlyWelcomeDisclaimer: {
+    marginTop: 8,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
   },
   insightModalContent: {
     width: '90%',

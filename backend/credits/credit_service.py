@@ -239,6 +239,13 @@ class CreditService:
                 VALUES ('karma_analysis_cost', 25, 'Credits per karma analysis')
             ''')
         
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'podcast_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('podcast_cost', 2, 'Credits per podcast (listen to message as audio)')
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -766,18 +773,28 @@ class CreditService:
             cursor.execute("""
                 SELECT setting_key, setting_value, description, discount 
                 FROM credit_settings 
-                WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost')
+                WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost', 'podcast_cost')
                 ORDER BY setting_key
             """)
         except sqlite3.OperationalError:
             cursor.execute("""
                 SELECT setting_key, setting_value, description 
                 FROM credit_settings 
-                WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost')
+                WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost', 'podcast_cost')
                 ORDER BY setting_key
             """)
             rows = cursor.fetchall()
             settings = [{"key": r[0], "value": r[1], "description": r[2], "discount": None} for r in rows]
+            if not any(s["key"] == "podcast_cost" for s in settings):
+                try:
+                    cursor.execute("""
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('podcast_cost', 2, 'Credits per podcast (listen to message as audio)')
+                    """)
+                    conn.commit()
+                    settings.append({"key": "podcast_cost", "value": 2, "description": "Credits per podcast (listen to message as audio)", "discount": None})
+                except Exception:
+                    pass
             conn.close()
             return settings
         rows = cursor.fetchall()
@@ -789,6 +806,22 @@ class CreditService:
                 "description": row[2],
                 "discount": row[3] if len(row) > 3 else None,
             })
+        # Ensure podcast_cost exists so admin Feature Costs always shows it
+        if not any(s["key"] == "podcast_cost" for s in settings):
+            try:
+                cursor.execute("""
+                    INSERT INTO credit_settings (setting_key, setting_value, description)
+                    VALUES ('podcast_cost', 2, 'Credits per podcast (listen to message as audio)')
+                """)
+                conn.commit()
+                settings.append({
+                    "key": "podcast_cost",
+                    "value": 2,
+                    "description": "Credits per podcast (listen to message as audio)",
+                    "discount": None,
+                })
+            except Exception:
+                pass
         conn.close()
         return settings
     

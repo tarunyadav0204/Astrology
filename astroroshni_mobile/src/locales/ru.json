@@ -252,8 +252,8 @@
           "description": "Анализ мировых событий, фондовых рынков, политики и экономики"
         },
         "events": {
-          "title": "Хронология событий",
-          "description": "Годовые прогнозы на базе ИИ с ежемесячной детализацией и ключевыми вехами"
+          "title": "Что проявится",
+          "description": "Смотрите, что принесёт год — карьера, любовь, деньги, здоровье — месяц за месяцем."
         }
       },
       "analysis": {
@@ -425,11 +425,54 @@
       "tabs": {
         "ask": "Спросить",
         "charts": "Карты",
-        "events": "События",
+        "events": "Прогнозы",
         "dashas": "Даши",
         "you": "Профиль"
       },
       "askFAB": "Спросить AstroRoshni"
+    },
+    "eventScreen": {
+      "headerTitle": "Важные жизненные события",
+      "headerPredictions": "Прогнозы {{year}}",
+      "monthlyGuide": "Месячный гид",
+      "selectYear": "Выберите год",
+      "selectYearSubtitle": "Какой год вы хотите изучить?",
+      "continue": "Продолжить",
+      "regenerateTitle": "Обновить прогнозы?",
+      "regenerateMessage": "Это будет стоить {{cost}} кредитов для новых прогнозов на {{year}}.",
+      "cancel": "Отмена",
+      "confirm": "Подтвердить",
+      "whatsIncluded": "Что входит:",
+      "monthlyForecasts": "12 месячных прогнозов",
+      "majorLifeEvents": "Важные жизненные события",
+      "timingGuidance": "Временные подсказки",
+      "aiInsights": "ИИ-анализ",
+      "thisYear": "В этом году",
+      "nextYear": "В следующем году",
+      "noPredictions": "Прогнозы не сформированы. Попробуйте обновить.",
+      "almostThere": "Почти готово..."
+    },
+    "monthlyAccordion": {
+      "focus": "ФОКУС:",
+      "possibleScenarios": "Возможные сценарии ({{count}})",
+      "askQuestions": "Задать вопросы",
+      "diveDeep": "Подробнее об этом месяце",
+      "why": "Почему:"
+    },
+    "monthlyDeepScreen": {
+      "loading": "Загрузка...",
+      "headerDeepDive": "{{monthYear}} — Глубокий разбор",
+      "headerMonthlyDeepDive": "Месячный глубокий разбор",
+      "emptyTitle": "Глубокий разбор {{monthYear}}",
+      "emptyDesc": "Каждый триггер и все возможные проявления этого месяца. Стоимость {{cost}} кредитов.",
+      "generateDeepDive": "Создать глубокий разбор",
+      "generateConfirmTitle": "Создать глубокий разбор",
+      "generateConfirmMessage": "Это будет стоить {{cost}} кредитов для всех проявлений {{monthYear}}.",
+      "cancel": "Отмена",
+      "continue": "Продолжить",
+      "loadingAnalyzing": "Глубокий анализ этого месяца...",
+      "loadingMapping": "Отображение каждого триггера и проявления...",
+      "loadingExamining": "Проверка всех активаций..."
     },
     "birthForm": {
       "headerTitle": {

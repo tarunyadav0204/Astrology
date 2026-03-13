@@ -252,8 +252,8 @@
         "description": "जागतिक घटना, शेअर बाजार, राजकारण आणि आर्थिक कल यांचे विश्लेषण करा"
       },
       "events": {
-        "title": "निकालांची टाइमलाइन",
-        "description": "मासिक विश्लेषण आणि प्रमुख टप्प्यांसह AI-आधारित वार्षिक भाकीत"
+        "title": "काय प्रकट होईल",
+        "description": "वर्ष काय आणते ते पहा — करिअर, प्रेम, पैसा, आरोग्य — महिन्यामहिन्याने."
       }
     },
     "analysis": {
@@ -425,11 +425,54 @@
     "tabs": {
       "ask": "विचारा",
       "charts": "कुंडल्या",
-      "events": "घटना",
+      "events": "भविष्यवाण्या",
       "dashas": "दशा",
       "you": "तुम्ही"
     },
     "askFAB": "AstroRoshni ला विचारा"
+  },
+  "eventScreen": {
+    "headerTitle": "मुख्य जीवन घटना",
+    "headerPredictions": "{{year}} भविष्यवाण्या",
+    "monthlyGuide": "मासिक मार्गदर्शन",
+    "selectYear": "तुमचे वर्ष निवडा",
+    "selectYearSubtitle": "तुम्हाला कोणते वर्ष अन्वेषण करायचे आहे?",
+    "continue": "सुरू ठेवा",
+    "regenerateTitle": "भविष्यवाण्या पुन्हा तयार करायच्या?",
+    "regenerateMessage": "{{year}} साठी नवीन भविष्यवाण्या तयार करण्यासाठी {{cost}} क्रेडिट लागतील.",
+    "cancel": "रद्द करा",
+    "confirm": "पुष्टी करा",
+    "whatsIncluded": "काय समाविष्ट आहे:",
+    "monthlyForecasts": "12 मासिक अंदाज",
+    "majorLifeEvents": "मुख्य जीवन घटना",
+    "timingGuidance": "वेळ मार्गदर्शन",
+    "aiInsights": "AI-चालित अंतर्दृष्टी",
+    "thisYear": "हे वर्ष",
+    "nextYear": "पुढचे वर्ष",
+    "noPredictions": "भविष्यवाण्या तयार झाल्या नाहीत. कृपया पुन्हा प्रयत्न करा.",
+    "almostThere": "जवळपास पूर्ण..."
+  },
+  "monthlyAccordion": {
+    "focus": "फोकस:",
+    "possibleScenarios": "शक्य परिस्थिती ({{count}})",
+    "askQuestions": "प्रश्न विचारा",
+    "diveDeep": "या महिन्यात खोलवर जा",
+    "why": "का:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "लोड होत आहे...",
+    "headerDeepDive": "{{monthYear}} — खोल डाइव्ह",
+    "headerMonthlyDeepDive": "मासिक खोल डाइव्ह",
+    "emptyTitle": "{{monthYear}} मध्ये खोलवर जा",
+    "emptyDesc": "या महिन्याची प्रत्येक ट्रिगर आणि सर्व शक्य अभिव्यक्ती मिळवा. {{cost}} क्रेडिट वापरते.",
+    "generateDeepDive": "खोल डाइव्ह तयार करा",
+    "generateConfirmTitle": "खोल डाइव्ह तयार करा",
+    "generateConfirmMessage": "{{monthYear}} साठी सर्व अभिव्यक्ती तयार करण्यासाठी {{cost}} क्रेडिट लागतील.",
+    "cancel": "रद्द करा",
+    "continue": "सुरू ठेवा",
+    "loadingAnalyzing": "या महिन्याचे खोलवर विश्लेषण होत आहे...",
+    "loadingMapping": "प्रत्येक ट्रिगर आणि अभिव्यक्ती मॅप होत आहे...",
+    "loadingExamining": "सर्व घर सक्रियकरण तपासले जात आहे..."
   },
   "birthForm": {
     "headerTitle": {

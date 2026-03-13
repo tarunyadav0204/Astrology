@@ -254,8 +254,8 @@
         "description": "Analyze world events, stock markets, politics, and economic trends"
       },
       "events": {
-        "title": "Event Timeline",
-        "description": "AI-powered yearly predictions with monthly breakdowns and major milestones"
+        "title": "What Will Manifest",
+        "description": "See what the year holds — career, love, money, health — month by month."
       }
     },
     "analysis": {
@@ -427,11 +427,59 @@
     "tabs": {
       "ask": "Ask",
       "charts": "Charts",
-      "events": "Events",
+      "events": "Predictions",
       "dashas": "Dashas",
       "you": "You"
     },
     "askFAB": "Ask AstroRoshni"
+  },
+  "eventScreen": {
+    "headerTitle": "Major Life Events",
+    "headerPredictions": "{{year}} Predictions",
+    "monthlyGuide": "Monthly Guide",
+    "selectYear": "Select Your Year",
+    "selectYearSubtitle": "Which year would you like to explore?",
+    "continue": "Continue",
+    "regenerateTitle": "Regenerate Predictions?",
+    "regenerateMessage": "This will cost {{cost}} credits to generate fresh predictions for {{year}}.",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "whatsIncluded": "What's Included:",
+    "monthlyForecasts": "12 Monthly Forecasts",
+    "majorLifeEvents": "Major Life Events",
+    "timingGuidance": "Timing Guidance",
+    "aiInsights": "AI-Powered Insights",
+    "thisYear": "This Year",
+    "nextYear": "Next Year",
+    "noPredictions": "No predictions generated. Please try regenerating.",
+    "almostThere": "Almost there..."
+  },
+  "monthlyAccordion": {
+    "focus": "FOCUS:",
+    "possibleScenarios": "Possible Scenarios ({{count}})",
+    "askQuestions": "Ask Questions",
+    "diveDeep": "Dive deep into this month",
+    "why": "Why:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "Loading...",
+    "headerDeepDive": "{{monthYear}} — Deep dive",
+    "headerMonthlyDeepDive": "Monthly deep dive",
+    "emptyTitle": "Deep dive into {{monthYear}}",
+    "emptyDesc": "Get every trigger and all possible manifestations for this month. Uses {{cost}} credits.",
+    "generateDeepDive": "Generate deep dive",
+    "generateConfirmTitle": "Generate deep dive",
+    "generateConfirmMessage": "This will cost {{cost}} credits to generate all manifestations for {{monthYear}}.",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "loadingAnalyzing": "Analyzing this month in depth...",
+    "loadingMapping": "Mapping every trigger and manifestation...",
+    "loadingExamining": "Examining all house activations..."
+  },
+  "credits": {
+    "eventTimeline": {
+      "description": "We will deeply analyze all your divisional charts using Parashari, Nadi, and Jaimini methods, and map all high‑probability events that may manifest over this period."
+    }
   },
   "birthForm": {
     "headerTitle": {

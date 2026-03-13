@@ -243,8 +243,8 @@
         "description": "विश्व घटनाओं, शेयर बाजारों, राजनीति और आर्थिक रुझानों का विश्लेषण करें"
       },
       "events": {
-        "title": "घटना समयरेखा",
-        "description": "मासिक विवरण और प्रमुख मील के पत्थर के साथ AI-संचालित वार्षिक भविष्यवाणियां"
+        "title": "क्या प्रकट होगा",
+        "description": "देखें साल क्या लेकर आएगा — करियर, प्यार, पैसा, सेहत — महीने दर महीने।"
       }
     },
     "analysis": {
@@ -411,11 +411,54 @@
     "tabs": {
       "ask": "पूछें",
       "charts": "चार्ट",
-      "events": "घटनाएं",
+      "events": "भविष्यवाणियां",
       "dashas": "दशा",
       "you": "आप"
     },
     "askFAB": "एस्ट्रोरोशनी से पूछें"
+  },
+  "eventScreen": {
+    "headerTitle": "प्रमुख जीवन घटनाएं",
+    "headerPredictions": "{{year}} भविष्यवाणियां",
+    "monthlyGuide": "मासिक मार्गदर्शन",
+    "selectYear": "अपना वर्ष चुनें",
+    "selectYearSubtitle": "आप कौन सा वर्ष देखना चाहेंगे?",
+    "continue": "जारी रखें",
+    "regenerateTitle": "भविष्यवाणियां फिर से बनाएं?",
+    "regenerateMessage": "{{year}} के लिए ताज़ा भविष्यवाणियां बनाने में {{cost}} क्रेडिट लगेंगे।",
+    "cancel": "रद्द करें",
+    "confirm": "पुष्टि करें",
+    "whatsIncluded": "क्या शामिल है:",
+    "monthlyForecasts": "12 मासिक पूर्वानुमान",
+    "majorLifeEvents": "प्रमुख जीवन घटनाएं",
+    "timingGuidance": "समय मार्गदर्शन",
+    "aiInsights": "AI-संचालित अंतर्दृष्टि",
+    "thisYear": "इस साल",
+    "nextYear": "अगला साल",
+    "noPredictions": "कोई भविष्यवाणी नहीं बनी। कृपया फिर से बनाएं।",
+    "almostThere": "लगभग हो गया..."
+  },
+  "monthlyAccordion": {
+    "focus": "फोकस:",
+    "possibleScenarios": "संभावित परिदृश्य ({{count}})",
+    "askQuestions": "प्रश्न पूछें",
+    "diveDeep": "इस महीने में गहराई से जाएं",
+    "why": "क्यों:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "लोड हो रहा है...",
+    "headerDeepDive": "{{monthYear}} — गहन विश्लेषण",
+    "headerMonthlyDeepDive": "मासिक गहन विश्लेषण",
+    "emptyTitle": "{{monthYear}} में गहराई से जाएं",
+    "emptyDesc": "इस महीने के हर ट्रिगर और सभी संभावित अभिव्यक्तियां पाएं। {{cost}} क्रेडिट लगते हैं।",
+    "generateDeepDive": "गहन विश्लेषण बनाएं",
+    "generateConfirmTitle": "गहन विश्लेषण बनाएं",
+    "generateConfirmMessage": "{{monthYear}} की सभी अभिव्यक्तियां बनाने में {{cost}} क्रेडिट लगेंगे।",
+    "cancel": "रद्द करें",
+    "continue": "जारी रखें",
+    "loadingAnalyzing": "इस महीने का गहन विश्लेषण हो रहा है...",
+    "loadingMapping": "हर ट्रिगर और अभिव्यक्ति मैप हो रही है...",
+    "loadingExamining": "सभी घर सक्रियताएं जांची जा रही हैं..."
   },
   "common": {
     "current": "वर्तमान",

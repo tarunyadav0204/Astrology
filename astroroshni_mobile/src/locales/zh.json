@@ -252,8 +252,8 @@
           "description": "分析世界事件、股市、政治和经济趋势"
         },
         "events": {
-          "title": "事件时间线",
-          "description": "基于 AI 的年度预测，包含月度明细和重大里程碑"
+          "title": "将显现什么",
+          "description": "看看这一年会带来什么 — 事业、感情、财运、健康 — 逐月呈现。"
         }
       },
       "analysis": {
@@ -425,11 +425,54 @@
       "tabs": {
         "ask": "提问",
         "charts": "星盘",
-        "events": "事件",
+        "events": "预测",
         "dashas": "大运",
         "you": "我的"
       },
       "askFAB": "咨询 AstroRoshni"
+    },
+    "eventScreen": {
+      "headerTitle": "重大人生事件",
+      "headerPredictions": "{{year}} 预测",
+      "monthlyGuide": "月度指南",
+      "selectYear": "选择年份",
+      "selectYearSubtitle": "你想查看哪一年？",
+      "continue": "继续",
+      "regenerateTitle": "重新生成预测？",
+      "regenerateMessage": "为 {{year}} 生成新预测将消耗 {{cost}} 积分。",
+      "cancel": "取消",
+      "confirm": "确认",
+      "whatsIncluded": "包含内容：",
+      "monthlyForecasts": "12 个月度预测",
+      "majorLifeEvents": "重大人生事件",
+      "timingGuidance": "时间指引",
+      "aiInsights": "AI 洞察",
+      "thisYear": "今年",
+      "nextYear": "明年",
+      "noPredictions": "未生成预测。请重试。",
+      "almostThere": "快好了..."
+    },
+    "monthlyAccordion": {
+      "focus": "重点：",
+      "possibleScenarios": "可能情景 ({{count}})",
+      "askQuestions": "提问",
+      "diveDeep": "深入本月",
+      "why": "原因："
+    },
+    "monthlyDeepScreen": {
+      "loading": "加载中...",
+      "headerDeepDive": "{{monthYear}} — 深度解析",
+      "headerMonthlyDeepDive": "月度深度解析",
+      "emptyTitle": "深入 {{monthYear}}",
+      "emptyDesc": "获取本月每个触发因素与所有可能表现。消耗 {{cost}} 积分。",
+      "generateDeepDive": "生成深度解析",
+      "generateConfirmTitle": "生成深度解析",
+      "generateConfirmMessage": "为 {{monthYear}} 生成全部表现将消耗 {{cost}} 积分。",
+      "cancel": "取消",
+      "continue": "继续",
+      "loadingAnalyzing": "正在深度分析本月...",
+      "loadingMapping": "正在映射每个触发与表现...",
+      "loadingExamining": "正在检查所有宫位激活..."
     },
     "birthForm": {
       "headerTitle": {
