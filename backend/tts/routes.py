@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import base64
+import os
 import re
 import html
 from google.cloud import texttospeech
@@ -15,9 +16,15 @@ from credits.routes import _get_play_credentials
 from tts.podcast_narrator import generate_podcast_script
 from tts.podcast_cache import get_cached_audio, put_cached_audio
 from activity.publisher import publish_activity
+from utils.env_json import parse_json_from_env
 
 credit_service = CreditService()
 
+# TTS credential order: (1) GOOGLE_TTS_SERVICE_ACCOUNT_JSON if set, else (2) GOOGLE_SERVICE_ACCOUNT_KEY
+# (inline JSON from tradebest where billing is enabled), else (3) Play credentials. This way the same
+# key you use as GOOGLE_SERVICE_ACCOUNT_KEY (tradebest) can drive TTS without a separate env var.
+TTS_CREDENTIALS_ENV = "GOOGLE_TTS_SERVICE_ACCOUNT_JSON"
+TTS_CREDENTIALS_ENV_ALT = "GOOGLE_SERVICE_ACCOUNT_KEY"
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["tts"])
@@ -198,24 +205,52 @@ async def _synthesize_ssml(client, voice, audio_config, ssml: str) -> bytes:
   return response.audio_content
 
 
+def _get_tts_credentials_only():
+  """
+  Load credentials from GOOGLE_TTS_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY (inline JSON
+  or file path). Used for TTS so it can use the tradebest key and billing project. Returns None if not set.
+  """
+  raw = os.environ.get(TTS_CREDENTIALS_ENV) or os.environ.get(TTS_CREDENTIALS_ENV_ALT)
+  if not raw or not str(raw).strip():
+    return None
+  raw = str(raw).strip()
+  from google.oauth2 import service_account
+  scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+  # Inline JSON (e.g. GOOGLE_SERVICE_ACCOUNT_KEY with full JSON)
+  info = parse_json_from_env(raw)
+  if info and isinstance(info, dict):
+    try:
+      return service_account.Credentials.from_service_account_info(info, scopes=scopes)
+    except (ValueError, TypeError):
+      return None
+  if os.path.isfile(raw):
+    try:
+      return service_account.Credentials.from_service_account_file(raw, scopes=scopes)
+    except Exception:
+      return None
+  return None
+
+
 def _get_google_credentials():
   """
-  Reuse Google Play service account credentials and extend scopes for Cloud TTS.
+  Use for TTS: (1) GOOGLE_TTS_SERVICE_ACCOUNT_JSON, or (2) GOOGLE_SERVICE_ACCOUNT_KEY (e.g. tradebest
+  JSON so billing is on the right project), else (3) Play credentials with cloud scope.
   """
   try:
+    tts_creds = _get_tts_credentials_only()
+    if tts_creds is not None:
+      return tts_creds
     base_creds = _get_play_credentials()
     if not base_creds:
-      logger.error("TTS: Google credentials not available (GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY missing)")
+      logger.error("TTS: Google credentials not available (set GOOGLE_SERVICE_ACCOUNT_KEY or GOOGLE_PLAY_SERVICE_ACCOUNT_JSON)")
       raise HTTPException(
         status_code=503,
-        detail="Google service account credentials not available (GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY).",
+        detail="Google service account credentials not available (GOOGLE_SERVICE_ACCOUNT_KEY or GOOGLE_PLAY_SERVICE_ACCOUNT_JSON).",
       )
-    # Add Cloud Text-to-Speech / Cloud Platform scope
     return base_creds.with_scopes(
       ["https://www.googleapis.com/auth/cloud-platform"]
     )
   except HTTPException:
-    # Already logged / detailed
     raise
   except Exception as e:
     logger.exception("TTS: Failed to build Google credentials")
