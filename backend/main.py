@@ -940,16 +940,16 @@ async def register(user_data: UserCreate):
     
     conn.commit()
     conn.close()
-    
-    access_token = create_access_token(data={"sub": user_data.phone})
-    
+
+    access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
-            "userid": user[0], 
-            "name": user[1], 
-            "phone": user[2], 
+            "userid": user[0],
+            "name": user[1],
+            "phone": user[2],
             "role": user[3],
             "email": user[4] if len(user) > 4 else None
         },
@@ -1039,16 +1039,16 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
     
     conn.commit()
     conn.close()
-    
-    access_token = create_access_token(data={"sub": user_data.phone})
-    
+
+    access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
-            "userid": user[0], 
-            "name": user[1], 
-            "phone": user[2], 
+            "userid": user[0],
+            "name": user[1],
+            "phone": user[2],
             "role": user[3],
             "email": user[4] if len(user) > 4 else None
         },
@@ -1238,16 +1238,15 @@ async def login(user_data: UserLogin):
                 'created_at': self_birth_chart[10]
             }
 
-        
-        access_token = create_access_token(data={"sub": user_data.phone})
-        
+        access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
             "user": {
-                "userid": user[0], 
-                "name": user[1], 
-                "phone": user[2], 
+                "userid": user[0],
+                "name": user[1],
+                "phone": user[2],
                 "role": user[4],
                 "email": user[5] if len(user) > 5 else None,
                 "subscriptions": user_subscriptions

@@ -33,6 +33,7 @@ Do these in order. Start with **Step 1 (BigQuery)**.
 event_id:STRING,
 user_id:INTEGER,
 user_phone:STRING,
+user_name:STRING,
 action:STRING,
 path:STRING,
 method:STRING,

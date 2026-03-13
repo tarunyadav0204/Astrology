@@ -389,6 +389,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       "podcast_generated",
       user_id=current_user.userid,
       user_phone=current_user.phone,
+      user_name=current_user.name,
       resource_type="message",
       resource_id=message_id,
       metadata={"cached": False},

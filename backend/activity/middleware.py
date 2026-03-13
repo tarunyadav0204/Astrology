@@ -17,22 +17,32 @@ logger = logging.getLogger(__name__)
 SKIP_PATHS = frozenset({"/", "/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"})
 
 
-def _get_user_phone_from_request(request: Request) -> str | None:
-    """Extract phone (JWT 'sub') from Authorization header without DB. Returns None if missing/invalid."""
+def _get_user_from_request(request: Request) -> tuple[str | None, int | None, str | None]:
+    """Extract phone (JWT 'sub'), userid (JWT 'userid'), and name (JWT 'name') from Authorization header. Returns (phone, user_id, name)."""
     auth = request.headers.get("Authorization")
     if not auth or not auth.startswith("Bearer "):
-        return None
+        return None, None, None
     token = auth[7:].strip()
     if not token:
-        return None
+        return None, None, None
     try:
         secret = os.getenv("JWT_SECRET")
         if not secret:
-            return None
+            return None, None, None
         payload = jwt.decode(token, secret, algorithms=["HS256"])
-        return payload.get("sub")
+        phone = payload.get("sub")
+        user_id = payload.get("userid")
+        if user_id is not None and not isinstance(user_id, int):
+            try:
+                user_id = int(user_id)
+            except (TypeError, ValueError):
+                user_id = None
+        name = payload.get("name")
+        if name is not None:
+            name = str(name).strip() or None
+        return phone, user_id, name
     except Exception:
-        return None
+        return None, None, None
 
 
 class ActivityMiddleware(BaseHTTPMiddleware):
@@ -45,7 +55,7 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         if path in SKIP_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
             return response
 
-        user_phone = _get_user_phone_from_request(request)
+        user_phone, user_id, user_name = _get_user_from_request(request)
         try:
             # Fire-and-forget: run in executor so we don't block
             import asyncio
@@ -58,6 +68,8 @@ class ActivityMiddleware(BaseHTTPMiddleware):
                 response.status_code,
                 duration_ms,
                 user_phone,
+                user_id,
+                user_name,
                 request.client.host if request.client else None,
                 request.headers.get("user-agent"),
             )
@@ -67,14 +79,16 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _publish_api_request(path, method, status_code, duration_ms, user_phone, ip, user_agent):
+def _publish_api_request(path, method, status_code, duration_ms, user_phone, user_id, user_name, ip, user_agent):
     publish_activity(
         "api_request",
         path=path,
         method=method,
         status_code=status_code,
         duration_ms=duration_ms,
+        user_id=user_id,
         user_phone=user_phone,
+        user_name=user_name,
         ip=ip,
         user_agent=user_agent,
     )

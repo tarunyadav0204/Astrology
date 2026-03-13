@@ -124,6 +124,7 @@ def publish_activity(
     *,
     user_id: Optional[int] = None,
     user_phone: Optional[str] = None,
+    user_name: Optional[str] = None,
     path: Optional[str] = None,
     method: Optional[str] = None,
     status_code: Optional[int] = None,
@@ -146,6 +147,8 @@ def publish_activity(
         payload["user_id"] = user_id
     if user_phone is not None:
         payload["user_phone"] = str(user_phone)
+    if user_name is not None:
+        payload["user_name"] = (str(user_name)[:200] if len(str(user_name)) > 200 else str(user_name))
     if path is not None:
         payload["path"] = path
     if method is not None:

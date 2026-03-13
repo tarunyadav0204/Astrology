@@ -50,6 +50,7 @@ def _row_from_payload(msg_id: str, payload: dict) -> dict:
         "event_id": msg_id,
         "user_id": payload.get("user_id"),
         "user_phone": payload.get("user_phone"),
+        "user_name": payload.get("user_name"),
         "action": payload.get("action") or "unknown",
         "path": payload.get("path"),
         "method": payload.get("method"),

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `PROJECT_ID.DATASET_ID.user_activity` (
   event_id STRING OPTIONS(description = "Unique event id (e.g. from Pub/Sub messageId)"),
   user_id INT64 OPTIONS(description = "User id from app DB when available"),
   user_phone STRING OPTIONS(description = "Phone from JWT sub when user_id not set"),
+  user_name STRING OPTIONS(description = "User display name from JWT or current_user"),
   action STRING NOT NULL OPTIONS(description = "e.g. api_request, podcast_generated, credits_purchased"),
   path STRING OPTIONS(description = "API path for api_request"),
   method STRING OPTIONS(description = "HTTP method"),

@@ -506,6 +506,7 @@ async def verify_google_play_purchase(
         "credits_purchased",
         user_id=current_user.userid,
         user_phone=current_user.phone,
+        user_name=current_user.name,
         resource_type="order",
         resource_id=order_id,
         metadata={"credits_added": amount, "product_id": product_id},
