@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 
 const AdminTerms = () => {
   const [terms, setTerms] = useState([]);
@@ -19,8 +20,6 @@ const AdminTerms = () => {
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
 
-  const token = localStorage.getItem('token');
-
   const fetchTerms = async (pageToLoad = page, currentSearch = search) => {
     setLoading(true);
     try {
@@ -32,9 +31,7 @@ const AdminTerms = () => {
         params.append('search', currentSearch.trim());
       }
       const res = await fetch(`/api/admin/terms?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
       const data = await res.json();
       setTerms(data.terms || []);
@@ -72,7 +69,7 @@ const AdminTerms = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify(body),
       });
@@ -129,7 +126,7 @@ const AdminTerms = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify(body),
       });
@@ -152,7 +149,7 @@ const AdminTerms = () => {
       const res = await fetch(`/api/admin/terms/${encodeURIComponent(term_id)}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...getAdminAuthHeaders(),
         },
       });
       if (!res.ok) {

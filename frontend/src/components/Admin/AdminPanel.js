@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminService } from '../../services/adminService';
+import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
@@ -85,6 +85,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
+  const [allowedDevices, setAllowedDevices] = useState([]);
+  const [allowedDevicesLoading, setAllowedDevicesLoading] = useState(false);
+  const [newAllowedDeviceId, setNewAllowedDeviceId] = useState('');
+  const [newAllowedDeviceLabel, setNewAllowedDeviceLabel] = useState('');
   const [blogPosts, setBlogPosts] = useState([]);
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
@@ -111,12 +115,36 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [redditCollectResult, setRedditCollectResult] = useState(null);
   const [redditEditingId, setRedditEditingId] = useState(null);
   const [redditEditMarkdown, setRedditEditMarkdown] = useState('');
+  const [deviceAccessStatus, setDeviceAccessStatus] = useState('pending'); // 'pending' | 'allowed' | 'blocked'
+  const [blockedDeviceId, setBlockedDeviceId] = useState(null);
+
+  const checkDeviceAccess = React.useCallback(async () => {
+    setDeviceAccessStatus('pending');
+    try {
+      const res = await fetch('/api/admin/allowed-devices', { headers: getAdminAuthHeaders() });
+      if (res.status === 403) {
+        const body = await res.json().catch(() => ({}));
+        if (body.detail === 'Device not allowed') {
+          setDeviceAccessStatus('blocked');
+          setBlockedDeviceId(body.device_id ?? getDeviceId());
+          return;
+        }
+      }
+      setDeviceAccessStatus('allowed');
+    } catch {
+      setDeviceAccessStatus('allowed');
+    }
+  }, []);
+
+  useEffect(() => {
+    checkDeviceAccess();
+  }, [checkDeviceAccess]);
 
   const fetchRedditDrafts = async () => {
     setRedditDraftsLoading(true);
     try {
       const res = await fetch('/api/admin/reddit/answers/drafts?limit=50', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       const data = await res.json();
       setRedditDrafts(data.drafts || []);
@@ -134,7 +162,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     try {
       const res = await fetch('/api/admin/reddit/collect?days_back=7&limit_per_sub=100', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok) {
@@ -156,7 +184,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify({ edited_markdown: editedMarkdown }),
       });
@@ -177,7 +205,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     try {
       const res = await fetch(`/api/admin/reddit/answers/${answerId}/reject`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       if (res.ok) {
         setRedditEditingId(null);
@@ -213,6 +241,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       // Credit ledger will be loaded by AdminCreditLedger component
     } else if (activeTab === 'settings') {
       fetchAdminSettings();
+      fetchAllowedDevices();
     } else if (activeTab === 'reddit') {
       fetchRedditDrafts();
     } else if (activeTab === 'notifications') {
@@ -222,10 +251,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   }, [activeTab, activeSubTab]);
 
+  const fetchAllowedDevices = async () => {
+    setAllowedDevicesLoading(true);
+    try {
+      const data = await adminService.getAllowedDevices();
+      setAllowedDevices(data.devices || []);
+    } catch (e) {
+      console.error('Failed to fetch allowed devices', e);
+      setAllowedDevices([]);
+    } finally {
+      setAllowedDevicesLoading(false);
+    }
+  };
+
   const fetchAdminSettings = async () => {
     try {
       const response = await fetch('/api/admin/settings', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders()
       });
       const data = await response.json();
       setAdminSettings(data.settings || []);
@@ -247,9 +289,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchBlogPosts = async () => {
     try {
       const response = await fetch('/api/blog/posts?status=published&limit=100', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
       if (!response.ok) {
         console.error('Failed to fetch blog posts for notifications:', response.status);
@@ -269,14 +309,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const handleSaveGeminiModels = async () => {
     setGeminiModelsSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
       const [chatRes, premiumRes, analysisRes] = await Promise.all([
         fetch('/api/admin/settings/gemini_chat_model', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers,
           body: JSON.stringify({
             key: 'gemini_chat_model',
             value: geminiChatModel,
@@ -285,10 +322,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         }),
         fetch('/api/admin/settings/gemini_premium_model', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers,
           body: JSON.stringify({
             key: 'gemini_premium_model',
             value: geminiPremiumModel,
@@ -297,10 +331,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         }),
         fetch('/api/admin/settings/gemini_analysis_model', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers,
           body: JSON.stringify({
             key: 'gemini_analysis_model',
             value: geminiAnalysisModel,
@@ -332,7 +363,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify({
           key: 'debug_logging_enabled',
@@ -350,7 +381,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
 
   const handleSaveAppVersionConfig = async () => {
-    const token = localStorage.getItem('token');
     const androidValue = androidMinVersion?.toString().trim();
     const iosValue = iosMinVersion?.toString().trim();
 
@@ -377,7 +407,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
+              ...getAdminAuthHeaders(),
             },
             body: JSON.stringify(p),
           })
@@ -455,7 +485,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchNotifUserIdsWithTokens = async () => {
     try {
       const tokenRes = await fetch('/api/nudge/admin/user-ids-with-tokens', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       if (tokenRes.ok) {
         const tokenData = await tokenRes.json();
@@ -472,7 +502,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setFactsLoading(true);
     try {
       const response = await fetch(`/api/admin/facts?search=${factsSearch}&page=${factsPage}&limit=20`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders()
       });
       const data = await response.json();
       setUserFacts(data.facts || []);
@@ -591,7 +621,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchPromoCodes = async () => {
     try {
       const response = await fetch('/api/credits/admin/promo-codes', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders()
       });
       const data = await response.json();
       setPromoCodes(data.promo_codes || []);
@@ -603,7 +633,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchCreditStats = async () => {
     try {
       const response = await fetch('/api/credits/admin/stats', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders()
       });
       const data = await response.json();
       setCreditStats(data);
@@ -618,7 +648,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify(newPromoCode)
       });
@@ -644,7 +674,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            ...getAdminAuthHeaders()
           },
           body: JSON.stringify({ prefix, count, credits, max_uses: 1, max_uses_per_user: 1 })
         });
@@ -664,7 +694,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchCreditSettings = async () => {
     try {
       const response = await fetch('/api/credits/admin/settings', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders()
       });
       const data = await response.json();
       setCreditSettings(data.settings || []);
@@ -679,7 +709,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify({ settings: creditSettings })
       });
@@ -734,7 +764,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify(updates)
       });
@@ -776,7 +806,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify({ code: code })
       });
@@ -818,7 +848,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            ...getAdminAuthHeaders(),
           },
           body: JSON.stringify({
             user_id: userId,
@@ -880,7 +910,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify({
           blog_id: blogId,
@@ -919,7 +949,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchCreditRequests = async () => {
     try {
       const response = await fetch('/api/credits/requests/all', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders()
       });
       const data = await response.json();
       setCreditRequests(data.requests || []);
@@ -934,7 +964,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify({
           request_id: requestId,
@@ -971,7 +1001,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAdminAuthHeaders()
         },
         body: JSON.stringify({
           request_id: requestId,
@@ -1005,7 +1035,48 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         onHomeClick={handleHomeClick}
       />
       <div className="admin-content-wrapper">
-
+      {deviceAccessStatus === 'pending' && (
+        <div className="admin-device-check">
+          <p>Checking access…</p>
+        </div>
+      )}
+      {deviceAccessStatus === 'blocked' && (
+        <div className="admin-device-blocked">
+          <h2>Admin access restricted</h2>
+          <p>This device is not registered for your admin account. Register it to continue, or add it manually from another approved device.</p>
+          <p className="admin-device-blocked-id">
+            <strong>Your device ID:</strong>{' '}
+            <code>{blockedDeviceId || getDeviceId()}</code>
+            <button
+              type="button"
+              className="copy-device-id-btn"
+              onClick={() => {
+                const id = blockedDeviceId || getDeviceId();
+                navigator.clipboard?.writeText(id).then(() => alert('Device ID copied to clipboard.')).catch(() => alert('Copy failed.'));
+              }}
+            >
+              Copy
+            </button>
+          </p>
+          <button
+            type="button"
+            className="register-this-device-btn"
+            onClick={async () => {
+              try {
+                await adminService.registerThisDevice();
+                await checkDeviceAccess();
+              } catch (e) {
+                alert(e.message || 'Failed to register device');
+              }
+            }}
+          >
+            Register this device
+          </button>
+          <p className="admin-device-blocked-hint">Or send the device ID to another admin to add it for you (Settings → Admin device allowlist).</p>
+        </div>
+      )}
+      {deviceAccessStatus === 'allowed' && (
+      <>
       <div className="admin-tabs">
         <button 
           className={`tab ${activeTab === 'users' ? 'active' : ''}`}
@@ -2667,9 +2738,121 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </button>
               </div>
             </div>
+
+            <div className="settings-section">
+              <h3>Admin device allowlist</h3>
+              <p className="settings-hint">
+                Devices are bound to your account: only you can use devices you register. Add this device with one click, or add another device&apos;s ID manually (e.g. from another browser). Empty list = any device allowed (bootstrap).
+              </p>
+              <p className="allowed-device-id">
+                <strong>This device ID:</strong> <code>{getDeviceId()}</code>
+                <button
+                  type="button"
+                  className="register-this-device-btn small"
+                  style={{ marginLeft: '12px' }}
+                  onClick={async () => {
+                    try {
+                      await adminService.registerThisDevice();
+                      await fetchAllowedDevices();
+                    } catch (e) {
+                      alert(e.message || 'Failed to register');
+                    }
+                  }}
+                >
+                  Register this device
+                </button>
+              </p>
+              {allowedDevicesLoading ? (
+                <p>Loading…</p>
+              ) : (
+                <>
+                  <table className="allowed-devices-table">
+                    <thead>
+                      <tr>
+                        <th>Device ID</th>
+                        <th>Label</th>
+                        <th>Added</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allowedDevices.length === 0 ? (
+                        <tr><td colSpan={4}>No devices in allowlist. Add one below or via DB.</td></tr>
+                      ) : (
+                        allowedDevices.map((d) => (
+                          <tr key={d.id}>
+                            <td><code className="device-id-cell">{d.device_id}</code></td>
+                            <td>{d.label || '—'}</td>
+                            <td>{d.created_at || '—'}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="delete-btn small"
+                                onClick={async () => {
+                                  try {
+                                    await adminService.removeAllowedDeviceById(d.id);
+                                    await fetchAllowedDevices();
+                                  } catch (e) {
+                                    alert(e.message || 'Failed to remove');
+                                  }
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                  <div className="allowed-devices-add">
+                    <label>
+                      <span>Add device ID (manual):</span>
+                      <input
+                        type="text"
+                        value={newAllowedDeviceId}
+                        onChange={(e) => setNewAllowedDeviceId(e.target.value)}
+                        placeholder="e.g. web-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        style={{ width: '320px', marginLeft: '8px' }}
+                      />
+                    </label>
+                    <label style={{ marginLeft: '12px' }}>
+                      <span>Label (optional):</span>
+                      <input
+                        type="text"
+                        value={newAllowedDeviceLabel}
+                        onChange={(e) => setNewAllowedDeviceLabel(e.target.value)}
+                        placeholder="e.g. Office laptop"
+                        style={{ width: '140px', marginLeft: '8px' }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      style={{ marginLeft: '12px' }}
+                      disabled={!newAllowedDeviceId.trim()}
+                      onClick={async () => {
+                        try {
+                          await adminService.addAllowedDevice(newAllowedDeviceId.trim(), newAllowedDeviceLabel.trim() || undefined);
+                          setNewAllowedDeviceId('');
+                          setNewAllowedDeviceLabel('');
+                          await fetchAllowedDevices();
+                        } catch (e) {
+                          alert(e.message || 'Failed to add device');
+                        }
+                      }}
+                    >
+                      Add device
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
+      </>
+      )}
       </div>
       
       {showApprovalModal && selectedRequest && (

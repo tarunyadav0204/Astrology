@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './ChatErrors.css';
 
 const ChatErrors = () => {
@@ -16,9 +17,7 @@ const ChatErrors = () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/admin/chat-errors?limit=100&source=${sourceFilter}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: getAdminAuthHeaders(),
       });
       const data = await response.json();
       console.log('Chat errors API response:', data);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminChatHistory.css';
 
 const AdminChatHistory = () => {
@@ -15,12 +16,8 @@ const AdminChatHistory = () => {
   const fetchAllChatHistory = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/admin/chat/all-history', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
       });
       
       if (response.ok) {
@@ -37,12 +34,8 @@ const AdminChatHistory = () => {
   const fetchUserChatHistory = async (userId) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/admin/chat/history/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(`/api/admin/chat/history/${userId}`, {
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
       });
       
       if (response.ok) {
@@ -60,12 +53,8 @@ const AdminChatHistory = () => {
 
   const fetchSessionDetails = async (sessionId) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/chat/session/${sessionId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
       });
       
       if (response.ok) {

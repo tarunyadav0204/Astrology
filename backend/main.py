@@ -56,6 +56,22 @@ try:
 except Exception as _e:
     _activity_admin_available = False
     activity_admin_router = None
+try:
+    from admin_device import (
+        ensure_table as ensure_admin_device_table,
+        AdminDeviceMiddleware,
+        list_allowed_devices,
+        add_allowed_device,
+        remove_allowed_device,
+        remove_allowed_device_by_id,
+        register_this_device,
+    )
+    ensure_admin_device_table()
+    _admin_device_middleware_available = True
+except Exception as _e:
+    _admin_device_middleware_available = False
+    AdminDeviceMiddleware = None
+    list_allowed_devices = add_allowed_device = remove_allowed_device = remove_allowed_device_by_id = register_this_device = None
 from credits.routes import router as credits_router
 from tts.routes import router as tts_router
 from credits.credit_request_routes import router as credit_request_router
@@ -292,6 +308,8 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
 if _activity_middleware_available:
     app.add_middleware(ActivityMiddleware)
+if _admin_device_middleware_available and AdminDeviceMiddleware is not None:
+    app.add_middleware(AdminDeviceMiddleware)
 
 # CORS configuration for multiple domains
 allowed_origins = [
@@ -3919,6 +3937,71 @@ async def update_admin_subscription_plan(plan_id: int, body: dict, current_user:
         conn.close()
     
     return {"message": "Subscription plan updated", "plan_id": plan_id}
+
+# ----- Admin allowed devices (device allowlist for admin access) -----
+@app.get("/api/admin/allowed-devices")
+async def get_admin_allowed_devices(current_user: User = Depends(get_current_user)):
+    """List allowed devices for the current admin only (per-user binding)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _admin_device_middleware_available or list_allowed_devices is None:
+        raise HTTPException(status_code=503, detail="Allowed devices feature not available")
+    return {"devices": list_allowed_devices(current_user.userid)}
+
+
+@app.post("/api/admin/allowed-devices")
+async def post_admin_allowed_device(body: dict, current_user: User = Depends(get_current_user)):
+    """Add a device ID to the current admin's allowlist (manual add, e.g. from another device's ID)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _admin_device_middleware_available or add_allowed_device is None:
+        raise HTTPException(status_code=503, detail="Allowed devices feature not available")
+    device_id = (body.get("device_id") or "").strip()
+    if not device_id:
+        raise HTTPException(status_code=400, detail="device_id required")
+    label = (body.get("label") or "").strip() or None
+    if add_allowed_device(device_id, label, current_user.userid):
+        return {"message": "Device added", "device_id": device_id}
+    raise HTTPException(status_code=409, detail="Device ID already in your allowlist")
+
+
+@app.delete("/api/admin/allowed-devices/{device_id:path}")
+async def delete_admin_allowed_device(device_id: str, current_user: User = Depends(get_current_user)):
+    """Remove a device from the current admin's allowlist."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _admin_device_middleware_available or remove_allowed_device is None:
+        raise HTTPException(status_code=503, detail="Allowed devices feature not available")
+    if remove_allowed_device(device_id, current_user.userid):
+        return {"message": "Device removed", "device_id": device_id}
+    raise HTTPException(status_code=404, detail="Device ID not found in your allowlist")
+
+
+@app.delete("/api/admin/allowed-devices-by-id/{row_id:int}")
+async def delete_admin_allowed_device_by_id(row_id: int, current_user: User = Depends(get_current_user)):
+    """Remove an allowed device by row id (only your own devices)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _admin_device_middleware_available or remove_allowed_device_by_id is None:
+        raise HTTPException(status_code=503, detail="Allowed devices feature not available")
+    if remove_allowed_device_by_id(row_id, current_user.userid):
+        return {"message": "Device removed", "id": row_id}
+    raise HTTPException(status_code=404, detail="Row not found")
+
+@app.post("/api/admin/register-this-device")
+async def register_this_device_endpoint(request: Request, current_user: User = Depends(get_current_user)):
+    """One-click register current device for this admin. No device check required (so you can register from a new device)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _admin_device_middleware_available or register_this_device is None:
+        raise HTTPException(status_code=503, detail="Allowed devices feature not available")
+    device_id = (request.headers.get("X-Device-Id") or request.headers.get("x-device-id") or "").strip()
+    if not device_id:
+        raise HTTPException(status_code=400, detail="X-Device-Id header required")
+    if register_this_device(device_id, current_user.userid):
+        return {"message": "Device registered", "device_id": device_id}
+    return {"message": "Device already registered", "device_id": device_id}
+
 
 @app.post("/api/admin/fix-timezones")
 async def fix_database_timezones(current_user: User = Depends(get_current_user)):

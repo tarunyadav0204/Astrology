@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminCreditLedger.css';
 
 const FEATURE_NAMES = {
@@ -44,7 +45,7 @@ export default function AdminDailyActivity() {
     let cancelled = false;
     setLoading(true);
     fetch(`/api/credits/admin/daily-activity?date=${date}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: getAdminAuthHeaders(),
     })
       .then((res) => res.json())
       .then((body) => {

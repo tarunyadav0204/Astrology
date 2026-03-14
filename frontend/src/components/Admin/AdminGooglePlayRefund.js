@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminGooglePlayRefund.css';
 
 const AdminGooglePlayRefund = () => {
@@ -23,7 +24,7 @@ const AdminGooglePlayRefund = () => {
       if (query.trim()) params.append('query', query.trim());
       if (orderIdFilter.trim()) params.append('order_id', orderIdFilter.trim());
       const response = await fetch(`/api/credits/admin/google-play-transactions?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       if (!response.ok) throw new Error('Failed to load transactions');
       const data = await response.json();
@@ -90,7 +91,7 @@ const AdminGooglePlayRefund = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify({
           userid: tx.userid,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminCreditLedger.css';
 
 const AdminCreditLedger = () => {
@@ -31,7 +32,7 @@ const AdminCreditLedger = () => {
       if (toDate) params.append('to_date', toDate);
       if (query.trim()) params.append('query', query.trim());
       const response = await fetch(`/api/credits/admin/search?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders(),
       });
       if (!response.ok) throw new Error(`Search failed with status ${response.status}`);
       const data = await response.json();
@@ -53,7 +54,7 @@ const AdminCreditLedger = () => {
   const fetchUsers = async () => {
     try {
       const response = await fetch('/api/credits/admin/users', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders(),
       });
       const data = await response.json();
       setUsers(data.users || []);
@@ -66,7 +67,7 @@ const AdminCreditLedger = () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/credits/admin/user-history/${userid}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAdminAuthHeaders(),
       });
       const data = await response.json();
       setTransactions(data.transactions || []);

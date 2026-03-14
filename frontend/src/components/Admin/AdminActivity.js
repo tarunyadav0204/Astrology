@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminActivity.css';
 
 const COLUMNS = [
@@ -39,7 +40,7 @@ export default function AdminActivity() {
       if (filterPhone.trim()) params.set('user_phone', filterPhone.trim());
       if (filterAction.trim()) params.set('action', filterAction.trim());
       const res = await fetch(`/api/admin/activity?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

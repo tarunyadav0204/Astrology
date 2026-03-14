@@ -1268,6 +1268,132 @@ select {
   font-size: 13px;
 }
 
+/* Admin device allowlist */
+.allowed-device-id {
+  margin: 10px 0;
+  font-size: 14px;
+}
+.allowed-device-id code {
+  background: #eee;
+  padding: 2px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+.allowed-devices-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  background: white;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.allowed-devices-table th,
+.allowed-devices-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #dee2e6;
+}
+.allowed-devices-table th {
+  background: #f1f3f5;
+  font-weight: 600;
+  color: #495057;
+}
+.device-id-cell {
+  font-size: 12px;
+  word-break: break-all;
+  background: #f8f9fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.allowed-devices-add {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.allowed-devices-add label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+}
+.allowed-devices-add .delete-btn.small {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+/* Device access check / blocked state */
+.admin-device-check {
+  padding: 48px 24px;
+  text-align: center;
+  color: #555;
+}
+.admin-device-blocked {
+  max-width: 520px;
+  margin: 32px auto;
+  padding: 32px;
+  background: #fff8e1;
+  border: 1px solid #ffc107;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.admin-device-blocked h2 {
+  margin-top: 0;
+  color: #e65100;
+}
+.admin-device-blocked p {
+  margin: 12px 0;
+  color: #333;
+}
+.admin-device-blocked-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.admin-device-blocked-id code {
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  word-break: break-all;
+  border: 1px solid #ddd;
+}
+.copy-device-id-btn {
+  padding: 6px 14px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.copy-device-id-btn:hover {
+  background: #1565c0;
+}
+.admin-device-blocked-hint {
+  font-size: 13px;
+  color: #666;
+}
+.register-this-device-btn {
+  margin: 16px 0 8px 0;
+  padding: 10px 20px;
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.register-this-device-btn:hover {
+  background: #1b5e20;
+}
+.register-this-device-btn.small {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
 /* Toggle Switch */
 .toggle-switch {
   position: relative;

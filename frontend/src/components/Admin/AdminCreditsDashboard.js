@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import {
   BarChart,
   Bar,
@@ -170,7 +171,7 @@ export default function AdminCreditsDashboard() {
     setError(null);
     const params = new URLSearchParams({ from_date, to_date });
     fetch(`/api/credits/admin/dashboard?${params}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: getAdminAuthHeaders(),
     })
       .then((res) => res.json())
       .then((body) => {

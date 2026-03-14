@@ -1,8 +1,10 @@
 import { APP_CONFIG } from '../config/app.config';
 
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? APP_CONFIG.api.prod 
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? APP_CONFIG.api.prod
   : APP_CONFIG.api.dev;
+
+const DEVICE_ID_KEY = 'admin_device_id';
 
 const getEndpoint = (path) => {
   if (API_BASE_URL.includes('localhost')) {
@@ -11,13 +13,34 @@ const getEndpoint = (path) => {
   return `/api${path}`;
 };
 
+/** Get or create a persistent device ID for this browser (used for admin device allowlist). */
+export function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id || id.length < 10) {
+    id = 'web-' + crypto.randomUUID();
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+/** Auth headers for admin API calls. Includes X-Device-Id for device allowlist. */
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Authorization': `Bearer ${token}`,
+    'X-Device-Id': getDeviceId(),
   };
 };
+
+/** Export for use in components that call admin APIs directly (e.g. fetch). */
+export function getAdminAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return {
+    'Authorization': `Bearer ${token}`,
+    'X-Device-Id': getDeviceId(),
+  };
+}
 
 export const adminService = {
   async getAllUsers(params = {}) {
@@ -156,5 +179,66 @@ export const adminService = {
     }
 
     return response.json();
-  }
+  },
+
+  async getAllowedDevices() {
+    const response = await fetch(getEndpoint('/admin/allowed-devices'), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch allowed devices');
+    }
+    return response.json();
+  },
+
+  /** One-click register current device for this admin (exempt from device check). */
+  async registerThisDevice() {
+    const response = await fetch(getEndpoint('/admin/register-this-device'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to register device');
+    }
+    return response.json();
+  },
+
+  async addAllowedDevice(deviceId, label) {
+    const response = await fetch(getEndpoint('/admin/allowed-devices'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ device_id: deviceId, label: label || '' }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to add device');
+    }
+    return response.json();
+  },
+
+  async removeAllowedDevice(deviceId) {
+    const response = await fetch(getEndpoint(`/admin/allowed-devices/${encodeURIComponent(deviceId)}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to remove device');
+    }
+    return response.json();
+  },
+
+  async removeAllowedDeviceById(rowId) {
+    const response = await fetch(getEndpoint(`/admin/allowed-devices-by-id/${rowId}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to remove device');
+    }
+    return response.json();
+  },
 };

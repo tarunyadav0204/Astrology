@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminUserCreditManagement.css';
 
 const PAGE_SIZE = 50;
@@ -23,7 +24,7 @@ const AdminUserCreditManagement = () => {
       params.set('page', String(page));
       params.set('limit', String(PAGE_SIZE));
       const response = await fetch(`/api/credits/admin/users?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
@@ -76,7 +77,7 @@ const AdminUserCreditManagement = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify(body),
       });
