@@ -1298,6 +1298,70 @@ input:checked + .toggle-slider:before {
   background: #fff;
 }
 
+.notif-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notif-search-input {
+  width: 100%;
+  max-width: 280px;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.notif-search-btn {
+  padding: 8px 16px;
+  background: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notif-search-btn:hover {
+  background: #c2185b;
+}
+
+.notif-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.notif-pagination-info {
+  font-size: 14px;
+  color: #555;
+}
+
+.notif-pagination-btn {
+  padding: 6px 14px;
+  background: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.notif-pagination-btn:hover:not(:disabled) {
+  background: #c2185b;
+}
+
+.notif-pagination-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
 .notif-user-table {
   width: 100%;
   border-collapse: collapse;
@@ -1342,6 +1406,16 @@ input:checked + .toggle-slider:before {
 
 .notif-th-phone {
   width: auto;
+}
+
+.notif-th-notifications {
+  width: 100px;
+  text-align: center;
+}
+
+.notif-td-notifications {
+  text-align: center;
+  font-size: 12px;
 }
 
 .notif-user-table tbody tr:nth-child(odd) {

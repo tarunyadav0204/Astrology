@@ -86,6 +86,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
   const [selectedNotifUserIds, setSelectedNotifUserIds] = useState([]); // multi-select
+  const [notifSearchName, setNotifSearchName] = useState('');
+  const [notifPage, setNotifPage] = useState(1);
+  const [notifTotal, setNotifTotal] = useState(0);
+  const [notifTotalPages, setNotifTotalPages] = useState(0);
+  const [notifUserIdsWithTokens, setNotifUserIdsWithTokens] = useState([]); // userids who have accepted notifications
   const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog'
   const [blogNotifSelectedId, setBlogNotifSelectedId] = useState('');
   const [blogNotifAudience, setBlogNotifAudience] = useState('all'); // 'all' | 'eligible'
@@ -204,6 +209,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       fetchRedditDrafts();
     } else if (activeTab === 'notifications') {
       fetchUsersForNotifications();
+      fetchNotifUserIdsWithTokens();
       fetchBlogPosts();
     }
   }, [activeTab, activeSubTab]);
@@ -414,17 +420,43 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const fetchUsersForNotifications = async () => {
+  const fetchUsersForNotifications = async (pageOverride = null) => {
     setLoading(true);
+    const page = pageOverride != null ? pageOverride : notifPage;
+    if (pageOverride != null) setNotifPage(page);
     try {
-      // Backend max limit is 100; fetch first page for recipient list
-      const data = await adminService.getAllUsers({ page: 1, limit: 100 });
+      const params = {
+        page,
+        limit: 100,
+        name: notifSearchName.trim() || undefined,
+      };
+      const data = await adminService.getAllUsers(params);
       setUsers(data.users || []);
+      setNotifTotal(data.total ?? 0);
+      setNotifTotalPages(data.total_pages ?? 0);
     } catch (error) {
       console.error('Error fetching users for notifications:', error);
       setUsers([]);
+      setNotifTotal(0);
+      setNotifTotalPages(0);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNotifUserIdsWithTokens = async () => {
+    try {
+      const tokenRes = await fetch('/api/nudge/admin/user-ids-with-tokens', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        setNotifUserIdsWithTokens(tokenData.user_ids || []);
+      } else {
+        setNotifUserIdsWithTokens([]);
+      }
+    } catch (e) {
+      setNotifUserIdsWithTokens([]);
     }
   };
 
@@ -1986,6 +2018,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <div className="notifications-form">
                   <div className="form-field">
                     <label>Recipients</label>
+                    <div className="notif-search-row">
+                      <input
+                        type="text"
+                        placeholder="Search by name (DB search)"
+                        value={notifSearchName}
+                        onChange={(e) => setNotifSearchName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchUsersForNotifications(1)}
+                        className="notif-search-input"
+                      />
+                      <button type="button" className="notif-search-btn" onClick={() => fetchUsersForNotifications(1)}>
+                        Search
+                      </button>
+                    </div>
                     <div className="notif-user-list">
                       <table className="notif-user-table">
                         <thead>
@@ -1994,24 +2039,28 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                               <input
                                 type="checkbox"
                                 id="notif-select-all"
-                                checked={users.length > 0 && selectedNotifUserIds.length === users.length}
+                                checked={users.length > 0 && users.every((u) => selectedNotifUserIds.includes(u.userid))}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedNotifUserIds(users.map((u) => u.userid));
+                                    const pageIds = new Set(users.map((u) => u.userid));
+                                    setSelectedNotifUserIds((prev) => [...new Set([...prev, ...pageIds])]);
                                   } else {
-                                    setSelectedNotifUserIds([]);
+                                    const pageIds = new Set(users.map((u) => u.userid));
+                                    setSelectedNotifUserIds((prev) => prev.filter((id) => !pageIds.has(id)));
                                   }
                                 }}
                               />
                             </th>
                             <th className="notif-th-name">Name</th>
                             <th className="notif-th-phone">Phone</th>
+                            <th className="notif-th-notifications">Notifications</th>
                           </tr>
                         </thead>
                         <tbody>
                           {users.map((u) => {
                             const id = u.userid;
                             const checked = selectedNotifUserIds.includes(id);
+                            const hasTokens = notifUserIdsWithTokens.includes(id);
                             return (
                               <tr key={id} className="notif-user-row">
                                 <td className="notif-td-checkbox">
@@ -2029,12 +2078,36 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                 </td>
                                 <td className="notif-td-name">{u.name || 'No name'}</td>
                                 <td className="notif-td-phone">{u.phone}</td>
+                                <td className="notif-td-notifications">{hasTokens ? 'Yes' : 'No'}</td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
                     </div>
+                    {notifTotalPages > 0 && (
+                      <div className="notif-pagination">
+                        <span className="notif-pagination-info">
+                          Page {notifPage} of {notifTotalPages} ({notifTotal} total)
+                        </span>
+                        <button
+                          type="button"
+                          className="notif-pagination-btn"
+                          disabled={notifPage <= 1 || loading}
+                          onClick={() => fetchUsersForNotifications(notifPage - 1)}
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          className="notif-pagination-btn"
+                          disabled={notifPage >= notifTotalPages || loading}
+                          onClick={() => fetchUsersForNotifications(notifPage + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
                     <div className="notif-user-summary">{selectedNotifUserIds.length} selected</div>
                     <small className="form-hint">
                       Only users with registered device tokens will actually receive a push notification.

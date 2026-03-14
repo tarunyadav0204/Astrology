@@ -92,6 +92,26 @@ async def register_device_token(
         raise HTTPException(status_code=500, detail="Failed to register token") from e
 
 
+@router.get("/admin/user-ids-with-tokens")
+async def get_user_ids_with_tokens(
+    current_user: User = Depends(get_current_user),
+):
+    """Return list of user_ids that have at least one device token (notifications accepted). Admin only."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        conn = db.get_conn()
+        try:
+            rows = db.get_all_device_tokens(conn)
+            user_ids = list({r[0] for r in rows})
+        finally:
+            conn.close()
+        return {"user_ids": user_ids}
+    except Exception as e:
+        logger.exception("Failed to get user ids with tokens: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load") from e
+
+
 @router.post("/admin/send")
 async def admin_send_notification(
     body: AdminSendNotificationRequest,
