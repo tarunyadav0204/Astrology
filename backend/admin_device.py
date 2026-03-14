@@ -164,13 +164,23 @@ def add_allowed_device(device_id: str, label: str | None, userid: int) -> bool:
         return False
 
 
-def register_this_device(device_id: str, userid: int) -> bool:
-    """One-click register: add (userid, device_id) with default label. Idempotent."""
+def register_this_device(device_id: str, userid: int) -> tuple[bool, str]:
+    """
+    One-click register only from first device (bootstrap) or idempotent confirm.
+    Returns (success, message). If user already has >= 1 other device and this one is new, returns (False, 'use_approved_device').
+    """
     if not (device_id and str(device_id).strip()):
-        return False
+        return False, "missing_device_id"
     device_id = str(device_id).strip()
+    if _device_exists_for_user(userid, device_id):
+        return True, "already_registered"
+    devices = list_allowed_devices(userid)
+    if len(devices) >= 1:
+        return False, "use_approved_device"  # must add new devices from an already-approved device
     label = f"Registered {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
-    return add_allowed_device(device_id, label, userid) or _device_exists_for_user(userid, device_id)
+    if add_allowed_device(device_id, label, userid):
+        return True, "registered"
+    return True, "already_registered"
 
 
 def _device_exists_for_user(userid: int, device_id: str) -> bool:

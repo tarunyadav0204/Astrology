@@ -1043,36 +1043,20 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       {deviceAccessStatus === 'blocked' && (
         <div className="admin-device-blocked">
           <h2>Admin access restricted</h2>
-          <p>This device is not registered for your admin account. Register it to continue, or add it manually from another approved device.</p>
           <p className="admin-device-blocked-id">
-            <strong>Your device ID:</strong>{' '}
+            <strong>Device ID:</strong>{' '}
             <code>{blockedDeviceId || getDeviceId()}</code>
             <button
               type="button"
               className="copy-device-id-btn"
               onClick={() => {
                 const id = blockedDeviceId || getDeviceId();
-                navigator.clipboard?.writeText(id).then(() => alert('Device ID copied to clipboard.')).catch(() => alert('Copy failed.'));
+                navigator.clipboard?.writeText(id).then(() => alert('Copied.')).catch(() => alert('Copy failed.'));
               }}
             >
               Copy
             </button>
           </p>
-          <button
-            type="button"
-            className="register-this-device-btn"
-            onClick={async () => {
-              try {
-                await adminService.registerThisDevice();
-                await checkDeviceAccess();
-              } catch (e) {
-                alert(e.message || 'Failed to register device');
-              }
-            }}
-          >
-            Register this device
-          </button>
-          <p className="admin-device-blocked-hint">Or send the device ID to another admin to add it for you (Settings → Admin device allowlist).</p>
         </div>
       )}
       {deviceAccessStatus === 'allowed' && (

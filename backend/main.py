@@ -3990,7 +3990,7 @@ async def delete_admin_allowed_device_by_id(row_id: int, current_user: User = De
 
 @app.post("/api/admin/register-this-device")
 async def register_this_device_endpoint(request: Request, current_user: User = Depends(get_current_user)):
-    """One-click register current device for this admin. No device check required (so you can register from a new device)."""
+    """One-click register: only works for your first device (bootstrap) or idempotent. New devices must be added from an already-approved device."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     if not _admin_device_middleware_available or register_this_device is None:
@@ -3998,7 +3998,13 @@ async def register_this_device_endpoint(request: Request, current_user: User = D
     device_id = (request.headers.get("X-Device-Id") or request.headers.get("x-device-id") or "").strip()
     if not device_id:
         raise HTTPException(status_code=400, detail="X-Device-Id header required")
-    if register_this_device(device_id, current_user.userid):
+    success, message = register_this_device(device_id, current_user.userid)
+    if not success and message == "use_approved_device":
+        raise HTTPException(
+            status_code=403,
+            detail="You already have an approved device. Add this device from that device (Settings → Admin device allowlist → Add device ID) or ask another admin to add it.",
+        )
+    if message == "registered":
         return {"message": "Device registered", "device_id": device_id}
     return {"message": "Device already registered", "device_id": device_id}
 
