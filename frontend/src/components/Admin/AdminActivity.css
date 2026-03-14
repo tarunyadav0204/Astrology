@@ -1,0 +1,127 @@
+.admin-activity {
+  padding: 20px;
+}
+
+.admin-activity h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.admin-activity-description {
+  margin-bottom: 16px;
+  color: #555;
+  font-size: 14px;
+}
+
+.admin-activity-filters {
+  margin-bottom: 16px;
+}
+
+.admin-activity-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.admin-activity-filter-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.admin-activity-filter-row input[type="text"],
+.admin-activity-filter-row input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.admin-activity-refresh-btn {
+  padding: 8px 16px;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.admin-activity-refresh-btn:hover {
+  background: #0056b3;
+}
+
+.admin-activity-error {
+  padding: 12px;
+  background: #f8d7da;
+  color: #721c24;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.admin-activity-loading {
+  padding: 16px;
+  color: #666;
+}
+
+.admin-activity-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-activity-th,
+.admin-activity-td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #dee2e6;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-activity-th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+}
+
+.admin-activity-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-activity-sortable:hover {
+  background: #e9ecef;
+}
+
+.admin-activity-sort-icon {
+  margin-left: 4px;
+  font-weight: bold;
+}
+
+.admin-activity-td {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-activity-empty {
+  text-align: center;
+  padding: 24px;
+  color: #6c757d;
+}

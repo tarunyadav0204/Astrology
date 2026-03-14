@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
+import AdminActivity from './AdminActivity';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
@@ -1052,6 +1053,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Facts
           </button>
+          <button 
+            className={`subtab ${activeSubTab === 'activity' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('activity')}
+          >
+            Activity
+          </button>
         </div>
       )}
 
@@ -1220,6 +1227,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'users' && activeSubTab === 'activity' && (
+          <AdminActivity />
         )}
 
         {activeTab === 'users' && activeSubTab === 'facts' && (

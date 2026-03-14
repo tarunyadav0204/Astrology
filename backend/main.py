@@ -50,6 +50,12 @@ from nakshatra.nakshatra_routes import router as nakshatra_router
 from festivals.routes import router as festivals_router
 from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
+try:
+    from activity.admin_routes import router as activity_admin_router
+    _activity_admin_available = True
+except Exception as _e:
+    _activity_admin_available = False
+    activity_admin_router = None
 from credits.routes import router as credits_router
 from tts.routes import router as tts_router
 from credits.credit_request_routes import router as credit_request_router
@@ -342,6 +348,8 @@ app.include_router(nakshatra_router, prefix="/api")
 app.include_router(festivals_router, prefix="/api")
 app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
+if _activity_admin_available and activity_admin_router:
+    app.include_router(activity_admin_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")

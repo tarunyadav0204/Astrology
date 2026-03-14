@@ -3,6 +3,7 @@ Middleware to log each API request as an activity event (action=api_request) to 
 Runs after the request; does not block the response.
 """
 import os
+from functools import lru_cache
 import time
 import logging
 import jwt
@@ -15,6 +16,31 @@ logger = logging.getLogger(__name__)
 
 # Skip activity for these paths to reduce noise (health, static, etc.)
 SKIP_PATHS = frozenset({"/", "/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"})
+
+
+def _resource_from_path(path: str) -> tuple[str | None, str | None]:
+    """
+    Derive resource_type and resource_id from request path for api_request events.
+    - resource_type: first segment after /api/ (e.g. credits, chat, charts, tts), or first segment if no /api/
+    - resource_id: last path segment if it looks like a number (e.g. session id, chart id), else None
+    """
+    if not path or not path.startswith("/"):
+        return None, None
+    parts = [p for p in path.split("/") if p]
+    if not parts:
+        return None, None
+    # resource_type: for /api/credits/balance use "credits"; for /api/chat/sessions/5 use "chat"
+    if parts[0] == "api" and len(parts) >= 2:
+        resource_type = parts[1]
+    else:
+        resource_type = parts[0]
+    # resource_id: last segment if numeric
+    resource_id = None
+    if parts:
+        last = parts[-1]
+        if last.isdigit():
+            resource_id = last
+    return resource_type or None, resource_id
 
 
 def _get_user_from_request(request: Request) -> tuple[str | None, int | None, str | None]:
@@ -79,7 +105,35 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         return response
 
 
+@lru_cache(maxsize=10_000)
+def _get_user_name_by_id(user_id: int) -> str | None:
+    """
+    Look up name from DB when JWT has userid but no name (e.g. old token).
+    Cached in-memory per process (max 10k users) to avoid DB hit on every request.
+    Runs in executor thread.
+    """
+    if user_id is None:
+        return None
+    try:
+        import sqlite3
+        conn = sqlite3.connect("astrology.db")
+        cur = conn.execute("SELECT name FROM users WHERE userid = ?", (user_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0] is not None and str(row[0]).strip():
+            return str(row[0]).strip()
+    except Exception as e:
+        logger.debug("Activity: name lookup for user_id=%s failed: %s", user_id, e)
+    return None
+
+
 def _publish_api_request(path, method, status_code, duration_ms, user_phone, user_id, user_name, ip, user_agent):
+    # Fallback: old JWTs or NULL name in DB – look up name when we have user_id but no name
+    if user_id is not None and (user_name is None or not str(user_name).strip()):
+        looked_up = _get_user_name_by_id(user_id)
+        if looked_up:
+            user_name = looked_up
+    resource_type, resource_id = _resource_from_path(path)
     publish_activity(
         "api_request",
         path=path,
@@ -89,6 +143,8 @@ def _publish_api_request(path, method, status_code, duration_ms, user_phone, use
         user_id=user_id,
         user_phone=user_phone,
         user_name=user_name,
+        resource_type=resource_type,
+        resource_id=resource_id,
         ip=ip,
         user_agent=user_agent,
     )
