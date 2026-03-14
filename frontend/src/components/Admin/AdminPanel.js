@@ -52,6 +52,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [pendingSubscription, setPendingSubscription] = useState(null);
+  const [seedVipLoading, setSeedVipLoading] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editingPlanDiscount, setEditingPlanDiscount] = useState('');
   const [savingPlanDiscount, setSavingPlanDiscount] = useState(false);
@@ -500,12 +501,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const handleUpdateSubscription = async (userId, platform, planName) => {
+  const handleUpdateSubscription = async (userId, platform, planName, durationDays) => {
     try {
-      await adminService.updateUserSubscription(userId, {
-        platform: platform,
-        plan_name: planName
-      });
+      const payload = { platform, plan_name: planName };
+      if (durationDays != null && durationDays > 0) payload.duration_days = durationDays;
+      await adminService.updateUserSubscription(userId, payload);
       fetchUsers();
       setEditingSubscription(null);
       setPendingSubscription(null);
@@ -516,8 +516,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
   const handleSaveSubscription = () => {
     if (pendingSubscription) {
-      const { userId, platform, planName } = pendingSubscription;
-      handleUpdateSubscription(userId, platform, planName);
+      const { userId, platform, planName, duration_days } = pendingSubscription;
+      handleUpdateSubscription(userId, platform, planName, duration_days);
     }
   };
 
@@ -1241,6 +1241,28 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     Search
                   </button>
                 </div>
+                <div className="users-seed-vip">
+                  <span>Don&apos;t see VIP Silver / Gold / Platinum in the subscription dropdown? </span>
+                  <button
+                    type="button"
+                    className="users-seed-vip-btn"
+                    disabled={seedVipLoading}
+                    onClick={async () => {
+                      setSeedVipLoading(true);
+                      try {
+                        await adminService.seedVipSubscriptionPlans();
+                        await fetchSubscriptionPlans();
+                        await fetchUsers(usersPage);
+                      } catch (e) {
+                        alert(e.message || 'Failed to seed VIP plans');
+                      } finally {
+                        setSeedVipLoading(false);
+                      }
+                    }}
+                  >
+                    {seedVipLoading ? 'Seeding…' : 'Seed VIP plans (Silver, Gold, Platinum)'}
+                  </button>
+                </div>
                 <div className="users-table">
                 <table>
                   <thead>
@@ -1331,8 +1353,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                         if (platform && planName) {
                                           setPendingSubscription({
                                             userId: user.userid,
-                                            platform: platform,
-                                            planName: planName
+                                            platform,
+                                            planName,
+                                            duration_days: 30
                                           });
                                         }
                                       }}
@@ -1340,10 +1363,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                       <option value="">Select Plan</option>
                                       {subscriptionPlans.map(plan => (
                                         <option key={`${plan.platform}-${plan.plan_name}`} value={`${plan.platform}|${plan.plan_name}`}>
-                                          {plan.platform}: {plan.plan_name}
+                                          {plan.platform}: {plan.tier_name || plan.plan_name}
                                         </option>
                                       ))}
                                     </select>
+                                    {pendingSubscription?.planName && (
+                                      <label className="new-subscription-duration">
+                                        <span>Duration (days)</span>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={3660}
+                                          value={pendingSubscription.duration_days ?? 30}
+                                          onChange={(e) => setPendingSubscription(prev => ({ ...prev, duration_days: parseInt(e.target.value, 10) || 30 }))}
+                                        />
+                                        <small>e.g. 30 = 1 month, 365 = 1 year</small>
+                                      </label>
+                                    )}
                                     <button onClick={handleSaveSubscription} className="save-btn">Save</button>
                                     <button onClick={handleCancelSubscription} className="cancel-btn">Cancel</button>
                                   </div>

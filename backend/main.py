@@ -3707,14 +3707,31 @@ async def update_user_subscription(user_id: int, subscription_data: dict, curren
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    platform = subscription_data['platform']
-    plan_name = subscription_data['plan_name']
+    platform = subscription_data.get('platform')
+    plan_name = subscription_data.get('plan_name')
+    if not platform or not plan_name:
+        raise HTTPException(status_code=400, detail="platform and plan_name required")
+    
+    # Optional: duration in days (e.g. 30 for 1 month). Default 365.
+    duration_days = subscription_data.get('duration_days')
+    if duration_days is not None:
+        try:
+            duration_days = int(duration_days)
+            if duration_days < 1 or duration_days > 3660:
+                raise HTTPException(status_code=400, detail="duration_days must be between 1 and 3660")
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="duration_days must be a positive integer")
+    else:
+        duration_days = 365
     
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
-    # Get plan_id
-    cursor.execute("SELECT plan_id FROM subscription_plans WHERE platform = ? AND plan_name = ?", (platform, plan_name))
+    # Get plan_id (match plan_name or tier_name for flexibility)
+    cursor.execute(
+        "SELECT plan_id FROM subscription_plans WHERE platform = ? AND (plan_name = ? OR tier_name = ?)",
+        (platform, plan_name, plan_name),
+    )
     plan = cursor.fetchone()
     
     if not plan:
@@ -3735,7 +3752,7 @@ async def update_user_subscription(user_id: int, subscription_data: dict, curren
     # Add new subscription
     from datetime import date, timedelta
     start_date = date.today()
-    end_date = start_date + timedelta(days=365)  # 1 year
+    end_date = start_date + timedelta(days=duration_days)
     
     cursor.execute('''
         INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
@@ -3745,7 +3762,7 @@ async def update_user_subscription(user_id: int, subscription_data: dict, curren
     conn.commit()
     conn.close()
     
-    return {"message": "Subscription updated successfully"}
+    return {"message": "Subscription updated successfully", "end_date": str(end_date)}
 
 @app.get("/api/admin/subscription-plans")
 async def get_admin_subscription_plans(current_user: User = Depends(get_current_user)):
@@ -3790,6 +3807,19 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
         plans.append(plan)
     
     return {'plans': plans}
+
+
+@app.post("/api/admin/seed-vip-subscription-plans")
+async def seed_vip_subscription_plans(current_user: User = Depends(get_current_user)):
+    """Idempotent: ensure VIP Silver, Gold, Platinum exist for astroroshni. Call this if admin dropdown only shows Free/Premium."""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        from subscription_tier_migration import ensure_subscription_tier_schema
+        ensure_subscription_tier_schema()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Seed failed: {str(e)}")
+    return {"message": "VIP subscription plans (Silver, Gold, Platinum) ensured.", "ok": True}
 
 
 @app.put("/api/admin/subscription-plans/{plan_id}")

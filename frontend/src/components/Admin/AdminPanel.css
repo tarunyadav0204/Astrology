@@ -520,6 +520,39 @@
   background: #c2185b;
 }
 
+.users-seed-vip {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fff8e1;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.users-seed-vip-btn {
+  padding: 6px 14px;
+  background: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.users-seed-vip-btn:hover:not(:disabled) {
+  background: #f57c00;
+}
+
+.users-seed-vip-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .users-pagination {
   display: flex;
   flex-wrap: wrap;
@@ -648,6 +681,25 @@ tr:hover {
 .new-subscription select {
   font-size: 11px;
   padding: 2px 4px;
+}
+
+.new-subscription-duration {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.new-subscription-duration input {
+  width: 80px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.new-subscription-duration small {
+  color: #666;
+  font-size: 10px;
 }
 
 .subscription-edit {

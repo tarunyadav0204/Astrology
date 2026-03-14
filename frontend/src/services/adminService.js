@@ -108,6 +108,20 @@ export const adminService = {
     return response.json();
   },
 
+  async seedVipSubscriptionPlans() {
+    const response = await fetch(getEndpoint('/admin/seed-vip-subscription-plans'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to seed VIP plans');
+    }
+
+    return response.json();
+  },
+
   async updateSubscriptionPlan(planId, payload) {
     const response = await fetch(getEndpoint(`/admin/subscription-plans/${planId}`), {
       method: 'PUT',
