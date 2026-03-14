@@ -89,6 +89,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [allowedDevicesLoading, setAllowedDevicesLoading] = useState(false);
   const [newAllowedDeviceId, setNewAllowedDeviceId] = useState('');
   const [newAllowedDeviceLabel, setNewAllowedDeviceLabel] = useState('');
+  const [newAllowedDeviceForUserId, setNewAllowedDeviceForUserId] = useState('');
   const [blogPosts, setBlogPosts] = useState([]);
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
@@ -117,6 +118,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [redditEditMarkdown, setRedditEditMarkdown] = useState('');
   const [deviceAccessStatus, setDeviceAccessStatus] = useState('pending'); // 'pending' | 'allowed' | 'blocked'
   const [blockedDeviceId, setBlockedDeviceId] = useState(null);
+  const [blockedUserId, setBlockedUserId] = useState(null);
 
   const checkDeviceAccess = React.useCallback(async () => {
     setDeviceAccessStatus('pending');
@@ -127,6 +129,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         if (body.detail === 'Device not allowed') {
           setDeviceAccessStatus('blocked');
           setBlockedDeviceId(body.device_id ?? getDeviceId());
+          setBlockedUserId(body.user_id ?? null);
           return;
         }
       }
@@ -1043,6 +1046,20 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       {deviceAccessStatus === 'blocked' && (
         <div className="admin-device-blocked">
           <h2>Admin access restricted</h2>
+          {blockedUserId != null && (
+            <p className="admin-device-blocked-id">
+              <strong>User ID:</strong> <code>{blockedUserId}</code>
+              <button
+                type="button"
+                className="copy-device-id-btn"
+                onClick={() => {
+                  navigator.clipboard?.writeText(String(blockedUserId)).then(() => alert('Copied.')).catch(() => alert('Copy failed.'));
+                }}
+              >
+                Copy
+              </button>
+            </p>
+          )}
           <p className="admin-device-blocked-id">
             <strong>Device ID:</strong>{' '}
             <code>{blockedDeviceId || getDeviceId()}</code>
@@ -2791,13 +2808,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </table>
                   <div className="allowed-devices-add">
                     <label>
-                      <span>Add device ID (manual):</span>
+                      <span>Device ID:</span>
                       <input
                         type="text"
                         value={newAllowedDeviceId}
                         onChange={(e) => setNewAllowedDeviceId(e.target.value)}
                         placeholder="e.g. web-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         style={{ width: '320px', marginLeft: '8px' }}
+                      />
+                    </label>
+                    <label style={{ marginLeft: '12px' }}>
+                      <span>For user ID (blank = you):</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={newAllowedDeviceForUserId}
+                        onChange={(e) => setNewAllowedDeviceForUserId(e.target.value)}
+                        placeholder="Other admin's user ID"
+                        style={{ width: '100px', marginLeft: '8px' }}
                       />
                     </label>
                     <label style={{ marginLeft: '12px' }}>
@@ -2817,9 +2845,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       disabled={!newAllowedDeviceId.trim()}
                       onClick={async () => {
                         try {
-                          await adminService.addAllowedDevice(newAllowedDeviceId.trim(), newAllowedDeviceLabel.trim() || undefined);
+                          const forId = newAllowedDeviceForUserId.trim() ? newAllowedDeviceForUserId.trim() : null;
+                          await adminService.addAllowedDevice(newAllowedDeviceId.trim(), newAllowedDeviceLabel.trim() || undefined, forId);
                           setNewAllowedDeviceId('');
                           setNewAllowedDeviceLabel('');
+                          setNewAllowedDeviceForUserId('');
                           await fetchAllowedDevices();
                         } catch (e) {
                           alert(e.message || 'Failed to add device');

@@ -205,11 +205,13 @@ export const adminService = {
     return response.json();
   },
 
-  async addAllowedDevice(deviceId, label) {
+  async addAllowedDevice(deviceId, label, forUserId = null) {
+    const body = { device_id: deviceId, label: label || '' };
+    if (forUserId != null && forUserId !== '') body.for_user_id = Number(forUserId);
     const response = await fetch(getEndpoint('/admin/allowed-devices'), {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ device_id: deviceId, label: label || '' }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));

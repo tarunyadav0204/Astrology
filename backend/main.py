@@ -3951,7 +3951,7 @@ async def get_admin_allowed_devices(current_user: User = Depends(get_current_use
 
 @app.post("/api/admin/allowed-devices")
 async def post_admin_allowed_device(body: dict, current_user: User = Depends(get_current_user)):
-    """Add a device ID to the current admin's allowlist (manual add, e.g. from another device's ID)."""
+    """Add a device ID. Default: for current admin. Optional for_user_id: add for another admin (so they can access)."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     if not _admin_device_middleware_available or add_allowed_device is None:
@@ -3960,9 +3960,27 @@ async def post_admin_allowed_device(body: dict, current_user: User = Depends(get
     if not device_id:
         raise HTTPException(status_code=400, detail="device_id required")
     label = (body.get("label") or "").strip() or None
-    if add_allowed_device(device_id, label, current_user.userid):
-        return {"message": "Device added", "device_id": device_id}
-    raise HTTPException(status_code=409, detail="Device ID already in your allowlist")
+    for_user_id = body.get("for_user_id")
+    if for_user_id is not None:
+        try:
+            for_user_id = int(for_user_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="for_user_id must be a number")
+        if for_user_id == current_user.userid:
+            target_userid = current_user.userid
+        else:
+            conn = sqlite3.connect('astrology.db')
+            cur = conn.execute("SELECT role FROM users WHERE userid = ?", (for_user_id,))
+            row = cur.fetchone()
+            conn.close()
+            if not row or row[0] != "admin":
+                raise HTTPException(status_code=400, detail="for_user_id must be another admin's user ID")
+            target_userid = for_user_id
+    else:
+        target_userid = current_user.userid
+    if add_allowed_device(device_id, label, target_userid):
+        return {"message": "Device added", "device_id": device_id, "for_user_id": target_userid}
+    raise HTTPException(status_code=409, detail="Device ID already in allowlist for that user")
 
 
 @app.delete("/api/admin/allowed-devices/{device_id:path}")

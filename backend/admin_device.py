@@ -276,13 +276,15 @@ class AdminDeviceMiddleware:
         if is_device_allowed_for_user(userid, device_id):
             await self.app(scope, receive, send)
             return
-        await self._send_403(scope, receive, send, "Device not allowed", device_id=device_id or None)
+        await self._send_403(scope, receive, send, "Device not allowed", device_id=device_id or None, user_id=userid)
         return
 
-    async def _send_403(self, scope, receive, send, message, device_id=None):
+    async def _send_403(self, scope, receive, send, message, device_id=None, user_id=None):
         from starlette.responses import JSONResponse
         body = {"detail": message}
         if device_id is not None:
             body["device_id"] = device_id
+        if user_id is not None:
+            body["user_id"] = user_id
         response = JSONResponse(status_code=403, content=body)
         await response(scope, receive, send)
