@@ -417,7 +417,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchUsersForNotifications = async () => {
     setLoading(true);
     try {
-      const data = await adminService.getAllUsers({ limit: 500 });
+      // Backend max limit is 100; fetch first page for recipient list
+      const data = await adminService.getAllUsers({ page: 1, limit: 100 });
       setUsers(data.users || []);
     } catch (error) {
       console.error('Error fetching users for notifications:', error);

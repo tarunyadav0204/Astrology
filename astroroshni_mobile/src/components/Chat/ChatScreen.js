@@ -332,24 +332,6 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
   const [showMundaneModal, setShowMundaneModal] = useState(false);
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  // Move input into view when keyboard opens (does not change tab bar layout)
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => setKeyboardHeight(e.endCoordinates.height)
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0)
-    );
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
   // Stop any ongoing TTS playback when leaving the chat screen
   useFocusEffect(
     React.useCallback(() => {
@@ -2869,16 +2851,13 @@ export default function ChatScreen({ navigation, route }) {
 
 
 
-        {/* Suggestions + Input: translate up when keyboard is open so input stays visible */}
-        <View style={[
-          { transform: [{ translateY: -keyboardHeight }] },
-          keyboardHeight > 0 && {
-            backgroundColor: colors.background,
-            paddingTop: 12,
-            marginHorizontal: -12,
-            paddingHorizontal: 12,
-          },
-        ]}>
+        {/* Suggestions + Input: KeyboardAvoidingView handles keeping above keyboard */}
+        <View style={{
+          backgroundColor: 'transparent',
+          paddingTop: 12,
+          marginHorizontal: -12,
+          paddingHorizontal: 12,
+        }}>
         {/* Suggestions (only show when not loading and not showing greeting) */}
         {!loading && !showGreeting && messages.length > 0 && (
           <View style={styles.suggestionsContainer}>
@@ -2895,7 +2874,7 @@ export default function ChatScreen({ navigation, route }) {
                   onPress={() => setInputText(item)}
                 >
                   <LinearGradient
-                    colors={['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']}
+                    colors={['rgba(255, 107, 53, 0.1)', 'rgba(255, 107, 53, 0.03)']}
                     style={styles.suggestionChipGradient}
                   >
                     <Text style={[styles.suggestionChipText, { color: colors.text }]}>{item}</Text>
@@ -2913,12 +2892,12 @@ export default function ChatScreen({ navigation, route }) {
           <View style={styles.unifiedInputContainer}>
             <LinearGradient
                       colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.1)'] : ['rgba(249, 115, 22, 0.08)', 'rgba(249, 115, 22, 0.04)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)'])}
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.05)'] : ['rgba(249, 115, 22, 0.04)', 'rgba(249, 115, 22, 0.02)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.03)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
               style={[
                 styles.inputBarGradient,
                 {
-                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
+                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(249, 115, 22, 0.2)',
                 }
               ]}
             >
@@ -4413,7 +4392,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderColor: 'rgba(255, 107, 53, 0.2)',
     borderRadius: 20,
   },
   suggestionChipText: {
