@@ -1306,21 +1306,22 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                   {editingSubscription === `${user.userid}-${platform}` ? (
                                     <div className="subscription-edit">
                                       <select 
-                                        defaultValue={sub.plan_name}
-                                        onChange={(e) => setPendingSubscription({
-                                          userId: user.userid,
-                                          platform: platform,
-                                          planName: e.target.value
-                                        })}
+                                        defaultValue={`${platform}|${sub.plan_name}`}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val.includes('|')) {
+                                            const [p, pn] = val.split('|');
+                                            setPendingSubscription({ userId: user.userid, platform: p, planName: pn });
+                                          } else {
+                                            setPendingSubscription({ userId: user.userid, platform: platform, planName: val });
+                                          }
+                                        }}
                                       >
-                                        {subscriptionPlans
-                                          .filter(plan => plan.platform === platform)
-                                          .map(plan => (
-                                            <option key={plan.plan_name} value={plan.plan_name}>
-                                              {plan.plan_name}
-                                            </option>
-                                          ))
-                                        }
+                                        {subscriptionPlans.map(plan => (
+                                          <option key={`${plan.platform}-${plan.plan_name}`} value={`${plan.platform}|${plan.plan_name}`}>
+                                            {plan.platform}: {plan.tier_name || plan.plan_name}
+                                          </option>
+                                        ))}
                                       </select>
                                       <button onClick={handleSaveSubscription} className="save-btn">Save</button>
                                       <button onClick={handleCancelSubscription} className="cancel-btn">Cancel</button>
