@@ -47,6 +47,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [factsTotalPages, setFactsTotalPages] = useState(1);
   const [factsLoading, setFactsLoading] = useState(false);
   const [charts, setCharts] = useState([]);
+  const [chartsSearchName, setChartsSearchName] = useState('');
+  const [chartsSearchPhone, setChartsSearchPhone] = useState('');
+  const [chartsPage, setChartsPage] = useState(1);
+  const [chartsTotal, setChartsTotal] = useState(0);
+  const [chartsTotalPages, setChartsTotalPages] = useState(0);
+  const [chartsLimit] = useState(100);
+  const [sharingChartId, setSharingChartId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
@@ -478,14 +485,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const fetchCharts = async () => {
+  const fetchCharts = async (pageOverride = null) => {
     setLoading(true);
+    const page = pageOverride != null ? pageOverride : chartsPage;
+    if (pageOverride != null) setChartsPage(page);
     try {
-      const data = await adminService.getAllCharts();
+      const data = await adminService.getAllCharts({
+        name: chartsSearchName.trim() || undefined,
+        phone: chartsSearchPhone.trim() || undefined,
+        page,
+        limit: chartsLimit,
+      });
       setCharts(data.charts || []);
+      setChartsTotal(data.total ?? 0);
+      setChartsTotalPages(data.total_pages ?? 0);
     } catch (error) {
       console.error('Error fetching charts:', error);
       setCharts([]);
+      setChartsTotal(0);
+      setChartsTotalPages(0);
     } finally {
       setLoading(false);
     }
@@ -543,6 +561,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert(error.message || 'Failed to update discount');
     } finally {
       setSavingPlanDiscount(false);
+    }
+  };
+
+  const handleShareForInvestigation = async (chartId) => {
+    setSharingChartId(chartId);
+    try {
+      const res = await adminService.shareChartForInvestigation(chartId);
+      alert(res.message || `Chart copied to ${res.copied_count} admin(s) for investigation.`);
+    } catch (error) {
+      console.error('Error sharing chart:', error);
+      alert(error.message || 'Failed to share chart');
+    } finally {
+      setSharingChartId(null);
     }
   };
 
@@ -1507,27 +1538,53 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'charts' && (
           <div className="charts-management">
             <h2>Birth Charts Management</h2>
+            <div className="charts-filters">
+              <label>
+                <span>Owner name</span>
+                <input
+                  type="text"
+                  placeholder="Search by name"
+                  value={chartsSearchName}
+                  onChange={(e) => setChartsSearchName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchCharts(1)}
+                />
+              </label>
+              <label>
+                <span>Owner phone</span>
+                <input
+                  type="text"
+                  placeholder="Search by phone"
+                  value={chartsSearchPhone}
+                  onChange={(e) => setChartsSearchPhone(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchCharts(1)}
+                />
+              </label>
+              <button type="button" className="users-search-btn" onClick={() => fetchCharts(1)}>
+                Search
+              </button>
+            </div>
             {loading ? (
               <div className="loading">Loading charts...</div>
             ) : (
-              <div className="charts-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Chart ID</th>
-                      <th>Name</th>
-                      <th>Gender</th>
-                      <th>Owner Phone</th>
-                      <th>Owner Name</th>
-                      <th>Birth Date</th>
-                      <th>Birth Time</th>
-                      <th>Location</th>
-                      <th>Created</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {charts.map(chart => (
+              <>
+                <div className="charts-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Chart ID</th>
+                        <th>Name</th>
+                        <th>Gender</th>
+                        <th>Owner Phone</th>
+                        <th>Owner Name</th>
+                        <th>Birth Date</th>
+                        <th>Birth Time</th>
+                        <th>Location</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {charts.map(chart => (
                       <tr key={chart.id}>
                         <td>{chart.id}</td>
                         <td>{chart.name}</td>
@@ -1538,19 +1595,58 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         <td>{chart.time}</td>
                         <td>{chart.place || `${chart.latitude?.toFixed(2)}, ${chart.longitude?.toFixed(2)}`}</td>
                         <td>{new Date(chart.created_at).toLocaleString()}</td>
-                        <td>
-                          <button 
+                        <td className="charts-actions-cell">
+                          <button
+                            type="button"
+                            className="share-investigation-btn"
+                            onClick={() => handleShareForInvestigation(chart.id)}
+                            disabled={sharingChartId === chart.id}
+                            title="Share for investigation (copy to all admins)"
+                          >
+                            {sharingChartId === chart.id ? (
+                              <span className="charts-btn-spinner" aria-hidden />
+                            ) : (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.82 3.98M15.41 6.51l-6.82 3.98"/></svg>
+                            )}
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteChart(chart.id)}
                             className="delete-btn"
+                            title="Delete chart"
                           >
-                            Delete
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                           </button>
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
+                {chartsTotalPages > 0 && (
+                  <div className="charts-pagination">
+                    <span className="charts-pagination-info">
+                      Page {chartsPage} of {chartsTotalPages} ({chartsTotal} total)
+                    </span>
+                    <button
+                      type="button"
+                      className="charts-pagination-btn"
+                      disabled={chartsPage <= 1 || loading}
+                      onClick={() => fetchCharts(chartsPage - 1)}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      className="charts-pagination-btn"
+                      disabled={chartsPage >= chartsTotalPages || loading}
+                      onClick={() => fetchCharts(chartsPage + 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -2232,6 +2328,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <div className="notifications-form">
                   <div className="form-field">
                     <label>Recipients</label>
+                    <div className="notif-search-row">
+                      <input
+                        type="text"
+                        placeholder="Search by name (DB search)"
+                        value={notifSearchName}
+                        onChange={(e) => setNotifSearchName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchUsersForNotifications(1)}
+                        className="notif-search-input"
+                      />
+                      <button type="button" className="notif-search-btn" onClick={() => fetchUsersForNotifications(1)}>
+                        Search
+                      </button>
+                    </div>
                     <div className="notif-user-list">
                       <table className="notif-user-table">
                         <thead>
@@ -2240,12 +2349,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                               <input
                                 type="checkbox"
                                 id="blog-notif-select-all"
-                                checked={users.length > 0 && selectedBlogNotifUserIds.length === users.length}
+                                checked={users.length > 0 && users.every((u) => selectedBlogNotifUserIds.includes(u.userid))}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedBlogNotifUserIds(users.map((u) => u.userid));
+                                    const pageIds = new Set(users.map((u) => u.userid));
+                                    setSelectedBlogNotifUserIds((prev) => [...new Set([...prev, ...pageIds])]);
                                   } else {
-                                    setSelectedBlogNotifUserIds([]);
+                                    const pageIds = new Set(users.map((u) => u.userid));
+                                    setSelectedBlogNotifUserIds((prev) => prev.filter((id) => !pageIds.has(id)));
                                   }
                                 }}
                               />
@@ -2281,6 +2392,29 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         </tbody>
                       </table>
                     </div>
+                    {notifTotalPages > 0 && (
+                      <div className="notif-pagination">
+                        <span className="notif-pagination-info">
+                          Page {notifPage} of {notifTotalPages} ({notifTotal} total)
+                        </span>
+                        <button
+                          type="button"
+                          className="notif-pagination-btn"
+                          disabled={notifPage <= 1 || loading}
+                          onClick={() => fetchUsersForNotifications(notifPage - 1)}
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          className="notif-pagination-btn"
+                          disabled={notifPage >= notifTotalPages || loading}
+                          onClick={() => fetchUsersForNotifications(notifPage + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
                     <div className="notif-user-summary">{selectedBlogNotifUserIds.length} selected</div>
                     <small className="form-hint">
                       If no users are selected, the notification will be sent based on the audience setting below.

@@ -57,8 +57,15 @@ export const adminService = {
     return response.json();
   },
 
-  async getAllCharts() {
-    const response = await fetch(getEndpoint('/admin/charts'), {
+  async getAllCharts(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.name != null && params.name !== '') sp.set('name', params.name);
+    if (params.phone != null && params.phone !== '') sp.set('phone', params.phone);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/charts') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
 
@@ -77,6 +84,20 @@ export const adminService = {
 
     if (!response.ok) {
       throw new Error('Failed to delete chart');
+    }
+
+    return response.json();
+  },
+
+  async shareChartForInvestigation(chartId) {
+    const response = await fetch(getEndpoint(`/admin/charts/${chartId}/share-for-investigation`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to share chart');
     }
 
     return response.json();

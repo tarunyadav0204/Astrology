@@ -477,6 +477,61 @@
   margin-bottom: 20px;
 }
 
+.charts-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.charts-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.charts-filters input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 160px;
+}
+
+.charts-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.charts-pagination-info {
+  font-size: 14px;
+  color: #555;
+}
+
+.charts-pagination-btn {
+  padding: 6px 14px;
+  background: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.charts-pagination-btn:hover:not(:disabled) {
+  background: #c2185b;
+}
+
+.charts-pagination-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
 .users-management-filters {
   display: flex;
   flex-wrap: wrap;
@@ -760,6 +815,68 @@ tr:hover {
 .edit-btn:hover,
 .delete-btn:hover {
   opacity: 0.8;
+}
+
+.share-investigation-btn {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.share-investigation-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.share-investigation-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Charts table: icon-only buttons, same size, side by side */
+.charts-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.charts-table .share-investigation-btn,
+.charts-table .delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.charts-table .share-investigation-btn {
+  margin-right: 0;
+}
+
+.charts-table .share-investigation-btn svg,
+.charts-table .delete-btn svg {
+  flex-shrink: 0;
+}
+
+.charts-btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: charts-spin 0.7s linear infinite;
+}
+
+@keyframes charts-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Subscription plan discounts: 4-column table and aligned buttons */

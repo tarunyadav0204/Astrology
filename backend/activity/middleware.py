@@ -3,7 +3,6 @@ Middleware to log each API request as an activity event (action=api_request) to 
 Runs after the request; does not block the response.
 """
 import os
-from functools import lru_cache
 import time
 import logging
 import jwt
@@ -13,6 +12,13 @@ from starlette.requests import Request
 from activity.publisher import publish_activity
 
 logger = logging.getLogger(__name__)
+
+# Resolve DB path so lookup works from any CWD (e.g. when run in executor thread)
+_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DB_PATH = os.environ.get("ASTROLOGY_DB_PATH") or os.path.join(_BACKEND_DIR, "astrology.db")
+# Cache only positive name lookups so we retry when name was missing or DB failed
+_name_cache = {}
+_MAX_NAME_CACHE = 10_000
 
 # Skip activity for these paths to reduce noise (health, static, etc.)
 SKIP_PATHS = frozenset({"/", "/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"})
@@ -105,25 +111,29 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         return response
 
 
-@lru_cache(maxsize=10_000)
 def _get_user_name_by_id(user_id: int) -> str | None:
     """
     Look up name from DB when JWT has userid but no name (e.g. old token).
-    Cached in-memory per process (max 10k users) to avoid DB hit on every request.
-    Runs in executor thread.
+    Only caches positive results so we retry when name was missing or DB path was wrong.
+    Runs in executor thread; uses resolved _DB_PATH so CWD does not matter.
     """
     if user_id is None:
         return None
+    if user_id in _name_cache:
+        return _name_cache[user_id]
     try:
         import sqlite3
-        conn = sqlite3.connect("astrology.db")
+        conn = sqlite3.connect(_DB_PATH)
         cur = conn.execute("SELECT name FROM users WHERE userid = ?", (user_id,))
         row = cur.fetchone()
         conn.close()
         if row and row[0] is not None and str(row[0]).strip():
-            return str(row[0]).strip()
+            name = str(row[0]).strip()
+            if len(_name_cache) < _MAX_NAME_CACHE:
+                _name_cache[user_id] = name
+            return name
     except Exception as e:
-        logger.debug("Activity: name lookup for user_id=%s failed: %s", user_id, e)
+        logger.warning("Activity: name lookup for user_id=%s failed (db=%s): %s", user_id, _DB_PATH, e)
     return None
 
 

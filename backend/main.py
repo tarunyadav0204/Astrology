@@ -3611,18 +3611,43 @@ async def get_admin_users(
     }
 
 @app.get("/api/admin/charts")
-async def get_admin_charts(current_user: User = Depends(get_current_user)):
+async def get_admin_charts(
+    current_user: User = Depends(get_current_user),
+    name: Optional[str] = Query(None, description="Filter by owner name (partial match)"),
+    phone: Optional[str] = Query(None, description="Filter by owner phone (partial match)"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(100, ge=1, le=100, description="Page size"),
+):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT bc.id, bc.userid, bc.name, bc.date, bc.time, bc.latitude, bc.longitude, bc.place, bc.gender, bc.created_at, u.name as user_name, u.phone
+    base_sql = '''
         FROM birth_charts bc
         JOIN users u ON bc.userid = u.userid
+    '''
+    params = []
+    where_parts = []
+    if name and name.strip():
+        where_parts.append("(u.name LIKE ? OR u.phone LIKE ?)")
+        q = f"%{name.strip()}%"
+        params.extend([q, q])
+    if phone and phone.strip():
+        where_parts.append("u.phone LIKE ?")
+        params.append(f"%{phone.strip()}%")
+    where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+    cursor.execute(f"SELECT COUNT(*) {base_sql} WHERE {where_sql}", params)
+    total = cursor.fetchone()[0] or 0
+    total_pages = max(1, (total + limit - 1) // limit)
+    offset = (page - 1) * limit
+    cursor.execute(f'''
+        SELECT bc.id, bc.userid, bc.name, bc.date, bc.time, bc.latitude, bc.longitude, bc.place, bc.gender, bc.created_at, u.name as user_name, u.phone
+        {base_sql}
+        WHERE {where_sql}
         ORDER BY bc.created_at DESC
-    ''')
+        LIMIT ? OFFSET ?
+    ''', params + [limit, offset])
     rows = cursor.fetchall()
     conn.close()
     
@@ -3660,7 +3685,7 @@ async def get_admin_charts(current_user: User = Depends(get_current_user)):
             }
         charts.append(chart)
     
-    return {'charts': charts}
+    return {'charts': charts, 'total': total, 'page': page, 'limit': limit, 'total_pages': total_pages}
 
 @app.delete("/api/admin/users/{user_id}")
 async def delete_admin_user(user_id: int, current_user: User = Depends(get_current_user)):
@@ -3685,6 +3710,46 @@ async def delete_admin_chart(chart_id: int, current_user: User = Depends(get_cur
     conn.commit()
     conn.close()
     return {"message": "Chart deleted successfully"}
+
+
+@app.post("/api/admin/charts/{chart_id}/share-for-investigation")
+async def share_chart_for_investigation(chart_id: int, current_user: User = Depends(get_current_user)):
+    """Copy this chart to all admin users so they can view it for investigation. Uses INSERT...SELECT so encrypted columns are copied as-is."""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT id, userid FROM birth_charts WHERE id = ?', (chart_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Chart not found")
+        owner_userid = row[1]
+        cursor.execute("SELECT userid FROM users WHERE role = 'admin'")
+        admin_rows = cursor.fetchall()
+        admin_userids = [r[0] for r in admin_rows]
+        copied = 0
+        for admin_uid in admin_userids:
+            if admin_uid == owner_userid:
+                continue
+            cursor.execute('''
+                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                SELECT ?, name, date, time, latitude, longitude, timezone, place, gender, 'shared'
+                FROM birth_charts WHERE id = ?
+            ''', (admin_uid, chart_id))
+            copied += 1
+        conn.commit()
+        return {"message": f"Chart copied to {copied} admin(s) for investigation.", "copied_count": copied}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 
 @app.put("/api/admin/users/{user_id}")
 async def update_admin_user(user_id: int, user_data: dict, current_user: User = Depends(get_current_user)):
