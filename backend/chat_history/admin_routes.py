@@ -52,6 +52,23 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+def _timestamp_to_ist_iso(val) -> Optional[str]:
+    """Convert DB timestamp (naive, stored as server local / IST) to ISO string with +05:30 so frontend displays correct IST."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    # Already has timezone suffix
+    if "Z" in s or "+" in s or (s.count("-") >= 2 and len(s) > 19 and s[-6] in ("+", "-")):
+        return s
+    # Naive: treat as IST and append +05:30
+    s = s.replace(" ", "T", 1)
+    if len(s) >= 19:
+        s = s[:19]  # YYYY-MM-DDTHH:MM:SS
+    return s + "+05:30"
+
 @router.get("/admin/chat/history/{user_id}")
 async def get_user_chat_history(user_id: int, current_user: dict = Depends(require_admin)):
     """Get chat history for a specific user (admin only)"""
@@ -75,7 +92,7 @@ async def get_user_chat_history(user_id: int, current_user: dict = Depends(requi
         for row in cursor.fetchall():
             sessions.append({
                 'session_id': row['session_id'],
-                'created_at': row['created_at'],
+                'created_at': _timestamp_to_ist_iso(row['created_at']),
                 'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview']
             })
         
@@ -127,7 +144,7 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                 'user_id': row['user_id'],
                 'user_name': row['name'] or 'Unknown User',
                 'user_phone': row['phone'] or 'No phone',
-                'created_at': display_time,
+                'created_at': _timestamp_to_ist_iso(display_time),
                 'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview'],
                 'system_type': row['system_type'],
                 'native_name': native_name
@@ -158,7 +175,7 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                         'user_id': 'legacy',
                         'user_name': user_name,
                         'user_phone': 'Legacy System',
-                        'created_at': row['created_at'],
+                        'created_at': _timestamp_to_ist_iso(row['created_at']),
                         'preview': first_question[:100] + '...' if len(first_question) > 100 else first_question,
                         'system_type': row['system_type']
                     })
@@ -213,7 +230,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 messages.append({
                     'sender': row['sender'],
                     'content': row['content'],
-                    'timestamp': row['timestamp'],
+                    'timestamp': _timestamp_to_ist_iso(row['timestamp']),
                     'native_name': native_name
                 })
             
@@ -221,7 +238,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
             return {
                 "session_id": session_row['session_id'],
                 "user_id": session_row['user_id'],
-                "created_at": session_row['created_at'],
+                "created_at": _timestamp_to_ist_iso(session_row['created_at']),
                 "native_name": native_name,
                 "messages": messages
             }
@@ -238,11 +255,12 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 messages = []
                 
                 for msg in conv_data.get('messages', []):
+                    ts = _timestamp_to_ist_iso(msg.get('timestamp') or legacy_conv['updated_at'])
                     if msg.get('question'):
                         messages.append({
                             'sender': 'user',
                             'content': msg['question'],
-                            'timestamp': msg.get('timestamp', legacy_conv['updated_at']),
+                            'timestamp': ts,
                             'native_name': legacy_native_name
                         })
                     
@@ -250,7 +268,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         messages.append({
                             'sender': 'assistant',
                             'content': msg['response'],
-                            'timestamp': msg.get('timestamp', legacy_conv['updated_at']),
+                            'timestamp': ts,
                             'native_name': legacy_native_name
                         })
                 
@@ -258,7 +276,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 return {
                     "session_id": session_id,
                     "user_id": "legacy",
-                    "created_at": legacy_conv['updated_at'],
+                    "created_at": _timestamp_to_ist_iso(legacy_conv['updated_at']),
                     "native_name": legacy_native_name,
                     "messages": messages
                 }

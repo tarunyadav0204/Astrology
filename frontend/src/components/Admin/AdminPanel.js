@@ -31,6 +31,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [activeTab, setActiveTab] = useState('users');
   const [activeSubTab, setActiveSubTab] = useState('management');
   const [users, setUsers] = useState([]);
+  const [usersSearchPhone, setUsersSearchPhone] = useState('');
+  const [usersSearchName, setUsersSearchName] = useState('');
+  const [usersSearchRole, setUsersSearchRole] = useState('all');
+  const [usersSearchSubscription, setUsersSearchSubscription] = useState('all');
+  const [usersSearchCreatedStart, setUsersSearchCreatedStart] = useState('');
+  const [usersSearchCreatedEnd, setUsersSearchCreatedEnd] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersTotalPages, setUsersTotalPages] = useState(0);
+  const [usersLimit] = useState(25);
   const [userFacts, setUserFacts] = useState([]);
   const [factsSearch, setFactsSearch] = useState('');
   const [factsPage, setFactsPage] = useState(1);
@@ -193,7 +203,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } else if (activeTab === 'reddit') {
       fetchRedditDrafts();
     } else if (activeTab === 'notifications') {
-      fetchUsers();
+      fetchUsersForNotifications();
       fetchBlogPosts();
     }
   }, [activeTab, activeSubTab]);
@@ -375,13 +385,42 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (pageOverride) => {
     setLoading(true);
+    const page = pageOverride !== undefined ? pageOverride : usersPage;
+    if (pageOverride !== undefined) setUsersPage(page);
     try {
-      const data = await adminService.getAllUsers();
+      const params = {
+        phone: usersSearchPhone.trim() || undefined,
+        name: usersSearchName.trim() || undefined,
+        role: usersSearchRole === 'all' ? undefined : usersSearchRole,
+        subscription: usersSearchSubscription === 'all' ? undefined : usersSearchSubscription,
+        created_from: usersSearchCreatedStart.trim() || undefined,
+        created_to: usersSearchCreatedEnd.trim() || undefined,
+        page,
+        limit: usersLimit,
+      };
+      const data = await adminService.getAllUsers(params);
       setUsers(data.users || []);
+      setUsersTotal(data.total ?? 0);
+      setUsersTotalPages(data.total_pages ?? 0);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setUsers([]);
+      setUsersTotal(0);
+      setUsersTotalPages(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsersForNotifications = async () => {
+    setLoading(true);
+    try {
+      const data = await adminService.getAllUsers({ limit: 500 });
+      setUsers(data.users || []);
+    } catch (error) {
+      console.error('Error fetching users for notifications:', error);
       setUsers([]);
     } finally {
       setLoading(false);
@@ -1105,12 +1144,77 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             {loading ? (
               <div className="loading">Loading users...</div>
             ) : (
-              <div className="users-table">
+              <>
+                <div className="users-management-filters">
+                  <label>
+                    <span>Phone</span>
+                    <input
+                      type="text"
+                      placeholder="Search by phone"
+                      value={usersSearchPhone}
+                      onChange={(e) => setUsersSearchPhone(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      placeholder="Search by name"
+                      value={usersSearchName}
+                      onChange={(e) => setUsersSearchName(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Role</span>
+                    <select
+                      value={usersSearchRole}
+                      onChange={(e) => setUsersSearchRole(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Subscription</span>
+                    <select
+                      value={usersSearchSubscription}
+                      onChange={(e) => setUsersSearchSubscription(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="none">None</option>
+                      {subscriptionPlans && [...new Set(subscriptionPlans.map((p) => p.plan_name || p.tier_name).filter(Boolean))].map((planName) => (
+                        <option key={planName} value={planName}>{planName}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Created from</span>
+                    <input
+                      type="date"
+                      value={usersSearchCreatedStart}
+                      onChange={(e) => setUsersSearchCreatedStart(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Created to</span>
+                    <input
+                      type="date"
+                      value={usersSearchCreatedEnd}
+                      onChange={(e) => setUsersSearchCreatedEnd(e.target.value)}
+                    />
+                  </label>
+                  <button type="button" className="users-search-btn" onClick={() => fetchUsers(1)}>
+                    Search
+                  </button>
+                </div>
+                <div className="users-table">
                 <table>
                   <thead>
                     <tr>
                       <th>Phone</th>
                       <th>Name</th>
+                      <th>Email</th>
                       <th>Role</th>
                       <th>Subscriptions</th>
                       <th>Created</th>
@@ -1118,10 +1222,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map(user => (
+                    {users.length === 0 ? (
+                      <tr><td colSpan={7} className="users-table-empty">No users match the search.</td></tr>
+                    ) : (
+                      users.map(user => (
                       <tr key={user.phone}>
                         <td>{user.phone}</td>
                         <td>{user.name}</td>
+                        <td>{user.email || '—'}</td>
                         <td>
                           {editingUser === user.phone ? (
                             <select 
@@ -1221,10 +1329,35 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
+                {usersTotalPages > 0 && (
+                  <div className="users-pagination">
+                    <span className="users-pagination-info">
+                      Page {usersPage} of {usersTotalPages} ({usersTotal} total)
+                    </span>
+                    <button
+                      type="button"
+                      className="users-pagination-btn"
+                      disabled={usersPage <= 1 || loading}
+                      onClick={() => fetchUsers(usersPage - 1)}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      className="users-pagination-btn"
+                      disabled={usersPage >= usersTotalPages || loading}
+                      onClick={() => fetchUsers(usersPage + 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
+              </>
             )}
           </div>
         )}

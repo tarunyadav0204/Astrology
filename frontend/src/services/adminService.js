@@ -20,8 +20,19 @@ const getAuthHeaders = () => {
 };
 
 export const adminService = {
-  async getAllUsers() {
-    const response = await fetch(getEndpoint('/admin/users'), {
+  async getAllUsers(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.phone != null && params.phone !== '') sp.set('phone', params.phone);
+    if (params.name != null && params.name !== '') sp.set('name', params.name);
+    if (params.role != null && params.role !== '' && params.role !== 'all') sp.set('role', params.role);
+    if (params.subscription != null && params.subscription !== '' && params.subscription !== 'all') sp.set('subscription', params.subscription);
+    if (params.created_from != null && params.created_from !== '') sp.set('created_from', params.created_from);
+    if (params.created_to != null && params.created_to !== '') sp.set('created_to', params.created_to);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/users') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
 

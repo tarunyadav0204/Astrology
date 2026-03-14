@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
+from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator, ValidationError
@@ -3508,25 +3508,81 @@ async def get_all_daily_horoscopes(date: Optional[str] = None):
 
 # Admin endpoints
 @app.get("/api/admin/users")
-async def get_admin_users(current_user: User = Depends(get_current_user)):
+async def get_admin_users(
+    current_user: User = Depends(get_current_user),
+    phone: Optional[str] = Query(None, description="Filter by phone (partial match)"),
+    name: Optional[str] = Query(None, description="Filter by name (partial match)"),
+    role: Optional[str] = Query(None, description="Filter by role (user/admin)"),
+    subscription: Optional[str] = Query(None, description="Filter by plan name, or 'none' for no subscription"),
+    created_from: Optional[str] = Query(None, description="Created on or after (YYYY-MM-DD)"),
+    created_to: Optional[str] = Query(None, description="Created on or before (YYYY-MM-DD)"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(25, ge=1, le=100, description="Page size"),
+):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT userid, name, phone, role, created_at FROM users ORDER BY created_at DESC")
+
+    conditions = []
+    params = []
+    if phone and phone.strip():
+        conditions.append("u.phone LIKE ?")
+        params.append(f"%{phone.strip()}%")
+    if name and name.strip():
+        conditions.append("u.name LIKE ?")
+        params.append(f"%{name.strip()}%")
+    if role and role.strip():
+        conditions.append("u.role = ?")
+        params.append(role.strip())
+    if created_from and created_from.strip():
+        conditions.append("DATE(u.created_at) >= ?")
+        params.append(created_from.strip())
+    if created_to and created_to.strip():
+        conditions.append("DATE(u.created_at) <= ?")
+        params.append(created_to.strip())
+
+    if subscription is not None and subscription.strip():
+        sub_val = subscription.strip()
+        if sub_val.lower() == 'none':
+            conditions.append("""u.userid NOT IN (
+                SELECT userid FROM user_subscriptions us
+                WHERE us.status = 'active' AND us.end_date >= date('now')
+            )""")
+        else:
+            conditions.append("""u.userid IN (
+                SELECT us.userid FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE (sp.plan_name = ? OR sp.tier_name = ?)
+                AND us.status = 'active' AND us.end_date >= date('now')
+            )""")
+            params.append(sub_val)
+            params.append(sub_val)
+
+    where_sql = " AND ".join(conditions) if conditions else "1=1"
+    base_sql = f"FROM users u WHERE {where_sql}"
+
+    # Total count
+    cursor.execute(f"SELECT COUNT(*) {base_sql}", params)
+    total = cursor.fetchone()[0]
+
+    # Paginated list of userids (order by created_at desc)
+    offset = (page - 1) * limit
+    cursor.execute(
+        f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.created_at {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
+        params + [limit, offset]
+    )
     rows = cursor.fetchall()
-    
+
     users = []
     for row in rows:
-        # Get user subscriptions
         cursor.execute('''
             SELECT sp.platform, sp.plan_name, us.status, us.end_date
             FROM user_subscriptions us
             JOIN subscription_plans sp ON us.plan_id = sp.plan_id
             WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
         ''', (row[0],))
-        
         subscriptions = {}
         for sub in cursor.fetchall():
             subscriptions[sub[0]] = {
@@ -3534,18 +3590,25 @@ async def get_admin_users(current_user: User = Depends(get_current_user)):
                 'status': sub[2],
                 'end_date': sub[3]
             }
-        
         users.append({
             'userid': row[0],
             'name': row[1],
             'phone': row[2],
             'role': row[3],
-            'created_at': row[4],
+            'email': row[4],
+            'created_at': row[5],
             'subscriptions': subscriptions
         })
-    
+
     conn.close()
-    return {'users': users}
+    total_pages = (total + limit - 1) // limit if limit else 0
+    return {
+        'users': users,
+        'total': total,
+        'page': page,
+        'limit': limit,
+        'total_pages': total_pages
+    }
 
 @app.get("/api/admin/charts")
 async def get_admin_charts(current_user: User = Depends(get_current_user)):

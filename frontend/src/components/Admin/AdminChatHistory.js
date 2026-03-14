@@ -77,14 +77,26 @@ const AdminChatHistory = () => {
     }
   };
 
+  const IST = 'Asia/Kolkata';
+
   const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      timeZone: IST
+    }) + ' IST';
+  };
+
+  const formatTimeIST = (dateStr) => {
+    return new Date(dateStr).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: IST
+    }) + ' IST';
   };
 
   const formatMessageContent = (content) => {
@@ -162,7 +174,7 @@ const AdminChatHistory = () => {
                       <span className="message-native-badge" title="Birth chart / Native">{message.native_name}</span>
                     )}
                     <span className="message-time">
-                      {new Date(message.timestamp).toLocaleTimeString()}
+                      {formatTimeIST(message.timestamp)}
                     </span>
                   </div>
                 </div>
