@@ -1,9 +1,12 @@
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 import { chatAPI } from '../services/api';
 
 let currentSound = null;
 /** Callbacks for the currently loaded podcast (onPause, onResume, onStop). Cleared when stop or done. */
 let podcastCallbacks = null;
+/** Temp file path for current podcast; cleared when playback ends or stops so we can delete it. */
+let podcastTempUri = null;
 
 export const textToSpeech = {
   async speak(text, { language = 'english', voiceName, onDone, onError } = {}) {
@@ -82,6 +85,10 @@ export const textToSpeech = {
         }
         currentSound = null;
         podcastCallbacks = null;
+        if (podcastTempUri) {
+          FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+          podcastTempUri = null;
+        }
       }
 
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
@@ -92,8 +99,23 @@ export const textToSpeech = {
         if (onError) onError(new Error('Podcast: missing audio from server'));
         return;
       }
-      const dataUri = `data:audio/mpeg;base64,${base64Audio}`;
-      const { sound } = await Audio.Sound.createAsync({ uri: dataUri });
+
+      // On real devices, data URIs often fail for large audio. Write to temp file and use file URI.
+      const filename = `podcast_${messageId || Date.now()}.mp3`;
+      podcastTempUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(podcastTempUri, base64Audio, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Ensure playback through speaker (not earpiece) on Android and allow playback in silent mode on iOS
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      const { sound } = await Audio.Sound.createAsync({ uri: podcastTempUri });
       currentSound = sound;
       podcastCallbacks = { onPause, onResume, onStop };
 
@@ -103,6 +125,10 @@ export const textToSpeech = {
           if (onDone) onDone();
           sound.unloadAsync();
           currentSound = null;
+          if (podcastTempUri) {
+            FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+            podcastTempUri = null;
+          }
         }
       });
 
@@ -117,6 +143,10 @@ export const textToSpeech = {
         console.error('[TTS] playPodcast error', e);
       }
       podcastCallbacks = null;
+      if (podcastTempUri) {
+        FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+        podcastTempUri = null;
+      }
       if (onError) onError(e);
     }
   },
@@ -154,6 +184,10 @@ export const textToSpeech = {
       currentSound = null;
       if (podcastCallbacks && podcastCallbacks.onStop) podcastCallbacks.onStop();
       podcastCallbacks = null;
+      if (podcastTempUri) {
+        FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+        podcastTempUri = null;
+      }
     }
   },
 
