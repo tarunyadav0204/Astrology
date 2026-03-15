@@ -11,6 +11,8 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +30,7 @@ export default function PodcastHistoryScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingMessageId, setPlayingMessageId] = useState(null);
+  const [sharingMessageId, setSharingMessageId] = useState(null);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -95,6 +98,42 @@ export default function PodcastHistoryScreen({ navigation }) {
     setPlayingMessageId(null);
   };
 
+  const sharePodcast = async (entry, e) => {
+    if (e) e.stopPropagation();
+    const token = await storage.getAuthToken();
+    if (!token) {
+      navigation.replace('Login');
+      return;
+    }
+    setSharingMessageId(entry.message_id);
+    try {
+      const streamUrl = chatAPI.getPodcastStreamUrl(entry.message_id, entry.lang);
+      const filename = `AstroRoshni-Podcast-${entry.message_id || Date.now()}.mp3`;
+      const localPath = `${FileSystem.cacheDirectory}${filename}`;
+      const { status } = await FileSystem.downloadAsync(streamUrl, localPath, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (status !== 200) {
+        Alert.alert('Error', 'Could not load podcast to share.');
+        return;
+      }
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(localPath, {
+        mimeType: 'audio/mpeg',
+        dialogTitle: 'Share Podcast',
+      });
+    } catch (err) {
+      console.error('[PodcastHistory] share error', err);
+      Alert.alert('Error', 'Could not share podcast. Please try again.');
+    } finally {
+      setSharingMessageId(null);
+    }
+  };
+
   const openSession = async (entry) => {
     const sessionId = entry.session_id;
     if (!sessionId) {
@@ -143,6 +182,7 @@ export default function PodcastHistoryScreen({ navigation }) {
 
   const renderItem = ({ item }) => {
     const isPlaying = playingMessageId === item.message_id;
+    const isSharing = sharingMessageId === item.message_id;
     return (
       <View style={[styles.card, { elevation: getCardElevation(5) }]}>
         <TouchableOpacity
@@ -172,6 +212,17 @@ export default function PodcastHistoryScreen({ navigation }) {
               <View style={styles.cardMeta}>
                 <Text style={[styles.playedAt, { color: colors.textSecondary }]}>{getRelativeTime(item.created_at)}</Text>
               </View>
+              <TouchableOpacity
+                onPress={(e) => sharePodcast(item, e)}
+                style={styles.shareIconWrap}
+                disabled={isSharing}
+              >
+                {isSharing ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Icon name="share-outline" size={22} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
               <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
             </View>
             <Text style={[styles.preview, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -244,7 +295,7 @@ export default function PodcastHistoryScreen({ navigation }) {
                 <Text style={styles.nowPlayingStopText}>Stop</Text>
               </TouchableOpacity>
             </View>
-          )}
+          ) : null}
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -294,6 +345,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardMeta: { flex: 1 },
+  shareIconWrap: { padding: 8, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
   nativeName: { fontSize: 15, fontWeight: '600' },
   playedAt: { fontSize: 12, marginTop: 2 },
   preview: { fontSize: 14, lineHeight: 20 },

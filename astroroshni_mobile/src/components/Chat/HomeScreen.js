@@ -2135,13 +2135,13 @@ const loadHomeData = async (nativeData = null) => {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Bottom Tabs - extend into safe area with same color (opaque) */}
+      {/* Bottom Tabs - reduced bottom padding on iPhone */}
       <View style={[
         styles.bottomTabs,
         {
           bottom: 0,
-          height: (Platform.OS === 'ios' ? 80 : 70) + insets.bottom,
-          paddingBottom: insets.bottom,
+          height: (Platform.OS === 'ios' ? 80 : 70) + (Platform.OS === 'ios' ? 10 : insets.bottom),
+          paddingBottom: Platform.OS === 'ios' ? 10 : insets.bottom,
         },
       ]}>
         <LinearGradient

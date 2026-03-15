@@ -109,6 +109,7 @@ export default function AdminActivity() {
       <h2>Activity</h2>
       <p className="admin-activity-description">
         Today&apos;s activity by default. Use filters and column headers to sort.
+        Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
       </p>
 
       <div className="admin-activity-filters">

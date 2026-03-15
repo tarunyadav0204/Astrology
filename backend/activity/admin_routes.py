@@ -2,9 +2,10 @@
 Admin-only API to query user activity from BigQuery (today by default, with filters and sort).
 """
 import os
+import sqlite3
 import logging
 from datetime import datetime, timezone, date
-from typing import Optional, Any
+from typing import Optional, Any, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from auth import get_current_user, User
@@ -12,6 +13,65 @@ from auth import get_current_user, User
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DB_PATH = os.environ.get("ASTROLOGY_DB_PATH") or os.path.join(_BACKEND_DIR, "astrology.db")
+
+
+def _enrich_activity_user_ids(out: List[Dict[str, Any]]) -> None:
+    """
+    For activity rows that have user_phone but missing user_id or user_name (e.g. old JWTs),
+    look up userid and name from the users table and set them on the row.
+    """
+    def _missing_uid(uid):  # treat None, 0, "" as missing
+        if uid is None:
+            return True
+        if isinstance(uid, (int, float)):
+            return int(uid) == 0
+        return str(uid).strip() == ""
+
+    def _missing_name(name):  # treat None or blank as missing
+        if name is None:
+            return True
+        return str(name).strip() == ""
+
+    phones_to_lookup = set()
+    for row in out:
+        phone = row.get("user_phone")
+        if phone and str(phone).strip():
+            uid = row.get("user_id")
+            name = row.get("user_name")
+            if _missing_uid(uid) or _missing_name(name):
+                phones_to_lookup.add(str(phone).strip())
+    if not phones_to_lookup:
+        return
+    try:
+        conn = sqlite3.connect(_DB_PATH)
+        cur = conn.execute(
+            "SELECT userid, name, phone FROM users WHERE phone IN ({})".format(
+                ",".join("?" * len(phones_to_lookup))
+            ),
+            list(phones_to_lookup),
+        )
+        # phone -> (userid, name); name may be None
+        phone_to_user = {}
+        for row in cur.fetchall():
+            phone_to_user[row[2]] = (row[0], row[1] if (row[1] and str(row[1]).strip()) else None)
+        conn.close()
+        for row in out:
+            phone = row.get("user_phone")
+            if not phone:
+                continue
+            entry = phone_to_user.get(str(phone).strip())
+            if not entry:
+                continue
+            userid, name = entry
+            if _missing_uid(row.get("user_id")):
+                row["user_id"] = userid
+            if _missing_name(row.get("user_name")) and name:
+                row["user_name"] = name
+    except Exception as e:
+        logger.warning("Activity: enrich user_id/user_name by phone failed (db=%s): %s", _DB_PATH, e)
 
 
 def _require_admin(current_user: User = Depends(get_current_user)) -> User:
@@ -138,4 +198,8 @@ async def get_activity(
         d = dict(row)
         row_dict = {col: d.get(col) or d.get(col.lower()) for col in ACTIVITY_COLUMNS}
         out.append({k: _serialize(v) for k, v in row_dict.items()})
+
+    # Enrich rows that have user_phone but no user_id (e.g. old JWTs): look up userid from users table
+    _enrich_activity_user_ids(out)
+
     return {"activity": out, "count": len(out)}

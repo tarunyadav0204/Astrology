@@ -8,6 +8,7 @@ import {
   Linking,
   Alert,
   Animated,
+  Easing,
   Clipboard,
   Share,
   ActivityIndicator,
@@ -56,6 +57,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const skeletonAnim = useRef(new Animated.Value(0)).current;
   /** After seek, ignore progress updates briefly so we don't overwrite with stale position. */
   const lastSeekedAtRef = useRef(0);
+  /** Subtle heartbeat-style pulse for the podcast icon (idle state). */
+  const podcastIconPulse = useRef(new Animated.Value(1)).current;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -86,6 +89,39 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       ).start();
     }
   }, [message.summary_image, isImageLoading]);
+
+  useEffect(() => {
+    const heartbeat = Animated.loop(
+      Animated.sequence([
+        Animated.timing(podcastIconPulse, {
+          toValue: 1.05,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(podcastIconPulse, {
+          toValue: 1.02,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+        Animated.timing(podcastIconPulse, {
+          toValue: 1.06,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(podcastIconPulse, {
+          toValue: 1,
+          duration: 520,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1300),
+      ])
+    );
+    heartbeat.start();
+    return () => heartbeat.stop();
+  }, [podcastIconPulse]);
 
   // Animated loader for typing indicator
   const dot1Anim = useRef(new Animated.Value(0)).current;
@@ -1261,7 +1297,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                   {isLoadingPodcast ? (
                     <ActivityIndicator size="small" color="#ff6b35" />
                   ) : (
-                    <Ionicons name="radio-outline" size={16} color="#666" />
+                    <Animated.View style={{ transform: [{ scale: podcastIconPulse }] }}>
+                      <Ionicons name="radio-outline" size={17} color="#ff6b35" />
+                    </Animated.View>
                   )}
                 </TouchableOpacity>
               )}
@@ -1458,7 +1496,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                     {isLoadingPodcast ? (
                       <ActivityIndicator size="small" color="#ff6b35" />
                     ) : (
-                      <Ionicons name="radio-outline" size={16} color="#666" />
+                      <Animated.View style={{ transform: [{ scale: podcastIconPulse }] }}>
+                        <Ionicons name="radio-outline" size={17} color="#ff6b35" />
+                      </Animated.View>
                     )}
                   </TouchableOpacity>
                 )}

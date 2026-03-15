@@ -225,8 +225,9 @@ export default function ChatViewScreen({ route, navigation }) {
                   {(() => {
                     const firstMsg = messages.find(m => m.sender === 'user');
                     const timestamp = firstMsg?.timestamp || session.created_at;
-                    // Backend sends UTC time without 'Z', so append it
-                    const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+                    const utcTimestamp = (timestamp && typeof timestamp === 'string')
+                      ? (timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z')
+                      : (timestamp != null ? new Date(timestamp).toISOString() : new Date().toISOString());
                     return new Date(utcTimestamp).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric', 
@@ -242,19 +243,15 @@ export default function ChatViewScreen({ route, navigation }) {
                   {(() => {
                     const firstMsg = messages.find(m => m.sender === 'user');
                     const timestamp = firstMsg?.timestamp || session.created_at;
-                    console.log('🕐 Raw timestamp from backend:', timestamp);
-                    // Backend sends UTC time without 'Z', so append it
-                    const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
-                    console.log('🕐 Converted to UTC format:', utcTimestamp);
+                    const utcTimestamp = (timestamp && typeof timestamp === 'string')
+                      ? (timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z')
+                      : (timestamp != null ? new Date(timestamp).toISOString() : new Date().toISOString());
                     const date = new Date(utcTimestamp);
-                    console.log('🕐 Parsed Date (local):', date.toString());
-                    const timeStr = date.toLocaleTimeString('en-US', { 
+                    return date.toLocaleTimeString('en-US', { 
                       hour: '2-digit', 
                       minute: '2-digit',
                       hour12: true
                     });
-                    console.log('🕐 Final formatted time:', timeStr);
-                    return timeStr;
                   })()}
                 </Text>
               </View>

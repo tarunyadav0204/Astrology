@@ -1389,7 +1389,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       users.map(user => (
                       <tr key={user.phone}>
                         <td>{user.phone}</td>
-                        <td>{user.name}</td>
+                        <td>{user.name || user.phone || '—'}</td>
                         <td>{user.email || '—'}</td>
                         <td>
                           {editingUser === user.phone ? (
