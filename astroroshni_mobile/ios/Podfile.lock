@@ -1,7 +1,14 @@
 PODS:
   - boost (1.84.0)
   - DoubleConversion (1.1.6)
-  - EXConstants (18.0.13):
+  - EXApplication (6.1.5):
+    - ExpoModulesCore
+  - EXAV (16.0.8):
+    - ExpoModulesCore
+    - ReactCommon/turbomodule/core
+  - EXConstants (17.0.8):
+    - ExpoModulesCore
+  - EXNotifications (0.31.5):
     - ExpoModulesCore
   - Expo (54.0.33):
     - boost
@@ -37,6 +44,8 @@ PODS:
   - ExpoAsset (12.0.12):
     - ExpoModulesCore
   - ExpoBlur (15.0.8):
+    - ExpoModulesCore
+  - ExpoDevice (7.0.3):
     - ExpoModulesCore
   - ExpoFileSystem (19.0.21):
     - ExpoModulesCore
@@ -2399,6 +2408,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNIap (12.15.2):
+    - React-Core
   - RNScreens (4.16.0):
     - boost
     - DoubleConversion
@@ -2436,10 +2447,14 @@ PODS:
 DEPENDENCIES:
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
+  - EXApplication (from `../node_modules/expo-application/ios`)
+  - EXAV (from `../node_modules/expo-av/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
+  - EXNotifications (from `../node_modules/expo-notifications/ios`)
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
+  - ExpoDevice (from `../node_modules/expo-device/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
@@ -2524,6 +2539,7 @@ DEPENDENCIES:
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNIap (from `../node_modules/react-native-iap`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
   - SocketRocket (~> 0.7.1)
@@ -2538,14 +2554,22 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
   DoubleConversion:
     :podspec: "../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec"
+  EXApplication:
+    :path: "../node_modules/expo-application/ios"
+  EXAV:
+    :path: "../node_modules/expo-av/ios"
   EXConstants:
     :path: "../node_modules/expo-constants/ios"
+  EXNotifications:
+    :path: "../node_modules/expo-notifications/ios"
   Expo:
     :path: "../node_modules/expo"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../node_modules/expo-blur/ios"
+  ExpoDevice:
+    :path: "../node_modules/expo-device/ios"
   ExpoFileSystem:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
@@ -2713,6 +2737,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-community/datetimepicker"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNIap:
+    :path: "../node_modules/react-native-iap"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNSVG:
@@ -2723,10 +2749,14 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
-  EXConstants: fce59a631a06c4151602843667f7cfe35f81e271
+  EXApplication: 1e06972201838375ca1ec1ba34d586a98a5dc718
+  EXAV: b60fcf142fae6684d295bc28cd7cfcb3335570ea
+  EXConstants: fcfc75800824ac2d5c592b5bc74130bad17b146b
+  EXNotifications: 6770976336aacdc7dc7aed7b538dd8f7ad2c55e8
   Expo: 78ceda23ec2990e8ec94980be4fce1aea9ffcdd5
   ExpoAsset: f867e55ceb428aab99e1e8c082b5aee7c159ea18
   ExpoBlur: b90747a3f22a8b6ceffd9cb0dc41a4184efdc656
+  ExpoDevice: d36ab4186b6799a28fd449bb9a1c77455f23fd1a
   ExpoFileSystem: 858a44267a3e6e9057e0888ad7c7cfbf55d52063
   ExpoFont: f543ce20a228dd702813668b1a07b46f51878d47
   ExpoKeepAwake: 55f75eca6499bb9e4231ebad6f3e9cb8f99c0296
@@ -2810,6 +2840,7 @@ SPEC CHECKSUMS:
   RNCPicker: da0f1c9411208c1ca52bc98383db54a06e0a3862
   RNDateTimePicker: 7d93eacf4bdf56350e4b7efd5cfc47639185e10c
   RNGestureHandler: 12a436b5074378be95468a57b62c165a1e24cfc9
+  RNIap: db3f43e41ed9d7b5c04fbfe759b10ac344521af6
   RNScreens: 35525ebfe219c8709da0d26aebbc9a5e02e1077b
   RNSVG: d3f55b1e5f680744764389119f1cb7512058672b
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748

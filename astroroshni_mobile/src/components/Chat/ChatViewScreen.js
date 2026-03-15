@@ -305,6 +305,7 @@ export default function ChatViewScreen({ route, navigation }) {
                         message={message} 
                         language="english"
                         onDelete={handleDeleteMessage}
+                        sessionId={session?.session_id}
                       />
                     </Animated.View>
                   );

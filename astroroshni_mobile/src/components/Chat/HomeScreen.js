@@ -64,9 +64,6 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
 
-  if (!colors) {
-    return null;
-  }
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [activeTab, setActiveTab] = useState('ask');

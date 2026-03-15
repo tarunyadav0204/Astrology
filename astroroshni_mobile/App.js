@@ -15,6 +15,7 @@ import ModernAuthFlow from './src/components/Auth/ModernAuthFlow';
 import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
+import PodcastHistoryScreen from './src/components/Chat/PodcastHistoryScreen';
 import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
 import BirthProfileIntroScreen from './src/components/BirthProfileIntro/BirthProfileIntroScreen';
 import SelectNativeScreen from './src/components/Native/SelectNativeScreen';
@@ -364,6 +365,11 @@ export default function App() {
           <Stack.Screen 
             name="ChatView" 
             component={ChatViewScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="PodcastHistory" 
+            component={PodcastHistoryScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

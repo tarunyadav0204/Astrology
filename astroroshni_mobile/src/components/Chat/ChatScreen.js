@@ -47,7 +47,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
-import { textToSpeech } from '../../utils/textToSpeech';
+import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -337,7 +337,7 @@ export default function ChatScreen({ navigation, route }) {
     React.useCallback(() => {
       return () => {
         try {
-          textToSpeech.stop();
+          getTextToSpeech().stop();
         } catch (e) {
           // ignore
         }
@@ -2467,12 +2467,8 @@ export default function ChatScreen({ navigation, route }) {
         style={styles.safeArea}
         edges={['top']}
       >
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
-        {/* Header */}
+        <View style={styles.safeAreaInner}>
+        {/* Header - outside KeyboardAvoidingView so home/greeting layout is never affected by keyboard */}
         <View style={styles.headerContainer}>
           <LinearGradient
             colors={theme === 'dark' 
@@ -2624,16 +2620,22 @@ export default function ChatScreen({ navigation, route }) {
           </LinearGradient>
         </View>
 
-        {/* Content */}
         {showGreeting ? (
-          <HomeScreen 
-            birthData={birthData}
-            onOptionSelect={handleGreetingOptionSelect}
-            navigation={navigation}
-            setShowDashaBrowser={setShowDashaBrowser}
-          />
+          <View style={{ flex: 1 }}>
+            <HomeScreen 
+              birthData={birthData}
+              onOptionSelect={handleGreetingOptionSelect}
+              navigation={navigation}
+              setShowDashaBrowser={setShowDashaBrowser}
+            />
+          </View>
         ) : (
           <>
+          <KeyboardAvoidingView 
+            style={styles.keyboardAvoidingView}
+            behavior="padding"
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : (insets?.top ?? 0)}
+          >
           {partnershipMode && (
             <View style={styles.floatingBadgesContainer}>
               <TouchableOpacity 
@@ -2832,6 +2834,7 @@ export default function ChatScreen({ navigation, route }) {
                       onDelete={handleDeleteMessage}
                       onRestart={restartPolling}
                       onSendRetry={handleSendRetry}
+                      sessionId={sessionId}
                     />
                     
                     {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
@@ -2846,10 +2849,6 @@ export default function ChatScreen({ navigation, route }) {
               );
             })}
           </GHScrollView>
-          </>
-        )}
-
-
 
         {/* Suggestions + Input: KeyboardAvoidingView handles keeping above keyboard */}
         <View style={{
@@ -3086,8 +3085,9 @@ export default function ChatScreen({ navigation, route }) {
           </View>
         )}
         </View>
+        </KeyboardAvoidingView>
 
-        {/* Quick Actions Bar */}
+        {/* Quick Actions Bar - outside KeyboardAvoidingView so it stays at bottom after keyboard dismiss on Android */}
         {!showGreeting && (
           <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, insets.bottom) }]}>
             <TouchableOpacity 
@@ -3138,6 +3138,8 @@ export default function ChatScreen({ navigation, route }) {
               <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.history')}</Text>
             </TouchableOpacity>
           </View>
+        )}
+        </>
         )}
 
         {/* Language Modal */}
@@ -3698,6 +3700,38 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('PodcastHistory');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🎙️</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.podcastHistory', 'Podcast History')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
                   {!isMundane && !showGreeting && (
                     <TouchableOpacity
                       style={getMenuOptionStyle()}
@@ -4176,7 +4210,8 @@ export default function ChatScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
-        </KeyboardAvoidingView>
+
+        </View>
       </SafeAreaView>
       
       <PremiumAnalysisModal
@@ -4219,6 +4254,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
+    flex: 1,
+  },
+  safeAreaInner: {
     flex: 1,
   },
   keyboardAvoidingView: {

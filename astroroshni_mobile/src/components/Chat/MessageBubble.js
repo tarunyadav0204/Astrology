@@ -24,7 +24,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../../utils/pdfGenerator';
-import { textToSpeech } from '../../utils/textToSpeech';
+import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -32,7 +32,7 @@ import { useCredits } from '../../credits/CreditContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry, sessionId }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const { podcastCost, credits } = useCredits();
@@ -60,7 +60,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   useFocusEffect(
     React.useCallback(() => {
       return () => {
-        textToSpeech.stopPodcast();
+        getTextToSpeech().stopPodcast();
         setIsPlayingPodcast(false);
         setIsPausedPodcast(false);
         setShowPodcastPlayerModal(false);
@@ -152,7 +152,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 
   const playPodcast = async () => {
     if (isPlayingPodcast) {
-      textToSpeech.stop();
+      getTextToSpeech().stop();
       setIsPlayingPodcast(false);
       return;
     }
@@ -164,9 +164,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     try {
       setIsLoadingPodcast(true);
       setIsPlayingPodcast(false);
-      await textToSpeech.playPodcast(cleanText, {
+      await getTextToSpeech().playPodcast(cleanText, {
         language,
         messageId: message.messageId || null,
+        sessionId: sessionId || null,
+        preview: (cleanText || message.content || '').slice(0, 150),
         onProgress: (pos, dur) => {
           if (Date.now() - lastSeekedAtRef.current < 600) return; // don't overwrite seek with stale callback
           setPodcastPositionMillis(pos);
@@ -241,7 +243,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 
   const onPodcastButtonPress = async () => {
     if (isPausedPodcast) {
-      textToSpeech.resumePodcast();
+      getTextToSpeech().resumePodcast();
       return;
     }
     if (isPlayingPodcast) return; // Pause/Stop are separate buttons
@@ -277,26 +279,26 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   };
 
   const handlePausePodcast = () => {
-    textToSpeech.pausePodcast();
+    getTextToSpeech().pausePodcast();
   };
 
   const handleResumePodcast = () => {
-    textToSpeech.resumePodcast();
+    getTextToSpeech().resumePodcast();
   };
 
   const handleStopPodcast = () => {
-    textToSpeech.stopPodcast();
+    getTextToSpeech().stopPodcast();
     setShowPodcastPlayerModal(false);
   };
 
   const handlePodcastPlayerClose = () => {
-    textToSpeech.stopPodcast();
+    getTextToSpeech().stopPodcast();
     setShowPodcastPlayerModal(false);
   };
 
   const handlePodcastSeek = (positionMillis) => {
     lastSeekedAtRef.current = Date.now();
-    textToSpeech.seekPodcast(positionMillis);
+    getTextToSpeech().seekPodcast(positionMillis);
     setPodcastPositionMillis(positionMillis);
   };
 
@@ -1230,8 +1232,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
 
-        {/* Quick action buttons under disclaimer (for long messages) */}
-        {!message.isTyping && message.messageId && message.role === 'assistant' && (
+        {/* Quick action buttons under disclaimer (for long messages) - show for assistant messages with content (incl. chat history) */}
+        {!message.isTyping && message.role === 'assistant' && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {message.showRestartButton && (
               <TouchableOpacity
@@ -1424,10 +1426,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
 
-        {!message.isTyping && message.messageId && message.role === 'assistant' && (
+        {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
+        {!message.isTyping && message.role === 'assistant' && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {/* Restart Button for timeout messages */}
-            {message.showRestartButton && (
+            {message.showRestartButton && message.messageId && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.restartButton]}
                 onPress={() => onRestart && onRestart(message.messageId)}

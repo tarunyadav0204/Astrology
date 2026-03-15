@@ -75,7 +75,7 @@ export const textToSpeech = {
     return !!currentSound;
   },
 
-  async playPodcast(messageContent, { language = 'english', messageId, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
+  async playPodcast(messageContent, { language = 'english', messageId, sessionId, preview, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
     try {
       if (!messageContent || !String(messageContent).trim()) return;
 
@@ -96,7 +96,7 @@ export const textToSpeech = {
 
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
       console.log('[Podcast] Requesting podcast audio', { lang, messageId: messageId || 'none', length: messageContent?.length });
-      const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null);
+      const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null, sessionId || null, preview || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
         if (onError) onError(new Error('Podcast: missing audio from server'));
@@ -235,6 +235,67 @@ export const textToSpeech = {
       return;
     }
     seekPromise = doSeek(positionMillis);
+  },
+
+  async playPodcastFromStream(streamUrl, authToken, { onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
+    if (!streamUrl || !authToken) {
+      if (onError) onError(new Error('Stream URL and auth token required'));
+      return;
+    }
+    try {
+      if (currentSound) {
+        try {
+          await currentSound.stopAsync();
+          await currentSound.unloadAsync();
+        } catch {
+          // ignore
+        }
+        currentSound = null;
+        podcastCallbacks = null;
+        if (podcastTempUri) {
+          FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+          podcastTempUri = null;
+        }
+      }
+      podcastTempUri = null;
+
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        allowsRecordingIOS: false,
+        playThroughEarpieceAndroid: false,
+        shouldDuckAndroid: false,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: streamUrl, headers: { Authorization: `Bearer ${authToken}` } },
+        { progressUpdateIntervalMillis: 250 }
+      );
+      currentSound = sound;
+      await sound.setVolumeAsync(1.0);
+      podcastCallbacks = { onPause, onResume, onStop, onProgress };
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && podcastCallbacks?.onProgress && status.positionMillis != null) {
+          podcastCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
+        }
+        if (status.didJustFinish) {
+          podcastCallbacks = null;
+          if (onDone) onDone();
+          sound.unloadAsync();
+          currentSound = null;
+        }
+      });
+
+      await sound.playAsync();
+      if (onStart) onStart();
+    } catch (e) {
+      console.error('[TTS] playPodcastFromStream error', e);
+      podcastCallbacks = null;
+      if (onError) onError(e);
+    }
   },
 
   async getAvailableVoices() {

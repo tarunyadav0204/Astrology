@@ -88,7 +88,7 @@ export const storage = {
     const data = await AsyncStorage.getItem('favorites');
     return data ? JSON.parse(data) : [];
   },
-  
+
   // Pending registration (user left app during OTP / phone step; restore on cold start)
   setPendingRegistration: (data) =>
     AsyncStorage.setItem('pendingRegistration', JSON.stringify({ ...data, timestamp: Date.now() })),

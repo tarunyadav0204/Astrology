@@ -196,12 +196,12 @@ export default function ChatHistoryScreen({ navigation }) {
       if (response.ok) {
         const sessionData = await response.json();
         // Map API response; native_name comes from DB (session + each message)
-        const mappedMessages = (sessionData.messages || []).map(msg => ({
-          messageId: msg.message_id,
-          role: msg.sender,
+        const mappedMessages = (sessionData.messages || []).map((msg, idx) => ({
+          messageId: msg.message_id ?? msg.messageId,
+          role: (msg.sender === 'ai' || msg.sender === 'assistant') ? 'assistant' : (msg.sender === 'user' ? 'user' : msg.sender),
           content: msg.content,
           timestamp: msg.timestamp,
-          id: `${msg.message_id}_${msg.timestamp}`,
+          id: `${msg.message_id ?? msg.messageId ?? idx}_${msg.timestamp}`,
           native_name: msg.native_name ?? sessionData.native_name ?? session.native_name ?? null,
           terms: msg.terms,
           glossary: msg.glossary,

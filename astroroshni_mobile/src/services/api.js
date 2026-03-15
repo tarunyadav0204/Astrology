@@ -124,16 +124,26 @@ export const chatAPI = {
     }),
   getTtsVoices: () =>
     api.get(getEndpoint('/tts/voices')),
-  getPodcastAudio: (messageContent, language = 'en', messageId = null) =>
+  getPodcastAudio: (messageContent, language = 'en', messageId = null, sessionId = null, preview = null) =>
     api.post(getEndpoint('/tts/podcast'), {
       message_content: messageContent,
       language,
       ...(messageId ? { message_id: messageId } : {}),
+      ...(sessionId ? { session_id: sessionId } : {}),
+      ...(preview ? { preview } : {}),
     }),
   checkPodcastCache: (messageId, lang = 'en') =>
     api.get(getEndpoint('/tts/podcast/check-cache'), {
       params: { message_id: messageId, lang: lang?.toLowerCase?.()?.startsWith?.('hi') ? 'hi' : 'en' },
     }),
+  getPodcastHistory: () =>
+    api.get(getEndpoint('/tts/podcast/history')),
+  getPodcastStreamUrl: (messageId, lang = 'en') => {
+    const langCode = lang?.toLowerCase?.()?.startsWith?.('hi') ? 'hi' : 'en';
+    const base = API_BASE_URL?.replace(/\/$/, '') || '';
+    const path = getEndpoint('/tts/podcast/stream').replace(/^\//, '');
+    return `${base}/${path}?message_id=${encodeURIComponent(String(messageId))}&lang=${encodeURIComponent(langCode)}`;
+  },
 };
 
 export const wealthAPI = {
