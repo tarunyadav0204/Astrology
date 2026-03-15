@@ -1669,6 +1669,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         onPause={handlePausePodcast}
         onResume={handleResumePodcast}
         onStop={handleStopPodcast}
+        onShare={sharePodcastAudio}
       />
     </Animated.View>
     </>

@@ -85,6 +85,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
+  const [podcastProvider, setPodcastProvider] = useState('tts');
+  const [podcastProviderSaving, setPodcastProviderSaving] = useState(false);
   const [allowedDevices, setAllowedDevices] = useState([]);
   const [allowedDevicesLoading, setAllowedDevicesLoading] = useState(false);
   const [newAllowedDeviceId, setNewAllowedDeviceId] = useState('');
@@ -284,6 +286,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
+      setPodcastProvider(data.podcast_provider || 'tts');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
     }
@@ -2683,6 +2686,57 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
             </div>
             
+            <div className="settings-section">
+              <h3>Podcast provider</h3>
+              <p className="settings-hint">
+                When a user requests a podcast and it is not cached, the app uses this method to generate it.
+                TTS: Gemini script + Google Text-to-Speech. Notebook LM: Discovery Engine Podcast API (full message as context, no script step).
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Provider</strong>
+                  <p>Choose which backend to use for new podcast generation.</p>
+                </div>
+                <select
+                  value={podcastProvider}
+                  onChange={(e) => setPodcastProvider(e.target.value)}
+                  style={{ minWidth: '220px' }}
+                >
+                  <option value="tts">TTS (Gemini script + Google TTS)</option>
+                  <option value="notebook_lm">Notebook LM (Discovery Engine API)</option>
+                </select>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button type="button" className="create-btn" onClick={async () => {
+                  setPodcastProviderSaving(true);
+                  try {
+                    const res = await fetch('/api/admin/settings/podcast_provider', {
+                      method: 'PUT',
+                      headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        key: 'podcast_provider',
+                        value: podcastProvider,
+                        description: 'Podcast generation: tts or notebook_lm',
+                      }),
+                    });
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}));
+                      alert('Failed to save: ' + (err.detail || res.status));
+                      return;
+                    }
+                    alert('Podcast provider saved. New podcast requests will use the selected method.');
+                  } catch (e) {
+                    console.error(e);
+                    alert('Failed to save podcast provider.');
+                  } finally {
+                    setPodcastProviderSaving(false);
+                  }
+                }} disabled={podcastProviderSaving}>
+                  {podcastProviderSaving ? 'Saving…' : 'Save podcast provider'}
+                </button>
+              </div>
+            </div>
+
             <div className="settings-section">
               <h3>Debug & Logging</h3>
               <div className="setting-item">

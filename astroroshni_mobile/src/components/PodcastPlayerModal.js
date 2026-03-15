@@ -93,6 +93,7 @@ export default function PodcastPlayerModal({
   onPause,
   onResume,
   onStop,
+  onShare,
 }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
@@ -233,6 +234,15 @@ export default function PodcastPlayerModal({
                         {isPlaying ? t('podcast.pause', 'Pause') : t('podcast.play', 'Play')}
                       </Text>
                     </TouchableOpacity>
+                    {onShare && (
+                      <TouchableOpacity
+                        style={[styles.controlBtn, { backgroundColor: colors.surface || 'rgba(255,255,255,0.15)' }]}
+                        onPress={onShare}
+                      >
+                        <Ionicons name="share-outline" size={28} color={colors.text} />
+                        <Text style={[styles.controlLabel, { color: colors.text }]}>{t('podcast.share', 'Share')}</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}

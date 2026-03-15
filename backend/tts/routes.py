@@ -15,8 +15,10 @@ from credits.credit_service import CreditService
 from credits.routes import _get_play_credentials
 from tts.podcast_narrator import generate_podcast_script
 from tts.podcast_cache import get_cached_audio, put_cached_audio
+from tts import notebook_lm_podcast
 from activity.publisher import publish_activity
 from utils.env_json import parse_json_from_env
+from utils.admin_settings import get_podcast_provider, PODCAST_PROVIDER_NOTEBOOK_LM
 
 credit_service = CreditService()
 
@@ -374,6 +376,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       if not cached and cache_lang == "en":
         cached = await loop.run_in_executor(None, lambda: get_cached_audio(message_id, "english"))
       if cached:
+        logger.info("Podcast: cache hit, message_id=%s (no generation)", message_id)
         audio_b64 = base64.b64encode(cached).decode("ascii")
         return JSONResponse({"audio": audio_b64, "cached": True})
 
@@ -390,58 +393,95 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
         detail=f"Insufficient credits. Need {effective_cost}, have {balance}.",
       )
 
-    # Run in executor so Gemini + TTS don't block the event loop; other requests stay responsive
+    provider = get_podcast_provider()
     loop = asyncio.get_running_loop()
-    script = await loop.run_in_executor(None, partial(generate_podcast_script, text, lang))
-    if not script or not script.strip():
-      raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
+    logger.info("Podcast: using provider=%s, message_id=%s (cache miss)", provider, message_id)
 
-    segments = _parse_podcast_script(script)
-    if not segments:
-      raise HTTPException(status_code=500, detail="Podcast script had no parseable FEMALE:/MALE: lines")
+    use_tts = provider != PODCAST_PROVIDER_NOTEBOOK_LM
+    audio_bytes = None
+    if provider == PODCAST_PROVIDER_NOTEBOOK_LM:
+      # NotebookLM (Discovery Engine) Podcast API: full message as context, no script step
+      try:
+        audio_bytes = await loop.run_in_executor(
+          None,
+          partial(
+            notebook_lm_podcast.generate_podcast_mp3,
+            text,
+            lang,
+            title="AstroRoshni Podcast",
+            description="Generated from your astrological reading.",
+            length="STANDARD",
+          ),
+        )
+        logger.info("Podcast: generated via Notebook LM (Discovery Engine), audio_bytes=%d", len(audio_bytes))
+      except Exception as e:
+        err_str = str(e)
+        if "404" in err_str or "Method not found" in err_str:
+          logger.warning(
+            "Podcast: Notebook LM returned 404 (method not found / limited availability), falling back to Google TTS. Error: %s",
+            err_str[:200],
+          )
+          use_tts = True
+        else:
+          logger.exception("NotebookLM podcast failed: %s", e)
+          raise HTTPException(
+            status_code=500,
+            detail="Podcast generation failed (NotebookLM). Check server logs and Discovery Engine setup.",
+          )
+    if use_tts:
+      # TTS flow: Gemini script then Google TTS synthesis
+      logger.info("Podcast: generating via Google TTS (Gemini script + synthesis)")
+      script = await loop.run_in_executor(None, partial(generate_podcast_script, text, lang))
+      if not script or not script.strip():
+        raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
 
-    script_chars = len(script)
-    script_words = len(script.split())
-    logger.info(
-      "Podcast script size: chars=%d words=%d segments=%d (TTS billed by character; ~₹2,490/1M chars after free tier)",
-      script_chars,
-      script_words,
-      len(segments),
-    )
+      segments = _parse_podcast_script(script)
+      if not segments:
+        raise HTTPException(status_code=500, detail="Podcast script had no parseable FEMALE:/MALE: lines")
 
-    try:
-      creds = _get_google_credentials()
-      client = texttospeech.TextToSpeechClient(credentials=creds)
-    except HTTPException:
-      raise
-    except Exception as e:
-      logger.exception("TTS: Error initializing TextToSpeechClient for podcast")
-      raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
+      script_chars = len(script)
+      script_words = len(script.split())
+      logger.info(
+        "Podcast script size: chars=%d words=%d segments=%d (TTS billed by character; ~₹2,490/1M chars after free tier)",
+        script_chars,
+        script_words,
+        len(segments),
+      )
 
-    female_name, male_name = _podcast_voices(lang)
-    language_code = "en-GB"  # Podcast uses UK English Chirp3-HD (Gacrux, Algenib)
-    audio_config = texttospeech.AudioConfig(
-      audio_encoding=texttospeech.AudioEncoding.MP3,
-      speaking_rate=0.95,
-      volume_gain_db=10.0,  # +10 dB max recommended; makes podcast clearly audible
-    )
-    audio_parts: list[bytes] = []
-    try:
-      for role, segment_text in segments:
-        if not segment_text or not segment_text.strip():
-          continue
-        voice_name = female_name if role == "female" else male_name
-        voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
-        ssml = _segment_text_to_ssml(segment_text, role)
-        segment_bytes = await _synthesize_ssml(client, voice, audio_config, ssml)
-        audio_parts.append(segment_bytes)
-    except Exception as e:
-      logger.exception("TTS: podcast synthesis failed")
-      raise HTTPException(status_code=500, detail=f"Podcast TTS failed: {e}")
+      try:
+        creds = _get_google_credentials()
+        client = texttospeech.TextToSpeechClient(credentials=creds)
+      except HTTPException:
+        raise
+      except Exception as e:
+        logger.exception("TTS: Error initializing TextToSpeechClient for podcast")
+        raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
-    audio_bytes = b"".join(audio_parts)
-    if not audio_bytes:
-      raise HTTPException(status_code=500, detail="Podcast produced no audio")
+      female_name, male_name = _podcast_voices(lang)
+      language_code = "en-GB"  # Podcast uses UK English Chirp3-HD (Gacrux, Algenib)
+      audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=0.95,
+        volume_gain_db=10.0,  # +10 dB max recommended; makes podcast clearly audible
+      )
+      audio_parts: list[bytes] = []
+      try:
+        for role, segment_text in segments:
+          if not segment_text or not segment_text.strip():
+            continue
+          voice_name = female_name if role == "female" else male_name
+          voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
+          ssml = _segment_text_to_ssml(segment_text, role)
+          segment_bytes = await _synthesize_ssml(client, voice, audio_config, ssml)
+          audio_parts.append(segment_bytes)
+      except Exception as e:
+        logger.exception("TTS: podcast synthesis failed")
+        raise HTTPException(status_code=500, detail=f"Podcast TTS failed: {e}")
+
+      audio_bytes = b"".join(audio_parts)
+      if not audio_bytes:
+        raise HTTPException(status_code=500, detail="Podcast produced no audio")
+      logger.info("Podcast: generated via Google TTS, audio_bytes=%d", len(audio_bytes))
 
     if message_id:
       await loop.run_in_executor(None, partial(put_cached_audio, message_id, cache_lang, audio_bytes))

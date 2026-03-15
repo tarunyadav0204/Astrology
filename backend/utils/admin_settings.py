@@ -73,3 +73,15 @@ def is_debug_logging_enabled() -> bool:
     """Check if debug logging is enabled"""
     value = get_setting('debug_logging_enabled')
     return value == 'true' if value else False
+
+
+PODCAST_PROVIDER_TTS = "tts"
+PODCAST_PROVIDER_NOTEBOOK_LM = "notebook_lm"
+
+
+def get_podcast_provider() -> str:
+    """Which podcast pipeline to use: 'tts' (Gemini script + Google TTS) or 'notebook_lm' (Discovery Engine Podcast API)."""
+    value = get_setting("podcast_provider")
+    if value and value.strip() in (PODCAST_PROVIDER_TTS, PODCAST_PROVIDER_NOTEBOOK_LM):
+        return value.strip()
+    return PODCAST_PROVIDER_TTS
