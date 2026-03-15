@@ -162,16 +162,30 @@ export default function App() {
             if (localBirthData) {
               setInitialRoute('Home');
             } else {
-              // Already logged in, no native selected: land on Home (empty state + CTA)
               setInitialRoute('Home');
             }
           } else {
-            // No charts: land on Home; user can add profile via CTA
             setInitialRoute('Home');
           }
         } catch (apiError) {
-          console.log('API Error on startup:', apiError);
-          setInitialRoute('Home');
+          // Backend GET /api/birth-charts uses get_current_user → returns 401 for invalid/expired token.
+          // Axios puts status on error.response.status. Only clear session on 401; on timeout/network error go Home.
+          const status = apiError?.response?.status;
+          const isUnauth = status === 401;
+          if (__DEV__ && apiError) {
+            console.log('[Bootstrap] getExistingCharts failed:', status ?? 'no status', apiError?.message || apiError?.code);
+          }
+          if (isUnauth) {
+            try {
+              await storage.removeAuthToken();
+              await storage.removeItem('userData');
+            } catch (clearErr) {
+              console.log('Clear storage on bootstrap auth fail:', clearErr);
+            }
+            setInitialRoute('Welcome');
+          } else {
+            setInitialRoute('Home');
+          }
         }
       } else {
         setInitialRoute('Welcome');

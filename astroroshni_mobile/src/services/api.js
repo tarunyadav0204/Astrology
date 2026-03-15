@@ -130,6 +130,10 @@ export const chatAPI = {
       language,
       ...(messageId ? { message_id: messageId } : {}),
     }),
+  checkPodcastCache: (messageId, lang = 'en') =>
+    api.get(getEndpoint('/tts/podcast/check-cache'), {
+      params: { message_id: messageId, lang: lang?.toLowerCase?.()?.startsWith?.('hi') ? 'hi' : 'en' },
+    }),
 };
 
 export const wealthAPI = {

@@ -29,11 +29,13 @@ import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
+import ConfirmCreditsModal from '../ConfirmCreditsModal';
+import PodcastPlayerModal from '../PodcastPlayerModal';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
-  const { podcastCost } = useCredits();
+  const { podcastCost, credits } = useCredits();
   const navigation = useNavigation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -44,9 +46,16 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [isPlayingPodcast, setIsPlayingPodcast] = useState(false);
   const [isPausedPodcast, setIsPausedPodcast] = useState(false);
   const [isSharingPodcast, setIsSharingPodcast] = useState(false);
+  const [showPodcastCreditsModal, setShowPodcastCreditsModal] = useState(false);
+  const [showPodcastPlayerModal, setShowPodcastPlayerModal] = useState(false);
+  const [podcastPlayerMode, setPodcastPlayerMode] = useState('generating');
+  const [podcastPositionMillis, setPodcastPositionMillis] = useState(0);
+  const [podcastDurationMillis, setPodcastDurationMillis] = useState(0);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const skeletonAnim = useRef(new Animated.Value(0)).current;
+  /** After seek, ignore progress updates briefly so we don't overwrite with stale position. */
+  const lastSeekedAtRef = useRef(0);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -54,6 +63,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         textToSpeech.stopPodcast();
         setIsPlayingPodcast(false);
         setIsPausedPodcast(false);
+        setShowPodcastPlayerModal(false);
       };
     }, [])
   );
@@ -157,31 +167,43 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       await textToSpeech.playPodcast(cleanText, {
         language,
         messageId: message.messageId || null,
+        onProgress: (pos, dur) => {
+          if (Date.now() - lastSeekedAtRef.current < 600) return; // don't overwrite seek with stale callback
+          setPodcastPositionMillis(pos);
+          if (dur > 0) setPodcastDurationMillis(dur);
+        },
         onStart: () => {
           setIsLoadingPodcast(false);
           setIsPlayingPodcast(true);
           setIsPausedPodcast(false);
+          setPodcastPlayerMode('playing');
+          setShowPodcastPlayerModal(true);
         },
         onDone: () => {
           setIsPlayingPodcast(false);
           setIsPausedPodcast(false);
+          setShowPodcastPlayerModal(false);
         },
         onPause: () => {
           setIsPlayingPodcast(false);
           setIsPausedPodcast(true);
+          setPodcastPlayerMode('paused');
         },
         onResume: () => {
           setIsPlayingPodcast(true);
           setIsPausedPodcast(false);
+          setPodcastPlayerMode('playing');
         },
         onStop: () => {
           setIsPlayingPodcast(false);
           setIsPausedPodcast(false);
+          setShowPodcastPlayerModal(false);
         },
         onError: (err) => {
           setIsLoadingPodcast(false);
           setIsPlayingPodcast(false);
           setIsPausedPodcast(false);
+          setShowPodcastPlayerModal(false);
           if (err?.response?.status === 402) {
             const cost = podcastCost ?? 2;
             Alert.alert(
@@ -217,7 +239,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     }
   };
 
-  const onPodcastButtonPress = () => {
+  const onPodcastButtonPress = async () => {
     if (isPausedPodcast) {
       textToSpeech.resumePodcast();
       return;
@@ -226,6 +248,31 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     if (isLoadingPodcast) return;
     const cleanText = getCleanMessageText();
     if (!cleanText) return;
+
+    // Ask backend if podcast exists for this message. If cached, fetch and play (no charge). If not, show credit modal then generate.
+    const messageId = message.messageId || null;
+    if (messageId) {
+      try {
+        const res = await chatAPI.checkPodcastCache(messageId, language);
+        if (res?.data?.cached === true) {
+          playPodcast();
+          return;
+        }
+      } catch (_) {
+        // On error (e.g. network), show modal so user confirms before we attempt creation
+      }
+    }
+
+    // No cached podcast: show credit confirmation modal; on confirm we call playPodcast() which generates and charges
+    setShowPodcastCreditsModal(true);
+  };
+
+  const confirmPodcastCredits = () => {
+    setShowPodcastCreditsModal(false);
+    setPodcastPlayerMode('generating');
+    setShowPodcastPlayerModal(true);
+    setPodcastPositionMillis(0);
+    setPodcastDurationMillis(0);
     playPodcast();
   };
 
@@ -233,8 +280,24 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     textToSpeech.pausePodcast();
   };
 
+  const handleResumePodcast = () => {
+    textToSpeech.resumePodcast();
+  };
+
   const handleStopPodcast = () => {
     textToSpeech.stopPodcast();
+    setShowPodcastPlayerModal(false);
+  };
+
+  const handlePodcastPlayerClose = () => {
+    textToSpeech.stopPodcast();
+    setShowPodcastPlayerModal(false);
+  };
+
+  const handlePodcastSeek = (positionMillis) => {
+    lastSeekedAtRef.current = Date.now();
+    textToSpeech.seekPodcast(positionMillis);
+    setPodcastPositionMillis(positionMillis);
   };
 
   const sharePodcastAudio = async () => {
@@ -1584,6 +1647,29 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmCreditsModal
+        visible={showPodcastCreditsModal}
+        onClose={() => setShowPodcastCreditsModal(false)}
+        onConfirm={confirmPodcastCredits}
+        title={t('credits.podcastModal.title', 'Listen as Podcast')}
+        description={t('credits.podcastModal.description', 'This will generate an audio podcast of this message. Credits will be deducted when the podcast is created.')}
+        cost={podcastCost ?? 2}
+        credits={credits ?? 0}
+        confirmLabel={t('common.continue', 'Continue')}
+      />
+
+      <PodcastPlayerModal
+        visible={showPodcastPlayerModal}
+        onClose={handlePodcastPlayerClose}
+        mode={podcastPlayerMode}
+        positionMillis={podcastPositionMillis}
+        durationMillis={podcastDurationMillis}
+        onSeek={handlePodcastSeek}
+        onPause={handlePausePodcast}
+        onResume={handleResumePodcast}
+        onStop={handleStopPodcast}
+      />
     </Animated.View>
     </>
   );

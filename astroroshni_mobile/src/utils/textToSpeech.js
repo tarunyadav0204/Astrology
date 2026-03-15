@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { chatAPI } from '../services/api';
 
@@ -7,6 +7,9 @@ let currentSound = null;
 let podcastCallbacks = null;
 /** Temp file path for current podcast; cleared when playback ends or stops so we can delete it. */
 let podcastTempUri = null;
+/** Guards seek: only one setPositionAsync at a time; pending seek applied after in-flight seek completes. */
+let seekPromise = null;
+let pendingSeekMillis = null;
 
 export const textToSpeech = {
   async speak(text, { language = 'english', voiceName, onDone, onError } = {}) {
@@ -72,7 +75,7 @@ export const textToSpeech = {
     return !!currentSound;
   },
 
-  async playPodcast(messageContent, { language = 'english', messageId, onStart, onDone, onError, onPause, onResume, onStop } = {}) {
+  async playPodcast(messageContent, { language = 'english', messageId, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
     try {
       if (!messageContent || !String(messageContent).trim()) return;
 
@@ -107,19 +110,29 @@ export const textToSpeech = {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Ensure playback through speaker (not earpiece) on Android and allow playback in silent mode on iOS
+      // Full-volume podcast: speaker (not earpiece), silent mode OK, take over session (DoNotMix) so we are not ducked
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
-        shouldDuckAndroid: true,
+        allowsRecordingIOS: false,
         playThroughEarpieceAndroid: false,
+        shouldDuckAndroid: false,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
       });
 
-      const { sound } = await Audio.Sound.createAsync({ uri: podcastTempUri });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: podcastTempUri },
+        { progressUpdateIntervalMillis: 250 }
+      );
       currentSound = sound;
-      podcastCallbacks = { onPause, onResume, onStop };
+      await sound.setVolumeAsync(1.0);
+      podcastCallbacks = { onPause, onResume, onStop, onProgress };
 
       sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && podcastCallbacks?.onProgress && status.positionMillis != null) {
+          podcastCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
+        }
         if (status.didJustFinish) {
           podcastCallbacks = null;
           if (onDone) onDone();
@@ -174,6 +187,8 @@ export const textToSpeech = {
   },
 
   async stopPodcast() {
+    seekPromise = null;
+    pendingSeekMillis = null;
     if (currentSound) {
       try {
         await currentSound.stopAsync();
@@ -189,6 +204,37 @@ export const textToSpeech = {
         podcastTempUri = null;
       }
     }
+  },
+
+  async seekPodcast(positionMillis) {
+    if (!currentSound) return;
+    const isInterrupted = (e) => e?.message === 'Seeking interrupted.' || String(e?.message || '').includes('Seeking interrupted');
+    const doSeek = async (pos) => {
+      const posInt = Math.floor(pos);
+      try {
+        if (!currentSound) return;
+        const status = await currentSound.getStatusAsync();
+        const wasPlaying = status.isLoaded && status.shouldPlay;
+        if (wasPlaying) await currentSound.pauseAsync();
+        await currentSound.setPositionAsync(posInt);
+        if (wasPlaying) await currentSound.playAsync();
+      } catch (e) {
+        if (isInterrupted(e)) return; // non-fatal
+        console.error('[TTS] seekPodcast error', e);
+      } finally {
+        seekPromise = null;
+        if (currentSound && pendingSeekMillis != null) {
+          const next = pendingSeekMillis;
+          pendingSeekMillis = null;
+          seekPromise = doSeek(next);
+        }
+      }
+    };
+    if (seekPromise) {
+      pendingSeekMillis = positionMillis;
+      return;
+    }
+    seekPromise = doSeek(positionMillis);
   },
 
   async getAvailableVoices() {

@@ -138,11 +138,12 @@ def _get_user_name_by_id(user_id: int) -> str | None:
 
 
 def _publish_api_request(path, method, status_code, duration_ms, user_phone, user_id, user_name, ip, user_agent):
-    # Fallback: old JWTs or NULL name in DB – look up name when we have user_id but no name
-    if user_id is not None and (user_name is None or not str(user_name).strip()):
+    # Always prefer DB for name when we have user_id so BigQuery gets current name (fixes old JWTs without name and stale tokens)
+    if user_id is not None:
         looked_up = _get_user_name_by_id(user_id)
         if looked_up:
             user_name = looked_up
+        # else keep user_name from JWT if DB returned None (e.g. NULL in users.name)
     resource_type, resource_id = _resource_from_path(path)
     publish_activity(
         "api_request",

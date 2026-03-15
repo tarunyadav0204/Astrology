@@ -321,6 +321,35 @@ class PodcastRequest(BaseModel):
   message_id: str | int | None = None  # optional: if provided, use GCS cache; client may send int (e.g. 2329)
 
 
+def _podcast_cache_lang(lang: str) -> str:
+  """Normalize language to cache key so store and lookup match (client may send 'en' or 'english')."""
+  if not lang or not str(lang).strip():
+    return "en"
+  l = str(lang).lower().strip()
+  return "hi" if l.startswith("hi") else "en"
+
+
+@router.get("/podcast/check-cache")
+async def podcast_check_cache(
+  message_id: str | int,
+  lang: str = "en",
+  current_user: User = Depends(get_current_user),
+):
+  """
+  Check if a podcast for this message is already cached (no credits will be charged on play).
+  Used by the app to skip the credit confirmation modal when replaying.
+  """
+  raw_id = message_id
+  mid = str(raw_id).strip() if raw_id is not None else None
+  if not mid:
+    return JSONResponse({"cached": False})
+  cache_lang = _podcast_cache_lang(lang)
+  cached = get_cached_audio(mid, cache_lang)
+  if not cached and cache_lang == "en":
+    cached = get_cached_audio(mid, "english")  # backward compat: old cache used "english"
+  return JSONResponse({"cached": bool(cached)})
+
+
 @router.post("/podcast")
 async def podcast(request: PodcastRequest, current_user: User = Depends(get_current_user)):
   """
@@ -337,9 +366,13 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
     lang = (request.language or "en").lower()
     raw_id = request.message_id
     message_id = str(raw_id).strip() if raw_id is not None else None
+    cache_lang = _podcast_cache_lang(lang)
 
     if message_id:
-      cached = get_cached_audio(message_id, lang)
+      loop = asyncio.get_running_loop()
+      cached = await loop.run_in_executor(None, lambda: get_cached_audio(message_id, cache_lang))
+      if not cached and cache_lang == "en":
+        cached = await loop.run_in_executor(None, lambda: get_cached_audio(message_id, "english"))
       if cached:
         audio_b64 = base64.b64encode(cached).decode("ascii")
         return JSONResponse({"audio": audio_b64, "cached": True})
@@ -357,7 +390,9 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
         detail=f"Insufficient credits. Need {effective_cost}, have {balance}.",
       )
 
-    script = generate_podcast_script(text, lang)
+    # Run in executor so Gemini + TTS don't block the event loop; other requests stay responsive
+    loop = asyncio.get_running_loop()
+    script = await loop.run_in_executor(None, partial(generate_podcast_script, text, lang))
     if not script or not script.strip():
       raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
 
@@ -388,6 +423,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
     audio_config = texttospeech.AudioConfig(
       audio_encoding=texttospeech.AudioEncoding.MP3,
       speaking_rate=0.95,
+      volume_gain_db=10.0,  # +10 dB max recommended; makes podcast clearly audible
     )
     audio_parts: list[bytes] = []
     try:
@@ -408,7 +444,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       raise HTTPException(status_code=500, detail="Podcast produced no audio")
 
     if message_id:
-      put_cached_audio(message_id, lang, audio_bytes)
+      await loop.run_in_executor(None, partial(put_cached_audio, message_id, cache_lang, audio_bytes))
 
     # Deduct (we already checked balance above)
     success = credit_service.spend_credits(

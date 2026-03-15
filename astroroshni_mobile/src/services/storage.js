@@ -89,6 +89,20 @@ export const storage = {
     return data ? JSON.parse(data) : [];
   },
   
+  // Pending registration (user left app during OTP / phone step; restore on cold start)
+  setPendingRegistration: (data) =>
+    AsyncStorage.setItem('pendingRegistration', JSON.stringify({ ...data, timestamp: Date.now() })),
+  getPendingRegistration: async () => {
+    const raw = await AsyncStorage.getItem('pendingRegistration');
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+  clearPendingRegistration: () => AsyncStorage.removeItem('pendingRegistration'),
+
   // Generic storage methods
   setItem: (key, value) => AsyncStorage.setItem(key, value),
   getItem: (key) => AsyncStorage.getItem(key),

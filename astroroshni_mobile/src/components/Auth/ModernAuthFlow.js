@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, Animated, Dimensions, AppState } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { storage } from '../../services/storage';
 import WelcomeScreen from './screens/WelcomeScreen';
 import PhoneInputScreen from './screens/PhoneInputScreen';
 import PasswordScreen from './screens/PasswordScreen';
@@ -23,33 +24,69 @@ import { COLORS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
-export default function ModernAuthFlow({ navigation }) {
+const INITIAL_FORM_DATA = {
+  phone: '',
+  countryCode: '+91',
+  password: '',
+  name: '',
+  email: '',
+  otpCode: '',
+  devOtpCode: '',
+  resetCode: '',
+  newPassword: '',
+  birthDetails: {
+    name: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '12:00:00',
+    place: '',
+    latitude: null,
+    longitude: null,
+    gender: ''
+  },
+  collectBirthDetails: false
+};
+
+export default function ModernAuthFlow({ navigation, route }) {
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({
-    phone: '',
-    countryCode: '+91',
-    password: '',
-    name: '',
-    email: '',
-    otpCode: '',
-    devOtpCode: '',
-    resetCode: '',
-    newPassword: '',
-    birthDetails: {
-      name: '',
-      date: new Date().toISOString().split('T')[0],
-      time: '12:00:00',
-      place: '',
-      latitude: null,
-      longitude: null,
-      gender: ''
-    },
-    collectBirthDetails: false
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  const restoredRef = useRef(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Restore in-progress registration (e.g. user left on OTP, app was killed, came back)
+  useEffect(() => {
+    const restore = route.params?.restore;
+    if (!restore?.step || restoredRef.current) return;
+    restoredRef.current = true;
+    storage.clearPendingRegistration();
+    setFormData(prev => ({
+      ...prev,
+      phone: restore.phone || prev.phone,
+      countryCode: restore.countryCode || prev.countryCode,
+    }));
+    setCurrentScreen(restore.step === 'otp' || restore.step === 'phone' ? restore.step : 'otp');
+  }, [route.params?.restore]);
+
+  // When user leaves app during OTP/phone step, persist so we can restore after cold start
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'background') return;
+      if (currentScreen !== 'otp' && currentScreen !== 'phone') return;
+      storage.setPendingRegistration({
+        phone: formData.phone,
+        countryCode: formData.countryCode || '+91',
+        step: currentScreen,
+      });
+    });
+    return () => sub.remove();
+  }, [currentScreen, formData.phone, formData.countryCode]);
+
+  // Clear pending when leaving auth flow so we don't restore next time
+  useEffect(() => {
+    return () => storage.clearPendingRegistration();
+  }, []);
 
   const navigateToScreen = (screenName, direction = 'forward') => {
     const slideValue = direction === 'forward' ? -width : width;
@@ -66,6 +103,7 @@ export default function ModernAuthFlow({ navigation }) {
         useNativeDriver: true,
       }),
     ]).start(() => {
+      if (screenName === 'name') storage.clearPendingRegistration();
       setCurrentScreen(screenName);
       slideAnim.setValue(direction === 'forward' ? width : -width);
       

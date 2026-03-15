@@ -119,19 +119,24 @@ const WelcomeScreen = ({ navigation }) => {
 
   const checkAuthStatus = async () => {
     try {
+      // If user left during OTP/phone step, restore them to that step instead of losing progress
+      const pending = await storage.getPendingRegistration();
+      const PENDING_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
+      if (pending?.step && pending?.timestamp && Date.now() - pending.timestamp < PENDING_MAX_AGE_MS) {
+        navigation.replace('Login', { restore: pending });
+        return;
+      }
+
       const authToken = await storage.getAuthToken();
       const birthDetails = await storage.getBirthDetails();
-      
+
       if (authToken && birthDetails) {
-        // User is logged in and has birth details, go to Home
         navigation.replace('Home');
       } else if (authToken) {
-        // Already logged in but no birth details: go to Home (empty state + Add profile CTA)
         navigation.replace('Home');
       }
-      // If no auth token, stay on Welcome screen
     } catch (error) {
-
+      // ignore
     }
   };
 
