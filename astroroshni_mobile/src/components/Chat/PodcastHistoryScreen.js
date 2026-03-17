@@ -16,21 +16,30 @@ import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { storage } from '../../services/storage';
 import { chatAPI } from '../../services/api';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import PodcastPlayerModal from '../PodcastPlayerModal';
 
 export default function PodcastHistoryScreen({ navigation }) {
   useAnalytics('PodcastHistoryScreen');
+  const { t } = useTranslation();
   const { theme, colors, getCardElevation } = useTheme();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingMessageId, setPlayingMessageId] = useState(null);
   const [sharingMessageId, setSharingMessageId] = useState(null);
+  const [showPodcastPlayerModal, setShowPodcastPlayerModal] = useState(false);
+  const [podcastPlayerMode, setPodcastPlayerMode] = useState('playing');
+  const [podcastPositionMillis, setPodcastPositionMillis] = useState(0);
+  const [podcastDurationMillis, setPodcastDurationMillis] = useState(0);
+  const [podcastPlaybackRate, setPodcastPlaybackRate] = useState(1);
+  const [selectedHistoryEntry, setSelectedHistoryEntry] = useState(null);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -81,21 +90,79 @@ export default function PodcastHistoryScreen({ navigation }) {
       return;
     }
     const streamUrl = chatAPI.getPodcastStreamUrl(entry.message_id, entry.lang);
+    setSelectedHistoryEntry(entry);
     setPlayingMessageId(entry.message_id);
+    setShowPodcastPlayerModal(true);
+    setPodcastPlayerMode('playing');
+    setPodcastPositionMillis(0);
+    setPodcastDurationMillis(0);
     getTextToSpeech().playPodcastFromStream(streamUrl, token, {
-      onStart: () => setPlayingMessageId(entry.message_id),
-      onDone: () => setPlayingMessageId(null),
+      onStart: () => {
+        setPlayingMessageId(entry.message_id);
+        setPodcastPlayerMode('playing');
+        getTextToSpeech().setPodcastRate(podcastPlaybackRate);
+      },
+      onProgress: (positionMillis, durationMillis) => {
+        setPodcastPositionMillis(positionMillis);
+        setPodcastDurationMillis(durationMillis);
+      },
+      onPause: () => setPodcastPlayerMode('paused'),
+      onResume: () => setPodcastPlayerMode('playing'),
+      onDone: () => {
+        setPlayingMessageId(null);
+        setShowPodcastPlayerModal(false);
+        setSelectedHistoryEntry(null);
+      },
       onError: () => {
         setPlayingMessageId(null);
+        setShowPodcastPlayerModal(false);
+        setSelectedHistoryEntry(null);
         Alert.alert('Error', 'Could not play podcast.');
       },
-      onStop: () => setPlayingMessageId(null),
+      onStop: () => {
+        setPlayingMessageId(null);
+        setShowPodcastPlayerModal(false);
+        setSelectedHistoryEntry(null);
+      },
     });
   };
 
   const stopPlaying = () => {
     getTextToSpeech().stopPodcast();
     setPlayingMessageId(null);
+    setShowPodcastPlayerModal(false);
+    setSelectedHistoryEntry(null);
+  };
+
+  const handlePodcastPlayerClose = () => {
+    getTextToSpeech().stopPodcast();
+    setPlayingMessageId(null);
+    setShowPodcastPlayerModal(false);
+    setSelectedHistoryEntry(null);
+  };
+
+  const handlePodcastSeek = (positionMillis) => {
+    getTextToSpeech().seekPodcast(positionMillis);
+    setPodcastPositionMillis(positionMillis);
+  };
+
+  const handlePausePodcast = () => {
+    getTextToSpeech().pausePodcast();
+  };
+
+  const handleResumePodcast = () => {
+    getTextToSpeech().resumePodcast();
+  };
+
+  const handleStopPodcast = () => {
+    getTextToSpeech().stopPodcast();
+    setPlayingMessageId(null);
+    setShowPodcastPlayerModal(false);
+    setSelectedHistoryEntry(null);
+  };
+
+  const handlePodcastShare = async () => {
+    if (selectedHistoryEntry) await sharePodcast(selectedHistoryEntry);
   };
 
   const sharePodcast = async (entry, e) => {
@@ -198,7 +265,14 @@ export default function PodcastHistoryScreen({ navigation }) {
           >
             <View style={styles.cardHeader}>
               <TouchableOpacity
-                onPress={(e) => { e.stopPropagation(); isPlaying ? stopPlaying() : playFromStream(item); }}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  if (isPlaying) {
+                    setShowPodcastPlayerModal(true);
+                  } else {
+                    playFromStream(item);
+                  }
+                }}
                 style={styles.iconWrap}
               >
                 <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.iconGrad}>
@@ -287,15 +361,34 @@ export default function PodcastHistoryScreen({ navigation }) {
               }
             />
           )}
-          {playingMessageId ? (
+          {playingMessageId && !showPodcastPlayerModal ? (
             <View style={[styles.nowPlayingBar, { backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.9)' : 'rgba(249,115,22,0.2)' }]}>
               <Icon name="radio" size={20} color={colors.text} />
-              <Text style={[styles.nowPlayingText, { color: colors.text }]} numberOfLines={1}>Playing podcast</Text>
+              <TouchableOpacity style={styles.nowPlayingTextWrap} onPress={() => setShowPodcastPlayerModal(true)}>
+                <Text style={[styles.nowPlayingText, { color: colors.text }]} numberOfLines={1}>Playing podcast – tap to open player</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={stopPlaying} style={styles.nowPlayingStop}>
                 <Text style={styles.nowPlayingStopText}>Stop</Text>
               </TouchableOpacity>
             </View>
           ) : null}
+          <PodcastPlayerModal
+            visible={showPodcastPlayerModal}
+            onClose={handlePodcastPlayerClose}
+            mode={podcastPlayerMode}
+            positionMillis={podcastPositionMillis}
+            durationMillis={podcastDurationMillis}
+            onSeek={handlePodcastSeek}
+            onPause={handlePausePodcast}
+            onResume={handleResumePodcast}
+            onStop={handleStopPodcast}
+            onShare={handlePodcastShare}
+            playbackRate={podcastPlaybackRate}
+            onSpeedChange={(rate) => {
+              setPodcastPlaybackRate(rate);
+              getTextToSpeech().setPodcastRate(rate);
+            }}
+          />
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -377,7 +470,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  nowPlayingText: { flex: 1, fontSize: 14 },
+  nowPlayingTextWrap: { flex: 1, justifyContent: 'center' },
+  nowPlayingText: { fontSize: 14 },
   nowPlayingStop: { paddingHorizontal: 12, paddingVertical: 6 },
   nowPlayingStopText: { color: '#ff6b35', fontWeight: '600', fontSize: 14 },
 });

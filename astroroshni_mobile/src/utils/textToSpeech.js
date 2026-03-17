@@ -75,7 +75,7 @@ export const textToSpeech = {
     return !!currentSound;
   },
 
-  async playPodcast(messageContent, { language = 'english', messageId, sessionId, preview, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
+  async playPodcast(messageContent, { language = 'english', messageId, sessionId, preview, nativeName, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
     try {
       if (!messageContent || !String(messageContent).trim()) return;
 
@@ -95,8 +95,8 @@ export const textToSpeech = {
       }
 
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
-      console.log('[Podcast] Requesting podcast audio', { lang, messageId: messageId || 'none', length: messageContent?.length });
-      const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null, sessionId || null, preview || null);
+      console.log('[Podcast] Requesting podcast audio', { lang, messageId: messageId || 'none', length: messageContent?.length, nativeName: nativeName || null });
+      const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null, sessionId || null, preview || null, nativeName || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
         if (onError) onError(new Error('Podcast: missing audio from server'));
@@ -110,10 +110,10 @@ export const textToSpeech = {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Full-volume podcast: speaker (not earpiece), silent mode OK, take over session (DoNotMix) so we are not ducked
+      // Full-volume podcast: speaker (not earpiece), silent mode OK, keep playing when screen off / in background
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
+        staysActiveInBackground: true,
         allowsRecordingIOS: false,
         playThroughEarpieceAndroid: false,
         shouldDuckAndroid: false,
@@ -206,6 +206,16 @@ export const textToSpeech = {
     }
   },
 
+  async setPodcastRate(rate) {
+    if (!currentSound) return;
+    try {
+      const r = Math.min(2, Math.max(0.5, Number(rate) || 1));
+      await currentSound.setRateAsync(r, true);
+    } catch (e) {
+      console.error('[TTS] setPodcastRate error', e);
+    }
+  },
+
   async seekPodcast(positionMillis) {
     if (!currentSound) return;
     const isInterrupted = (e) => e?.message === 'Seeking interrupted.' || String(e?.message || '').includes('Seeking interrupted');
@@ -261,7 +271,7 @@ export const textToSpeech = {
 
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
+        staysActiveInBackground: true,
         allowsRecordingIOS: false,
         playThroughEarpieceAndroid: false,
         shouldDuckAndroid: false,

@@ -686,20 +686,27 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🌐 {t('languageModal.title')}</Text>
-            {LANGUAGES.map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[
-                  styles.languageOption,
-                  language === lang.code && styles.languageOptionSelected
-                ]}
-                onPress={() => handleLanguageChange(lang.code)}
-              >
-                <Text style={styles.languageText}>
-                  {lang.flag} {lang.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <ScrollView
+              style={styles.languageModalScrollView}
+              contentContainerStyle={styles.languageModalScrollContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
+              {LANGUAGES.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageOption,
+                    language === lang.code && styles.languageOptionSelected
+                  ]}
+                  onPress={() => handleLanguageChange(lang.code)}
+                >
+                  <Text style={styles.languageText}>
+                    {lang.flag} {lang.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setShowLanguageModal(false)}
@@ -868,6 +875,13 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  languageModalScrollView: {
+    maxHeight: 320,
+  },
+  languageModalScrollContent: {
+    paddingRight: 8,
+    paddingBottom: 8,
   },
   languageOption: {
     padding: 16,

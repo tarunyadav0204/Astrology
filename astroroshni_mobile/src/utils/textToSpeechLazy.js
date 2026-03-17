@@ -21,6 +21,7 @@ const noopTts = {
   resumePodcast: noopAsync,
   stopPodcast: noopAsync,
   seekPodcast: noopAsync,
+  setPodcastRate: noopAsync,
   getAvailableVoices: () => Promise.resolve([]),
 };
 

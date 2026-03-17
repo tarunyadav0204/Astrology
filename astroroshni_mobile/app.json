@@ -28,6 +28,7 @@
       },
       "NSMicrophoneUsageDescription": "This app does not use the microphone.",
       "NSSpeechRecognitionUsageDescription": "This app uses speech recognition for voice commands.",
+      "UIBackgroundModes": ["audio"],
       "UILaunchScreen": {}
     }
     },
@@ -37,7 +38,7 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "versionCode": 104,
+      "versionCode": 105,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": ["com.android.vending.BILLING"]

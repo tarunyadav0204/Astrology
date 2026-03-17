@@ -93,9 +93,83 @@ def _build_voice_and_config(lang: str, voice_name: str | None = None):
   return voice, audio_config
 
 
-def _podcast_voices(_lang: str) -> tuple[str, str]:
-  """Return (female_voice_name, male_voice_name) for podcast. UK English Chirp3-HD."""
-  return ("en-GB-Chirp3-HD-Gacrux", "en-GB-Chirp3-HD-Algenib")
+def _podcast_voices(lang: str) -> tuple[str, str, str]:
+  """
+  Return (female_voice_name, male_voice_name, language_code) for podcast.
+  - en: UK English Chirp3-HD (Gacrux, Algenib).
+  - hi: Chirp3-HD Gacrux (F) + Puck (M) for a grounded + upbeat duo.
+  """
+  if lang and str(lang).lower().startswith("hi"):
+    # Use Chirp3 HD voices even for Hindi script so personas match English podcasts:
+    # Gacrux = mature/steady expert, Puck = upbeat and engaging.
+    return ("en-GB-Chirp3-HD-Gacrux", "en-GB-Chirp3-HD-Puck", "en-GB")
+  return ("en-GB-Chirp3-HD-Gacrux", "en-GB-Chirp3-HD-Algenib", "en-GB")
+
+
+# Sanskrit/Vedic terms that Google TTS often mispronounces. alias = spelling TTS will speak.
+# Order matters: longer phrases first so "Dharma Karma Yoga" is matched before "Dharma".
+_PRONUNCIATION_ALIASES: list[tuple[str, str]] = [
+  ("Dharma Karma Yoga", "Dhurma Karma Yo-ga"),
+  ("Chara Dasha", "Chuh-raa Daa-sha"),
+  ("Parashari", "Pa-raa-sha-ree"),
+  ("Jaimini", "Jaa-mee-nee"),
+  ("Nadi astrology", "Naa-dee astrology"),
+  ("Nadi", "Naa-dee"),
+  ("Dharma", "Dhurma"),
+  ("Karma", "Kar-ma"),
+  ("Yoga", "Yo-ga"),
+  ("Dasha", "Daa-sha"),
+  ("Mahadasha", "Maa-ha-daa-sha"),
+  ("Antardasha", "Un-tur-daa-sha"),
+  ("Nakshatra", "Nuk-shuh-tra"),
+  ("Drishti", "Drish-tee"),
+  ("Graha", "Gruh-ha"),
+  ("Rashi", "Raa-shee"),
+  ("Bhava", "Baa-va"),
+  ("Lagna", "Lug-na"),
+  ("Panchang", "Pun-chung"),
+  ("Sade Sati", "Saa-day Saa-tee"),
+  ("Vipat Tara", "Vi-pat Ta-ra")
+]
+
+
+def _strip_literal_punctuation_words(text: str) -> str:
+  """
+  Gemini sometimes outputs literal words like 'question mark' or 'dot'.
+  These are almost never desirable in spoken audio, so strip them.
+  """
+  # Lowercase match but preserve original case by replacing basic variants.
+  patterns = [
+    r"\s*[Qq]uestion mark",
+    r"\s*[Qq]uestion\-mark",
+    r"\s*[Ff]ull stop",
+  ]
+  for pat in patterns:
+    text = re.sub(pat, "", text)
+  return text
+
+
+def _apply_pronunciation_ssml(text: str) -> str:
+  """Wrap known Sanskrit/astrology terms in <sub alias="..."> so Google TTS pronounces them better."""
+  text = _strip_literal_punctuation_words(text)
+  for term, alias in _PRONUNCIATION_ALIASES:
+    if term in text:
+      safe_alias = html.escape(alias, quote=True)
+      # Pronounce using alias, but wrap in moderate emphasis so Vedic terms carry a bit more weight
+      # and blend better into the surrounding prosody.
+      text = text.replace(
+        term,
+        f'<emphasis level="moderate"><sub alias="{safe_alias}">{term}</sub></emphasis>',
+      )
+  return text
+
+
+def _apply_pronunciation_plain(text: str) -> str:
+  """Replace terms with phonetic spelling for plain-text TTS (no SSML). Used by /tts/synthesize."""
+  text = _strip_literal_punctuation_words(text)
+  for term, alias in _PRONUNCIATION_ALIASES:
+    text = text.replace(term, alias)
+  return text
 
 
 def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
@@ -103,15 +177,25 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
   Convert segment text with cues to SSML for Google TTS.
   Cues: [PAUSE:*], [EMPHASIS:...], [RISE:...], [FALL:...], [SLOW:...].
   Wraps in <prosody> so female and male sound distinct.
+  Applies pronunciation aliases for Sanskrit/Vedic terms (Parashari, Jaimini, Nadi, etc.).
   """
   if not segment_text or not segment_text.strip():
     return "<speak></speak>"
+  # Simple deterministic hash so prosody variation is stable per segment but not identical everywhere
+  base_hash = sum(ord(ch) for ch in segment_text)
+
   # Escape XML in the text so we can safely insert SSML tags
   text = html.escape(segment_text.strip(), quote=True)
-  # Pauses — use longer, audible breaks so it doesn't sound like one run-on announcement
-  text = re.sub(r"\[PAUSE:short\]", '<break time="500ms"/>', text, flags=re.IGNORECASE)
-  text = re.sub(r"\[PAUSE:medium\]", '<break time="1s"/>', text, flags=re.IGNORECASE)
-  text = re.sub(r"\[PAUSE:long\]", '<break time="1.5s"/>', text, flags=re.IGNORECASE)
+  # Treat \"...\" as a small hesitation / breath for the more expressive female host.
+  # For the male host we skip this to avoid extra micro-pauses.
+  if role != "male":
+    text = re.sub(r"\.\.\.", '<break time="260ms"/>', text)
+  # Improve pronunciation of Sanskrit/astrology terms via SSML <sub alias="...">
+  text = _apply_pronunciation_ssml(text)
+  # Pauses — defaults; we will further tighten them for the male host below so he sounds less choppy.
+  text = re.sub(r"\[PAUSE:short\]", '<break time="420ms"/>', text, flags=re.IGNORECASE)
+  text = re.sub(r"\[PAUSE:medium\]", '<break time="900ms"/>', text, flags=re.IGNORECASE)
+  text = re.sub(r"\[PAUSE:long\]", '<break time="1300ms"/>', text, flags=re.IGNORECASE)
   # Emphasis — strong so it stands out from neutral tone
   text = re.sub(
     r"\[EMPHASIS:([^\]]+)\]",
@@ -119,28 +203,72 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
     text,
     flags=re.IGNORECASE,
   )
-  # Intonation — subtle so the same 2 voices stay recognizable (avoid sounding like 3–4 people)
-  text = re.sub(
-    r"\[RISE:([^\]]+)\]",
-    r'<prosody pitch="+1st" rate="100%">\1</prosody>',
-    text,
-    flags=re.IGNORECASE,
-  )
-  text = re.sub(
-    r"\[FALL:([^\]]+)\]",
-    r'<prosody pitch="-0.8st" rate="97%">\1</prosody>',
-    text,
-    flags=re.IGNORECASE,
-  )
-  text = re.sub(
-    r"\[SLOW:([^\]]+)\]",
-    r'<prosody rate="92%" pitch="0st">\1</prosody>',
-    text,
-    flags=re.IGNORECASE,
-  )
-  # Base prosody per host — keep consistent so clearly 2 people (Gacrux vs Algenib)
+
+  # Intonation — add small deterministic variation so questions don't all sound identical
+  def _rise_repl(match: re.Match) -> str:
+    phrase = match.group(1)
+    local = (base_hash + sum(ord(c) for c in phrase)) % 3
+    # Slightly different upward pitches / rates
+    if local == 0:
+      pitch, rate = "+0.8st", "100%"
+    elif local == 1:
+      pitch, rate = "+1.2st", "103%"
+    else:
+      pitch, rate = "+1.5st", "98%"
+    return f'<prosody pitch="{pitch}" rate="{rate}">{phrase}</prosody>'
+
+  def _fall_repl(match: re.Match) -> str:
+    phrase = match.group(1)
+    local = (base_hash + sum(ord(c) for c in phrase) * 3) % 3
+    if local == 0:
+      pitch, rate = "-0.6st", "97%"
+    elif local == 1:
+      pitch, rate = "-1.0st", "94%"
+    else:
+      pitch, rate = "-1.4st", "92%"
+    return f'<prosody pitch="{pitch}" rate="{rate}">{phrase}</prosody>'
+
+  def _slow_repl(match: re.Match) -> str:
+    phrase = match.group(1)
+    local = (base_hash + len(phrase)) % 3
+    # Female host can slow down more; male host stays closer to normal so he doesn't feel dragged.
+    if role == "male":
+      if local == 0:
+        rate = "96%"
+      elif local == 1:
+        rate = "94%"
+      else:
+        rate = "98%"
+    else:
+      if local == 0:
+        rate = "92%"
+      elif local == 1:
+        rate = "88%"
+      else:
+        rate = "95%"
+    return f'<prosody rate="{rate}" pitch="0st">{phrase}</prosody>'
+
+  text = re.sub(r"\[RISE:([^\]]+)\]", _rise_repl, text, flags=re.IGNORECASE)
+  text = re.sub(r"\[FALL:([^\]]+)\]", _fall_repl, text, flags=re.IGNORECASE)
+  text = re.sub(r"\[SLOW:([^\]]+)\]", _slow_repl, text, flags=re.IGNORECASE)
+
+  # For the male host, further tighten medium/long pauses so his delivery feels more continuous.
   if role == "male":
-    prosody = '<prosody rate="100%" pitch="-0.2st">'
+    text = text.replace('<break time="900ms"/>', '<break time="650ms"/>')
+    text = text.replace('<break time="1300ms"/>', '<break time="950ms"/>')
+
+  # Interjections — wrap short exclamations so Google TTS treats them as expressive
+  def _interjection_repl(match: re.Match) -> str:
+    word = match.group(1)
+    punct = match.group(2) or ""
+    return f'<say-as interpret-as="interjection">{word}</say-as>{punct}'
+
+  text = re.sub(r"(?<![\w>])(Wow|Oh|Great|Nice|Exactly|Right)([!?,\.])", _interjection_repl, text)
+
+  # Base prosody per host — keep consistent so clearly 2 people (Gacrux vs Algenib).
+  # Make the male host slightly faster overall so his delivery feels snappier.
+  if role == "male":
+    prosody = '<prosody rate="105%" pitch="-0.2st">'
   else:
     prosody = '<prosody rate="100%" pitch="+0.2st">'
   return f"<speak>{prosody}{text}</prosody></speak>"
@@ -204,6 +332,7 @@ async def _chunk_and_synthesize(client, voice, audio_config, text: str) -> bytes
     start = end
 
   async def synthesize_chunk(idx: int, chunk_text: str) -> bytes:
+    chunk_text = _apply_pronunciation_plain(chunk_text)
     synthesis_input = texttospeech.SynthesisInput(text=chunk_text)
     logger.info("TTS: synthesizing chunk %s/%s (%s bytes)", idx + 1, len(chunks), len(chunk_text.encode("utf-8")))
     loop = asyncio.get_running_loop()
@@ -366,6 +495,7 @@ class PodcastRequest(BaseModel):
   message_id: str | int | None = None  # optional: if provided, use GCS cache; client may send int (e.g. 2329)
   session_id: str | None = None  # optional: for podcast history and opening conversation
   preview: str | None = None  # optional: first ~150 chars for history list
+  native_name: str | None = None  # optional: birth chart / native name for personalized intro
 
 
 def _podcast_cache_lang(lang: str) -> str:
@@ -374,6 +504,40 @@ def _podcast_cache_lang(lang: str) -> str:
     return "en"
   l = str(lang).lower().strip()
   return "hi" if l.startswith("hi") else "en"
+
+
+def _podcast_intro_line(native_name: str, lang: str) -> str:
+  """Return a short FEMALE: intro line with the native's name. Used when native_name is provided."""
+  name = (native_name or "").strip()
+  if not name:
+    return ""
+  use_hindi = lang and str(lang).lower().startswith("hi")
+  if use_hindi:
+    return f"FEMALE: नमस्ते {name}, यह आपका कॉस्मिक रीडिंग है। [PAUSE:short] चलिए शुरू करते हैं।\n\n"
+  return f"FEMALE: Hey {name}, this is your cosmic reading. [PAUSE:short] Let's dive in.\n\n"
+
+
+def _normalize_hindi_ordinals(script: str, lang: str) -> str:
+  """
+  Gemini sometimes writes mixed Hindi/English ordinals like "8wa", "8 wa", "12wa house".
+  For Hindi podcasts, normalize the most common patterns so TTS sounds more natural.
+  """
+  if not lang or not str(lang).lower().startswith("hi"):
+    return script
+
+  # 8wa / 8 wa → 8वाँ, and "8वाँ house" → "8वाँ भाव"
+  script = re.sub(r"\b8\s*wa\b", "8वाँ", script, flags=re.IGNORECASE)
+  script = re.sub(r"\b8\s*वा\b", "8वाँ", script, flags=re.IGNORECASE)
+  script = re.sub(r"\b8वाँ\s+house\b", "8वाँ भाव", script, flags=re.IGNORECASE)
+
+  # 12wa / 12 wa → 12वाँ, and "12वाँ house" → "12वाँ भाव"
+  script = re.sub(r"\b12\s*wa\b", "12वाँ", script, flags=re.IGNORECASE)
+  script = re.sub(r"\b12\s*वा\b", "12वाँ", script, flags=re.IGNORECASE)
+  script = re.sub(r"\b12वाँ\s+house\b", "12वाँ भाव", script, flags=re.IGNORECASE)
+
+  # Generic "(\d+) wa/वा house" → "<num>वाँ भाव" as a fallback
+  script = re.sub(r"\b(\d+)\s*(wa|वा)\s+house\b", r"\1वाँ भाव", script, flags=re.IGNORECASE)
+  return script
 
 
 @router.get("/podcast/check-cache")
@@ -487,6 +651,14 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       if not script or not script.strip():
         raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
 
+      # Prepend personalized intro when native_name is provided
+      intro = _podcast_intro_line(request.native_name or "", lang)
+      if intro:
+        script = intro + script
+
+      # Clean up common Hindi ordinal patterns (8wa house → 8वाँ भाव etc.) before we parse segments.
+      script = _normalize_hindi_ordinals(script, lang)
+
       segments = _parse_podcast_script(script)
       if not segments:
         raise HTTPException(status_code=500, detail="Podcast script had no parseable FEMALE:/MALE: lines")
@@ -509,8 +681,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
         logger.exception("TTS: Error initializing TextToSpeechClient for podcast")
         raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
-      female_name, male_name = _podcast_voices(lang)
-      language_code = "en-GB"  # Podcast uses UK English Chirp3-HD (Gacrux, Algenib)
+      female_name, male_name, language_code = _podcast_voices(lang)
       audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3,
         speaking_rate=0.95,

@@ -11,10 +11,12 @@ import {
   PanResponder,
   ActivityIndicator,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { COSMIC_AMBIENT_URL } from '../utils/constants';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_WIDTH = Math.min(SCREEN_WIDTH * 0.9, 360);
@@ -83,6 +85,8 @@ function SoundWaveIcon({ isActive, colors }) {
   );
 }
 
+const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5];
+
 export default function PodcastPlayerModal({
   visible,
   onClose,
@@ -94,6 +98,8 @@ export default function PodcastPlayerModal({
   onResume,
   onStop,
   onShare,
+  playbackRate = 1,
+  onSpeedChange,
 }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
@@ -103,17 +109,72 @@ export default function PodcastPlayerModal({
   const isPlaying = mode === 'playing';
   const isPaused = mode === 'paused';
 
+  const [ambienceOn, setAmbienceOn] = useState(false);
+  const ambientSoundRef = useRef(null);
+  const ambienceUrl = (COSMIC_AMBIENT_URL || '').trim();
+  const showAmbienceToggle = !!ambienceUrl;
+
+  // Load and play ambient loop when toggled on; stop and unload when toggled off or modal closes
+  useEffect(() => {
+    if (!showAmbienceToggle) return;
+    if (ambienceOn) {
+      let mounted = true;
+      (async () => {
+        try {
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: ambienceUrl },
+            { shouldPlay: true, isLooping: true }
+          );
+          if (!mounted) {
+            sound.unloadAsync();
+            return;
+          }
+          await sound.setVolumeAsync(0.2);
+          ambientSoundRef.current = sound;
+        } catch (e) {
+          if (mounted) setAmbienceOn(false);
+        }
+      })();
+      return () => {
+        mounted = false;
+        const s = ambientSoundRef.current;
+        ambientSoundRef.current = null;
+        if (s) s.unloadAsync().catch(() => {});
+      };
+    } else {
+      const s = ambientSoundRef.current;
+      ambientSoundRef.current = null;
+      if (s) s.unloadAsync().catch(() => {});
+    }
+  }, [ambienceOn, showAmbienceToggle, ambienceUrl]);
+
+  // When modal closes or unmounts, stop ambient
+  useEffect(() => {
+    if (!visible) {
+      setAmbienceOn(false);
+      const s = ambientSoundRef.current;
+      ambientSoundRef.current = null;
+      if (s) s.unloadAsync().catch(() => {});
+    }
+  }, [visible]);
+
   /** While dragging the progress bar, show this position; otherwise use positionMillis. Seek only on release to avoid "Seeking interrupted". */
   const [dragPositionMillis, setDragPositionMillis] = useState(null);
   const dragPositionRef = useRef(null);
   const displayPosition = dragPositionMillis ?? positionMillis;
   const progress = durationMillis > 0 ? Math.min(1, displayPosition / durationMillis) : 0;
 
+  /** Ref so panResponder (created once) always uses current durationMillis when computing seek position. */
+  const durationMillisRef = useRef(durationMillis);
+  durationMillisRef.current = durationMillis;
+
   const computePositionFromTouch = (locationX) => {
     const w = trackWidthRef.current;
     if (w <= 0) return 0;
+    const duration = durationMillisRef.current;
+    if (duration <= 0) return 0;
     const ratio = Math.max(0, Math.min(1, locationX / w));
-    return Math.floor(ratio * durationMillis);
+    return Math.floor(ratio * duration);
   };
 
   const panResponder = useRef(
@@ -154,7 +215,10 @@ export default function PodcastPlayerModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={[styles.overlay, { backgroundColor: overlayBg }]} onPress={onClose}>
+      <Pressable
+        style={[styles.overlay, { backgroundColor: overlayBg }]}
+        onPress={() => {}}
+      >
         <View style={styles.outer} pointerEvents="box-none">
           <View style={styles.modalCard} pointerEvents="box-none">
             <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -244,6 +308,54 @@ export default function PodcastPlayerModal({
                       </TouchableOpacity>
                     )}
                   </View>
+
+                  {onSpeedChange && (
+                    <View style={styles.speedRow}>
+                      <Text style={[styles.speedLabel, { color: colors.textSecondary }]}>
+                        {t('podcast.speed', 'Speed')}
+                      </Text>
+                      <View style={styles.speedOptions}>
+                        {SPEED_OPTIONS.map((speed) => (
+                          <TouchableOpacity
+                            key={speed}
+                            style={[
+                              styles.speedChip,
+                              { backgroundColor: colors.surface || 'rgba(255,255,255,0.15)' },
+                              playbackRate === speed && { backgroundColor: accentColor },
+                            ]}
+                            onPress={() => onSpeedChange(speed)}
+                          >
+                            <Text
+                              style={[
+                                styles.speedChipText,
+                                { color: playbackRate === speed ? '#fff' : (colors.textSecondary || '#999') },
+                                playbackRate === speed && styles.speedChipTextActive,
+                              ]}
+                            >
+                              {speed === 1 ? '1×' : `${speed}×`}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {showAmbienceToggle && (
+                    <TouchableOpacity
+                      style={[styles.ambienceRow, { backgroundColor: colors.surface || 'rgba(255,255,255,0.1)' }]}
+                      onPress={() => setAmbienceOn((v) => !v)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={ambienceOn ? 'planet' : 'planet-outline'}
+                        size={22}
+                        color={ambienceOn ? accentColor : (colors.textSecondary || '#999')}
+                      />
+                      <Text style={[styles.ambienceLabel, { color: ambienceOn ? accentColor : colors.textSecondary }]}>
+                        {t('podcast.cosmicAmbience', 'Cosmic ambience')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </LinearGradient>
@@ -378,5 +490,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginTop: 4,
+  },
+  ambienceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+  },
+  ambienceLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  speedRow: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  speedLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  speedOptions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  speedChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  speedChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  speedChipTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });

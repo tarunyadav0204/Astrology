@@ -52,17 +52,21 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [podcastPlayerMode, setPodcastPlayerMode] = useState('generating');
   const [podcastPositionMillis, setPodcastPositionMillis] = useState(0);
   const [podcastDurationMillis, setPodcastDurationMillis] = useState(0);
+  const [podcastPlaybackRate, setPodcastPlaybackRate] = useState(1);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const skeletonAnim = useRef(new Animated.Value(0)).current;
   /** After seek, ignore progress updates briefly so we don't overwrite with stale position. */
   const lastSeekedAtRef = useRef(0);
+  /** Set when user closes the modal while "Generating..." so we don't reopen or auto-play when the request completes. */
+  const userDismissedGeneratingRef = useRef(false);
   /** Subtle heartbeat-style pulse for the podcast icon (idle state). */
   const podcastIconPulse = useRef(new Animated.Value(1)).current;
 
   useFocusEffect(
     React.useCallback(() => {
       return () => {
+        userDismissedGeneratingRef.current = true;
         getTextToSpeech().stopPodcast();
         setIsPlayingPodcast(false);
         setIsPausedPodcast(false);
@@ -198,6 +202,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     if (!cleanText) return;
 
     try {
+      userDismissedGeneratingRef.current = false;
       setIsLoadingPodcast(true);
       setIsPlayingPodcast(false);
       await getTextToSpeech().playPodcast(cleanText, {
@@ -205,12 +210,20 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         messageId: message.messageId || null,
         sessionId: sessionId || null,
         preview: (cleanText || message.content || '').slice(0, 150),
+        nativeName: message.native_name || null,
         onProgress: (pos, dur) => {
+          if (userDismissedGeneratingRef.current) return;
           if (Date.now() - lastSeekedAtRef.current < 600) return; // don't overwrite seek with stale callback
           setPodcastPositionMillis(pos);
           if (dur > 0) setPodcastDurationMillis(dur);
         },
         onStart: () => {
+          if (userDismissedGeneratingRef.current) {
+            getTextToSpeech().stopPodcast();
+            setIsLoadingPodcast(false);
+            return;
+          }
+          getTextToSpeech().setPodcastRate(podcastPlaybackRate);
           setIsLoadingPodcast(false);
           setIsPlayingPodcast(true);
           setIsPausedPodcast(false);
@@ -218,6 +231,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           setShowPodcastPlayerModal(true);
         },
         onDone: () => {
+          if (userDismissedGeneratingRef.current) return;
           setIsPlayingPodcast(false);
           setIsPausedPodcast(false);
           setShowPodcastPlayerModal(false);
@@ -233,11 +247,13 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           setPodcastPlayerMode('playing');
         },
         onStop: () => {
+          if (userDismissedGeneratingRef.current) return;
           setIsPlayingPodcast(false);
           setIsPausedPodcast(false);
           setShowPodcastPlayerModal(false);
         },
         onError: (err) => {
+          userDismissedGeneratingRef.current = false;
           setIsLoadingPodcast(false);
           setIsPlayingPodcast(false);
           setIsPausedPodcast(false);
@@ -283,7 +299,13 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       return;
     }
     if (isPlayingPodcast) return; // Pause/Stop are separate buttons
-    if (isLoadingPodcast) return;
+    if (isLoadingPodcast) {
+      // User closed the generating modal and tapped again – reopen it and wait for completion
+      userDismissedGeneratingRef.current = false;
+      setShowPodcastPlayerModal(true);
+      setPodcastPlayerMode('generating');
+      return;
+    }
     const cleanText = getCleanMessageText();
     if (!cleanText) return;
 
@@ -328,6 +350,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   };
 
   const handlePodcastPlayerClose = () => {
+    if (podcastPlayerMode === 'generating') {
+      userDismissedGeneratingRef.current = true;
+    }
     getTextToSpeech().stopPodcast();
     setShowPodcastPlayerModal(false);
   };
@@ -344,7 +369,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     try {
       setIsSharingPodcast(true);
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
-      const response = await chatAPI.getPodcastAudio(cleanText, lang, message.messageId || null);
+      const response = await chatAPI.getPodcastAudio(cleanText, lang, message.messageId || null, null, null, message.native_name || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
         Alert.alert('Error', 'Could not get podcast audio to share.');
@@ -1713,6 +1738,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         onResume={handleResumePodcast}
         onStop={handleStopPodcast}
         onShare={sharePodcastAudio}
+        playbackRate={podcastPlaybackRate}
+        onSpeedChange={(rate) => {
+          setPodcastPlaybackRate(rate);
+          getTextToSpeech().setPodcastRate(rate);
+        }}
       />
     </Animated.View>
     </>

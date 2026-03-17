@@ -11,6 +11,7 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -68,23 +69,6 @@ export default function BlogListScreen({ navigation }) {
     fetchPosts(newCategory);
   };
 
-  const renderCategoryItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryChip,
-        selectedCategory === item && { backgroundColor: '#ff6b35' }
-      ]}
-      onPress={() => handleCategorySelect(item)}
-    >
-      <Text style={[
-        styles.categoryText,
-        { color: selectedCategory === item ? '#fff' : colors.textSecondary }
-      ]}>
-        {item}
-      </Text>
-    </TouchableOpacity>
-  );
-
   const renderPostItem = ({ item }) => (
     <TouchableOpacity
       style={[styles.postCard, { backgroundColor: colors.surface }]}
@@ -133,14 +117,30 @@ export default function BlogListScreen({ navigation }) {
 
           {categories.length > 0 && (
             <View style={styles.categoriesContainer}>
-              <FlatList
+              <GHScrollView
                 horizontal
-                data={categories}
-                renderItem={renderCategoryItem}
-                keyExtractor={(item) => item}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.categoriesList}
-              />
+                style={styles.categoriesScrollView}
+              >
+                {categories.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[
+                      styles.categoryChip,
+                      selectedCategory === item && { backgroundColor: '#ff6b35' }
+                    ]}
+                    onPress={() => handleCategorySelect(item)}
+                  >
+                    <Text style={[
+                      styles.categoryText,
+                      { color: selectedCategory === item ? '#fff' : colors.textSecondary }
+                    ]}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </GHScrollView>
             </View>
           )}
 
@@ -199,9 +199,13 @@ const styles = StyleSheet.create({
     height: 50,
     marginBottom: 10,
   },
+  categoriesScrollView: {
+    flexGrow: 0,
+  },
   categoriesList: {
     paddingHorizontal: 20,
     alignItems: 'center',
+    flexDirection: 'row',
   },
   categoryChip: {
     paddingHorizontal: 16,
