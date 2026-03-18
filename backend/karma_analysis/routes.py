@@ -7,7 +7,6 @@ from pydantic import BaseModel
 import os
 import sys
 import json
-import sqlite3
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -17,6 +16,7 @@ from auth import get_current_user, User
 from calculators.karma_context_builder import KarmaContextBuilder
 from ai.karma_gemini_analyzer import KarmaGeminiAnalyzer
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 load_dotenv()
 
@@ -29,14 +29,16 @@ class KarmaAnalysisRequest(BaseModel):
 def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: dict, karma_cost: int):
     """Background task to process karma analysis"""
     try:
-        conn = sqlite3.connect(os.getenv('DATABASE_PATH', 'astrology.db'))
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "UPDATE karma_insights SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE chart_id = ? AND user_id = ?",
-            (chart_id, user_id)
-        )
-        conn.commit()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE karma_insights
+                SET status = 'processing', updated_at = CURRENT_TIMESTAMP
+                WHERE chart_id = %s AND user_id = %s
+                """,
+                (chart_id, user_id),
+            )
         
         print(f"\n{'='*80}")
         print(f"🔮 KARMA ANALYSIS REQUEST - Chart ID: {chart_id}")
@@ -77,24 +79,27 @@ def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: d
             print(f"Error: {analysis.get('error')}")
         print(f"{'='*80}\n")
         
-        if analysis['success']:
-            cursor.execute(
-                """UPDATE karma_insights 
-                   SET status = 'complete', 
-                       karma_context = ?, 
-                       ai_interpretation = ?, 
-                       sections = ?,
-                       updated_at = CURRENT_TIMESTAMP 
-                   WHERE chart_id = ? AND user_id = ?""",
-                (
-                    json.dumps(analysis['karma_context']),
-                    analysis['ai_interpretation'],
-                    json.dumps(analysis['sections']),
-                    chart_id,
-                    user_id
+        if analysis["success"]:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    UPDATE karma_insights
+                    SET status = 'complete',
+                        karma_context = %s,
+                        ai_interpretation = %s,
+                        sections = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE chart_id = %s AND user_id = %s
+                    """,
+                    (
+                        json.dumps(analysis["karma_context"]),
+                        analysis["ai_interpretation"],
+                        json.dumps(analysis["sections"]),
+                        chart_id,
+                        user_id,
+                    ),
                 )
-            )
-            conn.commit()
             
             # Deduct credits only on successful analysis
             print(f"💰 Deducting {karma_cost} credits for successful analysis")
@@ -105,27 +110,37 @@ def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: d
                 f"Karma analysis for chart {chart_id}"
             )
         else:
-            cursor.execute(
-                "UPDATE karma_insights SET status = 'error', error = ?, updated_at = CURRENT_TIMESTAMP WHERE chart_id = ? AND user_id = ?",
-                (analysis.get('error', 'Unknown error'), chart_id, user_id)
-            )
-            conn.commit()
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    UPDATE karma_insights
+                    SET status = 'error',
+                        error = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE chart_id = %s AND user_id = %s
+                    """,
+                    (analysis.get("error", "Unknown error"), chart_id, user_id),
+                )
             print(f"⚠️ Analysis failed - no credits deducted")
-        conn.close()
         
     except Exception as e:
         print(f"\n❌ KARMA ANALYSIS BACKGROUND ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
-        
-        conn = sqlite3.connect(os.getenv('DATABASE_PATH', 'astrology.db'))
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE karma_insights SET status = 'error', error = ?, updated_at = CURRENT_TIMESTAMP WHERE chart_id = ? AND user_id = ?",
-            (str(e), chart_id, user_id)
-        )
-        conn.commit()
-        conn.close()
+
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE karma_insights
+                SET status = 'error',
+                    error = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE chart_id = %s AND user_id = %s
+                """,
+                (str(e), chart_id, user_id),
+            )
         print(f"⚠️ Exception occurred - no credits deducted")
 
 @router.post("/karma-analysis")
@@ -151,22 +166,24 @@ async def analyze_karma(request: KarmaAnalysisRequest, background_tasks: Backgro
                 detail=f"Insufficient credits. You need {karma_cost} credits but have {user_balance}."
             )
         
-        conn = sqlite3.connect(os.getenv('DATABASE_PATH', 'astrology.db'))
-        cursor = conn.cursor()
-        
         print(f"🔍 Fetching chart data for chart_id={request.chart_id}, user_id={current_user.userid}")
-        
-        cursor.execute(
-            "SELECT name, date, time, latitude, longitude, timezone, place, gender FROM birth_charts WHERE id = ? AND userid = ?",
-            (request.chart_id, current_user.userid)
-        )
-        result = cursor.fetchone()
-        
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT name, date, time, latitude, longitude, timezone, place, gender
+                FROM birth_charts
+                WHERE id = %s AND userid = %s
+                """,
+                (request.chart_id, current_user.userid),
+            )
+            result = cur.fetchone()
+
         if not result:
-            conn.close()
             print(f"❌ Chart not found")
             raise HTTPException(status_code=404, detail="Chart not found")
-        
+
         print(f"✅ Chart data found")
         
         # Decrypt all encrypted fields
@@ -200,35 +217,44 @@ async def analyze_karma(request: KarmaAnalysisRequest, background_tasks: Backgro
             }
         divisional_charts = None  # Will be calculated by KarmaContextBuilder
         
-        cursor.execute(
-            "SELECT status, karma_context, ai_interpretation, sections, error FROM karma_insights WHERE chart_id = ? AND user_id = ?",
-            (request.chart_id, current_user.userid)
-        )
-        existing = cursor.fetchone()
-        
-        if existing and existing[0] == 'complete' and not force_regenerate:
-            conn.close()
-            print(f"✅ Returning cached result")
-            return {
-                "status": "complete",
-                "data": {
-                    "karma_context": json.loads(existing[1]),
-                    "ai_interpretation": existing[2],
-                    "sections": json.loads(existing[3])
-                },
-                "cached": True
-            }
-        
-        print(f"📝 Creating new karma_insights entry")
-        
-        cursor.execute(
-            """INSERT OR REPLACE INTO karma_insights 
-               (chart_id, user_id, status, created_at, updated_at) 
-               VALUES (?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
-            (request.chart_id, current_user.userid)
-        )
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT status, karma_context, ai_interpretation, sections, error
+                FROM karma_insights
+                WHERE chart_id = %s AND user_id = %s
+                """,
+                (request.chart_id, current_user.userid),
+            )
+            existing = cur.fetchone()
+
+            if existing and existing[0] == "complete" and not force_regenerate:
+                print(f"✅ Returning cached result")
+                return {
+                    "status": "complete",
+                    "data": {
+                        "karma_context": json.loads(existing[1]),
+                        "ai_interpretation": existing[2],
+                        "sections": json.loads(existing[3]),
+                    },
+                    "cached": True,
+                }
+
+            print(f"📝 Creating new karma_insights entry")
+
+            # Upsert-style: clear to pending for this chart/user
+            execute(
+                conn,
+                """
+                INSERT INTO karma_insights (chart_id, user_id, status, created_at, updated_at)
+                VALUES (%s, %s, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (chart_id, user_id)
+                DO UPDATE SET status = EXCLUDED.status,
+                              updated_at = EXCLUDED.updated_at
+                """,
+                (request.chart_id, current_user.userid),
+            )
         
         print(f"🚀 Starting background task (credits will be deducted on success)")
         
@@ -259,34 +285,36 @@ async def analyze_karma(request: KarmaAnalysisRequest, background_tasks: Backgro
 async def get_karma_status(chart_id: str, current_user: User = Depends(get_current_user)):
     """Check status of karma analysis"""
     try:
-        conn = sqlite3.connect(os.getenv('DATABASE_PATH', 'astrology.db'))
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "SELECT status, karma_context, ai_interpretation, sections, error FROM karma_insights WHERE chart_id = ? AND user_id = ?",
-            (chart_id, current_user.userid)
-        )
-        result = cursor.fetchone()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT status, karma_context, ai_interpretation, sections, error
+                FROM karma_insights
+                WHERE chart_id = %s AND user_id = %s
+                """,
+                (chart_id, current_user.userid),
+            )
+            result = cur.fetchone()
         
         if not result:
             return {"status": "not_found"}
-        
+
         status = result[0]
-        
-        if status == 'complete':
+
+        if status == "complete":
             return {
                 "status": "complete",
                 "data": {
                     "karma_context": json.loads(result[1]),
                     "ai_interpretation": result[2],
-                    "sections": json.loads(result[3])
-                }
+                    "sections": json.loads(result[3]),
+                },
             }
-        elif status == 'error':
+        elif status == "error":
             return {
                 "status": "error",
-                "error": result[4]
+                "error": result[4],
             }
         else:
             return {"status": status}

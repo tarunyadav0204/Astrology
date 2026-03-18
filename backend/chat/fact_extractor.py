@@ -1,8 +1,10 @@
 import google.generativeai as genai
 import json
 import os
-import sqlite3
 from typing import Dict, List
+
+from db import get_conn, execute
+
 
 class FactExtractor:
     """Extract and store user facts from conversations using Gemini Flash"""
@@ -93,38 +95,38 @@ If no USER-STATED facts found, return empty array: []
     
     def _store_facts(self, facts: List[Dict], birth_chart_id: int):
         """Store facts in database"""
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        for fact_data in facts:
-            cursor.execute("""
-                INSERT INTO user_facts (birth_chart_id, category, fact, confidence)
-                VALUES (?, ?, ?, ?)
-            """, (
-                birth_chart_id,
-                fact_data['category'],
-                fact_data['fact'],
-                fact_data.get('confidence', 1.0)
-            ))
-        
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            for fact_data in facts:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO user_facts (birth_chart_id, category, fact, confidence)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (
+                        birth_chart_id,
+                        fact_data["category"],
+                        fact_data["fact"],
+                        fact_data.get("confidence", 1.0),
+                    ),
+                )
     
     def get_facts(self, birth_chart_id: int) -> Dict[str, List[str]]:
         """Retrieve all facts for a birth chart, filtering out old temporary events"""
         from datetime import datetime, timedelta
         
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT category, fact, extracted_at FROM user_facts
-            WHERE birth_chart_id = ?
-            ORDER BY extracted_at DESC
-        """, (birth_chart_id,))
-        
-        rows = cursor.fetchall()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT category, fact, extracted_at
+                FROM user_facts
+                WHERE birth_chart_id = %s
+                ORDER BY extracted_at DESC
+                """,
+                (birth_chart_id,),
+            )
+            rows = cur.fetchall()
         
         facts_by_category = {}
         cutoff_date = datetime.now() - timedelta(days=7)  # Filter temporary events older than 7 days

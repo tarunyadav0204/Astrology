@@ -1,16 +1,8 @@
-import sqlite3
 import json
 import re
 from typing import Dict, List, Tuple
 
-
-def _get_db_connection() -> sqlite3.Connection:
-  """
-  Lightweight helper to get a read-only style connection for glossary usage.
-  """
-  conn = sqlite3.connect("astrology.db")
-  conn.row_factory = sqlite3.Row
-  return conn
+from db import get_conn, execute
 
 
 def load_glossary_terms(language: str = "english") -> List[dict]:
@@ -26,26 +18,31 @@ def load_glossary_terms(language: str = "english") -> List[dict]:
   }
   """
   try:
-    conn = _get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-      """
-      SELECT term_id, display_text, definition, COALESCE(aliases, '[]') AS aliases_json
-      FROM glossary_terms
-      WHERE language = ? OR language IS NULL
-      """,
-      (language,),
-    )
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+      cur = execute(
+        conn,
+        """
+        SELECT term_id, display_text, definition, COALESCE(aliases, '[]') AS aliases_json
+        FROM glossary_terms
+        WHERE language = %s OR language IS NULL
+        """,
+        (language,),
+      )
+      rows = cur.fetchall() or []
   except Exception:
     # If anything goes wrong (e.g. table not created yet), fall back gracefully
     return []
 
   terms: List[dict] = []
   for row in rows:
+    # Row is a tuple (psycopg2), ordered as selected:
+    # term_id, display_text, definition, aliases_json
+    term_id = row[0]
+    display_text = row[1]
+    definition = row[2]
+    aliases_json = row[3] if len(row) > 3 else "[]"
     try:
-      aliases = json.loads(row["aliases_json"]) if row["aliases_json"] else []
+      aliases = json.loads(aliases_json) if aliases_json else []
       if not isinstance(aliases, list):
         aliases = []
     except Exception:
@@ -53,9 +50,9 @@ def load_glossary_terms(language: str = "english") -> List[dict]:
 
     terms.append(
       {
-        "term_id": row["term_id"],
-        "display_text": row["display_text"],
-        "definition": row["definition"],
+        "term_id": term_id,
+        "display_text": display_text,
+        "definition": definition,
         "aliases": aliases,
       }
     )

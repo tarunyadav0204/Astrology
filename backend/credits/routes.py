@@ -5,12 +5,12 @@ import json
 import logging
 import os
 import re
-import sqlite3
 from auth import get_current_user, User
 from .credit_service import CreditService
 from .admin.promo_manager import PromoCodeManager
 from utils.env_json import parse_json_from_env
 from activity.publisher import publish_activity
+from db import get_conn, execute
 
 router = APIRouter()
 credit_service = CreditService()
@@ -624,25 +624,36 @@ async def clear_subscription_no_purchase(current_user: User = Depends(get_curren
 @router.get("/google-play/subscription-plans")
 async def get_google_play_subscription_plans(current_user: User = Depends(get_current_user)):
     """List VIP subscription plans available for in-app purchase (platform=astroroshni, with google_play_product_id). For mobile to show and purchase."""
-    conn = sqlite3.connect(credit_service.db_path)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            SELECT plan_id, tier_name, discount_percent, google_play_product_id, price
-            FROM subscription_plans
-            WHERE platform = 'astroroshni' AND is_active = 1 AND google_play_product_id IS NOT NULL AND google_play_product_id != ''
-            ORDER BY COALESCE(discount_percent, 0) ASC
-        """)
-        rows = cursor.fetchall()
-    except sqlite3.OperationalError:
-        cursor.execute("""
-            SELECT plan_id, plan_name, 0, NULL, price
-            FROM subscription_plans
-            WHERE platform = 'astroroshni' AND is_active = 1
-            ORDER BY plan_name
-        """)
-        rows = [(r[0], r[1], 0, None, r[4]) for r in cursor.fetchall()]
-    conn.close()
+    with get_conn() as conn:
+        try:
+            cur = execute(
+                conn,
+                """
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price
+                FROM subscription_plans
+                WHERE platform = %s
+                  AND is_active = TRUE
+                  AND google_play_product_id IS NOT NULL
+                  AND google_play_product_id != ''
+                ORDER BY COALESCE(discount_percent, 0) ASC
+                """,
+                ("astroroshni",),
+            )
+            rows = cur.fetchall()
+        except Exception:
+            # Backward compatibility for deployments where tier_name / discount_percent are not present
+            cur = execute(
+                conn,
+                """
+                SELECT plan_id, plan_name, 0, NULL, price
+                FROM subscription_plans
+                WHERE platform = %s
+                  AND is_active = TRUE
+                ORDER BY plan_name
+                """,
+                ("astroroshni",),
+            )
+            rows = [(r[0], r[1], 0, None, r[4]) for r in cur.fetchall()]
     plans = []
     for r in rows:
         plan_id, name, discount, product_id, price = r[0], r[1], r[2] or 0, r[3], float(r[4]) if r[4] is not None else 0
@@ -731,46 +742,47 @@ async def spend_credits(request: dict, current_user: User = Depends(get_current_
 async def create_promo_code(request: CreatePromoCodeRequest, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
+
     try:
-        cursor.execute("""
-            INSERT INTO promo_codes (code, credits, max_uses, max_uses_per_user, expires_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            request.code.upper(),
-            request.credits,
-            request.max_uses,
-            request.max_uses_per_user,
-            request.expires_at,
-            current_user.userid
-        ))
-        
-        conn.commit()
-        conn.close()
-        
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                INSERT INTO promo_codes (code, credits, max_uses, max_uses_per_user, expires_at, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    request.code.upper(),
+                    request.credits,
+                    request.max_uses,
+                    request.max_uses_per_user,
+                    request.expires_at,
+                    current_user.userid,
+                ),
+            )
         return {"message": "Promo code created successfully"}
-    except sqlite3.IntegrityError:
-        conn.close()
+    except Exception:
+        # Most likely a uniqueness violation on code
         raise HTTPException(status_code=400, detail="Promo code already exists")
 
 @router.get("/admin/promo-codes")
 async def get_promo_codes(current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT code, credits, max_uses, max_uses_per_user, used_count, is_active, expires_at, created_at
-        FROM promo_codes 
-        ORDER BY created_at DESC
-    """)
-    
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT code, credits, max_uses, max_uses_per_user, used_count, is_active, expires_at, created_at
+            FROM promo_codes
+            ORDER BY created_at DESC
+            """,
+        )
+        rows = cur.fetchall()
+
     codes = []
-    for row in cursor.fetchall():
+    for row in rows:
         codes.append({
             "code": row[0],
             "credits": row[1],
@@ -779,52 +791,44 @@ async def get_promo_codes(current_user: User = Depends(get_current_user)):
             "used_count": row[4],
             "is_active": row[5],
             "expires_at": row[6],
-            "created_at": row[7]
+            "created_at": row[7],
         })
-    
-    conn.close()
     return {"promo_codes": codes}
 
 @router.put("/admin/promo-codes/{code}")
 async def update_promo_code(code: str, request: UpdatePromoCodeRequest, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        UPDATE promo_codes 
-        SET credits = ?, max_uses = ?, max_uses_per_user = ?, is_active = ?
-        WHERE code = ?
-    """, (request.credits, request.max_uses, request.max_uses_per_user, request.is_active, code.upper()))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Promo code not found")
-    
-    conn.commit()
-    conn.close()
-    
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            UPDATE promo_codes
+            SET credits = %s, max_uses = %s, max_uses_per_user = %s, is_active = %s
+            WHERE code = %s
+            """,
+            (request.credits, request.max_uses, request.max_uses_per_user, request.is_active, code.upper()),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Promo code not found")
+
     return {"message": "Promo code updated successfully"}
 
 @router.delete("/admin/promo-codes/{code}")
 async def delete_promo_code(code: str, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM promo_codes WHERE code = ?", (code.upper(),))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Promo code not found")
-    
-    conn.commit()
-    conn.close()
-    
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "DELETE FROM promo_codes WHERE code = %s",
+            (code.upper(),),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Promo code not found")
+
     return {"message": "Promo code deleted successfully"}
 
 @router.post("/admin/delete-promo-code")
@@ -835,19 +839,16 @@ async def delete_promo_code_post(request: dict, current_user: User = Depends(get
     code = request.get("code")
     if not code:
         raise HTTPException(status_code=400, detail="Promo code is required")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM promo_codes WHERE code = ?", (code.upper(),))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Promo code not found")
-    
-    conn.commit()
-    conn.close()
-    
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "DELETE FROM promo_codes WHERE code = %s",
+            (code.upper(),),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Promo code not found")
+
     return {"message": "Promo code deleted successfully"}
 
 @router.post("/admin/add-credits")
@@ -908,44 +909,37 @@ async def admin_refund_credits(request: AdminRefundRequest, current_user: User =
     if request.amount <= 0:
         raise HTTPException(status_code=400, detail="Refund amount must be positive")
 
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
+    with get_conn() as conn:
+        cur = execute(
+            conn,
             """
             SELECT userid, amount, source, reference_id, description
             FROM credit_transactions
-            WHERE id = ?
+            WHERE id = %s
             """,
             (request.transaction_id,),
         )
-        row = cursor.fetchone()
-        if not row or row[0] != request.userid:
-            raise HTTPException(status_code=404, detail="Original transaction not found for this user")
+        row = cur.fetchone()
 
-        original_amount = row[1]
-        source = row[2]
-        reference_id = row[3]
+    if not row or row[0] != request.userid:
+        raise HTTPException(status_code=404, detail="Original transaction not found for this user")
 
-        if abs(request.amount) > abs(original_amount):
-            raise HTTPException(status_code=400, detail="Refund amount cannot exceed original transaction amount")
+    original_amount = row[1]
+    source = row[2]
+    reference_id = row[3]
 
-        comment_parts = [f"Admin refund of {request.amount} credits for tx #{request.transaction_id}"]
-        if request.comment:
-            comment_parts.append(request.comment)
-        description = " - ".join(comment_parts)
+    if abs(request.amount) > abs(original_amount):
+        raise HTTPException(status_code=400, detail="Refund amount cannot exceed original transaction amount")
 
-        # Use reference_id as feature key for refund_credits
-        feature_key = reference_id or source or "admin_refund"
-        # Close DB before calling service (it opens its own connection)
-        conn.close()
-        credit_service.refund_credits(request.userid, request.amount, feature_key, description)
-        return {"message": "Refund applied", "credits_refunded": request.amount}
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+    comment_parts = [f"Admin refund of {request.amount} credits for tx #{request.transaction_id}"]
+    if request.comment:
+        comment_parts.append(request.comment)
+    description = " - ".join(comment_parts)
+
+    # Use reference_id as feature key for refund_credits
+    feature_key = reference_id or source or "admin_refund"
+    credit_service.refund_credits(request.userid, request.amount, feature_key, description)
+    return {"message": "Refund applied", "credits_refunded": request.amount}
 
 
 @router.post("/admin/reverse-google-play-purchase")
@@ -1302,32 +1296,40 @@ async def get_all_users_with_credits(
     limit = max(1, min(100, limit or 50))
     offset = (page - 1) * limit
 
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
     base = """
-        SELECT u.userid, u.name, u.phone, COALESCE(uc.credits, 0) as credits
         FROM users u
         LEFT JOIN user_credits uc ON u.userid = uc.userid
         WHERE 1=1
     """
-    params = []
+    params: list = []
     if search and search.strip():
         q = f"%{search.strip()}%"
-        base += " AND (u.name LIKE ? OR u.phone LIKE ?)"
+        base += " AND (u.name ILIKE %s OR u.phone ILIKE %s)"
         params.extend([q, q])
     if with_credits_only:
         base += " AND COALESCE(uc.credits, 0) > 0"
 
-    cursor.execute("SELECT COUNT(*) FROM (" + base + ") _", params)
-    total = cursor.fetchone()[0]
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT COUNT(*) " + base,
+            tuple(params),
+        )
+        total = cur.fetchone()[0] if cur.fetchone() is not None else 0
 
-    query = base + " ORDER BY u.name LIMIT ? OFFSET ?"
-    cursor.execute(query, params + [limit, offset])
+        cur = execute(
+            conn,
+            "SELECT u.userid, u.name, u.phone, COALESCE(uc.credits, 0) as credits "
+            + base
+            + " ORDER BY u.name LIMIT %s OFFSET %s",
+            tuple(params + [limit, offset]),
+        )
+        rows = cur.fetchall()
+
     users = [
         {"userid": row[0], "name": row[1], "phone": row[2], "credits": row[3]}
-        for row in cursor.fetchall()
+        for row in rows
     ]
-    conn.close()
     return {"users": users, "total": total, "page": page, "limit": limit}
 
 @router.get("/admin/user-history/{userid}")

@@ -9,6 +9,7 @@ import asyncio
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -54,20 +55,20 @@ async def analyze_health(request: HealthAnalysisRequest, current_user: User = De
             # Check for cached analysis first (unless force_regenerate)
             print(f"🔍 DEBUG: force_regenerate = {request.force_regenerate}")
             if not request.force_regenerate:
-                import sqlite3
                 import hashlib
                 
                 birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
-                
-                conn = sqlite3.connect('astrology.db')
-                cursor = conn.cursor()
-                
-                cursor.execute("""
-                    SELECT insights_data FROM ai_health_insights WHERE birth_hash = ?
-                """, (birth_hash,))
-                
-                result = cursor.fetchone()
-                conn.close()
+                with get_conn() as conn:
+                    cur = execute(
+                        conn,
+                        """
+                        SELECT insights_data
+                        FROM ai_health_insights
+                        WHERE userid = %s AND birth_hash = %s
+                        """,
+                        (current_user.userid, birth_hash),
+                    )
+                    result = cur.fetchone()
                 
                 if result:
                     analysis_data = json.loads(result[0])
@@ -244,32 +245,36 @@ CRITICAL RULES:
                     
                     # Cache the analysis
                     try:
-                        import sqlite3
                         import hashlib
                         
                         birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
-                        
-                        conn = sqlite3.connect('astrology.db')
-                        cursor = conn.cursor()
-                        
-                        cursor.execute("""
-                            CREATE TABLE IF NOT EXISTS ai_health_insights (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                birth_hash TEXT UNIQUE,
-                                insights_data TEXT,
-                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        with get_conn() as conn:
+                            # Table should exist from schema, keep defensive create
+                            execute(
+                                conn,
+                                """
+                                CREATE TABLE IF NOT EXISTS ai_health_insights (
+                                    id SERIAL PRIMARY KEY,
+                                    userid INTEGER NOT NULL DEFAULT 0,
+                                    birth_hash TEXT NOT NULL,
+                                    insights_data TEXT,
+                                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    UNIQUE(userid, birth_hash)
+                                )
+                                """,
                             )
-                        """)
-                        
-                        cursor.execute("""
-                            INSERT OR REPLACE INTO ai_health_insights 
-                            (birth_hash, insights_data, updated_at)
-                            VALUES (?, ?, CURRENT_TIMESTAMP)
-                        """, (birth_hash, json.dumps(health_insights)))
-                        
-                        conn.commit()
-                        conn.close()
+                            execute(
+                                conn,
+                                """
+                                INSERT INTO ai_health_insights (userid, birth_hash, insights_data, updated_at)
+                                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                                ON CONFLICT (userid, birth_hash)
+                                DO UPDATE SET insights_data = EXCLUDED.insights_data,
+                                              updated_at = EXCLUDED.updated_at
+                                """,
+                                (current_user.userid, birth_hash, json.dumps(health_insights)),
+                            )
                         print(f"💾 Analysis cached successfully")
                     except Exception as cache_error:
                         print(f"⚠️ Failed to cache analysis: {cache_error}")
@@ -310,21 +315,21 @@ CRITICAL RULES:
 @router.post("/get-analysis")
 async def get_previous_analysis(request: HealthAnalysisRequest, current_user: User = Depends(get_current_user)):
     """Get previously generated health analysis if exists"""
-    import sqlite3
     import hashlib
     
     try:
         birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
-        
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT insights_data FROM ai_health_insights WHERE birth_hash = ?
-        """, (birth_hash,))
-        
-        result = cursor.fetchone()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT insights_data
+                FROM ai_health_insights
+                WHERE userid = %s AND birth_hash = %s
+                """,
+                (current_user.userid, birth_hash),
+            )
+            result = cur.fetchone()
         
         if result:
             analysis_data = json.loads(result[0])

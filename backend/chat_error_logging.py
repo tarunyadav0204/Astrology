@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-import sqlite3
 import json
 from auth import get_current_user
+from db import get_conn, execute
 
 router = APIRouter()
+
 
 class ChatErrorLog(BaseModel):
     error_type: str
@@ -47,29 +48,36 @@ async def get_chat_errors(limit: int = 100, source: str = 'all', current_user = 
         return {"errors": []}
     
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        if source == 'all':
-            cursor.execute("""
-                SELECT id, username, phone, error_type, error_message, user_question, 
-                       platform, error_source, stack_trace, birth_data_context, created_at
-                FROM chat_error_logs
-                ORDER BY created_at DESC
-                LIMIT ?
-            """, (limit,))
-        else:
-            cursor.execute("""
-                SELECT id, username, phone, error_type, error_message, user_question, 
-                       platform, error_source, stack_trace, birth_data_context, created_at
-                FROM chat_error_logs
-                WHERE error_source = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-            """, (source, limit))
-        
+        with get_conn() as conn:
+            if source == 'all':
+                cur = execute(
+                    conn,
+                    """
+                    SELECT id, username, phone, error_type, error_message, user_question,
+                           platform, error_source, stack_trace, birth_data_context, created_at
+                    FROM chat_error_logs
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+            else:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT id, username, phone, error_type, error_message, user_question,
+                           platform, error_source, stack_trace, birth_data_context, created_at
+                    FROM chat_error_logs
+                    WHERE error_source = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (source, limit),
+                )
+            rows = cur.fetchall() or []
+
         errors = []
-        for row in cursor.fetchall():
+        for row in rows:
             errors.append({
                 'id': row[0],
                 'username': row[1],
@@ -83,8 +91,6 @@ async def get_chat_errors(limit: int = 100, source: str = 'all', current_user = 
                 'birth_data_context': row[9],
                 'created_at': row[10]
             })
-        
-        conn.close()
         return {"errors": errors}
         
     except Exception as e:

@@ -5,13 +5,13 @@ from pydantic import BaseModel, field_validator, ValidationError
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import swisseph as swe
-import sqlite3
 import os
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 from utils.timezone_service import parse_timezone_offset
+from db import get_conn, execute
 import bcrypt
 import jwt
 from horoscope.api import HoroscopeAPI
@@ -204,12 +204,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Subscription tier migration skipped: {e}")
     try:
-        conn = nudge_db.get_conn()
-        try:
+        with nudge_db.get_conn() as conn:
             nudge_db.init_nudge_tables(conn)
             print("Nudge engine tables (device_tokens, nudge_deliveries) initialized")
-        finally:
-            conn.close()
     except Exception as e:
         print(f"Warning: Could not initialize nudge engine tables: {e}")
     yield
@@ -890,19 +887,19 @@ def create_access_token(data: dict):
 
 # Helper function to check user access
 def has_platform_access(userid: int, platform: str, feature: str = None) -> bool:
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT sp.features
-        FROM user_subscriptions us
-        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-        WHERE us.userid = ? AND sp.platform = ? AND us.status = 'active' 
-              AND us.end_date >= date('now')
-    ''', (userid, platform))
-    
-    result = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT sp.features
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE us.userid = %s AND sp.platform = %s AND us.status = 'active'
+                  AND us.end_date >= CURRENT_DATE
+            """,
+            (userid, platform),
+        )
+        result = cur.fetchone()
     
     if not result:
         return False
@@ -923,49 +920,53 @@ class UserRegistrationWithBirth(BaseModel):
 
 @app.post("/api/register")
 async def register(user_data: UserCreate):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT phone FROM users WHERE phone = ?", (user_data.phone,))
-    if cursor.fetchone():
-        conn.close()
-        raise HTTPException(status_code=400, detail="Phone number already registered")
-    
-    hashed_password = hash_password(user_data.password)
-    cursor.execute(
-        "INSERT INTO users (name, phone, password, role, email) VALUES (?, ?, ?, ?, ?)",
-        (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email)
-    )
-    conn.commit()
-    
-    cursor.execute("SELECT userid, name, phone, role, email FROM users WHERE phone = ?", (user_data.phone,))
-    user = cursor.fetchone()
-    
-    # Get free plans for both platforms
-    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'")
-    astrovishnu_free = cursor.fetchone()
-    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'")
-    astroroshni_free = cursor.fetchone()
-    
-    # Give user free access to both platforms
-    from datetime import date, timedelta
-    start_date = date.today()
-    end_date = start_date + timedelta(days=365)  # 1 year free
-    
-    if astrovishnu_free:
-        cursor.execute(
-            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
-            (user[0], astrovishnu_free[0], start_date, end_date)
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT phone FROM users WHERE phone = %s", (user_data.phone,))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Phone number already registered")
+
+        hashed_password = hash_password(user_data.password)
+        execute(
+            conn,
+            "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
+            (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
         )
-    
-    if astroroshni_free:
-        cursor.execute(
-            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
-            (user[0], astroroshni_free[0], start_date, end_date)
+
+        cur = execute(conn, "SELECT userid, name, phone, role, email FROM users WHERE phone = %s", (user_data.phone,))
+        user = cur.fetchone()
+
+        # Get free plans for both platforms
+        cur = execute(
+            conn,
+            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'",
         )
-    
-    conn.commit()
-    conn.close()
+        astrovishnu_free = cur.fetchone()
+        cur = execute(
+            conn,
+            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'",
+        )
+        astroroshni_free = cur.fetchone()
+
+        # Give user free access to both platforms
+        from datetime import date, timedelta
+        start_date = date.today()
+        end_date = start_date + timedelta(days=365)  # 1 year free
+
+        if astrovishnu_free:
+            execute(
+                conn,
+                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                (user[0], astrovishnu_free[0], start_date, end_date),
+            )
+
+        if astroroshni_free:
+            execute(
+                conn,
+                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                (user[0], astroroshni_free[0], start_date, end_date),
+            )
+
+        conn.commit()
 
     access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
 
@@ -985,24 +986,22 @@ async def register(user_data: UserCreate):
 @app.post("/api/register-with-birth")
 async def register_with_birth(user_data: UserRegistrationWithBirth):
     """Register user with birth details for mobile app"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT phone FROM users WHERE phone = ?", (user_data.phone,))
-    if cursor.fetchone():
-        conn.close()
-        raise HTTPException(status_code=400, detail="Phone number already registered")
-    
-    # Create user
-    hashed_password = hash_password(user_data.password)
-    cursor.execute(
-        "INSERT INTO users (name, phone, password, role, email) VALUES (?, ?, ?, ?, ?)",
-        (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email)
-    )
-    conn.commit()
-    
-    cursor.execute("SELECT userid, name, phone, role, email FROM users WHERE phone = ?", (user_data.phone,))
-    user = cursor.fetchone()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT phone FROM users WHERE phone = %s", (user_data.phone,))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Phone number already registered")
+
+        # Create user
+        hashed_password = hash_password(user_data.password)
+        execute(
+            conn,
+            "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
+            (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
+        )
+        conn.commit()
+
+        cur = execute(conn, "SELECT userid, name, phone, role, email FROM users WHERE phone = %s", (user_data.phone,))
+        user = cur.fetchone()
     
     # Create birth chart if provided
     birth_chart_data = None
@@ -1019,14 +1018,17 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
 
-        cursor.execute('''
+        execute(conn, '''
             INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
         ''', (user[0], enc_name, enc_date, enc_time, enc_lat, enc_lon, 
             birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
 
         
-        chart_id = cursor.lastrowid
+        # Fetch chart id
+        cur = execute(conn, "SELECT id FROM birth_charts WHERE userid = %s AND relation = 'self' ORDER BY created_at DESC LIMIT 1", (user[0],))
+        row = cur.fetchone()
+        chart_id = row[0] if row else None
         birth_chart_data = {
             'id': chart_id,
             'name': birth_data.name,
@@ -1040,31 +1042,38 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             'relation': 'self'
         }
     
-    # Get free plans for both platforms
-    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'")
-    astrovishnu_free = cursor.fetchone()
-    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'")
-    astroroshni_free = cursor.fetchone()
-    
-    # Give user free access to both platforms
-    from datetime import date, timedelta
-    start_date = date.today()
-    end_date = start_date + timedelta(days=365)  # 1 year free
-    
-    if astrovishnu_free:
-        cursor.execute(
-            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
-            (user[0], astrovishnu_free[0], start_date, end_date)
+        # Get free plans for both platforms
+        cur = execute(
+            conn,
+            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'",
         )
-    
-    if astroroshni_free:
-        cursor.execute(
-            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
-            (user[0], astroroshni_free[0], start_date, end_date)
+        astrovishnu_free = cur.fetchone()
+        cur = execute(
+            conn,
+            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'",
         )
+        astroroshni_free = cur.fetchone()
+
+        # Give user free access to both platforms
+        from datetime import date, timedelta
+        start_date = date.today()
+        end_date = start_date + timedelta(days=365)  # 1 year free
+
+        if astrovishnu_free:
+            execute(
+                conn,
+                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                (user[0], astrovishnu_free[0], start_date, end_date),
+            )
     
-    conn.commit()
-    conn.close()
+        if astroroshni_free:
+            execute(
+                conn,
+                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                (user[0], astroroshni_free[0], start_date, end_date),
+            )
+
+        conn.commit()
 
     access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
 
@@ -1087,56 +1096,52 @@ def delete_user_data(userid: int):
     Permanently delete (or strongly anonymize) all data linked to a given user id.
     This is intended for account & data deletion requests.
     """
-    conn = sqlite3.connect("astrology.db")
-    cursor = conn.cursor()
-    try:
+    with get_conn() as conn:
         # 1) Chat history (sessions and messages)
-        cursor.execute(
+        execute(
+            conn,
             """
-            DELETE FROM chat_messages
-            WHERE session_id IN (
-              SELECT session_id FROM chat_sessions WHERE user_id = ?
-            )
+                DELETE FROM chat_messages
+                WHERE session_id IN (
+                  SELECT session_id FROM chat_sessions WHERE user_id = %s
+                )
             """,
             (userid,),
         )
-        cursor.execute("DELETE FROM chat_sessions WHERE user_id = ?", (userid,))
+        execute(conn, "DELETE FROM chat_sessions WHERE user_id = %s", (userid,))
 
         # 2) Credits & transactions
-        cursor.execute("DELETE FROM credit_transactions WHERE userid = ?", (userid,))
-        cursor.execute("DELETE FROM user_credits WHERE userid = ?", (userid,))
+        execute(conn, "DELETE FROM credit_transactions WHERE userid = %s", (userid,))
+        execute(conn, "DELETE FROM user_credits WHERE userid = %s", (userid,))
 
         # 3) Credit requests (user as requester)
         try:
-            cursor.execute("DELETE FROM credit_requests WHERE userid = ?", (userid,))
-        except sqlite3.OperationalError:
-            # Table may not exist in all deployments
+            execute(conn, "DELETE FROM credit_requests WHERE userid = %s", (userid,))
+        except Exception:
             pass
 
         # 4) Promo code usage (user as redeemer)
         try:
-            cursor.execute("DELETE FROM promo_code_usage WHERE userid = ?", (userid,))
-        except sqlite3.OperationalError:
+            execute(conn, "DELETE FROM promo_code_usage WHERE userid = %s", (userid,))
+        except Exception:
             pass
 
         # 5) User settings
         try:
-            cursor.execute("DELETE FROM user_settings WHERE user_id = ?", (userid,))
-        except sqlite3.OperationalError:
+            execute(conn, "DELETE FROM user_settings WHERE user_id = %s", (userid,))
+        except Exception:
             pass
 
         # 6) Subscriptions
-        cursor.execute("DELETE FROM user_subscriptions WHERE userid = ?", (userid,))
+        execute(conn, "DELETE FROM user_subscriptions WHERE userid = %s", (userid,))
 
         # 7) Birth charts
-        cursor.execute("DELETE FROM birth_charts WHERE userid = ?", (userid,))
+        execute(conn, "DELETE FROM birth_charts WHERE userid = %s", (userid,))
 
         # 8) Finally, delete the user record itself
-        cursor.execute("DELETE FROM users WHERE userid = ?", (userid,))
+        execute(conn, "DELETE FROM users WHERE userid = %s", (userid,))
 
         conn.commit()
-    finally:
-        conn.close()
 
 
 @app.delete("/api/admin/users/{userid}")
@@ -1150,11 +1155,9 @@ async def admin_delete_user(userid: int, current_user: User = Depends(get_curren
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     # Verify user exists
-    conn = sqlite3.connect("astrology.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT userid FROM users WHERE userid = ?", (userid,))
-    row = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT userid FROM users WHERE userid = %s", (userid,))
+        row = cur.fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1174,12 +1177,14 @@ async def delete_own_account(current_user: User = Depends(get_current_user)):
 
 @app.post("/api/login")
 async def login(user_data: UserLogin):
-    conn = None
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT userid, name, phone, password, role, email FROM users WHERE phone = ?", (user_data.phone,))
-        user = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT userid, name, phone, password, role, email FROM users WHERE phone = %s",
+                (user_data.phone,),
+            )
+            user = cur.fetchone()
         
         if not user:
             print(f"User not found for phone: {user_data.phone}")
@@ -1192,16 +1197,20 @@ async def login(user_data: UserLogin):
             print(f"Hash: {user[3][:20]}...")
             print(f"Hash format valid: {user[3].startswith('$2b$')}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-        # Get user's active subscriptions
-        cursor.execute('''
-            SELECT sp.platform, sp.plan_name, sp.features, us.status, us.end_date
-            FROM user_subscriptions us
-            JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-            WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
-        ''', (user[0],))
-        
-        subscriptions = cursor.fetchall()
+
+        with get_conn() as conn:
+            # Get user's active subscriptions
+            cur = execute(
+                conn,
+                """
+                    SELECT sp.platform, sp.plan_name, sp.features, us.status, us.end_date
+                    FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE us.userid = %s AND us.status = 'active' AND us.end_date >= CURRENT_DATE
+                """,
+                (user[0],),
+            )
+            subscriptions = cur.fetchall() or []
         
         # Format subscriptions
         user_subscriptions = {}
@@ -1223,15 +1232,19 @@ async def login(user_data: UserLogin):
                 }
         
         # Get user's "self" birth chart if exists
-        cursor.execute('''
-            SELECT id, name, date, time, latitude, longitude, timezone, place, gender, relation, created_at
-            FROM birth_charts 
-            WHERE userid = ? AND relation = 'self'
-            ORDER BY created_at DESC 
-            LIMIT 1
-        ''', (user[0],))
-        
-        self_birth_chart = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT id, name, date, time, latitude, longitude, timezone, place, gender, relation, created_at
+                    FROM birth_charts
+                    WHERE userid = %s AND relation = 'self'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """,
+                (user[0],),
+            )
+            self_birth_chart = cur.fetchone()
         birth_chart_data = None
 
         if self_birth_chart and encryptor:
@@ -1302,58 +1315,45 @@ async def get_me(current_user: User = Depends(get_current_user)):
 @app.get("/api/user/stats")
 async def get_user_stats(current_user: User = Depends(get_current_user)):
     """Return profile stats: total chat sessions, total birth charts, total questions asked."""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    try:
+    with get_conn() as conn:
         # Chat sessions count (chat_sessions may live in same DB via chat_history)
+        total_chat_sessions = 0
         try:
-            cursor.execute(
-                "SELECT COUNT(*) FROM chat_sessions WHERE user_id = ?",
-                (current_user.userid,),
-            )
-            total_chat_sessions = cursor.fetchone()[0] or 0
-        except sqlite3.OperationalError:
+            cur = execute(conn, "SELECT COUNT(*) FROM chat_sessions WHERE user_id = %s", (current_user.userid,))
+            total_chat_sessions = (cur.fetchone() or [0])[0] or 0
+        except Exception:
             total_chat_sessions = 0
 
-        # Birth charts count for this user
-        cursor.execute(
-            "SELECT COUNT(*) FROM birth_charts WHERE userid = ?",
-            (current_user.userid,),
-        )
-        total_birth_charts = cursor.fetchone()[0] or 0
+        cur = execute(conn, "SELECT COUNT(*) FROM birth_charts WHERE userid = %s", (current_user.userid,))
+        total_birth_charts = (cur.fetchone() or [0])[0] or 0
 
-        # Total questions asked (user messages across all sessions)
         total_questions = 0
         try:
-            cursor.execute(
+            cur = execute(
+                conn,
                 """
-                SELECT COUNT(*) FROM chat_messages cm
-                JOIN chat_sessions cs ON cs.session_id = cm.session_id
-                WHERE cs.user_id = ? AND cm.sender = 'user'
+                    SELECT COUNT(*) FROM chat_messages cm
+                    JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                    WHERE cs.user_id = %s AND cm.sender = 'user'
                 """,
                 (current_user.userid,),
             )
-            total_questions = cursor.fetchone()[0] or 0
-        except sqlite3.OperationalError:
+            total_questions = (cur.fetchone() or [0])[0] or 0
+        except Exception:
             pass
 
-        return {
-            "total_chat_sessions": total_chat_sessions,
-            "total_birth_charts": total_birth_charts,
-            "total_questions": total_questions,
-        }
-    finally:
-        conn.close()
+    return {
+        "total_chat_sessions": total_chat_sessions,
+        "total_birth_charts": total_birth_charts,
+        "total_questions": total_questions,
+    }
 
 @app.get("/api/admin/check-password-hashes")
 async def check_password_hashes():
     """Admin endpoint to check password hash integrity"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT userid, phone, password, created_at FROM users")
-    users = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT userid, phone, password, created_at FROM users")
+        users = cur.fetchall() or []
     
     results = []
     for user in users:
@@ -1391,12 +1391,9 @@ async def test_password(request: dict):
     if not phone or not test_passwords:
         raise HTTPException(status_code=400, detail="Phone and passwords array required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT password FROM users WHERE phone = ?", (phone,))
-    user = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT password FROM users WHERE phone = %s", (phone,))
+        user = cur.fetchone()
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1418,87 +1415,101 @@ async def test_password(request: dict):
 # Subscription Management APIs
 @app.get("/api/subscription-plans")
 async def get_subscription_plans(platform: str = None):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    if platform:
-        cursor.execute("SELECT * FROM subscription_plans WHERE platform = ? AND is_active = 1", (platform,))
-    else:
-        cursor.execute("SELECT * FROM subscription_plans WHERE is_active = 1")
-    
-    plans = cursor.fetchall()
-    conn.close()
-    
+    with get_conn() as conn:
+        if platform:
+            cur = execute(
+                conn,
+                "SELECT * FROM subscription_plans WHERE platform = %s AND is_active = TRUE",
+                (platform,),
+            )
+        else:
+            cur = execute(
+                conn,
+                "SELECT * FROM subscription_plans WHERE is_active = TRUE",
+            )
+        plans = cur.fetchall() or []
+
     result = []
     for plan in plans:
         result.append({
-            'plan_id': plan[0],
-            'platform': plan[1],
-            'plan_name': plan[2],
-            'price': plan[3],
-            'duration_months': plan[4],
-            'features': json.loads(plan[5]),
-            'is_active': plan[6]
+            "plan_id": plan[0],
+            "platform": plan[1],
+            "plan_name": plan[2],
+            "price": plan[3],
+            "duration_months": plan[4],
+            "features": json.loads(plan[5]) if plan[5] else {},
+            "is_active": plan[6],
         })
-    
-    return {'plans': result}
+
+    return {"plans": result}
 
 @app.get("/api/user-subscriptions")
 async def get_user_subscriptions(current_user: User = Depends(get_current_user)):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT us.subscription_id, sp.platform, sp.plan_name, sp.features, us.status, 
-               us.start_date, us.end_date, sp.price
-        FROM user_subscriptions us
-        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-        WHERE us.userid = ?
-        ORDER BY us.created_at DESC
-    ''', (current_user.userid,))
-    
-    subscriptions = cursor.fetchall()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT us.subscription_id,
+                       sp.platform,
+                       sp.plan_name,
+                       sp.features,
+                       us.status,
+                       us.start_date,
+                       us.end_date,
+                       sp.price
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE us.userid = %s
+                ORDER BY us.created_at DESC
+            """,
+            (current_user.userid,),
+        )
+        subscriptions = cur.fetchall() or []
+
     result = []
     for sub in subscriptions:
         result.append({
-            'id': sub[0],
-            'platform': sub[1],
-            'plan_name': sub[2],
-            'features': json.loads(sub[3]),
-            'status': sub[4],
-            'start_date': sub[5],
-            'end_date': sub[6],
-            'price': sub[7]
+            "id": sub[0],
+            "platform": sub[1],
+            "plan_name": sub[2],
+            "features": json.loads(sub[3]) if sub[3] else {},
+            "status": sub[4],
+            "start_date": sub[5],
+            "end_date": sub[6],
+            "price": sub[7],
         })
-    
-    return {'subscriptions': result}
+
+    return {"subscriptions": result}
 
 @app.post("/api/check-access")
 async def check_access(request: dict, current_user: User = Depends(get_current_user)):
     platform = request.get('platform')
     feature = request.get('feature')
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT sp.features
-        FROM user_subscriptions us
-        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-        WHERE us.userid = ? AND sp.platform = ? AND us.status = 'active' 
-              AND us.end_date >= date('now')
-    ''', (current_user.userid, platform))
-    
-    result = cursor.fetchone()
-    conn.close()
+    if not platform or not feature:
+        raise HTTPException(status_code=400, detail="platform and feature are required")
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT sp.features
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                WHERE us.userid = %s
+                  AND sp.platform = %s
+                  AND us.status = 'active'
+                  AND us.end_date >= CURRENT_DATE
+            """,
+            (current_user.userid, platform),
+        )
+        result = cur.fetchone()
     
     if not result:
         return {'has_access': False, 'reason': 'No active subscription'}
     
-    features = json.loads(result[0])
-    has_access = features.get(feature, False)
+    features = json.loads(result[0]) if result[0] else {}
+    has_access = bool(features.get(feature, False))
     
     return {
         'has_access': has_access,
@@ -1508,15 +1519,17 @@ async def check_access(request: dict, current_user: User = Depends(get_current_u
 
 @app.post("/api/forgot-password")
 async def forgot_password(request: ForgotPassword):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT userid, name FROM users WHERE phone = ?", (request.phone,))
-    user = cursor.fetchone()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT userid, name FROM users WHERE phone = %s",
+            (request.phone,),
+        )
+        user = cur.fetchone()
+
     if not user:
         raise HTTPException(status_code=404, detail="Phone number not found")
-    
+
     return {"message": "Password reset available", "user_name": user[1]}
 
 @app.post("/api/send-registration-otp")
@@ -1525,29 +1538,30 @@ async def send_registration_otp(request: SendResetCode):
     import secrets
     from datetime import datetime, timedelta
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Check if phone already exists
-    cursor.execute("SELECT userid FROM users WHERE phone = ?", (request.phone,))
-    existing_user = cursor.fetchone()
-    
-    if existing_user:
-        conn.close()
-        raise HTTPException(status_code=409, detail="Phone number already registered")
-    
-    # Generate 6-digit code and secure token
-    code = str(random.randint(100000, 999999))
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
-    
-    # Store registration OTP code
-    cursor.execute(
-        "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (?, ?, ?, ?)",
-        (request.phone, code, token, expires_at)
-    )
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        # Check if phone already exists
+        cur = execute(
+            conn,
+            "SELECT userid FROM users WHERE phone = %s",
+            (request.phone,),
+        )
+        existing_user = cur.fetchone()
+
+        if existing_user:
+            raise HTTPException(status_code=409, detail="Phone number already registered")
+
+        # Generate 6-digit code and secure token
+        code = str(random.randint(100000, 999999))
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
+
+        # Store registration OTP code
+        execute(
+            conn,
+            "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (%s, %s, %s, %s)",
+            (request.phone, code, token, expires_at),
+        )
+        conn.commit()
     
     # Send SMS with code
     from sms_service import sms_service
@@ -1571,27 +1585,29 @@ async def send_reset_code(request: SendResetCode):
     import secrets
     from datetime import datetime, timedelta
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT userid, name FROM users WHERE phone = ?", (request.phone,))
-    user = cursor.fetchone()
-    
-    if not user:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Phone number not found")
-    
-    # Generate 6-digit code and secure token
-    code = str(random.randint(100000, 999999))
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
-    
-    # Store reset code
-    cursor.execute(
-        "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (?, ?, ?, ?)",
-        (request.phone, code, token, expires_at)
-    )
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT userid, name FROM users WHERE phone = %s",
+            (request.phone,),
+        )
+        user = cur.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Phone number not found")
+
+        # Generate 6-digit code and secure token
+        code = str(random.randint(100000, 999999))
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
+
+        # Store reset code
+        execute(
+            conn,
+            "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (%s, %s, %s, %s)",
+            (request.phone, code, token, expires_at),
+        )
+        conn.commit()
     
     # Debug: Print environment variables
     print(f"Twilio SID: {os.getenv('TWILIO_ACCOUNT_SID')[:10] if os.getenv('TWILIO_ACCOUNT_SID') else 'None'}...")
@@ -1619,21 +1635,21 @@ async def send_reset_code(request: SendResetCode):
 async def verify_reset_code(request: VerifyResetCode):
     from datetime import datetime
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT token FROM password_reset_codes WHERE phone = ? AND code = ? AND expires_at > ? AND used = FALSE",
-        (request.phone, request.code, datetime.utcnow())
-    )
-    result = cursor.fetchone()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT token FROM password_reset_codes
+                WHERE phone = %s AND code = %s AND expires_at > %s AND used = FALSE
+            """,
+            (request.phone, request.code, datetime.utcnow()),
+        )
+        result = cur.fetchone()
+
     if not result:
-        conn.close()
         raise HTTPException(status_code=400, detail="Invalid or expired code")
-    
+
     token = result[0]
-    conn.close()
     
     return {"message": "Code verified", "reset_token": token}
 
@@ -1641,51 +1657,63 @@ async def verify_reset_code(request: VerifyResetCode):
 async def reset_password_with_token(request: ResetPasswordWithToken):
     from datetime import datetime
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Verify token is valid and not used
-    cursor.execute(
-        "SELECT phone FROM password_reset_codes WHERE token = ? AND expires_at > ? AND used = FALSE",
-        (request.token, datetime.utcnow())
-    )
-    result = cursor.fetchone()
-    
-    if not result:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    
-    phone = result[0]
-    
-    # Update password
-    hashed_password = hash_password(request.new_password)
-    cursor.execute("UPDATE users SET password = ? WHERE phone = ?", (hashed_password, phone))
-    
-    # Mark token as used
-    cursor.execute("UPDATE password_reset_codes SET used = TRUE WHERE token = ?", (request.token,))
-    
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        # Verify token is valid and not used
+        cur = execute(
+            conn,
+            """
+                SELECT phone FROM password_reset_codes
+                WHERE token = %s AND expires_at > %s AND used = FALSE
+            """,
+            (request.token, datetime.utcnow()),
+        )
+        result = cur.fetchone()
+
+        if not result:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+        phone = result[0]
+
+        # Update password
+        hashed_password = hash_password(request.new_password)
+        execute(
+            conn,
+            "UPDATE users SET password = %s WHERE phone = %s",
+            (hashed_password, phone),
+        )
+
+        # Mark token as used
+        execute(
+            conn,
+            "UPDATE password_reset_codes SET used = TRUE WHERE token = %s",
+            (request.token,),
+        )
+
+        conn.commit()
     
     return {"message": "Password reset successfully"}
 
 @app.post("/api/reset-password")
 async def reset_password(request: ResetPassword):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT userid FROM users WHERE phone = ?", (request.phone,))
-    user = cursor.fetchone()
-    
-    if not user:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Phone number not found")
-    
-    hashed_password = hash_password(request.new_password)
-    cursor.execute("UPDATE users SET password = ? WHERE phone = ?", (hashed_password, request.phone))
-    conn.commit()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT userid FROM users WHERE phone = %s",
+            (request.phone,),
+        )
+        user = cur.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Phone number not found")
+
+        hashed_password = hash_password(request.new_password)
+        execute(
+            conn,
+            "UPDATE users SET password = %s WHERE phone = %s",
+            (hashed_password, request.phone),
+        )
+        conn.commit()
+
     return {"message": "Password reset successfully"}
 
 @app.get("/api/user/self-birth-chart")
@@ -1693,33 +1721,40 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     """Get user's self birth chart"""
     print(f"🔍 [AUTH_DEBUG] get_self_birth_chart called by user: {current_user.userid} ({current_user.name}) - Phone: {current_user.phone}")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Debug: Check all charts for this user
-    cursor.execute('''
-        SELECT id, name, date, time, relation, created_at
-        FROM birth_charts WHERE userid = ?
-        ORDER BY created_at DESC
-    ''', (current_user.userid,))
-    
-    all_charts = cursor.fetchall()
+    with get_conn() as conn:
+        # Debug: Check all charts for this user
+        cur = execute(
+            conn,
+            """
+                SELECT id, name, date, time, relation, created_at
+                FROM birth_charts
+                WHERE userid = %s
+                ORDER BY created_at DESC
+            """,
+            (current_user.userid,),
+        )
+        all_charts = cur.fetchall() or []
     print(f"DEBUG: User {current_user.userid} has {len(all_charts)} total charts:")
     for chart in all_charts:
         print(f"  Chart ID: {chart[0]}, Name: {chart[1]}, Relation: {chart[4]}, Created: {chart[5]}")
     
-    # Look for chart with relation = 'self'
-    cursor.execute('''
-        SELECT id, name, date, time, latitude, longitude, timezone, place, gender
-        FROM birth_charts WHERE userid = ? AND relation = 'self'
-        ORDER BY created_at DESC LIMIT 1
-    ''', (current_user.userid,))
-    
-    result = cursor.fetchone()
+    with get_conn() as conn:
+        # Look for chart with relation = 'self'
+        cur = execute(
+            conn,
+            """
+                SELECT id, name, date, time, latitude, longitude, timezone, place, gender
+                FROM birth_charts
+                WHERE userid = %s AND relation = 'self'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """,
+            (current_user.userid,),
+        )
+        result = cur.fetchone()
     print(f"DEBUG: Self chart query result: {result}")
     
     if not result:
-        conn.close()
         return {"has_self_chart": False}
 
     # Decrypt data
@@ -1735,7 +1770,6 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
         name, date, time = result[1], result[2], result[3]
         lat, lon, place = result[4], result[5], result[7]
 
-    conn.close()
     return {
         "has_self_chart": True,
         "birth_chart_id": birth_chart_id,
@@ -1756,85 +1790,116 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
     print(f"DEBUG: update_self_birth_chart called for user {current_user.userid}, chart_id={chart_id}, clear_existing={clear_existing}")
     print(f"DEBUG: Birth data - name: {birth_data.name}, date: {birth_data.date}")
     
-    conn = None
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
+        with get_conn() as conn:
         
         # Prepare encrypted data
-        if encryptor:
-            enc_name = encryptor.encrypt(birth_data.name)
-            enc_date = encryptor.encrypt(birth_data.date)
-            enc_time = encryptor.encrypt(birth_data.time)
-            enc_lat = encryptor.encrypt(str(birth_data.latitude))
-            enc_lon = encryptor.encrypt(str(birth_data.longitude))
-            enc_place = encryptor.encrypt(birth_data.place or '')
-        else:
-            enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
-            enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
+            if encryptor:
+                enc_name = encryptor.encrypt(birth_data.name)
+                enc_date = encryptor.encrypt(birth_data.date)
+                enc_time = encryptor.encrypt(birth_data.time)
+                enc_lat = encryptor.encrypt(str(birth_data.latitude))
+                enc_lon = encryptor.encrypt(str(birth_data.longitude))
+                enc_place = encryptor.encrypt(birth_data.place or '')
+            else:
+                enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+                enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
         
         # If chart_id provided, update that specific chart
-        if chart_id:
-            # Verify chart belongs to user
-            cursor.execute('SELECT id FROM birth_charts WHERE id = ? AND userid = ?', (chart_id, current_user.userid))
-            if not cursor.fetchone():
-                raise HTTPException(status_code=404, detail="Chart not found or access denied")
-            
-            # Clear other self charts if requested
-            if clear_existing:
-                cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self' AND id != ?", 
-                             (current_user.userid, chart_id))
-            
-            # Update the specified chart
-            cursor.execute('''
-                UPDATE birth_charts 
-                SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation='self'
-                WHERE id=? AND userid=?
-            ''', (enc_name, enc_date, enc_time, enc_lat, enc_lon, birth_data.timezone, enc_place, 
-                  birth_data.gender or '', chart_id, current_user.userid))
-            
-            print(f"DEBUG: Updated chart {chart_id} to relation='self'")
-            birth_chart_id = chart_id
-        else:
-            # No chart_id provided - create new chart
-            if clear_existing:
-                cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
-            
-            cursor.execute('''
-                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-                birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
-            birth_chart_id = cursor.lastrowid
-            print(f"DEBUG: Inserted new chart as relation='self' with id={birth_chart_id}")
+            if chart_id:
+                # Verify chart belongs to user
+                cur = execute(
+                    conn,
+                    "SELECT id FROM birth_charts WHERE id = %s AND userid = %s",
+                    (chart_id, current_user.userid),
+                )
+                if not cur.fetchone():
+                    raise HTTPException(status_code=404, detail="Chart not found or access denied")
 
-        conn.commit()
-        print(f"DEBUG: Successfully updated self birth chart for user {current_user.userid}, id={birth_chart_id}")
-        return {"message": "Self birth chart updated successfully", "birth_chart_id": birth_chart_id}
+                # Clear other self charts if requested
+                if clear_existing:
+                    execute(
+                        conn,
+                        "UPDATE birth_charts SET relation = 'other' WHERE userid = %s AND relation = 'self' AND id != %s",
+                        (current_user.userid, chart_id),
+                    )
+
+                # Update the specified chart
+                execute(
+                    conn,
+                    """
+                        UPDATE birth_charts
+                        SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s, relation='self'
+                        WHERE id=%s AND userid=%s
+                    """,
+                    (
+                        enc_name,
+                        enc_date,
+                        enc_time,
+                        enc_lat,
+                        enc_lon,
+                        birth_data.timezone,
+                        enc_place,
+                        birth_data.gender or '',
+                        chart_id,
+                        current_user.userid,
+                    ),
+                )
+
+                print(f"DEBUG: Updated chart {chart_id} to relation='self'")
+                birth_chart_id = chart_id
+            else:
+                # No chart_id provided - create new chart
+                if clear_existing:
+                    execute(
+                        conn,
+                        "UPDATE birth_charts SET relation = 'other' WHERE userid = %s AND relation = 'self'",
+                        (current_user.userid,),
+                    )
+
+                cur = execute(
+                    conn,
+                    """
+                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """,
+                    (
+                        current_user.userid,
+                        enc_name,
+                        enc_date,
+                        enc_time,
+                        enc_lat,
+                        enc_lon,
+                        birth_data.timezone,
+                        enc_place,
+                        birth_data.gender or '',
+                        'self',
+                    ),
+                )
+                birth_chart_id = cur.fetchone()[0]
+                print(f"DEBUG: Inserted new chart as relation='self' with id={birth_chart_id}")
+
+            conn.commit()
+            print(f"DEBUG: Successfully updated self birth chart for user {current_user.userid}, id={birth_chart_id}")
+            return {"message": "Self birth chart updated successfully", "birth_chart_id": birth_chart_id}
         
-    except sqlite3.Error as e:
-        print(f"ERROR: Database error in update_self_birth_chart: {str(e)}")
-        if conn:
-            conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         print(f"ERROR: Exception in update_self_birth_chart: {str(e)}")
-        if conn:
-            conn.rollback()
+        try:
+            with get_conn() as conn:
+                conn.rollback()
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to update self birth chart: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
 
 @app.get("/api/health")
 async def api_health():
     try:
         # Test database connection
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM users")
-        user_count = cursor.fetchone()[0]
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT COUNT(*) FROM users")
+            user_count = cur.fetchone()[0]
         return {"status": "healthy", "message": "Astrology API is running", "users": user_count}
     except Exception as e:
         return {"status": "unhealthy", "message": f"Database error: {str(e)}"}
@@ -1924,11 +1989,9 @@ async def health_detailed():
         process = psutil.Process()
         
         # Test database
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM users")
-        user_count = cursor.fetchone()[0]
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT COUNT(*) FROM users")
+            user_count = cur.fetchone()[0]
         
         return {
             "status": "healthy",
@@ -3010,15 +3073,17 @@ async def get_planet_nakshatra_interpretation(
     house: int,
     current_user: User = Depends(get_current_user)
 ):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT interpretation FROM planet_nakshatra_interpretations WHERE planet = ? AND nakshatra = ? AND house = ?",
-        (planet, nakshatra, house)
-    )
-    result = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT interpretation
+                FROM planet_nakshatra_interpretations
+                WHERE planet = %s AND nakshatra = %s AND house = %s
+            """,
+            (planet, nakshatra, house),
+        )
+        result = cur.fetchone()
     
     if result:
         return {"interpretation": result[0]}
@@ -3174,14 +3239,11 @@ async def get_daily_prediction_rules(current_user: User = Depends(get_current_us
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    import sqlite3
     import json
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM daily_prediction_rules ORDER BY created_at DESC")
-    rows = cursor.fetchall()
-    conn.close()
+
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT * FROM daily_prediction_rules ORDER BY created_at DESC")
+        rows = cur.fetchall() or []
     
     rules = []
     for row in rows:
@@ -3206,18 +3268,13 @@ async def delete_daily_prediction_rule(rule_id: str, current_user: User = Depend
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    import sqlite3
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM daily_prediction_rules WHERE id = ?", (rule_id,))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Rule not found")
-    
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "DELETE FROM daily_prediction_rules WHERE id = %s", (rule_id,))
+
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Rule not found")
+
+        conn.commit()
     
     return {"message": "Rule deleted successfully"}
 
@@ -3227,35 +3284,34 @@ async def update_daily_prediction_rule(rule_id: str, rule_data: dict, current_us
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    import sqlite3
     import json
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        UPDATE daily_prediction_rules 
-        SET rule_type=?, conditions=?, prediction_template=?, confidence_base=?, 
-            life_areas=?, timing_advice=?, colors=?, is_active=?
-        WHERE id=?
-    ''', (
-        rule_data.get("rule_type", ""),
-        json.dumps(rule_data.get("conditions", {})),
-        rule_data.get("prediction_template", ""),
-        rule_data.get("confidence_base", 50),
-        json.dumps(rule_data.get("life_areas", [])),
-        rule_data.get("timing_advice", ""),
-        json.dumps(rule_data.get("colors", [])),
-        rule_data.get("is_active", True),
-        rule_id
-    ))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Rule not found")
-    
-    conn.commit()
-    conn.close()
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                UPDATE daily_prediction_rules
+                SET rule_type=%s, conditions=%s, prediction_template=%s, confidence_base=%s,
+                    life_areas=%s, timing_advice=%s, colors=%s, is_active=%s
+                WHERE id=%s
+            """,
+            (
+                rule_data.get("rule_type", ""),
+                json.dumps(rule_data.get("conditions", {})),
+                rule_data.get("prediction_template", ""),
+                rule_data.get("confidence_base", 50),
+                json.dumps(rule_data.get("life_areas", [])),
+                rule_data.get("timing_advice", ""),
+                json.dumps(rule_data.get("colors", [])),
+                bool(rule_data.get("is_active", True)),
+                rule_id,
+            ),
+        )
+
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Rule not found")
+
+        conn.commit()
     
     return {"message": "Rule updated successfully"}
 
@@ -3278,11 +3334,9 @@ async def get_nakshatras(current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM nakshatras ORDER BY id")
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT * FROM nakshatras ORDER BY id")
+        rows = cur.fetchall() or []
     
     nakshatras = []
     for row in rows:
@@ -3307,11 +3361,9 @@ async def get_nakshatras(current_user: User = Depends(get_current_user)):
 @app.get("/api/nakshatras-public")
 async def get_nakshatras_public():
     """Public endpoint to get detailed nakshatra data for UI"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM nakshatras ORDER BY id")
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT * FROM nakshatras ORDER BY id")
+        rows = cur.fetchall() or []
     
     nakshatras = []
     for row in rows:
@@ -3336,29 +3388,35 @@ async def create_nakshatra(nakshatra_data: NakshatraData, current_user: User = D
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
     try:
-        cursor.execute('''
-            INSERT INTO nakshatras (name, lord, deity, nature, guna, description, 
-                                  characteristics, positive_traits, negative_traits, 
-                                  careers, compatibility)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            nakshatra_data.name, nakshatra_data.lord, nakshatra_data.deity,
-            nakshatra_data.nature, nakshatra_data.guna, nakshatra_data.description,
-            nakshatra_data.characteristics, nakshatra_data.positive_traits,
-            nakshatra_data.negative_traits, nakshatra_data.careers,
-            nakshatra_data.compatibility
-        ))
-        conn.commit()
-        nakshatra_id = cursor.lastrowid
-        conn.close()
-        
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    INSERT INTO nakshatras (name, lord, deity, nature, guna, description,
+                                           characteristics, positive_traits, negative_traits,
+                                           careers, compatibility)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """,
+                (
+                    nakshatra_data.name,
+                    nakshatra_data.lord,
+                    nakshatra_data.deity,
+                    nakshatra_data.nature,
+                    nakshatra_data.guna,
+                    nakshatra_data.description,
+                    nakshatra_data.characteristics,
+                    nakshatra_data.positive_traits,
+                    nakshatra_data.negative_traits,
+                    nakshatra_data.careers,
+                    nakshatra_data.compatibility,
+                ),
+            )
+            nakshatra_id = cur.fetchone()[0]
+            conn.commit()
         return {"message": "Nakshatra created successfully", "id": nakshatra_id}
-    except sqlite3.IntegrityError:
-        conn.close()
+    except Exception:
         raise HTTPException(status_code=400, detail="Nakshatra name already exists")
 
 @app.put("/api/nakshatras/{nakshatra_id}")
@@ -3366,29 +3424,34 @@ async def update_nakshatra(nakshatra_id: int, nakshatra_data: NakshatraData, cur
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        UPDATE nakshatras 
-        SET name=?, lord=?, deity=?, nature=?, guna=?, description=?, 
-            characteristics=?, positive_traits=?, negative_traits=?, 
-            careers=?, compatibility=?
-        WHERE id=?
-    ''', (
-        nakshatra_data.name, nakshatra_data.lord, nakshatra_data.deity,
-        nakshatra_data.nature, nakshatra_data.guna, nakshatra_data.description,
-        nakshatra_data.characteristics, nakshatra_data.positive_traits,
-        nakshatra_data.negative_traits, nakshatra_data.careers,
-        nakshatra_data.compatibility, nakshatra_id
-    ))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Nakshatra not found")
-    
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                UPDATE nakshatras
+                SET name=%s, lord=%s, deity=%s, nature=%s, guna=%s, description=%s,
+                    characteristics=%s, positive_traits=%s, negative_traits=%s,
+                    careers=%s, compatibility=%s
+                WHERE id=%s
+            """,
+            (
+                nakshatra_data.name,
+                nakshatra_data.lord,
+                nakshatra_data.deity,
+                nakshatra_data.nature,
+                nakshatra_data.guna,
+                nakshatra_data.description,
+                nakshatra_data.characteristics,
+                nakshatra_data.positive_traits,
+                nakshatra_data.negative_traits,
+                nakshatra_data.careers,
+                nakshatra_data.compatibility,
+                nakshatra_id,
+            ),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Nakshatra not found")
+        conn.commit()
     
     return {"message": "Nakshatra updated successfully"}
 
@@ -3397,17 +3460,11 @@ async def delete_nakshatra(nakshatra_id: int, current_user: User = Depends(get_c
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM nakshatras WHERE id=?", (nakshatra_id,))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Nakshatra not found")
-    
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "DELETE FROM nakshatras WHERE id=%s", (nakshatra_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Nakshatra not found")
+        conn.commit()
     
     return {"message": "Nakshatra deleted successfully"}
 
@@ -3540,85 +3597,88 @@ async def get_admin_users(
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
+    with get_conn() as conn:
 
-    conditions = []
-    params = []
-    if phone and phone.strip():
-        conditions.append("u.phone LIKE ?")
-        params.append(f"%{phone.strip()}%")
-    if name and name.strip():
-        conditions.append("u.name LIKE ?")
-        params.append(f"%{name.strip()}%")
-    if role and role.strip():
-        conditions.append("u.role = ?")
-        params.append(role.strip())
-    if created_from and created_from.strip():
-        conditions.append("DATE(u.created_at) >= ?")
-        params.append(created_from.strip())
-    if created_to and created_to.strip():
-        conditions.append("DATE(u.created_at) <= ?")
-        params.append(created_to.strip())
+        conditions = []
+        params = []
+        if phone and phone.strip():
+            conditions.append("u.phone LIKE ?")
+            params.append(f"%{phone.strip()}%")
+        if name and name.strip():
+            conditions.append("u.name LIKE ?")
+            params.append(f"%{name.strip()}%")
+        if role and role.strip():
+            conditions.append("u.role = ?")
+            params.append(role.strip())
+        if created_from and created_from.strip():
+            conditions.append("DATE(u.created_at) >= ?")
+            params.append(created_from.strip())
+        if created_to and created_to.strip():
+            conditions.append("DATE(u.created_at) <= ?")
+            params.append(created_to.strip())
 
-    if subscription is not None and subscription.strip():
-        sub_val = subscription.strip()
-        if sub_val.lower() == 'none':
-            conditions.append("""u.userid NOT IN (
-                SELECT userid FROM user_subscriptions us
-                WHERE us.status = 'active' AND us.end_date >= date('now')
-            )""")
-        else:
-            conditions.append("""u.userid IN (
-                SELECT us.userid FROM user_subscriptions us
-                JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-                WHERE (sp.plan_name = ? OR sp.tier_name = ?)
-                AND us.status = 'active' AND us.end_date >= date('now')
-            )""")
-            params.append(sub_val)
-            params.append(sub_val)
+        if subscription is not None and subscription.strip():
+            sub_val = subscription.strip()
+            if sub_val.lower() == 'none':
+                conditions.append("""u.userid NOT IN (
+                    SELECT userid FROM user_subscriptions us
+                    WHERE us.status = 'active' AND us.end_date >= CURRENT_DATE
+                )""")
+            else:
+                conditions.append("""u.userid IN (
+                    SELECT us.userid FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE (sp.plan_name = ? OR sp.tier_name = ?)
+                    AND us.status = 'active' AND us.end_date >= CURRENT_DATE
+                )""")
+                params.append(sub_val)
+                params.append(sub_val)
 
-    where_sql = " AND ".join(conditions) if conditions else "1=1"
-    base_sql = f"FROM users u WHERE {where_sql}"
+        where_sql = " AND ".join(conditions) if conditions else "1=1"
+        base_sql = f"FROM users u WHERE {where_sql}"
 
-    # Total count
-    cursor.execute(f"SELECT COUNT(*) {base_sql}", params)
-    total = cursor.fetchone()[0]
+        # Total count
+        cur = execute(conn, f"SELECT COUNT(*) {base_sql}", params)
+        total = cur.fetchone()[0]
 
-    # Paginated list of userids (order by created_at desc)
-    offset = (page - 1) * limit
-    cursor.execute(
-        f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.created_at {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
-        params + [limit, offset]
-    )
-    rows = cursor.fetchall()
+        # Paginated list of userids (order by created_at desc)
+        offset = (page - 1) * limit
+        cur = execute(
+            conn,
+            f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.created_at {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
+            params + [limit, offset],
+        )
+        rows = cur.fetchall() or []
 
-    users = []
-    for row in rows:
-        cursor.execute('''
-            SELECT sp.platform, sp.plan_name, us.status, us.end_date
-            FROM user_subscriptions us
-            JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-            WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
-        ''', (row[0],))
-        subscriptions = {}
-        for sub in cursor.fetchall():
-            subscriptions[sub[0]] = {
-                'plan_name': sub[1],
-                'status': sub[2],
-                'end_date': sub[3]
-            }
-        users.append({
-            'userid': row[0],
-            'name': row[1],
-            'phone': row[2],
-            'role': row[3],
-            'email': row[4],
-            'created_at': row[5],
-            'subscriptions': subscriptions
-        })
+        users = []
+        for row in rows:
+            cur = execute(
+                conn,
+                """
+                    SELECT sp.platform, sp.plan_name, us.status, us.end_date
+                    FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= CURRENT_DATE
+                """,
+                (row[0],),
+            )
+            subscriptions = {}
+            for sub in (cur.fetchall() or []):
+                subscriptions[sub[0]] = {
+                    'plan_name': sub[1],
+                    'status': sub[2],
+                    'end_date': sub[3]
+                }
+            users.append({
+                'userid': row[0],
+                'name': row[1],
+                'phone': row[2],
+                'role': row[3],
+                'email': row[4],
+                'created_at': row[5],
+                'subscriptions': subscriptions
+            })
 
-    conn.close()
     total_pages = (total + limit - 1) // limit if limit else 0
     return {
         'users': users,
@@ -3639,35 +3699,36 @@ async def get_admin_charts(
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    base_sql = '''
-        FROM birth_charts bc
-        JOIN users u ON bc.userid = u.userid
-    '''
-    params = []
-    where_parts = []
-    if name and name.strip():
-        where_parts.append("(u.name LIKE ? OR u.phone LIKE ?)")
-        q = f"%{name.strip()}%"
-        params.extend([q, q])
-    if phone and phone.strip():
-        where_parts.append("u.phone LIKE ?")
-        params.append(f"%{phone.strip()}%")
-    where_sql = " AND ".join(where_parts) if where_parts else "1=1"
-    cursor.execute(f"SELECT COUNT(*) {base_sql} WHERE {where_sql}", params)
-    total = cursor.fetchone()[0] or 0
-    total_pages = max(1, (total + limit - 1) // limit)
-    offset = (page - 1) * limit
-    cursor.execute(f'''
-        SELECT bc.id, bc.userid, bc.name, bc.date, bc.time, bc.latitude, bc.longitude, bc.place, bc.gender, bc.created_at, u.name as user_name, u.phone
-        {base_sql}
-        WHERE {where_sql}
-        ORDER BY bc.created_at DESC
-        LIMIT ? OFFSET ?
-    ''', params + [limit, offset])
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        base_sql = '''
+            FROM birth_charts bc
+            JOIN users u ON bc.userid = u.userid
+        '''
+        params = []
+        where_parts = []
+        if name and name.strip():
+            where_parts.append("(u.name LIKE ? OR u.phone LIKE ?)")
+            q = f"%{name.strip()}%"
+            params.extend([q, q])
+        if phone and phone.strip():
+            where_parts.append("u.phone LIKE ?")
+            params.append(f"%{phone.strip()}%")
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+
+        cur = execute(conn, f"SELECT COUNT(*) {base_sql} WHERE {where_sql}", params)
+        total_row = cur.fetchone()
+        total = (total_row[0] if total_row else 0) or 0
+
+        total_pages = max(1, (total + limit - 1) // limit)
+        offset = (page - 1) * limit
+        cur = execute(conn, f'''
+            SELECT bc.id, bc.userid, bc.name, bc.date, bc.time, bc.latitude, bc.longitude, bc.place, bc.gender, bc.created_at, u.name as user_name, u.phone
+            {base_sql}
+            WHERE {where_sql}
+            ORDER BY bc.created_at DESC
+            LIMIT ? OFFSET ?
+        ''', params + [limit, offset])
+        rows = cur.fetchall() or []
     
     charts = []
     for row in rows:
@@ -3710,11 +3771,9 @@ async def delete_admin_user(user_id: int, current_user: User = Depends(get_curre
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM users WHERE userid=?', (user_id,))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        execute(conn, 'DELETE FROM users WHERE userid=%s', (user_id,))
+        conn.commit()
     return {"message": "User deleted successfully"}
 
 @app.delete("/api/admin/charts/{chart_id}")
@@ -3722,11 +3781,9 @@ async def delete_admin_chart(chart_id: int, current_user: User = Depends(get_cur
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM birth_charts WHERE id=?', (chart_id,))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        execute(conn, 'DELETE FROM birth_charts WHERE id=%s', (chart_id,))
+        conn.commit()
     return {"message": "Chart deleted successfully"}
 
 
@@ -3735,38 +3792,38 @@ async def share_chart_for_investigation(chart_id: int, current_user: User = Depe
     """Copy this chart to all admin users so they can view it for investigation. Uses INSERT...SELECT so encrypted columns are copied as-is."""
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT id, userid FROM birth_charts WHERE id = ?', (chart_id,))
-        row = cursor.fetchone()
-        if not row:
-            conn.close()
-            raise HTTPException(status_code=404, detail="Chart not found")
-        owner_userid = row[1]
-        cursor.execute("SELECT userid FROM users WHERE role = 'admin'")
-        admin_rows = cursor.fetchall()
-        admin_userids = [r[0] for r in admin_rows]
-        copied = 0
-        for admin_uid in admin_userids:
-            if admin_uid == owner_userid:
-                continue
-            cursor.execute('''
-                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                SELECT ?, name, date, time, latitude, longitude, timezone, place, gender, 'shared'
-                FROM birth_charts WHERE id = ?
-            ''', (admin_uid, chart_id))
-            copied += 1
-        conn.commit()
-        return {"message": f"Chart copied to {copied} admin(s) for investigation.", "copied_count": copied}
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    with get_conn() as conn:
+        try:
+            cur = execute(conn, 'SELECT id, userid FROM birth_charts WHERE id = %s', (chart_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Chart not found")
+            owner_userid = row[1]
+            cur = execute(conn, "SELECT userid FROM users WHERE role = 'admin'")
+            admin_rows = cur.fetchall() or []
+            admin_userids = [r[0] for r in admin_rows]
+            copied = 0
+            for admin_uid in admin_userids:
+                if admin_uid == owner_userid:
+                    continue
+                execute(
+                    conn,
+                    """
+                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                        SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared'
+                        FROM birth_charts WHERE id = %s
+                    """,
+                    (admin_uid, chart_id),
+                )
+                copied += 1
+            conn.commit()
+            return {"message": f"Chart copied to {copied} admin(s) for investigation.", "copied_count": copied}
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.put("/api/admin/users/{user_id}")
@@ -3774,15 +3831,17 @@ async def update_admin_user(user_id: int, user_data: dict, current_user: User = 
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE users 
-        SET name=?, phone=?, role=?
-        WHERE userid=?
-    ''', (user_data['name'], user_data['phone'], user_data['role'], user_id))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+                UPDATE users
+                SET name=%s, phone=%s, role=%s
+                WHERE userid=%s
+            """,
+            (user_data['name'], user_data['phone'], user_data['role'], user_id),
+        )
+        conn.commit()
     return {"message": "User updated successfully"}
 
 @app.put("/api/admin/users/{user_id}/subscription")
@@ -3807,43 +3866,45 @@ async def update_user_subscription(user_id: int, subscription_data: dict, curren
     else:
         duration_days = 365
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Get plan_id (match plan_name or tier_name for flexibility)
-    cursor.execute(
-        "SELECT plan_id FROM subscription_plans WHERE platform = ? AND (plan_name = ? OR tier_name = ?)",
-        (platform, plan_name, plan_name),
-    )
-    plan = cursor.fetchone()
-    
-    if not plan:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Plan not found")
-    
-    plan_id = plan[0]
-    
-    # Deactivate existing subscription for this platform
-    cursor.execute('''
-        UPDATE user_subscriptions 
-        SET status = 'inactive' 
-        WHERE userid = ? AND plan_id IN (
-            SELECT plan_id FROM subscription_plans WHERE platform = ?
+    with get_conn() as conn:
+        # Get plan_id (match plan_name or tier_name for flexibility)
+        cur = execute(
+            conn,
+            "SELECT plan_id FROM subscription_plans WHERE platform = %s AND (plan_name = %s OR tier_name = %s)",
+            (platform, plan_name, plan_name),
         )
-    ''', (user_id, platform))
-    
-    # Add new subscription
-    from datetime import date, timedelta
-    start_date = date.today()
-    end_date = start_date + timedelta(days=duration_days)
-    
-    cursor.execute('''
-        INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
-        VALUES (?, ?, ?, ?, 'active')
-    ''', (user_id, plan_id, start_date, end_date))
-    
-    conn.commit()
-    conn.close()
+        plan = cur.fetchone()
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        plan_id = plan[0]
+
+        # Deactivate existing subscription for this platform
+        execute(
+            conn,
+            """
+                UPDATE user_subscriptions
+                SET status = 'inactive'
+                WHERE userid = %s AND plan_id IN (
+                    SELECT plan_id FROM subscription_plans WHERE platform = %s
+                )
+            """,
+            (user_id, platform),
+        )
+
+        # Add new subscription
+        from datetime import date, timedelta
+        start_date = date.today()
+        end_date = start_date + timedelta(days=duration_days)
+
+        execute(
+            conn,
+            """
+                INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
+                VALUES (%s, %s, %s, %s, 'active')
+            """,
+            (user_id, plan_id, start_date, end_date),
+        )
+        conn.commit()
     
     return {"message": "Subscription updated successfully", "end_date": str(end_date)}
 
@@ -3852,21 +3913,30 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            SELECT plan_id, platform, plan_name, price, duration_months, features, is_active,
-                   tier_name, discount_percent, google_play_product_id
-            FROM subscription_plans
-            WHERE is_active = 1
-            ORDER BY platform, COALESCE(discount_percent, 0) DESC, plan_name
-        """)
-        rows = cursor.fetchall()
-    except sqlite3.OperationalError:
-        cursor.execute("SELECT plan_id, platform, plan_name, price, duration_months, features, is_active FROM subscription_plans WHERE is_active = 1 ORDER BY platform, plan_name")
-        rows = [(*r, None, None, None) for r in cursor.fetchall()]
-    conn.close()
+    with get_conn() as conn:
+        try:
+            cur = execute(
+                conn,
+                """
+                    SELECT plan_id, platform, plan_name, price, duration_months, features, is_active,
+                           tier_name, discount_percent, google_play_product_id
+                    FROM subscription_plans
+                    WHERE is_active = TRUE
+                    ORDER BY platform, COALESCE(discount_percent, 0) DESC, plan_name
+                """,
+            )
+            rows = cur.fetchall() or []
+        except Exception:
+            cur = execute(
+                conn,
+                """
+                    SELECT plan_id, platform, plan_name, price, duration_months, features, is_active
+                    FROM subscription_plans
+                    WHERE is_active = TRUE
+                    ORDER BY platform, plan_name
+                """,
+            )
+            rows = [(*r, None, None, None) for r in (cur.fetchall() or [])]
     
     plans = []
     for row in rows:
@@ -3916,25 +3986,20 @@ async def update_admin_subscription_plan(plan_id: int, body: dict, current_user:
         if discount_percent < 0 or discount_percent > 100:
             raise HTTPException(status_code=400, detail="discount_percent must be 0-100")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_id = ?", (plan_id,))
-        if not cursor.fetchone():
-            conn.close()
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT plan_id FROM subscription_plans WHERE plan_id = %s", (plan_id,))
+        if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Plan not found")
         if discount_percent is not None:
             try:
-                cursor.execute(
-                    "UPDATE subscription_plans SET discount_percent = ? WHERE plan_id = ?",
+                execute(
+                    conn,
+                    "UPDATE subscription_plans SET discount_percent = %s WHERE plan_id = %s",
                     (discount_percent, plan_id),
                 )
-            except sqlite3.OperationalError:
-                conn.close()
+            except Exception:
                 raise HTTPException(status_code=400, detail="discount_percent column not available")
         conn.commit()
-    finally:
-        conn.close()
     
     return {"message": "Subscription plan updated", "plan_id": plan_id}
 
@@ -3969,10 +4034,9 @@ async def post_admin_allowed_device(body: dict, current_user: User = Depends(get
         if for_user_id == current_user.userid:
             target_userid = current_user.userid
         else:
-            conn = sqlite3.connect('astrology.db')
-            cur = conn.execute("SELECT role FROM users WHERE userid = ?", (for_user_id,))
-            row = cur.fetchone()
-            conn.close()
+            with get_conn() as conn:
+                cur = execute(conn, "SELECT role FROM users WHERE userid = %s", (for_user_id,))
+                row = cur.fetchone()
             if not row or row[0] != "admin":
                 raise HTTPException(status_code=400, detail="for_user_id must be another admin's user ID")
             target_userid = for_user_id
@@ -4032,15 +4096,19 @@ async def fix_database_timezones(current_user: User = Depends(get_current_user))
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Fix problematic formats with proper IST handling
-    cursor.execute("""SELECT id, latitude, longitude, timezone FROM birth_charts 
-                     WHERE timezone LIKE '%/%' OR timezone = 'Asia/Kolkata' 
-                     OR timezone LIKE 'UTC+%:%' OR timezone LIKE 'UTC-%:%'
-                     OR timezone LIKE 'UTC+%.%:%' OR timezone LIKE 'UTC-%.%:%'""")
-    charts = cursor.fetchall()
+    with get_conn() as conn:
+        # Fix problematic formats with proper IST handling
+        cur = execute(
+            conn,
+            """
+                SELECT id, latitude, longitude, timezone
+                FROM birth_charts
+                WHERE timezone LIKE '%/%' OR timezone = 'Asia/Kolkata'
+                   OR timezone LIKE 'UTC+%:%' OR timezone LIKE 'UTC-%:%'
+                   OR timezone LIKE 'UTC+%.%:%' OR timezone LIKE 'UTC-%.%:%'
+            """,
+        )
+        charts = cur.fetchall() or []
     
     fixed_count = 0
     for chart_id, lat, lng, old_tz in charts:
@@ -4055,11 +4123,14 @@ async def fix_database_timezones(current_user: User = Depends(get_current_user))
             else:
                 new_tz = f"UTC{'+' if offset >= 0 else '-'}{abs(hours)}"
             
-            cursor.execute("UPDATE birth_charts SET timezone = ? WHERE id = ?", (new_tz, chart_id))
+            execute(
+                conn,
+                "UPDATE birth_charts SET timezone = %s WHERE id = %s",
+                (new_tz, chart_id),
+            )
             fixed_count += 1
-    
-    conn.commit()
-    conn.close()
+
+        conn.commit()
     
     return {"message": f"Fixed {fixed_count} timezone records"}
 

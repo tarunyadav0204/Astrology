@@ -275,20 +275,38 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
 const loadCurrentNative = async () => {
     try {
       const { storage } = require('../../services/storage');
-      
+
+      // Always prefer syncing the "self" native from backend so AsyncStorage
+      // doesn't keep a dangling deleted selection.
+      try {
+        const { authAPI } = require('../../services/api');
+        const response = await authAPI.getSelfBirthChart();
+        if (response?.data?.has_self_chart) {
+          const selfData = {
+            ...response.data,
+            id: response.data.birth_chart_id, // normalize id field
+          };
+          await storage.setBirthDetails(selfData);
+          setCurrentNativeData(selfData);
+          return selfData;
+        }
+      } catch (e) {
+        // If self-chart sync fails, fall back to whatever is in storage/profiles.
+      }
+
       // First try to get single birth details
       let selectedNative = await storage.getBirthDetails();
-      
+
       // If no single birth details, get from profiles
       if (!selectedNative) {
         const profiles = await storage.getBirthProfiles();
-        
+
         if (profiles && profiles.length > 0) {
           // Use the first profile or find 'self' relation
           selectedNative = profiles.find(p => p.relation === 'self') || profiles[0];
         }
       }
-      
+
       setCurrentNativeData(selectedNative);
       return selectedNative;
     } catch (error) {

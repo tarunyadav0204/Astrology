@@ -6,13 +6,13 @@ import sys
 import os
 import json
 import asyncio
-import sqlite3
 import hashlib
 import re
 import html
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -66,16 +66,22 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
     
     if not request.force_regenerate:
         try:
-            conn = sqlite3.connect('astrology.db')
-            cursor = conn.cursor()
-            cursor.execute("SELECT insights_data FROM ai_career_insights WHERE birth_hash = ?", (birth_hash,))
-            cached_result = cursor.fetchone()
-            conn.close()
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT insights_data FROM ai_career_insights WHERE userid = %s AND birth_hash = %s",
+                    (current_user.userid, birth_hash),
+                )
+                cached_result = cur.fetchone()
             
             if cached_result:
                 print(f"✅ Serving cached Progeny result for {birth_hash}")
                 # Format to match the SSE stream structure
-                final_response = {'status': 'complete', 'data': json.loads(cached_result[0]), 'cached': True}
+                final_response = {
+                    "status": "complete",
+                    "data": json.loads(cached_result[0]),
+                    "cached": True,
+                }
                 
                 async def serve_cache():
                     yield f"data: {json.dumps(final_response)}\n\n"
@@ -337,29 +343,34 @@ Escape quotes properly: \"text\"
                         # Cache the result
                         full_result = {'analysis': parsed_response}
                         try:
-                            conn = sqlite3.connect('astrology.db')
-                            cursor = conn.cursor()
-                            
-                            # --- SAFETY BLOCK START ---
-                            cursor.execute("""
-                                CREATE TABLE IF NOT EXISTS ai_career_insights (
-                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                    birth_hash TEXT UNIQUE,
-                                    insights_data TEXT,
-                                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            with get_conn() as conn:
+                                # Table should already exist in Postgres schema; keep defensive create
+                                execute(
+                                    conn,
+                                    """
+                                    CREATE TABLE IF NOT EXISTS ai_career_insights (
+                                        id SERIAL PRIMARY KEY,
+                                        userid INTEGER NOT NULL DEFAULT 0,
+                                        birth_hash TEXT NOT NULL,
+                                        insights_data TEXT,
+                                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                        UNIQUE(userid, birth_hash)
+                                    )
+                                    """,
                                 )
-                            """)
-                            # --- SAFETY BLOCK END ---
-                            
-                            # Reuse the existing table
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO ai_career_insights 
-                                (birth_hash, insights_data, updated_at)
-                                VALUES (?, ?, CURRENT_TIMESTAMP)
-                            """, (birth_hash, json.dumps(full_result)))
-                            conn.commit()
-                            conn.close()
+                                # Upsert cache entry
+                                execute(
+                                    conn,
+                                    """
+                                    INSERT INTO ai_career_insights (userid, birth_hash, insights_data, updated_at)
+                                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                                    ON CONFLICT (userid, birth_hash)
+                                    DO UPDATE SET insights_data = EXCLUDED.insights_data,
+                                                  updated_at = EXCLUDED.updated_at
+                                    """,
+                                    (current_user.userid, birth_hash, json.dumps(full_result)),
+                                )
                         except Exception as cache_err:
                             print(f"⚠️ Cache save failed: {cache_err}")
 

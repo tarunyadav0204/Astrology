@@ -1,6 +1,8 @@
-import sqlite3
 import os
 from typing import Dict, List, Optional
+
+from db import get_conn, execute
+
 
 class LayerConfigService:
     """Service for retrieving layer-based prompt configuration"""
@@ -12,215 +14,306 @@ class LayerConfigService:
     
     def get_category_configuration(self, category_key: str, tier_key: str = 'normal') -> Dict:
         """Get complete configuration for a category and tier including layers, fields, and charts"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
+        with get_conn() as conn:
             # Get required layers
-            cursor.execute("""
+            cur = execute(
+                conn,
+                """
                 SELECT al.layer_key, al.layer_name, al.priority
                 FROM category_layer_requirements clr
                 JOIN astrological_layers al ON clr.layer_id = al.layer_id
-                WHERE clr.category_key = ? AND clr.tier_key = ? AND clr.is_required = 1 AND al.is_active = 1
+                WHERE clr.category_key = %s AND clr.tier_key = %s AND clr.is_required = TRUE AND al.is_active = TRUE
                 ORDER BY al.priority
-            """, (category_key, tier_key))
-            
-            required_layers = [dict(row) for row in cursor.fetchall()]
-            
+                """,
+                (category_key, tier_key),
+            )
+            layer_rows = cur.fetchall() or []
+            required_layers = [
+                {"layer_key": r[0], "layer_name": r[1], "priority": r[2]}
+                for r in layer_rows
+            ]
+
             # Get required fields based on layers
-            layer_keys = [layer['layer_key'] for layer in required_layers]
-            placeholders = ','.join('?' * len(layer_keys))
-            
-            cursor.execute(f"""
-                SELECT cf.field_key, cf.field_name, cf.estimated_size_bytes, al.layer_key
-                FROM context_fields cf
-                JOIN astrological_layers al ON cf.layer_id = al.layer_id
-                WHERE al.layer_key IN ({placeholders}) AND cf.is_active = 1
-                ORDER BY al.priority, cf.field_key
-            """, layer_keys)
-            
-            required_fields = [dict(row) for row in cursor.fetchall()]
-            
+            layer_keys = [layer["layer_key"] for layer in required_layers]
+            required_fields: List[Dict] = []
+            if layer_keys:
+                placeholders = ",".join(["%s"] * len(layer_keys))
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT cf.field_key, cf.field_name, cf.estimated_size_bytes, al.layer_key
+                    FROM context_fields cf
+                    JOIN astrological_layers al ON cf.layer_id = al.layer_id
+                    WHERE al.layer_key IN ({placeholders}) AND cf.is_active = TRUE
+                    ORDER BY al.priority, cf.field_key
+                    """,
+                    tuple(layer_keys),
+                )
+                field_rows = cur.fetchall() or []
+                required_fields = [
+                    {
+                        "field_key": r[0],
+                        "field_name": r[1],
+                        "estimated_size_bytes": r[2],
+                        "layer_key": r[3],
+                    }
+                    for r in field_rows
+                ]
+
             # Get required divisional charts
-            cursor.execute("""
+            cur = execute(
+                conn,
+                """
                 SELECT dc.chart_key, dc.chart_name, dc.chart_number
                 FROM category_divisional_requirements cdr
                 JOIN divisional_charts dc ON cdr.chart_id = dc.chart_id
-                WHERE cdr.category_key = ? AND cdr.tier_key = ? AND cdr.is_required = 1 AND dc.is_active = 1
+                WHERE cdr.category_key = %s AND cdr.tier_key = %s AND cdr.is_required = TRUE AND dc.is_active = TRUE
                 ORDER BY dc.chart_number
-            """, (category_key, tier_key))
-            
-            required_charts = [dict(row) for row in cursor.fetchall()]
-            
+                """,
+                (category_key, tier_key),
+            )
+            chart_rows = cur.fetchall() or []
+            required_charts = [
+                {"chart_key": r[0], "chart_name": r[1], "chart_number": r[2]}
+                for r in chart_rows
+            ]
+
             # Get transit limits
-            cursor.execute("""
+            cur = execute(
+                conn,
+                """
                 SELECT max_transit_activations, include_macro_transits, include_navatara_warnings
                 FROM category_transit_limits
-                WHERE category_key = ? AND tier_key = ?
-            """, (category_key, tier_key))
-            
-            transit_config = cursor.fetchone()
-            transit_limits = dict(transit_config) if transit_config else {
-                'max_transit_activations': 20,
-                'include_macro_transits': 1,
-                'include_navatara_warnings': 0
-            }
-            
-            return {
-                'category_key': category_key,
-                'tier_key': tier_key,
-                'required_layers': required_layers,
-                'required_fields': required_fields,
-                'required_divisional_charts': required_charts,
-                'transit_limits': transit_limits
-            }
-            
-        finally:
-            conn.close()
+                WHERE category_key = %s AND tier_key = %s
+                """,
+                (category_key, tier_key),
+            )
+            tr = cur.fetchone()
+            if tr:
+                transit_limits = {
+                    "max_transit_activations": tr[0],
+                    "include_macro_transits": tr[1],
+                    "include_navatara_warnings": tr[2],
+                }
+            else:
+                transit_limits = {
+                    "max_transit_activations": 20,
+                    "include_macro_transits": 1,
+                    "include_navatara_warnings": 0,
+                }
+
+        return {
+            "category_key": category_key,
+            "tier_key": tier_key,
+            "required_layers": required_layers,
+            "required_fields": required_fields,
+            "required_divisional_charts": required_charts,
+            "transit_limits": transit_limits,
+        }
     
     def get_all_layers(self) -> List[Dict]:
         """Get all astrological layers"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("""
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
                 SELECT layer_id, layer_key, layer_name, description, priority, is_active
                 FROM astrological_layers
                 ORDER BY priority
-            """)
-            return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+                """,
+            )
+            rows = cur.fetchall() or []
+        return [
+            {
+                "layer_id": r[0],
+                "layer_key": r[1],
+                "layer_name": r[2],
+                "description": r[3],
+                "priority": r[4],
+                "is_active": r[5],
+            }
+            for r in rows
+        ]
     
     def get_all_fields(self) -> List[Dict]:
         """Get all context fields with their layer assignments"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("""
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
                 SELECT cf.field_id, cf.field_key, cf.field_name, cf.description,
                        cf.estimated_size_bytes, cf.is_active,
                        al.layer_key, al.layer_name
                 FROM context_fields cf
                 JOIN astrological_layers al ON cf.layer_id = al.layer_id
                 ORDER BY al.priority, cf.field_key
-            """)
-            return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+                """,
+            )
+            rows = cur.fetchall() or []
+        return [
+            {
+                "field_id": r[0],
+                "field_key": r[1],
+                "field_name": r[2],
+                "description": r[3],
+                "estimated_size_bytes": r[4],
+                "is_active": r[5],
+                "layer_key": r[6],
+                "layer_name": r[7],
+            }
+            for r in rows
+        ]
     
     def get_all_divisional_charts(self) -> List[Dict]:
         """Get all divisional charts"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("""
-                SELECT chart_id, chart_key, chart_name, chart_number, 
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT chart_id, chart_key, chart_name, chart_number,
                        primary_domain, description, is_active
                 FROM divisional_charts
                 ORDER BY chart_number
-            """)
-            return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+                """,
+            )
+            rows = cur.fetchall() or []
+        return [
+            {
+                "chart_id": r[0],
+                "chart_key": r[1],
+                "chart_name": r[2],
+                "chart_number": r[3],
+                "primary_domain": r[4],
+                "description": r[5],
+                "is_active": r[6],
+            }
+            for r in rows
+        ]
     
     def get_category_layer_requirements(self, category_key: str, tier_key: str = 'normal') -> List[Dict]:
         """Get layer requirements for a specific category and tier"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("""
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
                 SELECT al.layer_key, al.layer_name, al.description, al.priority, clr.is_required
                 FROM astrological_layers al
-                LEFT JOIN category_layer_requirements clr 
-                    ON al.layer_id = clr.layer_id AND clr.category_key = ? AND clr.tier_key = ?
+                LEFT JOIN category_layer_requirements clr
+                    ON al.layer_id = clr.layer_id AND clr.category_key = %s AND clr.tier_key = %s
                 ORDER BY al.priority
-            """, (category_key, tier_key))
-            return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+                """,
+                (category_key, tier_key),
+            )
+            rows = cur.fetchall() or []
+        return [
+            {
+                "layer_key": r[0],
+                "layer_name": r[1],
+                "description": r[2],
+                "priority": r[3],
+                "is_required": r[4],
+            }
+            for r in rows
+        ]
     
     def get_category_chart_requirements(self, category_key: str, tier_key: str = 'normal') -> List[Dict]:
         """Get divisional chart requirements for a specific category and tier"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("""
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
                 SELECT dc.chart_key, dc.chart_name, cdr.is_required
                 FROM divisional_charts dc
-                LEFT JOIN category_divisional_requirements cdr 
-                    ON dc.chart_id = cdr.chart_id AND cdr.category_key = ? AND cdr.tier_key = ?
+                LEFT JOIN category_divisional_requirements cdr
+                    ON dc.chart_id = cdr.chart_id AND cdr.category_key = %s AND cdr.tier_key = %s
                 ORDER BY dc.chart_number
-            """, (category_key, tier_key))
-            return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+                """,
+                (category_key, tier_key),
+            )
+            rows = cur.fetchall() or []
+        return [
+            {
+                "chart_key": r[0],
+                "chart_name": r[1],
+                "is_required": r[2],
+            }
+            for r in rows
+        ]
     
     def update_category_layer_requirement(self, category_key: str, layer_key: str, is_required: bool, tier_key: str = 'normal'):
         """Update layer requirement for a category and tier (for admin UI)"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        try:
+        with get_conn() as conn:
             # Get layer_id
-            cursor.execute("SELECT layer_id FROM astrological_layers WHERE layer_key = ?", (layer_key,))
-            layer_id = cursor.fetchone()[0]
-            
-            cursor.execute("""
-                INSERT OR REPLACE INTO category_layer_requirements (category_key, tier_key, layer_id, is_required)
-                VALUES (?, ?, ?, ?)
-            """, (category_key, tier_key, layer_id, 1 if is_required else 0))
-            
-            conn.commit()
-        finally:
-            conn.close()
+            cur = execute(
+                conn,
+                "SELECT layer_id FROM astrological_layers WHERE layer_key = %s",
+                (layer_key,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ValueError(f"Unknown layer_key: {layer_key}")
+            layer_id = row[0]
+
+            execute(
+                conn,
+                """
+                INSERT INTO category_layer_requirements (category_key, tier_key, layer_id, is_required)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (category_key, tier_key, layer_id)
+                DO UPDATE SET is_required = EXCLUDED.is_required
+                """,
+                (category_key, tier_key, layer_id, bool(is_required)),
+            )
     
     def update_category_chart_requirement(self, category_key: str, chart_key: str, is_required: bool, tier_key: str = 'normal'):
         """Update divisional chart requirement for a category and tier (for admin UI)"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        try:
+        with get_conn() as conn:
             # Get chart_id
-            cursor.execute("SELECT chart_id FROM divisional_charts WHERE chart_key = ?", (chart_key,))
-            chart_id = cursor.fetchone()[0]
-            
-            cursor.execute("""
-                INSERT OR REPLACE INTO category_divisional_requirements (category_key, tier_key, chart_id, is_required)
-                VALUES (?, ?, ?, ?)
-            """, (category_key, tier_key, chart_id, 1 if is_required else 0))
-            
-            conn.commit()
-        finally:
-            conn.close()
+            cur = execute(
+                conn,
+                "SELECT chart_id FROM divisional_charts WHERE chart_key = %s",
+                (chart_key,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ValueError(f"Unknown chart_key: {chart_key}")
+            chart_id = row[0]
+
+            execute(
+                conn,
+                """
+                INSERT INTO category_divisional_requirements (category_key, tier_key, chart_id, is_required)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (category_key, tier_key, chart_id)
+                DO UPDATE SET is_required = EXCLUDED.is_required
+                """,
+                (category_key, tier_key, chart_id, bool(is_required)),
+            )
     
     def update_transit_limits(self, category_key: str, max_activations: int, 
                              include_macro: bool, include_navatara: bool, tier_key: str = 'normal'):
         """Update transit limits for a category and tier (for admin UI)"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("""
-                INSERT OR REPLACE INTO category_transit_limits 
-                (category_key, tier_key, max_transit_activations, include_macro_transits, include_navatara_warnings)
-                VALUES (?, ?, ?, ?, ?)
-            """, (category_key, tier_key, max_activations, 1 if include_macro else 0, 1 if include_navatara else 0))
-            
-            conn.commit()
-        finally:
-            conn.close()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                INSERT INTO category_transit_limits
+                    (category_key, tier_key, max_transit_activations, include_macro_transits, include_navatara_warnings)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (category_key, tier_key)
+                DO UPDATE SET
+                    max_transit_activations = EXCLUDED.max_transit_activations,
+                    include_macro_transits = EXCLUDED.include_macro_transits,
+                    include_navatara_warnings = EXCLUDED.include_navatara_warnings
+                """,
+                (
+                    category_key,
+                    tier_key,
+                    max_activations,
+                    bool(include_macro),
+                    bool(include_navatara),
+                ),
+            )
     
     def get_estimated_context_size(self, category_key: str, tier_key: str = 'normal') -> Dict:
         """Calculate estimated context size for a category and tier"""

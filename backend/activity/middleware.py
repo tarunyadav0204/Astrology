@@ -2,7 +2,6 @@
 Middleware to log each API request as an activity event (action=api_request) to Pub/Sub.
 Runs after the request; does not block the response.
 """
-import os
 import time
 import logging
 import jwt
@@ -10,12 +9,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from activity.publisher import publish_activity
+from db import get_conn, execute
 
 logger = logging.getLogger(__name__)
 
-# Resolve DB path so lookup works from any CWD (e.g. when run in executor thread)
-_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_DB_PATH = os.environ.get("ASTROLOGY_DB_PATH") or os.path.join(_BACKEND_DIR, "astrology.db")
 # Cache only positive name lookups so we retry when name was missing or DB failed
 _name_cache = {}
 _MAX_NAME_CACHE = 10_000
@@ -122,18 +119,16 @@ def _get_user_name_by_id(user_id: int) -> str | None:
     if user_id in _name_cache:
         return _name_cache[user_id]
     try:
-        import sqlite3
-        conn = sqlite3.connect(_DB_PATH)
-        cur = conn.execute("SELECT name FROM users WHERE userid = ?", (user_id,))
-        row = cur.fetchone()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT name FROM users WHERE userid = %s", (user_id,))
+            row = cur.fetchone()
         if row and row[0] is not None and str(row[0]).strip():
             name = str(row[0]).strip()
             if len(_name_cache) < _MAX_NAME_CACHE:
                 _name_cache[user_id] = name
             return name
     except Exception as e:
-        logger.warning("Activity: name lookup for user_id=%s failed (db=%s): %s", user_id, _DB_PATH, e)
+        logger.warning("Activity: name lookup for user_id=%s failed: %s", user_id, e)
     return None
 
 

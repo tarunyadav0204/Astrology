@@ -1,7 +1,6 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-import sqlite3
 import jwt
 
 # JWT Configuration
@@ -29,12 +28,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             raise HTTPException(status_code=401, detail="Invalid token")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT userid, name, phone, role FROM users WHERE phone = ?", (phone,))
-    user = cursor.fetchone()
-    conn.close()
+
+    from db import get_conn, execute
+
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT userid, name, phone, role FROM users WHERE phone = ?", (phone,))
+        user = cur.fetchone()
     
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")

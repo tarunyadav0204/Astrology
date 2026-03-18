@@ -5,12 +5,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-import sqlite3
 import traceback
 from auth import get_current_user
 from calculators.kota_chakra_calculator import KotaChakraCalculator
 from calculators.chart_calculator import ChartCalculator
 from encryption_utils import EncryptionManager
+from db import get_conn, execute
 
 try:
     encryptor = EncryptionManager()
@@ -31,24 +31,24 @@ class PlanetDetailsRequest(BaseModel):
 
 @router.post("/calculate")
 async def calculate_kota_chakra(request: KotaChakraRequest, current_user = Depends(get_current_user)):
-    conn = None
     try:
         # Validate request
         if not request.birth_chart_id:
             raise HTTPException(status_code=400, detail="Birth chart ID is required")
         
-        # Database connection
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT name, date, time, place, 
-                   latitude, longitude, timezone, gender
-            FROM birth_charts 
-            WHERE id = ? AND userid = ?
-        """, (request.birth_chart_id, current_user.userid))
-        
-        chart_row = cursor.fetchone()
+        # Database connection (Postgres)
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT name, date, time, place,
+                       latitude, longitude, timezone, gender
+                FROM birth_charts
+                WHERE id = %s AND userid = %s
+                """,
+                (request.birth_chart_id, current_user.userid),
+            )
+            chart_row = cur.fetchone()
         
         if not chart_row:
             raise HTTPException(status_code=404, detail="Birth chart not found or access denied")
@@ -144,36 +144,30 @@ async def calculate_kota_chakra(request: KotaChakraRequest, current_user = Depen
     except ValueError as e:
         print(f"ValueError in kota-chakra/calculate: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Invalid data: {str(e)}")
-    except sqlite3.Error as e:
-        print(f"Database error in kota-chakra/calculate: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         print(f"Unexpected error in kota-chakra/calculate: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
 
 @router.post("/periods")
 async def get_yearly_periods(request: KotaChakraRequest, current_user = Depends(get_current_user)):
-    conn = None
     try:
         # Validate request
         if not request.birth_chart_id:
             raise HTTPException(status_code=400, detail="Birth chart ID is required")
         
-        # Database connection
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT date, time, latitude, longitude, timezone
-            FROM birth_charts 
-            WHERE id = ? AND userid = ?
-        """, (request.birth_chart_id, current_user.userid))
-        
-        chart_row = cursor.fetchone()
+        # Database connection (Postgres)
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT date, time, latitude, longitude, timezone
+                FROM birth_charts
+                WHERE id = %s AND userid = %s
+                """,
+                (request.birth_chart_id, current_user.userid),
+            )
+            chart_row = cur.fetchone()
         
         if not chart_row:
             raise HTTPException(status_code=404, detail="Birth chart not found or access denied")
@@ -297,34 +291,29 @@ async def get_yearly_periods(request: KotaChakraRequest, current_user = Depends(
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid data: {str(e)}")
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         print(f"Unexpected error in kota-chakra/periods: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
 
 @router.post("/planet-details")
 async def get_planet_details(request: PlanetDetailsRequest, current_user = Depends(get_current_user)):
-    conn = None
     try:
         if not request.birth_chart_id or not request.planet:
             raise HTTPException(status_code=400, detail="Birth chart ID and planet are required")
         
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT name, date, time, place, 
-                   latitude, longitude, timezone, gender
-            FROM birth_charts 
-            WHERE id = ? AND userid = ?
-        """, (request.birth_chart_id, current_user.userid))
-        
-        chart_row = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT name, date, time, place,
+                       latitude, longitude, timezone, gender
+                FROM birth_charts
+                WHERE id = %s AND userid = %s
+                """,
+                (request.birth_chart_id, current_user.userid),
+            )
+            chart_row = cur.fetchone()
         
         if not chart_row:
             raise HTTPException(status_code=404, detail="Birth chart not found or access denied")
@@ -411,6 +400,3 @@ async def get_planet_details(request: PlanetDetailsRequest, current_user = Depen
     except Exception as e:
         print(f"Error in planet-details: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
-    finally:
-        if conn:
-            conn.close()

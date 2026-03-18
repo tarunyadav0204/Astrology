@@ -4,7 +4,6 @@ import base64
 import os
 import re
 import html
-import sqlite3
 from google.cloud import texttospeech
 import logging
 import asyncio
@@ -12,6 +11,7 @@ from functools import partial
 from pydantic import BaseModel
 
 from auth import get_current_user, User
+from db import get_conn, execute
 from credits.credit_service import CreditService
 from credits.routes import _get_play_credentials
 from tts.podcast_narrator import generate_podcast_script
@@ -22,48 +22,44 @@ from utils.env_json import parse_json_from_env
 from utils.admin_settings import get_podcast_provider, PODCAST_PROVIDER_NOTEBOOK_LM
 
 credit_service = CreditService()
-PODCAST_HISTORY_DB = os.getenv("DATABASE_PATH", "astrology.db")
 
 
 def _ensure_podcast_history_table():
-    conn = sqlite3.connect(PODCAST_HISTORY_DB)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS podcast_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            userid INTEGER NOT NULL,
-            message_id TEXT NOT NULL,
-            session_id TEXT,
-            lang TEXT NOT NULL DEFAULT 'en',
-            preview TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(userid, message_id, lang)
-        )
-    """)
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        execute(conn, """
+            CREATE TABLE IF NOT EXISTS podcast_history (
+                id SERIAL PRIMARY KEY,
+                userid INTEGER NOT NULL,
+                message_id TEXT NOT NULL,
+                session_id TEXT,
+                lang TEXT NOT NULL DEFAULT 'en',
+                preview TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(userid, message_id, lang)
+            )
+        """)
+        conn.commit()
 
 
 def _add_podcast_history(userid: int, message_id: str, session_id: str | None, lang: str, preview: str | None):
     if not message_id or not str(message_id).strip():
         return
     _ensure_podcast_history_table()
-    conn = sqlite3.connect(PODCAST_HISTORY_DB)
-    try:
-        preview_trim = (preview or "")[:500].strip() or None
-        conn.execute(
+    preview_trim = (preview or "")[:500].strip() or None
+    with get_conn() as conn:
+        execute(
+            conn,
             """
             INSERT INTO podcast_history (userid, message_id, session_id, lang, preview)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT(userid, message_id, lang) DO UPDATE SET
-                session_id = COALESCE(excluded.session_id, session_id),
-                preview = COALESCE(excluded.preview, preview),
+                session_id = COALESCE(EXCLUDED.session_id, podcast_history.session_id),
+                preview = COALESCE(EXCLUDED.preview, podcast_history.preview),
                 created_at = CURRENT_TIMESTAMP
             """,
             (userid, str(message_id).strip(), session_id or None, (lang or "en").strip()[:10], preview_trim),
         )
         conn.commit()
-    finally:
-        conn.close()
 
 # TTS credential order: (1) GOOGLE_TTS_SERVICE_ACCOUNT_JSON if set, else (2) GOOGLE_SERVICE_ACCOUNT_KEY
 # (inline JSON from tradebest where billing is enabled), else (3) Play credentials. This way the same
@@ -757,9 +753,9 @@ async def podcast_history(current_user: User = Depends(get_current_user)):
   App builds play URL as GET /tts/podcast/stream?message_id=...&lang=...
   """
   _ensure_podcast_history_table()
-  conn = sqlite3.connect(PODCAST_HISTORY_DB)
-  try:
-    cursor = conn.execute(
+  with get_conn() as conn:
+    cursor = execute(
+      conn,
       """
       SELECT message_id, session_id, lang, preview, created_at
       FROM podcast_history
@@ -770,8 +766,6 @@ async def podcast_history(current_user: User = Depends(get_current_user)):
       (current_user.userid,),
     )
     rows = cursor.fetchall()
-  finally:
-    conn.close()
   return JSONResponse({
     "podcasts": [
       {
@@ -801,16 +795,14 @@ async def podcast_stream(
     raise HTTPException(status_code=400, detail="message_id required")
   cache_lang = _podcast_cache_lang(lang)
   _ensure_podcast_history_table()
-  conn = sqlite3.connect(PODCAST_HISTORY_DB)
-  try:
-    cursor = conn.execute(
+  with get_conn() as conn:
+    cursor = execute(
+      conn,
       "SELECT 1 FROM podcast_history WHERE userid = ? AND message_id = ? AND lang = ? LIMIT 1",
       (current_user.userid, raw_id, cache_lang),
     )
     if not cursor.fetchone():
       raise HTTPException(status_code=404, detail="Podcast not found or access denied")
-  finally:
-    conn.close()
   audio_bytes = get_cached_audio(raw_id, cache_lang)
   if not audio_bytes and cache_lang == "en":
     audio_bytes = get_cached_audio(raw_id, "english")

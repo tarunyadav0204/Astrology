@@ -19,12 +19,9 @@ def resolve_and_cap(
     Expand events with user_ids=None to all user ids, then for each user keep at most
     one nudge (highest priority). Users who already received a nudge on target_date are skipped.
     """
-    conn = db.get_conn()
-    try:
+    with db.get_conn() as conn:
         all_user_ids = db.get_all_user_ids(conn)
         already_sent = db.get_user_ids_receiving_nudge_on_date(conn, target_date)
-    finally:
-        conn.close()
 
     # Build per-user candidate list: (userid, event) for each event and each target user
     candidates: List[Tuple[int, NudgeEvent]] = []

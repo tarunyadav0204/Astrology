@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any
 from datetime import datetime
-import sqlite3
 import traceback
 import time
 from pydantic import BaseModel
@@ -18,6 +17,7 @@ from calculators.yogi_calculator import YogiCalculator
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
 from encryption_utils import EncryptionManager
+from db import get_conn, execute
 
 try:
     encryptor = EncryptionManager()
@@ -606,9 +606,6 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
         print(f"✅ Validation passed, proceeding with chart calculation")
         
         # Store birth data in database (update if exists for current user only)
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
         if encryptor:
             enc_name = encryptor.encrypt(birth_data.name)
             enc_date = encryptor.encrypt(birth_data.date)
@@ -620,53 +617,72 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
-        # Dedupe: same user + same name/date/time/place (exact duplicate native) -> return existing chart
+        new_chart_id = None
         try:
-            cursor.execute('''
-                SELECT id FROM birth_charts
-                WHERE userid = ? AND name = ? AND date = ? AND time = ? AND place = ?
-                ORDER BY id DESC LIMIT 1
-            ''', (current_user.userid, enc_name, enc_date, enc_time, enc_place))
-            dup = cursor.fetchone()
-            if dup:
-                new_chart_id = dup[0]
-                print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (exact native match)")
-                conn.close()
-                # Calculate and return chart data with existing id (no second insert)
-                from calculators.chart_calculator import ChartCalculator
-                from calculators.divisional_chart_calculator import DivisionalChartCalculator
-                calculator = ChartCalculator({})
-                chart_data = calculator.calculate_chart(birth_data, node_type)
-                div_calculator = DivisionalChartCalculator(chart_data)
-                chart_data['d3_chart'] = div_calculator.calculate_divisional_chart(3)
-                chart_data['d9_chart'] = div_calculator.calculate_divisional_chart(9)
-                chart_data['d10_chart'] = div_calculator.calculate_divisional_chart(10)
-                chart_data['birth_chart_id'] = new_chart_id
-                return chart_data
+            with get_conn() as conn:
+                # Dedupe: same user + same name/date/time/place (exact duplicate native) -> return existing chart
+                cur = execute(
+                    conn,
+                    """
+                    SELECT id
+                    FROM birth_charts
+                    WHERE userid = %s AND name = %s AND date = %s AND time = %s AND place = %s
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (current_user.userid, enc_name, enc_date, enc_time, enc_place),
+                )
+                dup = cur.fetchone()
+                if dup:
+                    new_chart_id = dup[0]
+                    print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (exact native match)")
+                else:
+                    print(f"🔍 [CHART_DEBUG] About to insert chart for user {current_user.userid}:")
+                    print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
+                    print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")
+                    print(f"🔍 [CHART_DEBUG] - Final relation value: {birth_data.relation or 'other'}")
+
+                    cur = execute(
+                        conn,
+                        """
+                        INSERT INTO birth_charts
+                            (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                        VALUES
+                            (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                        """,
+                        (
+                            current_user.userid,
+                            enc_name,
+                            enc_date,
+                            enc_time,
+                            enc_lat,
+                            enc_lon,
+                            birth_data.timezone,
+                            enc_place,
+                            birth_data.gender,
+                            birth_data.relation or "other",
+                        ),
+                    )
+                    row = cur.fetchone()
+                    new_chart_id = row[0] if row else None
+                    print(f"📝 [CHART_DEBUG] Inserted new chart with id: {new_chart_id}")
+                    # Persist the insert (psycopg2 defaults to transactional mode)
+                    conn.commit()
+
+                # Verify what was actually inserted (only when we have an id)
+                if new_chart_id is not None:
+                    cur = execute(
+                        conn,
+                        "SELECT relation FROM birth_charts WHERE id = %s",
+                        (new_chart_id,),
+                    )
+                    rel_row = cur.fetchone()
+                    actual_relation = rel_row[0] if rel_row else None
+                    print(f"✅ [CHART_DEBUG] Verified inserted relation: {actual_relation}")
         except Exception as dedupe_err:
-            print(f"🔍 [CHART_DEBUG] Dedupe check skipped: {dedupe_err}")
-
-        print(f"🔍 [CHART_DEBUG] About to insert chart for user {current_user.userid}:")
-        print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
-        print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")
-        print(f"🔍 [CHART_DEBUG] - Final relation value: {birth_data.relation or 'other'}")
-        
-        cursor.execute('''
-            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-            birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
-        
-        new_chart_id = cursor.lastrowid
-        print(f"📝 [CHART_DEBUG] Inserted new chart with id: {new_chart_id}")
-        
-        # Verify what was actually inserted
-        cursor.execute("SELECT relation FROM birth_charts WHERE id = ?", (new_chart_id,))
-        actual_relation = cursor.fetchone()[0]
-        print(f"✅ [CHART_DEBUG] Verified inserted relation: {actual_relation}")
-
-        conn.commit()
-        conn.close()
+            print(f"🔍 [CHART_DEBUG] Dedupe/insert check failed: {dedupe_err}")
+            raise HTTPException(status_code=500, detail=f"Failed to save birth chart: {dedupe_err}")
         
         # Calculate and return chart data using new calculators
         from calculators.chart_calculator import ChartCalculator
@@ -681,7 +697,7 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
         chart_data['d9_chart'] = div_calculator.calculate_divisional_chart(9)
         chart_data['d10_chart'] = div_calculator.calculate_divisional_chart(10)
         
-        # Add birth_chart_id to response
+        # Add birth_chart_id to response (may be None if insert failed)
         chart_data['birth_chart_id'] = new_chart_id
         
         print(f"✅ Chart calculation completed successfully with birth_chart_id: {new_chart_id}")

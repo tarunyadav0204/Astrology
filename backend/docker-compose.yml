@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: astroroshni-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: astroroshni
+      POSTGRES_USER: astroroshni_app
+      POSTGRES_PASSWORD: astroroshni_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - astroroshni_pgdata:/var/lib/postgresql/data
+
+volumes:
+  astroroshni_pgdata:

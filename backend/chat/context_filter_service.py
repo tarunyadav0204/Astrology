@@ -1,5 +1,7 @@
 import json
-import sqlite3
+
+from db import get_conn, execute
+
 
 class ContextFilterService:
     """Service to filter context data based on tier configuration"""
@@ -17,63 +19,64 @@ class ContextFilterService:
         
         print(f"\n🔍 CONTEXT FILTER: category={category_key}, tier={tier_key}")
         print(f"   Input context keys: {list(context.keys())}")
-        
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        # Get tier context config
-        cursor.execute('''
-            SELECT tier_context_config FROM prompt_category_config
-            WHERE category_key = ? AND tier_key = ?
-        ''', (category_key, tier_key))
-        
-        result = cursor.fetchone()
-        
-        if not result or not result[0]:
-            print(f"   ⚠️ No tier config found, returning full context")
-            conn.close()
-            return context
-        
-        try:
-            tier_config = json.loads(result[0])
-            print(f"   📋 Tier config: {tier_config}")
-        except:
-            print(f"   ⚠️ Failed to parse tier config, returning full context")
-            conn.close()
-            return context
-        
-        # If config says "all", return as-is
-        if not tier_config or tier_config.get('layers') == 'all':
-            print(f"   ✅ Config says 'all', returning full context")
-            conn.close()
-            return context
-        
-        # Get required layers for this tier
-        cursor.execute('''
-            SELECT al.layer_key FROM category_layer_requirements clr
-            JOIN astrological_layers al ON clr.layer_id = al.layer_id
-            WHERE clr.category_key = ? AND clr.tier_key = ? AND clr.is_required = 1
-        ''', (category_key, tier_key))
-        
-        required_layer_keys = [row[0] for row in cursor.fetchall()]
-        print(f"   📦 Required layers: {required_layer_keys}")
-        
-        # Get context field keys for required layers
-        if required_layer_keys:
-            placeholders = ','.join('?' * len(required_layer_keys))
-            cursor.execute(f'''
-                SELECT cf.field_key FROM context_fields cf
-                JOIN astrological_layers al ON cf.layer_id = al.layer_id
-                WHERE al.layer_key IN ({placeholders}) AND cf.is_active = 1
-            ''', required_layer_keys)
+        with get_conn() as conn:
+            # Get tier context config
+            cur = execute(
+                conn,
+                """
+                SELECT tier_context_config FROM prompt_category_config
+                WHERE category_key = %s AND tier_key = %s
+                """,
+                (category_key, tier_key),
+            )
+            result = cur.fetchone()
             
-            allowed_field_keys = [row[0] for row in cursor.fetchall()]
-            print(f"   ✅ Allowed fields: {allowed_field_keys}")
-        else:
-            allowed_field_keys = []
-            print(f"   ⚠️ No required layers, no fields allowed")
-        
-        conn.close()
+            if not result or not result[0]:
+                print(f"   ⚠️ No tier config found, returning full context")
+                return context
+            
+            try:
+                tier_config = json.loads(result[0])
+                print(f"   📋 Tier config: {tier_config}")
+            except:
+                print(f"   ⚠️ Failed to parse tier config, returning full context")
+                return context
+            
+            # If config says "all", return as-is
+            if not tier_config or tier_config.get('layers') == 'all':
+                print(f"   ✅ Config says 'all', returning full context")
+                return context
+            
+            # Get required layers for this tier
+            cur = execute(
+                conn,
+                """
+                SELECT al.layer_key FROM category_layer_requirements clr
+                JOIN astrological_layers al ON clr.layer_id = al.layer_id
+                WHERE clr.category_key = %s AND clr.tier_key = %s AND clr.is_required = TRUE
+                """,
+                (category_key, tier_key),
+            )
+            required_layer_keys = [row[0] for row in cur.fetchall()]
+            print(f"   📦 Required layers: {required_layer_keys}")
+            
+            # Get context field keys for required layers
+            if required_layer_keys:
+                placeholders = ','.join('?' * len(required_layer_keys))
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT cf.field_key FROM context_fields cf
+                    JOIN astrological_layers al ON cf.layer_id = al.layer_id
+                    WHERE al.layer_key IN ({placeholders}) AND cf.is_active = TRUE
+                    """,
+                    tuple(required_layer_keys),
+                )
+                allowed_field_keys = [row[0] for row in cur.fetchall()]
+                print(f"   ✅ Allowed fields: {allowed_field_keys}")
+            else:
+                allowed_field_keys = []
+                print(f"   ⚠️ No required layers, no fields allowed")
         
         # Create filtered context
         filtered_context = {}
@@ -125,16 +128,17 @@ class ContextFilterService:
     @staticmethod
     def get_tier_limits(tier_key: str = 'normal') -> dict:
         """Get size limits for a tier"""
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT max_instruction_size, max_context_size FROM prompt_tiers
-            WHERE tier_key = ?
-        ''', (tier_key,))
-        
-        result = cursor.fetchone()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT max_instruction_size, max_context_size
+                FROM prompt_tiers
+                WHERE tier_key = %s
+                """,
+                (tier_key,),
+            )
+            result = cur.fetchone()
         
         if result:
             return {

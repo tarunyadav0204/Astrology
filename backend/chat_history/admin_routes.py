@@ -2,10 +2,10 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
-import sqlite3
 import json
 from datetime import datetime
 from auth import get_current_user
+from db import get_conn, execute
 
 # YYYY-MM-DD for date filters (today / this month)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -47,12 +47,6 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 router = APIRouter()
 
 
-def get_db_connection():
-    conn = sqlite3.connect('astrology.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def _timestamp_to_ist_iso(val) -> Optional[str]:
     """Convert DB timestamp (naive, stored as server local / IST) to ISO string with +05:30 so frontend displays correct IST."""
     if val is None:
@@ -73,32 +67,32 @@ def _timestamp_to_ist_iso(val) -> Optional[str]:
 async def get_user_chat_history(user_id: int, current_user: dict = Depends(require_admin)):
     """Get chat history for a specific user (admin only)"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get all sessions for the user
-        cursor.execute("""
-            SELECT session_id, created_at, 
-                   (SELECT content FROM chat_messages 
-                    WHERE session_id = cs.session_id 
-                    AND sender = 'user' 
-                    ORDER BY timestamp ASC LIMIT 1) as preview
-            FROM chat_sessions cs
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-        """, (user_id,))
-        
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT session_id, created_at,
+                       (SELECT content FROM chat_messages
+                        WHERE session_id = cs.session_id
+                        AND sender = 'user'
+                        ORDER BY timestamp ASC LIMIT 1) as preview
+                FROM chat_sessions cs
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                """,
+                (user_id,),
+            )
+            rows = cur.fetchall() or []
         sessions = []
-        for row in cursor.fetchall():
+        for row in rows:
+            preview = row[2]
+            preview_str = (preview[:100] + '...') if preview and len(preview) > 100 else preview
             sessions.append({
-                'session_id': row['session_id'],
-                'created_at': _timestamp_to_ist_iso(row['created_at']),
-                'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview']
+                'session_id': row[0],
+                'created_at': _timestamp_to_ist_iso(row[1]),
+                'preview': preview_str,
             })
-        
-        conn.close()
         return {"sessions": sessions}
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching chat history: {str(e)}")
 
@@ -106,88 +100,86 @@ async def get_user_chat_history(user_id: int, current_user: dict = Depends(requi
 async def get_all_chat_history(current_user: dict = Depends(require_admin)):
     """Get chat history for all users (admin only)"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get new system sessions with last activity time and birth chart name
-        cursor.execute("""
-            SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, u.name, u.phone,
-                   bc.name as native_name_raw,
-                   (SELECT content FROM chat_messages 
-                    WHERE session_id = cs.session_id 
-                    AND sender = 'user' 
-                    ORDER BY timestamp ASC LIMIT 1) as preview,
-                   (SELECT MAX(timestamp) FROM chat_messages 
-                    WHERE session_id = cs.session_id) as last_activity,
-                   'new' as system_type
-            FROM chat_sessions cs
-            LEFT JOIN users u ON cs.user_id = u.userid
-            LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-            ORDER BY cs.created_at DESC
-            LIMIT 500
-        """)
-        
         from encryption_utils import EncryptionManager
         enc = EncryptionManager()
         sessions = []
-        for row in cursor.fetchall():
-            native_name = None
-            raw = row['native_name_raw'] if row['native_name_raw'] is not None else None
-            if raw:
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, u.name, u.phone,
+                       bc.name as native_name_raw,
+                       (SELECT content FROM chat_messages
+                        WHERE session_id = cs.session_id
+                        AND sender = 'user'
+                        ORDER BY timestamp ASC LIMIT 1) as preview,
+                       (SELECT MAX(timestamp) FROM chat_messages
+                        WHERE session_id = cs.session_id) as last_activity,
+                       'new' as system_type
+                FROM chat_sessions cs
+                LEFT JOIN users u ON cs.user_id = u.userid
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                ORDER BY cs.created_at DESC
+                LIMIT 500
+                """,
+                (),
+            )
+            for row in cur.fetchall() or []:
+                native_name = None
+                raw = row[6] if row[6] is not None else None
+                if raw:
+                    try:
+                        native_name = enc.decrypt(raw)
+                    except Exception:
+                        native_name = raw
+                display_time = row[8] if row[8] else row[2]
+                preview = row[7]
+                preview_str = (preview[:100] + '...') if preview and len(preview) > 100 else preview
+                sessions.append({
+                    'session_id': row[0],
+                    'user_id': row[1],
+                    'user_name': row[4] or 'Unknown User',
+                    'user_phone': row[5] or 'No phone',
+                    'created_at': _timestamp_to_ist_iso(display_time),
+                    'preview': preview_str,
+                    'system_type': row[9],
+                    'native_name': native_name,
+                })
+
+            cur = execute(
+                conn,
+                """
+                SELECT cc.birth_hash, cc.conversation_data, cc.created_at,
+                       'old' as system_type
+                FROM chat_conversations cc
+                ORDER BY cc.created_at DESC
+                LIMIT 200
+                """,
+                (),
+            )
+            for row in cur.fetchall() or []:
                 try:
-                    native_name = enc.decrypt(raw)
+                    conv_data = json.loads(row[1])
+                    messages = conv_data.get('messages', [])
+                    birth_data = conv_data.get('birth_data', {})
+                    user_name = birth_data.get('name', f'Legacy User #{row[0][:8]}')
+                    if messages:
+                        first_question = messages[0].get('question', 'Chat conversation')
+                        sessions.append({
+                            'session_id': row[0],
+                            'user_id': 'legacy',
+                            'user_name': user_name,
+                            'user_phone': 'Legacy System',
+                            'created_at': _timestamp_to_ist_iso(row[2]),
+                            'preview': first_question[:100] + '...' if len(first_question) > 100 else first_question,
+                            'system_type': row[3],
+                        })
                 except Exception:
-                    native_name = raw
-            display_time = row['last_activity'] if row['last_activity'] else row['created_at']
-            sessions.append({
-                'session_id': row['session_id'],
-                'user_id': row['user_id'],
-                'user_name': row['name'] or 'Unknown User',
-                'user_phone': row['phone'] or 'No phone',
-                'created_at': _timestamp_to_ist_iso(display_time),
-                'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview'],
-                'system_type': row['system_type'],
-                'native_name': native_name
-            })
-        
-        # Get old system conversations with created_at instead of updated_at
-        cursor.execute("""
-            SELECT cc.birth_hash, cc.conversation_data, cc.created_at,
-                   'old' as system_type
-            FROM chat_conversations cc
-            ORDER BY cc.created_at DESC
-            LIMIT 200
-        """)
-        
-        for row in cursor.fetchall():
-            try:
-                conv_data = json.loads(row['conversation_data'])
-                messages = conv_data.get('messages', [])
-                birth_data = conv_data.get('birth_data', {})
-                
-                # Get name from birth data
-                user_name = birth_data.get('name', f'Legacy User #{row["birth_hash"][:8]}')
-                
-                if messages:
-                    first_question = messages[0].get('question', 'Chat conversation')
-                    sessions.append({
-                        'session_id': row['birth_hash'],
-                        'user_id': 'legacy',
-                        'user_name': user_name,
-                        'user_phone': 'Legacy System',
-                        'created_at': _timestamp_to_ist_iso(row['created_at']),
-                        'preview': first_question[:100] + '...' if len(first_question) > 100 else first_question,
-                        'system_type': row['system_type']
-                    })
-            except:
-                pass
-        
-        # Sort all sessions by date
+                    pass
+
         sessions.sort(key=lambda x: x['created_at'], reverse=True)
-        
-        conn.close()
         return {"sessions": sessions[:500]}
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching all chat history: {str(e)}")
 
@@ -195,21 +187,22 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
 async def get_session_details(session_id: str, current_user: dict = Depends(require_admin)):
     """Get detailed messages for a specific session (admin only). Includes native_name (birth chart name) for the session."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # First try new system: get session and join birth_charts for native_name
-        cursor.execute("""
-            SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, bc.name as native_name_raw
-            FROM chat_sessions cs
-            LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-            WHERE cs.session_id = ?
-        """, (session_id,))
-        session_row = cursor.fetchone()
-        
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, bc.name as native_name_raw
+                FROM chat_sessions cs
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE cs.session_id = %s
+                """,
+                (session_id,),
+            )
+            session_row = cur.fetchone()
+
         if session_row:
             native_name = None
-            raw_name = session_row['native_name_raw'] if session_row['native_name_raw'] is not None else None
+            raw_name = session_row[4] if session_row[4] is not None else None
             if raw_name:
                 try:
                     from encryption_utils import EncryptionManager
@@ -217,75 +210,75 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     native_name = enc.decrypt(raw_name)
                 except Exception:
                     native_name = raw_name
-            
-            cursor.execute("""
-                SELECT sender, content, timestamp 
-                FROM chat_messages 
-                WHERE session_id = ? 
-                ORDER BY timestamp ASC
-            """, (session_id,))
-            
-            messages = []
-            for row in cursor.fetchall():
-                messages.append({
-                    'sender': row['sender'],
-                    'content': row['content'],
-                    'timestamp': _timestamp_to_ist_iso(row['timestamp']),
-                    'native_name': native_name
-                })
-            
-            conn.close()
+
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT sender, content, timestamp
+                    FROM chat_messages
+                    WHERE session_id = %s
+                    ORDER BY timestamp ASC
+                    """,
+                    (session_id,),
+                )
+                msg_rows = cur.fetchall() or []
+            messages = [
+                {'sender': r[0], 'content': r[1], 'timestamp': _timestamp_to_ist_iso(r[2]), 'native_name': native_name}
+                for r in msg_rows
+            ]
             return {
-                "session_id": session_row['session_id'],
-                "user_id": session_row['user_id'],
-                "created_at": _timestamp_to_ist_iso(session_row['created_at']),
+                "session_id": session_row[0],
+                "user_id": session_row[1],
+                "created_at": _timestamp_to_ist_iso(session_row[2]),
                 "native_name": native_name,
-                "messages": messages
+                "messages": messages,
             }
-        
-        # Try legacy system
-        cursor.execute("SELECT * FROM chat_conversations WHERE birth_hash = ?", (session_id,))
-        legacy_conv = cursor.fetchone()
-        
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT birth_hash, conversation_data, updated_at FROM chat_conversations WHERE birth_hash = %s",
+                (session_id,),
+            )
+            legacy_conv = cur.fetchone()
+
         if legacy_conv:
             try:
-                conv_data = json.loads(legacy_conv['conversation_data'])
+                conv_data = json.loads(legacy_conv[1])
                 birth_data = conv_data.get('birth_data', {})
                 legacy_native_name = birth_data.get('name') or None
                 messages = []
-                
+                updated_at = legacy_conv[2]
                 for msg in conv_data.get('messages', []):
-                    ts = _timestamp_to_ist_iso(msg.get('timestamp') or legacy_conv['updated_at'])
+                    ts = _timestamp_to_ist_iso(msg.get('timestamp') or updated_at)
                     if msg.get('question'):
                         messages.append({
                             'sender': 'user',
                             'content': msg['question'],
                             'timestamp': ts,
-                            'native_name': legacy_native_name
+                            'native_name': legacy_native_name,
                         })
-                    
                     if msg.get('response'):
                         messages.append({
                             'sender': 'assistant',
                             'content': msg['response'],
                             'timestamp': ts,
-                            'native_name': legacy_native_name
+                            'native_name': legacy_native_name,
                         })
-                
-                conn.close()
                 return {
                     "session_id": session_id,
                     "user_id": "legacy",
-                    "created_at": _timestamp_to_ist_iso(legacy_conv['updated_at']),
+                    "created_at": _timestamp_to_ist_iso(updated_at),
                     "native_name": legacy_native_name,
-                    "messages": messages
+                    "messages": messages,
                 }
             except Exception:
                 pass
-        
-        conn.close()
+
         raise HTTPException(status_code=404, detail="Session not found")
-        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching session details: {str(e)}")
 
@@ -294,25 +287,31 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
 async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
     """Get category counts and FAQ (canonical_question) counts for chat analysis dashboard (admin only)."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT category, COUNT(*) AS count
-            FROM chat_messages
-            WHERE sender = 'user' AND category IS NOT NULL AND trim(category) != ''
-            GROUP BY category
-            ORDER BY count DESC
-        """)
-        by_category = [{"category": row["category"], "count": row["count"]} for row in cursor.fetchall()]
-        cursor.execute("""
-            SELECT canonical_question, COUNT(*) AS count
-            FROM chat_messages
-            WHERE sender = 'user' AND canonical_question IS NOT NULL AND trim(canonical_question) != ''
-            GROUP BY canonical_question
-            ORDER BY count DESC
-        """)
-        by_faq = [{"canonical_question": row["canonical_question"], "count": row["count"]} for row in cursor.fetchall()]
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT category, COUNT(*) AS count
+                FROM chat_messages
+                WHERE sender = 'user' AND category IS NOT NULL AND trim(category) != ''
+                GROUP BY category
+                ORDER BY count DESC
+                """,
+                (),
+            )
+            by_category = [{"category": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
+            cur = execute(
+                conn,
+                """
+                SELECT canonical_question, COUNT(*) AS count
+                FROM chat_messages
+                WHERE sender = 'user' AND canonical_question IS NOT NULL AND trim(canonical_question) != ''
+                GROUP BY canonical_question
+                ORDER BY count DESC
+                """,
+                (),
+            )
+            by_faq = [{"canonical_question": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
         return {"by_category": by_category, "by_faq": by_faq}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching chat analysis stats: {str(e)}")
@@ -330,12 +329,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_analysis_model,
             get_podcast_provider,
         )
-        conn = get_db_connection()
-        _ensure_admin_settings_table(conn)
-        cursor = conn.cursor()
-        cursor.execute("SELECT key, value, description FROM admin_settings")
-        settings = [{"key": row["key"], "value": row["value"], "description": row["description"]} for row in cursor.fetchall()]
-        conn.close()
+        with get_conn() as conn:
+            _ensure_admin_settings_table(conn)
+            cur = execute(conn, "SELECT key, value, description FROM admin_settings", ())
+            settings = [{"key": row[0], "value": row[1], "description": row[2]} for row in (cur.fetchall() or [])]
         return {
             "settings": settings,
             "gemini_model_options": [{"value": v, "label": l} for v, l in GEMINI_MODEL_OPTIONS],
@@ -357,55 +354,50 @@ async def get_glossary_terms(
 ):
     """Get glossary terms (for chat glossary) with optional search and pagination."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
         where_clause = ""
         params: List[Any] = []
         if search:
-            where_clause = "WHERE term_id LIKE ? OR display_text LIKE ?"
+            where_clause = "WHERE term_id LIKE %s OR display_text LIKE %s"
             like = f"%{search}%"
-            params.extend([like, like])
+            params = [like, like]
 
-        # Total count
-        cursor.execute(
-            f"SELECT COUNT(*) AS total FROM glossary_terms {where_clause}",
-            params,
-        )
-        total = cursor.fetchone()["total"]
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"SELECT COUNT(*) AS total FROM glossary_terms {where_clause}",
+                tuple(params),
+            )
+            total = (cur.fetchone() or [0])[0]
 
-        offset = (page - 1) * limit
-        cursor.execute(
-            f"""
-            SELECT term_id, display_text, definition, language, COALESCE(aliases, '[]') AS aliases_json
-            FROM glossary_terms
-            {where_clause}
-            ORDER BY term_id ASC
-            LIMIT ? OFFSET ?
-            """,
-            params + [limit, offset],
-        )
-
-        rows = cursor.fetchall()
-        conn.close()
+            offset = (page - 1) * limit
+            cur = execute(
+                conn,
+                f"""
+                SELECT term_id, display_text, definition, language, COALESCE(aliases, '[]') AS aliases_json
+                FROM glossary_terms
+                {where_clause}
+                ORDER BY term_id ASC
+                LIMIT %s OFFSET %s
+                """,
+                tuple(params) + (limit, offset),
+            )
+            rows = cur.fetchall() or []
 
         terms: List[Dict[str, Any]] = []
         for row in rows:
             try:
-                aliases = json.loads(row["aliases_json"]) if row["aliases_json"] else []
+                aliases = json.loads(row[4]) if row[4] else []
                 if not isinstance(aliases, list):
                     aliases = []
             except Exception:
                 aliases = []
-            terms.append(
-                {
-                    "term_id": row["term_id"],
-                    "display_text": row["display_text"],
-                    "definition": row["definition"],
-                    "language": row["language"],
-                    "aliases": aliases,
-                }
-            )
+            terms.append({
+                "term_id": row[0],
+                "display_text": row[1],
+                "definition": row[2],
+                "language": row[3],
+                "aliases": aliases,
+            })
 
         return {
             "terms": terms,
@@ -426,24 +418,27 @@ async def create_glossary_term(
 ):
     """Create or overwrite a glossary term."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
         aliases_json = json.dumps(term.aliases or [])
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO glossary_terms (term_id, display_text, definition, language, aliases)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                term.term_id.strip(),
-                term.display_text.strip(),
-                term.definition.strip(),
-                term.language or "english",
-                aliases_json,
-            ),
-        )
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                INSERT INTO glossary_terms (term_id, display_text, definition, language, aliases)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (term_id) DO UPDATE SET
+                    display_text = EXCLUDED.display_text,
+                    definition = EXCLUDED.definition,
+                    language = EXCLUDED.language,
+                    aliases = EXCLUDED.aliases
+                """,
+                (
+                    term.term_id.strip(),
+                    term.display_text.strip(),
+                    term.definition.strip(),
+                    term.language or "english",
+                    aliases_json,
+                ),
+            )
         return {"message": "Term saved", "term_id": term.term_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving term: {str(e)}")
@@ -455,28 +450,25 @@ async def update_glossary_term(
 ):
     """Update an existing glossary term."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
         aliases_json = json.dumps(term.aliases or [])
-        cursor.execute(
-            """
-            UPDATE glossary_terms
-            SET display_text = ?, definition = ?, language = ?, aliases = ?
-            WHERE term_id = ?
-            """,
-            (
-                term.display_text.strip(),
-                term.definition.strip(),
-                term.language or "english",
-                aliases_json,
-                term_id,
-            ),
-        )
-        if cursor.rowcount == 0:
-            conn.close()
-            raise HTTPException(status_code=404, detail="Term not found")
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                UPDATE glossary_terms
+                SET display_text = %s, definition = %s, language = %s, aliases = %s
+                WHERE term_id = %s
+                """,
+                (
+                    term.display_text.strip(),
+                    term.definition.strip(),
+                    term.language or "english",
+                    aliases_json,
+                    term_id,
+                ),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Term not found")
         return {"message": "Term updated", "term_id": term_id}
     except HTTPException:
         raise
@@ -490,12 +482,9 @@ async def delete_glossary_term(
 ):
     """Delete a glossary term."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM glossary_terms WHERE term_id = ?", (term_id,))
-        deleted = cursor.rowcount
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(conn, "DELETE FROM glossary_terms WHERE term_id = %s", (term_id,))
+            deleted = cur.rowcount
         if deleted == 0:
             raise HTTPException(status_code=404, detail="Term not found")
         return {"message": "Term deleted", "term_id": term_id}
@@ -509,15 +498,20 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
     """Update admin setting"""
     try:
         from utils.admin_settings import _ensure_admin_settings_table
-        conn = get_db_connection()
-        _ensure_admin_settings_table(conn)
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO admin_settings (key, value, description, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-            (key, setting.value, setting.description)
-        )
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            _ensure_admin_settings_table(conn)
+            execute(
+                conn,
+                """
+                INSERT INTO admin_settings (key, value, description, updated_at)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT ("key") DO UPDATE SET
+                    value = EXCLUDED.value,
+                    description = EXCLUDED.description,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (key, setting.value, setting.description),
+            )
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")
@@ -533,68 +527,72 @@ async def get_all_user_facts(
     try:
         from encryption_utils import EncryptionManager
         encryption = EncryptionManager()
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Build WHERE clause
+
         where_clause = ""
-        params = []
+        params: List[Any] = []
         if search:
-            where_clause = " WHERE (u.name LIKE ? OR u.phone LIKE ? OR bc.name LIKE ?)"
+            where_clause = " WHERE (u.name LIKE %s OR u.phone LIKE %s OR bc.name LIKE %s)"
             params = [f"%{search}%", f"%{search}%", f"%{search}%"]
-        
-        # Get total count
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM user_facts uf
-            INNER JOIN birth_charts bc ON bc.id = uf.birth_chart_id
-            INNER JOIN users u ON u.userid = bc.userid
-            {where_clause}
-        """
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()['total']
-        
-        # Get facts with user and birth chart info
-        query = f"""
-            SELECT 
-                u.userid, COALESCE(u.name, u.phone) as username, u.phone,
-                bc.id as birth_chart_id, bc.name as native_name,
-                uf.category, uf.fact, uf.extracted_at
-            FROM user_facts uf
-            INNER JOIN birth_charts bc ON bc.id = uf.birth_chart_id
-            INNER JOIN users u ON u.userid = bc.userid
-            {where_clause}
-            ORDER BY u.name, bc.id, uf.category, uf.extracted_at DESC
-            LIMIT ? OFFSET ?
-        """
-        params.extend([limit, (page - 1) * limit])
-        
-        cursor.execute(query, params)
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT COUNT(*) as total
+                FROM user_facts uf
+                INNER JOIN birth_charts bc ON bc.id = uf.birth_chart_id
+                INNER JOIN users u ON u.userid = bc.userid
+                {where_clause}
+                """,
+                tuple(params),
+            )
+            total = (cur.fetchone() or [0])[0]
+
+            offset = (page - 1) * limit
+            cur = execute(
+                conn,
+                f"""
+                SELECT
+                    u.userid, COALESCE(u.name, u.phone) as username, u.phone,
+                    bc.id as birth_chart_id, bc.name as native_name,
+                    uf.category, uf.fact, uf.extracted_at
+                FROM user_facts uf
+                INNER JOIN birth_charts bc ON bc.id = uf.birth_chart_id
+                INNER JOIN users u ON u.userid = bc.userid
+                {where_clause}
+                ORDER BY u.name, bc.id, uf.category, uf.extracted_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                tuple(params) + (limit, offset),
+            )
+            rows = cur.fetchall() or []
+
         facts = []
-        for row in cursor.fetchall():
+        for row in rows:
+            native_name = row[4]
+            try:
+                native_name = encryption.decrypt(native_name)
+            except Exception:
+                pass
             facts.append({
-                'user_id': row['userid'],
-                'username': row['username'],
-                'phone': row['phone'],
-                'birth_chart_id': row['birth_chart_id'],
-                'native_name': encryption.decrypt(row['native_name']),
-                'category': row['category'],
-                'fact': row['fact'],
-                'extracted_at': row['extracted_at']
+                'user_id': row[0],
+                'username': row[1],
+                'phone': row[2],
+                'birth_chart_id': row[3],
+                'native_name': native_name,
+                'category': row[5],
+                'fact': row[6],
+                'extracted_at': row[7],
             })
-        
-        conn.close()
-        
+
         return {
             'success': True,
             'facts': facts,
             'page': page,
             'limit': limit,
             'total': total,
-            'total_pages': (total + limit - 1) // limit
+            'total_pages': (total + limit - 1) // limit,
         }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching facts: {str(e)}")
 
@@ -639,67 +637,76 @@ async def get_chat_performance(
             encryption = EncryptionManager()
         except Exception:
             encryption = None
-        conn = get_db_connection()
-        cursor = conn.cursor()
+
         base_where = """
             cm.sender = 'assistant' AND cm.status = 'completed'
             AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
         """
         duration_where = ""
-        count_params = []
+        count_params: List[Any] = []
         if duration_filter:
             lo, hi = duration_filter
             duration_where = " AND cm.started_at IS NOT NULL AND cm.completed_at IS NOT NULL"
-            duration_where += " AND (julianday(cm.completed_at) - julianday(cm.started_at)) * 86400 >= ?"
+            duration_where += " AND EXTRACT(EPOCH FROM (cm.completed_at::timestamp - cm.started_at::timestamp)) >= %s"
             count_params.append(lo)
             if hi is not None:
-                duration_where += " AND (julianday(cm.completed_at) - julianday(cm.started_at)) * 86400 < ?"
+                duration_where += " AND EXTRACT(EPOCH FROM (cm.completed_at::timestamp - cm.started_at::timestamp)) < %s"
                 count_params.append(hi)
         date_where = ""
         sdate, edate = _normalize_date_range(start_date, end_date)
         if sdate and edate:
-            # Use date prefix (YYYY-MM-DD) so filtering works for both date and datetime stored values
-            date_where = " AND cm.completed_at IS NOT NULL AND substr(cm.completed_at, 1, 10) >= ? AND substr(cm.completed_at, 1, 10) <= ?"
+            date_where = " AND cm.completed_at IS NOT NULL AND cm.completed_at::date >= %s AND cm.completed_at::date <= %s"
             count_params.extend([sdate, edate])
-        cursor.execute(f"""
-            SELECT COUNT(*) FROM chat_messages cm
-            WHERE {base_where}{duration_where}{date_where}
-        """, count_params)
-        total = cursor.fetchone()[0]
-        # Optional columns language, intent_router_ms may not exist on older DBs
-        try:
-            cursor.execute("PRAGMA table_info(chat_messages)")
-            cols = [r[1] for r in cursor.fetchall()]
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT COUNT(*) FROM chat_messages cm
+                WHERE {base_where}{duration_where}{date_where}
+                """,
+                tuple(count_params),
+            )
+            total = (cur.fetchone() or [0])[0]
+
+            # Optional columns: check Postgres information_schema
+            cur = execute(
+                conn,
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'chat_messages'",
+                (),
+            )
+            cols = [r[0] for r in (cur.fetchall() or [])]
             has_language = 'language' in cols
             has_intent_ms = 'intent_router_ms' in cols
-        except Exception:
-            has_language = has_intent_ms = False
-        sel = """
-            SELECT cm.message_id, cm.content, cm.started_at, cm.completed_at,
-                   cs.session_id, u.name as user_name, u.phone as user_phone,
-                   bc.name as native_name,
-                   (SELECT content FROM chat_messages m2
-                    WHERE m2.session_id = cm.session_id AND m2.sender = 'user' AND m2.message_id < cm.message_id
-                    ORDER BY m2.message_id DESC LIMIT 1) as user_question
-        """
-        if has_language:
-            sel += ", cm.language"
-        if has_intent_ms:
-            sel += ", cm.intent_router_ms"
-        sel += f"""
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cs.session_id = cm.session_id
-            LEFT JOIN users u ON u.userid = cs.user_id
-            LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-            WHERE {base_where}{duration_where}{date_where}
-            ORDER BY cm.message_id DESC
-            LIMIT ? OFFSET ?
-        """
-        cursor.execute(sel, count_params + [per_page, offset])
-        rows = cursor.fetchall()
+
+            sel = """
+                SELECT cm.message_id, cm.content, cm.started_at, cm.completed_at,
+                       cs.session_id, u.name as user_name, u.phone as user_phone,
+                       bc.name as native_name,
+                       (SELECT content FROM chat_messages m2
+                        WHERE m2.session_id = cm.session_id AND m2.sender = 'user' AND m2.message_id < cm.message_id
+                        ORDER BY m2.message_id DESC LIMIT 1) as user_question
+            """
+            if has_language:
+                sel += ", cm.language"
+            if has_intent_ms:
+                sel += ", cm.intent_router_ms"
+            sel += f"""
+                FROM chat_messages cm
+                JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                LEFT JOIN users u ON u.userid = cs.user_id
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE {base_where}{duration_where}{date_where}
+                ORDER BY cm.message_id DESC
+                LIMIT %s OFFSET %s
+            """
+            cur = execute(conn, sel, tuple(count_params) + (per_page, offset))
+            rows = cur.fetchall() or []
+            colnames = [d[0] for d in cur.description] if cur.description else []
+
         items = []
         for row in rows:
-            row_dict = dict(row)
+            row_dict = dict(zip(colnames, row)) if colnames else {}
             content = row_dict.get('content') or ''
             preview = content[:300].strip() + ('…' if len(content) > 300 else '')
             user_question = row_dict.get('user_question') or ''
@@ -723,7 +730,7 @@ async def get_chat_performance(
             else:
                 native_name = raw_native or '—'
             items.append({
-                'message_id': row_dict['message_id'],
+                'message_id': row_dict.get('message_id'),
                 'user_name': row_dict.get('user_name') or '—',
                 'user_phone': row_dict.get('user_phone') or '—',
                 'user_question': uq_preview,
@@ -733,7 +740,6 @@ async def get_chat_performance(
                 'duration_seconds': duration_seconds,
                 'completed_at': row_dict.get('completed_at'),
             })
-        conn.close()
         return {
             'items': items,
             'total': total,
@@ -771,29 +777,32 @@ async def get_chat_performance_stats(
     if limit < 1 or limit > 20000:
         limit = 5000
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
         date_where = ""
-        params = [limit]
+        params: List[Any] = [limit]
         sdate, edate = _normalize_date_range(start_date, end_date)
         if sdate and edate:
-            date_where = " AND cm.completed_at IS NOT NULL AND substr(cm.completed_at, 1, 10) >= ? AND substr(cm.completed_at, 1, 10) <= ?"
+            date_where = " AND cm.completed_at IS NOT NULL AND cm.completed_at::date >= %s AND cm.completed_at::date <= %s"
             params = [sdate, edate, limit]
-        cursor.execute(f"""
-            SELECT cm.message_id, cm.started_at, cm.completed_at,
-                   COALESCE(u.name, u.phone, 'Unknown') as user_name, u.phone as user_phone
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cs.session_id = cm.session_id
-            LEFT JOIN users u ON u.userid = cs.user_id
-            WHERE cm.sender = 'assistant' AND cm.status = 'completed'
-            AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
-            AND cm.started_at IS NOT NULL AND cm.completed_at IS NOT NULL
-            {date_where}
-            ORDER BY cm.message_id DESC
-            LIMIT ?
-        """, params)
-        rows = cursor.fetchall()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT cm.message_id, cm.started_at, cm.completed_at,
+                       COALESCE(u.name, u.phone, 'Unknown') as user_name, u.phone as user_phone
+                FROM chat_messages cm
+                JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                LEFT JOIN users u ON u.userid = cs.user_id
+                WHERE cm.sender = 'assistant' AND cm.status = 'completed'
+                AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
+                AND cm.started_at IS NOT NULL AND cm.completed_at IS NOT NULL
+                {date_where}
+                ORDER BY cm.message_id DESC
+                LIMIT %s
+                """,
+                tuple(params),
+            )
+            rows = cur.fetchall() or []
+            colnames = [d[0] for d in cur.description] if cur.description else []
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
 
@@ -818,13 +827,11 @@ async def get_chat_performance_stats(
                 return label
         return None
 
-    # Overall counts per bucket
     bucket_counts = {label: 0 for label, _, _ in DURATION_BUCKETS}
-    # By user: { user_key: { bucket: count } }
     user_buckets = {}
 
     for row in rows:
-        r = dict(row)
+        r = dict(zip(colnames, row)) if colnames else {}
         sec = duration_seconds(r.get("started_at"), r.get("completed_at"))
         b = bucket_for(sec)
         if b is None:
@@ -844,7 +851,6 @@ async def get_chat_performance_stats(
             "buckets": [{"name": label, "count": counts.get(label, 0)} for label, _, _ in DURATION_BUCKETS],
         })
 
-    # Slow responses (>2 min) by hour of day (when completed_at occurred)
     SLOW_THRESHOLD_SEC = 120
     hour_labels = [
         "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
@@ -852,7 +858,7 @@ async def get_chat_performance_stats(
     ]
     slow_by_hour = {h: 0 for h in range(24)}
     for row in rows:
-        r = dict(row)
+        r = dict(zip(colnames, row)) if colnames else {}
         sec = duration_seconds(r.get("started_at"), r.get("completed_at"))
         if sec is None or sec < SLOW_THRESHOLD_SEC:
             continue

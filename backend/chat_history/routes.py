@@ -3,10 +3,10 @@ Chat History API Routes
 """
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timedelta
-import sqlite3
 import uuid
 import json
 from auth import get_current_user
+from db import get_conn, execute
 
 def sanitize_text(text):
     """Remove invalid Unicode characters and surrogates to prevent encoding attacks"""
@@ -20,111 +20,82 @@ router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
 def init_chat_tables():
     """Initialize chat history tables with polling support"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_sessions (
-            session_id TEXT PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            birth_chart_id INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (userid),
-            FOREIGN KEY (birth_chart_id) REFERENCES birth_charts (id)
-        )
-    ''')
-    
-    # Add birth_chart_id column if it doesn't exist
-    try:
-        cursor.execute('ALTER TABLE chat_sessions ADD COLUMN birth_chart_id INTEGER')
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    # Add follow_up_questions column
-    try:
-        cursor.execute('ALTER TABLE chat_messages ADD COLUMN follow_up_questions TEXT')
-    except sqlite3.OperationalError:
-        pass # Column already exists
-    
-    # FAQ / categorization columns (for user messages)
-    for col, typ in [
-        ('category', 'TEXT'),
-        ('canonical_question', 'TEXT'),
-        ('categorized_at', 'TIMESTAMP'),
-    ]:
-        try:
-            cursor.execute(f'ALTER TABLE chat_messages ADD COLUMN {col} {typ}')
-        except sqlite3.OperationalError:
-            pass
-    
-    # Chat performance: language and intent router timing
-    for col, typ in [
-        ('language', 'TEXT'),
-        ('intent_router_ms', 'REAL'),
-    ]:
-        try:
-            cursor.execute(f'ALTER TABLE chat_messages ADD COLUMN {col} {typ}')
-        except sqlite3.OperationalError:
-            pass
+    with get_conn() as conn:
+        # Sessions
+        execute(conn, """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                birth_chart_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    # Idempotency support: client_request_id to de-duplicate /chat-v2/ask calls
-    try:
-        cursor.execute('ALTER TABLE chat_messages ADD COLUMN client_request_id TEXT')
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            message_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT NOT NULL,
-            sender TEXT NOT NULL CHECK (sender IN ('user', 'assistant')),
-            content TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status TEXT DEFAULT 'completed' CHECK (status IN ('processing', 'completed', 'failed', 'cancelled')),
-            started_at TIMESTAMP,
-            completed_at TIMESTAMP,
-            error_message TEXT,
-            FOREIGN KEY (session_id) REFERENCES chat_sessions (session_id)
-        )
-    ''')
-    
-    # Add indexes for performance
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_birth_chart ON chat_sessions (birth_chart_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON chat_sessions (created_at)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages (session_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_status ON chat_messages (status)')
+        # Messages
+        execute(conn, """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                message_id SERIAL PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                sender TEXT NOT NULL CHECK (sender IN ('user', 'assistant')),
+                content TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'completed' CHECK (status IN ('processing', 'completed', 'failed', 'cancelled')),
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                error_message TEXT,
+                follow_up_questions TEXT,
+                category TEXT,
+                canonical_question TEXT,
+                categorized_at TIMESTAMP,
+                language TEXT,
+                intent_router_ms REAL,
+                client_request_id TEXT
+            )
+        """)
 
-    # Glossary terms table for centralized term/definition management
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS glossary_terms (
-            term_id TEXT PRIMARY KEY,
-            display_text TEXT NOT NULL,
-            definition TEXT NOT NULL,
-            language TEXT DEFAULT 'english',
-            aliases TEXT
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+        # Add columns for older deployments (safe idempotent)
+        execute(conn, "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS birth_chart_id INTEGER")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS follow_up_questions TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS category TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS canonical_question TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS categorized_at TIMESTAMP")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS language TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent_router_ms REAL")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
+
+        # Indexes
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_birth_chart ON chat_sessions (birth_chart_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON chat_sessions (created_at)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages (session_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_messages_status ON chat_messages (status)")
+
+        # Glossary terms table for centralized term/definition management
+        execute(conn, """
+            CREATE TABLE IF NOT EXISTS glossary_terms (
+                term_id TEXT PRIMARY KEY,
+                display_text TEXT NOT NULL,
+                definition TEXT NOT NULL,
+                language TEXT DEFAULT 'english',
+                aliases TEXT
+            )
+        """)
+
+        conn.commit()
 
 @router.post("/session")
 async def create_chat_session(request: dict, current_user = Depends(get_current_user)):
     """Create a new chat session"""
     session_id = str(uuid.uuid4())
     birth_chart_id = request.get("birth_chart_id")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (?, ?, ?)",
-        (session_id, current_user.userid, birth_chart_id)
-    )
-    
-    conn.commit()
-    conn.close()
+
+    with get_conn() as conn:
+        execute(
+            conn,
+            "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (%s, %s, %s)",
+            (session_id, current_user.userid, birth_chart_id),
+        )
+        conn.commit()
     
     return {"session_id": session_id}
 
@@ -137,67 +108,66 @@ async def save_chat_message(request: dict, current_user = Depends(get_current_us
     
     if not all([session_id, sender, content]):
         raise HTTPException(status_code=400, detail="Missing required fields")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Verify session belongs to user
-    cursor.execute(
-        "SELECT user_id FROM chat_sessions WHERE session_id = ?",
-        (session_id,)
-    )
-    session = cursor.fetchone()
-    
-    if not session or session[0] != current_user.userid:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    cursor.execute(
-        "INSERT INTO chat_messages (session_id, sender, content) VALUES (?, ?, ?)",
-        (session_id, sender, sanitize_text(content))
-    )
-    
-    conn.commit()
-    conn.close()
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT user_id FROM chat_sessions WHERE session_id = %s",
+            (session_id,),
+        )
+        session = cur.fetchone()
+        if not session or session[0] != current_user.userid:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        execute(
+            conn,
+            "INSERT INTO chat_messages (session_id, sender, content) VALUES (%s, %s, %s)",
+            (session_id, sender, sanitize_text(content)),
+        )
+        conn.commit()
     
     return {"message": "Message saved"}
 
 @router.get("/history")
 async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depends(get_current_user)):
     """Get user's chat session history with pagination"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
     # Calculate offset
     offset = (page - 1) * limit
-    
-    # Get total count
-    cursor.execute('SELECT COUNT(*) FROM chat_sessions WHERE user_id = ?', (current_user.userid,))
-    total_count = cursor.fetchone()[0]
-    
-    cursor.execute('''
-        SELECT 
-            cs.session_id,
-            cs.created_at,
-            cm.content as first_message,
-            cs.birth_chart_id,
-            bc.name as native_name
-        FROM chat_sessions cs
-        LEFT JOIN chat_messages cm ON cs.session_id = cm.session_id 
-            AND cm.sender = 'user'
-            AND cm.message_id = (
-                SELECT MIN(message_id) 
-                FROM chat_messages 
-                WHERE session_id = cs.session_id AND sender = 'user'
-            )
-        LEFT JOIN birth_charts bc ON cs.birth_chart_id = bc.id
-        WHERE cs.user_id = ?
-        ORDER BY cs.created_at DESC
-        LIMIT ? OFFSET ?
-    ''', (current_user.userid, limit, offset))
-    
-    sessions = cursor.fetchall()
-    conn.close()
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT COUNT(*) FROM chat_sessions WHERE user_id = %s",
+            (current_user.userid,),
+        )
+        total_count_row = cur.fetchone()
+        total_count = total_count_row[0] if total_count_row else 0
+
+        cur = execute(
+            conn,
+            """
+                SELECT
+                    cs.session_id,
+                    cs.created_at,
+                    cm.content as first_message,
+                    cs.birth_chart_id,
+                    bc.name as native_name
+                FROM chat_sessions cs
+                LEFT JOIN chat_messages cm ON cs.session_id = cm.session_id
+                    AND cm.sender = 'user'
+                    AND cm.message_id = (
+                        SELECT MIN(message_id)
+                        FROM chat_messages
+                        WHERE session_id = cs.session_id AND sender = 'user'
+                    )
+                LEFT JOIN birth_charts bc ON cs.birth_chart_id = bc.id
+                WHERE cs.user_id = %s
+                ORDER BY cs.created_at DESC
+                LIMIT %s OFFSET %s
+            """,
+            (current_user.userid, limit, offset),
+        )
+        sessions = cur.fetchall() or []
     
     from encryption_utils import EncryptionManager
     encryptor = EncryptionManager()
@@ -232,25 +202,37 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
 @router.get("/session/{session_id}")
 async def get_chat_session(session_id: str, current_user = Depends(get_current_user)):
     """Get full conversation for a session. Includes native_name (birth chart name) from DB for the session."""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT cs.user_id, cs.birth_chart_id, bc.name as native_name_raw
+                FROM chat_sessions cs
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE cs.session_id = %s
+            """,
+            (session_id,),
+        )
+        session_row = cur.fetchone()
 
-    # Get session and birth chart name (same as admin / chat performance: native_name lives in DB per session)
-    cursor.execute("""
-        SELECT cs.user_id, cs.birth_chart_id, bc.name as native_name_raw
-        FROM chat_sessions cs
-        LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-        WHERE cs.session_id = ?
-    """, (session_id,))
-    session_row = cursor.fetchone()
+        if not session_row or session_row[0] != current_user.userid:
+            raise HTTPException(status_code=404, detail="Session not found")
 
-    if not session_row or session_row["user_id"] != current_user.userid:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Session not found")
+        raw_name = session_row[2] if len(session_row) > 2 else None
+
+        cur = execute(
+            conn,
+            """
+                SELECT message_id, sender, content, timestamp, terms, glossary, images
+                FROM chat_messages
+                WHERE session_id = %s
+                ORDER BY timestamp ASC
+            """,
+            (session_id,),
+        )
+        messages = cur.fetchall() or []
 
     native_name = None
-    raw_name = session_row["native_name_raw"] if session_row["native_name_raw"] else None
     if raw_name:
         try:
             from encryption_utils import EncryptionManager
@@ -258,15 +240,6 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             native_name = enc.decrypt(raw_name)
         except Exception:
             native_name = raw_name
-
-    cursor.execute('''
-        SELECT message_id, sender, content, timestamp, terms, glossary, images
-        FROM chat_messages
-        WHERE session_id = ?
-        ORDER BY timestamp ASC
-    ''', (session_id,))
-    messages = cursor.fetchall()
-    conn.close()
 
     conversation = []
     for msg in messages:
@@ -370,88 +343,96 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             status_code=402,
             detail=f"Insufficient credits for {analysis_type}. You need {effective_cost} credits but have {user_balance}."
         )
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Verify session belongs to user
-    cursor.execute("SELECT user_id FROM chat_sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
-    if not session or session[0] != current_user.userid:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Session not found")
 
-    # Idempotency: if this client_request_id was already processed for this session,
-    # return the existing assistant/user message IDs instead of creating duplicates.
-    if client_request_id:
-        cursor.execute(
-            """
-            SELECT message_id
-            FROM chat_messages
-            WHERE session_id = ? AND sender = 'assistant' AND client_request_id = ?
-            ORDER BY message_id DESC
-            LIMIT 1
-            """,
-            (session_id, client_request_id),
-        )
-        existing = cursor.fetchone()
-        if existing:
-            assistant_message_id = existing[0]
-            # Find the most recent user message before this assistant message in the same session
-            cursor.execute(
+    with get_conn() as conn:
+        # Verify session belongs to user
+        cur = execute(conn, "SELECT user_id FROM chat_sessions WHERE session_id = %s", (session_id,))
+        session = cur.fetchone()
+        if not session or session[0] != current_user.userid:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Idempotency: if this client_request_id was already processed for this session,
+        # return the existing assistant/user message IDs instead of creating duplicates.
+        if client_request_id:
+            cur = execute(
+                conn,
                 """
-                SELECT message_id
-                FROM chat_messages
-                WHERE session_id = ? AND sender = 'user' AND message_id < ?
-                ORDER BY message_id DESC
-                LIMIT 1
+                    SELECT message_id
+                    FROM chat_messages
+                    WHERE session_id = %s AND sender = 'assistant' AND client_request_id = %s
+                    ORDER BY message_id DESC
+                    LIMIT 1
                 """,
-                (session_id, assistant_message_id),
+                (session_id, client_request_id),
             )
-            user_row = cursor.fetchone()
-            user_message_id = user_row[0] if user_row else None
-            conn.close()
-            return {
-                "user_message_id": user_message_id,
-                "message_id": assistant_message_id,
-                "status": "processing",
-                "message_type": "answer",
-                "chart_insights": [],
-                "loading_messages": [],
-            }
-    
-    # Save user question (sanitized)
-    cursor.execute(
-        "INSERT INTO chat_messages (session_id, sender, content, status, completed_at) VALUES (?, ?, ?, ?, ?)",
-        (session_id, "user", sanitize_text(question), "completed", datetime.now())
-    )
-    
-    user_message_id = cursor.lastrowid
-    print(f"💾 User message saved with ID: {user_message_id}")
-    
-    # Create processing assistant message (track client_request_id for idempotency)
-    cursor.execute(
-        "INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id) VALUES (?, ?, ?, ?, ?, ?)",
-        (session_id, "assistant", "", "processing", datetime.now(), client_request_id)
-    )
-    
-    assistant_message_id = cursor.lastrowid
-    print(f"💾 Assistant message saved with ID: {assistant_message_id}")
-    conn.commit()
-    conn.close()
+            existing = cur.fetchone()
+            if existing:
+                assistant_message_id = existing[0]
+                cur = execute(
+                    conn,
+                    """
+                        SELECT message_id
+                        FROM chat_messages
+                        WHERE session_id = %s AND sender = 'user' AND message_id < %s
+                        ORDER BY message_id DESC
+                        LIMIT 1
+                    """,
+                    (session_id, assistant_message_id),
+                )
+                user_row = cur.fetchone()
+                user_message_id = user_row[0] if user_row else None
+                return {
+                    "user_message_id": user_message_id,
+                    "message_id": assistant_message_id,
+                    "status": "processing",
+                    "message_type": "answer",
+                    "chart_insights": [],
+                    "loading_messages": [],
+                }
+
+        # Save user question (sanitized)
+        cur = execute(
+            conn,
+            """
+                INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING message_id
+            """,
+            (session_id, "user", sanitize_text(question), "completed", datetime.now()),
+        )
+        user_message_id = cur.fetchone()[0]
+        print(f"💾 User message saved with ID: {user_message_id}")
+
+        # Create processing assistant message (track client_request_id for idempotency)
+        cur = execute(
+            conn,
+            """
+                INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING message_id
+            """,
+            (session_id, "assistant", "", "processing", datetime.now(), client_request_id),
+        )
+        assistant_message_id = cur.fetchone()[0]
+        print(f"💾 Assistant message saved with ID: {assistant_message_id}")
+
+        conn.commit()
     
     # Refuse death-related questions without calling Gemini
     from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
     if is_death_related(sanitize_text(question)):
         print(f"🚫 Death-related question detected - returning refusal without analysis")
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
-            (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), assistant_message_id)
-        )
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                    UPDATE chat_messages
+                    SET content = %s, status = %s, message_type = %s, completed_at = %s
+                    WHERE message_id = %s
+                """,
+                (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), assistant_message_id),
+            )
+            conn.commit()
         return {
             "user_message_id": user_message_id,
             "message_id": assistant_message_id,
@@ -466,10 +447,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     try:
         user_facts = {}
         d1_chart = None
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT birth_chart_id FROM chat_sessions WHERE session_id = ?", (session_id,))
-            session_data = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
+            session_data = cur.fetchone()
             birth_chart_id = session_data[0] if session_data else None
             
             if birth_chart_id:
@@ -514,10 +494,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         
         # Get clarification count from conversation state
         clarification_count = 0
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT clarification_count FROM conversation_state WHERE session_id = ?", (session_id,))
-            state_row = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT clarification_count FROM conversation_state WHERE session_id = %s", (session_id,))
+            state_row = cur.fetchone()
             clarification_count = state_row[0] if state_row else 0
         
         # Detect notification-originated questions to avoid clarification loops
@@ -568,25 +547,31 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             clarification_question = intent.get('clarification_question', 'Could you provide more details?')
             
             # Update assistant message with clarification
-            conn = sqlite3.connect('astrology.db')
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
-                (sanitize_text(clarification_question), "completed", "clarification", datetime.now(), assistant_message_id)
-            )
-            
-            # Update conversation state
-            cursor.execute("""
-                INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
-                VALUES (?, ?, ?)
-                ON CONFLICT(session_id) DO UPDATE SET 
-                    clarification_count = clarification_count + 1,
-                    extracted_context = ?,
-                    last_updated = CURRENT_TIMESTAMP
-            """, (session_id, 1, json.dumps(intent.get('extracted_context', {})), json.dumps(intent.get('extracted_context', {}))))
-            
-            conn.commit()
-            conn.close()
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, message_type = %s, completed_at = %s
+                        WHERE message_id = %s
+                    """,
+                    (sanitize_text(clarification_question), "completed", "clarification", datetime.now(), assistant_message_id),
+                )
+
+                execute(
+                    conn,
+                    """
+                        INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (session_id) DO UPDATE SET
+                            clarification_count = conversation_state.clarification_count + 1,
+                            extracted_context = EXCLUDED.extracted_context,
+                            last_updated = CURRENT_TIMESTAMP
+                    """,
+                    (session_id, 1, json.dumps(intent.get('extracted_context', {}))),
+                )
+
+                conn.commit()
             
             print(f"✅ CLARIFICATION SAVED - Returning to user")
             return {
@@ -637,22 +622,22 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     # print(f"🔍 [STATUS CHECK] messageId: {message_id}, user: {current_user.userid}, time: {time.time()}")
     
     try:
-        conn = sqlite3.connect('astrology.db')
         db_start = time.time()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cm.session_id = cs.session_id
-            WHERE cm.message_id = ?
-        ''', (message_id,))
-        
-        result = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
+                           cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions
+                    FROM chat_messages cm
+                    JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                    WHERE cm.message_id = %s
+                """,
+                (message_id,),
+            )
+            result = cur.fetchone()
         db_time = time.time() - db_start
         # print(f"📊 [DB QUERY] took {db_time:.3f}s for messageId: {message_id}")
-        
-        conn.close()
         
         if not result:
             print(f"❌ [STATUS] Message {message_id} not found")
@@ -724,23 +709,36 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         # Log to admin so status-check failures (DB/500) are visible
         try:
             from utils.error_logger import log_chat_error
-            conn2 = sqlite3.connect('astrology.db')
-            cur = conn2.cursor()
-            cur.execute('''
-                SELECT cs.user_id, cm.session_id FROM chat_messages cm
-                JOIN chat_sessions cs ON cs.session_id = cm.session_id
-                WHERE cm.message_id = ?
-            ''', (message_id,))
-            row = cur.fetchone()
+            with get_conn() as conn2:
+                cur = execute(
+                    conn2,
+                    """
+                        SELECT cs.user_id, cm.session_id
+                        FROM chat_messages cm
+                        JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                        WHERE cm.message_id = %s
+                    """,
+                    (message_id,),
+                )
+                row = cur.fetchone()
             if row:
                 user_id, sid = row[0], row[1]
-                cur.execute('SELECT content FROM chat_messages WHERE session_id = ? AND sender = ? ORDER BY message_id DESC LIMIT 1', (sid, 'user'))
-                qrow = cur.fetchone()
+                with get_conn() as conn3:
+                    curq = execute(
+                        conn3,
+                        """
+                            SELECT content
+                            FROM chat_messages
+                            WHERE session_id = %s AND sender = %s
+                            ORDER BY message_id DESC
+                            LIMIT 1
+                        """,
+                        (sid, 'user'),
+                    )
+                    qrow = curq.fetchone()
                 question = (qrow[0][:500] if qrow else None) or f"(message_id: {message_id})"
-                conn2.close()
                 log_chat_error(user_id, 'Unknown', '', e, question, None, 'backend')
             else:
-                conn2.close()
                 err = Exception(f"Status check failed for message_id {message_id}: {e}")
                 log_chat_error(None, 'Unknown', '', err, f"message_id: {message_id}", None, 'backend')
         except Exception as log_err:
@@ -759,15 +757,19 @@ def get_original_question_for_clarification(session_id, current_message_id, conn
     print(f"   Current message ID: {current_message_id}")
     
     # Find the last assistant message with message_type='clarification' before current
-    cursor.execute("""
+    cursor = execute(
+        conn,
+        """
         SELECT message_id FROM chat_messages
-        WHERE session_id = ?
+        WHERE session_id = %s
           AND sender = 'assistant'
           AND message_type = 'clarification'
-          AND message_id < ?
+          AND message_id < %s
         ORDER BY timestamp DESC
         LIMIT 1
-    """, (session_id, current_message_id))
+        """,
+        (session_id, current_message_id),
+    )
     
     clarification_msg = cursor.fetchone()
     if not clarification_msg:
@@ -777,14 +779,18 @@ def get_original_question_for_clarification(session_id, current_message_id, conn
     print(f"   ✅ Found clarification message ID: {clarification_msg[0]}")
     
     # Find the user message immediately before that clarification
-    cursor.execute("""
+    cursor = execute(
+        conn,
+        """
         SELECT content FROM chat_messages
-        WHERE session_id = ?
+        WHERE session_id = %s
           AND sender = 'user'
-          AND message_id < ?
+          AND message_id < %s
         ORDER BY timestamp DESC
         LIMIT 1
-    """, (session_id, clarification_msg[0]))
+        """,
+        (session_id, clarification_msg[0]),
+    )
     
     result = cursor.fetchone()
     if result:
@@ -801,28 +807,35 @@ def get_original_user_message_id_for_faq(session_id: str, assistant_message_id: 
     original user question (so we save category/canonical_question on that, not on the follow-up).
     Returns None if there was no clarification before this assistant message (i.e. first question).
     """
-    cursor = conn.cursor()
-    cursor.execute("""
+    cursor = execute(
+        conn,
+        """
         SELECT message_id FROM chat_messages
-        WHERE session_id = ?
+        WHERE session_id = %s
           AND sender = 'assistant'
           AND message_type = 'clarification'
-          AND message_id < ?
+          AND message_id < %s
         ORDER BY message_id DESC
         LIMIT 1
-    """, (session_id, assistant_message_id))
+        """,
+        (session_id, assistant_message_id),
+    )
     row = cursor.fetchone()
     if not row:
         return None
     clarification_msg_id = row[0]
-    cursor.execute("""
+    cursor = execute(
+        conn,
+        """
         SELECT message_id FROM chat_messages
-        WHERE session_id = ?
+        WHERE session_id = %s
           AND sender = 'user'
-          AND message_id < ?
+          AND message_id < %s
         ORDER BY message_id DESC
         LIMIT 1
-    """, (session_id, clarification_msg_id))
+        """,
+        (session_id, clarification_msg_id),
+    )
     row = cursor.fetchone()
     return row[0] if row else None
 
@@ -844,20 +857,23 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Refuse death-related questions without calling the model
         if is_death_related(question):
             print(f"🚫 Death-related question detected in background task - saving refusal")
-            with sqlite3.connect('astrology.db') as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
-                    (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), message_id)
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, message_type = %s, completed_at = %s
+                        WHERE message_id = %s
+                    """,
+                    (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), message_id),
                 )
                 conn.commit()
             return
         
         # Get birth_chart_id from session
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT birth_chart_id FROM chat_sessions WHERE session_id = ?", (session_id,))
-            session_data = cursor.fetchone()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
+            session_data = cur.fetchone()
             birth_chart_id = session_data[0] if session_data else None
         
         # Get user facts for intent routing
@@ -917,16 +933,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         context_builder = ChatContextBuilder()
         
         # Get conversation history for intent routing
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT sender, content, message_type FROM chat_messages 
-                WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                  AND content != ''
-                ORDER BY timestamp ASC
-            ''', (session_id,))
-            
-            history_rows = cursor.fetchall()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT sender, content, message_type
+                    FROM chat_messages
+                    WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
+                      AND content != ''
+                    ORDER BY timestamp ASC
+                """,
+                (session_id,),
+            )
+            history_rows = cur.fetchall() or []
             history = []
             
             # Pair up user questions with assistant responses
@@ -947,8 +966,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             history = history[-3:] if len(history) > 3 else history
             
             # Get conversation state
-            cursor.execute("SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = ?", (session_id,))
-            state_row = cursor.fetchone()
+            cur = execute(
+                conn,
+                "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
+                (session_id,),
+            )
+            state_row = cur.fetchone()
             clarification_count = state_row[0] if state_row else 0
             extracted_context = json.loads(state_row[1]) if state_row and state_row[1] else {}
         
@@ -966,16 +989,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"{'='*80}")
             
             # Get conversation history
-            with sqlite3.connect('astrology.db') as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT sender, content, message_type FROM chat_messages 
-                    WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                      AND content != ''
-                    ORDER BY timestamp ASC
-                ''', (session_id,))
-                
-                history_rows = cursor.fetchall()
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                        SELECT sender, content, message_type
+                        FROM chat_messages
+                        WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
+                          AND content != ''
+                        ORDER BY timestamp ASC
+                    """,
+                    (session_id,),
+                )
+                history_rows = cur.fetchall() or []
                 history = []
                 
                 # Pair up user questions with assistant responses
@@ -996,8 +1022,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 history = history[-3:] if len(history) > 3 else history
                 
                 # Get conversation state
-                cursor.execute("SELECT clarification_count FROM conversation_state WHERE session_id = ?", (session_id,))
-                state_row = cursor.fetchone()
+                cur = execute(
+                    conn,
+                    "SELECT clarification_count FROM conversation_state WHERE session_id = %s",
+                    (session_id,),
+                )
+                state_row = cur.fetchone()
                 clarification_count = state_row[0] if state_row else 0
             
             intent_router = IntentRouter()
@@ -1013,7 +1043,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             combined_question = question
             if clarification_count > 0:
                 print(f"🔍 Clarification detected, looking for original question...")
-                with sqlite3.connect('astrology.db') as conn:
+                with get_conn() as conn:
                     original_question = get_original_question_for_clarification(session_id, message_id, conn)
                     if original_question:
                         # Detect if user changed topic (response is long and doesn't look like clarification)
@@ -1085,37 +1115,55 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             if intent.get('status') == 'CLARIFY' and clarification_count < MAX_CLARIFICATIONS:
                 print(f"✅ RETURNING CLARIFICATION QUESTION")
                 # Return clarification question
-                with sqlite3.connect('astrology.db') as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ?, language = ?, intent_router_ms = ? WHERE message_id = ?",
-                        (sanitize_text(intent.get('clarification_question', 'Could you provide more details?')), "completed", "clarification", datetime.now(), language, intent_router_ms, message_id)
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET content = %s, status = %s, message_type = %s, completed_at = %s,
+                                language = %s, intent_router_ms = %s
+                            WHERE message_id = %s
+                        """,
+                        (
+                            sanitize_text(intent.get('clarification_question', 'Could you provide more details?')),
+                            "completed",
+                            "clarification",
+                            datetime.now(),
+                            language,
+                            intent_router_ms,
+                            message_id,
+                        ),
                     )
-                    
-                    # Update conversation state
-                    cursor.execute("""
-                        INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
-                        VALUES (?, ?, ?)
-                        ON CONFLICT(session_id) DO UPDATE SET 
-                            clarification_count = clarification_count + 1,
-                            extracted_context = ?,
-                            last_updated = CURRENT_TIMESTAMP
-                    """, (session_id, 1, json.dumps(intent.get('extracted_context', {})), json.dumps(intent.get('extracted_context', {}))))
-                    
+                    execute(
+                        conn,
+                        """
+                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (session_id) DO UPDATE SET
+                                clarification_count = conversation_state.clarification_count + 1,
+                                extracted_context = EXCLUDED.extracted_context,
+                                last_updated = CURRENT_TIMESTAMP
+                        """,
+                        (session_id, 1, json.dumps(intent.get('extracted_context', {}))),
+                    )
                     conn.commit()
                 print(f"✅ CLARIFICATION SAVED TO DATABASE, EXITING EARLY")
                 return  # Exit early, no chart calculation needed
             elif intent.get('status') == 'READY':
                 # Reset clarification count when ready to answer
-                with sqlite3.connect('astrology.db') as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
-                        VALUES (?, ?, ?)
-                        ON CONFLICT(session_id) DO UPDATE SET 
-                            clarification_count = 0,
-                            last_updated = CURRENT_TIMESTAMP
-                    """, (session_id, 0, json.dumps(intent.get('extracted_context', {}))))
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (session_id) DO UPDATE SET
+                                clarification_count = 0,
+                                extracted_context = EXCLUDED.extracted_context,
+                                last_updated = CURRENT_TIMESTAMP
+                        """,
+                        (session_id, 0, json.dumps(intent.get('extracted_context', {}))),
+                    )
                     conn.commit()
                 print(f"✅ RESET CLARIFICATION COUNT TO 0 (READY status)")
             
@@ -1224,16 +1272,20 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"{'='*80}\n")
         
         # Get conversation history
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT sender, content FROM chat_messages 
-                WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                  AND (sender = 'user' OR message_type = 'answer')
-                ORDER BY timestamp DESC LIMIT 6
-            ''', (session_id,))
-            
-            history_rows = cursor.fetchall()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT sender, content
+                    FROM chat_messages
+                    WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
+                      AND (sender = 'user' OR message_type = 'answer')
+                    ORDER BY timestamp DESC
+                    LIMIT 6
+                """,
+                (session_id,),
+            )
+            history_rows = cur.fetchall() or []
             history = []
             for i in range(0, len(history_rows), 2):
                 if i + 1 < len(history_rows):
@@ -1321,9 +1373,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         )
         
         # Update database with result
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            
+        with get_conn() as conn:
             if result.get('success'):
                 # Use already parsed terms and glossary from GeminiChatAnalyzer
                 terms = result.get('terms', [])
@@ -1357,14 +1407,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         target_message_id = original_user_msg_id if original_user_msg_id else user_message_id
                         if original_user_msg_id:
                             print(f"   📋 Clarification flow: saving FAQ on original user message {target_message_id} (not follow-up {user_message_id})")
-                        cursor.execute(
-                            "UPDATE chat_messages SET category = ?, canonical_question = ?, categorized_at = ? WHERE message_id = ?",
+                        execute(
+                            conn,
+                            """
+                                UPDATE chat_messages
+                                SET category = %s, canonical_question = %s, categorized_at = %s
+                                WHERE message_id = %s
+                            """,
                             (
                                 faq_metadata.get('category') or None,
                                 faq_metadata.get('canonical_question') or None,
                                 datetime.now(),
-                                target_message_id
-                            )
+                                target_message_id,
+                            ),
                         )
                         print(f"   📋 FAQ saved on user message {target_message_id}: {faq_metadata.get('category')} / {faq_metadata.get('canonical_question', '')[:40]}...")
                     
@@ -1390,21 +1445,28 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         if isinstance(raw_follow_ups, str):
                             follow_up_questions.append(sanitize_text(raw_follow_ups))
                     
-                    cursor.execute(
-                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, follow_up_questions = ?, status = ?, message_type = ?, completed_at = ?, language = ?, intent_router_ms = ? WHERE message_id = ?",
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET content = %s, terms = %s, glossary = %s, images = %s,
+                                follow_up_questions = %s, status = %s, message_type = %s,
+                                completed_at = %s, language = %s, intent_router_ms = %s
+                            WHERE message_id = %s
+                        """,
                         (
-                            sanitize_text(result['response']), 
+                            sanitize_text(result['response']),
                             json.dumps(terms),
                             json.dumps(glossary),
                             summary_image,  # Store as string URL, not JSON
                             json.dumps(follow_up_questions),
-                            "completed", 
-                            "answer", 
-                            datetime.now(), 
+                            "completed",
+                            "answer",
+                            datetime.now(),
                             language,
                             intent_router_ms,
-                            message_id
-                        )
+                            message_id,
+                        ),
                     )
                 else:
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
@@ -1415,9 +1477,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         log_chat_error(user_id, username, '', credit_err, question, birth_details, 'backend')
                     except Exception:
                         pass
-                    cursor.execute(
-                        "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                        ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET status = %s, error_message = %s, completed_at = %s
+                            WHERE message_id = %s
+                        """,
+                        ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id),
                     )
             else:
                 error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
@@ -1428,9 +1495,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     log_chat_error(user_id, username, '', err, question, birth_details, 'backend')
                 except Exception:
                     pass
-                cursor.execute(
-                    "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                    ("failed", error_msg, datetime.now(), message_id)
+                execute(
+                    conn,
+                    """
+                        UPDATE chat_messages
+                        SET status = %s, error_message = %s, completed_at = %s
+                        WHERE message_id = %s
+                    """,
+                    ("failed", error_msg, datetime.now(), message_id),
                 )
             
             conn.commit()
@@ -1448,8 +1520,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             try:
                 from nudge_engine import db as nudge_db
                 from nudge_engine import push as push_module
-                conn_nudge = nudge_db.get_conn()
-                try:
+                with nudge_db.get_conn() as conn_nudge:
                     nudge_db.init_nudge_tables(conn_nudge)
                     tokens = nudge_db.get_device_tokens_for_user(conn_nudge, user_id)
                     for token, _platform in tokens:
@@ -1459,8 +1530,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             "Tap to view your analysis.",
                             data={"cta": "astroroshni://chat", "session_id": session_id},
                         )
-                finally:
-                    conn_nudge.close()
             except Exception as push_err:
                 print(f"Push (response ready) failed: {push_err}")
         
@@ -1473,11 +1542,15 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             log_chat_error(user_id, username, '', e, question, birth_details, 'backend')
         except Exception as log_err:
             print(f"⚠️ Failed to log error to chat_error_logs: {log_err}")
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                ("failed", user_friendly_error, datetime.now(), message_id)
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                    UPDATE chat_messages
+                    SET status = %s, error_message = %s, completed_at = %s
+                    WHERE message_id = %s
+                """,
+                ("failed", user_friendly_error, datetime.now(), message_id),
             )
             conn.commit()
         print(f"Error processing message {message_id}: {e}")
@@ -1490,82 +1563,88 @@ async def delete_message(message_id: int, current_user = Depends(get_current_use
     print(f"🗑️ DELETE STEP 1: Request received for message ID: {message_id} by user: {current_user.userid}")
     
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        print(f"🗑️ DELETE STEP 2: Database connection established")
-        
-        # First, let's see what messages exist for this user
-        cursor.execute('''
-            SELECT cm.message_id, cm.sender, cm.message_type, SUBSTR(cm.content, 1, 50)
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cm.session_id = cs.session_id
-            WHERE cs.user_id = ?
-            ORDER BY cm.message_id DESC LIMIT 10
-        ''', (current_user.userid,))
-        
-        user_messages = cursor.fetchall()
-        print(f"🔍 Recent messages for user {current_user.userid}:")
-        for msg in user_messages:
-            print(f"   ID: {msg[0]}, Sender: {msg[1]}, Type: {msg[2]}, Content: {msg[3]}...")
-        
-        print(f"🗑️ DELETE STEP 3: Verifying message ownership")
-        # Verify message belongs to user
-        cursor.execute('''
-            SELECT cm.session_id, cs.user_id, cm.message_type, cm.sender
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cm.session_id = cs.session_id
-            WHERE cm.message_id = ?
-        ''', (message_id,))
-        
-        result = cursor.fetchone()
-        print(f"🔍 Database lookup result for ID {message_id}: {result}")
-        
-        if not result:
-            print(f"❌ Message {message_id} not found in database")
-            conn.close()
-            raise HTTPException(status_code=404, detail=f"Message {message_id} not found in database")
-        
-        session_id, user_id, message_type, sender = result
-        print(f"🔍 Message details - User: {user_id}, Type: {message_type}, Sender: {sender}")
-        print(f"🔍 Requesting user: {current_user.userid}")
-        
-        if user_id != current_user.userid:
-            print(f"❌ Access denied: message belongs to user {user_id}, not {current_user.userid}")
-            conn.close()
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        print(f"🗑️ DELETE STEP 4: Getting message details for audit")
-        # Get message details for audit log
-        cursor.execute("SELECT content, message_type, sender FROM chat_messages WHERE message_id = ?", (message_id,))
-        msg_details = cursor.fetchone()
-        print(f"🗑️ DELETE STEP 5: Message details retrieved: {msg_details is not None}")
-        
-        if msg_details:
-            content, msg_type, sender = msg_details
-            print(f"🗑️ DELETE STEP 6: Inserting audit record")
-            # Insert audit record
-            try:
-                cursor.execute("""
-                    INSERT INTO message_deletion_audit 
-                    (message_id, user_id, session_id, message_content, message_type, sender) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (message_id, current_user.userid, session_id, None, msg_type, sender))
-                print(f"🗑️ DELETE STEP 7: Audit record inserted successfully")
-            except Exception as audit_error:
-                print(f"❌ DELETE STEP 7 ERROR: Audit insert failed: {audit_error}")
-                # Continue with deletion even if audit fails
-        
-        print(f"🗑️ DELETE STEP 8: Performing actual deletion")
-        # Hard delete the message
-        cursor.execute("DELETE FROM chat_messages WHERE message_id = ?", (message_id,))
-        deleted_rows = cursor.rowcount
-        print(f"🗑️ DELETE STEP 9: Deleted {deleted_rows} rows for message ID {message_id}")
-        
-        print(f"🗑️ DELETE STEP 10: Committing transaction")
-        conn.commit()
-        print(f"🗑️ DELETE STEP 11: Transaction committed successfully")
-        
-        conn.close()
+        with get_conn() as conn:
+            print(f"🗑️ DELETE STEP 2: Database connection established")
+
+            # First, let's see what messages exist for this user
+            cur = execute(
+                conn,
+                """
+                    SELECT cm.message_id, cm.sender, cm.message_type, SUBSTRING(cm.content, 1, 50)
+                    FROM chat_messages cm
+                    JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                    WHERE cs.user_id = %s
+                    ORDER BY cm.message_id DESC
+                    LIMIT 10
+                """,
+                (current_user.userid,),
+            )
+            user_messages = cur.fetchall() or []
+            print(f"🔍 Recent messages for user {current_user.userid}:")
+            for msg in user_messages:
+                print(f"   ID: {msg[0]}, Sender: {msg[1]}, Type: {msg[2]}, Content: {msg[3]}...")
+
+            print(f"🗑️ DELETE STEP 3: Verifying message ownership")
+            cur = execute(
+                conn,
+                """
+                    SELECT cm.session_id, cs.user_id, cm.message_type, cm.sender
+                    FROM chat_messages cm
+                    JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                    WHERE cm.message_id = %s
+                """,
+                (message_id,),
+            )
+            result = cur.fetchone()
+            print(f"🔍 Database lookup result for ID {message_id}: {result}")
+
+            if not result:
+                print(f"❌ Message {message_id} not found in database")
+                raise HTTPException(status_code=404, detail=f"Message {message_id} not found in database")
+
+            session_id, user_id, message_type, sender = result
+            print(f"🔍 Message details - User: {user_id}, Type: {message_type}, Sender: {sender}")
+            print(f"🔍 Requesting user: {current_user.userid}")
+
+            if user_id != current_user.userid:
+                print(f"❌ Access denied: message belongs to user {user_id}, not {current_user.userid}")
+                raise HTTPException(status_code=403, detail="Access denied")
+
+            print(f"🗑️ DELETE STEP 4: Getting message details for audit")
+            cur = execute(
+                conn,
+                "SELECT content, message_type, sender FROM chat_messages WHERE message_id = %s",
+                (message_id,),
+            )
+            msg_details = cur.fetchone()
+            print(f"🗑️ DELETE STEP 5: Message details retrieved: {msg_details is not None}")
+
+            if msg_details:
+                content, msg_type, sender = msg_details
+                print(f"🗑️ DELETE STEP 6: Inserting audit record")
+                try:
+                    execute(
+                        conn,
+                        """
+                            INSERT INTO message_deletion_audit
+                            (message_id, user_id, session_id, message_content, message_type, sender)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (message_id, current_user.userid, session_id, None, msg_type, sender),
+                    )
+                    print(f"🗑️ DELETE STEP 7: Audit record inserted successfully")
+                except Exception as audit_error:
+                    print(f"❌ DELETE STEP 7 ERROR: Audit insert failed: {audit_error}")
+
+            print(f"🗑️ DELETE STEP 8: Performing actual deletion")
+            cur = execute(conn, "DELETE FROM chat_messages WHERE message_id = %s", (message_id,))
+            deleted_rows = cur.rowcount
+            print(f"🗑️ DELETE STEP 9: Deleted {deleted_rows} rows for message ID {message_id}")
+
+            print(f"🗑️ DELETE STEP 10: Committing transaction")
+            conn.commit()
+            print(f"🗑️ DELETE STEP 11: Transaction committed successfully")
+
         print(f"🗑️ DELETE STEP 12: Database connection closed")
         
         print(f"✅ DELETE COMPLETE: Message {message_id} deleted successfully")
@@ -1585,27 +1664,24 @@ async def delete_message(message_id: int, current_user = Depends(get_current_use
 async def cleanup_old_chats():
     """Clean up chats older than 1 month (admin only)"""
     cutoff_date = datetime.now() - timedelta(days=30)
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Delete old messages first (foreign key constraint)
-    cursor.execute('''
-        DELETE FROM chat_messages 
-        WHERE session_id IN (
-            SELECT session_id FROM chat_sessions 
-            WHERE created_at < ?
+
+    with get_conn() as conn:
+        # Delete old messages first (foreign key constraint)
+        execute(
+            conn,
+            """
+                DELETE FROM chat_messages
+                WHERE session_id IN (
+                    SELECT session_id FROM chat_sessions
+                    WHERE created_at < %s
+                )
+            """,
+            (cutoff_date,),
         )
-    ''', (cutoff_date,))
-    
-    # Delete old sessions
-    cursor.execute(
-        "DELETE FROM chat_sessions WHERE created_at < ?",
-        (cutoff_date,)
-    )
-    
-    deleted_sessions = cursor.rowcount
-    conn.commit()
-    conn.close()
-    
+
+        # Delete old sessions
+        cur = execute(conn, "DELETE FROM chat_sessions WHERE created_at < %s", (cutoff_date,))
+        deleted_sessions = cur.rowcount
+        conn.commit()
+
     return {"message": f"Cleaned up {deleted_sessions} old sessions"}

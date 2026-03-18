@@ -1,5 +1,4 @@
-import sqlite3
-from typing import Optional
+from typing import Optional, Any
 
 # Allowed Gemini model IDs (with models/ prefix for API). Used by admin UI and as fallbacks.
 GEMINI_MODEL_OPTIONS = [
@@ -19,28 +18,32 @@ DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
 DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite-preview"
 
 
-def _ensure_admin_settings_table(conn: sqlite3.Connection) -> None:
-    """Create admin_settings table if it does not exist."""
-    conn.execute("""
+def _ensure_admin_settings_table(conn: Any) -> None:
+    """Create admin_settings table if it does not exist (works for sqlite + postgres)."""
+    from db import execute
+    execute(
+        conn,
+        """
         CREATE TABLE IF NOT EXISTS admin_settings (
-            key TEXT PRIMARY KEY,
+            "key" TEXT PRIMARY KEY,
             value TEXT,
             description TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+        """,
+    )
 
 
 def get_setting(key: str) -> Optional[str]:
     """Get admin setting value"""
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        _ensure_admin_settings_table(conn)
-        cursor.execute("SELECT value FROM admin_settings WHERE key = ?", (key,))
-        result = cursor.fetchone()
-        conn.close()
-        return result[0] if result else None
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            _ensure_admin_settings_table(conn)
+            cursor = execute(conn, 'SELECT value FROM admin_settings WHERE "key" = ?', (key,))
+            result = cursor.fetchone()
+            return result[0] if result else None
     except Exception:
         return None
 

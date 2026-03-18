@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -36,6 +37,30 @@ router = APIRouter(prefix="/trading", tags=["trading"])
 context_gen = TradingAIContextGenerator()
 credit_service = CreditService()
 
+
+def _normalize_birth_date_time(date_str: str, time_str: str) -> tuple[str, str]:
+    """
+    Mobile sometimes sends ISO strings like:
+    - date: 'YYYY-MM-DDTHH:MM:SS.sssZ'
+    - time: 'YYYY-MM-DDTHH:MM:SS.sssZ'
+    Normalize to:
+    - date: 'YYYY-MM-DD'
+    - time: 'HH:MM'
+    """
+    d = (date_str or "").strip()
+    t = (time_str or "").strip()
+    if "T" in d:
+        d = d.split("T", 1)[0]
+    if "T" in t:
+        # '...T18:30:00.000Z' -> '18:30'
+        t_part = t.split("T", 1)[1]
+        t = t_part[:5] if len(t_part) >= 5 else t_part
+    # If time is full 'HH:MM:SS', trim seconds
+    if len(t) >= 5 and t[2] == ":":
+        t = t[:5]
+    return d, t
+
+
 @router.post("/daily-forecast")
 async def get_daily_forecast(request: TradingRequest, current_user: User = Depends(get_current_user)):
     if request.premium_analysis:
@@ -47,44 +72,45 @@ async def get_daily_forecast(request: TradingRequest, current_user: User = Depen
     cost = credit_service.get_effective_cost(current_user.userid, raw_cost)
     
     # Check cache first
-    import sqlite3
     import hashlib
     
     target_date = request.target_date or datetime.now().strftime('%Y-%m-%d')
     cache_key = hashlib.md5(f"{current_user.userid}_{target_date}_{request.date}_{request.time}_{request.place}".encode()).hexdigest()
     
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS trading_daily_cache (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                cache_key TEXT UNIQUE,
-                user_id INTEGER,
-                target_date TEXT,
-                analysis_data TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        with get_conn() as conn:
+            # Ensure cache table exists (defensive)
+            execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS trading_daily_cache (
+                    id SERIAL PRIMARY KEY,
+                    cache_key TEXT UNIQUE,
+                    user_id INTEGER,
+                    target_date TEXT,
+                    analysis_data TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
             )
-        """)
-        
-        # Skip cache if force_regenerate is True
-        if not request.force_regenerate:
-            cursor.execute("""
-                SELECT analysis_data FROM trading_daily_cache 
-                WHERE cache_key = ? AND DATE(created_at) = DATE('now')
-            """, (cache_key,))
-            
-            cached_result = cursor.fetchone()
-            
-            if cached_result:
-                conn.close()
-                cached_data = json.loads(cached_result[0])
-                cached_data['cached'] = True
-                return cached_data
-        
-        conn.close()
-            
+
+            # Skip cache if force_regenerate is True
+            if not request.force_regenerate:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT analysis_data
+                    FROM trading_daily_cache
+                    WHERE cache_key = %s AND created_at::date = CURRENT_DATE
+                    """,
+                    (cache_key,),
+                )
+                cached_result = cur.fetchone()
+
+                if cached_result:
+                    cached_data = json.loads(cached_result[0])
+                    cached_data["cached"] = True
+                    return cached_data
     except Exception as cache_error:
         print(f"Cache check failed: {cache_error}")
     
@@ -97,6 +123,9 @@ async def get_daily_forecast(request: TradingRequest, current_user: User = Depen
     try:
         target_dt = datetime.strptime(request.target_date, "%Y-%m-%d") if request.target_date else datetime.now()
         birth_data = request.dict()
+        birth_data["date"], birth_data["time"] = _normalize_birth_date_time(
+            birth_data.get("date"), birth_data.get("time")
+        )
         
         # Auto-detect timezone from coordinates if not provided
         if not birth_data.get('timezone') and birth_data.get('latitude') and birth_data.get('longitude'):
@@ -195,17 +224,19 @@ JSON OUTPUT ONLY (Must be valid JSON):
                 
                 # Cache the result
                 try:
-                    conn = sqlite3.connect('astrology.db')
-                    cursor = conn.cursor()
-                    
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO trading_daily_cache 
-                        (cache_key, user_id, target_date, analysis_data)
-                        VALUES (?, ?, ?, ?)
-                    """, (cache_key, current_user.userid, target_date, json.dumps(response_data)))
-                    
-                    conn.commit()
-                    conn.close()
+                    with get_conn() as conn:
+                        execute(
+                            conn,
+                            """
+                            INSERT INTO trading_daily_cache (cache_key, user_id, target_date, analysis_data)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (cache_key)
+                            DO UPDATE SET analysis_data = EXCLUDED.analysis_data,
+                                          target_date = EXCLUDED.target_date,
+                                          created_at = CURRENT_TIMESTAMP
+                            """,
+                            (cache_key, current_user.userid, target_date, json.dumps(response_data)),
+                        )
                 except Exception as cache_error:
                     print(f"Failed to cache result: {cache_error}")
                 
@@ -232,43 +263,51 @@ async def get_monthly_calendar(request: TradingRequest, year: int, month: int, c
     cost = credit_service.get_effective_cost(current_user.userid, raw_cost)
     
     # Check cache first
-    import sqlite3
     import hashlib
+
+    # Normalize ISO date/time coming from mobile storage
+    normalized_date, normalized_time = _normalize_birth_date_time(request.date, request.time)
+    request.date = normalized_date
+    request.time = normalized_time
     
     cache_key = hashlib.md5(f"{current_user.userid}_{year}_{month}_{request.date}_{request.time}_{request.place}".encode()).hexdigest()
     
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS trading_monthly_cache (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                cache_key TEXT UNIQUE,
-                user_id INTEGER,
-                year INTEGER,
-                month INTEGER,
-                analysis_data TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS trading_monthly_cache (
+                    id SERIAL PRIMARY KEY,
+                    cache_key TEXT UNIQUE,
+                    user_id INTEGER,
+                    year INTEGER,
+                    month INTEGER,
+                    analysis_data TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
             )
-        """)
-        
-        cursor.execute("""
-            SELECT analysis_data FROM trading_monthly_cache 
-            WHERE cache_key = ?
-        """, (cache_key,))
-        
-        cached_result = cursor.fetchone()
-        conn.close()
-        
+
+            cur = execute(
+                conn,
+                """
+                SELECT analysis_data
+                FROM trading_monthly_cache
+                WHERE cache_key = %s
+                """,
+                (cache_key,),
+            )
+            cached_result = cur.fetchone()
+
         if cached_result:
             cached_data = json.loads(cached_result[0])
-            
+
             async def return_cached():
                 yield f"data: {json.dumps({'status': 'complete', 'data': cached_data, 'cached': True})}\n\n"
-            
+
             return StreamingResponse(return_cached(), media_type="text/plain")
-            
+
     except Exception as cache_error:
         print(f"Cache check failed: {cache_error}")
     
@@ -307,17 +346,20 @@ async def get_monthly_calendar(request: TradingRequest, year: int, month: int, c
             
             # Cache the result
             try:
-                conn = sqlite3.connect('astrology.db')
-                cursor = conn.cursor()
-                
-                cursor.execute("""
-                    INSERT OR REPLACE INTO trading_monthly_cache 
-                    (cache_key, user_id, year, month, analysis_data)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (cache_key, current_user.userid, year, month, json.dumps(calendar)))
-                
-                conn.commit()
-                conn.close()
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO trading_monthly_cache (cache_key, user_id, year, month, analysis_data)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (cache_key)
+                        DO UPDATE SET analysis_data = EXCLUDED.analysis_data,
+                                      year = EXCLUDED.year,
+                                      month = EXCLUDED.month,
+                                      created_at = CURRENT_TIMESTAMP
+                        """,
+                        (cache_key, current_user.userid, year, month, json.dumps(calendar)),
+                    )
             except Exception as cache_error:
                 print(f"Failed to cache result: {cache_error}")
             

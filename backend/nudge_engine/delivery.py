@@ -22,9 +22,8 @@ def deliver(
     """
     if not to_send:
         return 0
-    conn = db.get_conn()
     count = 0
-    try:
+    with db.get_conn() as conn:
         for userid, ev in to_send:
             try:
                 params_json = json.dumps(ev.params) if ev.params else ""
@@ -57,6 +56,4 @@ def deliver(
                     "Delivery failed for user %s, trigger %s: %s",
                     userid, ev.trigger_id, e,
                 )
-    finally:
-        conn.close()
     return count

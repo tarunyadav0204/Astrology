@@ -1,9 +1,11 @@
 """
 Shared error logging utility for chat errors
 """
-import sqlite3
 import json
 import traceback
+
+from db import get_conn, execute
+
 
 def log_chat_error(
     user_id,
@@ -39,36 +41,32 @@ def log_chat_error(
                 'place': birth_data.get('place', '')
             })
         
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-
         # Prefer an explicit error_type string when provided (e.g. from mobile),
         # otherwise fall back to the Python exception class name.
         resolved_error_type = error_type or type(error).__name__
 
-        cursor.execute(
-            """
-            INSERT INTO chat_error_logs 
-            (user_id, username, phone, error_type, error_message, user_question, 
-             stack_trace, platform, error_source, birth_data_context)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                username,
-                phone,
-                resolved_error_type,
-                str(error),
-                user_question,
-                stack_trace,
-                error_source,
-                error_source,
-                birth_context,
-            ),
-        )
-        
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                INSERT INTO chat_error_logs
+                (user_id, username, phone, error_type, error_message, user_question,
+                 stack_trace, platform, error_source, birth_data_context)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    user_id,
+                    username,
+                    phone,
+                    resolved_error_type,
+                    str(error),
+                    user_question,
+                    stack_trace,
+                    error_source,
+                    error_source,
+                    birth_context,
+                ),
+            )
 
         print(f"🚨 ERROR LOGGED: {resolved_error_type} for user {username}")
         return True

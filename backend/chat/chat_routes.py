@@ -11,6 +11,7 @@ import re
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -714,19 +715,18 @@ async def get_question_suggestions():
 @router.get("/scan-timeline")
 async def scan_timeline(birth_chart_id: int, current_user: User = Depends(get_current_user)):
     """Silent background scan for calibration events"""
-    import sqlite3
-    
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT name, date, time, latitude, longitude, timezone, place, gender
-            FROM birth_charts WHERE id = ? AND userid = ?
-        ''', (birth_chart_id, current_user.userid))
-        
-        birth_row = cursor.fetchone()
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT name, date, time, latitude, longitude, timezone, place, gender
+                    FROM birth_charts
+                    WHERE id = %s AND userid = %s
+                """,
+                (birth_chart_id, current_user.userid),
+            )
+            birth_row = cur.fetchone()
         
         if not birth_row:
             return {"events": []}
@@ -781,25 +781,23 @@ async def scan_timeline(birth_chart_id: int, current_user: User = Depends(get_cu
 @router.post("/verify-calibration")
 async def verify_calibration(request: dict, current_user: User = Depends(get_current_user)):
     """Store user's verification response"""
-    import sqlite3
-    
     try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE birth_charts 
-            SET is_rectified = ?, calibration_year = ?
-            WHERE id = ? AND userid = ?
-        ''', (
-            1 if request.get('verified') else 0,
-            request.get('event_year'),
-            request.get('birth_chart_id'),
-            current_user.userid
-        ))
-        
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                    UPDATE birth_charts
+                    SET is_rectified = %s, calibration_year = %s
+                    WHERE id = %s AND userid = %s
+                """,
+                (
+                    1 if request.get('verified') else 0,
+                    request.get('event_year'),
+                    request.get('birth_chart_id'),
+                    current_user.userid,
+                ),
+            )
+            conn.commit()
         
         return {"success": True}
         
@@ -838,37 +836,31 @@ async def save_message(request: dict):
 
 def init_event_timeline_table():
     """Initialize event timeline jobs table"""
-    import sqlite3
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS event_timeline_jobs (
-            job_id TEXT PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            birth_chart_id INTEGER NOT NULL,
-            selected_year INTEGER NOT NULL,
-            status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
-            result_data TEXT,
-            error_message TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            started_at TIMESTAMP,
-            completed_at TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (userid),
-            FOREIGN KEY (birth_chart_id) REFERENCES birth_charts (id)
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+                CREATE TABLE IF NOT EXISTS event_timeline_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    birth_chart_id INTEGER NOT NULL,
+                    selected_year INTEGER NOT NULL,
+                    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+                    result_data TEXT,
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    started_at TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    selected_month INTEGER
+                )
+            """,
         )
-    ''')
-    
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_user_id ON event_timeline_jobs (user_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_birth_chart ON event_timeline_jobs (birth_chart_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_status ON event_timeline_jobs (status)')
-    # Add selected_month for monthly dive deep (nullable; NULL = yearly run)
-    try:
-        cursor.execute('ALTER TABLE event_timeline_jobs ADD COLUMN selected_month INTEGER')
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_timeline_user_id ON event_timeline_jobs (user_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_timeline_birth_chart ON event_timeline_jobs (birth_chart_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_timeline_status ON event_timeline_jobs (status)")
+        # Backwards compat: ensure column exists for older DBs
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS selected_month INTEGER")
         conn.commit()
-    except Exception:
-        pass  # column may already exist
-    conn.close()
 
 @router.post("/monthly-events")
 async def get_monthly_events(request: ClearChatRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
@@ -876,7 +868,6 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
     Start async event timeline generation - returns job_id for polling
     """
     import uuid
-    import sqlite3
     
     try:
         # Initialize table if needed
@@ -915,35 +906,35 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         
         # Create job
         job_id = str(uuid.uuid4())
-        
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
+
         birth_chart_id = request.birth_chart_id
         if not birth_chart_id:
             print(f"❌ Missing birth_chart_id in request: {request}")
             raise HTTPException(status_code=400, detail="birth_chart_id is required. Please ensure birth chart is saved to database.")
-        
-        # Verify birth chart exists and belongs to user
-        cursor.execute(
-            "SELECT id FROM birth_charts WHERE id = ? AND userid = ?",
-            (birth_chart_id, current_user.userid)
-        )
-        if not cursor.fetchone():
-            print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Birth chart not found. Please re-select your birth chart from the profile screen."
+
+        with get_conn() as conn:
+            # Verify birth chart exists and belongs to user
+            cur = execute(
+                conn,
+                "SELECT id FROM birth_charts WHERE id = %s AND userid = %s",
+                (birth_chart_id, current_user.userid),
             )
-        
-        cursor.execute(
-            """INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, selected_month, status)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (job_id, current_user.userid, birth_chart_id, target_year, target_month, 'pending')
-        )
-        
-        conn.commit()
-        conn.close()
+            if not cur.fetchone():
+                print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Birth chart not found. Please re-select your birth chart from the profile screen.",
+                )
+
+            execute(
+                conn,
+                """
+                    INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, selected_month, status)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (job_id, current_user.userid, birth_chart_id, target_year, target_month, 'pending'),
+            )
+            conn.commit()
         
         # Start background processing
         background_tasks.add_task(
@@ -968,19 +959,17 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
 @router.get("/monthly-events/status/{job_id}")
 async def get_event_timeline_status(job_id: str, current_user: User = Depends(get_current_user)):
     """Poll event timeline job status"""
-    import sqlite3
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT status, result_data, error_message, started_at, completed_at
-        FROM event_timeline_jobs
-        WHERE job_id = ? AND user_id = ?
-    ''', (job_id, current_user.userid))
-    
-    result = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT status, result_data, error_message, started_at, completed_at
+                FROM event_timeline_jobs
+                WHERE job_id = %s AND user_id = %s
+            """,
+            (job_id, current_user.userid),
+        )
+        result = cur.fetchone()
     
     if not result:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1004,8 +993,6 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
 @router.post("/monthly-events/cached")
 async def get_cached_timeline(request: ClearChatRequest, current_user: User = Depends(get_current_user)):
     """Get cached event timeline if exists for user and year"""
-    import sqlite3
-    
     try:
         target_year = request.selectedYear or datetime.now().year
         # Handle both birth_chart_id and id fields, convert float to int
@@ -1019,40 +1006,46 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
             print(f"⚠️ No birth_chart_id provided for cache lookup")
             return {"cached": False}
         
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        # Verify birth chart belongs to user
-        cursor.execute(
-            "SELECT id FROM birth_charts WHERE id = ? AND userid = ?",
-            (birth_chart_id, current_user.userid)
-        )
-        if not cursor.fetchone():
-            conn.close()
-            print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
-            return {"cached": False}
-        
-        # Find most recent completed job for this user/birth_chart/year (and month if monthly deep)
-        target_month = request.selectedMonth
-        if target_month is not None:
-            cursor.execute('''
-                SELECT result_data, completed_at, job_id
-                FROM event_timeline_jobs
-                WHERE user_id = ? AND birth_chart_id = ? AND selected_year = ? AND selected_month = ? AND status = 'completed'
-                ORDER BY completed_at DESC
-                LIMIT 1
-            ''', (current_user.userid, birth_chart_id, target_year, target_month))
-        else:
-            cursor.execute('''
-                SELECT result_data, completed_at, job_id
-                FROM event_timeline_jobs
-                WHERE user_id = ? AND birth_chart_id = ? AND selected_year = ? AND (selected_month IS NULL OR selected_month = 0) AND status = 'completed'
-                ORDER BY completed_at DESC
-                LIMIT 1
-            ''', (current_user.userid, birth_chart_id, target_year))
-        
-        result = cursor.fetchone()
-        conn.close()
+        with get_conn() as conn:
+            # Verify birth chart belongs to user
+            cur = execute(
+                conn,
+                "SELECT id FROM birth_charts WHERE id = %s AND userid = %s",
+                (birth_chart_id, current_user.userid),
+            )
+            if not cur.fetchone():
+                print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
+                return {"cached": False}
+
+            # Find most recent completed job for this user/birth_chart/year (and month if monthly deep)
+            target_month = request.selectedMonth
+            if target_month is not None:
+                cur = execute(
+                    conn,
+                    """
+                        SELECT result_data, completed_at, job_id
+                        FROM event_timeline_jobs
+                        WHERE user_id = %s AND birth_chart_id = %s AND selected_year = %s AND selected_month = %s AND status = 'completed'
+                        ORDER BY completed_at DESC
+                        LIMIT 1
+                    """,
+                    (current_user.userid, birth_chart_id, target_year, target_month),
+                )
+            else:
+                cur = execute(
+                    conn,
+                    """
+                        SELECT result_data, completed_at, job_id
+                        FROM event_timeline_jobs
+                        WHERE user_id = %s AND birth_chart_id = %s AND selected_year = %s
+                          AND (selected_month IS NULL OR selected_month = 0)
+                          AND status = 'completed'
+                        ORDER BY completed_at DESC
+                        LIMIT 1
+                    """,
+                    (current_user.userid, birth_chart_id, target_year),
+                )
+            result = cur.fetchone()
         
         if result and result[0]:
             print(f"✅ Found cached timeline: job_id={result[2]}, cached_at={result[1]}")
@@ -1073,8 +1066,6 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
 
 async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: int, user_id: int, cost: int, target_month: int = None):
     """Background task to process event timeline (yearly or monthly dive deep)."""
-    import sqlite3
-    
     print("\n" + "*"*100)
     print(f"🚀 BACKGROUND TASK STARTED: process_event_timeline")
     print(f"   - Job ID: {job_id}")
@@ -1085,27 +1076,29 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
     print(f"   - Cost: {cost} credits")
     print("*"*100 + "\n")
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
     try:
-        # Update status to processing
-        print("🔄 Updating job status to 'processing'...")
-        cursor.execute(
-            "UPDATE event_timeline_jobs SET status = ?, started_at = ? WHERE job_id = ?",
-            ('processing', datetime.now(), job_id)
-        )
-        conn.commit()
-        print("✅ Job status updated")
-        
-        # Fetch birth data from database
-        print(f"🔍 Fetching birth chart {birth_chart_id} from database...")
-        cursor.execute('''
-            SELECT name, date, time, latitude, longitude, timezone, place, gender
-            FROM birth_charts WHERE id = ?
-        ''', (birth_chart_id,))
-        
-        birth_row = cursor.fetchone()
+        with get_conn() as conn:
+            # Update status to processing
+            print("🔄 Updating job status to 'processing'...")
+            execute(
+                conn,
+                "UPDATE event_timeline_jobs SET status = %s, started_at = %s WHERE job_id = %s",
+                ('processing', datetime.now(), job_id),
+            )
+            conn.commit()
+            print("✅ Job status updated")
+
+            # Fetch birth data from database
+            print(f"🔍 Fetching birth chart {birth_chart_id} from database...")
+            cur = execute(
+                conn,
+                """
+                    SELECT name, date, time, latitude, longitude, timezone, place, gender
+                    FROM birth_charts WHERE id = %s
+                """,
+                (birth_chart_id,),
+            )
+            birth_row = cur.fetchone()
         print(f"📊 Birth row result: {birth_row}")
         
         if not birth_row:
@@ -1177,12 +1170,14 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
             print(f"\n💾 Saving result to database...")
             result_json = json.dumps(predictions)
             print(f"   - Result JSON length: {len(result_json)} characters")
-            
-            cursor.execute(
-                "UPDATE event_timeline_jobs SET status = ?, result_data = ?, completed_at = ? WHERE job_id = ?",
-                ('completed', json.dumps(predictions), datetime.now(), job_id)
-            )
-            conn.commit()
+
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    "UPDATE event_timeline_jobs SET status = %s, result_data = %s, completed_at = %s WHERE job_id = %s",
+                    ('completed', json.dumps(predictions), datetime.now(), job_id),
+                )
+                conn.commit()
             print(f"✅ Result saved, task completed")
         else:
             raise Exception(predictions.get('error', 'Prediction failed'))
@@ -1191,11 +1186,12 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         print(f"\n❌ BACKGROUND TASK ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
-        cursor.execute(
-            "UPDATE event_timeline_jobs SET status = ?, error_message = ?, completed_at = ? WHERE job_id = ?",
-            ('failed', str(e), datetime.now(), job_id)
-        )
-        conn.commit()
+        with get_conn() as conn:
+            execute(
+                conn,
+                "UPDATE event_timeline_jobs SET status = %s, error_message = %s, completed_at = %s WHERE job_id = %s",
+                ('failed', str(e), datetime.now(), job_id),
+            )
+            conn.commit()
     finally:
-        conn.close()
         print(f"\n🔒 Database connection closed for job {job_id}\n")

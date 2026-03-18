@@ -29,15 +29,12 @@ def run_nudge_scan(target_date: Optional[date] = None) -> Dict[str, Any]:
         "error": None,
     }
     try:
-        conn = db.get_conn()
-        try:
+        with db.get_conn() as conn:
             db.init_nudge_tables(conn)
-        except Exception as e:
-            logger.exception("Init nudge tables failed: %s", e)
-            summary["error"] = str(e)
-            return summary
-        finally:
-            conn.close()
+    except Exception as e:
+        logger.exception("Init nudge tables failed: %s", e)
+        summary["error"] = str(e)
+        return summary
 
         events = scan(target_date)
         summary["events_found"] = len(events)

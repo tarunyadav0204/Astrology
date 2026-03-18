@@ -2,13 +2,13 @@
 Admin-only API to query user activity from BigQuery (today by default, with filters and sort).
 """
 import os
-import sqlite3
 import logging
 from datetime import datetime, timezone, date
 from typing import Optional, Any, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from auth import get_current_user, User
+from db import get_conn, execute
 
 logger = logging.getLogger(__name__)
 
@@ -46,18 +46,19 @@ def _enrich_activity_user_ids(out: List[Dict[str, Any]]) -> None:
     if not phones_to_lookup:
         return
     try:
-        conn = sqlite3.connect(_DB_PATH)
-        cur = conn.execute(
-            "SELECT userid, name, phone FROM users WHERE phone IN ({})".format(
-                ",".join("?" * len(phones_to_lookup))
-            ),
-            list(phones_to_lookup),
-        )
-        # phone -> (userid, name); name may be None
-        phone_to_user = {}
-        for row in cur.fetchall():
-            phone_to_user[row[2]] = (row[0], row[1] if (row[1] and str(row[1]).strip()) else None)
-        conn.close()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT userid, name, phone FROM users WHERE phone = ANY(%s)",
+                (list(phones_to_lookup),),
+            )
+            # phone -> (userid, name); name may be None
+            phone_to_user = {}
+            for row in cur.fetchall() or []:
+                phone_to_user[row[2]] = (
+                    row[0],
+                    row[1] if (row[1] and str(row[1]).strip()) else None,
+                )
         for row in out:
             phone = row.get("user_phone")
             if not phone:

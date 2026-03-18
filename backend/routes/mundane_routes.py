@@ -2,12 +2,13 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-import sqlite3
 from auth import get_current_user
 from calculators.mundane.mundane_context_builder import MundaneContextBuilder
 from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from db import get_conn, execute
 
 router = APIRouter()
+
 
 class MundaneRequest(BaseModel):
     session_id: str
@@ -26,18 +27,14 @@ async def create_mundane_session(request: dict, current_user = Depends(get_curre
     """Create a new mundane chat session"""
     import uuid
     session_id = str(uuid.uuid4())
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (?, ?, ?)",
-        (session_id, current_user.userid, None)  # No birth_chart_id for mundane
-    )
-    
-    conn.commit()
-    conn.close()
-    
+
+    with get_conn() as conn:
+        execute(
+            conn,
+            "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (%s, %s, %s)",
+            (session_id, current_user.userid, None),  # No birth_chart_id for mundane
+        )
+
     return {"session_id": session_id}
 
 @router.post("/api/mundane/analyze")
@@ -64,31 +61,40 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
             detail=f"Insufficient credits. You need {chat_cost} credits but have {user_balance}."
         )
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Verify session belongs to user
-    cursor.execute("SELECT user_id FROM chat_sessions WHERE session_id = ?", (request.session_id,))
-    session = cursor.fetchone()
-    if not session or session[0] != current_user.userid:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Save user question
-    cursor.execute(
-        "INSERT INTO chat_messages (session_id, sender, content, status, completed_at) VALUES (?, ?, ?, ?, ?)",
-        (request.session_id, "user", request.question, "completed", datetime.now())
-    )
-    
-    # Create processing assistant message
-    cursor.execute(
-        "INSERT INTO chat_messages (session_id, sender, content, status, started_at) VALUES (?, ?, ?, ?, ?)",
-        (request.session_id, "assistant", "", "processing", datetime.now())
-    )
-    
-    message_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        # Verify session belongs to user
+        cur = execute(
+            conn,
+            "SELECT user_id FROM chat_sessions WHERE session_id = %s",
+            (request.session_id,),
+        )
+        session = cur.fetchone()
+        if not session or session[0] != current_user.userid:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Save user question
+        cur = execute(
+            conn,
+            """
+            INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING message_id
+            """,
+            (request.session_id, "user", request.question, "completed", datetime.now()),
+        )
+
+        # Create processing assistant message
+        cur = execute(
+            conn,
+            """
+            INSERT INTO chat_messages (session_id, sender, content, status, started_at)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING message_id
+            """,
+            (request.session_id, "assistant", "", "processing", datetime.now()),
+        )
+        row = cur.fetchone()
+        message_id = row[0] if row else None
     
     # Start background processing
     background_tasks.add_task(
@@ -116,19 +122,18 @@ async def process_mundane_response(
         # Build lightweight conversation history (last 3 Q&A) for this mundane session
         history = []
         try:
-            with sqlite3.connect('astrology.db') as conn:
-                cursor = conn.cursor()
-                # Fetch all prior messages in this session before the current assistant placeholder
-                cursor.execute(
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
                     """
                     SELECT message_id, sender, content, timestamp
                     FROM chat_messages
-                    WHERE session_id = ? AND message_id < ?
+                    WHERE session_id = %s AND message_id < %s
                     ORDER BY timestamp ASC, message_id ASC
                     """,
                     (session_id, message_id),
                 )
-                rows = cursor.fetchall()
+                rows = cur.fetchall() or []
 
             # Pair user/assistant messages into simple Q&A objects
             pending_question = None
@@ -179,47 +184,67 @@ async def process_mundane_response(
         )
         
         # Update database with result
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            
-            if result.get('success'):
+        from credits.credit_service import CreditService
+
+        credit_service = CreditService()
+        with get_conn() as conn:
+            if result.get("success"):
                 # Deduct credits
-                from credits.credit_service import CreditService
-                credit_service = CreditService()
                 success = credit_service.spend_credits(
                     user_id,
                     chat_cost,
-                    'mundane_analysis',
-                    f"Mundane: {country} {year}"
+                    "mundane_analysis",
+                    f"Mundane: {country} {year}",
                 )
-                
+
                 if success:
-                    cursor.execute(
-                        "UPDATE chat_messages SET content = ?, status = ?, completed_at = ? WHERE message_id = ?",
-                        (result['response'], "completed", datetime.now(), message_id)
+                    execute(
+                        conn,
+                        """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, completed_at = %s
+                        WHERE message_id = %s
+                        """,
+                        (result["response"], "completed", datetime.now(), message_id),
                     )
                 else:
-                    cursor.execute(
-                        "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                        ("failed", "Credit deduction failed", datetime.now(), message_id)
+                    execute(
+                        conn,
+                        """
+                        UPDATE chat_messages
+                        SET status = %s, error_message = %s, completed_at = %s
+                        WHERE message_id = %s
+                        """,
+                        ("failed", "Credit deduction failed", datetime.now(), message_id),
                     )
             else:
-                cursor.execute(
-                    "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                    ("failed", result.get('error', 'Analysis failed'), datetime.now(), message_id)
+                execute(
+                    conn,
+                    """
+                    UPDATE chat_messages
+                    SET status = %s, error_message = %s, completed_at = %s
+                    WHERE message_id = %s
+                    """,
+                    (
+                        "failed",
+                        result.get("error", "Analysis failed"),
+                        datetime.now(),
+                        message_id,
+                    ),
                 )
-            
-            conn.commit()
     
     except Exception as e:
         import traceback
         print(f"❌ Mundane Analysis Error: {str(e)}")
         print(traceback.format_exc())
         
-        with sqlite3.connect('astrology.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                ("failed", "Analysis failed. Please try again.", datetime.now(), message_id)
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE chat_messages
+                SET status = %s, error_message = %s, completed_at = %s
+                WHERE message_id = %s
+                """,
+                ("failed", "Analysis failed. Please try again.", datetime.now(), message_id),
             )
-            conn.commit()

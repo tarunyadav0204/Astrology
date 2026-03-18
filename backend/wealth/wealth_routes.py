@@ -5,10 +5,10 @@ import sys
 import os
 import hashlib
 import json
-import sqlite3
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 # Add the parent directory to the path to import calculators
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -75,39 +75,51 @@ def _create_birth_hash(birth_data):
 
 def _init_ai_insights_table():
     """Initialize AI insights table if not exists"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ai_wealth_insights (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            birth_hash TEXT UNIQUE,
-            insights_data TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS ai_wealth_insights (
+                id SERIAL PRIMARY KEY,
+                userid INTEGER NOT NULL DEFAULT 0,
+                birth_hash TEXT NOT NULL,
+                insights_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                , UNIQUE(userid, birth_hash)
+            )
+            """,
         )
-    ''')
-    conn.commit()
-    conn.close()
 
-def _get_stored_ai_insights(birth_hash):
+def _get_stored_ai_insights(userid: int, birth_hash: str):
     """Get stored AI insights from database"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT insights_data FROM ai_wealth_insights WHERE birth_hash = ?', (birth_hash,))
-    result = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT insights_data
+            FROM ai_wealth_insights
+            WHERE userid = %s AND birth_hash = %s
+            """,
+            (userid, birth_hash),
+        )
+        result = cur.fetchone()
     return json.loads(result[0]) if result else None
 
-def _store_ai_insights(birth_hash, insights_data):
+def _store_ai_insights(userid: int, birth_hash: str, insights_data):
     """Store AI insights in database"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT OR REPLACE INTO ai_wealth_insights (birth_hash, insights_data, updated_at)
-        VALUES (?, ?, ?)
-    ''', (birth_hash, json.dumps(insights_data), datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            INSERT INTO ai_wealth_insights (userid, birth_hash, insights_data, updated_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (userid, birth_hash)
+            DO UPDATE SET insights_data = EXCLUDED.insights_data,
+                          updated_at = EXCLUDED.updated_at
+            """,
+            (userid, birth_hash, json.dumps(insights_data), datetime.now().isoformat()),
+        )
 
 def parse_gemini_astrology_response(raw_text):
     """
@@ -311,7 +323,7 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             # Check cache first
             force_regen = request.force_regenerate
             print(f"🔍 Cache check - force_regenerate: {force_regen}")
-            stored_insights = _get_stored_ai_insights(birth_hash)
+            stored_insights = _get_stored_ai_insights(current_user.userid, birth_hash)
             print(f"💾 Cached insights found: {stored_insights is not None}")
             
             if stored_insights and not force_regen:
@@ -534,7 +546,7 @@ IMPORTANT: Include meaningful final_thoughts with overall assessment and key adv
                         print(f"❌ Credit deduction failed")
                     
                     # Store in cache
-                    _store_ai_insights(birth_hash, parsed_response)
+                    _store_ai_insights(current_user.userid, birth_hash, parsed_response)
                     print(f"💾 Response cached successfully")
                     
                     # Build the final insights object - send data in mobile-expected format
@@ -609,7 +621,7 @@ async def check_cached_insights(request: BirthDetailsRequest, current_user: User
         birth_hash = _create_birth_hash(birth_data)
         _init_ai_insights_table()
         
-        stored_insights = _get_stored_ai_insights(birth_hash)
+        stored_insights = _get_stored_ai_insights(current_user.userid, birth_hash)
         
         if stored_insights:
             # Format cached response for mobile compatibility

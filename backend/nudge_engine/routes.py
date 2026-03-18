@@ -12,7 +12,6 @@ from auth import User, get_current_user
 from .service import run_nudge_scan
 from . import db
 from . import push as push_module
-from blog.routes import get_db_connection as get_blog_conn
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +79,9 @@ async def register_device_token(
     if platform not in ("ios", "android"):
         raise HTTPException(status_code=400, detail="platform must be ios or android")
     try:
-        conn = db.get_conn()
-        try:
+        with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             db.save_device_token(conn, current_user.userid, body.token, platform)
-        finally:
-            conn.close()
         return {"ok": True, "message": "Token registered"}
     except Exception as e:
         logger.exception("Device token registration failed: %s", e)
@@ -100,12 +96,9 @@ async def get_user_ids_with_tokens(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     try:
-        conn = db.get_conn()
-        try:
+        with db.get_conn() as conn:
             rows = db.get_all_device_tokens(conn)
             user_ids = list({r[0] for r in rows})
-        finally:
-            conn.close()
         return {"user_ids": user_ids}
     except Exception as e:
         logger.exception("Failed to get user ids with tokens: %s", e)
@@ -138,8 +131,7 @@ async def admin_send_notification(
     if not title or not body_text:
         raise HTTPException(status_code=400, detail="title and body required")
     try:
-        conn = db.get_conn()
-        try:
+        with db.get_conn() as conn:
             tokens = db.get_device_tokens_for_user(conn, body.user_id)
             if not tokens:
                 logger.info(
@@ -166,7 +158,6 @@ async def admin_send_notification(
                     data=push_data,
                 ):
                     sent += 1
-            channel = "push" if sent else "stored"
             db.insert_delivery(
                 conn,
                 userid=body.user_id,
@@ -177,8 +168,6 @@ async def admin_send_notification(
                 event_params="{}",
                 channel=channel,
             )
-        finally:
-            conn.close()
         logger.info(
             "Admin send notification success: user_id=%s sent=%s tokens_found=%s",
             body.user_id,
@@ -234,8 +223,7 @@ async def admin_send_blog_notification(
         notif_title = (title or "").strip()[:100] or "New blog on AstroRoshni"
         notif_body = "Tap to read this new article on AstroRoshni."
 
-        conn = db.get_conn()
-        try:
+        with db.get_conn() as conn:
             # Ensure nudge tables (including device_tokens) exist
             db.init_nudge_tables(conn)
 
@@ -296,8 +284,6 @@ async def admin_send_blog_notification(
                     event_params=f'{{"blog_id": {blog_id}, "slug": "{slug}"}}',
                     channel=channel,
                 )
-        finally:
-            conn.close()
 
         logger.info(
             "Admin send blog notification success: blog_id=%s users=%s tokens_sent=%s",

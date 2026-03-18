@@ -13,6 +13,7 @@ import asyncio
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -187,32 +188,41 @@ Escape quotes properly: \"text\"
                     
                     # Cache the analysis
                     try:
-                        import sqlite3
                         import hashlib
-                        
-                        birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
-                        
-                        conn = sqlite3.connect('astrology.db')
-                        cursor = conn.cursor()
-                        
-                        cursor.execute("""
-                            CREATE TABLE IF NOT EXISTS ai_marriage_insights (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                birth_hash TEXT UNIQUE,
-                                insights_data TEXT,
-                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+                        birth_hash = hashlib.md5(
+                            f"{request.date}_{request.time}_{request.place}".encode()
+                        ).hexdigest()
+
+                        with get_conn() as conn:
+                            # Table should be present from schema, but keep defensive create
+                            execute(
+                                conn,
+                                """
+                                CREATE TABLE IF NOT EXISTS ai_marriage_insights (
+                                    id SERIAL PRIMARY KEY,
+                                    userid INTEGER NOT NULL DEFAULT 0,
+                                    birth_hash TEXT NOT NULL,
+                                    insights_data TEXT,
+                                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    UNIQUE(userid, birth_hash)
+                                )
+                                """,
                             )
-                        """)
-                        
-                        cursor.execute("""
-                            INSERT OR REPLACE INTO ai_marriage_insights 
-                            (birth_hash, insights_data, updated_at)
-                            VALUES (?, ?, CURRENT_TIMESTAMP)
-                        """, (birth_hash, json.dumps(marriage_insights)))
-                        
-                        conn.commit()
-                        conn.close()
+
+                            execute(
+                                conn,
+                                """
+                                INSERT INTO ai_marriage_insights (userid, birth_hash, insights_data, updated_at)
+                                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                                ON CONFLICT (userid, birth_hash)
+                                DO UPDATE SET insights_data = EXCLUDED.insights_data,
+                                              updated_at = EXCLUDED.updated_at
+                                """,
+                                (current_user.userid, birth_hash, json.dumps(marriage_insights)),
+                            )
+
                         print(f"💾 Analysis cached successfully")
                     except Exception as cache_error:
                         print(f"⚠️ Failed to cache analysis: {cache_error}")

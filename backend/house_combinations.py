@@ -6,8 +6,9 @@ Database tables and API endpoints for managing house specifications and combinat
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import sqlite3
 import json
+
+from db import get_conn, execute
 
 router = APIRouter()
 
@@ -30,34 +31,38 @@ class GenerateRequest(BaseModel):
 
 def init_house_combinations_db():
     """Initialize house combinations database tables"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # House specifications table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS house_specifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            house_number INTEGER UNIQUE NOT NULL,
-            specifications TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    with get_conn() as conn:
+        # House specifications table
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS house_specifications (
+                id SERIAL PRIMARY KEY,
+                house_number INTEGER UNIQUE NOT NULL,
+                specifications TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
         )
-    ''')
-    
-    # House combinations table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS house_combinations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            houses TEXT NOT NULL,
-            positive_prediction TEXT NOT NULL,
-            negative_prediction TEXT NOT NULL,
-            combination_name TEXT NOT NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+        # House combinations table
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS house_combinations (
+                id SERIAL PRIMARY KEY,
+                houses TEXT NOT NULL,
+                positive_prediction TEXT NOT NULL,
+                negative_prediction TEXT NOT NULL,
+                combination_name TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
         )
-    ''')
-    
+
     # Insert comprehensive house specifications
     default_specs = {
         1: ["personality", "health", "appearance", "self", "vitality", "head", "brain", "identity", "physical body", "constitution", "temperament", "general well-being", "life force", "ego", "individuality", "first impressions", "leadership", "initiative", "independence", "self-confidence", "personal magnetism", "physical strength", "longevity", "birth circumstances", "early life"],
@@ -86,11 +91,18 @@ def init_house_combinations_db():
     }
     
     for house_num, specs in default_specs.items():
-        cursor.execute(
-            "INSERT OR REPLACE INTO house_specifications (house_number, specifications) VALUES (?, ?)",
-            (house_num, json.dumps(specs))
+        execute(
+            conn,
+            """
+            INSERT INTO house_specifications (house_number, specifications)
+            VALUES (%s, %s)
+            ON CONFLICT (house_number)
+            DO UPDATE SET specifications = EXCLUDED.specifications,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (house_num, json.dumps(specs)),
         )
-    
+
     # Insert some default combinations
     default_combinations = [
         {
@@ -120,13 +132,21 @@ def init_house_combinations_db():
     ]
     
     for combo in default_combinations:
-        cursor.execute(
-            "INSERT OR IGNORE INTO house_combinations (houses, positive_prediction, negative_prediction, combination_name) VALUES (?, ?, ?, ?)",
-            (json.dumps(combo["houses"]), combo["positive_prediction"], combo["negative_prediction"], combo["combination_name"])
+        execute(
+            conn,
+            """
+            INSERT INTO house_combinations (houses, positive_prediction, negative_prediction, combination_name)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (houses, combination_name)
+            DO NOTHING
+            """,
+            (
+                json.dumps(combo["houses"]),
+                combo["positive_prediction"],
+                combo["negative_prediction"],
+                combo["combination_name"],
+            ),
         )
-    
-    conn.commit()
-    conn.close()
 
 
 # Initialize database on module load (after function is defined)
@@ -139,12 +159,13 @@ except Exception as e:
 @router.get("/house-specifications")
 async def get_house_specifications():
     """Get all house specifications"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM house_specifications ORDER BY house_number")
-    rows = cursor.fetchall()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT id, house_number, specifications, created_at, updated_at FROM house_specifications ORDER BY house_number",
+        )
+        rows = cur.fetchall() or []
+
     specs = []
     for row in rows:
         specs.append({
@@ -152,7 +173,7 @@ async def get_house_specifications():
             "house_number": row[1],
             "specifications": json.loads(row[2]),
             "created_at": row[3],
-            "updated_at": row[4]
+            "updated_at": row[4],
         })
     
     return {"specifications": specs}
@@ -164,33 +185,44 @@ async def update_house_specification(
 ):
     """Update house specifications"""
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE house_specifications SET specifications = ?, updated_at = CURRENT_TIMESTAMP WHERE house_number = ?",
-        (json.dumps(spec.specifications), house_number)
-    )
-    
-    if cursor.rowcount == 0:
-        cursor.execute(
-            "INSERT INTO house_specifications (house_number, specifications) VALUES (?, ?)",
-            (house_number, json.dumps(spec.specifications))
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            UPDATE house_specifications
+            SET specifications = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE house_number = %s
+            """,
+            (json.dumps(spec.specifications), house_number),
         )
-    
-    conn.commit()
-    conn.close()
+
+        if cur.rowcount == 0:
+            execute(
+                conn,
+                """
+                INSERT INTO house_specifications (house_number, specifications)
+                VALUES (%s, %s)
+                """,
+                (house_number, json.dumps(spec.specifications)),
+            )
     
     return {"message": "House specification updated successfully"}
 
 @router.get("/house-combinations")
 async def get_house_combinations():
     """Get all house combinations"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM house_combinations ORDER BY id")
-    rows = cursor.fetchall()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT id, houses, positive_prediction, negative_prediction, combination_name,
+                   is_active, created_at, updated_at
+            FROM house_combinations
+            ORDER BY id
+            """,
+        )
+        rows = cur.fetchall() or []
+
     combinations = []
     for row in rows:
         combinations.append({
@@ -212,14 +244,22 @@ async def create_house_combination(
 ):
     """Create new house combination"""
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO house_combinations (houses, positive_prediction, negative_prediction, combination_name, is_active) VALUES (?, ?, ?, ?, ?)",
-        (json.dumps(combination.houses), combination.positive_prediction, combination.negative_prediction, combination.combination_name, combination.is_active)
-    )
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            INSERT INTO house_combinations
+                (houses, positive_prediction, negative_prediction, combination_name, is_active)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                json.dumps(combination.houses),
+                combination.positive_prediction,
+                combination.negative_prediction,
+                combination.combination_name,
+                combination.is_active,
+            ),
+        )
     
     return {"message": "House combination created successfully"}
 
@@ -230,19 +270,31 @@ async def update_house_combination(
 ):
     """Update house combination"""
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE house_combinations SET houses = ?, positive_prediction = ?, negative_prediction = ?, combination_name = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (json.dumps(combination.houses), combination.positive_prediction, combination.negative_prediction, combination.combination_name, combination.is_active, combination_id)
-    )
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Combination not found")
-    
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            UPDATE house_combinations
+            SET houses = %s,
+                positive_prediction = %s,
+                negative_prediction = %s,
+                combination_name = %s,
+                is_active = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (
+                json.dumps(combination.houses),
+                combination.positive_prediction,
+                combination.negative_prediction,
+                combination.combination_name,
+                combination.is_active,
+                combination_id,
+            ),
+        )
+
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Combination not found")
     
     return {"message": "House combination updated successfully"}
 
@@ -252,16 +304,15 @@ async def delete_house_combination(
 ):
     """Delete house combination"""
     
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM house_combinations WHERE id = ?", (combination_id,))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Combination not found")
-    
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "DELETE FROM house_combinations WHERE id = %s",
+            (combination_id,),
+        )
+
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Combination not found")
     
     return {"message": "House combination deleted successfully"}
 
@@ -273,30 +324,27 @@ async def search_house_combinations(
     limit: int = 100
 ):
     """Search house combinations by houses and text"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    query = "SELECT * FROM house_combinations WHERE is_active = TRUE"
-    params = []
-    
-    if houses:
-        # Parse houses (e.g., "2,8" or "1,5,9")
-        house_list = [int(h.strip()) for h in houses.split(',') if h.strip().isdigit()]
-        if house_list:
-            # Filter results in Python for exact house matching
-            query += " AND id > 0"  # Placeholder to get all results first
-    
-    if search_text:
-        query += " AND (combination_name LIKE ? OR positive_prediction LIKE ? OR negative_prediction LIKE ?)"
-        search_pattern = f'%{search_text}%'
-        params.extend([search_pattern, search_pattern, search_pattern])
-    
-    query += " ORDER BY id DESC LIMIT ?"
-    params.append(limit)
-    
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        
+        query = "SELECT id, houses, positive_prediction, negative_prediction, combination_name, is_active, created_at, updated_at FROM house_combinations WHERE is_active = TRUE"
+        params = []
+        
+        if houses:
+            house_list = [int(h.strip()) for h in houses.split(',') if h.strip().isdigit()]
+            if house_list:
+                query += " AND id > 0"
+        
+        if search_text:
+            query += " AND (combination_name LIKE ? OR positive_prediction LIKE ? OR negative_prediction LIKE ?)"
+            search_pattern = f'%{search_text}%'
+            params.extend([search_pattern, search_pattern, search_pattern])
+        
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
     
     combinations = []
     for row in rows:
@@ -330,11 +378,16 @@ async def search_house_combinations(
 
 def get_active_house_combinations() -> List[Dict]:
     """Get active house combinations for prediction engine"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT houses, positive_prediction, negative_prediction, combination_name FROM house_combinations WHERE is_active = TRUE")
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT houses, positive_prediction, negative_prediction, combination_name
+            FROM house_combinations
+            WHERE is_active = TRUE
+            """,
+        )
+        rows = cur.fetchall() or []
     
     combinations = []
     for row in rows:
@@ -349,11 +402,12 @@ def get_active_house_combinations() -> List[Dict]:
 
 def get_house_specifications_dict() -> Dict[int, List[str]]:
     """Get house specifications as dictionary for prediction engine"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT house_number, specifications FROM house_specifications")
-    rows = cursor.fetchall()
-    conn.close()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT house_number, specifications FROM house_specifications",
+        )
+        rows = cur.fetchall() or []
     
     specs = {}
     for row in rows:

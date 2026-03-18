@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, Dict, List, Any, Tuple
-import sqlite3
 import os
 from datetime import datetime
 from collections import defaultdict, OrderedDict
 from calculators.annual_nakshatra_calculator import AnnualNakshatraCalculator
+from db import get_conn, execute
 
 router = APIRouter()
 
@@ -64,9 +64,9 @@ def _build_nakshatra_year_response(year: int, latitude: float, longitude: float,
 
 
 def get_db_connection():
-    """Get database connection"""
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'astrology.db')
-    return sqlite3.connect(db_path)
+    """Get database connection (Postgres) via shared db utility."""
+    # Kept for backward compatibility with existing call sites
+    return get_conn()
 
 
 @router.get("/nakshatra/year/{year}")
@@ -140,17 +140,18 @@ async def get_nakshatra_year_data(
             )
         
         # Get detailed nakshatra info from database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT name, lord, deity, nature, guna, description, characteristics, 
-                   positive_traits, negative_traits, careers, compatibility
-            FROM nakshatras WHERE LOWER(name) = LOWER(?)
-        """, (nakshatra_name.title(),))
-        
-        db_result = cursor.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT name, lord, deity, nature, guna, description, characteristics,
+                       positive_traits, negative_traits, careers, compatibility
+                FROM nakshatras
+                WHERE LOWER(name) = LOWER(%s)
+                """,
+                (nakshatra_name.title(),),
+            )
+            db_result = cur.fetchone()
         
         # Start with calculator properties (includes symbol)
         detailed_info = nakshatra_data['properties'].copy()
@@ -207,16 +208,16 @@ async def get_all_nakshatras():
         nakshatras_list = calculator.get_all_nakshatras_list()
         
         # Get additional info from database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT name, lord, deity, nature, guna, description
-            FROM nakshatras ORDER BY id
-        """)
-        
-        db_results = cursor.fetchall()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT name, lord, deity, nature, guna, description
+                FROM nakshatras
+                ORDER BY id
+                """,
+            )
+            db_results = cur.fetchall()
         
         # Merge calculator data with database data
         enhanced_list = []
@@ -264,17 +265,18 @@ async def get_nakshatra_info(nakshatra_name: str):
             raise HTTPException(status_code=404, detail=f"Nakshatra '{nakshatra_name}' not found")
         
         # Get from database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT name, lord, deity, nature, guna, description, characteristics,
-                   positive_traits, negative_traits, careers, compatibility
-            FROM nakshatras WHERE name = ?
-        """, (nakshatra_name.title(),))
-        
-        result = cursor.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT name, lord, deity, nature, guna, description, characteristics,
+                       positive_traits, negative_traits, careers, compatibility
+                FROM nakshatras
+                WHERE name = %s
+                """,
+                (nakshatra_name.title(),),
+            )
+            result = cur.fetchone()
         
         if not result:
             raise HTTPException(status_code=404, detail=f"Detailed info for '{nakshatra_name}' not found")

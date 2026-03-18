@@ -4,11 +4,13 @@ Seed initial prompt configuration data
 Run: python3 chat/PromptConfig/seed_data.py
 """
 
-import sqlite3
 import json
 import os
 
-def seed_instruction_modules(cursor):
+from db import get_conn, execute
+
+
+def seed_instruction_modules(conn):
     """Seed instruction modules"""
     
     modules = [
@@ -95,21 +97,31 @@ Always cite classical texts (BPHS, Jaimini Sutras, Phaladeepika, Saravali).''',
     ]
     
     for module in modules:
-        cursor.execute('''
-            INSERT OR REPLACE INTO prompt_instruction_modules 
-            (module_key, module_name, instruction_text, character_count, priority)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (
-            module['module_key'],
-            module['module_name'],
-            module['instruction_text'],
-            len(module['instruction_text']),
-            module['priority']
-        ))
+        execute(
+            conn,
+            """
+            INSERT INTO prompt_instruction_modules
+                (module_key, module_name, instruction_text, character_count, priority)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (module_key)
+            DO UPDATE SET
+                module_name = EXCLUDED.module_name,
+                instruction_text = EXCLUDED.instruction_text,
+                character_count = EXCLUDED.character_count,
+                priority = EXCLUDED.priority
+            """,
+            (
+                module["module_key"],
+                module["module_name"],
+                module["instruction_text"],
+                len(module["instruction_text"]),
+                module["priority"],
+            ),
+        )
     
     print(f"✅ Seeded {len(modules)} instruction modules")
 
-def seed_category_configs(cursor):
+def seed_category_configs(conn):
     """Seed category configurations"""
     
     categories = [
@@ -188,41 +200,46 @@ def seed_category_configs(cursor):
     ]
     
     for category in categories:
-        cursor.execute('''
-            INSERT OR REPLACE INTO prompt_category_config 
-            (category_key, category_name, required_modules, required_data_fields,
-             optional_data_fields, max_transit_activations)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            category['category_key'],
-            category['category_name'],
-            json.dumps(category['required_modules']),
-            json.dumps(category['required_data_fields']),
-            json.dumps(category['optional_data_fields']),
-            category['max_transit_activations']
-        ))
+        execute(
+            conn,
+            """
+            INSERT INTO prompt_category_config
+                (category_key, category_name, required_modules, required_data_fields,
+                 optional_data_fields, max_transit_activations)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (category_key, tier_key)
+            DO UPDATE SET
+                category_name = EXCLUDED.category_name,
+                required_modules = EXCLUDED.required_modules,
+                required_data_fields = EXCLUDED.required_data_fields,
+                optional_data_fields = EXCLUDED.optional_data_fields,
+                max_transit_activations = EXCLUDED.max_transit_activations
+            """,
+            (
+                category["category_key"],
+                category["category_name"],
+                json.dumps(category["required_modules"]),
+                json.dumps(category["required_data_fields"]),
+                json.dumps(category["optional_data_fields"]),
+                category["max_transit_activations"],
+            ),
+        )
     
     print(f"✅ Seeded {len(categories)} category configurations")
 
 def seed_data():
     """Main seed function"""
-    db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'astrology.db')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    print("Seeding prompt configuration data...")
-    
-    seed_instruction_modules(cursor)
-    seed_category_configs(cursor)
-    
-    conn.commit()
-    conn.close()
-    
-    print("\n✅ All data seeded successfully!")
-    print("\nYou can now:")
-    print("1. Use PromptConfigService to fetch configurations")
-    print("2. Access admin UI to manage modules and categories")
-    print("3. View performance logs in prompt_performance_log table")
+    with get_conn() as conn:
+        print("Seeding prompt configuration data...")
+        
+        seed_instruction_modules(conn)
+        seed_category_configs(conn)
+        
+        print("\n✅ All data seeded successfully!")
+        print("\nYou can now:")
+        print("1. Use PromptConfigService to fetch configurations")
+        print("2. Access admin UI to manage modules and categories")
+        print("3. View performance logs in prompt_performance_log table")
 
 if __name__ == '__main__':
     seed_data()

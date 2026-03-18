@@ -186,6 +186,25 @@ export default function SelectNativeScreen({ navigation, route }) {
     }
   };
 
+  const syncSelfBirthDetails = async () => {
+    try {
+      const { authAPI } = require('../../services/api');
+      const response = await authAPI.getSelfBirthChart();
+      if (response?.data?.has_self_chart) {
+        const bd = {
+          ...response.data,
+          id: response.data.birth_chart_id, // normalize id field
+        };
+        await storage.setBirthDetails(bd);
+      } else {
+        // No chart marked as self after deletion: clear selection
+        await storage.clearBirthDetails();
+      }
+    } catch (e) {
+      // Non-fatal; UI will fall back to whatever is in storage/profiles.
+    }
+  };
+
   const selectProfile = async (profile) => {
     try {
       // Ensure profile includes id
@@ -270,6 +289,8 @@ export default function SelectNativeScreen({ navigation, route }) {
                 await chartAPI.deleteChart(profile.id);
               }
               await storage.removeBirthProfile(profile.name);
+              // Prevent stale selected chart: sync "self" from backend.
+              await syncSelfBirthDetails();
               loadProfiles();
             } catch (error) {
               Alert.alert('Error', 'Failed to delete profile');

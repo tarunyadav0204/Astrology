@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Form
 from typing import List, Optional
-import sqlite3
 import json
 import os
 from datetime import datetime
@@ -12,13 +11,9 @@ except Exception as e:
     from .local_storage import storage_manager
 import re
 
-router = APIRouter(prefix="/api/blog", tags=["blog"])
+from db import get_conn, execute
 
-def get_db_connection():
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'astrology.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+router = APIRouter(prefix="/api/blog", tags=["blog"])
 
 def create_slug(title: str) -> str:
     """Create URL-friendly slug from title"""
@@ -34,158 +29,157 @@ async def get_posts(
     offset: int = 0
 ):
     """Get blog posts with filtering"""
-    conn = get_db_connection()
-    
     query = "SELECT * FROM blog_posts WHERE 1=1"
-    params = []
-    
+    params: list = []
+
     if status:
-        query += " AND status = ?"
+        query += " AND status = %s"
         params.append(status)
-    
+
     if category:
-        query += " AND category = ?"
+        query += " AND category = %s"
         params.append(category)
-    
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+
+    query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
     params.extend([limit, offset])
-    
-    cursor = conn.execute(query, params)
-    posts = cursor.fetchall()
-    conn.close()
-    
-    # Convert to Pydantic models
-    result = []
-    for post in posts:
-        post_dict = dict(post)
-        post_dict['tags'] = json.loads(post_dict['tags']) if post_dict['tags'] else []
-        result.append(BlogPost(**post_dict))
-    
+
+    with get_conn() as conn:
+        cur = execute(conn, query, tuple(params))
+        rows = cur.fetchall() or []
+        colnames = [d[0] for d in cur.description] if cur.description else []
+
+    result: List[BlogPost] = []
+    for row in rows:
+        data = dict(zip(colnames, row)) if colnames else {}
+        tags_raw = data.get("tags")
+        data["tags"] = json.loads(tags_raw) if tags_raw else []
+        result.append(BlogPost(**data))
+
     return result
 
 @router.post("/posts", response_model=BlogPost)
 async def create_post(post: BlogPostCreate):
     """Create new blog post"""
-    conn = get_db_connection()
-    
     # Use provided slug or generate from title
     slug = post.slug or create_slug(post.title)
-    
-    # Check if slug exists
-    cursor = conn.execute("SELECT id FROM blog_posts WHERE slug = ?", (slug,))
-    if cursor.fetchone():
-        # Add timestamp to make unique
-        slug = f"{slug}-{int(datetime.now().timestamp())}"
-    
-    # Insert post
-    cursor = conn.execute('''
-        INSERT INTO blog_posts 
-        (title, slug, content, excerpt, meta_description, tags, category, 
-         featured_image, status, scheduled_for, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        post.title, slug, post.content, post.excerpt, post.meta_description,
-        json.dumps(post.tags), post.category, post.featured_image, post.status,
-        post.scheduled_for, datetime.now() if post.status == 'published' else None
-    ))
-    
-    post_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    # Return created post
+
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT id FROM blog_posts WHERE slug = %s", (slug,))
+        if cur.fetchone():
+            slug = f"{slug}-{int(datetime.now().timestamp())}"
+
+        cur = execute(
+            conn,
+            """
+            INSERT INTO blog_posts
+                (title, slug, content, excerpt, meta_description, tags, category,
+                 featured_image, status, scheduled_for, published_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                post.title,
+                slug,
+                post.content,
+                post.excerpt,
+                post.meta_description,
+                json.dumps(post.tags),
+                post.category,
+                post.featured_image,
+                post.status,
+                post.scheduled_for,
+                datetime.now() if post.status == "published" else None,
+            ),
+        )
+        row = cur.fetchone()
+        post_id = row[0] if row else None
+
+    if post_id is None:
+        raise HTTPException(status_code=500, detail="Failed to create post")
+
     return await get_post_by_id(post_id)
 
 @router.get("/posts/{post_id}", response_model=BlogPost)
 async def get_post_by_id(post_id: int):
     """Get single blog post by ID"""
-    conn = get_db_connection()
-    cursor = conn.execute("SELECT * FROM blog_posts WHERE id = ?", (post_id,))
-    post = cursor.fetchone()
-    conn.close()
-    
-    if not post:
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT * FROM blog_posts WHERE id = %s", (post_id,))
+        row = cur.fetchone()
+        colnames = [d[0] for d in cur.description] if cur.description else []
+
+    if not row:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    post_dict = dict(post)
-    post_dict['tags'] = json.loads(post_dict['tags']) if post_dict['tags'] else []
-    return BlogPost(**post_dict)
+
+    data = dict(zip(colnames, row)) if colnames else {}
+    tags_raw = data.get("tags")
+    data["tags"] = json.loads(tags_raw) if tags_raw else []
+    return BlogPost(**data)
 
 @router.get("/posts/slug/{slug}", response_model=BlogPost)
 async def get_post_by_slug(slug: str):
     """Get single blog post by slug"""
-    conn = get_db_connection()
-    cursor = conn.execute("SELECT * FROM blog_posts WHERE slug = ?", (slug,))
-    post = cursor.fetchone()
-    
-    if post:
-        # Increment view count
-        conn.execute("UPDATE blog_posts SET view_count = view_count + 1 WHERE slug = ?", (slug,))
-        conn.commit()
-    
-    conn.close()
-    
-    if not post:
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT * FROM blog_posts WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        colnames = [d[0] for d in cur.description] if cur.description else []
+
+        if row:
+            execute(
+                conn,
+                "UPDATE blog_posts SET view_count = view_count + 1 WHERE slug = %s",
+                (slug,),
+            )
+
+    if not row:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    post_dict = dict(post)
-    post_dict['tags'] = json.loads(post_dict['tags']) if post_dict['tags'] else []
-    return BlogPost(**post_dict)
+
+    data = dict(zip(colnames, row)) if colnames else {}
+    tags_raw = data.get("tags")
+    data["tags"] = json.loads(tags_raw) if tags_raw else []
+    return BlogPost(**data)
 
 @router.put("/posts/{post_id}", response_model=BlogPost)
 async def update_post(post_id: int, post_update: BlogPostUpdate):
     """Update blog post"""
-    conn = get_db_connection()
-    
     # Build update query dynamically
     update_fields = []
-    params = []
-    
+    params: list = []
+
     for field, value in post_update.dict(exclude_unset=True).items():
-        if field == 'tags':
+        if field == "tags":
             value = json.dumps(value)
-        update_fields.append(f"{field} = ?")
+        update_fields.append(f"{field} = %s")
         params.append(value)
-    
+
     if not update_fields:
         raise HTTPException(status_code=400, detail="No fields to update")
-    
-    # Add updated_at
-    update_fields.append("updated_at = ?")
+
+    update_fields.append("updated_at = %s")
     params.append(datetime.now())
-    
-    # Add published_at if status changed to published
-    if post_update.status == 'published':
-        update_fields.append("published_at = ?")
+
+    if post_update.status == "published":
+        update_fields.append("published_at = %s")
         params.append(datetime.now())
-    
+
     params.append(post_id)
-    
-    query = f"UPDATE blog_posts SET {', '.join(update_fields)} WHERE id = ?"
-    cursor = conn.execute(query, params)
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    conn.commit()
-    conn.close()
-    
+
+    query = f"UPDATE blog_posts SET {', '.join(update_fields)} WHERE id = %s"
+
+    with get_conn() as conn:
+        cur = execute(conn, query, tuple(params))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Post not found")
+
     return await get_post_by_id(post_id)
 
 @router.delete("/posts/{post_id}")
 async def delete_post(post_id: int):
     """Delete blog post"""
-    conn = get_db_connection()
-    cursor = conn.execute("DELETE FROM blog_posts WHERE id = ?", (post_id,))
-    
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    conn.commit()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(conn, "DELETE FROM blog_posts WHERE id = %s", (post_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Post not found")
+
     return {"message": "Post deleted successfully"}
 
 @router.post("/upload-image")
@@ -203,20 +197,31 @@ async def upload_image(file: UploadFile = File(...), alt_text: str = Form("")):
     )
     
     # Save to database
-    conn = get_db_connection()
-    cursor = conn.execute('''
-        INSERT INTO blog_media 
-        (filename, gcs_path, public_url, original_name, file_size, mime_type, alt_text)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        upload_result['filename'], upload_result['gcs_path'], upload_result['public_url'],
-        file.filename, len(content), file.content_type, alt_text
-    ))
-    
-    media_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            INSERT INTO blog_media
+                (filename, gcs_path, public_url, original_name, file_size, mime_type, alt_text)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                upload_result["filename"],
+                upload_result["gcs_path"],
+                upload_result["public_url"],
+                file.filename,
+                len(content),
+                file.content_type,
+                alt_text,
+            ),
+        )
+        row = cur.fetchone()
+        media_id = row[0] if row else None
+
+    if media_id is None:
+        raise HTTPException(status_code=500, detail="Failed to save media record")
+
     return {
         "id": media_id,
         "url": upload_result['public_url'],
@@ -252,76 +257,26 @@ async def get_storage_status():
 @router.get("/categories")
 async def get_categories():
     """Get all blog categories"""
-    conn = get_db_connection()
-    cursor = conn.execute("SELECT DISTINCT category FROM blog_posts WHERE category IS NOT NULL")
-    categories = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    
-    return categories
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT DISTINCT category FROM blog_posts WHERE category IS NOT NULL",
+        )
+        rows = cur.fetchall() or []
+    return [row[0] for row in rows]
 
 @router.get("/media")
 async def get_media(limit: int = 20, offset: int = 0):
     """Get uploaded media files with alt text"""
-    conn = get_db_connection()
-    cursor = conn.execute(
-        "SELECT * FROM blog_media ORDER BY created_at DESC LIMIT ? OFFSET ?",
-        (limit, offset)
-    )
-    media = cursor.fetchall()
-    conn.close()
-    
-    return [dict(row) for row in media]
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT * FROM blog_media ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            (limit, offset),
+        )
+        rows = cur.fetchall() or []
+        colnames = [d[0] for d in cur.description] if cur.description else []
 
-# Remove the blog sitemap endpoint since we're moving to root
-# @router.get("/sitemap.xml")
-# async def generate_complete_sitemap(x_sitemap_key: str = Header(None)):
-    
-    conn = get_db_connection()
-    cursor = conn.execute(
-        "SELECT slug, updated_at FROM blog_posts WHERE status = 'published' ORDER BY updated_at DESC"
-    )
-    posts = cursor.fetchall()
-    conn.close()
-    
-    # Static pages from existing sitemap
-    sitemap_xml = '''<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://astroroshni.com/</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/blog</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/marriage-analysis</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/career-guidance</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/panchang</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>'''
-    
-    # Add blog posts
-    for post in posts:
-        sitemap_xml += f'''
-  <url>
-    <loc>https://astroroshni.com/blog/{post[0]}</loc>
-    <lastmod>{post[1][:10]}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>'''
-    
-    sitemap_xml += '\n</urlset>'
-    
-    return Response(content=sitemap_xml, media_type="application/xml")
+    return [dict(zip(colnames, row)) for row in rows]
+
+# Legacy sitemap code removed (endpoint now served at root-level sitemap)
