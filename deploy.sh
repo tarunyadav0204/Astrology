@@ -5,10 +5,16 @@ set -e
 
 echo "🚀 Starting deployment..."
 
+# Deploy branch on the server (default: main).
+# Can be overridden by setting DEPLOY_BRANCH in the SSH script, e.g.:
+#   DEPLOY_BRANCH=test bash deploy.sh
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
+
 # Pull latest changes
 echo "📥 Pulling latest changes from Git..."
-git fetch origin main
-git reset --hard origin/main
+git fetch origin "${DEPLOY_BRANCH}"
+git reset --hard "origin/${DEPLOY_BRANCH}"
 
 # Backend deployment
 echo "🐍 Setting up backend..."

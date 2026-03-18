@@ -1,0 +1,21 @@
+name: Deploy to GCP (Test)
+
+on:
+  push:
+    branches: [ test ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to test VM
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.TEST_HOST }}
+          username: ${{ secrets.TEST_USERNAME }}
+          key: ${{ secrets.TEST_SSH_KEY }}
+          script: |
+            cd AstrologyApp
+            export DEPLOY_BRANCH="${{ github.ref_name }}"
+            bash deploy.sh
