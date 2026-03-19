@@ -29,6 +29,61 @@ export const setGlobalErrorHandler = (callback) => {
   errorHandlerCallback = callback;
 };
 
+// ---- Transparent client-side caching (charts) ----
+const CHART_ONLY_CACHE_VERSION = 3;
+const CHART_ONLY_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const chartOnlyInFlight = new Map(); // storageKey -> Promise
+const chartOnlyMemory = new Map(); // storageKey -> { expiresAt, data }
+
+const normalizeChartOnlyBirthDataKey = (birthData) => {
+  // Prefer the unique birth chart id when available.
+  const birthChartId =
+    birthData?.birth_chart_id ??
+    birthData?.birthChartId ??
+    birthData?.birthChartID ??
+    birthData?.id ??
+    null;
+
+  // Fallback: deterministic from the inputs that affect chart computation.
+  const dateRaw = birthData?.date;
+  const timeRaw = birthData?.time;
+
+  const date =
+    typeof dateRaw === 'string'
+      ? dateRaw.includes('T')
+        ? dateRaw.split('T')[0]
+        : dateRaw
+      : dateRaw;
+
+  const time =
+    typeof timeRaw === 'string'
+      ? timeRaw.includes('T')
+        ? new Date(timeRaw).toTimeString().slice(0, 5)
+        : timeRaw.slice(0, 5)
+      : timeRaw;
+
+  const roundCoord = (v) => {
+    const n = typeof v === 'string' || typeof v === 'number' ? Number(v) : null;
+    if (n === null || Number.isNaN(n)) return null;
+    return Math.round(n * 1e6) / 1e6; // stable against tiny float changes
+  };
+
+  const lat = roundCoord(birthData?.latitude);
+  const lon = roundCoord(birthData?.longitude);
+
+  // Ayanamsa isn't present in the mobile birth/profile payloads (at least in this app codebase),
+  // so we keep the fingerprint to the deterministic inputs we actually have.
+  const fp = `dt:${JSON.stringify({ date, time, lat, lon })}`;
+
+  // Even if backend keeps the same birth_chart_id after user edits,
+  // we include the fingerprint so the cache can't return a stale chart.
+  if (birthChartId !== null && typeof birthChartId !== 'undefined' && birthChartId !== '') {
+    return `id:${String(birthChartId)}|${fp}`;
+  }
+
+  return fp;
+};
+
 // Handle response errors
 api.interceptors.response.use(
   (response) => response,
@@ -184,17 +239,54 @@ export const chartAPI = {
       });
   },
   calculateChartOnly: (birthData) => {
-    // console.log('[API] Calling calculateChartOnly');
-    const startTime = Date.now();
-    return api.post(getEndpoint('/calculate-chart-only'), birthData)
-      .then(response => {
-        // console.log(`[API] calculateChartOnly completed in ${Date.now() - startTime}ms`);
-        return response;
-      })
-      .catch(error => {
-        // console.error(`[API] calculateChartOnly failed after ${Date.now() - startTime}ms:`, error);
-        throw error;
-      });
+    const cacheKey = normalizeChartOnlyBirthDataKey(birthData);
+    const storageKey = `chart_only_cache:v${CHART_ONLY_CACHE_VERSION}:${cacheKey}`;
+
+    const mem = chartOnlyMemory.get(storageKey);
+    if (mem && mem.expiresAt > Date.now() && mem.data) {
+      return Promise.resolve({ data: mem.data, status: 200 });
+    }
+
+    const existingPromise = chartOnlyInFlight.get(storageKey);
+    if (existingPromise) return existingPromise;
+
+    const requestPromise = (async () => {
+      // 1) AsyncStorage cache
+      try {
+        const cached = await AsyncStorage.getItem(storageKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.expiresAt > Date.now() && parsed?.data) {
+            chartOnlyMemory.set(storageKey, { expiresAt: parsed.expiresAt, data: parsed.data });
+            return { data: parsed.data, status: 200 };
+          }
+        }
+      } catch (_) {
+        // ignore cache errors
+      }
+
+      // 2) Network call
+      const response = await api.post(getEndpoint('/calculate-chart-only'), birthData);
+
+      // 3) Store in caches
+      try {
+        const expiresAt = Date.now() + CHART_ONLY_CACHE_TTL_MS;
+        const chartData = response?.data;
+        if (chartData) {
+          chartOnlyMemory.set(storageKey, { expiresAt, data: chartData });
+          await AsyncStorage.setItem(storageKey, JSON.stringify({ expiresAt, data: chartData }));
+        }
+      } catch (_) {
+        // ignore storage errors
+      }
+
+      return response;
+    })();
+
+    chartOnlyInFlight.set(storageKey, requestPromise);
+    return requestPromise.finally(() => {
+      chartOnlyInFlight.delete(storageKey);
+    });
   },
   calculateAllCharts: (birthData) => {
     // console.log('[API] Calling calculateAllCharts');

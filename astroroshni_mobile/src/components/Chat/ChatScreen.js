@@ -1489,6 +1489,7 @@ export default function ChatScreen({ navigation, route }) {
             id: Date.now().toString(),
             content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
             role: 'assistant',
+            isWelcome: true,
             timestamp: new Date().toISOString(),
           };
         } else {
@@ -1496,6 +1497,7 @@ export default function ChatScreen({ navigation, route }) {
             id: Date.now().toString(),
             content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
             role: 'assistant',
+            isWelcome: true,
             timestamp: new Date().toISOString(),
           };
         }

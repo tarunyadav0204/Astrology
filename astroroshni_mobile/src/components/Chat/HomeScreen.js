@@ -877,13 +877,13 @@ const loadHomeData = async (nativeData = null) => {
               >
                 <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#3B82F620' : 'rgba(59, 130, 246, 0.12)' }]}>
                   <Text style={styles.headerSignEmoji}>
-                    {loading ? '⏳' : getSignIcon(chartData?.houses?.[0]?.sign)}
+                    {chartData ? getSignIcon(chartData?.houses?.[0]?.sign) : '⏳'}
                   </Text>
                 </View>
                 <View>
                   <Text style={[styles.headerSignLabel, { color: colors.textTertiary }]}>{t('home.signs.ascendant', 'Asc')}</Text>
                   <Text style={[styles.headerSignName, { color: colors.text }]}>
-                    {loading ? '...' : getSignName(chartData?.houses?.[0]?.sign)}
+                    {chartData ? getSignName(chartData?.houses?.[0]?.sign) : '...'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -899,13 +899,13 @@ const loadHomeData = async (nativeData = null) => {
               >
                 <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#DC262620' : 'rgba(220, 38, 38, 0.12)' }]}>
                   <Text style={styles.headerSignEmoji}>
-                    {loading ? '⏳' : getSignIcon(chartData?.planets?.Moon?.sign)}
+                    {chartData ? getSignIcon(chartData?.planets?.Moon?.sign) : '⏳'}
                   </Text>
                 </View>
                 <View>
                   <Text style={[styles.headerSignLabel, { color: colors.textTertiary }]}>{t('home.signs.moon', 'Moon')}</Text>
                   <Text style={[styles.headerSignName, { color: colors.text }]}>
-                    {loading ? '...' : getSignName(chartData?.planets?.Moon?.sign)}
+                    {chartData ? getSignName(chartData?.planets?.Moon?.sign) : '...'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -921,13 +921,13 @@ const loadHomeData = async (nativeData = null) => {
               >
                 <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#F59E0B20' : 'rgba(245, 158, 11, 0.2)' }]}>
                   <Text style={styles.headerSignEmoji}>
-                    {loading ? '⏳' : getSignIcon(chartData?.planets?.Sun?.sign)}
+                    {chartData ? getSignIcon(chartData?.planets?.Sun?.sign) : '⏳'}
                   </Text>
                 </View>
                 <View>
                   <Text style={[styles.headerSignLabel, { color: colors.textTertiary }]}>{t('home.signs.sun', 'Sun')}</Text>
                   <Text style={[styles.headerSignName, { color: colors.text }]}>
-                    {loading ? '...' : getSignName(chartData?.planets?.Sun?.sign)}
+                    {chartData ? getSignName(chartData?.planets?.Sun?.sign) : '...'}
                   </Text>
                 </View>
               </TouchableOpacity>

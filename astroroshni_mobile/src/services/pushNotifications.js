@@ -187,8 +187,14 @@ async function processNotificationResponse(response, navigationRef) {
       }
       // else: leave current selected native unchanged (getBirthDetails stays as is)
     }
-    if (navigationRef?.current && (cta === 'astroroshni://chat' || !cta)) {
-      const sessionId = data?.session_id != null ? String(data.session_id).trim() : null;
+    // Only navigate to chat when we have an actual chat payload.
+    // Previously, notifications with no CTA would always open chat on cold start,
+    // and if the app crashed during initialization, Expo's "last notification response"
+    // could remain stale and cause the user to land on chat unexpectedly.
+    const sessionId = data?.session_id != null ? String(data.session_id).trim() : null;
+    const hasChatPayload = !!(question || sessionId);
+
+    if (navigationRef?.current && (cta === 'astroroshni://chat' || (!cta && hasChatPayload))) {
       navigationRef.current.navigate('Home', {
         startChat: true,
         ...(question && { initialMessage: question }),

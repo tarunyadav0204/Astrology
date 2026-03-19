@@ -62,6 +62,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const userDismissedGeneratingRef = useRef(false);
   /** Subtle heartbeat-style pulse for the podcast icon (idle state). */
   const podcastIconPulse = useRef(new Animated.Value(1)).current;
+  /** Stronger blink so users notice it. */
+  const podcastIconOpacity = useRef(new Animated.Value(1)).current;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -97,35 +99,41 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   useEffect(() => {
     const heartbeat = Animated.loop(
       Animated.sequence([
-        Animated.timing(podcastIconPulse, {
-          toValue: 1.05,
-          duration: 200,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(podcastIconPulse, {
-          toValue: 1.02,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-        Animated.timing(podcastIconPulse, {
-          toValue: 1.06,
-          duration: 200,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(podcastIconPulse, {
-          toValue: 1,
-          duration: 520,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.delay(1300),
+        Animated.parallel([
+          Animated.timing(podcastIconPulse, {
+            toValue: 1.28,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(podcastIconOpacity, {
+            toValue: 0.55,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(podcastIconPulse, {
+            toValue: 1,
+            duration: 280,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(podcastIconOpacity, {
+            toValue: 1,
+            duration: 280,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+        // Pause so the blink is noticeable but not constant flashing.
+        Animated.delay(1100),
       ])
     );
     heartbeat.start();
     return () => heartbeat.stop();
-  }, [podcastIconPulse]);
+  }, [podcastIconPulse, podcastIconOpacity]);
 
   // Animated loader for typing indicator
   const dot1Anim = useRef(new Animated.Value(0)).current;
@@ -1294,7 +1302,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         )}
 
         {/* Quick action buttons under disclaimer (for long messages) - show for assistant messages with content (incl. chat history) */}
-        {!message.isTyping && message.role === 'assistant' && (message.messageId || message.content) && (
+        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {message.showRestartButton && (
               <TouchableOpacity
@@ -1315,14 +1323,14 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             <>
               {!(isPlayingPodcast || isPausedPodcast) && (
                 <TouchableOpacity
-                  style={styles.actionButton}
+                  style={[styles.actionButton, styles.listenPodcastButton]}
                   onPress={onPodcastButtonPress}
                   disabled={isLoadingPodcast}
                 >
                   {isLoadingPodcast ? (
                     <ActivityIndicator size="small" color="#ff6b35" />
                   ) : (
-                    <Animated.View style={{ transform: [{ scale: podcastIconPulse }] }}>
+                    <Animated.View style={{ transform: [{ scale: podcastIconPulse }], opacity: podcastIconOpacity }}>
                       <Ionicons name="radio-outline" size={17} color="#ff6b35" />
                     </Animated.View>
                   )}
@@ -1490,7 +1498,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         )}
 
         {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
-        {!message.isTyping && message.role === 'assistant' && (message.messageId || message.content) && (
+        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {/* Restart Button for timeout messages */}
             {message.showRestartButton && message.messageId && (
@@ -1514,7 +1522,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               <>
                 {!(isPlayingPodcast || isPausedPodcast) && (
                   <TouchableOpacity
-                    style={styles.actionButton}
+                    style={[styles.actionButton, styles.listenPodcastButton]}
                     onPress={onPodcastButtonPress}
                     disabled={isLoadingPodcast}
                   >
@@ -2171,6 +2179,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  // Podcast action button styling (no badge; just a subtle orange highlight).
+  listenPodcastButton: {
+    backgroundColor: 'rgba(255, 107, 53, 0.12)',
+    borderColor: 'rgba(255, 107, 53, 0.25)',
   },
   pdfButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
