@@ -5,7 +5,7 @@ import calendar
 import json
 import asyncio
 import os
-import google.generativeai as genai
+import google.generativeai as genai  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 
 class EventPredictor:
@@ -150,7 +150,8 @@ Do not predict events based on transits alone. Transiting planets will ONLY trig
   1. Natal Return: Is a transiting Dasha lord passing exactly over its natal sign/position?
   2. Relationship Recreation: Is a transiting Dasha lord moving over or aspecting a planet it has a relationship with in the NATAL chart? (e.g., If Natal Saturn aspects Natal Venus, look for Transit Saturn aspecting Transit/Natal Venus).
   3. Nakshatra Return: Is the transiting planet passing through its natal Nakshatra?
-* Priority Logic: Dasha planets that meet ANY of these three conditions are the FIRST to activate. They will immediately "fire" and manifest the results of the houses they rule and the house they are currently transiting.
+  4. **Sun Activation (Monthly Gating Rule):** Is the transiting **Sun** conjunct (same whole-sign) OR 7th-aspecting (Sun aspects 7th only per the standard Vedic aspect table) the **transit position/sign/house** of any active Dasha lord (MD/AD/Pratyantardasha/Sookshma)? If YES, treat that matched Dasha lord as FIRST to activate.
+* Priority Logic: If Sun Activation is detected for ANY active Dasha lord, those dasha planets are the FIRST to activate. Otherwise, dasha planets that meet ANY of the Natal Return/Relationship Recreation/Nakshatra Return conditions are the FIRST to activate.
 
 **Step 3: Filter Through Precision Checks (The Catalyst)**
 Before finalizing the event, cross-reference the activated planets with the warning systems:
@@ -173,7 +174,7 @@ Combine the significations of the activated houses to form specific, real-world 
 2. For that month, include an `activation_overview` object that:
    - Copies MD/AD/PD/Sookshma exactly from DASHA FACTS / `current_dashas` into `dasha_focus`.
    - Summarizes the key natal links of these planets.
-   - Lists the key transit triggers (Natal Return, Relationship Recreation, Nakshatra Return) you used.
+   - Lists the key transit triggers (Natal Return, Relationship Recreation, Nakshatra Return, and/or Sun Activation) you used.
    - Lists the activated houses and why they are activated.
 3. CRITICAL: Under `events`, create **at least 20 event objects** (more if many activation patterns exist). You MUST keep generating events until you have covered **all meaningful combinations of the activated houses and planets**. For EVERY event:
    - Provide `activation_reasoning` showing your work (e.g., "Because AD lord Rahu is transiting over its natal position in the 8th house, recreating its natal aspect with Saturn...").
