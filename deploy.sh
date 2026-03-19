@@ -10,11 +10,41 @@ echo "🚀 Starting deployment..."
 #   DEPLOY_BRANCH=test bash deploy.sh
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
+FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-false}"
 
 # Pull latest changes
 echo "📥 Pulling latest changes from Git..."
+PREV_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
 git fetch origin "${DEPLOY_BRANCH}"
 git reset --hard "origin/${DEPLOY_BRANCH}"
+NEW_HEAD="$(git rev-parse --short HEAD)"
+echo "🔎 Deploying commit: ${PREV_HEAD} -> ${NEW_HEAD}"
+
+CHANGED_FILES=""
+if [ -n "${PREV_HEAD}" ]; then
+  CHANGED_FILES="$(git diff --name-only "${PREV_HEAD}" "${NEW_HEAD}" || true)"
+fi
+
+needs_backend_deps=false
+if [ ! -d "backend/venv" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
+  needs_backend_deps=true
+elif echo "${CHANGED_FILES}" | grep -E -q '^backend/requirements\.txt$|^backend/requirements/|^backend/setup\.py$|^backend/pyproject\.toml$'; then
+  needs_backend_deps=true
+fi
+
+needs_frontend_install=false
+needs_frontend_build=false
+if [ ! -d "frontend/node_modules" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
+  needs_frontend_install=true
+fi
+if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ ! -d "frontend/build" ]; then
+  needs_frontend_build=true
+elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/'; then
+  needs_frontend_build=true
+  if echo "${CHANGED_FILES}" | grep -E -q '^frontend/package(-lock)?\.json$'; then
+    needs_frontend_install=true
+  fi
+fi
 
 # Backend deployment
 echo "🐍 Setting up backend..."
@@ -27,9 +57,12 @@ fi
 
 # Activate virtual environment and install dependencies
 source venv/bin/activate
-pip3 install -r requirements.txt
-pip3 install --upgrade google-generativeai
-pip3 install cryptography
+if [ "${needs_backend_deps}" = "true" ]; then
+  echo "📦 Installing backend dependencies..."
+  pip3 install -r requirements.txt
+else
+  echo "⏭️ Backend dependencies unchanged; skipping pip install"
+fi
 echo "✅ Backend dependencies installed"
 
 # Setup encryption (idempotent - safe to run multiple times)
@@ -44,8 +77,19 @@ fi
 # Frontend deployment
 echo "⚛️ Building frontend..."
 cd ../frontend
-npm install
-npm run build
+if [ "${needs_frontend_install}" = "true" ]; then
+  echo "📦 Installing frontend dependencies..."
+  npm install
+else
+  echo "⏭️ Frontend dependencies unchanged; skipping npm install"
+fi
+
+if [ "${needs_frontend_build}" = "true" ]; then
+  echo "🏗️ Frontend changed; building..."
+  npm run build
+else
+  echo "⏭️ Frontend unchanged; skipping build"
+fi
 echo "✅ Frontend built successfully"
 
 # Start services
@@ -78,8 +122,18 @@ sleep 3
 # Check if backend is running
 if ps -p $BACKEND_PID > /dev/null; then
     echo "✅ Backend started successfully on port 8001"
-    # Test health endpoint
-    curl -f http://localhost:8001/api/health || echo "⚠️ Health check failed"
+    # Retry health check to avoid false warning during cold startup
+    for i in 1 2 3 4 5; do
+      if curl -fsS http://localhost:8001/api/health >/dev/null; then
+        echo "✅ Backend health check passed"
+        break
+      fi
+      if [ "$i" -eq 5 ]; then
+        echo "⚠️ Health check failed after retries"
+      else
+        sleep 2
+      fi
+    done
 else
     echo "❌ Backend failed to start. Check logs:"
     tail -20 ../logs/backend.log
