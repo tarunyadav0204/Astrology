@@ -5,8 +5,13 @@ on:
     branches: [ test ]
   workflow_dispatch:
 
+concurrency:
+  group: deploy-test
+  cancel-in-progress: true
+
 jobs:
   deploy:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to test VM
@@ -15,7 +20,10 @@ jobs:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USERNAME }}
           key: ${{ secrets.TEST_SSH_KEY }}
+          script_stop: true
           script: |
             cd AstrologyApp
             export DEPLOY_BRANCH="${{ github.ref_name }}"
             bash deploy.sh
+            curl -fsS http://127.0.0.1:8001/api/health >/dev/null
+            curl -fsS -I http://127.0.0.1:3001/ >/dev/null

@@ -35,6 +35,7 @@ import { useCredits } from '../../credits/CreditContext';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const HOME_CHART_CACHE_PREFIX = 'home_chart_cache:';
 const ordinalSuffix = (n) => {
   if (n >= 11 && n <= 13) return 'th';
   switch (n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
@@ -276,8 +277,14 @@ const loadCurrentNative = async () => {
     try {
       const { storage } = require('../../services/storage');
 
-      // Always prefer syncing the "self" native from backend so AsyncStorage
-      // doesn't keep a dangling deleted selection.
+      // First try to get single birth details
+      let selectedNative = await storage.getBirthDetails();
+      if (selectedNative && (selectedNative.id || selectedNative.birth_chart_id)) {
+        setCurrentNativeData(selectedNative);
+        return selectedNative;
+      }
+
+      // If nothing selected, sync "self" from backend as a safe default.
       try {
         const { authAPI } = require('../../services/api');
         const response = await authAPI.getSelfBirthChart();
@@ -291,11 +298,8 @@ const loadCurrentNative = async () => {
           return selfData;
         }
       } catch (e) {
-        // If self-chart sync fails, fall back to whatever is in storage/profiles.
+        // If self-chart sync fails, fall back to profiles.
       }
-
-      // First try to get single birth details
-      let selectedNative = await storage.getBirthDetails();
 
       // If no single birth details, get from profiles
       if (!selectedNative) {
@@ -316,27 +320,13 @@ const loadCurrentNative = async () => {
 
 const loadHomeData = async (nativeData = null) => {
     try {
-      setLoading(true);
-      
-      // Clear existing chart data first
-      setChartData(null);
-      setDashData(null);
-      
-      // Load pricing from same API as deduction (credits/settings/analysis-pricing)
-      try {
-        const pricingResponse = await pricingAPI.getPricing();
-        if (pricingResponse?.data?.pricing) {
-          setPricing(pricingResponse.data.pricing);
-          setPricingOriginal(pricingResponse.data.pricing_original || {});
-        } else if (pricingResponse?.data && typeof pricingResponse.data.career !== 'undefined') {
-          setPricing(pricingResponse.data);
-          setPricingOriginal({});
-        }
-      } catch (pricingError) {
+      // Keep existing chart visible while refreshing in background.
+      const hadChart = !!chartData;
+      if (!hadChart) {
+        setLoading(true);
       }
-      
-      const targetDate = new Date().toISOString().split('T')[0];
-      
+      setDashData(null);
+
       // Use provided native data or get fresh from storage
       let currentBirthData = nativeData;
       if (!currentBirthData) {
@@ -357,6 +347,35 @@ const loadHomeData = async (nativeData = null) => {
       // Fallback to props if no native data
       if (!currentBirthData) {
         currentBirthData = birthData;
+      }
+
+      const targetDate = new Date().toISOString().split('T')[0];
+
+      // Fast-first render: hydrate signs from cache by native id.
+      const cacheId = currentBirthData?.id || currentBirthData?.birth_chart_id;
+      if (cacheId) {
+        try {
+          const raw = await AsyncStorage.getItem(`${HOME_CHART_CACHE_PREFIX}${cacheId}`);
+          if (raw) {
+            const cached = JSON.parse(raw);
+            if (cached?.houses && cached?.planets) {
+              setChartData(cached);
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Load pricing from same API as deduction (credits/settings/analysis-pricing)
+      try {
+        const pricingResponse = await pricingAPI.getPricing();
+        if (pricingResponse?.data?.pricing) {
+          setPricing(pricingResponse.data.pricing);
+          setPricingOriginal(pricingResponse.data.pricing_original || {});
+        } else if (pricingResponse?.data && typeof pricingResponse.data.career !== 'undefined') {
+          setPricing(pricingResponse.data);
+          setPricingOriginal({});
+        }
+      } catch (pricingError) {
       }
       
       // Load transits with birth data
@@ -383,6 +402,9 @@ const loadHomeData = async (nativeData = null) => {
               const currentMaha = dashaRes.value.data.maha_dashas?.find(d => d.current);
               if (currentMaha) {
                 tickerUpdate.mahadasha = currentMaha.planet;
+              }
+              if (!dashaRes.value.data.error) {
+                setDashData(dashaRes.value.data);
               }
             }
             
@@ -480,19 +502,22 @@ const loadHomeData = async (nativeData = null) => {
         
         // console.log('🏠 HomeScreen - Sending birth data to backend:', JSON.stringify(formattedBirthData, null, 2));
         
-        const [dashResponse, chartResponse] = await Promise.allSettled([
-          chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
+        const [chartResponse] = await Promise.allSettled([
           chartAPI.calculateChartOnly(formattedBirthData)
         ]);
-        
-        if (dashResponse && dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
-          setDashData(dashResponse.value.data);
-        }
         
         if (chartResponse && chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
           // console.log('🏠 HomeScreen - Received chart data from backend:', JSON.stringify(chartResponse.value.data, null, 2));
           // console.log('🏠 HomeScreen - Ascendant sign from chart:', chartResponse.value.data?.houses?.[0]?.sign);
           setChartData(chartResponse.value.data);
+          if (cacheId) {
+            try {
+              await AsyncStorage.setItem(
+                `${HOME_CHART_CACHE_PREFIX}${cacheId}`,
+                JSON.stringify(chartResponse.value.data)
+              );
+            } catch (_) {}
+          }
         }
       }
     } catch (error) {

@@ -419,7 +419,7 @@ export default function SelectNativeScreen({ navigation, route }) {
               {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : returnTo === 'KarmaAnalysis' ? 'Select native for karma analysis' : 'Choose a profile for astrological analysis'}
             </Text>
 
-            {profiles.length > 5 && (
+            {(totalCharts > PAGE_SIZE || localSearchQuery.length > 0 || profiles.length > 0) && (
               <View style={[styles.localSearchContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' }]}>
                 <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.localSearchIcon} />
                 <TextInput
