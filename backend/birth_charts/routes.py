@@ -18,25 +18,19 @@ class ShareChartRequest(BaseModel):
     target_user_id: int
 
 @router.get("/birth-charts")
-async def get_birth_charts(search: str = "", limit: int = 50, current_user: User = Depends(get_current_user)):
-    print(f"Search query: '{search}', Limit: {limit}")
+async def get_birth_charts(
+    search: str = "",
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+):
+    print(f"Search query: '{search}', Limit: {limit}, Offset: {offset}")
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
     with get_conn() as conn:
-        if search.strip():
-            search_pattern = f"%{search.strip()}%"
-            print(f"Using search pattern: {search_pattern}")
-            cur = execute(
-                conn,
-                """
-                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation
-                FROM birth_charts
-                WHERE userid = %s AND name LIKE %s
-                ORDER BY created_at DESC
-                LIMIT %s
-                """,
-                (current_user.userid, search_pattern, limit),
-            )
-        else:
-            print("No search query, returning all charts")
+        # Name is encrypted at rest in most environments. For encrypted mode, SQL LIKE
+        # cannot search plaintext, so we decrypt+filter in Python for search queries.
+        if search.strip() and encryptor:
             cur = execute(
                 conn,
                 """
@@ -44,11 +38,67 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
                 FROM birth_charts
                 WHERE userid = %s
                 ORDER BY created_at DESC
-                LIMIT %s
                 """,
-                (current_user.userid, limit),
+                (current_user.userid,),
             )
-        rows = cur.fetchall() or []
+            all_rows = cur.fetchall() or []
+            needle = search.strip().lower()
+            filtered_rows = []
+            for row in all_rows:
+                try:
+                    dec_name = encryptor.decrypt(row[2]) if row[2] else ""
+                    if needle in dec_name.lower():
+                        filtered_rows.append(row)
+                except Exception:
+                    # Skip malformed encrypted rows in search mode.
+                    continue
+            total = len(filtered_rows)
+            rows = filtered_rows[offset:offset + limit]
+        elif search.strip():
+            search_pattern = f"%{search.strip()}%"
+            cur = execute(
+                conn,
+                """
+                SELECT COUNT(*) FROM birth_charts
+                WHERE userid = %s AND name ILIKE %s
+                """,
+                (current_user.userid, search_pattern),
+            )
+            total = int(cur.fetchone()[0] or 0)
+            cur = execute(
+                conn,
+                """
+                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation
+                FROM birth_charts
+                WHERE userid = %s AND name ILIKE %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (current_user.userid, search_pattern, limit, offset),
+            )
+            rows = cur.fetchall() or []
+        else:
+            cur = execute(
+                conn,
+                """
+                SELECT COUNT(*) FROM birth_charts
+                WHERE userid = %s
+                """,
+                (current_user.userid,),
+            )
+            total = int(cur.fetchone()[0] or 0)
+            cur = execute(
+                conn,
+                """
+                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation
+                FROM birth_charts
+                WHERE userid = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (current_user.userid, limit, offset),
+            )
+            rows = cur.fetchall() or []
 
     charts = []
     for row in rows:
@@ -84,7 +134,13 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
             }
         charts.append(chart)
     
-    return {'charts': charts}
+    return {
+        'charts': charts,
+        'total': total,
+        'limit': limit,
+        'offset': offset,
+        'has_more': (offset + len(charts)) < total,
+    }
 
 @router.put("/birth-charts/{chart_id}/set-as-self")
 async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_current_user)):

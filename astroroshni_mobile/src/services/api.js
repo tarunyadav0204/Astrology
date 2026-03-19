@@ -343,10 +343,11 @@ export const chartAPI = {
   submitPhysicalFeedback: (feedbackData) => 
     api.post(getEndpoint('/physical-feedback'), feedbackData),
 
-  getExistingCharts: (search = '') => {
+  getExistingCharts: (search = '', limit = 10, offset = 0) => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
-    params.append('limit', '50');
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
     return api.get(`${getEndpoint('/birth-charts')}?${params}`);
   },
   updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),

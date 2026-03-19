@@ -98,6 +98,11 @@ export default function SelectNativeScreen({ navigation, route }) {
   const { theme, colors } = useTheme();
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [listLoading, setListLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [totalCharts, setTotalCharts] = useState(0);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [selectedProfileForMenu, setSelectedProfileForMenu] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -111,17 +116,25 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadProfiles();
+      loadProfiles({ reset: true });
     }, [])
   );
 
-  const loadProfiles = async () => {
+  const PAGE_SIZE = 10;
+
+  const loadProfiles = async ({ reset = false, search = localSearchQuery } = {}) => {
     try {
+      if (reset) {
+        setListLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       const currentNative = await storage.getBirthDetails();
       
       // Fetch saved charts from API
       const { chartAPI } = require('../../services/api');
-      const response = await chartAPI.getExistingCharts();
+      const nextOffset = reset ? 0 : offset;
+      const response = await chartAPI.getExistingCharts(search.trim(), PAGE_SIZE, nextOffset);
       const apiCharts = response.data.charts || [];
       
       const profileList = [];
@@ -142,16 +155,31 @@ export default function SelectNativeScreen({ navigation, route }) {
         });
       });
       
-      setProfiles(profileList);
+      setProfiles(prev => (reset ? profileList : [...prev, ...profileList]));
+      setOffset(nextOffset + profileList.length);
+      setHasMore(!!response.data?.has_more);
+      setTotalCharts(response.data?.total || 0);
       
       if (currentNative) {
         setSelectedProfile(currentNative.name);
       }
     } catch (error) {
       // Fallback to local storage if API fails
-      const savedProfiles = await storage.getBirthProfiles();
-      setProfiles(savedProfiles);
+      if (reset) {
+        const savedProfiles = await storage.getBirthProfiles();
+        setProfiles(savedProfiles);
+        setOffset(savedProfiles.length);
+        setHasMore(false);
+      }
+    } finally {
+      setListLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLocalSearchChange = (text) => {
+    setLocalSearchQuery(text);
+    loadProfiles({ reset: true, search: text });
   };
 
   const syncSelfBirthDetails = async () => {
@@ -399,20 +427,24 @@ export default function SelectNativeScreen({ navigation, route }) {
                   placeholder="Search by name..."
                   placeholderTextColor={colors.textSecondary + '80'}
                   value={localSearchQuery}
-                  onChangeText={setLocalSearchQuery}
+                  onChangeText={handleLocalSearchChange}
                   autoCorrect={false}
                 />
                 {localSearchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setLocalSearchQuery('')}>
+                  <TouchableOpacity onPress={() => handleLocalSearchChange('')}>
                     <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
                 )}
               </View>
             )}
 
-            {profiles
-              .filter(p => p.name.toLowerCase().includes(localSearchQuery.toLowerCase()))
-              .map((profile) => (
+            {listLoading && profiles.length === 0 ? (
+              <View style={styles.inlineLoader}>
+                <ActivityIndicator size="small" color="#ff6b35" />
+                <Text style={[styles.inlineLoaderText, { color: colors.textSecondary }]}>Loading charts...</Text>
+              </View>
+            ) : (
+              profiles.map((profile) => (
               <ProfileCard
                 key={profile.id}
                 profile={profile}
@@ -423,7 +455,23 @@ export default function SelectNativeScreen({ navigation, route }) {
                 theme={theme}
                 colors={colors}
               />
-            ))}
+            )))}
+
+            {hasMore && !listLoading && (
+              <TouchableOpacity
+                style={[styles.loadMoreButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)' }]}
+                onPress={() => loadProfiles({ reset: false })}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color="#ff6b35" />
+                ) : (
+                  <Text style={[styles.loadMoreText, { color: colors.text }]}>
+                    Load more ({profiles.length}/{totalCharts || '?'})
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
 
             {profiles.length === 0 && (
               <View style={styles.emptyState}>
@@ -665,6 +713,27 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     paddingVertical: 8,
+  },
+  inlineLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  inlineLoaderText: {
+    fontSize: 14,
+  },
+  loadMoreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   profileWrapper: {
     position: 'relative',
