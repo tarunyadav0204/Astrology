@@ -96,11 +96,26 @@ echo "✅ Frontend built successfully"
 echo "🔄 Restarting services..."
 cd ..
 
+# Stop restart monitor first to avoid it racing deploy and re-spawning services
+echo "Stopping restart monitor..."
+pkill -f restart_server.sh 2>/dev/null || true
+sleep 1
+
 # Kill existing processes on ports 8001 and 3001
 echo "Stopping existing services..."
 fuser -k 8001/tcp 2>/dev/null || true
 fuser -k 3001/tcp 2>/dev/null || true
-sleep 3
+pkill -f "python main.py" 2>/dev/null || true
+pkill -f "uvicorn.*8001" 2>/dev/null || true
+pkill -f "serve -s build -l 3001" 2>/dev/null || true
+
+# Wait until both ports are fully free before starting
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if ! ss -ltn 2>/dev/null | grep -qE ':(8001|3001)\s'; then
+    break
+  fi
+  sleep 1
+done
 
 # Start backend
 cd backend
@@ -148,10 +163,6 @@ echo "✅ Frontend started on port 3001"
 # Start auto-restart monitor
 echo "🔄 Starting auto-restart monitor..."
 cd ..
-
-# Kill existing restart monitor if running
-pkill -f restart_server.sh 2>/dev/null || true
-sleep 2
 
 # Start the restart monitor in background
 nohup ./restart_server.sh > logs/monitor.log 2>&1 &
