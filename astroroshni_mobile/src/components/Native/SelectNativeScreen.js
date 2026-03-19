@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -98,7 +98,6 @@ export default function SelectNativeScreen({ navigation, route }) {
   const { theme, colors } = useTheme();
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
-  const [profileCharts, setProfileCharts] = useState({});
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [selectedProfileForMenu, setSelectedProfileForMenu] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -115,15 +114,6 @@ export default function SelectNativeScreen({ navigation, route }) {
       loadProfiles();
     }, [])
   );
-  
-  // Refresh profiles when screen comes into focus (after creating new profile)
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadProfiles();
-    });
-    
-    return unsubscribe;
-  }, [navigation]);
 
   const loadProfiles = async () => {
     try {
@@ -153,28 +143,6 @@ export default function SelectNativeScreen({ navigation, route }) {
       });
       
       setProfiles(profileList);
-      
-      // Calculate chart data for each profile
-      const chartPromises = profileList.map(async (profile) => {
-        try {
-          const formattedData = {
-            name: profile.name,
-            date: profile.date.includes('T') ? profile.date.split('T')[0] : profile.date,
-            time: profile.time.includes('T') ? new Date(profile.time).toTimeString().slice(0, 5) : profile.time,
-            latitude: parseFloat(profile.latitude),
-            longitude: parseFloat(profile.longitude)
-          };
-          
-          const response = await chartAPI.calculateChartOnly(formattedData);
-          return { [profile.name]: response.data };
-        } catch (error) {
-          return { [profile.name]: null };
-        }
-      });
-      
-      const chartResults = await Promise.all(chartPromises);
-      const chartsMap = chartResults.reduce((acc, chart) => ({ ...acc, ...chart }), {});
-      setProfileCharts(chartsMap);
       
       if (currentNative) {
         setSelectedProfile(currentNative.name);
@@ -384,21 +352,13 @@ export default function SelectNativeScreen({ navigation, route }) {
     // Don't clear selectedProfileForMenu here - keep it for share modal
   };
 
-  const getSignIcon = (signNumber) => {
-    const icons = {
-      0: '♈', 1: '♉', 2: '♊', 3: '♋',
-      4: '♌', 5: '♍', 6: '♎', 7: '♏',
-      8: '♐', 9: '♑', 10: '♒', 11: '♓'
-    };
-    return icons[signNumber] !== undefined ? icons[signNumber] : '♈';
-  };
-
   const getZodiacSign = (profileName) => {
-    const chartData = profileCharts[profileName];
-    if (chartData?.houses?.[0]?.sign !== undefined) {
-      return getSignIcon(chartData.houses[0].sign);
-    }
-    return '♈'; // Default to Aries if no chart data
+    // Avoid expensive per-profile chart API calls on list load.
+    // Keep icon deterministic from profile name.
+    const icons = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+    if (!profileName) return icons[0];
+    const hash = profileName.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return icons[hash % icons.length];
   };
 
   return (

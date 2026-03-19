@@ -40,6 +40,10 @@ import { Platform } from 'react-native';
 const USE_DEV_API = false;
 // For simulator leave empty (uses localhost/10.0.2.2). For physical device set your machine IP, e.g. 'http://192.168.1.10:8001'
 const DEV_API_HOST = '';
+// Test VM backend (switch to this for simulator testing against test infra)
+const TEST_API_URL = 'http://34.93.109.132:8001';
+// Production backend
+const PROD_API_URL = 'https://astroroshni.com';
 
 const getApiUrl = () => {
   if (__DEV__ && USE_DEV_API) {
@@ -47,12 +51,16 @@ const getApiUrl = () => {
     if (Platform.OS === 'ios') return 'http://localhost:8001';
     if (Platform.OS === 'android') return 'http://10.0.2.2:8001';
   }
-  if (Platform.OS === 'ios') {
-    return 'http://localhost:8001';
-  } else {
-    return 'http://10.0.2.2:8001';
-  }
-  // return 'https://astroroshni.com';
+
+  // Uncomment exactly one of these for non-dev builds / manual switching:
+  return TEST_API_URL;
+  // return PROD_API_URL;
+
+  // if (Platform.OS === 'ios') {
+  //   return 'http://localhost:8001';
+  // } else {
+  //   return 'http://10.0.2.2:8001';
+  // }
 };
 
 export const API_BASE_URL = getApiUrl();

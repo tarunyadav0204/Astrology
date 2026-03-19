@@ -225,7 +225,7 @@ CREATE TABLE "trading_monthly_cache" (
 DROP TABLE IF EXISTS "physical_traits_cache" CASCADE;
 CREATE TABLE "physical_traits_cache" (
     "id" SERIAL,
-    "birth_chart_id" INTEGER NOT NULL,
+    "birth_chart_id" BIGINT NOT NULL,
     "traits_data" TEXT NOT NULL,
     "user_feedback" TEXT,
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -573,7 +573,9 @@ CREATE TABLE "chat_sessions" (
     "session_id" TEXT,
     "user_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "birth_chart_id" INTEGER,
+    -- SQLite source data stores this sometimes as very large numeric floats,
+    -- so BIGINT avoids integer overflow during migration.
+    "birth_chart_id" BIGINT,
     PRIMARY KEY ("session_id"),
     FOREIGN KEY ("user_id") REFERENCES "users" ("userid")
 );
@@ -604,7 +606,7 @@ CREATE TABLE "user_settings" (
 
 DROP TABLE IF EXISTS "birth_charts" CASCADE;
 CREATE TABLE "birth_charts" (
-    "id" SERIAL,
+    "id" BIGSERIAL,
     "userid" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "date" TEXT NOT NULL,
@@ -642,6 +644,8 @@ CREATE TABLE "credit_requests" (
 DROP TABLE IF EXISTS "user_subscriptions" CASCADE;
 CREATE TABLE "user_subscriptions" (
     "id" SERIAL,
+    -- Legacy SQLite primary key retained for migration compatibility
+    "subscription_id" INTEGER,
     "userid" INTEGER NOT NULL,
     "plan_id" INTEGER NOT NULL,
     "status" TEXT DEFAULT 'active',
@@ -649,6 +653,7 @@ CREATE TABLE "user_subscriptions" (
     "end_date" TIMESTAMP NOT NULL,
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY ("id"),
+    UNIQUE ("subscription_id"),
     FOREIGN KEY ("plan_id") REFERENCES "subscription_plans" ("plan_id"),
     FOREIGN KEY ("userid") REFERENCES "users" ("userid")
 );
@@ -759,7 +764,7 @@ CREATE TABLE "chat_messages" (
 DROP TABLE IF EXISTS "user_facts" CASCADE;
 CREATE TABLE "user_facts" (
     "id" SERIAL,
-    "birth_chart_id" INTEGER NOT NULL,
+    "birth_chart_id" BIGINT NOT NULL,
     "category" TEXT NOT NULL,
     "fact" TEXT NOT NULL,
     "confidence" DOUBLE PRECISION DEFAULT 1.0,
@@ -772,7 +777,7 @@ DROP TABLE IF EXISTS "event_timeline_jobs" CASCADE;
 CREATE TABLE "event_timeline_jobs" (
     "job_id" TEXT,
     "user_id" INTEGER NOT NULL,
-    "birth_chart_id" INTEGER NOT NULL,
+    "birth_chart_id" BIGINT NOT NULL,
     "selected_year" INTEGER NOT NULL,
     "status" TEXT DEFAULT 'pending',
     "result_data" TEXT,
