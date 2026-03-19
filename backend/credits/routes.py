@@ -1145,44 +1145,96 @@ _PRICING_KEYS_MAP = [
 
 @router.get("/settings/my-pricing")
 async def get_my_pricing(current_user: User = Depends(get_current_user)):
-    """Authenticated: returns pricing with subscription tier discount applied. For app to show user's actual cost. Backward compat: old app keeps using analysis-pricing."""
-    discount_percent = credit_service.get_subscription_discount_percent(current_user.userid)
-    tier_name = credit_service.get_subscription_tier_name(current_user.userid)
+    """Authenticated: return user pricing quickly with one DB roundtrip for settings + one for subscription."""
     pricing = {}
     pricing_original = {}
+    discount_percent = 0
+    tier_name = None
+
+    # Avoid N× DB calls over high-latency links by bulk-fetching all settings once.
+    settings_keys = [setting_key for _, setting_key in _PRICING_KEYS_MAP]
+    with get_conn() as conn:
+        # Active subscription (max discount) for this user.
+        date_expr = credit_service._date_today_expr()
+        cur = execute(
+            conn,
+            f"""
+            SELECT COALESCE(sp.discount_percent, 0), sp.tier_name
+            FROM user_subscriptions us
+            JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+            WHERE us.userid = %s AND us.status = 'active' AND us.end_date >= {date_expr}
+            ORDER BY sp.discount_percent DESC
+            LIMIT 1
+            """,
+            (current_user.userid,),
+        )
+        row = cur.fetchone()
+        if row:
+            discount_percent = max(0, min(100, int(row[0]) if row[0] is not None else 0))
+            tier_name = row[1] if len(row) > 1 else None
+
+        # Fetch all credit settings in one query.
+        placeholders = ", ".join(["%s"] * len(settings_keys))
+        cur = execute(
+            conn,
+            f"""
+            SELECT setting_key, setting_value, discount
+            FROM credit_settings
+            WHERE setting_key IN ({placeholders})
+            """,
+            tuple(settings_keys),
+        )
+        rows = cur.fetchall() or []
+
+    settings_map = {
+        r[0]: {"value": int(r[1]) if r[1] is not None else 1, "discount": r[2]}
+        for r in rows
+    }
+
+    def _effective_from_setting(setting_key: str) -> tuple[int, int]:
+        s = settings_map.get(setting_key)
+        if not s:
+            original = 1
+            base_effective = 1
+        else:
+            original = int(s["value"])
+            d = s["discount"]
+            base_effective = int(d) if (d is not None and int(d) >= 0) else original
+        if discount_percent > 0:
+            effective = max(1, round(original * (100 - discount_percent) / 100))
+        else:
+            effective = base_effective
+        return effective, original
+
     for short_key, setting_key in _PRICING_KEYS_MAP:
-        base = credit_service.get_credit_setting(setting_key)
-        effective = credit_service.get_effective_cost(current_user.userid, base, setting_key)
+        effective, original_val = _effective_from_setting(setting_key)
         pricing[short_key] = effective
-        # Show true original price struck through whenever effective < original
-        # This uses the same sources as /settings/analysis-pricing so feature-level discounts
-        # (from credit_settings) still show original vs discounted even before subscriptions launch.
-        _, original_val, _ = credit_service.get_credit_setting_and_original(setting_key)
         if original_val is not None and effective < original_val:
             pricing_original[short_key] = original_val
-    # Computed: trading premium daily (daily_base * premium_multiplier, then discount)
+
+    # Computed: trading premium daily/monthly from effective base costs.
     try:
-        daily_base = credit_service.get_credit_setting('trading_daily_cost')
-        mult = credit_service.get_credit_setting('premium_chat_cost')
-        if daily_base is not None and mult is not None:
-            raw = int(daily_base) * int(mult)
-            pricing["trading_premium"] = credit_service.get_effective_cost(current_user.userid, raw)
-            # Always expose original when effective < raw (same logic as other keys)
-            if raw > 0 and pricing["trading_premium"] < raw:
-                pricing_original["trading_premium"] = raw
+        daily_effective, daily_original = _effective_from_setting("trading_daily_cost")
+        premium_effective, premium_original = _effective_from_setting("premium_chat_cost")
+        raw_effective = int(daily_effective) * int(premium_effective)
+        raw_original = int(daily_original) * int(premium_original)
+        pricing["trading_premium"] = raw_effective
+        if raw_original > 0 and raw_effective < raw_original:
+            pricing_original["trading_premium"] = raw_original
     except (TypeError, ValueError):
         pass
-    # Computed: trading premium monthly
+
     try:
-        monthly_base = credit_service.get_credit_setting('trading_monthly_cost')
-        mult = credit_service.get_credit_setting('premium_chat_cost')
-        if monthly_base is not None and mult is not None:
-            raw = int(monthly_base) * int(mult)
-            pricing["trading_monthly_premium"] = credit_service.get_effective_cost(current_user.userid, raw)
-            if raw > 0 and pricing["trading_monthly_premium"] < raw:
-                pricing_original["trading_monthly_premium"] = raw
+        monthly_effective, monthly_original = _effective_from_setting("trading_monthly_cost")
+        premium_effective, premium_original = _effective_from_setting("premium_chat_cost")
+        raw_effective = int(monthly_effective) * int(premium_effective)
+        raw_original = int(monthly_original) * int(premium_original)
+        pricing["trading_monthly_premium"] = raw_effective
+        if raw_original > 0 and raw_effective < raw_original:
+            pricing_original["trading_monthly_premium"] = raw_original
     except (TypeError, ValueError):
         pass
+
     result = {"pricing": pricing, "subscription_discount_percent": discount_percent}
     if tier_name:
         result["subscription_tier_name"] = tier_name
