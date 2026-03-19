@@ -132,23 +132,35 @@ echo "Starting backend..."
 nohup python main.py > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
-sleep 3
+sleep 2
 
 # Check if backend is running
 if ps -p $BACKEND_PID > /dev/null; then
     echo "✅ Backend started successfully on port 8001"
-    # Retry health check to avoid false warning during cold startup
-    for i in 1 2 3 4 5; do
+    # Retry health check with longer warm-up window.
+    backend_ready=false
+    for i in $(seq 1 20); do
       if curl -fsS http://localhost:8001/api/health >/dev/null; then
         echo "✅ Backend health check passed"
+        backend_ready=true
         break
       fi
-      if [ "$i" -eq 5 ]; then
-        echo "⚠️ Health check failed after retries"
-      else
-        sleep 2
+
+      # If process exited, fail fast and print logs.
+      if ! ps -p $BACKEND_PID > /dev/null; then
+        echo "❌ Backend process exited before health check passed"
+        tail -80 ../logs/backend.log
+        exit 1
       fi
+
+      sleep 2
     done
+
+    if [ "$backend_ready" != "true" ]; then
+      echo "❌ Health check did not pass in time"
+      tail -80 ../logs/backend.log
+      exit 1
+    fi
 else
     echo "❌ Backend failed to start. Check logs:"
     tail -20 ../logs/backend.log
