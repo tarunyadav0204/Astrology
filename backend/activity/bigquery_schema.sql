@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS `PROJECT_ID.DATASET_ID.user_activity` (
   resource_type STRING OPTIONS(description = "e.g. message, chart"),
   resource_id STRING OPTIONS(description = "Related entity id"),
   metadata STRING OPTIONS(description = "JSON string for extra data"),
+  error_type STRING OPTIONS(description = "Exception type (for api_error)"),
+  error_message STRING OPTIONS(description = "Error message (for api_error)"),
+  stack_trace STRING OPTIONS(description = "Full stack trace (for api_error)"),
   ip STRING OPTIONS(description = "Client IP"),
   user_agent STRING OPTIONS(description = "Client user agent"),
   created_at TIMESTAMP NOT NULL OPTIONS(description = "Event time UTC")

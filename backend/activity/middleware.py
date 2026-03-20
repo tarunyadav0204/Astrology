@@ -5,6 +5,7 @@ Runs after the request; does not block the response.
 import time
 import logging
 import jwt
+import traceback
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -77,35 +78,65 @@ def _get_user_from_request(request: Request) -> tuple[str | None, int | None, st
 class ActivityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter() - start) * 1000
-
+        duration_ms = None
         path = request.url.path
-        if path in SKIP_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
-            return response
 
-        user_phone, user_id, user_name = _get_user_from_request(request)
         try:
-            # Fire-and-forget: run in executor so we don't block
-            import asyncio
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(
-                None,
-                _publish_api_request,
-                path,
-                request.method,
-                response.status_code,
-                duration_ms,
-                user_phone,
-                user_id,
-                user_name,
-                request.client.host if request.client else None,
-                request.headers.get("user-agent"),
-            )
-        except Exception as e:
-            logger.debug("Activity: failed to schedule publish: %s", e)
+            response = await call_next(request)
+            duration_ms = (time.perf_counter() - start) * 1000
 
-        return response
+            if path in SKIP_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
+                return response
+
+            user_phone, user_id, user_name = _get_user_from_request(request)
+            try:
+                # Fire-and-forget: run in executor so we don't block
+                import asyncio
+                loop = asyncio.get_running_loop()
+                loop.run_in_executor(
+                    None,
+                    _publish_api_request,
+                    path,
+                    request.method,
+                    response.status_code,
+                    duration_ms,
+                    user_phone,
+                    user_id,
+                    user_name,
+                    request.client.host if request.client else None,
+                    request.headers.get("user-agent"),
+                )
+            except Exception as e:
+                logger.debug("Activity: failed to schedule publish: %s", e)
+
+            return response
+        except Exception as e:
+            duration_ms = (time.perf_counter() - start) * 1000
+
+            user_phone, user_id, user_name = _get_user_from_request(request)
+            try:
+                import asyncio
+                loop = asyncio.get_running_loop()
+                loop.run_in_executor(
+                    None,
+                    _publish_api_error,
+                    path,
+                    request.method,
+                    500,
+                    duration_ms,
+                    user_phone,
+                    user_id,
+                    user_name,
+                    request.client.host if request.client else None,
+                    request.headers.get("user-agent"),
+                    type(e).__name__,
+                    str(e),
+                    traceback.format_exc(),
+                )
+            except Exception as schedule_err:
+                logger.debug("Activity: failed to schedule error publish: %s", schedule_err)
+
+            raise
 
 
 def _get_user_name_by_id(user_id: int) -> str | None:
@@ -153,4 +184,44 @@ def _publish_api_request(path, method, status_code, duration_ms, user_phone, use
         resource_id=resource_id,
         ip=ip,
         user_agent=user_agent,
+    )
+
+
+def _publish_api_error(
+    path,
+    method,
+    status_code,
+    duration_ms,
+    user_phone,
+    user_id,
+    user_name,
+    ip,
+    user_agent,
+    error_type,
+    error_message,
+    stack_trace,
+):
+    """Publish an API exception to BigQuery via Pub/Sub."""
+    if user_id is not None:
+        looked_up = _get_user_name_by_id(user_id)
+        if looked_up:
+            user_name = looked_up
+
+    resource_type, resource_id = _resource_from_path(path)
+    publish_activity(
+        "api_error",
+        path=path,
+        method=method,
+        status_code=status_code,
+        duration_ms=duration_ms,
+        user_id=user_id,
+        user_phone=user_phone,
+        user_name=user_name,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        ip=ip,
+        user_agent=user_agent,
+        error_type=error_type,
+        error_message=error_message,
+        stack_trace=stack_trace,
     )

@@ -43,7 +43,18 @@ export default function EventScreen({ route }) {
   const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
   const { theme, colors } = useTheme();
+  const bgGradient = theme === 'dark'
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+    : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientStart];
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const deviceNow = React.useMemo(() => new Date(), []);
+  const deviceYear = deviceNow.getFullYear();
+  const deviceMonth = deviceNow.getMonth() + 1;
+  const deviceDay = deviceNow.getDate();
+  const recommendedMonth = deviceDay <= 15 ? deviceMonth : Math.min(deviceMonth + 1, 12);
+  const deviceMonths = React.useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
+  const [readingMode, setReadingMode] = useState('yearly'); // 'yearly' | 'monthly'
+  const [selectedMonth, setSelectedMonth] = useState(recommendedMonth);
   const [monthlyData, setMonthlyData] = useState(null);
   
   // Loading states
@@ -390,17 +401,18 @@ export default function EventScreen({ route }) {
   const years = React.useMemo(() => Array.from({length: 101}, (_, i) => START_YEAR + i), []);
 
   useEffect(() => {
-    if (yearSliderRef.current && !analysisStarted) {
+    if (yearSliderRef.current && !analysisStarted && readingMode === 'yearly') {
       const index = selectedYear - START_YEAR;
       setTimeout(() => {
         yearSliderRef.current?.scrollToIndex({ 
           index, 
           animated: false,
-          viewPosition: 0
+          // 0.5 tends to place the selected chip near the center.
+          viewPosition: 0.5
         });
       }, 100);
     }
-  }, [analysisStarted]);
+  }, [analysisStarted, readingMode, selectedYear]);
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
@@ -409,8 +421,12 @@ export default function EventScreen({ route }) {
     yearSliderRef.current?.scrollToIndex({ 
       index, 
       animated: true, 
-      viewPosition: 0 
+      viewPosition: 0.5
     });
+  };
+
+  const handleMonthlyContinue = () => {
+    navigation.navigate('MonthlyDeepScreen', { year: deviceYear, month: selectedMonth });
   };
 
   const navigateToChat = (context, type) => {
@@ -561,7 +577,8 @@ export default function EventScreen({ route }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Regenerate Confirmation Modal */}
       <Modal
         visible={showRegenerateModal}
@@ -571,8 +588,8 @@ export default function EventScreen({ route }) {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
-            <Ionicons name="refresh-circle" size={48} color={colors.accent} style={styles.modalIcon} />
-            <Text style={[styles.modalTitle, { color: colors.accent }]}>{t('eventScreen.regenerateTitle', 'Regenerate Predictions?')}</Text>
+            <Ionicons name="refresh-circle" size={48} color={colors.primary} style={styles.modalIcon} />
+            <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('eventScreen.regenerateTitle', 'Regenerate Predictions?')}</Text>
             <Text style={[styles.modalText, { color: colors.textSecondary }]}>
               {t('eventScreen.regenerateMessage', { cost: creditCost, year: selectedYear })}
             </Text>
@@ -584,7 +601,7 @@ export default function EventScreen({ route }) {
                 <Text style={[styles.modalButtonTextCancel, { color: colors.text }]}>{t('eventScreen.cancel', 'Cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.accent }]} 
+                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.primary }]} 
                 onPress={handleRegenerateConfirm}
               >
                 <Text style={[styles.modalButtonTextConfirm, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>{t('eventScreen.confirm', 'Confirm')}</Text>
@@ -594,12 +611,14 @@ export default function EventScreen({ route }) {
         </View>
       </Modal>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.backgroundSecondary, borderBottomColor: colors.cardBorder }]}>
+      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: colors.cardBorder }]}>
         <TouchableOpacity onPress={() => analysisStarted ? setAnalysisStarted(false) : navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.surface }]}>
-          <Ionicons name="arrow-back" size={24} color={colors.accent} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.accent }]}>{analysisStarted ? t('eventScreen.headerPredictions', { year: selectedYear }) : t('eventScreen.headerTitle', 'Major Life Events')}</Text>
+          <Text style={[styles.headerTitle, { color: colors.primary }]}>
+            {analysisStarted ? t('eventScreen.headerPredictions', { year: selectedYear }) : t('eventScreen.headerTitle', 'Major Life Events')}
+          </Text>
           {birthData && (
             <NativeSelectorChip 
               birthData={birthData}
@@ -611,7 +630,7 @@ export default function EventScreen({ route }) {
         <View style={styles.headerRight}>
           {analysisStarted && monthlyData && (
             <TouchableOpacity onPress={() => setShowRegenerateModal(true)} style={[styles.regenerateButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Ionicons name="refresh" size={22} color={colors.accent} />
+              <Ionicons name="refresh" size={22} color={colors.primary} />
             </TouchableOpacity>
           )}
           {analysisStarted && (
@@ -621,9 +640,9 @@ export default function EventScreen({ route }) {
               style={[styles.settingsButton, { backgroundColor: colors.surface }]}
             >
               {isExportingPdf ? (
-                <ActivityIndicator size="small" color={colors.accent} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Ionicons name="document-text-outline" size={24} color={colors.accent} />
+                <Ionicons name="document-text-outline" size={24} color={colors.primary} />
               )}
             </TouchableOpacity>
           )}
@@ -632,101 +651,193 @@ export default function EventScreen({ route }) {
       </View>
 
       {!analysisStarted ? (
-        <View style={[styles.selectionContainer, { backgroundColor: colors.background }]}>
-          <Text style={[styles.selectionTitle, { color: colors.accent }]}>🌟 {t('eventScreen.selectYear', 'Select Your Year')}</Text>
-          <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>{t('eventScreen.selectYearSubtitle', 'Which year would you like to explore?')}</Text>
+        <View style={[styles.selectionContainer, { backgroundColor: 'transparent' }]}>
+          <Text style={[styles.selectionTitle, { color: colors.primary }]}>🌟 {t('eventScreen.chooseReading', 'Choose your reading')}</Text>
+          <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>
+            {readingMode === 'yearly'
+              ? t('eventScreen.yearlySubtitle', 'You’ll get the year’s vibe with 12 monthly story arcs. Tap any month to go deeper.')
+              : t('eventScreen.monthlySubtitle', 'Pick your month—then we’ll generate an in-depth, one-month deep dive with dasha activation and many scenarios.')}
+          </Text>
+
+          <View style={styles.modeToggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.modeToggleButton,
+                { backgroundColor: readingMode === 'yearly' ? colors.primary : colors.cardBackground, borderColor: readingMode === 'yearly' ? colors.primary : colors.cardBorder }
+              ]}
+              onPress={() => setReadingMode('yearly')}
+            >
+              <Text style={[styles.modeToggleText, { color: readingMode === 'yearly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.primary }]}>
+                {t('eventScreen.yearlyOverview', 'Whole Year')}
+              </Text>
+              <Text style={[styles.modeToggleSubtext, { color: readingMode === 'yearly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.textSecondary }]}>
+                {t('eventScreen.yearlyOverviewDesc', '12 monthly chapters')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.modeToggleButton,
+                { backgroundColor: readingMode === 'monthly' ? colors.primary : colors.cardBackground, borderColor: readingMode === 'monthly' ? colors.primary : colors.cardBorder }
+              ]}
+              onPress={() => setReadingMode('monthly')}
+            >
+              <Text style={[styles.modeToggleText, { color: readingMode === 'monthly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.primary }]}>
+                {t('eventScreen.monthlyDeepDive', 'One Month')}
+              </Text>
+              <Text style={[styles.modeToggleSubtext, { color: readingMode === 'monthly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.textSecondary }]}>
+                {t('eventScreen.monthlyDeepDiveDesc', 'Deep detail for your month')}
+              </Text>
+            </TouchableOpacity>
+          </View>
           
           {/* Year Picker - Horizontal Chips */}
-          <View style={styles.yearChipsContainer}>
-            <FlatList
-              ref={yearSliderRef}
-              horizontal
-              data={years}
-              keyExtractor={(item) => item.toString()}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.yearChipsContent}
-              decelerationRate="fast"
-              getItemLayout={(data, index) => ({
-                length: TOTAL_ITEM_SIZE,
-                offset: TOTAL_ITEM_SIZE * index,
-                index,
-              })}
-              onScrollToIndexFailed={(info) => {
-                const wait = new Promise(resolve => setTimeout(resolve, 500));
-                wait.then(() => {
-                  yearSliderRef.current?.scrollToIndex({ 
-                    index: info.index, 
-                    animated: true,
-                    viewPosition: 0
-                  });
-                });
-              }}
-              renderItem={({ item }) => (
-                <View style={{ width: TOTAL_ITEM_SIZE }}>
-                  <TouchableOpacity
-                    style={[
-                      styles.yearChip,
-                      { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
-                      selectedYear === item && { backgroundColor: colors.accent, borderColor: colors.accent },
-                      { width: ITEM_WIDTH }
-                    ]}
-                    onPress={() => handleYearChange(item)}
-                  >
-                    <Text style={[
-                      styles.yearChipText,
-                      { color: colors.textSecondary },
-                      selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
-                    ]}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-          </View>
+          {readingMode === 'yearly' ? (
+            <>
+              {/* Year Picker - Horizontal Chips */}
+              <View style={styles.yearChipsContainer}>
+                <FlatList
+                  ref={yearSliderRef}
+                  horizontal
+                  data={years}
+                  keyExtractor={(item) => item.toString()}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.yearChipsContent}
+                  decelerationRate="fast"
+                  getItemLayout={(data, index) => ({
+                    length: TOTAL_ITEM_SIZE,
+                    offset: TOTAL_ITEM_SIZE * index,
+                    index,
+                  })}
+                  onScrollToIndexFailed={(info) => {
+                    const wait = new Promise(resolve => setTimeout(resolve, 500));
+                    wait.then(() => {
+                      yearSliderRef.current?.scrollToIndex({
+                        index: info.index,
+                        animated: true,
+                        viewPosition: 0
+                      });
+                    });
+                  }}
+                  renderItem={({ item }) => (
+                    <View style={{ width: TOTAL_ITEM_SIZE }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.yearChip,
+                          { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                    selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
+                          { width: ITEM_WIDTH }
+                        ]}
+                        onPress={() => handleYearChange(item)}
+                      >
+                        <Text style={[
+                          styles.yearChipText,
+                          { color: colors.textSecondary },
+                          selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
+                        ]}>
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
+              </View>
 
-          {/* Quick Select */}
-          <View style={styles.quickSelectContainer}>
-            <TouchableOpacity 
-              style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
-              onPress={() => handleYearChange(new Date().getFullYear())}
-            >
-              <Text style={[styles.quickSelectText, { color: colors.accent }]}>{t('eventScreen.thisYear', 'This Year')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
-              onPress={() => handleYearChange(new Date().getFullYear() + 1)}
-            >
-              <Text style={[styles.quickSelectText, { color: colors.accent }]}>{t('eventScreen.nextYear', 'Next Year')}</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Quick Select */}
+              <View style={styles.quickSelectContainer}>
+                <TouchableOpacity
+                  style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
+                  onPress={() => handleYearChange(deviceYear)}
+                >
+                  <Text style={[styles.quickSelectText, { color: colors.primary }]}>{t('eventScreen.thisYear', 'This Year')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
+                  onPress={() => handleYearChange(deviceYear + 1)}
+                >
+                  <Text style={[styles.quickSelectText, { color: colors.primary }]}>{t('eventScreen.nextYear', 'Next Year')}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginTop: 8, marginBottom: 12 }]}>
+                {t('eventScreen.pickMonth', `Pick a month in ${deviceYear}`)}
+              </Text>
+              <View style={styles.monthChipsContainer}>
+                <FlatList
+                  horizontal
+                  data={deviceMonths}
+                  keyExtractor={(item) => item.toString()}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.monthChipsContent}
+                  renderItem={({ item }) => (
+                    <View style={{ width: ITEM_WIDTH }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.monthChip,
+                          { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                          selectedMonth === item && { backgroundColor: colors.primary, borderColor: colors.primary },
+                        ]}
+                        onPress={() => setSelectedMonth(item)}
+                      >
+                        <Text style={[
+                          styles.monthChipText,
+                          { color: colors.textSecondary },
+                          selectedMonth === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
+                        ]}>
+                          {getMonthName(item)}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
+              </View>
+            </>
+          )}
 
           {/* What's Included */}
           <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.featuresTitle, { color: colors.accent }]}>{t('eventScreen.whatsIncluded', "What's Included:")}</Text>
+            <Text style={[styles.featuresTitle, { color: colors.primary }]}>{t('eventScreen.whatsIncluded', "What's Included:")}</Text>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.monthlyForecasts', '12 Monthly Forecasts')}</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+              <Text style={[styles.featureText, { color: colors.text }]}>
+                {readingMode === 'yearly'
+                  ? t('eventScreen.monthlyForecasts', '12 Monthly Forecasts')
+                  : t('eventScreen.oneMonthDeep', 'One Month Deep Dive')}
+              </Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.majorLifeEvents', 'Major Life Events')}</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.timingGuidance', 'Timing Guidance')}</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.aiInsights', 'AI-Powered Insights')}</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+              <Text style={[styles.featureText, { color: colors.text }]}>
+                {t(
+                  'eventScreen.aiInsights',
+                  'Using classic vedic methods including Parashari, Nadi and Jaimini'
+                )}
+              </Text>
             </View>
           </View>
 
           {/* Continue Button */}
           <View style={styles.unlockButtonContainer}>
-            <TouchableOpacity style={styles.unlockButton} onPress={handleContinue}>
-              <LinearGradient colors={[colors.accent, colors.primary]} style={styles.unlockGradient}>
-                <Text style={[styles.unlockButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>{t('eventScreen.continue', 'Continue')}</Text>
+            <TouchableOpacity
+              style={styles.unlockButton}
+              onPress={readingMode === 'yearly' ? handleContinue : handleMonthlyContinue}
+            >
+              <LinearGradient colors={[colors.primary, '#ff8c5a']} style={styles.unlockGradient}>
+                <Text style={[styles.unlockButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+                  {readingMode === 'yearly'
+                    ? t('eventScreen.continue', 'Continue')
+                    : t('eventScreen.generateMonth', 'Generate my month reading')}
+                </Text>
                 <Ionicons name="arrow-forward" size={22} color={theme === 'dark' ? colors.background : '#1a1a1a'} />
               </LinearGradient>
             </TouchableOpacity>
@@ -734,13 +845,13 @@ export default function EventScreen({ route }) {
         </View>
       ) : (
         <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {/* Native Name */}
         {nativeName && (
           <View style={styles.nameContainer}>
-            <Text style={[styles.nameText, { color: colors.accent }]}>{nativeName}</Text>
+            <Text style={[styles.nameText, { color: colors.primary }]}>{nativeName}</Text>
           </View>
         )}
 
@@ -748,12 +859,12 @@ export default function EventScreen({ route }) {
         {monthlyData?.macro_trends && (
           <View style={[styles.macroCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
             <View style={styles.macroHeader}>
-              <Ionicons name="planet" size={18} color={colors.accent} />
-              <Text style={[styles.macroTitle, { color: colors.accent }]}>The Vibe of {selectedYear}</Text>
+              <Ionicons name="planet" size={18} color={colors.primary} />
+              <Text style={[styles.macroTitle, { color: colors.primary }]}>The Vibe of {selectedYear}</Text>
             </View>
             {monthlyData.macro_trends.map((trend, index) => (
               <View key={index} style={styles.trendRow}>
-                <Text style={[styles.bullet, { color: colors.accent }]}>•</Text>
+                <Text style={[styles.bullet, { color: colors.primary }]}>•</Text>
                 <Text style={[styles.trendText, { color: colors.text }]}>{trend}</Text>
               </View>
             ))}
@@ -764,16 +875,16 @@ export default function EventScreen({ route }) {
         {loadingMonthly ? (
           <View style={styles.section}>
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.accent} />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
               <Text style={[styles.loadingText, { color: colors.text }]}>{loadingMessages[loadingMessageIndex].text}</Text>
               
               {loadingProgress >= 0 ? (
                 <View style={styles.progressBarContainer}>
                   <View style={[styles.progressBarTrack, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
-                    <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.accent }]} />
+                    <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.primary }]} />
                   </View>
-                  <Text style={[styles.progressPercentText, { color: colors.accent }]}>
+                  <Text style={[styles.progressPercentText, { color: colors.primary }]}>
                     {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : t('eventScreen.almostThere', 'Almost there...')}
                   </Text>
                 </View>
@@ -784,7 +895,7 @@ export default function EventScreen({ route }) {
           </View>
         ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.accent }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Guide')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Guide')}</Text>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
                 <MonthlyAccordion
@@ -819,12 +930,13 @@ export default function EventScreen({ route }) {
         credits={credits}
         confirmLabel={t('eventScreen.continue', 'Continue')}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -926,36 +1038,82 @@ const styles = StyleSheet.create({
   
   selectionContainer: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#0a0a0f'
   },
   selectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFD700',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 16,
     marginBottom: 8,
     letterSpacing: 0.5
   },
   selectionSubtitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#b8b8c8',
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 18,
     lineHeight: 22
   },
+  modeToggleContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  modeToggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeToggleText: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    marginBottom: 4,
+  },
+  modeToggleSubtext: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  monthChipsContainer: {
+    marginBottom: 16,
+    height: 56,
+    justifyContent: 'center',
+  },
+  monthChipsContent: {
+    paddingHorizontal: (width - ITEM_WIDTH) / 2,
+  },
+  monthChip: {
+    paddingVertical: 12,
+    backgroundColor: '#16162a',
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: ITEM_WIDTH - 6,
+  },
+  monthChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#b8b8c8',
+  },
   yearChipsContainer: {
-    marginBottom: 24,
-    height: 64
+    marginBottom: 16,
+    height: 56
   },
   yearChipsContent: {
     paddingHorizontal: (width - 80) / 2
   },
   yearChip: {
-    paddingVertical: 14,
+    paddingVertical: 12,
     backgroundColor: '#16162a',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: 'rgba(255, 215, 0, 0.2)',
     alignItems: 'center',
@@ -971,7 +1129,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6
   },
   yearChipText: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#b8b8c8'
   },
@@ -983,11 +1141,11 @@ const styles = StyleSheet.create({
   quickSelectContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24
+    marginBottom: 18
   },
   quickSelectButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: '#16162a',
     borderRadius: 12,
     borderWidth: 1.5,
@@ -995,43 +1153,48 @@ const styles = StyleSheet.create({
   },
   quickSelectText: {
     color: '#FFD700',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.3
   },
   featuresContainer: {
     backgroundColor: '#16162a',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
+    padding: 16,
+    paddingRight: 22,
+    borderRadius: 14,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 0, 0.15)'
   },
   featuresTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFD700',
-    marginBottom: 14,
+    marginBottom: 12,
     letterSpacing: 0.3
   },
   featureItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 10,
     gap: 12
   },
   featureText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#e8e8f0',
-    lineHeight: 20
+    lineHeight: 20,
+    flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap'
   },
   unlockButtonContainer: {
     marginTop: 'auto',
-    paddingTop: 20
+    paddingTop: 12,
+    paddingBottom: 6,
   },
   unlockButton: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 6 },
@@ -1040,14 +1203,14 @@ const styles = StyleSheet.create({
     elevation: 10
   },
   unlockGradient: {
-    paddingVertical: 18,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10
   },
   unlockButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.5
   },

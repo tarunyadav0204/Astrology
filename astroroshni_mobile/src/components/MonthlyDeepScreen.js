@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -34,6 +35,9 @@ export default function MonthlyDeepScreen() {
   const { credits, fetchBalance } = useCredits();
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
+  const bgGradient = theme === 'dark'
+    ? ['#1a0033', '#2d1b4e', '#4a2c6d', colors.primary]
+    : ['#fefcfb', '#fef7f0', '#fed7d7', '#fefcfb'];
 
   const [birthData, setBirthData] = useState(null);
   const [monthlyData, setMonthlyData] = useState(null);
@@ -43,7 +47,48 @@ export default function MonthlyDeepScreen() {
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const loadingIntervalRef = useRef(null);
   const [showMonthlyCreditsModal, setShowMonthlyCreditsModal] = useState(false);
+  const [showGenerateButton, setShowGenerateButton] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const openCreditsModal = useCallback(async () => {
+    try {
+      await fetchBalance();
+      const balanceRes = await creditAPI.getBalance();
+      const actualCredits = balanceRes.data.balance;
+
+      if (actualCredits < creditCost) {
+        Alert.alert('Insufficient Credits', `You need ${creditCost} credits. You have ${actualCredits}.`, [
+          { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        if (isMountedRef.current) {
+          setShowMonthlyCreditsModal(false);
+          setShowGenerateButton(true);
+        }
+        return false;
+      }
+
+      if (isMountedRef.current) {
+        setShowMonthlyCreditsModal(true);
+        setShowGenerateButton(false);
+      }
+      return true;
+    } catch (e) {
+      if (isMountedRef.current) {
+        setShowMonthlyCreditsModal(false);
+        setShowGenerateButton(true);
+      }
+      return false;
+    }
+  }, [fetchBalance, creditCost, creditAPI, navigation]);
 
   useEffect(() => {
     pricingAPI.getPricing().then((res) => {
@@ -159,6 +204,13 @@ export default function MonthlyDeepScreen() {
         });
         if (mounted && cacheRes.data?.cached && cacheRes.data?.data) {
           setMonthlyData(cacheRes.data.data);
+          setShowMonthlyCreditsModal(false);
+          setShowGenerateButton(false);
+        } else {
+          // Not cached: open credits modal immediately (user decides before generation).
+          setMonthlyData(null);
+          setShowGenerateButton(false);
+          await openCreditsModal();
         }
       } catch (e) {
         console.error('Cache check failed:', e);
@@ -169,17 +221,7 @@ export default function MonthlyDeepScreen() {
   }, [year, month, getBirthDetails, navigation, route.params]);
 
   const handleGenerate = async () => {
-    await fetchBalance();
-    const balanceRes = await creditAPI.getBalance();
-    const actualCredits = balanceRes.data.balance;
-    if (actualCredits < creditCost) {
-      Alert.alert('Insufficient Credits', `You need ${creditCost} credits. You have ${actualCredits}.`, [
-        { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-      return;
-    }
-    setShowMonthlyCreditsModal(true);
+    await openCreditsModal();
   };
 
   const singleMonth = monthlyData?.monthly_predictions?.[0];
@@ -236,99 +278,109 @@ export default function MonthlyDeepScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('monthlyDeepScreen.loading', 'Loading...')}</Text>
-        </View>
-      </SafeAreaView>
+      <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
+        <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('monthlyDeepScreen.loading', 'Loading...')}</Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.backgroundSecondary, borderBottomColor: colors.cardBorder }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.surface }]}>
-          <Ionicons name="arrow-back" size={24} color={colors.accent} />
+    <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: colors.cardBorder }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.surface }]}>
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.accent }]} numberOfLines={1}>
-          {monthLabel ? t('monthlyDeepScreen.headerDeepDive', { monthYear: monthLabel }) : t('monthlyDeepScreen.headerMonthlyDeepDive', 'Monthly deep dive')}
-        </Text>
-        <View style={styles.headerRight}>
-          {singleMonth && !generating && (
-            <>
-              <TouchableOpacity
-                onPress={handleGenerate}
-                style={[styles.regenerateButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-              >
-                <Ionicons name="refresh" size={20} color={colors.accent} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleExportPdf}
-                disabled={isExportingPdf}
-                style={[styles.settingsButton, { backgroundColor: colors.surface }]}
-              >
-                {isExportingPdf ? (
-                  <ActivityIndicator size="small" color={colors.accent} />
-                ) : (
-                  <Ionicons name="document-text-outline" size={20} color={colors.accent} />
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-
-      {generating ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
-          <Text style={[styles.loadingText, { color: colors.text }]}>{loadingMessages[loadingMessageIndex].text}</Text>
-        </View>
-      ) : singleMonth ? (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <MonthlyAccordion
-            data={{ ...singleMonth, month: getMonthName(singleMonth.month_id) }}
-            onChatPress={() => navigateToChatWithMonth({ ...singleMonth, month: getMonthName(singleMonth.month_id) })}
-            defaultExpanded
-            hideDiveDeep
-          />
-        </ScrollView>
-      ) : (
-        <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
-          <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('monthlyDeepScreen.emptyTitle', { monthYear: monthLabel })}</Text>
-          <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            {t('monthlyDeepScreen.emptyDesc', { cost: creditCost })}
+          <Text style={[styles.headerTitle, { color: colors.primary }]} numberOfLines={1}>
+            {monthLabel ? t('monthlyDeepScreen.headerDeepDive', { monthYear: monthLabel }) : t('monthlyDeepScreen.headerMonthlyDeepDive', 'Monthly deep dive')}
           </Text>
-          <TouchableOpacity style={[styles.generateButton, { backgroundColor: colors.accent }]} onPress={handleGenerate}>
-            <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
-              {t('monthlyDeepScreen.generateDeepDive', 'Generate deep dive')}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {singleMonth && !generating && (
+              <>
+                <TouchableOpacity
+                  onPress={handleGenerate}
+                  style={[styles.regenerateButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                >
+                  <Ionicons name="refresh" size={20} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleExportPdf}
+                  disabled={isExportingPdf}
+                  style={[styles.settingsButton, { backgroundColor: colors.surface }]}
+                >
+                  {isExportingPdf ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
-      )}
-      <ConfirmCreditsModal
-        visible={showMonthlyCreditsModal}
-        onClose={() => setShowMonthlyCreditsModal(false)}
-        onConfirm={() => {
-          setShowMonthlyCreditsModal(false);
-          fetchDeepMonth();
-        }}
-        title={t('monthlyDeepScreen.generateConfirmTitle', 'Generate deep dive')}
-        description={t(
-          'credits.eventTimeline.description',
-          'We will deeply analyze all your divisional charts using Parashari, Nadi, and Jaimini methods, and map all high‑probability events that may manifest over this period.'
+
+        {generating ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
+            <Text style={[styles.loadingText, { color: colors.text }]}>{loadingMessages[loadingMessageIndex].text}</Text>
+          </View>
+        ) : singleMonth ? (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <MonthlyAccordion
+              data={{ ...singleMonth, month: getMonthName(singleMonth.month_id) }}
+              onChatPress={() => navigateToChatWithMonth({ ...singleMonth, month: getMonthName(singleMonth.month_id) })}
+              defaultExpanded
+              hideDiveDeep
+            />
+          </ScrollView>
+        ) : (
+          <View style={[styles.emptyContainer, { backgroundColor: 'transparent' }]}>
+            <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('monthlyDeepScreen.emptyTitle', { monthYear: monthLabel })}</Text>
+            <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
+              {t('monthlyDeepScreen.emptyDesc', { cost: creditCost })}
+            </Text>
+            {showGenerateButton && !showMonthlyCreditsModal && (
+              <TouchableOpacity style={[styles.generateButton, { backgroundColor: colors.primary }]} onPress={handleGenerate}>
+                <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+                  {t('monthlyDeepScreen.generateDeepDive', 'Generate deep dive')}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
-        cost={creditCost}
-        credits={credits}
-        confirmLabel={t('monthlyDeepScreen.continue', 'Continue')}
-      />
-    </SafeAreaView>
+        <ConfirmCreditsModal
+          visible={showMonthlyCreditsModal}
+          onClose={() => {
+            setShowMonthlyCreditsModal(false);
+            setShowGenerateButton(true);
+          }}
+          onConfirm={() => {
+            setShowMonthlyCreditsModal(false);
+            setShowGenerateButton(false);
+            fetchDeepMonth();
+          }}
+          title={t('monthlyDeepScreen.generateConfirmTitle', 'Generate deep dive')}
+          description={t(
+            'credits.eventTimeline.description',
+            'We will deeply analyze all your divisional charts using Parashari, Nadi, and Jaimini methods, and map all high‑probability events that may manifest over this period.'
+          )}
+          cost={creditCost}
+          credits={credits}
+          confirmLabel={t('monthlyDeepScreen.continue', 'Continue')}
+        />
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 

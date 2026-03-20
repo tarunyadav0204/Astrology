@@ -467,7 +467,8 @@ CREATE TABLE "device_tokens" (
     "token" TEXT NOT NULL,
     "platform" TEXT NOT NULL,
     "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY ("id")
+    PRIMARY KEY ("id"),
+    UNIQUE ("userid", "platform")
 );
 
 DROP TABLE IF EXISTS "nudge_deliveries" CASCADE;

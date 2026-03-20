@@ -134,6 +134,9 @@ def publish_activity(
     metadata: Optional[dict] = None,
     ip: Optional[str] = None,
     user_agent: Optional[str] = None,
+    error_type: Optional[str] = None,
+    error_message: Optional[str] = None,
+    stack_trace: Optional[str] = None,
 ) -> bool:
     """
     Publish an activity event to Pub/Sub. Fire-and-forget; does not block.
@@ -167,6 +170,15 @@ def publish_activity(
         payload["ip"] = ip
     if user_agent is not None:
         payload["user_agent"] = (user_agent[:500] if len(user_agent or "") > 500 else user_agent)
+    if error_type is not None:
+        payload["error_type"] = (str(error_type)[:200] if len(str(error_type)) > 200 else str(error_type))
+    if error_message is not None:
+        msg = str(error_message)
+        payload["error_message"] = msg[:8000] if len(msg) > 8000 else msg
+    if stack_trace is not None:
+        st = str(stack_trace)
+        # Keep message sizes bounded for Pub/Sub payload.
+        payload["stack_trace"] = st[:40000] if len(st) > 40000 else st
 
     try:
         return _publish_sync(payload)

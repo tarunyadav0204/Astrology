@@ -29,6 +29,12 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
+        # Ensure ON CONFLICT(userid, platform) works even if the table was
+        # created earlier without the unique constraint (common after partial migrations).
+        execute(
+            conn,
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_device_tokens_userid_platform ON device_tokens(userid, platform)",
+        )
         execute(
             conn,
             """
@@ -50,6 +56,13 @@ def init_nudge_tables(conn) -> None:
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_sent "
             "ON nudge_deliveries(userid, sent_at)",
         )
+        # DDL statements are transactional in Postgres; ensure persistence
+        # because our connection context manager closes without auto-commit.
+        try:
+            conn.commit()
+        except Exception:
+            # If the connection/driver is already in autocommit mode, commit is harmless.
+            pass
     except Exception as e:
         logger.exception("Failed to init nudge tables: %s", e)
         raise

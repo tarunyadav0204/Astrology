@@ -40,8 +40,8 @@ import { Platform } from 'react-native';
 const USE_DEV_API = false;
 // For simulator leave empty (uses localhost/10.0.2.2). For physical device set your machine IP, e.g. 'http://192.168.1.10:8001'
 const DEV_API_HOST = '';
-// Test VM backend (switch to this for simulator testing against test infra)
-const TEST_API_URL = 'http://34.93.109.132:8001';
+// Test VM backend over HTTPS (recommended for physical devices)
+const TEST_API_URL = 'https://test.astroroshni.com';
 // Production backend
 const PROD_API_URL = 'https://astroroshni.com';
 
