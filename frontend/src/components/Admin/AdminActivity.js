@@ -5,7 +5,9 @@ import './AdminActivity.css';
 const COLUMNS = [
   'event_id', 'user_id', 'user_phone', 'user_name', 'action', 'path',
   'method', 'status_code', 'duration_ms', 'resource_type', 'resource_id',
-  'metadata', 'ip', 'user_agent', 'created_at',
+  'metadata',
+  'error_type', 'error_message', 'stack_trace',
+  'ip', 'user_agent', 'created_at',
 ];
 
 function todayStr() {
@@ -21,6 +23,7 @@ export default function AdminActivity() {
   const [filterUserName, setFilterUserName] = useState('');
   const [filterPhone, setFilterPhone] = useState('');
   const [filterAction, setFilterAction] = useState('');
+  const [onlyErrors, setOnlyErrors] = useState(true);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
 
@@ -38,7 +41,11 @@ export default function AdminActivity() {
       });
       if (filterUserName.trim()) params.set('user_name', filterUserName.trim());
       if (filterPhone.trim()) params.set('user_phone', filterPhone.trim());
-      if (filterAction.trim()) params.set('action', filterAction.trim());
+      if (onlyErrors) {
+        params.set('action', 'api_error');
+      } else if (filterAction.trim()) {
+        params.set('action', filterAction.trim());
+      }
       const res = await fetch(`/api/admin/activity?${params.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
@@ -54,7 +61,7 @@ export default function AdminActivity() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, filterUserName, filterPhone, filterAction, sortBy, sortOrder]);
+  }, [dateFrom, dateTo, filterUserName, filterPhone, filterAction, onlyErrors, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchActivity();
@@ -72,6 +79,10 @@ export default function AdminActivity() {
   const renderCell = (row, col) => {
     let v = row[col];
     if (v === null || v === undefined) return '—';
+    if (col === 'stack_trace' && typeof v === 'string') {
+      // Keep admin table readable; stack traces are huge.
+      return v.length > 250 ? `${v.slice(0, 250)}…` : v;
+    }
     if (col === 'created_at' && typeof v === 'string') {
       try {
         return new Date(v).toLocaleString();
@@ -97,6 +108,9 @@ export default function AdminActivity() {
       resource_type: 'Resource Type',
       resource_id: 'Resource ID',
       metadata: 'Metadata',
+      error_type: 'Error Type',
+      error_message: 'Error Message',
+      stack_trace: 'Stack Trace',
       ip: 'IP',
       user_agent: 'User Agent',
       created_at: 'Created At',
@@ -154,9 +168,18 @@ export default function AdminActivity() {
               type="text"
               placeholder="e.g. api_request, podcast_generated"
               value={filterAction}
+                disabled={onlyErrors}
               onChange={(e) => setFilterAction(e.target.value)}
             />
           </label>
+            <label style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 }}>
+              <input
+                type="checkbox"
+                checked={onlyErrors}
+                onChange={(e) => setOnlyErrors(e.target.checked)}
+              />
+              <span>Only errors</span>
+            </label>
           <button type="button" className="admin-activity-refresh-btn" onClick={fetchActivity}>
             Refresh
           </button>
@@ -175,7 +198,7 @@ export default function AdminActivity() {
                   <th
                     key={col}
                     className="admin-activity-th admin-activity-sortable"
-                    onClick={() => handleSort(col)}
+                    onClick={() => (col === 'stack_trace' ? null : handleSort(col))}
                     title={`Sort by ${columnLabel(col)}`}
                   >
                     {columnLabel(col)}

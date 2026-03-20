@@ -94,7 +94,9 @@ def _get_bigquery_table() -> Optional[str]:
 ACTIVITY_COLUMNS = [
     "event_id", "user_id", "user_phone", "user_name", "action", "path",
     "method", "status_code", "duration_ms", "resource_type", "resource_id",
-    "metadata", "ip", "user_agent", "created_at",
+    "metadata",
+    "error_type", "error_message", "stack_trace",
+    "ip", "user_agent", "created_at",
 ]
 
 
