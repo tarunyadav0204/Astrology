@@ -5,6 +5,11 @@ const getApiUrl = () => {
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
   
+  // Test backend (HTTPS via Caddy)
+  if (hostname === 'test.astroroshni.com' || hostname.includes('test.astroroshni.com')) {
+    return APP_CONFIG.api.test;
+  }
+
   // If accessing via production domains, use production API (load balancer)
   if (hostname === 'astroclick.net' || hostname.includes('astroclick.net') ||
       hostname === 'astroroshni.com' || hostname.includes('astroroshni.com') ||
