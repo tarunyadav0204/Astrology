@@ -39,6 +39,25 @@ def get_conn():
             pass
 
 
+@contextmanager
+def get_conn_dict():
+    """
+    Postgres connection whose cursors return dict-like rows (RealDictCursor).
+    Use for code that expects sqlite3.Row-style access (e.g. row['col']).
+    """
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+
+    conn = psycopg2.connect(_postgres_dsn(), cursor_factory=RealDictCursor)
+    try:
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def execute(conn, sql: str, params=None):
     params = params or ()
     sql = _adapt_query_for_postgres(sql)
