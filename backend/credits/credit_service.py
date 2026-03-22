@@ -796,8 +796,6 @@ class CreditService:
         wildcard search on user name or phone. Dates are YYYY-MM-DD inclusive.
         """
         from db import get_conn, execute
-        with get_conn() as conn:
-            cursor = conn.cursor()
 
         sql = """
             SELECT ct.id, ct.userid, u.name, u.phone,
@@ -809,16 +807,18 @@ class CreditService:
         """
         params: List[Any] = [from_date, to_date]
 
-        if query:
-            like = f"%{query}%"
-            sql += " AND (u.name LIKE ? OR u.phone LIKE ?)"
+        if query and query.strip():
+            like = f"%{query.strip()}%"
+            # ILIKE matches SQLite-style case-insensitive search better for names/phones
+            sql += " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
             params.extend([like, like])
 
-            sql += " ORDER BY ct.created_at DESC LIMIT ?"
-            params.append(limit)
+        sql += " ORDER BY ct.created_at DESC LIMIT ?"
+        params.append(limit)
 
-            execute(conn, sql, params)
-            rows = cursor.fetchall()
+        with get_conn() as conn:
+            cur = execute(conn, sql, params)
+            rows = cur.fetchall()
 
         transactions = []
         for row in rows:
@@ -852,36 +852,40 @@ class CreditService:
         """
         from db import get_conn, execute
         with get_conn() as conn:
-            cursor = conn.cursor()
             sql = """
             SELECT ct.id, ct.userid, u.name, u.phone,
                    ct.reference_id, ct.amount, ct.metadata, ct.created_at
             FROM credit_transactions ct
             LEFT JOIN users u ON u.userid = ct.userid
             WHERE ct.source = 'google_play'
+              AND ct.transaction_type = 'earned'
               AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
             """
             params: List[Any] = [from_date, to_date]
-            if query:
-                like = f"%{query}%"
-                sql += " AND (u.name LIKE ? OR u.phone LIKE ?)"
+            if query and query.strip():
+                like = f"%{query.strip()}%"
+                sql += " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
                 params.extend([like, like])
             if order_id_filter and order_id_filter.strip():
-                sql += " AND ct.reference_id LIKE ?"
+                sql += " AND ct.reference_id ILIKE ?"
                 params.append(f"%{order_id_filter.strip()}%")
             sql += " ORDER BY ct.created_at DESC LIMIT ?"
             params.append(limit)
-            execute(conn, sql, params)
-            rows = cursor.fetchall()
+            cur = execute(conn, sql, params)
+            rows = cur.fetchall()
 
             # (userid, order_id) -> total reversed amount (for partial display)
             reversed_amounts = {}
-            execute(conn, """
+            cur_rev = execute(
+                conn,
+                """
                 SELECT userid, reference_id, SUM(ABS(amount)) FROM credit_transactions
                 WHERE source = 'google_play_refund' AND reference_id IS NOT NULL
                 GROUP BY userid, reference_id
-            """)
-            for r in cursor.fetchall():
+                """,
+                (),
+            )
+            for r in cur_rev.fetchall():
                 reversed_amounts[(r[0], r[1])] = r[2]
             out = []
             for row in rows:
@@ -918,33 +922,39 @@ class CreditService:
         """
         from db import get_conn, execute
         with get_conn() as conn:
-            cursor = conn.cursor()
-
-            execute(conn, """
-            SELECT ct.userid, u.name, u.phone, COUNT(*) AS cnt
-            FROM credit_transactions ct
-            LEFT JOIN users u ON u.userid = ct.userid
-            WHERE ct.transaction_type = 'spent'
-              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
-            GROUP BY ct.userid
-            ORDER BY cnt DESC
-            LIMIT 10
-            """, (from_date, to_date))
+            cur = execute(
+                conn,
+                """
+                SELECT ct.userid, u.name, u.phone, COUNT(*) AS cnt
+                FROM credit_transactions ct
+                LEFT JOIN users u ON u.userid = ct.userid
+                WHERE ct.transaction_type = 'spent'
+                  AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+                GROUP BY ct.userid, u.name, u.phone
+                ORDER BY cnt DESC
+                LIMIT 10
+                """,
+                (from_date, to_date),
+            )
             top_users = [
                 {"userid": r[0], "user_name": r[1] or "", "user_phone": r[2] or "", "transaction_count": r[3]}
-                for r in cursor.fetchall()
+                for r in cur.fetchall()
             ]
             top_userids = {u["userid"] for u in top_users}
 
-            execute(conn, """
-            SELECT ct.userid, COALESCE(ct.reference_id, 'other') AS activity, COUNT(*) AS cnt
-            FROM credit_transactions ct
-            WHERE ct.transaction_type = 'spent'
-              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
-            GROUP BY ct.userid, COALESCE(ct.reference_id, 'other')
-            """, (from_date, to_date))
+            cur = execute(
+                conn,
+                """
+                SELECT ct.userid, COALESCE(ct.reference_id, 'other') AS activity, COUNT(*) AS cnt
+                FROM credit_transactions ct
+                WHERE ct.transaction_type = 'spent'
+                  AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+                GROUP BY ct.userid, COALESCE(ct.reference_id, 'other')
+                """,
+                (from_date, to_date),
+            )
             activity_breakdown = {}
-            for row in cursor.fetchall():
+            for row in cur.fetchall():
                 uid, activity, cnt = row[0], row[1], row[2]
                 if uid in top_userids:
                     if uid not in activity_breakdown:
@@ -954,50 +964,61 @@ class CreditService:
             for u in top_users:
                 u["by_activity"] = activity_breakdown.get(u["userid"], [])
 
-            execute(conn, """
-            SELECT COALESCE(ct.reference_id, 'other') AS activity,
-                   COUNT(*) AS cnt,
-                   SUM(-ct.amount) AS total_credits
-            FROM credit_transactions ct
-            WHERE ct.transaction_type = 'spent'
-              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
-            GROUP BY COALESCE(ct.reference_id, 'other')
-            ORDER BY total_credits DESC
-            """, (from_date, to_date))
+            cur = execute(
+                conn,
+                """
+                SELECT COALESCE(ct.reference_id, 'other') AS activity,
+                       COUNT(*) AS cnt,
+                       SUM(-ct.amount) AS total_credits
+                FROM credit_transactions ct
+                WHERE ct.transaction_type = 'spent'
+                  AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+                GROUP BY COALESCE(ct.reference_id, 'other')
+                ORDER BY total_credits DESC
+                """,
+                (from_date, to_date),
+            )
             distribution = [
                 {"activity": r[0], "transaction_count": r[1], "total_credits": r[2] or 0}
-                for r in cursor.fetchall()
+                for r in cur.fetchall()
             ]
 
-        cursor.execute("""
-            SELECT date(ct.created_at) AS d,
-                   SUM(CASE WHEN ct.transaction_type IN ('earned', 'refund') THEN ct.amount ELSE 0 END) AS earned,
-                   SUM(CASE WHEN ct.transaction_type = 'spent' THEN -ct.amount ELSE 0 END) AS spent,
-                   COUNT(*) AS transaction_count
-            FROM credit_transactions ct
-            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?
-            GROUP BY date(ct.created_at)
-            ORDER BY d
-        """, (from_date, to_date))
-        time_series = [
-            {"date": r[0], "earned": r[1] or 0, "spent": r[2] or 0, "transaction_count": r[3]}
-            for r in cursor.fetchall()
-        ]
+            cur = execute(
+                conn,
+                """
+                SELECT date(ct.created_at) AS d,
+                       SUM(CASE WHEN ct.transaction_type IN ('earned', 'refund') THEN ct.amount ELSE 0 END) AS earned,
+                       SUM(CASE WHEN ct.transaction_type = 'spent' THEN -ct.amount ELSE 0 END) AS spent,
+                       COUNT(*) AS transaction_count
+                FROM credit_transactions ct
+                WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+                GROUP BY date(ct.created_at)
+                ORDER BY d
+                """,
+                (from_date, to_date),
+            )
+            time_series = [
+                {"date": r[0], "earned": r[1] or 0, "spent": r[2] or 0, "transaction_count": r[3]}
+                for r in cur.fetchall()
+            ]
 
-        cursor.execute("""
-            SELECT
-                SUM(CASE WHEN transaction_type IN ('earned', 'refund') THEN amount ELSE 0 END),
-                SUM(CASE WHEN transaction_type = 'spent' THEN -amount ELSE 0 END),
-                COUNT(*)
-            FROM credit_transactions
-            WHERE date(created_at) >= ? AND date(created_at) <= ?
-        """, (from_date, to_date))
-        row = cursor.fetchone()
-        total_earned = row[0] or 0
-        total_spent = row[1] or 0
-        total_count = row[2] or 0
+            cur = execute(
+                conn,
+                """
+                SELECT
+                    SUM(CASE WHEN transaction_type IN ('earned', 'refund') THEN amount ELSE 0 END),
+                    SUM(CASE WHEN transaction_type = 'spent' THEN -amount ELSE 0 END),
+                    COUNT(*)
+                FROM credit_transactions
+                WHERE date(created_at) >= ? AND date(created_at) <= ?
+                """,
+                (from_date, to_date),
+            )
+            row = cur.fetchone()
+            total_earned = row[0] or 0
+            total_spent = row[1] or 0
+            total_count = row[2] or 0
 
-        conn.close()
         return {
             "from_date": from_date,
             "to_date": to_date,

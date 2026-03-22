@@ -1367,7 +1367,8 @@ async def get_all_users_with_credits(
             "SELECT COUNT(*) " + base,
             tuple(params),
         )
-        total = cur.fetchone()[0] if cur.fetchone() is not None else 0
+        count_row = cur.fetchone()
+        total = count_row[0] if count_row else 0
 
         cur = execute(
             conn,
@@ -1464,6 +1465,8 @@ async def get_google_play_transactions(
         raise HTTPException(status_code=403, detail="Admin access required")
     from datetime import date as date_type, timedelta
     today = date_type.today()
+    # Default: last 2 years — Google Play credit purchases are infrequent; 30 days hid migrated/historical rows.
+    default_start = today - timedelta(days=730)
     if from_date and to_date:
         try:
             fd = date_type.fromisoformat(from_date)
@@ -1471,10 +1474,24 @@ async def get_google_play_transactions(
             if fd > td:
                 fd, td = td, fd
         except ValueError:
-            fd = today - timedelta(days=30)
+            fd = default_start
+            td = today
+    elif from_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = today
+        except ValueError:
+            fd = default_start
+            td = today
+    elif to_date:
+        try:
+            td = date_type.fromisoformat(to_date)
+            fd = td - timedelta(days=730)
+        except ValueError:
+            fd = default_start
             td = today
     else:
-        fd = today - timedelta(days=30)
+        fd = default_start
         td = today
     transactions = credit_service.get_google_play_transactions(
         fd.isoformat(), td.isoformat(), query=query, order_id_filter=order_id
