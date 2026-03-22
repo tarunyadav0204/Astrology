@@ -5,6 +5,15 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+# Load backend/.env so POSTGRES_DSN / DATABASE_URL / SQLITE_DB_PATH match production (same as main.py).
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(_backend_dir, ".env"))
+except ImportError:
+    pass
+
 from db import get_conn, execute
 
 
