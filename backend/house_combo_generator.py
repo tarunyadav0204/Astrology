@@ -1,28 +1,32 @@
 """
 House Combination Generator
-Automatically generates house combinations using house specifications
+Automatically generates house combinations using house specifications (Postgres).
 """
 
-import sqlite3
 import json
 import itertools
-from typing import List, Dict, Tuple, Set
 from collections import defaultdict
+from typing import Dict, List, Set, Tuple
+
+from db import execute, get_conn
+from psycopg2 import IntegrityError
+
 
 class HouseCombinationGenerator:
     def __init__(self):
         self.house_specs = self._load_house_specifications()
         self.combination_templates = self._define_combination_templates()
-    
+
     def _load_house_specifications(self) -> Dict[int, List[str]]:
         """Load house specifications from database"""
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT house_number, specifications FROM house_specifications")
-        rows = cursor.fetchall()
-        conn.close()
-        
-        specs = {}
+        specs: Dict[int, List[str]] = {}
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT house_number, specifications FROM house_specifications",
+                (),
+            )
+            rows = cur.fetchall() or []
         for row in rows:
             specs[row[0]] = json.loads(row[1])
         return specs
@@ -403,30 +407,31 @@ class HouseCombinationGenerator:
         return combinations
     
     def save_generated_combinations(self, combinations: List[Dict]) -> int:
-        """Save generated combinations to database"""
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
+        """Save generated combinations to database (Postgres)."""
         saved_count = 0
-        for combo in combinations:
-            try:
-                cursor.execute(
-                    "INSERT INTO house_combinations (houses, positive_prediction, negative_prediction, combination_name, is_active) VALUES (?, ?, ?, ?, ?)",
-                    (
-                        json.dumps(combo["houses"]),
-                        combo["positive_prediction"],
-                        combo["negative_prediction"],
-                        combo["combination_name"],
-                        True
+        with get_conn() as conn:
+            for combo in combinations:
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO house_combinations
+                        (houses, positive_prediction, negative_prediction, combination_name, is_active)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            json.dumps(combo["houses"]),
+                            combo["positive_prediction"],
+                            combo["negative_prediction"],
+                            combo["combination_name"],
+                            "TRUE",
+                        ),
                     )
-                )
-                saved_count += 1
-            except sqlite3.IntegrityError:
-                # Skip duplicates
-                continue
-        
-        conn.commit()
-        conn.close()
+                    saved_count += 1
+                except IntegrityError:
+                    # Skip duplicates (if a UNIQUE constraint exists) or other constraint violations
+                    continue
+            conn.commit()
         return saved_count
 
 def generate_and_save_combinations(massive=False):
