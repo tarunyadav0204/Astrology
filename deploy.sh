@@ -25,12 +25,9 @@ if [ -n "${PREV_HEAD}" ]; then
   CHANGED_FILES="$(git diff --name-only "${PREV_HEAD}" "${NEW_HEAD}" || true)"
 fi
 
-needs_backend_deps=false
-if [ ! -d "backend/venv" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
-  needs_backend_deps=true
-elif echo "${CHANGED_FILES}" | grep -E -q '^backend/requirements\.txt$|^backend/requirements/|^backend/setup\.py$|^backend/pyproject\.toml$'; then
-  needs_backend_deps=true
-fi
+# Backend: always `pip install -r requirements.txt` on every deploy.
+# Relying only on git-diff for requirements.txt misses cases (e.g. merge order,
+# manual pulls) and caused prod to skip new packages like psycopg2-binary.
 
 needs_frontend_install=false
 needs_frontend_build=false
@@ -57,12 +54,8 @@ fi
 
 # Activate virtual environment and install dependencies
 source venv/bin/activate
-if [ "${needs_backend_deps}" = "true" ]; then
-  echo "📦 Installing backend dependencies..."
-  pip3 install -r requirements.txt
-else
-  echo "⏭️ Backend dependencies unchanged; skipping pip install"
-fi
+echo "📦 Installing backend dependencies (always; idempotent)..."
+pip3 install -r requirements.txt
 echo "✅ Backend dependencies installed"
 
 # Setup encryption (idempotent - safe to run multiple times)
