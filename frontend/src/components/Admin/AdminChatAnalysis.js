@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 
 export default function AdminChatAnalysis() {
   const [byCategory, setByCategory] = useState([]);
@@ -7,9 +8,8 @@ export default function AdminChatAnalysis() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     fetch('/api/admin/chat/analysis-stats', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAdminAuthHeaders(),
     })
       .then((res) => {
         if (!res.ok) throw new Error(res.statusText || 'Failed to load');
