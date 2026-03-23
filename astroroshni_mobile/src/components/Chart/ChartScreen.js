@@ -125,6 +125,9 @@ export default function ChartScreen({ navigation, route }) {
         chartTranslateX.setValue(0);
         setCurrentChartIndex(newIndex);
         scrollToActiveTab(newIndex);
+      } else if ((translationX > swipeThreshold || (velocityX > velocityThreshold && translationX > 10)) && idx === 0) {
+        // At first chart, right-swipe acts as screen back gesture.
+        navigation.goBack();
       } else {
         resetChartTranslation();
       }
@@ -273,7 +276,7 @@ export default function ChartScreen({ navigation, route }) {
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <View style={styles.compactHeader}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
-              <Ionicons name="close" size={20} color={colors.text} />
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
               <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>

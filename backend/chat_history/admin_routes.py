@@ -288,30 +288,50 @@ async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
     """Get category counts and FAQ (canonical_question) counts for chat analysis dashboard (admin only)."""
     try:
         with get_conn() as conn:
+            # Post-migration safety: older DBs may miss these columns.
             cur = execute(
                 conn,
                 """
-                SELECT category, COUNT(*) AS count
-                FROM chat_messages
-                WHERE sender = 'user' AND category IS NOT NULL AND trim(category) != ''
-                GROUP BY category
-                ORDER BY count DESC
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'chat_messages'
                 """,
                 (),
             )
-            by_category = [{"category": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
-            cur = execute(
-                conn,
-                """
-                SELECT canonical_question, COUNT(*) AS count
-                FROM chat_messages
-                WHERE sender = 'user' AND canonical_question IS NOT NULL AND trim(canonical_question) != ''
-                GROUP BY canonical_question
-                ORDER BY count DESC
-                """,
-                (),
-            )
-            by_faq = [{"canonical_question": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
+            cols = {row[0] for row in (cur.fetchall() or [])}
+            has_category = "category" in cols
+            has_canonical = "canonical_question" in cols
+
+            by_category = []
+            by_faq = []
+
+            if has_category:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT category, COUNT(*) AS count
+                    FROM chat_messages
+                    WHERE sender = 'user' AND category IS NOT NULL AND trim(category) != ''
+                    GROUP BY category
+                    ORDER BY count DESC
+                    """,
+                    (),
+                )
+                by_category = [{"category": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
+
+            if has_canonical:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT canonical_question, COUNT(*) AS count
+                    FROM chat_messages
+                    WHERE sender = 'user' AND canonical_question IS NOT NULL AND trim(canonical_question) != ''
+                    GROUP BY canonical_question
+                    ORDER BY count DESC
+                    """,
+                    (),
+                )
+                by_faq = [{"canonical_question": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
         return {"by_category": by_category, "by_faq": by_faq}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching chat analysis stats: {str(e)}")

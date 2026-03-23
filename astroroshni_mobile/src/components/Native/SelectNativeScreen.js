@@ -18,6 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../utils/constants';
+import { formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
@@ -61,10 +62,10 @@ const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign
                     )}
                   </View>
                   <Text style={[styles.profileDate, { color: colors.textSecondary }]}>
-                    {new Date(profile.date).toLocaleDateString('en-US', {
+                    {formatBirthDateForDisplay(profile.date, {
                       month: 'short',
                       day: 'numeric',
-                      year: 'numeric'
+                      year: 'numeric',
                     })} • {profile.time}
                   </Text>
                   {profile.place && (

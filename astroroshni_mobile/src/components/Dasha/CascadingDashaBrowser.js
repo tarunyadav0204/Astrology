@@ -11,10 +11,11 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
+import { ScrollView as GHScrollView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
+import { parseCalendarDateInput } from '../../utils/birthDateUtils';
 import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -80,6 +81,33 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   const [kalchakraViewMode, setKalchakraViewMode] = useState('chips'); // 'chips', 'wheel', 'timeline'
 
   const [jaiminiTab, setJaiminiTab] = useState('home'); // 'home', 'periods', 'analysis'
+  const swipeStartXRef = useRef(0);
+  const swipeStartYRef = useRef(0);
+
+  // Full-screen Modal does not get native stack swipe-back; emulate left-edge swipe to close.
+  const modalSwipeHandlers = {
+    onStartShouldSetResponderCapture: (evt) => (evt?.nativeEvent?.pageX ?? 999) < 24,
+    onResponderGrant: (evt) => {
+      swipeStartXRef.current = evt?.nativeEvent?.pageX ?? 0;
+      swipeStartYRef.current = evt?.nativeEvent?.pageY ?? 0;
+    },
+    onResponderRelease: (evt) => {
+      const endX = evt?.nativeEvent?.pageX ?? 0;
+      const endY = evt?.nativeEvent?.pageY ?? 0;
+      const dx = endX - swipeStartXRef.current;
+      const dy = Math.abs(endY - swipeStartYRef.current);
+      if (dx > 60 && dy < 48) {
+        onClose?.();
+      }
+    },
+  };
+
+  const handleEdgeSwipeClose = (event) => {
+    const { state, translationX, velocityX, translationY } = event.nativeEvent;
+    if (state === State.END && Math.abs(translationY) < 80 && (translationX > 70 || velocityX > 700)) {
+      onClose?.();
+    }
+  };
 
   const tSign = (sign) => {
     if (!sign) return '';
@@ -1461,7 +1489,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     const mahadashas = kalchakraData.mahadashas || [];
     
     // Calculate current age
-    const birthDate = new Date(birthData.date);
+    const birthDate = parseCalendarDateInput(birthData.date) || new Date(birthData.date);
     const currentAge = Math.floor((new Date() - birthDate) / (365.25 * 24 * 60 * 60 * 1000));
     
     
@@ -2134,12 +2162,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   // No birth data: show empty state instead of loader
   if (visible && (!birthData || !birthData.name)) {
     return (
-      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+        <View
+          style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+          {...modalSwipeHandlers}
+        >
           <StatusBar barStyle={colors.statusBarStyle} />
+
+          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
+            <View style={styles.edgeSwipeZone} />
+          </PanGestureHandler>
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
-              <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
+              <Icon name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
@@ -2173,12 +2208,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
 
   if (loading) {
     return (
-      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+        <View
+          style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+          {...modalSwipeHandlers}
+        >
           <StatusBar barStyle={colors.statusBarStyle} />
+
+          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
+            <View style={styles.edgeSwipeZone} />
+          </PanGestureHandler>
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
-              <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
+              <Icon name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
@@ -2194,12 +2236,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
 
   if (error) {
     return (
-      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+        <View
+          style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+          {...modalSwipeHandlers}
+        >
           <StatusBar barStyle={colors.statusBarStyle} />
+
+          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
+            <View style={styles.edgeSwipeZone} />
+          </PanGestureHandler>
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
-              <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
+              <Icon name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
@@ -2216,12 +2265,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <View
+        style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+        {...modalSwipeHandlers}
+      >
         <StatusBar barStyle={colors.statusBarStyle} />
+
+          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
+            <View style={styles.edgeSwipeZone} />
+          </PanGestureHandler>
         <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
           <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
-            <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
+            <Icon name="arrow-back" size={22} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserFor', { name: birthData?.name || t('common.user') })}</Text>
           <View style={styles.placeholder} />

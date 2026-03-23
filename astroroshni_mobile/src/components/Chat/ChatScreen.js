@@ -17,12 +17,12 @@ import {
   Dimensions,
   InteractionManager,
   Keyboard,
+  StatusBar,
 } from 'react-native';
 import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
@@ -298,6 +298,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -332,6 +333,18 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
   const [showMundaneModal, setShowMundaneModal] = useState(false);
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
   // Stop any ongoing TTS playback when leaving the chat screen
   useFocusEffect(
     React.useCallback(() => {
@@ -2633,13 +2646,12 @@ export default function ChatScreen({ navigation, route }) {
           </View>
         ) : (
           <>
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            enabled
+            behavior="padding"
             keyboardVerticalOffset={
-              Platform.OS === 'ios'
-                ? (insets?.bottom ?? 0)
-                : (insets?.top ?? 0)
+              Platform.OS === 'ios' ? (insets?.bottom ?? 0) : 8
             }
           >
           {partnershipMode && (
@@ -2857,12 +2869,14 @@ export default function ChatScreen({ navigation, route }) {
           </GHScrollView>
 
         {/* Suggestions + Input: KeyboardAvoidingView handles keeping above keyboard */}
-        <View style={{
+        <View
+          style={{
           backgroundColor: 'transparent',
           paddingTop: 12,
           marginHorizontal: -12,
           paddingHorizontal: 12,
-        }}>
+        }}
+        >
         {/* Suggestions (only show when not loading and not showing greeting) */}
         {!loading && !showGreeting && messages.length > 0 && (
           <View style={styles.suggestionsContainer}>
@@ -2894,7 +2908,12 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Unified Input Bar */}
         {!showGreeting && (
-          <View style={styles.unifiedInputContainer}>
+          <View
+            style={[
+              styles.unifiedInputContainer,
+              Platform.OS === 'android' && isKeyboardVisible ? { marginBottom: 52 } : null,
+            ]}
+          >
             <LinearGradient
                       colors={Platform.OS === 'android'
                         ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.05)'] : ['rgba(249, 115, 22, 0.04)', 'rgba(249, 115, 22, 0.02)'])
@@ -3042,7 +3061,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
             
-            {effectiveChatCost === 0 && (
+            {effectiveChatCost === 0 && !(Platform.OS === 'android' && isKeyboardVisible) && (
               <View style={styles.firstQuestionFreeBanner}>
                 <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
                 <View style={styles.firstQuestionFreeTextWrap}>
@@ -3052,7 +3071,7 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             )}
             
-            {credits < effectiveChatCost && (
+            {credits < effectiveChatCost && !(Platform.OS === 'android' && isKeyboardVisible) && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -3061,7 +3080,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             
-            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && (
+            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && !(Platform.OS === 'android' && isKeyboardVisible) && (
               <View style={styles.premiumTooltip}>
                 <TouchableOpacity 
                   style={styles.tooltipClose}
@@ -3094,7 +3113,7 @@ export default function ChatScreen({ navigation, route }) {
         </KeyboardAvoidingView>
 
         {/* Quick Actions Bar - outside KeyboardAvoidingView so it stays at bottom after keyboard dismiss on Android */}
-        {!showGreeting && (
+        {!showGreeting && !(Platform.OS === 'android' && isKeyboardVisible) && (
           <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, insets.bottom) }]}>
             <TouchableOpacity 
               style={styles.quickActionButton}

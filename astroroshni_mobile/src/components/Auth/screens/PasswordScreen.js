@@ -34,6 +34,7 @@ export default function PasswordScreen({
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
   const scrollViewRef = useRef(null);
+  const passwordInputRef = useRef(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -64,6 +65,18 @@ export default function PasswordScreen({
     return () => {
       keyboardDidShowListener?.remove();
     };
+  }, [isLogin]);
+
+  // Delay initial focus so keyboard avoidance/layout is ready first (fixes first-load overlap on Android)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      passwordInputRef.current?.focus();
+      if (scrollViewRef.current && isLogin) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
   }, [isLogin]);
 
   const handleContinue = async () => {
@@ -115,12 +128,19 @@ export default function PasswordScreen({
           } catch (_) {}
         }
 
+        const resetTo = (routeName) => {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: routeName }],
+          });
+        };
+
         // Navigate based on self_birth_chart
         if (response.data.self_birth_chart) {
-          navigation.replace('Home');
+          resetTo('Home');
         } else {
           // Show intro screen (explain birth profile, Continue → SelectNative/BirthForm, Skip → Home)
-          navigation.replace('BirthProfileIntro');
+          resetTo('BirthProfileIntro');
         }
       } else {
         // Registration complete - register user and navigate to birth form
@@ -162,6 +182,7 @@ export default function PasswordScreen({
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView 
         ref={scrollViewRef}
@@ -209,13 +230,13 @@ export default function PasswordScreen({
           <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
             <Ionicons name="lock-closed-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
             <TextInput
+              ref={passwordInputRef}
               style={styles.input}
               placeholder="Password"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={formData.password}
               onChangeText={(value) => updateFormData('password', value)}
               secureTextEntry={!showPassword}
-              autoFocus
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}

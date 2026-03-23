@@ -18,6 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Rect, Line, Polygon } from 'react-native-svg';
 import { COLORS, LANGUAGES } from '../../utils/constants';
+import { parseCalendarDateInput, formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -231,8 +232,10 @@ export default function ProfileScreen({ navigation }) {
 
   const getZodiacSign = (date) => {
     if (!date) return '♈';
-    const month = new Date(date).getMonth() + 1;
-    const day = new Date(date).getDate();
+    const d = parseCalendarDateInput(date);
+    if (!d) return '♈';
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
     
     if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return '♈';
     if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return '♉';
@@ -337,11 +340,13 @@ export default function ProfileScreen({ navigation }) {
               </View>
               <Text style={[styles.userName, { color: colors.text }]}>{userData?.name || 'User'}</Text>
               <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>
-                {birthData?.date ? new Date(birthData.date).toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                }) : 'Birth date not set'}
+                {birthData?.date
+                  ? formatBirthDateForDisplay(birthData.date, {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : 'Birth date not set'}
               </Text>
               {birthData?.time && (
                 <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>🕐 {birthData.time}</Text>

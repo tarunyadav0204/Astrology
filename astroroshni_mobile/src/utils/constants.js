@@ -53,8 +53,8 @@ const getApiUrl = () => {
   }
 
   // Uncomment exactly one of these for non-dev builds / manual switching:
-  return TEST_API_URL;
-  // return PROD_API_URL;
+  // return TEST_API_URL;
+  return PROD_API_URL;
 
   // if (Platform.OS === 'ios') {
   //   return 'http://localhost:8001';

@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { storage } from '../../services/storage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { parseCalendarDateInput } from '../../utils/birthDateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AshtakvargaChart from './AshtakvargaChart';
 import DateNavigator from '../Common/DateNavigator';
@@ -145,9 +146,10 @@ export default function AshtakvargaOracle({ navigation }) {
       
       if (data?.name) {
         setBirthData(data);
-        setSelectedDate(new Date(data.date));
+        const birthCal = parseCalendarDateInput(data.date) || new Date();
+        setSelectedDate(birthCal);
         try {
-          await fetchAshtakvargaData(data, new Date(data.date));
+          await fetchAshtakvargaData(data, birthCal);
         } catch (fetchErr) {
           console.error('Error fetching ashtakvarga:', fetchErr);
           setOracleData(null);
@@ -200,7 +202,7 @@ export default function AshtakvargaOracle({ navigation }) {
       }
       
       const birthNorm = normalizeBirthForApi(birth);
-      const birthDate = new Date(birthNorm.date);
+      const birthDate = parseCalendarDateInput(birthNorm.date) || new Date(birthNorm.date);
       const selectedDate = date || birthDate;
       
       // Compare only date parts (ignore time)
@@ -419,7 +421,7 @@ export default function AshtakvargaOracle({ navigation }) {
           date={selectedDate}
           onDateChange={setSelectedDate}
           cosmicTheme={true}
-          resetDate={birthData ? new Date(birthData.date) : new Date()}
+          resetDate={birthData ? (parseCalendarDateInput(birthData.date) || new Date()) : new Date()}
         />
         
         <View style={[styles.chartContainer, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)', borderRadius: 16 }]}>

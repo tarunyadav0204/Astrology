@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { storage } from '../../services/storage';
 import { chartAPI, authAPI } from '../../services/api';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
+import { parseCalendarDateInput } from '../../utils/birthDateUtils';
 import locationCache from '../../services/locationCache';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -49,7 +50,7 @@ export default function BirthFormScreen({ navigation, route }) {
 
   const [formData, setFormData] = useState({
     name: editProfile?.name || prefillData?.name || '',
-    date: editProfile?.date ? new Date(editProfile.date) : new Date(),
+    date: editProfile?.date ? parseCalendarDateInput(editProfile.date) || new Date() : new Date(),
     time: editProfile?.time ? getTimeDate(editProfile.time) : new Date(),
     place: editProfile?.place || '',
     latitude: editProfile?.latitude || null,
@@ -115,7 +116,9 @@ export default function BirthFormScreen({ navigation, route }) {
         // Only load data if user hasn't made a selection yet
         setFormData(prev => ({
           name: existingData.name || prev.name,
-          date: existingData.date ? new Date(existingData.date) : prev.date,
+          date: existingData.date
+            ? parseCalendarDateInput(existingData.date) || prev.date
+            : prev.date,
           time: existingData.time ? getTimeDate(existingData.time) : prev.time,
           place: existingData.place || prev.place,
           latitude: existingData.latitude || prev.latitude,

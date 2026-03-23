@@ -6,17 +6,36 @@ from auth import get_current_user, User
 from db import get_conn, execute
 
 class FeedbackRequest(BaseModel):
-    message_id: str
+    message_id: int
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
 
 router = APIRouter(prefix="/chat/feedback", tags=["chat_feedback"])
+
+
+def _ensure_feedback_table(conn):
+    """Ensure feedback table exists in Postgres deployments."""
+    execute(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS message_feedback (
+            id SERIAL PRIMARY KEY,
+            message_id INTEGER NOT NULL,
+            rating INTEGER NOT NULL,
+            comment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (message_id) REFERENCES chat_messages (message_id) ON DELETE CASCADE
+        )
+        """,
+        (),
+    )
 
 @router.post("/submit")
 async def submit_feedback(request: FeedbackRequest, current_user: User = Depends(get_current_user)):
     """Submit feedback for a chat message"""
     try:
         with get_conn() as conn:
+            _ensure_feedback_table(conn)
             cur = execute(
                 conn,
                 "SELECT id FROM message_feedback WHERE message_id = %s",
@@ -67,6 +86,7 @@ async def get_feedback_stats(
     
     try:
         with get_conn() as conn:
+            _ensure_feedback_table(conn)
             cur = execute(conn, "SELECT COUNT(*), AVG(rating) FROM message_feedback", ())
             total_feedback, avg_rating = cur.fetchone() or (0, None)
 
@@ -97,7 +117,7 @@ async def get_feedback_stats(
             count_query = f"""
                 SELECT COUNT(*)
                 FROM message_feedback mf
-                LEFT JOIN chat_messages cm ON mf.message_id = cm.message_id::text
+                LEFT JOIN chat_messages cm ON mf.message_id = cm.message_id
                 LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN users u ON cs.user_id = u.userid
                 {where_clause}
@@ -110,7 +130,7 @@ async def get_feedback_stats(
             feedback_query = f"""
                 SELECT mf.rating, mf.comment, mf.created_at, COALESCE(u.name, 'Unknown User') as user_name
                 FROM message_feedback mf
-                LEFT JOIN chat_messages cm ON mf.message_id = cm.message_id::text
+                LEFT JOIN chat_messages cm ON mf.message_id = cm.message_id
                 LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN users u ON cs.user_id = u.userid
                 {where_clause}
@@ -152,6 +172,7 @@ async def get_user_feedback(current_user: User = Depends(get_current_user)):
     """Get feedback submitted by current user"""
     try:
         with get_conn() as conn:
+            _ensure_feedback_table(conn)
             cur = execute(
                 conn,
                 """

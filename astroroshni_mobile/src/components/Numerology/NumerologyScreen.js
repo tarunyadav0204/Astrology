@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SoulBlueprint from './SoulBlueprint';
 import CosmicWeather from './CosmicWeather';
@@ -176,7 +177,7 @@ export default function NumerologyScreen({ navigation, route }) {
                         {birthData?.name || 'Numerology'}
                       </Text>
                       <Text style={styles.modalSubtitle}>
-                        {birthData?.date ? new Date(birthData.date).toLocaleDateString() : ''}
+                        {birthData?.date ? formatBirthDateForDisplay(birthData.date) : ''}
                       </Text>
                     </View>
                     <View style={styles.placeholder} />
