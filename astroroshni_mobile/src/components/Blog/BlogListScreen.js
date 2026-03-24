@@ -10,6 +10,7 @@ import {
   Image,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -115,35 +116,6 @@ export default function BlogListScreen({ navigation }) {
             <View style={{ width: 40 }} />
           </View>
 
-          {categories.length > 0 && (
-            <View style={styles.categoriesContainer}>
-              <GHScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesList}
-                style={styles.categoriesScrollView}
-              >
-                {categories.map((item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[
-                      styles.categoryChip,
-                      selectedCategory === item && { backgroundColor: '#ff6b35' }
-                    ]}
-                    onPress={() => handleCategorySelect(item)}
-                  >
-                    <Text style={[
-                      styles.categoryText,
-                      { color: selectedCategory === item ? '#fff' : colors.textSecondary }
-                    ]}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </GHScrollView>
-            </View>
-          )}
-
           {loading ? (
             <View style={styles.loader}>
               <ActivityIndicator size="large" color="#ff6b35" />
@@ -153,8 +125,10 @@ export default function BlogListScreen({ navigation }) {
               data={posts}
               renderItem={renderPostItem}
               keyExtractor={(item) => item.id.toString()}
+              ListHeaderComponent={renderCategoryHeader}
               contentContainerStyle={styles.postList}
               showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={Platform.OS === 'android'}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#ff6b35']} />
               }
@@ -196,11 +170,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   categoriesContainer: {
-    height: 50,
-    marginBottom: 10,
+    paddingBottom: 10,
+    width: '100%',
   },
   categoriesScrollView: {
     flexGrow: 0,
+  },
+  categoriesScrollViewWidth: {
+    width: '100%',
   },
   categoriesList: {
     paddingHorizontal: 20,

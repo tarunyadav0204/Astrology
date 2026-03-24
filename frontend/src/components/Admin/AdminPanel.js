@@ -760,19 +760,41 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
 
   const handleUpdatePromoCode = async (code, updates) => {
-    if (!updates.credits || updates.credits < 1 || !updates.max_uses || updates.max_uses < 1) {
+    const row = promoCodes.find((p) => p.code === code);
+    if (!row) {
+      alert('Promo code not found in table; refresh and try again.');
+      return;
+    }
+    const credits = updates.credits != null ? Number(updates.credits) : Number(row.credits);
+    const maxUses = updates.max_uses != null ? Number(updates.max_uses) : Number(row.max_uses);
+    const maxPerUser =
+      updates.max_uses_per_user != null ? Number(updates.max_uses_per_user) : Number(row.max_uses_per_user ?? 1);
+    const isActive = updates.is_active != null ? Boolean(updates.is_active) : Boolean(row.is_active);
+
+    if (!Number.isFinite(credits) || credits < 1 || !Number.isFinite(maxUses) || maxUses < 1) {
       alert('Credits and max uses must be positive numbers');
       return;
     }
-    
+    if (!Number.isFinite(maxPerUser) || maxPerUser < 1) {
+      alert('Max uses per user must be at least 1');
+      return;
+    }
+
+    const payload = {
+      credits,
+      max_uses: maxUses,
+      max_uses_per_user: maxPerUser,
+      is_active: isActive,
+    };
+
     try {
-      const response = await fetch(`/api/credits/admin/promo-codes/${code}`, {
+      const response = await fetch(`/api/credits/admin/promo-codes/${encodeURIComponent(code)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           ...getAdminAuthHeaders()
         },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(payload)
       });
       
       if (response.ok) {
@@ -795,6 +817,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setEditFormData({
       credits: code.credits,
       max_uses: code.max_uses,
+      max_uses_per_user: code.max_uses_per_user ?? 1,
       is_active: code.is_active
     });
   };
@@ -1968,8 +1991,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           {editingPromoCode === code.code ? (
                             <input
                               type="number"
-                              value={editFormData.credits || code.credits}
-                              onChange={(e) => setEditFormData({...editFormData, credits: parseInt(e.target.value)})}
+                              value={editFormData.credits ?? code.credits}
+                              onChange={(e) => setEditFormData({...editFormData, credits: parseInt(e.target.value, 10)})}
                               style={{ width: '80px' }}
                             />
                           ) : (
@@ -1980,8 +2003,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           {editingPromoCode === code.code ? (
                             <input
                               type="number"
-                              value={editFormData.max_uses || code.max_uses}
-                              onChange={(e) => setEditFormData({...editFormData, max_uses: parseInt(e.target.value)})}
+                              value={editFormData.max_uses ?? code.max_uses}
+                              onChange={(e) => setEditFormData({...editFormData, max_uses: parseInt(e.target.value, 10)})}
                               style={{ width: '60px' }}
                             />
                           ) : (
@@ -1992,8 +2015,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           {editingPromoCode === code.code ? (
                             <input
                               type="number"
-                              value={editFormData.max_uses_per_user || code.max_uses_per_user}
-                              onChange={(e) => setEditFormData({...editFormData, max_uses_per_user: parseInt(e.target.value)})}
+                              value={editFormData.max_uses_per_user ?? code.max_uses_per_user}
+                              onChange={(e) => setEditFormData({...editFormData, max_uses_per_user: parseInt(e.target.value, 10)})}
                               style={{ width: '60px' }}
                             />
                           ) : (
