@@ -33,7 +33,7 @@ import { useCredits } from '../../credits/CreditContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry, sessionId }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry, onStartNewChat, sessionId }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const { podcastCost, credits } = useCredits();
@@ -423,21 +423,28 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   };
 
   const deleteMessage = async () => {
+    const serverId = message.messageId || message.message_id;
+    if (!serverId) {
+      if (onDelete) {
+        onDelete(message.id);
+      }
+      return;
+    }
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const deleteUrl = `${API_BASE_URL}${getEndpoint(`/chat-v2/message/${message.messageId}`)}`;
-      
+      const deleteUrl = `${API_BASE_URL}${getEndpoint(`/chat-v2/message/${serverId}`)}`;
+
       const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
+
       if (response.ok) {
         Alert.alert('✅ Deleted', 'Message deleted successfully');
         if (onDelete) {
-          onDelete(message.messageId);
+          onDelete(serverId);
         }
       } else {
         Alert.alert('❌ Error', 'Failed to delete message');
@@ -1492,8 +1499,20 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         {(message.showRestartButton || message.showSendRetryButton) && (
           <View style={styles.timeoutHint}>
             <Text style={styles.timeoutHintText}>
-              {t('chat.timeoutHint', 'Tap the refresh icon below to check again, or find your response later in Chat History.')}
+              {message.showSendRetryButton
+                ? t('chat.timeoutHintRetry', 'Tap refresh to retry. If the problem continues, use the menu (☰) → New conversation to start a fresh session. Past threads stay in Chat History.')
+                : t('chat.timeoutHint', 'Tap the refresh icon below to check again, or find your response later in Chat History.')}
             </Text>
+            {message.showSendRetryButton && onStartNewChat ? (
+              <TouchableOpacity
+                style={styles.startNewChatLink}
+                onPress={onStartNewChat}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.startNewChatA11y', 'Start new conversation')}
+              >
+                <Text style={styles.startNewChatLinkText}>{t('chat.startNewChat', 'Start new conversation')}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
 
@@ -1617,13 +1636,19 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
 
-        {!message.isTyping && message.messageId && message.role === 'user' && (
+        {!message.isTyping && message.role === 'user' && !!(message.content && message.content.trim()) && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={copyToClipboard}
             >
               <Ionicons name="copy-outline" size={16} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={shareMessage}
+            >
+              <Ionicons name="share-social-outline" size={16} color="#666" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.deleteButton]}
@@ -2184,6 +2209,18 @@ const styles = StyleSheet.create({
   listenPodcastButton: {
     backgroundColor: 'rgba(255, 107, 53, 0.12)',
     borderColor: 'rgba(255, 107, 53, 0.25)',
+    // Android: elevation from actionButton reads as a heavy outline; use flat fill + border only.
+    ...(Platform.OS === 'android'
+      ? {
+          elevation: 0,
+          shadowColor: 'transparent',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          borderWidth: 1.5,
+          borderColor: 'rgba(255, 107, 53, 0.35)',
+        }
+      : {}),
   },
   pdfButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -2466,6 +2503,16 @@ const styles = StyleSheet.create({
     color: '#7c2d12',
     fontWeight: '600',
     lineHeight: 18,
+  },
+  startNewChatLink: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
+  startNewChatLinkText: {
+    fontSize: 13,
+    color: '#c2410c',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   imageModalOverlay: {
     flex: 1,

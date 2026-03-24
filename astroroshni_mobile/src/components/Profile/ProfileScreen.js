@@ -550,6 +550,19 @@ export default function ProfileScreen({ navigation }) {
 
                 <TouchableOpacity
                   style={styles.settingItem}
+                  onPress={() => navigation.navigate('NudgeInbox')}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="mail-unread-outline" size={22} color="#ff6b35" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Notification history</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+
+                <TouchableOpacity
+                  style={styles.settingItem}
                   disabled={pushSyncing}
                   onPress={async () => {
                     if (Platform.OS === 'ios') {

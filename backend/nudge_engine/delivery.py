@@ -49,6 +49,7 @@ def deliver(
                     sent_at=target_date,
                     event_params=params_json,
                     channel=channel,
+                    data_payload=push_data,
                 )
                 count += 1
             except Exception as e:
@@ -56,4 +57,8 @@ def deliver(
                     "Delivery failed for user %s, trigger %s: %s",
                     userid, ev.trigger_id, e,
                 )
+        try:
+            conn.commit()
+        except Exception:
+            pass
     return count

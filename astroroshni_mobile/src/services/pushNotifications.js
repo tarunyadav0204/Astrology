@@ -43,6 +43,26 @@ export function setupNotificationHandler() {
  * Request permission and get Expo push token.
  * @returns {{ token: string | null, reason: 'ok' | 'not_device' | 'denied' | 'token_failed', errorDetail?: string }}
  */
+/**
+ * Current OS permission only (does not show the system dialog).
+ * @returns {Promise<'granted' | 'denied' | 'undetermined'>}
+ */
+export async function getPushPermissionStatusAsync() {
+  if (!Device.isDevice) {
+    return 'denied';
+  }
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status === 'granted' || status === 'denied' || status === 'undetermined') {
+      return status;
+    }
+    return 'undetermined';
+  } catch (e) {
+    if (__DEV__) console.warn('[Push] getPushPermissionStatusAsync:', e?.message);
+    return 'undetermined';
+  }
+}
+
 export async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
     return { token: null, reason: 'not_device' };

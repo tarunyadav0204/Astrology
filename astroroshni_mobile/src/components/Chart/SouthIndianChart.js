@@ -80,8 +80,20 @@ const SouthIndianChart = ({
     return shortNakshatras[nakshatraIndex] || 'Unk';
   };
 
+  const getNakshatraPada = (longitude) => {
+    const lon = typeof longitude === 'number' && !Number.isNaN(longitude) ? longitude : 0;
+    const degreeInNakshatra = lon % 13.333333;
+    return Math.floor(degreeInNakshatra / 3.333333) + 1;
+  };
+
   const formatDegree = (degree) => {
-    return degree.toFixed(2) + '°';
+    if (typeof degree !== 'number' || Number.isNaN(degree)) return '0°';
+    return `${Math.round(degree)}°`;
+  };
+
+  const formatDegreeFull = (degree) => {
+    if (typeof degree !== 'number' || Number.isNaN(degree)) return '0.0000°';
+    return degree.toFixed(4) + '°';
   };
 
   const getPlanetStatus = (planetName, signIndex) => {
@@ -138,11 +150,13 @@ const SouthIndianChart = ({
         planetsInSign.push({
           symbol: symbol,
           name: name,
-          degree: data.degree ? data.degree.toFixed(2) : '0.00',
+          degree: typeof data.degree === 'number' ? data.degree : 0,
           longitude: data.longitude || 0,
           nakshatra: getNakshatra(data.longitude || 0),
           shortNakshatra: getShortNakshatra(data.longitude || 0),
-          formattedDegree: formatDegree(data.degree || 0)
+          pada: getNakshatraPada(data.longitude || 0),
+          formattedDegree: formatDegree(data.degree ?? 0),
+          formattedDegreeFull: formatDegreeFull(data.degree ?? 0)
         });
       });
     
@@ -151,11 +165,13 @@ const SouthIndianChart = ({
       planetsInSign.push({
         symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',
-        degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
+        degree: typeof chartData.planets.InduLagna.degree === 'number' ? chartData.planets.InduLagna.degree : 0,
         longitude: chartData.planets.InduLagna.longitude || 0,
         nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
-        formattedDegree: formatDegree(chartData.planets.InduLagna.degree || 0)
+        pada: getNakshatraPada(chartData.planets.InduLagna.longitude || 0),
+        formattedDegree: formatDegree(chartData.planets.InduLagna.degree ?? 0),
+        formattedDegreeFull: formatDegreeFull(chartData.planets.InduLagna.degree ?? 0)
       });
     }
     

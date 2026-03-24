@@ -32,6 +32,7 @@ import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
+import NotificationEnableReminderModal from '../Notifications/NotificationEnableReminderModal';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import { storage } from '../../services/storage';
 import { chatAPI, pricingAPI } from '../../services/api';
@@ -298,6 +299,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
+  const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
@@ -354,6 +356,27 @@ export default function ChatScreen({ navigation, route }) {
         } catch (e) {
           // ignore
         }
+      };
+    }, [])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      const loadUnread = async () => {
+        try {
+          const { nudgeAPI } = require('../../services/api');
+          const res = await nudgeAPI.getUnreadCount();
+          if (!cancelled) {
+            setNudgeUnreadCount(Number(res.data?.unread_count) || 0);
+          }
+        } catch {
+          if (!cancelled) setNudgeUnreadCount(0);
+        }
+      };
+      loadUnread();
+      return () => {
+        cancelled = true;
       };
     }, [])
   );
@@ -1580,6 +1603,13 @@ export default function ChatScreen({ navigation, route }) {
       const body = isMundane ? {} : { birth_chart_id: birthData?.id };
       
       if (!isMundane && !birthData?.id) {
+        Alert.alert(
+          t('chat.sessionNeedsProfile', 'Profile required'),
+          t(
+            'chat.sessionNeedsProfileBody',
+            'Save your birth profile to your account (open Birth profile and ensure it is connected) so chat can start a session.'
+          )
+        );
         return null;
       }
       
@@ -1951,6 +1981,7 @@ export default function ChatScreen({ navigation, route }) {
     clientRequestId,
   }) => {
     const token = await AsyncStorage.getItem('authToken');
+    let activeSessionId = currentSessionId;
 
     const attemptSend = async (attempt = 1) => {
       try {
@@ -1963,7 +1994,7 @@ export default function ChatScreen({ navigation, route }) {
           : messageText;
 
         const requestBody = {
-          session_id: currentSessionId,
+          session_id: activeSessionId,
           question: finalQuestion,
           language: language || 'english',
           response_style: 'detailed',
@@ -2016,6 +2047,21 @@ export default function ChatScreen({ navigation, route }) {
 
         if (!response.ok) {
           const errorText = await response.text();
+          const sessionMissing =
+            response.status === 404 &&
+            /session not found/i.test(errorText) &&
+            attempt === 1 &&
+            !isMundane;
+          if (sessionMissing) {
+            console.warn('🔄 Stale chat session — creating a new one and retrying once');
+            setSessionId(null);
+            const newSessionId = await createSession();
+            if (newSessionId) {
+              setSessionId(newSessionId);
+              activeSessionId = newSessionId;
+              return attemptSend(2);
+            }
+          }
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
@@ -2038,7 +2084,7 @@ export default function ChatScreen({ navigation, route }) {
         console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
 
         // Start polling IMMEDIATELY before state updates to avoid delay
-        pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
+        pollForResponse(assistantMessageId, processingMessageId, activeSessionId, messageText);
 
         // Update user message with real DB ID (async, non-blocking)
         if (user_message_id) {
@@ -2160,6 +2206,15 @@ export default function ChatScreen({ navigation, route }) {
       currentSessionId = await createSession();
       if (!currentSessionId) {
         setLoading(false);
+        setIsTyping(false);
+        setMessagesWithStorage(prev => prev.filter(msg => msg.id !== processingMessageId));
+        Alert.alert(
+          t('chat.couldNotStart', 'Could not start chat'),
+          t(
+            'chat.couldNotStartBody',
+            'Check your connection, ensure your birth profile is saved to your account, then try again.'
+          )
+        );
         return;
       }
     }
@@ -2263,6 +2318,8 @@ export default function ChatScreen({ navigation, route }) {
         userMessage = 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
       } else if (error.message?.includes('HTTP 500')) {
         userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
+      } else if (error.message?.includes('HTTP 404') && /session not found/i.test(error.message)) {
+        userMessage = 'Your chat session expired or was reset. Tap retry — we will start a fresh session.';
       }
       
       // Replace processing message with error and show retry button
@@ -2298,6 +2355,13 @@ export default function ChatScreen({ navigation, route }) {
       if (!currentSessionId) {
         setLoading(false);
         setIsTyping(false);
+        Alert.alert(
+          t('chat.couldNotStart', 'Could not start chat'),
+          t(
+            'chat.couldNotStartBody',
+            'Check your connection, ensure your birth profile is saved to your account, then try again.'
+          )
+        );
         return;
       }
     }
@@ -2367,20 +2431,51 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
-  const clearChat = () => {
+  /** Clears local thread, resets server session id (next send creates a new session). Server Chat History entries stay as-is. */
+  const performStartNewChat = () => {
+    setSessionId(null);
+    setLoading(false);
+    setIsTyping(false);
+    setDynamicLoadingMessages(null);
+    const nativeName = birthData?.name || 'there';
+    let welcomeMessage;
+    if (isMundaneRef.current) {
+      welcomeMessage = {
+        id: Date.now().toString(),
+        content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
+        role: 'assistant',
+        isWelcome: true,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      welcomeMessage = {
+        id: Date.now().toString(),
+        content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+        role: 'assistant',
+        isWelcome: true,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    setMessagesWithStorage([welcomeMessage]);
+    setShowGreeting(false);
+  };
+
+  const confirmStartNewChat = () => {
     Alert.alert(
-      'Clear Chat',
-      'Are you sure you want to clear all messages?',
+      t('chat.newConversationTitle', 'New conversation'),
+      t('chat.newConversationMessage', 'This clears the chat on this screen and starts a fresh session on your next message. Your past threads remain in Chat History.'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('chat.newConversationConfirm', 'Start fresh'),
           style: 'destructive',
-          onPress: () => setMessages([]),
+          onPress: performStartNewChat,
         },
       ]
     );
   };
+
+  const clearChat = confirmStartNewChat;
 
   const logout = async () => {
     Alert.alert(
@@ -2400,10 +2495,14 @@ export default function ChatScreen({ navigation, route }) {
     );
   };
 
-  const handleDeleteMessage = async (messageId) => {
-    // Find the message to determine if it's a user message or assistant message
-    const message = messages.find(msg => msg.messageId === messageId || msg.message_id === messageId);
-    
+  const handleDeleteMessage = async (messageIdOrLocalId) => {
+    const message = messages.find(
+      msg =>
+        msg.messageId === messageIdOrLocalId ||
+        msg.message_id === messageIdOrLocalId ||
+        msg.id === messageIdOrLocalId
+    );
+
     if (!message) {
       return;
     }
@@ -2611,6 +2710,32 @@ export default function ChatScreen({ navigation, route }) {
                   )}
                 </Text>
               </TouchableOpacity>
+
+              {showGreeting && (
+                <TouchableOpacity
+                  style={styles.headerBellButton}
+                  onPress={() => navigation.navigate('NudgeInbox')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Notification history"
+                >
+                  {/* Fixed 40×40 box: icon + badge both live inside so nothing draws outside bounds (no clipping surprises). */}
+                  <View style={styles.headerBellHitBox} pointerEvents="none">
+                    <Ionicons name="notifications-outline" size={22} color={colors.text} />
+                    {nudgeUnreadCount > 0 && (
+                      <View style={styles.headerBellBadge}>
+                        <Text
+                          style={styles.headerBellBadgeText}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.35}
+                          allowFontScaling
+                        >
+                          {nudgeUnreadCount > 99 ? '99+' : String(nudgeUnreadCount)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
               
               <TouchableOpacity
                 style={styles.menuButton}
@@ -2852,6 +2977,7 @@ export default function ChatScreen({ navigation, route }) {
                       onDelete={handleDeleteMessage}
                       onRestart={restartPolling}
                       onSendRetry={handleSendRetry}
+                      onStartNewChat={confirmStartNewChat}
                       sessionId={sessionId}
                     />
                     
@@ -3732,6 +3858,41 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  {!showGreeting && (
+                    <TouchableOpacity
+                      style={getMenuOptionStyle()}
+                      onPress={() => {
+                        Animated.timing(drawerAnim, {
+                          toValue: 300,
+                          duration: 250,
+                          useNativeDriver: true,
+                        }).start(() => {
+                          menuJustClosedAt.current = Date.now();
+                          setShowMenu(false);
+                          confirmStartNewChat();
+                        });
+                      }}
+                    >
+                      <LinearGradient
+                        colors={Platform.OS === 'android'
+                          ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                          : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      >
+                        <View style={styles.menuIconContainer}>
+                          <LinearGradient
+                            colors={['#ff6b35', '#ff8c5a']}
+                            style={styles.menuIconGradient}
+                          >
+                            <Text style={styles.menuEmoji}>🔁</Text>
+                          </LinearGradient>
+                        </View>
+                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.newConversation', 'New conversation')}</Text>
+                        <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -4245,6 +4406,8 @@ export default function ChatScreen({ navigation, route }) {
 
         </View>
       </SafeAreaView>
+
+      <NotificationEnableReminderModal homeActive={showGreeting} />
       
       <PremiumAnalysisModal
         visible={showPremiumModal}
@@ -4298,6 +4461,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
+    overflow: 'visible',
   },
   header: {
     flexDirection: 'row',
@@ -4306,6 +4470,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     borderWidth: 1,
+    overflow: 'visible',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -4411,6 +4576,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
+    overflow: 'visible',
   },
   creditButton: {
     backgroundColor: 'rgba(255, 107, 53, 0.2)',
@@ -4435,6 +4602,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerBellButton: {
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 40,
+    minHeight: 40,
+  },
+  headerBellHitBox: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headerBellBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 2,
+    minWidth: 18,
+    minHeight: 18,
+    maxWidth: 34,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    backgroundColor: '#ff6b35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  headerBellBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   messagesContainer: {
     flex: 1,

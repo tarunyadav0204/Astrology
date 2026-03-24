@@ -1,14 +1,17 @@
 """
-HTTP endpoints: daily nudge scan (cron), device token registration (app), admin send.
+HTTP endpoints: daily nudge scan (cron), device token registration (app), admin send,
+in-app inbox for stored nudges.
 """
+import json
 import logging
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from auth import User, get_current_user
+from db import get_conn, execute
 from .service import run_nudge_scan
 from . import db
 from . import push as push_module
@@ -35,6 +38,11 @@ class AdminSendBlogNotificationRequest(BaseModel):
     blog_id: int
     audience: str = "all"  # "all" or "eligible"
     user_ids: Optional[List[int]] = None  # optional explicit user selection
+
+
+class MarkNudgesReadRequest(BaseModel):
+    """If ids is omitted or empty, mark all nudges read for the current user."""
+    ids: Optional[List[int]] = None
 
 
 @router.post("/scan")
@@ -82,6 +90,7 @@ async def register_device_token(
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             db.save_device_token(conn, current_user.userid, body.token, platform)
+            conn.commit()
         return {"ok": True, "message": "Token registered"}
     except Exception as e:
         logger.exception("Device token registration failed: %s", e)
@@ -132,32 +141,24 @@ async def admin_send_notification(
         raise HTTPException(status_code=400, detail="title and body required")
     try:
         with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
             tokens = db.get_device_tokens_for_user(conn, body.user_id)
-            if not tokens:
-                logger.info(
-                    "Admin send notification: user_id=%s has no device tokens",
-                    body.user_id,
-                )
-                return {
-                    "ok": False,
-                    "sent": 0,
-                    "tokens_found": 0,
-                    "message": "User has no registered device tokens",
-                }
-            push_data = {"trigger_id": "admin", "cta": "astroroshni://chat"}
+            push_data: Dict[str, Any] = {"trigger_id": "admin", "cta": "astroroshni://chat"}
             if body.question and (body.question or "").strip():
                 push_data["question"] = (body.question or "").strip()[:500]
             if body.native_id is not None:
                 push_data["native_id"] = str(body.native_id)
             sent = 0
-            for token, platform in tokens:
-                if push_module.send_expo_push(
-                    token,
-                    title,
-                    body_text,
-                    data=push_data,
-                ):
-                    sent += 1
+            if tokens:
+                for token, platform in tokens:
+                    if push_module.send_expo_push(
+                        token,
+                        title,
+                        body_text,
+                        data=push_data,
+                    ):
+                        sent += 1
+            channel = "push" if sent > 0 else "stored"
             db.insert_delivery(
                 conn,
                 userid=body.user_id,
@@ -167,18 +168,23 @@ async def admin_send_notification(
                 sent_at=date.today(),
                 event_params="{}",
                 channel=channel,
+                data_payload=push_data,
             )
+            conn.commit()
         logger.info(
             "Admin send notification success: user_id=%s sent=%s tokens_found=%s",
             body.user_id,
             sent,
-            len(tokens),
+            len(tokens or []),
         )
         return {
             "ok": True,
             "sent": sent,
-            "tokens_found": len(tokens),
-            "message": f"Notification sent to {sent} of {len(tokens)} device(s)",
+            "tokens_found": len(tokens or []),
+            "message": (
+                f"Notification sent to {sent} of {len(tokens or [])} device(s); "
+                "also saved to in-app inbox."
+            ),
         }
     except HTTPException:
         raise
@@ -203,17 +209,13 @@ async def admin_send_blog_notification(
         raise HTTPException(status_code=400, detail="blog_id required")
 
     try:
-        # Fetch blog post
-        blog_conn = get_blog_conn()
-        try:
-            cur = blog_conn.cursor()
-            cur.execute(
-                "SELECT id, title, slug, featured_image, status FROM blog_posts WHERE id = ?",
+        with get_conn() as blog_conn:
+            cur = execute(
+                blog_conn,
+                "SELECT id, title, slug, featured_image, status FROM blog_posts WHERE id = %s",
                 (body.blog_id,),
             )
             row = cur.fetchone()
-        finally:
-            blog_conn.close()
         if not row:
             raise HTTPException(status_code=404, detail="Blog post not found")
         blog_id, title, slug, featured_image, status = row
@@ -274,6 +276,7 @@ async def admin_send_blog_notification(
                         sent += 1
                         user_sent += 1
                 channel = "push" if user_sent else "stored"
+                ep = json.dumps({"blog_id": blog_id, "slug": slug or ""}, ensure_ascii=False)
                 db.insert_delivery(
                     conn,
                     userid=userid,
@@ -281,9 +284,11 @@ async def admin_send_blog_notification(
                     title=notif_title,
                     body=notif_body,
                     sent_at=date.today(),
-                    event_params=f'{{"blog_id": {blog_id}, "slug": "{slug}"}}',
+                    event_params=ep,
                     channel=channel,
+                    data_payload=push_data,
                 )
+            conn.commit()
 
         logger.info(
             "Admin send blog notification success: blog_id=%s users=%s tokens_sent=%s",
@@ -302,3 +307,77 @@ async def admin_send_blog_notification(
     except Exception as e:
         logger.exception("Admin send blog notification failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to send blog notification") from e
+
+
+def _delivery_row_to_item(row: tuple) -> Dict[str, Any]:
+    (
+        rid,
+        trigger_id,
+        title,
+        body,
+        event_params,
+        data_json_raw,
+        sent_at,
+        channel,
+        created_at,
+        read_at,
+    ) = row
+    data: Optional[Dict[str, Any]] = None
+    if data_json_raw:
+        try:
+            data = json.loads(data_json_raw)
+        except Exception:
+            data = None
+    def _iso(val):
+        if val is None:
+            return None
+        if hasattr(val, "isoformat"):
+            return val.isoformat()
+        return str(val)
+
+    return {
+        "id": int(rid),
+        "trigger_id": trigger_id,
+        "title": title,
+        "body": body,
+        "event_params": event_params,
+        "data": data,
+        "sent_at": str(sent_at) if sent_at is not None else None,
+        "channel": channel,
+        "created_at": _iso(created_at),
+        "read_at": _iso(read_at),
+    }
+
+
+@router.get("/inbox")
+async def get_nudge_inbox(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+):
+    """List nudges saved for this user (daily nudges, admin sends, blog announcements)."""
+    with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
+        rows = db.list_deliveries_for_user(conn, current_user.userid, limit=limit, offset=offset)
+        unread = db.count_unread_deliveries(conn, current_user.userid)
+    return {"items": [_delivery_row_to_item(r) for r in rows], "unread_count": unread}
+
+
+@router.get("/inbox/unread-count")
+async def get_nudge_inbox_unread_count(current_user: User = Depends(get_current_user)):
+    with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
+        n = db.count_unread_deliveries(conn, current_user.userid)
+    return {"unread_count": n}
+
+
+@router.post("/inbox/mark-read")
+async def post_mark_nudges_read(
+    body: MarkNudgesReadRequest,
+    current_user: User = Depends(get_current_user),
+):
+    with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
+        updated = db.mark_deliveries_read(conn, current_user.userid, body.ids)
+        conn.commit()
+    return {"ok": True, "updated": updated}

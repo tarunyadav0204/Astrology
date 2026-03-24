@@ -67,7 +67,7 @@ const NorthIndianChart = ({
   }, [chartData, chartType, rotatedAscendant]);
 
   const handlePlanetPress = (planet) => {
-    const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+    const tooltipText = `${planet.name}: ${planet.formattedDegree} in ${planet.nakshatra} · Pada ${planet.pada}`;
     setTooltip({ show: true, text: tooltipText });
     setTimeout(() => setTooltip({ show: false, text: '' }), 2000);
   };
@@ -175,10 +175,20 @@ const NorthIndianChart = ({
     return shortNakshatras[nakshatraIndex] || 'Unk';
   };
 
+  const getNakshatraPada = (longitude) => {
+    const lon = typeof longitude === 'number' && !Number.isNaN(longitude) ? longitude : 0;
+    const degreeInNakshatra = lon % 13.333333;
+    return Math.floor(degreeInNakshatra / 3.333333) + 1;
+  };
+
   const formatDegree = (degree) => {
-    if (typeof degree !== 'number') return '0°';
-    // Show whole-degree precision only (no decimals)
-    return Math.round(degree).toString() + '°';
+    if (typeof degree !== 'number' || Number.isNaN(degree)) return '0°';
+    return `${Math.round(degree)}°`;
+  };
+
+  const formatDegreeFull = (degree) => {
+    if (typeof degree !== 'number' || Number.isNaN(degree)) return '0.0000°';
+    return degree.toFixed(4) + '°';
   };
 
   const getPlanetsInHouse = (houseIndex) => {
@@ -194,11 +204,13 @@ const NorthIndianChart = ({
         planetsInHouse.push({
           symbol: t(`planets.${name}`, name.substring(0, 2)),
           name: name,
-          degree: typeof data.degree === 'number' ? Math.round(data.degree).toString() : '0',
+          degree: typeof data.degree === 'number' ? data.degree : 0,
           longitude: data.longitude || 0,
           nakshatra: getNakshatra(data.longitude || 0),
           shortNakshatra: getShortNakshatra(data.longitude || 0),
-          formattedDegree: formatDegree(data.degree || 0)
+          pada: getNakshatraPada(data.longitude || 0),
+          formattedDegree: formatDegree(data.degree ?? 0),
+          formattedDegreeFull: formatDegreeFull(data.degree ?? 0)
         });
       }
     });
@@ -206,11 +218,13 @@ const NorthIndianChart = ({
       planetsInHouse.push({
         symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',
-        degree: typeof planets.InduLagna.degree === 'number' ? Math.round(planets.InduLagna.degree).toString() : '0',
+        degree: typeof planets.InduLagna.degree === 'number' ? planets.InduLagna.degree : 0,
         longitude: planets.InduLagna.longitude || 0,
         nakshatra: getNakshatra(planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(planets.InduLagna.longitude || 0),
-        formattedDegree: formatDegree(planets.InduLagna.degree || 0)
+        pada: getNakshatraPada(planets.InduLagna.longitude || 0),
+        formattedDegree: formatDegree(planets.InduLagna.degree ?? 0),
+        formattedDegreeFull: formatDegreeFull(planets.InduLagna.degree ?? 0)
       });
     }
     return planetsInHouse;

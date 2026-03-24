@@ -8,6 +8,7 @@ import time
 from pydantic import BaseModel
 from auth import get_current_user, User
 from calculators.chart_calculator import ChartCalculator
+from calculators.vedic_graha_drishti import attach_graha_drishti_to_chart
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
@@ -550,6 +551,8 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         
         div_end = time.time()
         print(f"[BACKEND] D{division_number} divisional calculation completed in {div_end - div_start:.3f}s")
+
+        attach_graha_drishti_to_chart(divisional_data)
         
         end_time = time.time()
         print(f"[BACKEND] Total divisional chart request completed in {end_time - start_time:.3f}s")

@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   StatusBar,
   Animated,
   Dimensions,
@@ -31,6 +32,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
 
 const { width, height } = Dimensions.get('window');
 
@@ -189,6 +191,22 @@ export default function ChartScreen({ navigation, route }) {
   const closeHouseDrawer = () => {
     setSelectedHouse(null);
   };
+
+  const houseDrawerAspects = useMemo(() => {
+    if (!selectedHouse?.chartData || selectedHouse.rashiIndex == null) return [];
+    const cd = selectedHouse.chartData;
+    const h = selectedHouse.houseNum;
+    const server =
+      cd.graha_drishti_by_house?.[String(h)] ?? cd.houses?.[h - 1]?.graha_drishti;
+    if (Array.isArray(server) && server.length > 0) {
+      return server.map((row) => ({
+        planetName: row.planet,
+        planetHouse: row.planet_house != null ? row.planet_house : null,
+        aspectKinds: row.aspect_labels || '',
+      }));
+    }
+    return getGrahaDrishtiToHouseSign(cd, selectedHouse.rashiIndex);
+  }, [selectedHouse]);
   
   const handleShare = async () => {
     try {
@@ -459,27 +477,32 @@ export default function ChartScreen({ navigation, route }) {
           animationType="none"
           onRequestClose={closeHouseDrawer}
         >
-          <TouchableOpacity 
-            style={styles.drawerOverlay} 
-            activeOpacity={1} 
-            onPress={closeHouseDrawer}
-          >
-            <View 
+          <View style={styles.drawerOverlay}>
+            <Pressable
+              style={[StyleSheet.absoluteFill, styles.drawerBackdrop]}
+              onPress={closeHouseDrawer}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close', 'Close')}
+            />
+            <View
               style={[
-                styles.drawerContent, 
-                { 
-                  backgroundColor: isClassic ? colors.cardBackground : (theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)')
-                }
+                styles.drawerContent,
+                {
+                  backgroundColor: isClassic ? colors.cardBackground : (theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)'),
+                },
               ]}
             >
               <View style={styles.drawerHandle} />
               
               {selectedHouse && (
-                <View style={{ height: height * 0.7 }}>
-                  <ScrollView 
-                    style={{ flex: 1 }}
+                <View style={styles.drawerInner}>
+                  <ScrollView
+                    style={styles.drawerScroll}
                     contentContainerStyle={styles.drawerScrollContent}
-                    showsVerticalScrollIndicator={false}
+                    showsVerticalScrollIndicator
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    bounces
                   >
                     {/* House Header */}
                     <View style={styles.drawerHeader}>
@@ -516,13 +539,42 @@ export default function ChartScreen({ navigation, route }) {
                             <View style={styles.planetInfo}>
                               <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
                               <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
-                                {planet.formattedDegree} in {planet.nakshatra}
+                                {(planet.formattedDegreeFull || planet.formattedDegree)} in {planet.nakshatra}
+                                {planet.pada != null ? ` · Pada ${planet.pada}` : ''}
                               </Text>
                             </View>
                           </View>
                         ))
                       ) : (
                         <Text style={[styles.emptySectionText, { color: colors.textTertiary }]}>No planets occupy this house.</Text>
+                      )}
+                    </View>
+
+                    <View style={styles.drawerSection}>
+                      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                        {t('chartScreen.grahaDrishti', 'Graha drishti')}
+                      </Text>
+                      {houseDrawerAspects.length > 0 ? (
+                        houseDrawerAspects.map((row, idx) => (
+                          <View key={`${row.planetName}-${idx}`} style={styles.aspectRow}>
+                            <Ionicons name="eye-outline" size={18} color={colors.primary} style={styles.aspectIcon} />
+                            <View style={styles.planetInfo}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {t(`planets.${row.planetName}`, row.planetName)}
+                                {row.planetHouse != null
+                                  ? ` · ${t('chartScreen.houseAbbr', 'H')}${row.planetHouse}`
+                                  : ''}
+                              </Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                {row.aspectKinds} {t('chartScreen.aspectSuffix', 'aspect')}
+                              </Text>
+                            </View>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={[styles.emptySectionText, { color: colors.textTertiary }]}>
+                          {t('chartScreen.noGrahaDrishti', 'No graha drishti from other houses.')}
+                        </Text>
                       )}
                     </View>
 
@@ -578,7 +630,7 @@ export default function ChartScreen({ navigation, route }) {
                 </View>
               )}
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
       </View>
     </GestureHandlerRootView>
@@ -793,13 +845,25 @@ const styles = StyleSheet.create({
   // Drawer Styles
   drawerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  drawerBackdrop: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   drawerContent: {
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     maxHeight: height * 0.75,
+    zIndex: 1,
+    elevation: 24,
+  },
+  drawerInner: {
+    height: height * 0.7,
+    maxHeight: height * 0.75,
+  },
+  drawerScroll: {
+    flex: 1,
+    minHeight: 0,
   },
   drawerHandle: {
     width: 40,
@@ -863,6 +927,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
+  },
+  planetInfo: {
+    flex: 1,
+  },
+  aspectRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 12,
+  },
+  aspectIcon: {
+    marginRight: 10,
+    marginTop: 2,
   },
   planetIconContainer: {
     width: 36,

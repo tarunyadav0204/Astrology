@@ -1,5 +1,6 @@
 import swisseph as swe
 from .base_calculator import BaseCalculator
+from .vedic_graha_drishti import attach_graha_drishti_to_chart
 from utils.timezone_service import parse_timezone_offset
 
 class ChartCalculator(BaseCalculator):
@@ -227,14 +228,16 @@ class ChartCalculator(BaseCalculator):
         
         calc_end = time.time()
         # print(f"[CALC] Total chart calculation took {calc_end - calc_start:.3f}s")
-        
-        return {
+
+        result = {
             "planets": planets,
             "houses": houses,
             "ayanamsa": ayanamsa,
             "ascendant": ascendant_sidereal,
-            "bhav_chalit": bhav_chalit
+            "bhav_chalit": bhav_chalit,
         }
+        attach_graha_drishti_to_chart(result)
+        return result
     
     def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Bhav Chalit using Placidus house system (professional KP/Sripati method)"""

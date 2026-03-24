@@ -452,6 +452,16 @@ export const chartAPI = {
 export const nudgeAPI = {
   registerDeviceToken: (token, platform) =>
     api.post(getEndpoint('/nudge/device-token'), { token, platform }),
+  getInbox: (params = {}) => {
+    const sp = new URLSearchParams();
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    if (params.offset != null) sp.set('offset', String(params.offset));
+    const q = sp.toString();
+    return api.get(getEndpoint(`/nudge/inbox${q ? `?${q}` : ''}`));
+  },
+  getUnreadCount: () => api.get(getEndpoint('/nudge/inbox/unread-count')),
+  /** ids omitted or empty array = mark all read */
+  markRead: (body = {}) => api.post(getEndpoint('/nudge/inbox/mark-read'), body),
 };
 
 export const creditAPI = {

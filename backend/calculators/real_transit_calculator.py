@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from utils.timezone_service import parse_timezone_offset
 
+from .vedic_graha_drishti import DEFAULT_ASPECTS, GRAHA_HOUSE_ASPECTS
+
 class RealTransitCalculator:
     """Real astronomical transit calculations using Swiss Ephemeris"""
     
@@ -18,18 +20,8 @@ class RealTransitCalculator:
             'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
         ]
         
-        # Traditional Vedic aspects for each planet
-        self.vedic_aspects = {
-            'Sun': [1, 7],
-            'Moon': [1, 7],
-            'Mars': [1, 4, 7, 8],
-            'Mercury': [1, 7],
-            'Jupiter': [1, 5, 7, 9],
-            'Venus': [1, 7],
-            'Saturn': [1, 3, 7, 10],
-            'Rahu': [1, 5, 7, 9],
-            'Ketu': [1, 5, 7, 9]
-        }
+        # Same house-number lists as vedic_graha_drishti.GRAHA_HOUSE_ASPECTS (single source of truth)
+        self.vedic_aspects = GRAHA_HOUSE_ASPECTS
         
         self.planet_numbers = {
             'Sun': swe.SUN, 'Moon': swe.MOON, 'Mars': swe.MARS,
@@ -375,7 +367,7 @@ class RealTransitCalculator:
             print(f"🔍 Checking natal: {planet1} in house {planet1_house} -> {planet2} in house {planet2_house} (aspect {aspect_number})")
         
         # Check if planet1 could aspect planet2 in natal chart
-        available_aspects = self.vedic_aspects.get(planet1, [])
+        available_aspects = self.vedic_aspects.get(planet1, DEFAULT_ASPECTS)
         
         for test_aspect in available_aspects:
             if test_aspect == 1:
@@ -513,7 +505,7 @@ class RealTransitCalculator:
         # print(f"         Total conjunctions: {len(conjunct_planets)} - {conjunct_planets}")
         
         # Calculate all aspects cast by transit planet
-        available_aspects = self.vedic_aspects.get(transit_planet, [1, 7])
+        available_aspects = self.vedic_aspects.get(transit_planet, DEFAULT_ASPECTS)
         # print(f"         {transit_planet} can cast aspects: {available_aspects}")
         
         all_aspects = []

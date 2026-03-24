@@ -36,6 +36,7 @@ def run_nudge_scan(target_date: Optional[date] = None) -> Dict[str, Any]:
         summary["error"] = str(e)
         return summary
 
+    try:
         events = scan(target_date)
         summary["events_found"] = len(events)
         if not events:

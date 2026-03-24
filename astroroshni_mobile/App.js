@@ -50,6 +50,7 @@ import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
 import MundaneHubScreen from './src/components/Chat/MundaneHubScreen';
 import BlogListScreen from './src/components/Blog/BlogListScreen';
 import BlogPostDetailScreen from './src/components/Blog/BlogPostDetailScreen';
+import NudgeInboxScreen from './src/components/Notifications/NudgeInboxScreen';
 import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -390,6 +391,11 @@ export default function App() {
           <Stack.Screen 
             name="Profile" 
             component={ProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NudgeInbox"
+            component={NudgeInboxScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 
