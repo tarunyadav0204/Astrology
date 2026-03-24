@@ -23,7 +23,7 @@ export default function AdminActivity() {
   const [filterUserName, setFilterUserName] = useState('');
   const [filterPhone, setFilterPhone] = useState('');
   const [filterAction, setFilterAction] = useState('');
-  const [onlyErrors, setOnlyErrors] = useState(true);
+  const [onlyErrors, setOnlyErrors] = useState(false);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
 

@@ -4,6 +4,7 @@ Runs after the request; does not block the response.
 """
 import time
 import logging
+import os
 import jwt
 import traceback
 from starlette.middleware.base import BaseHTTPMiddleware
