@@ -58,6 +58,13 @@ def get_conn_dict():
             pass
 
 
+# subscription_plans.is_active may be BOOLEAN or INTEGER (0/1) after SQLite → Postgres migration.
+# Using "= TRUE" or "= 1" alone fails for the other type; this matches both.
+SQL_SUBSCRIPTION_PLAN_ACTIVE = (
+    "(COALESCE(LOWER(TRIM(is_active::text)), '') IN ('1', 't', 'true'))"
+)
+
+
 def execute(conn, sql: str, params=None):
     params = params or ()
     sql = _adapt_query_for_postgres(sql)

@@ -10,7 +10,7 @@ from .credit_service import CreditService
 from .admin.promo_manager import PromoCodeManager
 from utils.env_json import parse_json_from_env
 from activity.publisher import publish_activity
-from db import get_conn, execute
+from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 
 router = APIRouter()
 credit_service = CreditService()
@@ -644,11 +644,11 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
             # Backward compatibility for deployments where tier_name / discount_percent are not present
             cur = execute(
                 conn,
-                """
+                f"""
                 SELECT plan_id, plan_name, 0, NULL, price
                 FROM subscription_plans
                 WHERE platform = %s
-                  AND is_active = TRUE
+                  AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                 ORDER BY plan_name
                 """,
                 ("astroroshni",),

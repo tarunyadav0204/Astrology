@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 from utils.timezone_service import parse_timezone_offset
-from db import get_conn, execute
+from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 import bcrypt
 import jwt
 from horoscope.api import HoroscopeAPI
@@ -1419,13 +1419,13 @@ async def get_subscription_plans(platform: str = None):
         if platform:
             cur = execute(
                 conn,
-                "SELECT * FROM subscription_plans WHERE platform = %s AND is_active = TRUE",
+                f"SELECT * FROM subscription_plans WHERE platform = %s AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}",
                 (platform,),
             )
         else:
             cur = execute(
                 conn,
-                "SELECT * FROM subscription_plans WHERE is_active = TRUE",
+                f"SELECT * FROM subscription_plans WHERE {SQL_SUBSCRIPTION_PLAN_ACTIVE}",
             )
         plans = cur.fetchall() or []
 
@@ -3917,11 +3917,11 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
         try:
             cur = execute(
                 conn,
-                """
+                f"""
                     SELECT plan_id, platform, plan_name, price, duration_months, features, is_active,
                            tier_name, discount_percent, google_play_product_id
                     FROM subscription_plans
-                    WHERE is_active = TRUE
+                    WHERE {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                     ORDER BY platform, COALESCE(discount_percent, 0) DESC, plan_name
                 """,
             )
@@ -3929,10 +3929,10 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
         except Exception:
             cur = execute(
                 conn,
-                """
+                f"""
                     SELECT plan_id, platform, plan_name, price, duration_months, features, is_active
                     FROM subscription_plans
-                    WHERE is_active = TRUE
+                    WHERE {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                     ORDER BY platform, plan_name
                 """,
             )

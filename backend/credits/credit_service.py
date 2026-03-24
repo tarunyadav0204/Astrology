@@ -250,12 +250,12 @@ class CreditService:
 
     def get_plan_id_by_google_play_product_id(self, product_id: str, platform: str = "astroroshni") -> Optional[int]:
         """Return plan_id for subscription_plans where google_play_product_id = product_id. None if not found."""
-        from db import get_conn, execute
+        from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
         try:
             with get_conn() as conn:
                 cursor = execute(
                     conn,
-                    "SELECT plan_id FROM subscription_plans WHERE google_play_product_id = ? AND platform = ? AND is_active = 1",
+                    f"SELECT plan_id FROM subscription_plans WHERE google_play_product_id = %s AND platform = %s AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}",
                     (product_id.strip(), platform),
                 )
                 row = cursor.fetchone()
