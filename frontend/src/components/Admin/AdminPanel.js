@@ -18,6 +18,18 @@ import BlogDashboard from '../Blog/BlogDashboard';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
+/** API may return boolean, 0/1, or legacy strings for promo_codes.is_active */
+function promoCodeIsActive(value) {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0 || value == null) return false;
+  if (typeof value === 'string') {
+    const s = value.trim().toLowerCase();
+    if (s === '0' || s === 'false' || s === 'f' || s === 'no' || s === '') return false;
+    return s === '1' || s === 'true' || s === 't' || s === 'yes';
+  }
+  return Boolean(value);
+}
+
 const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
   const navigate = useNavigate();
   
@@ -769,7 +781,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     const maxUses = updates.max_uses != null ? Number(updates.max_uses) : Number(row.max_uses);
     const maxPerUser =
       updates.max_uses_per_user != null ? Number(updates.max_uses_per_user) : Number(row.max_uses_per_user ?? 1);
-    const isActive = updates.is_active != null ? Boolean(updates.is_active) : Boolean(row.is_active);
+    const isActive = updates.is_active != null ? Boolean(updates.is_active) : promoCodeIsActive(row.is_active);
 
     if (!Number.isFinite(credits) || credits < 1 || !Number.isFinite(maxUses) || maxUses < 1) {
       alert('Credits and max uses must be positive numbers');
@@ -818,7 +830,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       credits: code.credits,
       max_uses: code.max_uses,
       max_uses_per_user: code.max_uses_per_user ?? 1,
-      is_active: code.is_active
+      is_active: promoCodeIsActive(code.is_active),
     });
   };
 
@@ -2027,15 +2039,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         <td>
                           {editingPromoCode === code.code ? (
                             <select
-                              value={editFormData.is_active !== undefined ? (editFormData.is_active ? '1' : '0') : (code.is_active ? '1' : '0')}
-                              onChange={(e) => setEditFormData({...editFormData, is_active: e.target.value === '1'})}
+                              value={
+                                editFormData.is_active !== undefined
+                                  ? (editFormData.is_active ? '1' : '0')
+                                  : (promoCodeIsActive(code.is_active) ? '1' : '0')
+                              }
+                              onChange={(e) => setEditFormData({ ...editFormData, is_active: e.target.value === '1' })}
                             >
                               <option value="1">Active</option>
                               <option value="0">Inactive</option>
                             </select>
                           ) : (
-                            <span className={`status ${code.is_active ? 'active' : 'inactive'}`}>
-                              {code.is_active ? 'Active' : 'Inactive'}
+                            <span className={`status ${promoCodeIsActive(code.is_active) ? 'active' : 'inactive'}`}>
+                              {promoCodeIsActive(code.is_active) ? 'Active' : 'Inactive'}
                             </span>
                           )}
                         </td>

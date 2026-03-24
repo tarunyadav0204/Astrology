@@ -760,6 +760,7 @@ async def create_promo_code(request: CreatePromoCodeRequest, current_user: User 
                     current_user.userid,
                 ),
             )
+            conn.commit()
         return {"message": "Promo code created successfully"}
     except Exception:
         # Most likely a uniqueness violation on code
@@ -812,6 +813,7 @@ async def update_promo_code(code: str, request: UpdatePromoCodeRequest, current_
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Promo code not found")
+        conn.commit()
 
     return {"message": "Promo code updated successfully"}
 
@@ -828,6 +830,7 @@ async def delete_promo_code(code: str, current_user: User = Depends(get_current_
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Promo code not found")
+        conn.commit()
 
     return {"message": "Promo code deleted successfully"}
 
@@ -848,6 +851,7 @@ async def delete_promo_code_post(request: dict, current_user: User = Depends(get
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Promo code not found")
+        conn.commit()
 
     return {"message": "Promo code deleted successfully"}
 
