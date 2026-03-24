@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import {
   BarChart,
   Bar,
@@ -62,9 +63,12 @@ export default function AdminChatPerformanceCharts() {
       const params = new URLSearchParams({ limit: '5000' });
       if (start_date && end_date) params.set('start_date', start_date), params.set('end_date', end_date);
       const response = await fetch(`/api/admin/chat-performance/stats?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: getAdminAuthHeaders(),
       });
-      if (!response.ok) throw new Error('Failed to fetch stats');
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Failed to fetch stats (${response.status})`);
+      }
       const data = await response.json();
       setBuckets(data.buckets || []);
       setByUser(data.by_user || []);

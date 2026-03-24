@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminChatPerformance.css';
 
 const DURATION_OPTIONS = [
@@ -64,13 +65,12 @@ const AdminChatPerformance = () => {
       if (start_date && end_date) params.set('start_date', start_date), params.set('end_date', end_date);
       const response = await fetch(
         `/api/admin/chat-performance?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
+        { headers: getAdminAuthHeaders() }
       );
-      if (!response.ok) throw new Error('Failed to fetch');
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Request failed (${response.status})`);
+      }
       const data = await response.json();
       setItems(data.items || []);
       setTotal(data.total ?? 0);
