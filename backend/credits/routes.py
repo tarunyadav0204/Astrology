@@ -1329,9 +1329,14 @@ async def create_bulk_promo_codes(request: dict, current_user: User = Depends(ge
 async def get_credit_stats(current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    stats = promo_manager.get_usage_stats()
-    return stats
+    try:
+        return promo_manager.get_usage_stats()
+    except Exception as e:
+        logger.exception("GET /admin/stats failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load credit stats: {e!s}",
+        ) from e
 
 @router.get("/admin/users")
 async def get_all_users_with_credits(

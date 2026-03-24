@@ -8,12 +8,12 @@ from db import execute, get_conn
 
 def _is_active_sql() -> str:
     """
-    promo_codes.is_active may be BOOLEAN (from init_tables) or TEXT (from SQLite migration).
+    promo_codes.is_active may be BOOLEAN, INTEGER (0/1), or TEXT after SQLite→Postgres migration.
+    Do not use `is_active IS TRUE` alone: PostgreSQL rejects it when the column is INTEGER.
     """
-    return """(
-        is_active IS TRUE
-        OR COALESCE(LOWER(TRIM(is_active::text)), 'true') IN ('true', '1', 't')
-    )"""
+    return (
+        "(COALESCE(LOWER(TRIM(is_active::text)), '') IN ('1', 't', 'true'))"
+    )
 
 
 class PromoCodeManager:
