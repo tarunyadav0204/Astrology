@@ -1,4 +1,7 @@
 # Push to main runs deploy.sh on the server (restart backend + frontend).
+# Do NOT git pull/reset before deploy.sh: deploy.sh records PREV_HEAD then
+# fetches/resets so CHANGED_FILES is non-empty and frontend rebuilds when
+# frontend/ changed. A pre-reset makes PREV_HEAD == NEW_HEAD and skips npm build.
 name: Deploy to GCP
 
 on:
@@ -19,6 +22,4 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         script: |
           cd AstrologyApp
-          git fetch origin main
-          git reset --hard origin/main
           bash deploy.sh

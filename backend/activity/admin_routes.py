@@ -35,35 +35,57 @@ def _enrich_activity_user_ids(out: List[Dict[str, Any]]) -> None:
             return True
         return str(name).strip() == ""
 
+    def _phone_key(v: Any) -> str:
+        """
+        Normalize phone values to a comparable key across BigQuery/Postgres types.
+        Handles ints from Postgres and strings like '+91 98765-43210' from events.
+        """
+        s = str(v or "").strip()
+        if not s:
+            return ""
+        digits = "".join(ch for ch in s if ch.isdigit())
+        return digits or s
+
     phones_to_lookup = set()
     for row in out:
         phone = row.get("user_phone")
-        if phone and str(phone).strip():
+        k = _phone_key(phone)
+        if k:
             uid = row.get("user_id")
             name = row.get("user_name")
             if _missing_uid(uid) or _missing_name(name):
-                phones_to_lookup.add(str(phone).strip())
+                phones_to_lookup.add(k)
     if not phones_to_lookup:
         return
     try:
         with get_conn() as conn:
+            # phone may be stored as TEXT or numeric in different environments.
+            # Compare via normalized digits to avoid type/format mismatches.
             cur = execute(
                 conn,
-                "SELECT userid, name, phone FROM users WHERE phone = ANY(%s)",
+                """
+                SELECT userid, name, phone
+                FROM users
+                WHERE regexp_replace(COALESCE(phone::text, ''), '[^0-9]', '', 'g') = ANY(%s)
+                """,
                 (list(phones_to_lookup),),
             )
             # phone -> (userid, name); name may be None
             phone_to_user = {}
             for row in cur.fetchall() or []:
-                phone_to_user[row[2]] = (
+                k = _phone_key(row[2])
+                if not k:
+                    continue
+                phone_to_user[k] = (
                     row[0],
                     row[1] if (row[1] and str(row[1]).strip()) else None,
                 )
         for row in out:
             phone = row.get("user_phone")
-            if not phone:
+            k = _phone_key(phone)
+            if not k:
                 continue
-            entry = phone_to_user.get(str(phone).strip())
+            entry = phone_to_user.get(k)
             if not entry:
                 continue
             userid, name = entry
