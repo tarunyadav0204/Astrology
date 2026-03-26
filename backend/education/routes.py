@@ -279,6 +279,7 @@ DISCLAIMER: Always mention this is astrological guidance, not career counseling.
                                 """,
                                 (current_user.userid, birth_hash, json.dumps(education_insights)),
                             )
+                            conn.commit()
                         print(f"💾 Analysis cached successfully")
                     except Exception as cache_error:
                         print(f"⚠️ Failed to cache analysis: {cache_error}")

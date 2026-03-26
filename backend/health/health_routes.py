@@ -275,6 +275,7 @@ CRITICAL RULES:
                                 """,
                                 (current_user.userid, birth_hash, json.dumps(health_insights)),
                             )
+                            conn.commit()
                         print(f"💾 Analysis cached successfully")
                     except Exception as cache_error:
                         print(f"⚠️ Failed to cache analysis: {cache_error}")

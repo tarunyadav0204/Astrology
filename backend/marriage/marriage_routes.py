@@ -222,6 +222,7 @@ Escape quotes properly: \"text\"
                                 """,
                                 (current_user.userid, birth_hash, json.dumps(marriage_insights)),
                             )
+                            conn.commit()
 
                         print(f"💾 Analysis cached successfully")
                     except Exception as cache_error:

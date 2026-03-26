@@ -371,6 +371,7 @@ Escape quotes properly: \"text\"
                                     """,
                                     (current_user.userid, birth_hash, json.dumps(full_result)),
                                 )
+                                conn.commit()
                         except Exception as cache_err:
                             print(f"⚠️ Cache save failed: {cache_err}")
 

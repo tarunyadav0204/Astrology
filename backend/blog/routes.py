@@ -93,6 +93,7 @@ async def create_post(post: BlogPostCreate):
         )
         row = cur.fetchone()
         post_id = row[0] if row else None
+        conn.commit()
 
     if post_id is None:
         raise HTTPException(status_code=500, detail="Failed to create post")
@@ -129,6 +130,7 @@ async def get_post_by_slug(slug: str):
                 "UPDATE blog_posts SET view_count = view_count + 1 WHERE slug = %s",
                 (slug,),
             )
+            conn.commit()
 
     if not row:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -169,6 +171,7 @@ async def update_post(post_id: int, post_update: BlogPostUpdate):
         cur = execute(conn, query, tuple(params))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Post not found")
+        conn.commit()
 
     return await get_post_by_id(post_id)
 
@@ -218,6 +221,7 @@ async def upload_image(file: UploadFile = File(...), alt_text: str = Form("")):
         )
         row = cur.fetchone()
         media_id = row[0] if row else None
+        conn.commit()
 
     if media_id is None:
         raise HTTPException(status_code=500, detail="Failed to save media record")

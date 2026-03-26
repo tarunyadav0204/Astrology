@@ -63,8 +63,8 @@ def init_house_combinations_db():
             """,
         )
 
-    # Insert comprehensive house specifications
-    default_specs = {
+        # Insert comprehensive house specifications
+        default_specs = {
         1: ["personality", "health", "appearance", "self", "vitality", "head", "brain", "identity", "physical body", "constitution", "temperament", "general well-being", "life force", "ego", "individuality", "first impressions", "leadership", "initiative", "independence", "self-confidence", "personal magnetism", "physical strength", "longevity", "birth circumstances", "early life"],
         
         2: ["wealth", "family", "speech", "food", "savings", "face", "early childhood", "accumulated wealth", "liquid assets", "bank balance", "movable property", "precious metals", "jewelry", "family traditions", "family values", "immediate family", "spouse's family", "voice quality", "speaking ability", "oral communication", "eating habits", "taste preferences", "nutrition", "mouth", "teeth", "tongue", "throat", "neck", "right eye", "death circumstances", "family lineage", "ancestral wealth", "financial security", "material possessions", "self-worth through possessions"],
@@ -88,23 +88,23 @@ def init_house_combinations_db():
         11: ["gains", "friends", "aspirations", "elder siblings", "income", "social network", "profits", "earnings", "financial gains", "monetary benefits", "winnings", "prizes", "rewards", "bonuses", "commissions", "dividends", "interest", "returns on investment", "business profits", "trade gains", "salary increases", "promotions", "raises", "friendship", "social circle", "companions", "associates", "colleagues", "allies", "supporters", "well-wishers", "benefactors", "patrons", "sponsors", "social groups", "clubs", "societies", "organizations", "communities", "networks", "connections", "contacts", "relationships", "hopes", "wishes", "desires", "dreams", "ambitions", "goals", "objectives", "expectations", "fulfillment of desires", "realization of dreams", "achievement of goals", "success in endeavors", "older brothers", "older sisters", "paternal uncles", "father's siblings", "step-children", "adopted children", "left ear", "calves", "shins", "ankles", "circulatory system", "blood circulation"],
         
         12: ["losses", "spirituality", "foreign lands", "expenses", "isolation", "moksha", "expenditure", "spending", "outflow of money", "financial losses", "wastage", "charity", "donations", "giving", "philanthropy", "generosity", "sacrifice", "renunciation", "letting go", "release", "liberation", "freedom", "detachment", "solitude", "seclusion", "retreat", "meditation", "contemplation", "introspection", "self-reflection", "inner journey", "spiritual practices", "yoga", "pranayama", "dhyana", "samadhi", "enlightenment", "self-realization", "God-realization", "union with divine", "transcendence", "nirvana", "foreign countries", "distant lands", "overseas", "abroad", "immigration", "emigration", "exile", "banishment", "deportation", "foreign settlement", "life abroad", "hospitals", "asylums", "prisons", "jails", "confinement", "imprisonment", "detention", "quarantine", "rehabilitation centers", "monasteries", "ashrams", "hermitages", "secluded places", "hidden enemies", "secret opponents", "backstabbers", "betrayers", "conspiracies", "plots", "schemes", "scandals", "secrets", "confidential matters", "private affairs", "behind-the-scenes activities", "subconscious mind", "unconscious", "dreams", "sleep", "bed", "bedroom", "sexual pleasures", "physical intimacy", "left eye", "feet", "toes", "lymphatic system", "immune system", "final liberation"]
-    }
-    
-    for house_num, specs in default_specs.items():
-        execute(
-            conn,
-            """
-            INSERT INTO house_specifications (house_number, specifications)
-            VALUES (%s, %s)
-            ON CONFLICT (house_number)
-            DO UPDATE SET specifications = EXCLUDED.specifications,
-                          updated_at = CURRENT_TIMESTAMP
-            """,
-            (house_num, json.dumps(specs)),
-        )
+        }
 
-    # Insert some default combinations
-    default_combinations = [
+        for house_num, specs in default_specs.items():
+            execute(
+                conn,
+                """
+                INSERT INTO house_specifications (house_number, specifications)
+                VALUES (%s, %s)
+                ON CONFLICT (house_number)
+                DO UPDATE SET specifications = EXCLUDED.specifications,
+                              updated_at = CURRENT_TIMESTAMP
+                """,
+                (house_num, json.dumps(specs)),
+            )
+
+        # Insert some default combinations
+        default_combinations = [
         {
             "houses": [2, 8],
             "positive_prediction": "Expect unearned income through investments, insurance, or inheritance. Financial gains from hidden sources.",
@@ -129,24 +129,26 @@ def init_house_combinations_db():
             "negative_prediction": "Career conflicts due to partnership issues. Professional reputation affected by relationship problems.",
             "combination_name": "Partnership + Career"
         }
-    ]
-    
-    for combo in default_combinations:
-        execute(
-            conn,
-            """
-            INSERT INTO house_combinations (houses, positive_prediction, negative_prediction, combination_name)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (houses, combination_name)
-            DO NOTHING
-            """,
-            (
-                json.dumps(combo["houses"]),
-                combo["positive_prediction"],
-                combo["negative_prediction"],
-                combo["combination_name"],
-            ),
-        )
+        ]
+
+        for combo in default_combinations:
+            execute(
+                conn,
+                """
+                INSERT INTO house_combinations (houses, positive_prediction, negative_prediction, combination_name)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (houses, combination_name)
+                DO NOTHING
+                """,
+                (
+                    json.dumps(combo["houses"]),
+                    combo["positive_prediction"],
+                    combo["negative_prediction"],
+                    combo["combination_name"],
+                ),
+            )
+
+        conn.commit()
 
 
 # Initialize database on module load (after function is defined)
@@ -205,7 +207,8 @@ async def update_house_specification(
                 """,
                 (house_number, json.dumps(spec.specifications)),
             )
-    
+        conn.commit()
+
     return {"message": "House specification updated successfully"}
 
 @router.get("/house-combinations")
@@ -260,7 +263,8 @@ async def create_house_combination(
                 combination.is_active,
             ),
         )
-    
+        conn.commit()
+
     return {"message": "House combination created successfully"}
 
 @router.put("/house-combinations/{combination_id}")
@@ -295,7 +299,8 @@ async def update_house_combination(
 
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Combination not found")
-    
+        conn.commit()
+
     return {"message": "House combination updated successfully"}
 
 @router.delete("/house-combinations/{combination_id}")
@@ -313,7 +318,8 @@ async def delete_house_combination(
 
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Combination not found")
-    
+        conn.commit()
+
     return {"message": "House combination deleted successfully"}
 
 @router.get("/search-combinations")
@@ -325,8 +331,6 @@ async def search_house_combinations(
 ):
     """Search house combinations by houses and text"""
     with get_conn() as conn:
-        cursor = conn.cursor()
-        
         query = "SELECT id, houses, positive_prediction, negative_prediction, combination_name, is_active, created_at, updated_at FROM house_combinations WHERE is_active = TRUE"
         params = []
         
@@ -336,15 +340,15 @@ async def search_house_combinations(
                 query += " AND id > 0"
         
         if search_text:
-            query += " AND (combination_name LIKE ? OR positive_prediction LIKE ? OR negative_prediction LIKE ?)"
+            query += " AND (combination_name LIKE %s OR positive_prediction LIKE %s OR negative_prediction LIKE %s)"
             search_pattern = f'%{search_text}%'
             params.extend([search_pattern, search_pattern, search_pattern])
         
-        query += " ORDER BY id DESC LIMIT ?"
+        query += " ORDER BY id DESC LIMIT %s"
         params.append(limit)
         
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
+        cur = execute(conn, query, tuple(params))
+        rows = cur.fetchall()
     
     combinations = []
     for row in rows:

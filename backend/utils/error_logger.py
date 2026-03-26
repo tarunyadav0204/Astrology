@@ -67,6 +67,7 @@ def log_chat_error(
                     birth_context,
                 ),
             )
+            conn.commit()
 
         print(f"🚨 ERROR LOGGED: {resolved_error_type} for user {username}")
         return True

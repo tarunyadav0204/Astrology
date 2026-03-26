@@ -110,7 +110,8 @@ If no USER-STATED facts found, return empty array: []
                         fact_data.get("confidence", 1.0),
                     ),
                 )
-    
+            conn.commit()
+
     def get_facts(self, birth_chart_id: int) -> Dict[str, List[str]]:
         """Retrieve all facts for a birth chart, filtering out old temporary events"""
         from datetime import datetime, timedelta

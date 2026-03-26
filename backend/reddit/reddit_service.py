@@ -59,6 +59,7 @@ class RedditService:
                 )
                 """,
             )
+            conn.commit()
 
     # Question helpers
 
@@ -146,6 +147,8 @@ class RedditService:
                 )
                 question_id = cur.fetchone()[0]
 
+            conn.commit()
+
         return question_id
 
     def list_questions(
@@ -192,6 +195,7 @@ class RedditService:
                 "UPDATE reddit_questions SET status = %s, updated_at = %s WHERE id = %s",
                 (status, now, question_id),
             )
+            conn.commit()
 
     # Answer helpers
 
@@ -217,6 +221,8 @@ class RedditService:
                 (question_id, draft_markdown, flags_str, now, now),
             )
             answer_id = cur.fetchone()[0]
+
+            conn.commit()
 
         return answer_id
 
@@ -294,4 +300,5 @@ class RedditService:
                 f"UPDATE reddit_answers SET {set_sql} WHERE id = %s",
                 tuple(params),
             )
+            conn.commit()
 

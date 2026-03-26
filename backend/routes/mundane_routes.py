@@ -34,6 +34,7 @@ async def create_mundane_session(request: dict, current_user = Depends(get_curre
             "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (%s, %s, %s)",
             (session_id, current_user.userid, None),  # No birth_chart_id for mundane
         )
+        conn.commit()
 
     return {"session_id": session_id}
 
@@ -95,7 +96,8 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
         )
         row = cur.fetchone()
         message_id = row[0] if row else None
-    
+        conn.commit()
+
     # Start background processing
     background_tasks.add_task(
         process_mundane_response,
@@ -232,7 +234,8 @@ async def process_mundane_response(
                         message_id,
                     ),
                 )
-    
+            conn.commit()
+
     except Exception as e:
         import traceback
         print(f"❌ Mundane Analysis Error: {str(e)}")
@@ -248,3 +251,4 @@ async def process_mundane_response(
                 """,
                 ("failed", "Analysis failed. Please try again.", datetime.now(), message_id),
             )
+            conn.commit()

@@ -264,7 +264,8 @@ class LayerConfigService:
                 """,
                 (category_key, tier_key, layer_id, bool(is_required)),
             )
-    
+            conn.commit()
+
     def update_category_chart_requirement(self, category_key: str, chart_key: str, is_required: bool, tier_key: str = 'normal'):
         """Update divisional chart requirement for a category and tier (for admin UI)"""
         with get_conn() as conn:
@@ -289,7 +290,8 @@ class LayerConfigService:
                 """,
                 (category_key, tier_key, chart_id, bool(is_required)),
             )
-    
+            conn.commit()
+
     def update_transit_limits(self, category_key: str, max_activations: int, 
                              include_macro: bool, include_navatara: bool, tier_key: str = 'normal'):
         """Update transit limits for a category and tier (for admin UI)"""
@@ -314,7 +316,8 @@ class LayerConfigService:
                     bool(include_navatara),
                 ),
             )
-    
+            conn.commit()
+
     def get_estimated_context_size(self, category_key: str, tier_key: str = 'normal') -> Dict:
         """Calculate estimated context size for a category and tier"""
         config = self.get_category_configuration(category_key, tier_key)

@@ -243,29 +243,31 @@ async def get_category_instruction_modules(category_key: str, tier_key: str = 'n
             (category_key, tier_key),
         )
         result = cur.fetchone()
-    required_modules = []
-    tier_context_config = {}
-    if result:
-        if result['required_modules']:
-            try:
-                required_modules = json.loads(result['required_modules'])
-            except:
-                required_modules = result['required_modules'].split(',') if result['required_modules'] else []
-        if result['tier_context_config']:
-            try:
-                tier_context_config = json.loads(result['tier_context_config'])
-            except:
-                tier_context_config = {}
-    
-    cur = execute(
-        conn,
-        """
-        SELECT id, module_key, module_name, character_count, priority, is_active
-        FROM prompt_instruction_modules
-        ORDER BY priority
-        """,
-    )
-    rows = cur.fetchall() or []
+        required_modules = []
+        tier_context_config = {}
+        if result:
+            raw_mods = result[0]
+            raw_ctx = result[1]
+            if raw_mods:
+                try:
+                    required_modules = json.loads(raw_mods)
+                except Exception:
+                    required_modules = raw_mods.split(",") if raw_mods else []
+            if raw_ctx:
+                try:
+                    tier_context_config = json.loads(raw_ctx)
+                except Exception:
+                    tier_context_config = {}
+
+        cur = execute(
+            conn,
+            """
+            SELECT id, module_key, module_name, character_count, priority, is_active
+            FROM prompt_instruction_modules
+            ORDER BY priority
+            """,
+        )
+        rows = cur.fetchall() or []
     modules = []
     for row in rows:
         module = {
@@ -331,7 +333,8 @@ async def update_instruction_module_text(
             """,
             (update.instruction_text, char_count, update.module_key),
         )
-    
+        conn.commit()
+
     return {"success": True, "message": "Instruction text updated", "character_count": char_count}
 
 @router.post("/category/instruction-modules")
@@ -355,7 +358,8 @@ async def update_category_instruction_modules(
             """,
             (modules_str, context_config_str, update.category_key, update.tier_key),
         )
-    
+        conn.commit()
+
     return {"success": True, "message": "Instruction modules and context config updated"}
 
 class CopyConfigRequest(BaseModel):
@@ -405,6 +409,7 @@ async def copy_config_to_all_categories(
                         (required_modules, category, request.tier_key),
                     )
 
+            conn.commit()
             return {
                 "success": True,
                 "message": f"Config copied to all categories for {request.tier_key} tier",

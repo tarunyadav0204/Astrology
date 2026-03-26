@@ -234,7 +234,8 @@ def seed_data():
         
         seed_instruction_modules(conn)
         seed_category_configs(conn)
-        
+        conn.commit()
+
         print("\n✅ All data seeded successfully!")
         print("\nYou can now:")
         print("1. Use PromptConfigService to fetch configurations")

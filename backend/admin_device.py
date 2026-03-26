@@ -29,6 +29,7 @@ def ensure_table():
             )
             """,
         )
+        conn.commit()
 
 
 def get_user_id_and_role_from_token(token: str) -> tuple[int | None, str | None]:
@@ -112,6 +113,7 @@ def add_allowed_device(device_id: str, label: str | None, userid: int) -> bool:
                     f"INSERT INTO {_TABLE} (userid, device_id, label) VALUES (%s, %s, %s)",
                     (userid, device_id, (label or "").strip() or None),
                 )
+                conn.commit()
                 return True
             except Exception:
                 # Unique violation -> already exists
@@ -166,6 +168,7 @@ def remove_allowed_device(device_id: str, userid: int) -> bool:
                 (userid, str(device_id).strip()),
             )
             deleted = cur.rowcount > 0
+            conn.commit()
             return deleted
     except Exception as e:
         logger.warning("admin_device: remove_allowed_device failed: %s", e)
@@ -182,6 +185,7 @@ def remove_allowed_device_by_id(row_id: int, userid: int) -> bool:
                 (row_id, userid),
             )
             deleted = cur.rowcount > 0
+            conn.commit()
             return deleted
     except Exception as e:
         logger.warning("admin_device: remove_allowed_device_by_id failed: %s", e)

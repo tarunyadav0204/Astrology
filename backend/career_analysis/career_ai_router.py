@@ -312,6 +312,7 @@ CRITICAL RULES:
                                 """,
                                 (current_user.userid, birth_hash, json.dumps(career_insights)),
                             )
+                            conn.commit()
                         print("💾 Analysis cached successfully")
                     except Exception as cache_error:
                         print(f"⚠️ Failed to cache analysis: {cache_error}")

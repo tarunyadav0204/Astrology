@@ -90,6 +90,7 @@ def _init_ai_insights_table():
             )
             """,
         )
+        conn.commit()
 
 def _get_stored_ai_insights(userid: int, birth_hash: str):
     """Get stored AI insights from database"""
@@ -120,6 +121,7 @@ def _store_ai_insights(userid: int, birth_hash: str, insights_data):
             """,
             (userid, birth_hash, json.dumps(insights_data), datetime.now().isoformat()),
         )
+        conn.commit()
 
 def parse_gemini_astrology_response(raw_text):
     """

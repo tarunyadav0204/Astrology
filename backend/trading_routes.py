@@ -110,7 +110,9 @@ async def get_daily_forecast(request: TradingRequest, current_user: User = Depen
                 if cached_result:
                     cached_data = json.loads(cached_result[0])
                     cached_data["cached"] = True
+                    conn.commit()
                     return cached_data
+                conn.commit()
     except Exception as cache_error:
         print(f"Cache check failed: {cache_error}")
     
@@ -237,6 +239,7 @@ JSON OUTPUT ONLY (Must be valid JSON):
                             """,
                             (cache_key, current_user.userid, target_date, json.dumps(response_data)),
                         )
+                        conn.commit()
                 except Exception as cache_error:
                     print(f"Failed to cache result: {cache_error}")
                 
@@ -299,6 +302,7 @@ async def get_monthly_calendar(request: TradingRequest, year: int, month: int, c
                 (cache_key,),
             )
             cached_result = cur.fetchone()
+            conn.commit()
 
         if cached_result:
             cached_data = json.loads(cached_result[0])
@@ -360,6 +364,7 @@ async def get_monthly_calendar(request: TradingRequest, year: int, month: int, c
                         """,
                         (cache_key, current_user.userid, year, month, json.dumps(calendar)),
                     )
+                    conn.commit()
             except Exception as cache_error:
                 print(f"Failed to cache result: {cache_error}")
             

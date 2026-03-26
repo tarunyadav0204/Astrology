@@ -63,6 +63,8 @@ async def submit_feedback(request: FeedbackRequest, current_user: User = Depends
                     (request.message_id, request.rating, request.comment, datetime.now()),
                 )
 
+            conn.commit()
+
         return {
             "success": True,
             "message": "Feedback submitted successfully"
@@ -87,6 +89,7 @@ async def get_feedback_stats(
     try:
         with get_conn() as conn:
             _ensure_feedback_table(conn)
+            conn.commit()
             cur = execute(conn, "SELECT COUNT(*), AVG(rating) FROM message_feedback", ())
             total_feedback, avg_rating = cur.fetchone() or (0, None)
 
@@ -173,6 +176,7 @@ async def get_user_feedback(current_user: User = Depends(get_current_user)):
     try:
         with get_conn() as conn:
             _ensure_feedback_table(conn)
+            conn.commit()
             cur = execute(
                 conn,
                 """

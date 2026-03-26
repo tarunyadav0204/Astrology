@@ -39,7 +39,8 @@ def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: d
                 """,
                 (chart_id, user_id),
             )
-        
+            conn.commit()
+
         print(f"\n{'='*80}")
         print(f"🔮 KARMA ANALYSIS REQUEST - Chart ID: {chart_id}")
         print(f"{'='*80}")
@@ -100,7 +101,8 @@ def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: d
                         user_id,
                     ),
                 )
-            
+                conn.commit()
+
             # Deduct credits only on successful analysis
             print(f"💰 Deducting {karma_cost} credits for successful analysis")
             credit_service.spend_credits(
@@ -122,6 +124,7 @@ def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: d
                     """,
                     (analysis.get("error", "Unknown error"), chart_id, user_id),
                 )
+                conn.commit()
             print(f"⚠️ Analysis failed - no credits deducted")
         
     except Exception as e:
@@ -141,6 +144,7 @@ def process_karma_analysis_background(chart_id: str, user_id: int, birth_data: d
                 """,
                 (str(e), chart_id, user_id),
             )
+            conn.commit()
         print(f"⚠️ Exception occurred - no credits deducted")
 
 @router.post("/karma-analysis")
@@ -255,7 +259,8 @@ async def analyze_karma(request: KarmaAnalysisRequest, background_tasks: Backgro
                 """,
                 (request.chart_id, current_user.userid),
             )
-        
+            conn.commit()
+
         print(f"🚀 Starting background task (credits will be deducted on success)")
         
         background_tasks.add_task(

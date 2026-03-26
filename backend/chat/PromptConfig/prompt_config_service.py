@@ -87,7 +87,8 @@ class PromptConfigService:
                     error_message,
                 ),
             )
-    
+            conn.commit()
+
     def get_all_categories(self) -> List[Dict]:
         """Get all active categories"""
         with get_conn() as conn:
