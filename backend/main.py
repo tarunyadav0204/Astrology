@@ -114,6 +114,7 @@ import sys
 import atexit
 import logging
 from encryption_utils import EncryptionManager
+from psycopg2 import errors as pg_errors
 try:
     encryptor = EncryptionManager()
 except ValueError as e:
@@ -973,11 +974,18 @@ async def register(user_data: UserCreate):
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
         hashed_password = hash_password(user_data.password)
-        execute(
-            conn,
-            "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
-            (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
-        )
+        try:
+            execute(
+                conn,
+                "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
+                (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
+            )
+        except pg_errors.UniqueViolation:
+            conn.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Unable to complete registration. Try signing in, or contact support if this persists.",
+            )
 
         cur = execute(conn, "SELECT userid, name, phone, role, email FROM users WHERE phone = %s", (user_data.phone,))
         user = cur.fetchone()
@@ -1040,87 +1048,89 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
 
         # Create user
         hashed_password = hash_password(user_data.password)
-        execute(
-            conn,
-            "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
-            (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
-        )
+        try:
+            execute(
+                conn,
+                "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
+                (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
+            )
+        except pg_errors.UniqueViolation:
+            conn.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Unable to complete registration. Try signing in, or contact support if this persists.",
+            )
         conn.commit()
 
         cur = execute(conn, "SELECT userid, name, phone, role, email FROM users WHERE phone = %s", (user_data.phone,))
         user = cur.fetchone()
-    
-    # Create birth chart if provided
-    birth_chart_data = None
-    if user_data.birth_details:
-        birth_data = user_data.birth_details
-        if encryptor:
-            enc_name = encryptor.encrypt(birth_data.name)
-            enc_date = encryptor.encrypt(birth_data.date)
-            enc_time = encryptor.encrypt(birth_data.time)
-            enc_lat = encryptor.encrypt(str(birth_data.latitude))
-            enc_lon = encryptor.encrypt(str(birth_data.longitude))
-            enc_place = encryptor.encrypt(birth_data.place or '')
-        else:
-            enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
-            enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
 
-        execute(conn, '''
-            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
-        ''', (user[0], enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-            birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
+        birth_chart_data = None
+        if user_data.birth_details:
+            birth_data = user_data.birth_details
+            if encryptor:
+                enc_name = encryptor.encrypt(birth_data.name)
+                enc_date = encryptor.encrypt(birth_data.date)
+                enc_time = encryptor.encrypt(birth_data.time)
+                enc_lat = encryptor.encrypt(str(birth_data.latitude))
+                enc_lon = encryptor.encrypt(str(birth_data.longitude))
+                enc_place = encryptor.encrypt(birth_data.place or '')
+            else:
+                enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+                enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
 
-        
-        # Fetch chart id
-        cur = execute(conn, "SELECT id FROM birth_charts WHERE userid = %s AND relation = 'self' ORDER BY created_at DESC LIMIT 1", (user[0],))
-        row = cur.fetchone()
-        chart_id = row[0] if row else None
-        birth_chart_data = {
-            'id': chart_id,
-            'name': birth_data.name,
-            'date': birth_data.date,
-            'time': birth_data.time,
-            'latitude': birth_data.latitude,
-            'longitude': birth_data.longitude,
-            'timezone': birth_data.timezone,
-            'place': birth_data.place or '',
-            'gender': birth_data.gender or '',
-            'relation': 'self'
-        }
-    
-        # Get free plans for both platforms
-        cur = execute(
-            conn,
-            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'",
-        )
-        astrovishnu_free = cur.fetchone()
-        cur = execute(
-            conn,
-            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'",
-        )
-        astroroshni_free = cur.fetchone()
+            execute(conn, '''
+                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+            ''', (user[0], enc_name, enc_date, enc_time, enc_lat, enc_lon,
+                birth_data.timezone, enc_place, birth_data.gender or ''))
 
-        # Give user free access to both platforms
-        from datetime import date, timedelta
-        start_date = date.today()
-        end_date = start_date + timedelta(days=365)  # 1 year free
+            cur = execute(conn, "SELECT id FROM birth_charts WHERE userid = %s AND relation = 'self' ORDER BY created_at DESC LIMIT 1", (user[0],))
+            row = cur.fetchone()
+            chart_id = row[0] if row else None
+            birth_chart_data = {
+                'id': chart_id,
+                'name': birth_data.name,
+                'date': birth_data.date,
+                'time': birth_data.time,
+                'latitude': birth_data.latitude,
+                'longitude': birth_data.longitude,
+                'timezone': birth_data.timezone,
+                'place': birth_data.place or '',
+                'gender': birth_data.gender or '',
+                'relation': 'self'
+            }
 
-        if astrovishnu_free:
-            execute(
+            cur = execute(
                 conn,
-                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
-                (user[0], astrovishnu_free[0], start_date, end_date),
+                "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'",
             )
-    
-        if astroroshni_free:
-            execute(
+            astrovishnu_free = cur.fetchone()
+            cur = execute(
                 conn,
-                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
-                (user[0], astroroshni_free[0], start_date, end_date),
+                "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'",
             )
+            astroroshni_free = cur.fetchone()
 
-        conn.commit()
+            from datetime import date, timedelta
+            start_date = date.today()
+            end_date = start_date + timedelta(days=365)  # 1 year free
+
+            if astrovishnu_free:
+                execute(
+                    conn,
+                    "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                    (user[0], astrovishnu_free[0], start_date, end_date),
+                )
+
+            if astroroshni_free:
+                execute(
+                    conn,
+                    "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                    (user[0], astroroshni_free[0], start_date, end_date),
+                )
+
+            conn.commit()
 
     access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
 

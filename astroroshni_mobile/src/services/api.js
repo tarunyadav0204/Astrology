@@ -110,8 +110,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Backend down (5xx errors)
-    if (error.response?.status >= 500) {
+    // Only treat proxy / gateway / explicit overload as "servers down".
+    // Plain 500 from our API usually means an app/DB bug or constraint — not "you have no internet".
+    // Showing the global overlay there confuses users (e.g. duplicate key → 500 before we fixed it).
+    const status = error.response?.status;
+    if (status === 502 || status === 503 || status === 504) {
       if (errorHandlerCallback) {
         errorHandlerCallback({
           type: 'server',
