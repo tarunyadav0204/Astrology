@@ -1724,11 +1724,13 @@ async def verify_reset_code(request: VerifyResetCode):
     from datetime import datetime
     
     with get_conn() as conn:
+        # `used` may be TEXT ('FALSE'/'TRUE') from SQLite-era migrations or BOOLEAN; avoid `used = FALSE`.
         cur = execute(
             conn,
             """
                 SELECT token FROM password_reset_codes
-                WHERE phone = %s AND code = %s AND expires_at > %s AND used = FALSE
+                WHERE phone = %s AND code = %s AND expires_at > %s
+                  AND COALESCE(LOWER(TRIM(used::text)), '') NOT IN ('true', '1', 't', 'yes')
             """,
             (request.phone, request.code, datetime.utcnow()),
         )
@@ -1751,7 +1753,8 @@ async def reset_password_with_token(request: ResetPasswordWithToken):
             conn,
             """
                 SELECT phone FROM password_reset_codes
-                WHERE token = %s AND expires_at > %s AND used = FALSE
+                WHERE token = %s AND expires_at > %s
+                  AND COALESCE(LOWER(TRIM(used::text)), '') NOT IN ('true', '1', 't', 'yes')
             """,
             (request.token, datetime.utcnow()),
         )
@@ -1773,7 +1776,7 @@ async def reset_password_with_token(request: ResetPasswordWithToken):
         # Mark token as used
         execute(
             conn,
-            "UPDATE password_reset_codes SET used = TRUE WHERE token = %s",
+            "UPDATE password_reset_codes SET used = 'TRUE' WHERE token = %s",
             (request.token,),
         )
 
