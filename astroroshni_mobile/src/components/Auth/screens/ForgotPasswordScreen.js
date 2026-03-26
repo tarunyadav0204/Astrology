@@ -137,7 +137,11 @@ export default function ForgotPasswordScreen({
             <View style={styles.header}>
               <Text style={styles.emoji}>📱</Text>
               <Text style={styles.title}>Reset Password</Text>
-              <Text style={styles.subtitle}>Enter your phone number to receive a reset code</Text>
+              <Text style={styles.subtitle}>
+                {isUSPhone
+                  ? 'Enter your phone number and email. We will send a reset code to your email.'
+                  : 'Enter your phone number to receive a reset code'}
+              </Text>
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
@@ -194,7 +198,10 @@ export default function ForgotPasswordScreen({
             <View style={styles.header}>
               <Text style={styles.emoji}>🔐</Text>
               <Text style={styles.title}>Enter Code</Text>
-              <Text style={styles.subtitle}>We've sent a 6-digit code to {formData.phone}</Text>
+              <Text style={styles.subtitle}>
+                We've sent a 6-digit code to{'\n'}
+                {isUSPhone && formData.email ? formData.email : formData.phone}
+              </Text>
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>

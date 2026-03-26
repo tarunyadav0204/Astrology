@@ -1693,8 +1693,15 @@ async def send_reset_code(request: SendResetCode):
     sms_sent = sms_service.send_reset_code(request.phone, code)
     email_sent = _send_otp_email(target_email, code) if target_email else False
     
+    if _is_us_number(request.phone):
+        msg = f"Reset code sent to {target_email}"
+        if sms_sent:
+            msg += f" and to {request.phone}"
+    else:
+        msg = f"Reset code sent to {request.phone}"
+
     response = {
-        "message": f"Reset code sent to {request.phone}",
+        "message": msg,
         "user_name": user[1],
         "delivery": {
             "sms_sent": bool(sms_sent),
