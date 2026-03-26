@@ -16,7 +16,17 @@ def get_conn():
 
 def init_nudge_tables(conn) -> None:
     """Create device_tokens and nudge_deliveries if they do not exist."""
+    # Important:
+    # Postgres marks the whole transaction as aborted if any statement fails.
+    # This nudge init runs during mobile app flows, so we must not let a
+    # single DDL failure poison the connection and break later inserts.
+    #
+    # Running DDL in autocommit isolates each statement so one failure
+    # cannot cause "InFailedSqlTransaction" for the next statement.
+    prev_autocommit = getattr(conn, "autocommit", False)
     try:
+        conn.autocommit = True
+
         execute(
             conn,
             """
@@ -30,12 +40,14 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
+
         # Ensure ON CONFLICT(userid, platform) works even if the table was
         # created earlier without the unique constraint (common after partial migrations).
         execute(
             conn,
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_device_tokens_userid_platform ON device_tokens(userid, platform)",
         )
+
         execute(
             conn,
             """
@@ -54,13 +66,13 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
+
         execute(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_sent "
             "ON nudge_deliveries(userid, sent_at)",
         )
-        # Use IF NOT EXISTS so we never abort the transaction on duplicate column (Postgres 11+).
-        # Swallowing ALTER errors with except pass leaves the connection in InFailedSqlTransaction.
+
         execute(
             conn,
             "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ",
@@ -69,21 +81,22 @@ def init_nudge_tables(conn) -> None:
             conn,
             "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS data_json TEXT",
         )
+
         execute(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_unread "
             "ON nudge_deliveries(userid) WHERE read_at IS NULL",
         )
-        # DDL statements are transactional in Postgres; ensure persistence
-        # because our connection context manager closes without auto-commit.
-        try:
-            conn.commit()
-        except Exception:
-            # If the connection/driver is already in autocommit mode, commit is harmless.
-            pass
     except Exception as e:
+        # With autocommit enabled, the exception raised here should be the
+        # real failing statement error (not a follow-on InFailedSqlTransaction).
         logger.exception("Failed to init nudge tables: %s", e)
         raise
+    finally:
+        try:
+            conn.autocommit = prev_autocommit
+        except Exception:
+            pass
 
 
 def get_all_user_ids(conn) -> List[int]:
