@@ -23,6 +23,7 @@ export default function AdminActivity() {
   const [filterUserName, setFilterUserName] = useState('');
   const [filterPhone, setFilterPhone] = useState('');
   const [filterAction, setFilterAction] = useState('');
+  const [filterResourceId, setFilterResourceId] = useState('');
   const [onlyErrors, setOnlyErrors] = useState(false);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -46,6 +47,7 @@ export default function AdminActivity() {
       } else if (filterAction.trim()) {
         params.set('action', filterAction.trim());
       }
+      if (filterResourceId.trim()) params.set('resource_id', filterResourceId.trim());
       const res = await fetch(`/api/admin/activity?${params.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
@@ -61,7 +63,7 @@ export default function AdminActivity() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, filterUserName, filterPhone, filterAction, onlyErrors, sortBy, sortOrder]);
+  }, [dateFrom, dateTo, filterUserName, filterPhone, filterAction, filterResourceId, onlyErrors, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchActivity();
@@ -170,6 +172,15 @@ export default function AdminActivity() {
               value={filterAction}
                 disabled={onlyErrors}
               onChange={(e) => setFilterAction(e.target.value)}
+            />
+          </label>
+          <label>
+            <span>Resource ID</span>
+            <input
+              type="text"
+              placeholder="e.g. GPA.3349-2483-3207-52951"
+              value={filterResourceId}
+              onChange={(e) => setFilterResourceId(e.target.value)}
             />
           </label>
             <label style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 }}>

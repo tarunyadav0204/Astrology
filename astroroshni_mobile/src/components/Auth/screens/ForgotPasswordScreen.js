@@ -25,6 +25,7 @@ export default function ForgotPasswordScreen({
   const [resetToken, setResetToken] = useState('');
   const [localNewPassword, setLocalNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const isUSPhone = (formData.phone || '').trim().startsWith('+1');
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -62,10 +63,18 @@ export default function ForgotPasswordScreen({
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
+    if (isUSPhone && !formData.email) {
+      Alert.alert('Error', 'Please enter email for US numbers');
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await authAPI.sendResetCode({ phone: formData.phone });
+      const payload = { phone: formData.phone };
+      if (isUSPhone && formData.email) {
+        payload.email = formData.email;
+      }
+      const response = await authAPI.sendResetCode(payload);
       Alert.alert('Success', response.data.message);
       setStep(2);
     } catch (error) {
@@ -145,6 +154,23 @@ export default function ForgotPasswordScreen({
                 />
               </View>
             </Animated.View>
+
+            {isUSPhone && (
+              <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email Address"
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    value={formData.email}
+                    onChangeText={(value) => updateFormData('email', value)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </Animated.View>
+            )}
 
             <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
               <TouchableOpacity

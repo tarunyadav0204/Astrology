@@ -88,7 +88,11 @@ export default function OTPScreen({
     
     try {
       const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
-      const response = await authAPI.sendRegistrationOtp({ phone: fullPhone });
+      const payload = { phone: fullPhone };
+      if ((formData.countryCode || '') === '+1' && formData.email) {
+        payload.email = formData.email;
+      }
+      const response = await authAPI.sendRegistrationOtp(payload);
       setResendTimer(30);
       
       // Show dev OTP code if available

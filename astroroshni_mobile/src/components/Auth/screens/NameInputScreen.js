@@ -41,6 +41,10 @@ export default function NameInputScreen({
 
   const handleContinue = () => {
     if (isValid) {
+      if ((formData.countryCode === '+1') && formData.email) {
+        navigateToScreen('password');
+        return;
+      }
       navigateToScreen('email');
     }
   };

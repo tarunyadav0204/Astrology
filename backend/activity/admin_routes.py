@@ -129,6 +129,7 @@ async def get_activity(
     user_name: Optional[str] = Query(None, description="Filter by username (partial match)"),
     user_phone: Optional[str] = Query(None, description="Filter by phone (partial match)"),
     action: Optional[str] = Query(None, description="Filter by action (e.g. api_request, podcast_generated)"),
+    resource_id: Optional[str] = Query(None, description="Filter by resource id (e.g. Google Play order id)"),
     sort_by: Optional[str] = Query("created_at", description="Column to sort by"),
     order: Optional[str] = Query("desc", description="asc or desc"),
     limit: int = Query(500, ge=1, le=2000),
@@ -162,6 +163,8 @@ async def get_activity(
         where_parts.append("COALESCE(user_phone, '') LIKE @user_phone")
     if action and action.strip():
         where_parts.append("COALESCE(action, '') = @action")
+    if resource_id and resource_id.strip():
+        where_parts.append("COALESCE(resource_id, '') LIKE @resource_id")
     where_clause = " AND ".join(where_parts)
 
     query = f"""
@@ -200,6 +203,8 @@ async def get_activity(
             job_params.append(bigquery.ScalarQueryParameter("user_phone", "STRING", f"%{user_phone.strip()}%"))
         if action and action.strip():
             job_params.append(bigquery.ScalarQueryParameter("action", "STRING", action.strip()))
+        if resource_id and resource_id.strip():
+            job_params.append(bigquery.ScalarQueryParameter("resource_id", "STRING", f"%{resource_id.strip()}%"))
 
         job_config = bigquery.QueryJobConfig(query_parameters=job_params)
         rows_iter = client.query(query, job_config=job_config)

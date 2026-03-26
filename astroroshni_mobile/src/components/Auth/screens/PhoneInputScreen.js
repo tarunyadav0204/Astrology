@@ -86,6 +86,10 @@ export default function PhoneInputScreen({
       console.log('  → Navigating to password screen');
       navigateToScreen('password');
     } else {
+      if (selectedCountry.code === '+1') {
+        navigateToScreen('email');
+        return;
+      }
       // Check if phone exists by trying to send registration OTP
       setLoading(true);
       

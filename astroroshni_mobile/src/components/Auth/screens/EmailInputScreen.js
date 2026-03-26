@@ -9,18 +9,23 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
+import { authAPI } from '../../../services/api';
 
 export default function EmailInputScreen({ 
   formData, 
   updateFormData, 
-  navigateToScreen 
+  navigateToScreen,
+  isLogin,
 }) {
+  const [loading, setLoading] = React.useState(false);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const isValid = emailRegex.test(formData.email);
+  const isUsRegistrationPreOtp = !isLogin && formData.countryCode === '+1' && !formData.otpCode;
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -40,9 +45,27 @@ export default function EmailInputScreen({
     ]).start();
   }, []);
 
-  const handleContinue = () => {
-    if (isValid) {
+  const handleContinue = async () => {
+    if (!isValid) return;
+
+    if (!isUsRegistrationPreOtp) {
       navigateToScreen('password');
+      return;
+    }
+
+    const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
+    setLoading(true);
+    try {
+      const response = await authAPI.sendRegistrationOtp({ phone: fullPhone, email: formData.email });
+      if (response?.data?.dev_code) {
+        updateFormData('devOtpCode', response.data.dev_code);
+      }
+      navigateToScreen('otp');
+    } catch (error) {
+      const message = error?.response?.data?.detail || 'Unable to send OTP. Please try again.';
+      Alert.alert('Error', message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,7 +81,7 @@ export default function EmailInputScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen('name', 'back')}
+          onPress={() => navigateToScreen(isUsRegistrationPreOtp ? 'phone' : 'name', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -117,13 +140,13 @@ export default function EmailInputScreen({
           <TouchableOpacity
             style={[styles.continueButton, !isValid && styles.buttonDisabled]}
             onPress={handleContinue}
-            disabled={!isValid}
+            disabled={!isValid || loading}
           >
             <LinearGradient
               colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
               style={styles.buttonGradient}
             >
-              <Text style={styles.buttonText}>Continue</Text>
+              <Text style={styles.buttonText}>{loading ? 'Sending OTP...' : 'Continue'}</Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
             </LinearGradient>
           </TouchableOpacity>

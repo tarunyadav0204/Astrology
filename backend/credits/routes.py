@@ -521,7 +521,11 @@ async def verify_google_play_purchase(
         user_name=current_user.name,
         resource_type="order",
         resource_id=order_id,
-        metadata={"credits_added": amount, "product_id": product_id},
+        metadata={
+            "credits_added": amount,
+            "product_id": product_id,
+            "order_id": order_id,
+        },
     )
     return {"success": True, "message": "Credits added", "credits_added": amount}
 

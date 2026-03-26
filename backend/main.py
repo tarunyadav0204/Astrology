@@ -131,6 +131,52 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def _is_us_number(phone: str) -> bool:
+    normalized = (phone or "").strip()
+    return normalized.startswith("+1")
+
+
+def _send_otp_email(to_email: str, code: str) -> bool:
+    if not to_email:
+        return False
+
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    from_email = os.getenv("SMTP_FROM_EMAIL") or smtp_user
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes")
+
+    if not smtp_host or not from_email:
+        logger.warning("OTP email not sent: SMTP env not configured")
+        return False
+
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+
+        message = MIMEText(
+            f"Your AstroRoshni verification code is: {code}\n\n"
+            "This code expires in 10 minutes.",
+            "plain",
+            "utf-8",
+        )
+        message["Subject"] = "Your AstroRoshni OTP Code"
+        message["From"] = from_email
+        message["To"] = to_email
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            if use_tls:
+                server.starttls()
+            if smtp_user and smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.sendmail(from_email, [to_email], message.as_string())
+        return True
+    except Exception:
+        logger.exception("Failed sending OTP email to %s", to_email)
+        return False
+
 def log_shutdown(reason):
     logger.critical(f"SERVER SHUTDOWN: {reason}")
     try:
@@ -623,6 +669,7 @@ class ResetPassword(BaseModel):
 
 class SendResetCode(BaseModel):
     phone: str
+    email: Optional[str] = None
 
 class VerifyResetCode(BaseModel):
     phone: str
@@ -1549,6 +1596,8 @@ async def send_registration_otp(request: SendResetCode):
 
         if existing_user:
             raise HTTPException(status_code=409, detail="Phone number already registered")
+        if _is_us_number(request.phone) and not request.email:
+            raise HTTPException(status_code=400, detail="Email is required for US numbers")
 
         # Generate 6-digit code and secure token
         code = str(random.randint(100000, 999999))
@@ -1567,9 +1616,16 @@ async def send_registration_otp(request: SendResetCode):
     from sms_service import sms_service
     sms_sent = sms_service.send_reset_code(request.phone, code)
     
+    email_sent = _send_otp_email(request.email, code) if request.email else False
     response = {
-        "message": f"Registration OTP sent to {request.phone}"
+        "message": f"Registration OTP sent to {request.phone}",
+        "delivery": {
+            "sms_sent": bool(sms_sent),
+            "email_sent": bool(email_sent),
+        },
     }
+    if _is_us_number(request.phone) and not sms_sent and not email_sent:
+        raise HTTPException(status_code=503, detail="Failed to deliver OTP to SMS and email")
     
     # Development mode: show code if SMS failed and not in production
     is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
@@ -1588,13 +1644,21 @@ async def send_reset_code(request: SendResetCode):
     with get_conn() as conn:
         cur = execute(
             conn,
-            "SELECT userid, name FROM users WHERE phone = %s",
+            "SELECT userid, name, email FROM users WHERE phone = %s",
             (request.phone,),
         )
         user = cur.fetchone()
 
         if not user:
             raise HTTPException(status_code=404, detail="Phone number not found")
+
+        requested_email = (request.email or "").strip().lower()
+        user_email = (user[2] or "").strip().lower() if user[2] else ""
+        target_email = user_email or requested_email
+        if _is_us_number(request.phone) and not target_email:
+            raise HTTPException(status_code=400, detail="Email is required for US numbers")
+        if requested_email and user_email and requested_email != user_email:
+            raise HTTPException(status_code=400, detail="Provided email does not match account email")
 
         # Generate 6-digit code and secure token
         code = str(random.randint(100000, 999999))
@@ -1617,11 +1681,18 @@ async def send_reset_code(request: SendResetCode):
     # Send SMS with code
     from sms_service import sms_service
     sms_sent = sms_service.send_reset_code(request.phone, code)
+    email_sent = _send_otp_email(target_email, code) if target_email else False
     
     response = {
         "message": f"Reset code sent to {request.phone}",
-        "user_name": user[1]
+        "user_name": user[1],
+        "delivery": {
+            "sms_sent": bool(sms_sent),
+            "email_sent": bool(email_sent),
+        },
     }
+    if _is_us_number(request.phone) and not sms_sent and not email_sent:
+        raise HTTPException(status_code=503, detail="Failed to deliver reset code to SMS and email")
     
     # Development mode: show code if SMS failed and not in production
     is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
