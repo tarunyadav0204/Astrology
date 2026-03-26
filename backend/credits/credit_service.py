@@ -23,31 +23,74 @@ class CreditService:
         """
         from db import execute
 
-        if free_used is None:
-            execute(
-                conn,
-                """
-                INSERT INTO user_credits (userid, credits, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT (userid) DO UPDATE
-                  SET credits = EXCLUDED.credits,
-                      updated_at = CURRENT_TIMESTAMP
-                """,
-                (userid, credits),
-            )
-        else:
-            execute(
-                conn,
-                """
-                INSERT INTO user_credits (userid, credits, free_chat_question_used, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT (userid) DO UPDATE
-                  SET credits = EXCLUDED.credits,
-                      free_chat_question_used = GREATEST(user_credits.free_chat_question_used, EXCLUDED.free_chat_question_used),
-                      updated_at = CURRENT_TIMESTAMP
-                """,
-                (userid, credits, int(free_used)),
-            )
+        try:
+            if free_used is None:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO user_credits (userid, credits, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (userid) DO UPDATE
+                      SET credits = EXCLUDED.credits,
+                          updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (userid, credits),
+                )
+            else:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO user_credits (userid, credits, free_chat_question_used, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (userid) DO UPDATE
+                      SET credits = EXCLUDED.credits,
+                          free_chat_question_used = GREATEST(user_credits.free_chat_question_used, EXCLUDED.free_chat_question_used),
+                          updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (userid, credits, int(free_used)),
+                )
+        except Exception as e:
+            # Postgres requires a UNIQUE/exclusion constraint for ON CONFLICT (userid).
+            # If user_credits.userid is missing that constraint (partial migration),
+            # we must not crash the whole purchase; fall back to manual UPDATE-then-INSERT.
+            msg = str(e)
+            if "ON CONFLICT" not in msg or "specification" not in msg:
+                raise
+
+            if free_used is None:
+                cur = execute(
+                    conn,
+                    "UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
+                    (credits, userid),
+                )
+                if getattr(cur, "rowcount", 0) == 0:
+                    execute(
+                        conn,
+                        "INSERT INTO user_credits (userid, credits, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                        (userid, credits),
+                    )
+            else:
+                free_int = int(free_used)
+                cur = execute(
+                    conn,
+                    """
+                    UPDATE user_credits
+                    SET credits = ?,
+                        free_chat_question_used = GREATEST(free_chat_question_used, ?),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE userid = ?
+                    """,
+                    (credits, free_int, userid),
+                )
+                if getattr(cur, "rowcount", 0) == 0:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO user_credits (userid, credits, free_chat_question_used, updated_at)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (userid, credits, free_int),
+                    )
     
     def init_tables(self):
         """Initialize credit-related tables"""
@@ -67,6 +110,19 @@ class CreditService:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+
+            # Best-effort: ensure ON CONFLICT (userid) can work in partially-migrated DBs.
+            # If schema exists without the UNIQUE constraint on userid, this creates it.
+            # If duplicates already exist, the CREATE UNIQUE INDEX will fail; manual upsert fallback
+            # in _upsert_user_credits will still keep the app functional.
+            try:
+                execute(
+                    conn,
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_credits_userid_unique ON user_credits(userid)",
+                )
+                conn.commit()
+            except Exception:
+                pass
         
         # Credit transactions table
             execute(conn, '''
