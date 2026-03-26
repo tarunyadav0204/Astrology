@@ -418,20 +418,31 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       });
     }
 
+    if (payloads.length === 0) {
+      alert('Enter at least one minimum version (Android versionCode or iOS build number).');
+      return;
+    }
     try {
-      await Promise.all(
+      const responses = await Promise.all(
         payloads.map((p) =>
-          fetch(`/api/admin/settings/${p.key}`, {
+          fetch(`/api/admin/settings/${encodeURIComponent(p.key)}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               ...getAdminAuthHeaders(),
             },
-            body: JSON.stringify(p),
+            body: JSON.stringify({ ...p, key: p.key }),
           })
         )
       );
+      const failed = responses.find((r) => !r.ok);
+      if (failed) {
+        const err = await failed.json().catch(() => ({}));
+        alert('Failed to save: ' + (err.detail || failed.statusText || 'unknown error'));
+        return;
+      }
       alert('App version config saved. Users below these versions will be forced to update.');
+      fetchAdminSettings();
     } catch (error) {
       console.error('Error saving app version config:', error);
       alert('Failed to save app version config.');

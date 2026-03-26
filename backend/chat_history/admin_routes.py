@@ -489,6 +489,7 @@ async def update_glossary_term(
             )
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Term not found")
+            conn.commit()
         return {"message": "Term updated", "term_id": term_id}
     except HTTPException:
         raise
@@ -505,6 +506,7 @@ async def delete_glossary_term(
         with get_conn() as conn:
             cur = execute(conn, "DELETE FROM glossary_terms WHERE term_id = %s", (term_id,))
             deleted = cur.rowcount
+            conn.commit()
         if deleted == 0:
             raise HTTPException(status_code=404, detail="Term not found")
         return {"message": "Term deleted", "term_id": term_id}
@@ -532,6 +534,7 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
                 """,
                 (key, setting.value, setting.description),
             )
+            conn.commit()
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")
