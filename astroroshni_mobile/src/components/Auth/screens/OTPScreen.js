@@ -142,7 +142,9 @@ export default function OTPScreen({
           <Text style={styles.title}>Enter OTP</Text>
           <Text style={styles.subtitle}>
             We've sent a 6-digit code to{"\n"}
-            {formData.countryCode} {formData.phone}
+            {(formData.countryCode || '') === '+1' && formData.email
+              ? formData.email
+              : `${formData.countryCode} ${formData.phone}`}
           </Text>
           {devOtpCode && (
             <View style={styles.devCodeContainer}>
