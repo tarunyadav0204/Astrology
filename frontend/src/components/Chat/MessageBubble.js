@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
 import ResponseRenderer from '../TermTooltip/ResponseRenderer';
+import NorthIndianChart from '../Charts/NorthIndianChart';
 
 const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -14,6 +15,22 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
     const [showActions, setShowActions] = useState(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
+
+    const insightsKey = message?.processingClientId ?? message?.messageId ?? null;
+    const chartInsights = Array.isArray(message?.chartInsights) ? message.chartInsights : [];
+    const [insightIndex, setInsightIndex] = useState(0);
+
+    useEffect(() => {
+        if (!insightsKey) return;
+        if (!chartInsights.length) return;
+
+        setInsightIndex(0);
+        const interval = setInterval(() => {
+            setInsightIndex((prev) => (prev + 1) % chartInsights.length);
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, [insightsKey, chartInsights.length]);
     
     React.useEffect(() => {
         const loadVoices = () => {
@@ -242,39 +259,26 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             console.log('🔍 Terms replaced:', termCount);
         }
         
-        // 8. Convert headers to section cards (### only, not ####)
-        // First, protect #### subsections from being converted
+        // 8. Headings (lighter, non-overwhelming)
         formatted = formatted.replace(/#### (.*?)\n/g, (match, header) => {
-            return `<h4 class="subsection-header">${header.trim()}</h4>\n`;
+            return `<h4 class="chat-subheader">${header.trim()}</h4>\n`;
         });
-        
-        // Then convert ### main sections to cards
         formatted = formatted.replace(/### (.*?)\n/g, (match, header) => {
-            return `</div></div><div class="section-card"><div class="section-header">${header.trim()}</div><div class="section-content">`;
+            return `<h3 class="chat-section-title">${header.trim()}</h3>\n`;
         });
-        
-        // 9. Process paragraphs and lists
-        const sections = formatted.split('</div></div>');
-        formatted = sections.map(section => {
-            if (!section.includes('<div class="section-content">')) return section;
-            
-            const parts = section.split('<div class="section-content">');
-            if (parts.length < 2) return section;
-            
-            let content = parts[1];
-            // Process numbered lists (1. 2. 3.) with line breaks
-            content = content.replace(/(\d+\.\s+[^\n]+)/g, '<p class="numbered-item">$1</p>');
-            // Process bullet lists
-            content = content.replace(/\n\*\s+(.+)/g, '<li class="chat-bullet">• $1</li>');
-            content = content.replace(/(<li class="chat-bullet">.*?<\/li>)/gs, '<ul class="chat-list">$1</ul>');
-            
-            return parts[0] + '<div class="section-content">' + content;
-        }).join('</div></div>');
-        
-        // 10. Close divs and remove leading closures
-        formatted = formatted.trim() + '</div></div>';
-        formatted = formatted.replace(/^<\/div><\/div>/, '');
-        
+
+        // 9. Lists (keep them readable without heavy card chrome)
+        // Some responses return dash bullets inline on one line:
+        // "... sentence. - Bullet one - Bullet two"
+        // Normalize those into line-start bullets before list conversion.
+        formatted = formatted.replace(/([.:!?])\s-\s(?=(?:\*\*)?[A-Z0-9])/g, '$1\n- ');
+        formatted = formatted.replace(/(\d+\.\s+[^\n]+)/g, '<p class="numbered-item">$1</p>');
+        formatted = formatted.replace(/(^|\n)-\s+(.+)/g, '$1<li class="chat-bullet">• $2</li>');
+        formatted = formatted.replace(/\n\*\s+(.+)/g, '<li class="chat-bullet">• $1</li>');
+        formatted = formatted.replace(/(<li class="chat-bullet">.*?<\/li>)/gs, '<ul class="chat-list">$1</ul>');
+
+        // 10. Wrap into a single response container to avoid many "cards"
+        formatted = `<div class="chat-response">${formatted.trim()}</div>`;
         return formatted;
     };
 
@@ -392,7 +396,7 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"/>
                         </svg>
                     </button>
-                    {message.messageId && message.isFromDatabase && (
+                    {message.messageId && (
                         <button 
                             className="action-btn delete-btn"
                             onClick={handleDeleteMessage}
@@ -484,16 +488,141 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                         console.log('No tooltip found');
                     }}
                 >
-                    {/* Always use ResponseRenderer for assistant messages */}
-                    {message.role === 'assistant' ? (
-                        <div dangerouslySetInnerHTML={{ __html: formatContent(message.content, message) }} />
+                    {(message.isTyping || message.isProcessing) ? (
+                        <>
+                            <div className="processing-chart-skeleton">
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Chart in progress...</div>
+                                {chartInsights.length > 0 && message.chartData ? (
+                                    (() => {
+                                        const currentInsight = chartInsights[insightIndex] || chartInsights[0];
+                                        const houseNumberRaw = currentInsight?.house_number ?? currentInsight?.house ?? currentInsight?.houseNumber;
+                                        const houseNumber = parseInt(houseNumberRaw, 10);
+                                        return (
+                                            <>
+                                                <div style={{
+                                                    width: '100%',
+                                                    maxWidth: 420,
+                                                    margin: '0 auto 10px auto',
+                                                    borderRadius: 14,
+                                                    border: '1px solid rgba(255,107,53,0.25)',
+                                                    background: 'rgba(255,107,53,0.05)',
+                                                    padding: 10,
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <NorthIndianChart
+                                                        chartData={message.chartData}
+                                                        showDegreeNakshatra={false}
+                                                        chartRefHighlight={
+                                                            Number.isFinite(houseNumber)
+                                                                ? { type: 'house', value: houseNumber }
+                                                                : null
+                                                        }
+                                                    />
+                                                </div>
+                                                <div style={{ color: '#7c2d12', opacity: 0.95, lineHeight: 1.35, whiteSpace: 'pre-wrap', fontSize: 14 }}>
+                                                    {currentInsight?.message || message.loadingMessage || message.content}
+                                                </div>
+                                            </>
+                                        );
+                                    })()
+                                ) : (
+                                    <>
+                                        {message.summary_image && (
+                                            <div
+                                                style={{
+                                                    margin: '0 auto 12px auto',
+                                                    borderRadius: 12,
+                                                    overflow: 'hidden',
+                                                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                                                    background: 'linear-gradient(135deg, rgba(255,107,53,0.1), rgba(138,43,226,0.1))',
+                                                    border: '2px solid rgba(255,107,53,0.3)',
+                                                    maxWidth: 500
+                                                }}
+                                            >
+                                                <img
+                                                    src={
+                                                        message.summary_image.startsWith('data:')
+                                                            ? message.summary_image
+                                                            : `data:image/png;base64,${message.summary_image}`
+                                                    }
+                                                    alt="Analysis Summary"
+                                                    style={{ width: '100%', height: 'auto', display: 'block' }}
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = 'none';
+                                                        if (e.currentTarget?.parentElement) e.currentTarget.parentElement.style.display = 'none';
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                        {message.chartData && (
+                                            <div style={{
+                                                width: '100%',
+                                                margin: '0 auto 12px auto',
+                                                padding: '10px 12px',
+                                                borderRadius: 12,
+                                                border: '1px solid rgba(255,107,53,0.25)',
+                                                background: 'rgba(255,107,53,0.06)'
+                                            }}>
+                                                <div style={{ fontWeight: 800, marginBottom: 6, color: '#7c2d12' }}>
+                                                    Chart essence
+                                                </div>
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '1fr 1fr 1fr',
+                                                    gap: 8,
+                                                    alignItems: 'start'
+                                                }}>
+                                                    <div>
+                                                        <div style={{ fontSize: 11, color: '#7c2d12', opacity: 0.8 }}>☀️ Sun</div>
+                                                        <div style={{ fontSize: 12, fontWeight: 700 }}>
+                                                            {message.chartData?.planets?.Sun?.sign_name || '...'}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontSize: 11, color: '#7c2d12', opacity: 0.8 }}>🌙 Moon</div>
+                                                        <div style={{ fontSize: 12, fontWeight: 700 }}>
+                                                            {message.chartData?.planets?.Moon?.sign_name || '...'}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontSize: 11, color: '#7c2d12', opacity: 0.8 }}>⬆️ Asc</div>
+                                                        <div style={{ fontSize: 12, fontWeight: 700 }}>
+                                                            {message.chartData?.houses?.[0]?.sign_name || '...'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ marginTop: 10, fontSize: 11, color: '#7c2d12', opacity: 0.9 }}>
+                                                    Graha Drishti facets: {
+                                                        (message.chartData?.houses || []).reduce((acc, h) => acc + (h?.graha_drishti?.length || 0), 0)
+                                                    }
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div style={{ color: '#7c2d12', opacity: 0.9, lineHeight: 1.35, whiteSpace: 'pre-wrap' }}>
+                                            {message.loadingMessage || message.content}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </>
                     ) : (
-                        <div dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
+                        <>
+                            {/* Always use ResponseRenderer for assistant messages */}
+                            {message.role === 'assistant' ? (
+                                <div dangerouslySetInnerHTML={{ __html: formatContent(message.content, message) }} />
+                            ) : (
+                                <div dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
+                            )}
+                        </>
                     )}
                 </div>
                 
                 {/* Action buttons positioned like mobile */}
-                {!message.isTyping && !message.isProcessing && message.messageId && message.isFromDatabase && (
+                {!message.isTyping &&
+                    !message.isProcessing &&
+                    message.messageId &&
+                    message.content &&
+                    message.content.trim().length > 0 && (
                     <div className="message-action-buttons">
                         <button 
                             className="action-btn copy-btn"
@@ -519,6 +648,24 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                            </svg>
+                        </button>
+                        <button
+                            className="action-btn whatsapp-btn"
+                            style={{
+                                width: '20px',
+                                height: '20px',
+                                minWidth: '20px',
+                                padding: '0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                            onClick={handleWhatsAppShare}
+                            title="Share on WhatsApp"
+                        >
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"/>
                             </svg>
                         </button>
                         <button 

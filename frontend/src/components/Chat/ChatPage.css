@@ -2,15 +2,17 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+    background: #ffffff;
+    padding-top: 72px;
+    box-sizing: border-box;
 }
 
 .chat-header {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(10px);
     padding: 20px;
-    text-align: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .chat-header > div:first-child {
@@ -38,13 +40,13 @@
 }
 
 .chat-header h1 {
-    color: white;
+    color: #111827;
     margin: 0 0 10px 0;
     font-size: 28px;
 }
 
 .chat-header p {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(17, 24, 39, 0.7);
     margin: 0;
     font-size: 16px;
 }
@@ -87,16 +89,33 @@
 }
 
 .message-bubble.user .message-content {
-    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-    color: white;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.10) 0%, rgba(247, 147, 30, 0.10) 100%);
+    color: #7c2d12;
     border-bottom-right-radius: 5px;
+    border: 1px solid rgba(255, 107, 53, 0.20);
 }
 
 .message-bubble.assistant .message-content {
-    background: rgba(255, 255, 255, 0.95);
+    background: #ffffff;
     color: #333;
     border-bottom-left-radius: 5px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Make loading/processing bubble prominent on white background (mobile-like). */
+.message-bubble.processing .message-content,
+.message-bubble.typing .message-content {
+    background: rgba(255, 107, 53, 0.06);
+    border: 1px solid rgba(255, 107, 53, 0.22);
+    border-left: 6px solid rgba(255, 107, 53, 0.95);
+    box-shadow: 0 2px 10px rgba(255, 107, 53, 0.08);
+}
+
+.message-bubble.processing .message-text,
+.message-bubble.typing .message-text {
+    color: #7c2d12 !important;
+    font-weight: 800;
 }
 
 /* Clarification message styling */
@@ -216,11 +235,53 @@
     color: #2c3e50 !important;
 }
 
+.enhanced-formatting .chat-response{
+    background: rgba(17, 24, 39, 0.02);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 14px 14px;
+}
+
+.enhanced-formatting .chat-section-title{
+    margin: 14px 0 8px 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: #111827;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.enhanced-formatting .chat-subheader{
+    margin: 12px 0 6px 0;
+    font-size: 14px;
+    font-weight: 750;
+    color: rgba(17,24,39,0.85);
+}
+
+/* Old "card-per-section" UI made the thread feel heavy; keep styles minimal if still present */
+.enhanced-formatting .section-card,
+.enhanced-formatting .section-header,
+.enhanced-formatting .section-content{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
     .enhanced-formatting .chat-header {
         font-size: 14px;
         padding: 6px 10px;
+    }
+
+    .enhanced-formatting .chat-section-title{
+        font-size: 15px;
+    }
+
+    .enhanced-formatting .chat-subheader{
+        font-size: 13px;
     }
     
     .enhanced-formatting .chat-summary,
@@ -247,10 +308,204 @@
 }
 
 .chat-input-container {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 107, 53, 0.04);
     backdrop-filter: blur(10px);
     padding: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Guided wizard (embedded setup inside ChatPage) */
+.wizard-mode-grid{
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 14px;
+}
+.wizard-mode-card{
+    flex: 1 1 220px;
+    max-width: 320px;
+    background: rgba(255,107,53,0.05);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 14px;
+    padding: 16px;
+    cursor: pointer;
+    color: #111827;
+    text-align: left;
+    transition: transform .08s ease, border-color .15s ease, background .15s ease;
+}
+.wizard-mode-card:hover{
+    transform: translateY(-1px);
+    background: rgba(255,107,53,0.08);
+}
+.wizard-mode-card.active{
+    border-color: rgba(255,107,53,0.9);
+    box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
+}
+.wizard-mode-title{
+    font-weight: 800;
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+.wizard-mode-subtitle{
+    font-size: 13px;
+    color: rgba(17,24,39,0.72);
+    line-height: 1.4;
+}
+.wizard-step{
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.wizard-step-title{
+    font-weight: 800;
+    color: #111827;
+}
+.wizard-inline-card{
+    background: rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: 14px;
+    border: 1px solid rgba(0,0,0,0.06);
+}
+.wizard-primary-btn{
+    background: linear-gradient(45deg, #ff6b35, #f7931e);
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.wizard-secondary-btn{
+    background: rgba(255,107,53,0.12);
+    color: #c2410c;
+    border: 1px solid rgba(255,107,53,0.35);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.wizard-secondary-btn.active{
+    background: rgba(255,107,53,0.18);
+    border-color: rgba(255,107,53,0.65);
+}
+.wizard-link-btn{
+    background: transparent;
+    border: none;
+    color: #c2410c;
+    cursor: pointer;
+    font-weight: 800;
+    text-decoration: underline;
+    padding: 0;
+}
+.wizard-field{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+.wizard-field label{
+    font-size: 12px;
+    font-weight: 800;
+    color: #333;
+}
+.wizard-input{
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.12);
+    outline: none;
+    background: white;
+    font-size: 13px;
+}
+.wizard-suggestions{
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.wizard-suggestion-btn{
+    text-align: left;
+    background: rgba(255,107,53,0.08);
+    border: 1px solid rgba(255,107,53,0.25);
+    color: #7c2d12;
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+}
+.wizard-placeholder{
+    height: 10px;
+}
+
+/* Message action buttons (copy/share/delete) */
+.message-action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+    opacity: 0.9;
+    transition: opacity 0.2s ease;
+}
+
+.message-action-buttons:hover {
+    opacity: 1;
+}
+
+/* Typing / processing indicator (mobile-like dots) */
+.message-bubble.typing,
+.message-bubble.processing {
+    opacity: 0.95;
+}
+
+.typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 10px;
+}
+
+.typing-indicator span {
+    height: 8px;
+    width: 8px;
+    background: #ff6b35;
+    border-radius: 50%;
+    display: inline-block;
+    margin: 0 2px;
+    animation: typing 1.4s infinite ease-in-out;
+}
+
+.message-bubble.processing .typing-indicator span {
+    background: #ff6b35;
+}
+
+.typing-indicator span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typing {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.processing-chart-skeleton{
+    width: 100%;
+    background: rgba(255, 107, 53, 0.05);
+    border: 1px dashed rgba(255, 107, 53, 0.35);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
 }
 
 .suggestions {
@@ -262,9 +517,9 @@
 }
 
 .suggestion-button {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    background: rgba(255, 107, 53, 0.08);
+    border: 1px solid rgba(255, 107, 53, 0.25);
+    color: #7c2d12;
     padding: 8px 15px;
     border-radius: 20px;
     cursor: pointer;
@@ -272,8 +527,54 @@
     transition: all 0.3s ease;
 }
 
+/* Horizontal scroller for suggestion chips (saves vertical space). */
+.suggestions-scroll-wrapper{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.suggestions-arrow-btn{
+    flex: 0 0 auto;
+    background: rgba(255, 107, 53, 0.10);
+    border: 1px solid rgba(255, 107, 53, 0.28);
+    color: #c2410c;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.suggestions-arrow-btn:hover{
+    background: rgba(255, 107, 53, 0.16);
+}
+
+.suggestions-scroll-row{
+    flex: 1 1 auto;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 6px 0;
+    scroll-behavior: smooth;
+}
+
+.suggestions-scroll-row::-webkit-scrollbar{
+    height: 0;
+}
+
+.suggestion-button.suggestion-chip{
+    flex: 0 0 auto;
+    max-width: 280px;
+    white-space: normal;
+    font-size: 13px;
+    padding: 8px 12px;
+}
+
 .suggestion-button:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 107, 53, 0.12);
     transform: translateY(-2px);
 }
 
@@ -287,11 +588,12 @@
 .chat-input {
     flex: 1;
     padding: 15px 20px;
-    border: none;
+    border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 25px;
-    background: rgba(255, 255, 255, 0.9);
+    background: #ffffff;
     font-size: 16px;
     outline: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .chat-input:disabled {
@@ -408,9 +710,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(255, 0, 0, 0.1);
-    border: 1px solid rgba(255, 0, 0, 0.3);
-    color: white;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #7f1d1d;
     padding: 10px 15px;
     border-radius: 10px;
     margin-bottom: 10px;
@@ -430,7 +732,7 @@
 
 .credit-info {
     text-align: center;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(17, 24, 39, 0.72);
     font-size: 12px;
     margin-top: 10px;
 }

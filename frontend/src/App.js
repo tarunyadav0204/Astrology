@@ -47,7 +47,6 @@ import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
 import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
-import ChatModal from './components/Chat/ChatModal';
 import BlogList from './components/Blog/BlogList';
 import BlogPost from './components/Blog/BlogPost';
 import BlogDashboard from './components/Blog/BlogDashboard';
@@ -64,7 +63,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
-  const [showChatModal, setShowChatModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -814,8 +812,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
-              <FloatingChatButton onOpenChat={() => setShowChatModal(true)} />
-              <ChatModal isOpen={showChatModal} onClose={() => setShowChatModal(false)} />
+              <FloatingChatButton onOpenChat={() => { window.location.href = '/chat'; }} />
             </CreditProvider>
           </AstrologyProvider>
         </Router>
@@ -1000,8 +997,7 @@ function App() {
             </div>
           } />
             </Routes>
-            {currentView !== 'dashboard' && <FloatingChatButton onOpenChat={() => setShowChatModal(true)} />}
-            <ChatModal isOpen={showChatModal} onClose={() => setShowChatModal(false)} />
+            {currentView !== 'dashboard' && <FloatingChatButton onOpenChat={() => { window.location.href = '/chat'; }} />}
           </CreditProvider>
         </AstrologyProvider>
       </Router>

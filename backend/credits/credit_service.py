@@ -373,6 +373,9 @@ class CreditService:
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:
         """Add credits to user account. metadata: optional JSON (e.g. Google Play purchase_token, purchase_time for support)."""
         from db import get_conn, execute
+        import logging
+
+        log = logging.getLogger(__name__)
         try:
             with get_conn() as conn:
                 current_balance = self.get_user_credits(userid)
@@ -390,6 +393,13 @@ class CreditService:
                 conn.commit()
             return True
         except Exception:
+            log.exception(
+                "add_credits failed userid=%s amount=%s source=%s reference_id=%s",
+                userid,
+                amount,
+                source,
+                reference_id,
+            )
             return False
     
     def spend_credits(self, userid: int, amount: int, feature: str, description: str = None) -> bool:

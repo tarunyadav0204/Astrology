@@ -59,14 +59,16 @@ def init_nudge_tables(conn) -> None:
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_sent "
             "ON nudge_deliveries(userid, sent_at)",
         )
-        for alter in (
-            "ALTER TABLE nudge_deliveries ADD COLUMN read_at TIMESTAMPTZ",
-            "ALTER TABLE nudge_deliveries ADD COLUMN data_json TEXT",
-        ):
-            try:
-                execute(conn, alter)
-            except Exception:
-                pass
+        # Use IF NOT EXISTS so we never abort the transaction on duplicate column (Postgres 11+).
+        # Swallowing ALTER errors with except pass leaves the connection in InFailedSqlTransaction.
+        execute(
+            conn,
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ",
+        )
+        execute(
+            conn,
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS data_json TEXT",
+        )
         execute(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_unread "

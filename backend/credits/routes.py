@@ -494,7 +494,7 @@ async def verify_google_play_purchase(
         "order_id": order_id,
     })
 
-    credit_service.add_credits(
+    ok = credit_service.add_credits(
         current_user.userid,
         amount,
         GOOGLE_PLAY_SOURCE,
@@ -502,6 +502,18 @@ async def verify_google_play_purchase(
         description=f"Google Play: {product_id}",
         metadata=purchase_metadata,
     )
+    if not ok:
+        logger.error(
+            "Google Play: verify OK with Play but add_credits failed user=%s order_id=%s product=%s amount=%s",
+            current_user.userid,
+            order_id,
+            product_id,
+            amount,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Purchase verified with Google Play but credits could not be saved. Please contact support with your order id.",
+        )
     publish_activity(
         "credits_purchased",
         user_id=current_user.userid,
