@@ -1692,13 +1692,17 @@ async def send_reset_code(request: SendResetCode):
     from sms_service import sms_service
     sms_sent = sms_service.send_reset_code(request.phone, code)
     email_sent = _send_otp_email(target_email, code) if target_email else False
-    
-    if _is_us_number(request.phone):
-        msg = f"Reset code sent to {target_email}"
-        if sms_sent:
-            msg += f" and to {request.phone}"
-    else:
-        msg = f"Reset code sent to {request.phone}"
+
+    delivered_to = []
+    if email_sent and target_email:
+        delivered_to.append(target_email)
+    if sms_sent:
+        delivered_to.append(request.phone)
+
+    if not delivered_to:
+        raise HTTPException(status_code=503, detail="Failed to deliver reset code to SMS and email")
+
+    msg = "Reset code sent to " + " and ".join(delivered_to)
 
     response = {
         "message": msg,
@@ -1708,9 +1712,6 @@ async def send_reset_code(request: SendResetCode):
             "email_sent": bool(email_sent),
         },
     }
-    if _is_us_number(request.phone) and not sms_sent and not email_sent:
-        raise HTTPException(status_code=503, detail="Failed to deliver reset code to SMS and email")
-    
     # Development mode: show code if SMS failed and not in production
     is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
     if not sms_sent and is_development:

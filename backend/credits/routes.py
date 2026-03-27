@@ -427,6 +427,9 @@ class GooglePlayVerifyRequest(BaseModel):
     purchase_token: str
     product_id: str
     order_id: str
+    price_amount_micros: Optional[int] = None
+    price_currency: Optional[str] = None
+    localized_price: Optional[str] = None
 
 
 class GooglePlaySubscriptionVerifyRequest(BaseModel):
@@ -492,6 +495,9 @@ async def verify_google_play_purchase(
         "purchase_time_millis": purchase.get("purchaseTimeMillis"),
         "product_id": product_id,
         "order_id": order_id,
+        "price_amount_micros": request.price_amount_micros,
+        "price_currency": request.price_currency,
+        "localized_price": request.localized_price,
     })
 
     ok = credit_service.add_credits(
@@ -1480,6 +1486,7 @@ async def get_google_play_transactions(
     to_date: Optional[str] = None,
     query: Optional[str] = None,
     order_id: Optional[str] = None,
+    currency: Optional[str] = None,
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -1519,7 +1526,11 @@ async def get_google_play_transactions(
         fd = default_start
         td = today
     transactions = credit_service.get_google_play_transactions(
-        fd.isoformat(), td.isoformat(), query=query, order_id_filter=order_id
+        fd.isoformat(),
+        td.isoformat(),
+        query=query,
+        order_id_filter=order_id,
+        currency_filter=currency,
     )
     return {
         "from_date": fd.isoformat(),

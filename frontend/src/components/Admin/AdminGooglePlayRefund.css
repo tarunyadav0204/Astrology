@@ -187,7 +187,17 @@
   min-width: 120px;
 }
 
-.play-refund-search input:focus {
+.play-refund-search select {
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 120px;
+  background: #fff;
+}
+
+.play-refund-search input:focus,
+.play-refund-search select:focus {
   outline: none;
   border-color: #f97316;
 }

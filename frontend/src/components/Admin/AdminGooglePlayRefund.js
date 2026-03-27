@@ -9,13 +9,14 @@ const AdminGooglePlayRefund = () => {
   const [searchTo, setSearchTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOrderId, setSearchOrderId] = useState('');
+  const [searchCurrency, setSearchCurrency] = useState('');
 
   const [refundModal, setRefundModal] = useState({ open: false, tx: null, amount: '', reason: '' });
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundError, setRefundError] = useState(null);
   const [refundResult, setRefundResult] = useState(null);
 
-  const loadTransactions = async (fromDate = '', toDate = '', query = '', orderIdFilter = '') => {
+  const loadTransactions = async (fromDate = '', toDate = '', query = '', orderIdFilter = '', currencyFilter = '') => {
     setListLoading(true);
     try {
       const params = new URLSearchParams();
@@ -23,6 +24,7 @@ const AdminGooglePlayRefund = () => {
       if (toDate) params.append('to_date', toDate);
       if (query.trim()) params.append('query', query.trim());
       if (orderIdFilter.trim()) params.append('order_id', orderIdFilter.trim());
+      if (currencyFilter.trim()) params.append('currency', currencyFilter.trim().toUpperCase());
       const response = await fetch(`/api/credits/admin/google-play-transactions?${params.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
@@ -42,7 +44,7 @@ const AdminGooglePlayRefund = () => {
   }, []);
 
   const handleSearch = () => {
-    loadTransactions(searchFrom, searchTo, searchQuery, searchOrderId);
+    loadTransactions(searchFrom, searchTo, searchQuery, searchOrderId, searchCurrency);
   };
 
   const formatDate = (dateStr) => {
@@ -60,6 +62,21 @@ const AdminGooglePlayRefund = () => {
     if (!token) return '—';
     if (token.length <= 20) return token;
     return `${token.slice(0, 12)}…${token.slice(-8)}`;
+  };
+
+  const formatMoney = (tx) => {
+    if (tx.localized_price) return tx.localized_price;
+    if (tx.price_amount_micros == null) return '—';
+    const amount = Number(tx.price_amount_micros) / 1_000_000;
+    if (!Number.isFinite(amount)) return '—';
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: tx.price_currency || 'USD',
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(2)} ${tx.price_currency || ''}`.trim();
+    }
   };
 
   const openRefundModal = (tx) => {
@@ -106,7 +123,7 @@ const AdminGooglePlayRefund = () => {
         return;
       }
       setRefundResult(data);
-      await loadTransactions(searchFrom, searchTo, searchQuery, searchOrderId);
+      await loadTransactions(searchFrom, searchTo, searchQuery, searchOrderId, searchCurrency);
     } catch (err) {
       setRefundError(err.message || 'Something went wrong.');
     } finally {
@@ -149,6 +166,17 @@ const AdminGooglePlayRefund = () => {
               onChange={(e) => setSearchOrderId(e.target.value)}
             />
           </label>
+          <label>
+            <span>Currency</span>
+            <select value={searchCurrency} onChange={(e) => setSearchCurrency(e.target.value)}>
+              <option value="">All</option>
+              <option value="USD">USD</option>
+              <option value="INR">INR</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="AED">AED</option>
+            </select>
+          </label>
           <button type="button" className="play-refund-search-btn" onClick={handleSearch} disabled={listLoading}>
             {listLoading ? 'Loading…' : 'Search'}
           </button>
@@ -165,7 +193,8 @@ const AdminGooglePlayRefund = () => {
                   <th>Phone</th>
                   <th>Order ID</th>
                   <th>Purchase token</th>
-                  <th>Amount</th>
+                  <th>Credits</th>
+                  <th>Money</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
@@ -173,7 +202,7 @@ const AdminGooglePlayRefund = () => {
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="play-refund-empty">No Google Play transactions in this period.</td>
+                    <td colSpan={9} className="play-refund-empty">No Google Play transactions in this period.</td>
                   </tr>
                 ) : (
                   transactions.map((tx) => (
@@ -184,6 +213,7 @@ const AdminGooglePlayRefund = () => {
                       <td className="order-id-cell">{tx.order_id || '—'}</td>
                       <td className="token-cell" title={tx.purchase_token}>{truncateToken(tx.purchase_token)}</td>
                       <td className="amount-cell">+{tx.amount}</td>
+                      <td className="amount-cell">{formatMoney(tx)}</td>
                       <td>
                         <span className={`status-badge status-${tx.status.toLowerCase()}`}>
                           {tx.status === 'Reversed' && tx.reversed_amount != null && tx.reversed_amount > 0

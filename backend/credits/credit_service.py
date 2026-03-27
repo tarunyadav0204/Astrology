@@ -909,6 +909,7 @@ class CreditService:
         to_date: str,
         query: Optional[str] = None,
         order_id_filter: Optional[str] = None,
+        currency_filter: Optional[str] = None,
         limit: int = 500,
     ) -> List[Dict[str, Any]]:
         """
@@ -954,18 +955,29 @@ class CreditService:
             for r in cur_rev.fetchall():
                 reversed_amounts[(r[0], r[1])] = r[2]
             out = []
+            normalized_currency = (currency_filter or "").strip().upper()
             for row in rows:
                 tx_id, userid, name, phone, order_id, amount, metadata_json, created_at = row
                 purchase_token = ""
+                price_amount_micros = None
+                price_currency = None
+                localized_price = None
                 if metadata_json:
                     try:
                         meta = json.loads(metadata_json)
                         purchase_token = meta.get("purchase_token") or ""
+                        price_amount_micros = meta.get("price_amount_micros")
+                        price_currency = meta.get("price_currency")
+                        localized_price = meta.get("localized_price")
                     except Exception:
                         pass
                 key = (userid, order_id)
                 reversed_amt = reversed_amounts.get(key, 0)
                 status = "Reversed" if reversed_amt else "Credited"
+                if normalized_currency:
+                    tx_currency = (price_currency or "").strip().upper()
+                    if tx_currency != normalized_currency:
+                        continue
                 out.append({
                     "id": tx_id,
                     "userid": userid,
@@ -977,6 +989,9 @@ class CreditService:
                     "created_at": created_at,
                     "status": status,
                     "reversed_amount": reversed_amt if reversed_amt else None,
+                    "price_amount_micros": price_amount_micros,
+                    "price_currency": price_currency,
+                    "localized_price": localized_price,
                 })
             return out
 

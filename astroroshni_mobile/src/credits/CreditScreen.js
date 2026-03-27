@@ -76,6 +76,7 @@ const CreditScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState(null);
   const [iapReady, setIapReady] = useState(false);
+  const [iapProducts, setIapProducts] = useState([]);
   const [googlePlayProducts, setGooglePlayProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
@@ -96,7 +97,21 @@ const CreditScreen = ({ navigation }) => {
     if (!purchaseToken || !productId || !orderId) return;
     setPurchasingProductId(productId);
     try {
-      const { data } = await creditAPI.verifyGooglePlayPurchase(purchaseToken, productId, orderId);
+      const iapProduct = iapProducts.find((p) => (p.productId || p.product_id) === productId);
+      const oneTimeOffer = iapProduct?.oneTimePurchaseOfferDetails || {};
+      const pricingPayload = {
+        price_amount_micros: oneTimeOffer.priceAmountMicros
+          ? parseInt(oneTimeOffer.priceAmountMicros, 10)
+          : null,
+        price_currency: oneTimeOffer.priceCurrencyCode || null,
+        localized_price: iapProduct?.localizedPrice || iapProduct?.price || null,
+      };
+      const { data } = await creditAPI.verifyGooglePlayPurchase(
+        purchaseToken,
+        productId,
+        orderId,
+        pricingPayload
+      );
       await fetchBalance();
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
@@ -266,7 +281,10 @@ const CreditScreen = ({ navigation }) => {
         await RNIap.initConnection();
         if (!mounted) return;
         await RNIap.flushFailedPurchasesCachedAsPendingAndroid?.();
-        if (productIds.length > 0) await RNIap.getProducts({ skus: productIds });
+        if (productIds.length > 0) {
+          const products = await RNIap.getProducts({ skus: productIds });
+          if (mounted && Array.isArray(products)) setIapProducts(products);
+        }
         if (subscriptionProductIds.length > 0) {
           const subs = await RNIap.getSubscriptions({ skus: subscriptionProductIds });
           if (mounted && Array.isArray(subs)) setIapSubscriptions(subs);

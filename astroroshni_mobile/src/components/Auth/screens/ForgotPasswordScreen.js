@@ -25,7 +25,12 @@ export default function ForgotPasswordScreen({
   const [resetToken, setResetToken] = useState('');
   const [localNewPassword, setLocalNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const isUSPhone = (formData.phone || '').trim().startsWith('+1');
+  const normalizedPhone = (formData.phone || '').trim();
+  const normalizedCountryCode = (formData.countryCode || '').trim();
+  const fullPhone = normalizedPhone.startsWith('+')
+    ? normalizedPhone
+    : `${normalizedCountryCode}${normalizedPhone}`;
+  const isUSPhone = fullPhone.startsWith('+1');
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -59,7 +64,7 @@ export default function ForgotPasswordScreen({
   }, []);
 
   const handleSendCode = async () => {
-    if (!formData.phone) {
+    if (!normalizedPhone) {
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
@@ -70,7 +75,7 @@ export default function ForgotPasswordScreen({
 
     setLoading(true);
     try {
-      const payload = { phone: formData.phone };
+      const payload = { phone: fullPhone };
       if (isUSPhone && formData.email) {
         payload.email = formData.email;
       }
@@ -78,7 +83,7 @@ export default function ForgotPasswordScreen({
       Alert.alert('Success', response.data.message);
       setStep(2);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Phone number not found');
+      Alert.alert('Error', error.response?.data?.detail || error.response?.data?.message || 'Phone number not found');
     } finally {
       setLoading(false);
     }
@@ -93,7 +98,7 @@ export default function ForgotPasswordScreen({
     setLoading(true);
     try {
       const response = await authAPI.verifyResetCode({
-        phone: formData.phone,
+        phone: fullPhone,
         code: formData.resetCode
       });
       setResetToken(response.data.reset_token);
@@ -101,7 +106,7 @@ export default function ForgotPasswordScreen({
       Alert.alert('Success', 'Code verified! Enter new password.');
       setStep(3);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Invalid or expired code');
+      Alert.alert('Error', error.response?.data?.detail || error.response?.data?.message || 'Invalid or expired code');
     } finally {
       setLoading(false);
     }
@@ -123,7 +128,7 @@ export default function ForgotPasswordScreen({
         { text: 'OK', onPress: () => navigateToScreen('welcome') }
       ]);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Password reset failed');
+      Alert.alert('Error', error.response?.data?.detail || error.response?.data?.message || 'Password reset failed');
     } finally {
       setLoading(false);
     }
@@ -200,7 +205,7 @@ export default function ForgotPasswordScreen({
               <Text style={styles.title}>Enter Code</Text>
               <Text style={styles.subtitle}>
                 We've sent a 6-digit code to{'\n'}
-                {isUSPhone && formData.email ? formData.email : formData.phone}
+                {isUSPhone && formData.email ? formData.email : fullPhone}
               </Text>
             </View>
 
