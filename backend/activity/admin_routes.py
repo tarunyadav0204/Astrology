@@ -196,16 +196,20 @@ async def get_activity(
                     ELSE NULL
                 END AS dedup_key
             FROM base
+        ),
+        grouped AS (
+            SELECT
+                ANY_VALUE(user_id) AS user_id,
+                ANY_VALUE(user_name) AS user_name,
+                ANY_VALUE(user_phone) AS user_phone,
+                COUNT(*) AS api_calls
+            FROM keyed
+            WHERE dedup_key IS NOT NULL
+            GROUP BY dedup_key
         )
-        SELECT
-            ANY_VALUE(user_id) AS user_id,
-            ANY_VALUE(user_name) AS user_name,
-            ANY_VALUE(user_phone) AS user_phone,
-            COUNT(*) AS api_calls
-        FROM keyed
-        WHERE dedup_key IS NOT NULL
-        GROUP BY dedup_key
-        ORDER BY MIN(LOWER(TRIM(COALESCE(user_name, '')))), MIN(COALESCE(user_phone, ''))
+        SELECT user_id, user_name, user_phone, api_calls
+        FROM grouped
+        ORDER BY LOWER(TRIM(COALESCE(user_name, ''))), COALESCE(user_phone, '')
         LIMIT 5000
     """
     try:
