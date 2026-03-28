@@ -271,6 +271,61 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False) -> s
 # IV. FINAL PROMPT CONSTRUCTION
 # --------------------------------------------------------------------------------------
 
+def _summarize_natal_for_mundane_prompt(chart: dict) -> dict:
+    """Strip heavy chart blobs so Gemini sees dasha/geo context without token overflow."""
+    if not chart or not isinstance(chart, dict):
+        return chart
+    planets = chart.get("planets") or {}
+    slim_p = {}
+    for name in (
+        "Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu",
+    ):
+        if name not in planets:
+            continue
+        p = planets[name]
+        if not isinstance(p, dict):
+            continue
+        slim_p[name] = {
+            "longitude": p.get("longitude"),
+            "house": p.get("house"),
+            "sign_name": p.get("sign_name"),
+            "retrograde": p.get("retrograde"),
+        }
+        nk = p.get("nakshatra")
+        if isinstance(nk, dict) and nk.get("name"):
+            slim_p[name]["nakshatra"] = nk.get("name")
+    out = {
+        "ascendant": chart.get("ascendant"),
+        "ascendant_sign": chart.get("ascendant_sign"),
+        "planets": slim_p,
+    }
+    return out
+
+
+def _slim_mundane_context_for_llm(ctx: dict) -> dict:
+    """Reduce token load for mundane prompts; authoritative summary carries dasha truth."""
+    ev = ctx.get("event_chart")
+    if isinstance(ev, dict):
+        ctx["event_chart"] = _summarize_natal_for_mundane_prompt(ev)
+    ec = ctx.get("entity_charts")
+    if isinstance(ec, dict):
+        for _ent, data in list(ec.items()):
+            if not isinstance(data, dict) or not data.get("available"):
+                continue
+            nc = data.get("natal_chart")
+            if isinstance(nc, dict):
+                data["natal_chart"] = _summarize_natal_for_mundane_prompt(nc)
+    la = ctx.get("locational_analysis")
+    if isinstance(la, dict):
+        for _ent, data in list(la.items()):
+            if not isinstance(data, dict) or not data.get("available"):
+                continue
+            lg = data.get("lagna_chart")
+            if isinstance(lg, dict):
+                data["lagna_chart"] = _summarize_natal_for_mundane_prompt(lg)
+    return ctx
+
+
 def build_final_prompt(user_question: str, context: dict, history: list, language: str, response_style: str, user_context: dict, premium_analysis: bool, mode: str = 'default') -> str:
     """
     Builds the final, consolidated prompt for the Gemini AI.
@@ -357,9 +412,21 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     import copy
     static_context = copy.deepcopy(context)
     transits = static_context.pop('transit_activations', None)
+
+    mundane_auth = None
+    if analysis_type == "mundane":
+        mundane_auth = static_context.pop("mundane_authoritative_summary", None)
+        static_context = _slim_mundane_context_for_llm(static_context)
+
     chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=False)
     
     data_label = "MUNDANE ASTROLOGY DATA" if analysis_type == 'mundane' else "BIRTH CHART DATA"
+    if analysis_type == "mundane" and mundane_auth:
+        prompt_parts.append(
+            "⚠️ MUNDANE AUTHORITATIVE SUMMARY (READ FIRST — if national_dasha_loaded is true for an entity, "
+            "national Vimshottari data exists; do not claim the repository is missing it):\n"
+            + json.dumps(mundane_auth, indent=2, default=json_serializer, sort_keys=False)
+        )
     prompt_parts.append(f"{data_label}:\n{chart_json}")
 
     if transits:

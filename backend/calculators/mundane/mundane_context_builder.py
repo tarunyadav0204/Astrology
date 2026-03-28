@@ -37,7 +37,9 @@ You are **Tara (Mundane Elite Edition)**, the world's most advanced AI authority
 Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chakras**, and **Modern Geopolitical Risk Analysis** to provide predictions that exceed the accuracy of even the most renowned human mundane astrologers.
 
 ### 🚨 ABSOLUTE INTEGRITY RULE (NON-NEGOTIABLE)
-- **NO HALLUCINATION:** If an entity's data shows `available: false` in `entity_charts` or `locational_analysis`, you MUST state: "Data for [Entity] is currently unavailable in the national repository." DO NOT invent dashas, natal positions, or locational charts for these entities.
+- **READ `mundane_authoritative_summary` FIRST (injected at the top of the data payload).** For each entity, if `national_dasha_loaded` is **true**, national Vimshottari data **was** loaded — you MUST cite those mahadasha/antardasha planets by name. **You must NOT** write that national repository / entity dasha data is "unavailable" for that entity.
+- **LOCATIONAL:** If `locational_chart_loaded` is **true** for an entity, a locational chart for that capital **was** computed — do not claim locational data is missing for that capital.
+- **NO HALLUCINATION:** Only if `national_dasha_loaded` is **false** or `entity_charts[entity].available` is **false** may you say national chart data is missing for that entity (cite the given `reason` if present). DO NOT invent dashas not shown in the summary or JSON.
 - **DATA ANCHORING:** Every prediction must be anchored in the provided JSON fields. If you cite a planetary position, it MUST match the data.
 
 ### 1. THE MUNDANE ELITE PROTOCOL (Technical Depth)
@@ -332,12 +334,42 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
                 except Exception as e:
                     context["locational_analysis"][ent] = {"available": False, "reason": str(e)}
             else:
-                # Fallback: if no specific locational data, mark as not available to prevent hallucination
-                context["locational_analysis"][ent] = {"available": False}
+                reason = None
+                if not event_date:
+                    reason = "no_event_date"
+                elif not foundation:
+                    reason = "nation_foundation_missing"
+                elif event_utc_hour is None:
+                    reason = "event_utc_not_computed"
+                context["locational_analysis"][ent] = {"available": False, "reason": reason or "locational_skipped"}
 
-        # Legacy support for single country fields
-        if country_name in context["entity_charts"]:
-            ent_data = context["entity_charts"][country_name]
+        # Compact summary for the LLM (full chart JSON is large; models often miss nested `available: true`).
+        mundane_authoritative_summary = {"entities": {}, "instruction": "Use this block first. If national_dasha_loaded is true, dasha data exists — do not claim national repository is empty for that entity."}
+        for ent in target_entities:
+            ec = context["entity_charts"].get(ent, {})
+            loc = context["locational_analysis"].get(ent, {})
+            row = {
+                "national_dasha_loaded": bool(ec.get("available")),
+                "locational_chart_loaded": bool(loc.get("available")),
+            }
+            if ec.get("available"):
+                md = (ec.get("dasha") or {}).get("mahadasha") or {}
+                ad = (ec.get("dasha") or {}).get("antardasha") or {}
+                row["vimshottari_mahadasha_planet"] = md.get("planet")
+                row["vimshottari_antardasha_planet"] = ad.get("planet")
+                row["national_foundation_event"] = (ec.get("foundation") or {}).get("event")
+            else:
+                row["national_chart_reason"] = ec.get("reason")
+            if loc.get("available"):
+                row["locational_capital"] = loc.get("location")
+            else:
+                row["locational_reason"] = loc.get("reason")
+            mundane_authoritative_summary["entities"][ent] = row
+        context["mundane_authoritative_summary"] = mundane_authoritative_summary
+
+        # Legacy support for single country fields (use resolved primary key)
+        if primary_resolved in context["entity_charts"]:
+            ent_data = context["entity_charts"][primary_resolved]
             context["national_chart_available"] = ent_data.get("available", False)
             context["national_dasha"] = ent_data.get("dasha")
             context["national_foundation"] = ent_data.get("foundation")
