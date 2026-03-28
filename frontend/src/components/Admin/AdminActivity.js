@@ -14,6 +14,16 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Sum of request duration_ms from activity logs (server-side handling time, not “time in app”). */
+function formatTotalDurationMs(ms) {
+  if (ms == null || Number.isNaN(Number(ms))) return '—';
+  const n = Number(ms);
+  if (n < 1000) return `${Math.round(n)} ms`;
+  const s = n / 1000;
+  const digits = s >= 100 ? 0 : s >= 10 ? 1 : 2;
+  return `${s.toFixed(digits)} s`;
+}
+
 export default function AdminActivity() {
   const [activity, setActivity] = useState([]);
   const [distinctUsers, setDistinctUsers] = useState([]);
@@ -138,6 +148,8 @@ export default function AdminActivity() {
         Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
         The <strong>Users in date range</strong> table lists distinct users (name and phone) who had any
         matching API activity between the selected dates (same filters as below).
+        <strong> Total API time</strong> is the sum of request <code>duration_ms</code> (server processing
+        time per logged call), not a measure of how long someone stayed in the app.
       </p>
 
       <div className="admin-activity-filters">
@@ -229,12 +241,13 @@ export default function AdminActivity() {
                     <th className="admin-activity-th">Phone</th>
                     <th className="admin-activity-th">User ID</th>
                     <th className="admin-activity-th">API calls</th>
+                    <th className="admin-activity-th">Total API time</th>
                   </tr>
                 </thead>
                 <tbody>
                   {distinctUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="admin-activity-empty">
+                      <td colSpan={5} className="admin-activity-empty">
                         No users with activity for the selected date range and filters.
                       </td>
                     </tr>
@@ -255,6 +268,16 @@ export default function AdminActivity() {
                           {row.user_id != null && row.user_id !== '' ? String(row.user_id) : '—'}
                         </td>
                         <td className="admin-activity-td">{row.api_calls != null ? row.api_calls : '—'}</td>
+                        <td
+                          className="admin-activity-td"
+                          title={
+                            row.total_duration_ms != null
+                              ? `${row.total_duration_ms} ms summed`
+                              : ''
+                          }
+                        >
+                          {formatTotalDurationMs(row.total_duration_ms)}
+                        </td>
                       </tr>
                     ))
                   )}

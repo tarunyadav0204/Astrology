@@ -13,7 +13,11 @@ from calculators.mundane.outer_planet_calculator import OuterPlanetCalculator
 from calculators.mundane.mundane_yoga_calculator import MundaneYogaCalculator
 from calculators.mundane.geodetic_calculator import GeodeticCalculator
 from calculators.mundane.nav_nayak_calculator import NavNayakCalculator
-from calculators.mundane.nation_chart_service import get_nation_foundation, get_nation_birth_dict_for_dasha
+from calculators.mundane.nation_chart_service import (
+    get_nation_foundation,
+    get_nation_birth_dict_for_dasha,
+    resolve_nation_chart_key,
+)
 from calculators.chart_calculator import ChartCalculator
 from calculators.panchang_calculator import PanchangCalculator
 
@@ -96,12 +100,22 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         self.panchang_calc = PanchangCalculator()
 
     def _resolve_nation_name(self, name: str) -> str:
-        """Map common aliases to the standard names in nation_charts.json."""
-        name_clean = name.strip().upper()
-        mapping = {
+        """
+        Map user/alias labels to canonical keys in nation_charts.json.
+        Do not use substring matching (e.g. 'US' inside 'AUSTRALIA') — that mis-resolved countries.
+        """
+        raw = (name or "").strip()
+        if not raw:
+            return raw
+        canon = resolve_nation_chart_key(raw)
+        if canon:
+            return canon
+        name_clean = raw.upper()
+        alias_to_canonical = {
             "US": "USA",
             "UNITED STATES": "USA",
             "UNITED STATES OF AMERICA": "USA",
+            "USA": "USA",
             "UK": "UK",
             "UNITED KINGDOM": "UK",
             "BRITAIN": "UK",
@@ -119,18 +133,11 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
             "UAE": "United Arab Emirates",
             "KSA": "Saudi Arabia",
         }
-        # First check exact match in mapping (case insensitive)
-        for key, val in mapping.items():
-            if name_clean == key:
-                return val
-        
-        # Then check if any key is contained in the name
-        for key, val in mapping.items():
-            if key in name_clean:
-                return val
-                
-        # Otherwise return original but title-cased
-        return name.title()
+        if name_clean in alias_to_canonical:
+            candidate = alias_to_canonical[name_clean]
+            resolved = resolve_nation_chart_key(candidate)
+            return resolved or candidate
+        return raw.title()
 
     def build_mundane_context(
         self, 
@@ -228,16 +235,26 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         context["entity_charts"] = {}
         context["locational_analysis"] = {} # Charts for capitals of involved nations
         
-        # Resolve entity names to match JSON keys
+        # Resolve entity names to match JSON keys. Always include the primary country of analysis
+        # so its national chart/dasha appear in entity_charts (not only "nations involved").
         target_entities = []
         if entities:
             for e in entities:
-                resolved = self._resolve_nation_name(e)
-                if resolved not in target_entities:
+                if e is None:
+                    continue
+                s = str(e).strip()
+                if not s:
+                    continue
+                resolved = self._resolve_nation_name(s)
+                if resolved and resolved not in target_entities:
                     target_entities.append(resolved)
         else:
-            target_entities = [country_name]
-        
+            target_entities = [self._resolve_nation_name(country_name)]
+
+        primary_resolved = self._resolve_nation_name(country_name)
+        if primary_resolved and primary_resolved not in target_entities:
+            target_entities.insert(0, primary_resolved)
+
         # Ensure target_entities is what's used in context
         context["entities_involved"] = target_entities
         

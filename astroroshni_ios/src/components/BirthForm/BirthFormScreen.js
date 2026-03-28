@@ -91,6 +91,8 @@ export default function BirthFormScreen({ navigation, route }) {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const stableDateRef = useRef(null);
+  /** Guard against double-tap: ignore duplicate Complete taps until success alert dismissed or error. */
+  const submittingRef = useRef(false);
   const confettiAnims = useRef([...Array(20)].map(() => ({
     x: new Animated.Value(0),
     y: new Animated.Value(0),
@@ -413,6 +415,8 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const nextStep = () => {
+    if (loading) return;
+    if (step === 5 && submittingRef.current) return;
     if (validateStep()) {
       if (step < 5) setStep(step + 1);
       else handleSubmit();
@@ -424,13 +428,15 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const handleSubmit = async () => {
-    // Final validation before submission
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     if (!formData.latitude || !formData.longitude) {
       Alert.alert(t('birthForm.alerts.invalidLocation.title', 'Invalid Location'), t('birthForm.alerts.invalidLocation.noSelection', 'Please select a location from the suggestions.'));
-      setLoading(false);
+      submittingRef.current = false;
       return;
     }
-    
+
     setLoading(true);
     try {
       // console.log('🚀 [DEBUG] BirthForm: Starting handleSubmit');
@@ -529,6 +535,8 @@ export default function BirthFormScreen({ navigation, route }) {
         const successMessage = updateGender ? t('birthForm.alerts.success.genderUpdated', 'Gender updated successfully!') : editProfile ? t('birthForm.alerts.success.profileUpdated', 'Profile updated successfully!') : t('birthForm.alerts.success.chartCalculated', 'Birth chart calculated successfully!');
         Alert.alert(t('birthForm.alerts.success.title', 'Success'), successMessage, [
           { text: t('birthForm.alerts.ok', 'OK'), onPress: () => {
+            submittingRef.current = false;
+            setLoading(false);
             if (editProfile) {
               navigation.navigate('SelectNative');
             } else {
@@ -538,9 +546,9 @@ export default function BirthFormScreen({ navigation, route }) {
         ]);
       }, 1000);
     } catch (error) {
-      Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
-    } finally {
+      submittingRef.current = false;
       setLoading(false);
+      Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
     }
   };
 

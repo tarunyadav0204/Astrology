@@ -420,6 +420,8 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const nextStep = () => {
+    if (loading) return;
+    if (step === 5 && submittingRef.current) return;
     if (validateStep()) {
       if (step < 5) setStep(step + 1);
       else handleSubmit();
@@ -541,6 +543,8 @@ export default function BirthFormScreen({ navigation, route }) {
         const successMessage = updateGender ? t('birthForm.alerts.success.genderUpdated', 'Gender updated successfully!') : editProfile ? t('birthForm.alerts.success.profileUpdated', 'Profile updated successfully!') : t('birthForm.alerts.success.chartCalculated', 'Birth chart calculated successfully!');
         Alert.alert(t('birthForm.alerts.success.title', 'Success'), successMessage, [
           { text: t('birthForm.alerts.ok', 'OK'), onPress: () => {
+            submittingRef.current = false;
+            setLoading(false);
             if (editProfile) {
               navigation.navigate('SelectNative');
             } else {
@@ -550,10 +554,9 @@ export default function BirthFormScreen({ navigation, route }) {
         ]);
       }, 1000);
     } catch (error) {
-      Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
-    } finally {
-      setLoading(false);
       submittingRef.current = false;
+      setLoading(false);
+      Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
     }
   };
 

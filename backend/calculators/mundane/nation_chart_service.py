@@ -2,7 +2,6 @@
 
 import json
 import os
-from datetime import datetime
 from typing import Dict, Any, Optional
 
 
@@ -11,20 +10,49 @@ def _get_nation_charts_path() -> str:
     return os.path.join(base, 'data', 'nation_charts.json')
 
 
+def _load_nation_charts_raw() -> Dict[str, Any]:
+    path = _get_nation_charts_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def resolve_nation_chart_key(label: str, data: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """
+    Return the canonical key in nation_charts.json for a user-facing label, or None.
+    Matches case-insensitively on JSON keys (e.g. 'usa' -> 'USA', 'iran' -> 'Iran').
+    Pass `data` from a single load to avoid reading the file twice.
+    """
+    label = (label or "").strip()
+    if not label:
+        return None
+    if data is None:
+        data = _load_nation_charts_raw()
+    if not data:
+        return None
+    if label in data:
+        return label
+    ll = label.lower()
+    for k in data:
+        if k.lower() == ll:
+            return k
+    return None
+
+
 def get_nation_foundation(country_name: str) -> Optional[Dict[str, Any]]:
     """
     Return foundation date/time/location for a country if available.
-    country_name should match keys in nation_charts.json (e.g. 'India', 'USA').
+    country_name should match keys in nation_charts.json (e.g. 'India', 'USA'); casing is normalized.
     """
-    path = _get_nation_charts_path()
-    if not os.path.exists(path):
+    data = _load_nation_charts_raw()
+    key = resolve_nation_chart_key(country_name, data)
+    if not key:
         return None
-    try:
-        with open(path, 'r') as f:
-            data = json.load(f)
-        return data.get(country_name)
-    except Exception:
-        return None
+    return data.get(key)
 
 
 def get_nation_birth_dict_for_dasha(country_name: str) -> Optional[Dict[str, Any]]:

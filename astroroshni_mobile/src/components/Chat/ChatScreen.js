@@ -2235,7 +2235,8 @@ export default function ChatScreen({ navigation, route }) {
           category: mundaneContext?.category || 'general',
           event_date: mundaneContext?.event_date,
           event_time: mundaneContext?.event_time,
-          entities: mundaneContext?.entities
+          // Ref fallback: state can lag one frame behind route params when starting from MundaneHub
+          entities: mundaneContext?.entities ?? mundaneContextRef.current?.entities,
         };
         
         const response = await fetch(`${API_BASE_URL}${getEndpoint('/mundane/analyze')}`, {

@@ -176,7 +176,7 @@ async def get_activity(
     """
     distinct_query = f"""
         WITH base AS (
-            SELECT user_id, user_name, user_phone
+            SELECT user_id, user_name, user_phone, duration_ms
             FROM {table}
             WHERE {where_clause}
         ),
@@ -185,6 +185,7 @@ async def get_activity(
                 user_id,
                 user_name,
                 user_phone,
+                duration_ms,
                 CASE
                     WHEN user_id IS NOT NULL AND user_id != 0
                         THEN CONCAT('id:', CAST(user_id AS STRING))
@@ -202,12 +203,13 @@ async def get_activity(
                 ANY_VALUE(user_id) AS user_id,
                 ANY_VALUE(user_name) AS user_name,
                 ANY_VALUE(user_phone) AS user_phone,
-                COUNT(*) AS api_calls
+                COUNT(*) AS api_calls,
+                SUM(COALESCE(duration_ms, 0)) AS total_duration_ms
             FROM keyed
             WHERE dedup_key IS NOT NULL
             GROUP BY dedup_key
         )
-        SELECT user_id, user_name, user_phone, api_calls
+        SELECT user_id, user_name, user_phone, api_calls, total_duration_ms
         FROM grouped
         ORDER BY LOWER(TRIM(COALESCE(user_name, ''))), COALESCE(user_phone, '')
         LIMIT 5000
@@ -279,11 +281,17 @@ async def get_activity(
     distinct_out: List[Dict[str, Any]] = []
     for row in distinct_rows:
         d = dict(row)
+        tdur = d.get("total_duration_ms")
+        try:
+            total_dur = float(tdur) if tdur is not None else 0.0
+        except (TypeError, ValueError):
+            total_dur = 0.0
         distinct_out.append({
             "user_id": _serialize(d.get("user_id")),
             "user_name": _serialize(d.get("user_name")),
             "user_phone": _serialize(d.get("user_phone")),
             "api_calls": int(d.get("api_calls") or 0),
+            "total_duration_ms": round(total_dur, 2),
         })
     _enrich_activity_user_ids(distinct_out)
 
