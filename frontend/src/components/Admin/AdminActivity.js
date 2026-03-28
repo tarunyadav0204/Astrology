@@ -16,6 +16,8 @@ function todayStr() {
 
 export default function AdminActivity() {
   const [activity, setActivity] = useState([]);
+  const [distinctUsers, setDistinctUsers] = useState([]);
+  const [distinctUserCount, setDistinctUserCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dateFrom, setDateFrom] = useState(todayStr);
@@ -57,9 +59,17 @@ export default function AdminActivity() {
       }
       const data = await res.json();
       setActivity(data.activity || []);
+      setDistinctUsers(data.distinct_users || []);
+      setDistinctUserCount(
+        typeof data.distinct_user_count === 'number'
+          ? data.distinct_user_count
+          : (data.distinct_users || []).length,
+      );
     } catch (e) {
       setError(e.message || 'Failed to load activity');
       setActivity([]);
+      setDistinctUsers([]);
+      setDistinctUserCount(0);
     } finally {
       setLoading(false);
     }
@@ -126,6 +136,8 @@ export default function AdminActivity() {
       <p className="admin-activity-description">
         Today&apos;s activity by default. Use filters and column headers to sort.
         Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
+        The <strong>Users in date range</strong> table lists distinct users (name and phone) who had any
+        matching API activity between the selected dates (same filters as below).
       </p>
 
       <div className="admin-activity-filters">
@@ -201,6 +213,56 @@ export default function AdminActivity() {
       {loading && <div className="admin-activity-loading">Loading activity…</div>}
 
       {!loading && !error && (
+        <>
+          <div className="admin-activity-distinct-section">
+            <h3 className="admin-activity-distinct-heading">
+              Users in date range
+              <span className="admin-activity-distinct-count">
+                ({distinctUserCount} distinct {distinctUserCount === 1 ? 'user' : 'users'})
+              </span>
+            </h3>
+            <div className="admin-activity-table-wrap admin-activity-distinct-wrap">
+              <table className="admin-activity-table admin-activity-distinct-table">
+                <thead>
+                  <tr>
+                    <th className="admin-activity-th">Name</th>
+                    <th className="admin-activity-th">Phone</th>
+                    <th className="admin-activity-th">User ID</th>
+                    <th className="admin-activity-th">API calls</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {distinctUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="admin-activity-empty">
+                        No users with activity for the selected date range and filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    distinctUsers.map((row, idx) => (
+                      <tr key={`${row.user_id ?? ''}-${row.user_phone ?? ''}-${idx}`}>
+                        <td className="admin-activity-td" title={row.user_name || ''}>
+                          {row.user_name != null && String(row.user_name).trim() !== ''
+                            ? String(row.user_name)
+                            : '—'}
+                        </td>
+                        <td className="admin-activity-td" title={row.user_phone || ''}>
+                          {row.user_phone != null && String(row.user_phone).trim() !== ''
+                            ? String(row.user_phone)
+                            : '—'}
+                        </td>
+                        <td className="admin-activity-td">
+                          {row.user_id != null && row.user_id !== '' ? String(row.user_id) : '—'}
+                        </td>
+                        <td className="admin-activity-td">{row.api_calls != null ? row.api_calls : '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         <div className="admin-activity-table-wrap">
           <table className="admin-activity-table">
             <thead>
@@ -243,6 +305,7 @@ export default function AdminActivity() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

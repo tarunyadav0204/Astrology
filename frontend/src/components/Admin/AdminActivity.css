@@ -125,3 +125,31 @@
   padding: 24px;
   color: #6c757d;
 }
+
+.admin-activity-distinct-section {
+  margin-bottom: 28px;
+}
+
+.admin-activity-distinct-heading {
+  margin: 0 0 10px 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #343a40;
+}
+
+.admin-activity-distinct-count {
+  margin-left: 8px;
+  font-weight: 500;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.admin-activity-distinct-wrap {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.admin-activity-distinct-table .admin-activity-td,
+.admin-activity-distinct-table .admin-activity-th {
+  max-width: none;
+}

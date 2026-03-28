@@ -174,6 +174,40 @@ async def get_activity(
         ORDER BY {order_col} {order}
         LIMIT @limit_param OFFSET @offset_param
     """
+    distinct_query = f"""
+        WITH base AS (
+            SELECT user_id, user_name, user_phone
+            FROM {table}
+            WHERE {where_clause}
+        ),
+        keyed AS (
+            SELECT
+                user_id,
+                user_name,
+                user_phone,
+                CASE
+                    WHEN user_id IS NOT NULL AND user_id != 0
+                        THEN CONCAT('id:', CAST(user_id AS STRING))
+                    WHEN REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '') != ''
+                        THEN CONCAT(
+                            'ph:',
+                            REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '')
+                        )
+                    ELSE NULL
+                END AS dedup_key
+            FROM base
+        )
+        SELECT
+            ANY_VALUE(user_id) AS user_id,
+            ANY_VALUE(user_name) AS user_name,
+            ANY_VALUE(user_phone) AS user_phone,
+            COUNT(*) AS api_calls
+        FROM keyed
+        WHERE dedup_key IS NOT NULL
+        GROUP BY dedup_key
+        ORDER BY MIN(LOWER(TRIM(COALESCE(user_name, '')))), MIN(COALESCE(user_phone, ''))
+        LIMIT 5000
+    """
     try:
         from google.cloud import bigquery
         from google.oauth2 import service_account
@@ -191,24 +225,30 @@ async def get_activity(
                 creds = service_account.Credentials.from_service_account_file(raw)
         client = bigquery.Client(project=project, credentials=creds) if creds else bigquery.Client(project=project)
 
-        job_params = [
+        filter_params: List[Any] = [
             bigquery.ScalarQueryParameter("from_date", "DATE", from_date),
             bigquery.ScalarQueryParameter("to_date", "DATE", to_date),
+        ]
+        if user_name and user_name.strip():
+            filter_params.append(bigquery.ScalarQueryParameter("user_name", "STRING", f"%{user_name.strip()}%"))
+        if user_phone and user_phone.strip():
+            filter_params.append(bigquery.ScalarQueryParameter("user_phone", "STRING", f"%{user_phone.strip()}%"))
+        if action and action.strip():
+            filter_params.append(bigquery.ScalarQueryParameter("action", "STRING", action.strip()))
+        if resource_id and resource_id.strip():
+            filter_params.append(bigquery.ScalarQueryParameter("resource_id", "STRING", f"%{resource_id.strip()}%"))
+
+        job_params = filter_params + [
             bigquery.ScalarQueryParameter("limit_param", "INT64", int(limit)),
             bigquery.ScalarQueryParameter("offset_param", "INT64", int(offset)),
         ]
-        if user_name and user_name.strip():
-            job_params.append(bigquery.ScalarQueryParameter("user_name", "STRING", f"%{user_name.strip()}%"))
-        if user_phone and user_phone.strip():
-            job_params.append(bigquery.ScalarQueryParameter("user_phone", "STRING", f"%{user_phone.strip()}%"))
-        if action and action.strip():
-            job_params.append(bigquery.ScalarQueryParameter("action", "STRING", action.strip()))
-        if resource_id and resource_id.strip():
-            job_params.append(bigquery.ScalarQueryParameter("resource_id", "STRING", f"%{resource_id.strip()}%"))
 
         job_config = bigquery.QueryJobConfig(query_parameters=job_params)
         rows_iter = client.query(query, job_config=job_config)
         rows = list(rows_iter)
+
+        distinct_job_config = bigquery.QueryJobConfig(query_parameters=filter_params)
+        distinct_rows = list(client.query(distinct_query, job_config=distinct_job_config))
     except Exception as e:
         logger.exception("BigQuery activity query failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Activity query failed: {e}")
@@ -232,4 +272,20 @@ async def get_activity(
     # Enrich rows that have user_phone but no user_id (e.g. old JWTs): look up userid from users table
     _enrich_activity_user_ids(out)
 
-    return {"activity": out, "count": len(out)}
+    distinct_out: List[Dict[str, Any]] = []
+    for row in distinct_rows:
+        d = dict(row)
+        distinct_out.append({
+            "user_id": _serialize(d.get("user_id")),
+            "user_name": _serialize(d.get("user_name")),
+            "user_phone": _serialize(d.get("user_phone")),
+            "api_calls": int(d.get("api_calls") or 0),
+        })
+    _enrich_activity_user_ids(distinct_out)
+
+    return {
+        "activity": out,
+        "count": len(out),
+        "distinct_users": distinct_out,
+        "distinct_user_count": len(distinct_out),
+    }
