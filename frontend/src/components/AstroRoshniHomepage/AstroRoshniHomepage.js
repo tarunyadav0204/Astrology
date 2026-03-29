@@ -2089,21 +2089,61 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         <div className="container">
           <div className="app-content">
             <div className="app-info">
-              <h2>📱 Download Our Mobile App</h2>
-              <p>Get instant access to astrology on the go!</p>
-              <ul className="app-features">
-                <li>✓ Push notifications for important transits</li>
-                <li>✓ Offline chart viewing</li>
-                <li>✓ Quick consultation booking</li>
-                <li>✓ Daily horoscope alerts</li>
-              </ul>
-              <div className="app-badges">
-                <button className="app-badge">📱 App Store</button>
-                <button className="app-badge">🤖 Google Play</button>
+              <span className="app-section-kicker">Android · Full Vedic engine</span>
+              <h2>AstroRoshni in your pocket</h2>
+              <p className="app-section-lead">
+                The same depth as our web platform—multi-layer chart synthesis, elite mundane tools, and answers you can
+                use—optimized for quick taps on the go.
+              </p>
+              <div className="app-feature-grid">
+                <div className="app-feature-group">
+                  <h3 className="app-feature-group-title">Insight &amp; timing</h3>
+                  <ul className="app-features">
+                    <li>Rich, detailed answers to almost any question—typically in under a minute</li>
+                    <li>Yearly and monthly forecasts anchored to your chart</li>
+                    <li>Past-life karma analysis along classical lines</li>
+                    <li>Focused reports for career, wealth, marriage, and health</li>
+                    <li>Global markets &amp; geopolitical outlooks—including conflict and risk scenarios</li>
+                  </ul>
+                </div>
+                <div className="app-feature-group">
+                  <h3 className="app-feature-group-title">Built for daily use</h3>
+                  <ul className="app-features">
+                    <li>Push notifications for important transits</li>
+                    <li>Offline access to your charts</li>
+                    <li>Best-in-class user experience</li>
+                    <li>Multilingual support in 12 languages</li>
+                    <li>Daily horoscope alerts tailored to you</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="app-store-row">
+                <a
+                  className="google-play-cta"
+                  href="https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span className="google-play-cta__icon" aria-hidden>
+                    <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path fill="#fff" d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                  <span className="google-play-cta__text">
+                    <span className="google-play-cta__label">GET IT ON</span>
+                    <span className="google-play-cta__brand">Google Play</span>
+                  </span>
+                </a>
               </div>
             </div>
             <div className="app-mockup">
-              <div className="phone-mockup">📱</div>
+              <img
+                className="app-homepage-screenshot"
+                src={`${process.env.PUBLIC_URL || ''}/images/AppHomepage.png`}
+                alt="AstroRoshni mobile app"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           </div>
         </div>
