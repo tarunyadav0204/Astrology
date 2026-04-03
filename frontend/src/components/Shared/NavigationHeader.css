@@ -1,3 +1,5 @@
+@import './nativeSelectorChip.css';
+
 /* Comprehensive Header Styles */
 .main-header {
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
@@ -129,7 +131,7 @@
   }
   
   .compact-actions .credits-btn,
-  .compact-actions .change-native-btn,
+  .compact-actions .native-selector-chip,
   .compact-actions .auth-btn {
     display: none;
   }
@@ -290,33 +292,6 @@
 .credits-btn.mobile {
   font-size: 12px;
   padding: 5px 10px;
-}
-
-.change-native-btn,
-.change-native-btn.mobile {
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%) !important;
-  color: white !important;
-  border: none !important;
-  padding: 6px 12px;
-  border-radius: 15px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.change-native-btn:hover,
-.change-native-btn.mobile:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(255, 107, 53, 0.3) !important;
-  background: linear-gradient(135deg, #f7931e 0%, #ff6b35 100%) !important;
-}
-
-.change-native-btn.mobile {
-  font-size: 16px;
-  padding: 6px 10px;
-  min-width: 36px;
 }
 
 .user-name {
@@ -734,9 +709,10 @@
     flex-shrink: 0;
   }
   
-  .mobile-change-native-btn {
-    display: flex !important;
-    flex-shrink: 0;
+  .native-selector-chip--nav-mobile {
+    display: inline-flex !important;
+    flex-shrink: 1;
+    min-width: 0;
   }
   
   .main-nav .container {
@@ -904,33 +880,11 @@
   box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3) !important;
 }
 
-.mobile-change-native-btn {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #9c27b0, #673ab7) !important;
-  border: 1px solid rgba(156, 39, 176, 0.5) !important;
-  color: white !important;
-  font-size: 18px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.3) !important;
-}
-
 .mobile-search-btn:hover,
 .mobile-menu-btn:hover {
   background: linear-gradient(135deg, #ffed4e, #ffd700);
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
-}
-
-.mobile-change-native-btn:hover {
-  background: linear-gradient(135deg, #673ab7, #9c27b0) !important;
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.5) !important;
 }
 
 .mobile-actions-group {

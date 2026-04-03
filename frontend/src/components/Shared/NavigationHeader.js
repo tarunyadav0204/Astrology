@@ -84,8 +84,15 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                     </button>
                   )}
                   {birthData && birthData.name && onChangeNative && (
-                    <button className="change-native-btn" onClick={onChangeNative}>
-                      👤 {birthData.name} ▼
+                    <button
+                      type="button"
+                      className="native-selector-chip"
+                      onClick={onChangeNative}
+                      title="Change native / chart"
+                    >
+                      <span className="native-selector-chip__icon" aria-hidden>👤</span>
+                      <span className="native-selector-chip__name">{birthData.name}</span>
+                      <span className="native-selector-chip__chevron" aria-hidden>▾</span>
                     </button>
                   )}
                 </>
@@ -174,8 +181,15 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                   </button>
                 )}
                 {birthData && birthData.name && onChangeNative && (
-                  <button className="change-native-btn" onClick={onChangeNative}>
-                    👤 {birthData.name} ▼
+                  <button
+                    type="button"
+                    className="native-selector-chip"
+                    onClick={onChangeNative}
+                    title="Change native / chart"
+                  >
+                    <span className="native-selector-chip__icon" aria-hidden>👤</span>
+                    <span className="native-selector-chip__name">{birthData.name}</span>
+                    <span className="native-selector-chip__chevron" aria-hidden>▾</span>
                   </button>
                 )}
                 <button className="profile-btn" onClick={() => navigate('/profile')}>
@@ -215,8 +229,15 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               🔍
             </button>
             {user && birthData && birthData.name && onChangeNative && (
-              <button className="mobile-change-native-btn" onClick={onChangeNative}>
-                👤
+              <button
+                type="button"
+                className="native-selector-chip native-selector-chip--nav-mobile"
+                onClick={onChangeNative}
+                title={`Native: ${birthData.name} — tap to change`}
+              >
+                <span className="native-selector-chip__icon" aria-hidden>👤</span>
+                <span className="native-selector-chip__name">{birthData.name}</span>
+                <span className="native-selector-chip__chevron" aria-hidden>▾</span>
               </button>
             )}
             <button className="mobile-menu-btn" onClick={() => setShowMobileMenu(true)}>

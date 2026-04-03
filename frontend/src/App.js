@@ -15,7 +15,6 @@ import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AuthModalShell from './components/Auth/AuthModalShell';
 import ChartSelector from './components/ChartSelector/ChartSelector';
-import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
 
 import AstroRoshniHomepage from './components/AstroRoshniHomepage/AstroRoshniHomepage';

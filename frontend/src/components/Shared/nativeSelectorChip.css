@@ -1,0 +1,85 @@
+/* Shared: native / chart selector chip (NavigationHeader, UnifiedHeader) */
+.native-selector-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: min(220px, 38vw);
+  padding: 0.35rem 0.65rem 0.35rem 0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #ad1457;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+  text-align: left;
+}
+
+.native-selector-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.25);
+  background: #fff;
+}
+
+.native-selector-chip:active {
+  transform: translateY(0);
+}
+
+.native-selector-chip__icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.native-selector-chip__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.native-selector-chip__chevron {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  opacity: 0.75;
+  line-height: 1;
+}
+
+.native-selector-chip--nav-mobile {
+  max-width: min(160px, 46vw);
+  padding: 0.3rem 0.5rem 0.3rem 0.45rem;
+  font-size: 12px;
+}
+
+.native-selector-chip--nav-mobile .native-selector-chip__icon {
+  font-size: 0.9rem;
+}
+
+/* Dashboard header: chart / native selector next to hamburger */
+.native-selector-chip--dashboard-chart {
+  max-width: min(260px, 70vw);
+  width: 100%;
+  justify-content: flex-start;
+}
+
+@media (max-width: 768px) {
+  .native-selector-chip--dashboard-chart {
+    max-width: min(200px, 58vw);
+    font-size: 12px;
+    padding: 0.3rem 0.55rem 0.3rem 0.45rem;
+  }
+}
+
+.chart-search-dropdown {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}

@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
-import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
+import '../Shared/nativeSelectorChip.css';
 
 const UnifiedHeader = ({ 
   currentChart, 
-  onSelectChart, 
+  onChangeNative, 
   onViewAllCharts, 
   onNewChart, 
   onLogout,
@@ -306,49 +306,19 @@ const UnifiedHeader = ({
           </>
         )}
 
-        {/* Mobile Chart Info */}
-        {isMobile && currentChart && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            flex: 1,
-            minWidth: 0
-          }}>
-            <div style={{
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: '700',
-              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '150px'
-            }}>
-              🌟 {currentChart.name}
-            </div>
-            <div style={{
-              color: 'rgba(255,255,255,0.9)',
-              fontSize: '10px',
-              fontWeight: '500',
-              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-            }}>
-              {new Date(currentChart.date).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric', 
-                year: 'numeric' 
-              })}
-            </div>
-          </div>
-        )}
-        
-        {/* Desktop Chart Selector */}
-        {!isMobile && currentChart && (
-          <ChartSearchDropdown
-            currentChart={currentChart}
-            onSelectChart={onSelectChart}
-            onViewAll={onViewAllCharts}
-          />
+        {currentChart && onChangeNative && (
+          <button
+            type="button"
+            className="native-selector-chip native-selector-chip--dashboard-chart"
+            onClick={onChangeNative}
+            title="Change native / chart"
+          >
+            <span className="native-selector-chip__icon" aria-hidden>👤</span>
+            <span className="native-selector-chip__name">
+              {currentChart.name || 'Select chart'}
+            </span>
+            <span className="native-selector-chip__chevron" aria-hidden>▾</span>
+          </button>
         )}
       </div>
 

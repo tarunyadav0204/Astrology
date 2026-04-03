@@ -190,7 +190,7 @@ const VimshottariTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentS
   const scrollCards = (level, direction) => {
     const container = document.querySelector(`.vimshottari-tab .dasha-level:nth-child(${level}) .dasha-cards`);
     if (container) {
-      const scrollAmount = 200;
+      const scrollAmount = typeof window !== 'undefined' && window.innerWidth <= 768 ? 140 : 220;
       container.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'

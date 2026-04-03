@@ -1,10 +1,13 @@
 .dasha-browser {
-  padding: 2rem;
-  max-width: 95vw;
+  --dasha-pad-x: 0.75rem;
+  padding: 1rem var(--dasha-pad-x) 2rem;
+  width: 100%;
+  max-width: min(1200px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
+  box-sizing: border-box;
 }
 
 .dasha-browser-loading {
@@ -17,43 +20,214 @@
 }
 
 /* Integrated Header */
+/* Full-width single-row date bar — mobile only (see media query) */
+.dasha-date-toolbar--mobile {
+  display: none;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.35rem;
+  margin: 0 0 0.75rem 0;
+  background: linear-gradient(180deg, #fffaf5 0%, #ffffff 55%);
+  border-bottom: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.dasha-date-toolbar--mobile .dasha-nav-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.25rem 0.06rem;
+  font-size: 0.56rem;
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.dasha-date-toolbar--mobile .dasha-date-btn--compact {
+  flex: 1.45 1 0;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  padding: 0.25rem 0.2rem;
+  min-height: 40px;
+  border-radius: 8px;
+  font-size: 0.58rem;
+  gap: 0.15rem;
+}
+
+.dasha-date-toolbar--mobile .dasha-date-btn__icon {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+}
+
+.dasha-date-btn__text--short {
+  display: none;
+}
+
+/* Hidden native date input — opened programmatically from the calendar button */
+.dasha-date-input-native {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+}
+
+.dasha-date-toolbar--mobile,
+.nav-section--desktop {
+  position: relative;
+}
+
 .integrated-header {
   display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   background: linear-gradient(135deg, #ffffff 0%, #fef7f0 100%);
   border: 2px solid #f97316;
-  border-radius: 20px;
+  border-radius: 16px;
   overflow: hidden;
-  margin: 0 auto 2rem auto;
+  margin: 0 auto 1.25rem auto;
   box-shadow: 0 12px 48px rgba(249, 115, 22, 0.2);
-  width: 90vw;
-  min-height: 100px;
-  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+  min-height: auto;
 }
 
 .nav-section {
-  flex: 1;
-  padding: 0.5rem 0.3rem;
+  flex: 1 1 320px;
+  padding: 0.65rem 0.5rem;
   display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.15rem;
+  gap: 0.5rem;
   border-right: 1px solid rgba(249, 115, 22, 0.2);
   background: rgba(249, 115, 22, 0.02);
   min-width: 0;
-  flex-shrink: 0;
 }
 
-.tabs-section {
-  flex: 1;
-  padding: 0.5rem 0.8rem;
+.nav-buttons--cluster {
   display: flex;
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+  justify-content: center;
+  min-width: 0;
+}
+
+.dasha-nav-btn {
+  border-radius: 8px;
+  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+  min-height: 40px;
+  padding: 0.35rem 0.45rem;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid #f97316;
+  color: #c2410c;
+  font-weight: 600;
+  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.dasha-nav-btn:active {
+  transform: scale(0.97);
+}
+
+.dasha-date-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.15rem;
+  gap: 0.35rem;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  min-height: 42px;
+  width: 100%;
+  max-width: 100%;
+  background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+  color: white;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: clamp(0.75rem, 3vw, 0.9rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dasha-date-btn__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Desktop: tabs inside orange card next to date nav */
+.tabs-section--desktop {
+  flex: 1 1 240px;
+  padding: 0.5rem 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.35rem;
   border-left: 1px solid rgba(249, 115, 22, 0.2);
   background: rgba(249, 115, 22, 0.02);
   min-width: 0;
-  flex-shrink: 0;
+}
+
+/* Mobile: horizontal scroll tab bar — shown only ≤900px (see media query) */
+.tabs-section--mobile {
+  display: none;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.45rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #f97316 #fff5eb;
+  padding: 0.5rem 0.35rem 0.6rem;
+  margin: 0 0 0.35rem 0;
+  width: 100%;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.18);
+  background: linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+}
+
+.tabs-section--mobile::-webkit-scrollbar {
+  height: 5px;
+}
+
+.tabs-section--mobile::-webkit-scrollbar-track {
+  background: #fff5eb;
+  border-radius: 3px;
+}
+
+.tabs-section--mobile::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.45);
+  border-radius: 3px;
+}
+
+.tabs-section--mobile .dasha-tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+  padding: 0.55rem 1rem;
+  min-height: 44px;
+  width: auto;
+  min-width: max-content;
 }
 
 /* Current Dasha Container - Below Header */
@@ -64,7 +238,7 @@
 
 .nav-buttons {
   display: flex;
-  gap: 0.08rem;
+  gap: 0.2rem;
 }
 
 .nav-btn {
@@ -89,6 +263,9 @@
 .date-display {
   display: flex;
   justify-content: center;
+  flex: 1 1 160px;
+  min-width: min(100%, 200px);
+  max-width: 100%;
 }
 
 .today-btn {
@@ -125,21 +302,20 @@
 }
 
 .dasha-tab {
-  padding: 0.8rem 1.2rem;
+  padding: 0.5rem 0.35rem;
   background: rgba(249, 115, 22, 0.1);
   border: 1px solid rgba(249, 115, 22, 0.3);
-  border-radius: 0;
+  border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
   color: #6b7280;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  flex: 1;
+  font-size: clamp(0.68rem, 2.8vw, 0.88rem);
+  white-space: normal;
+  line-height: 1.2;
   min-width: 0;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  height: 48px;
+  text-align: center;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,9 +346,9 @@
 
 /* Tab Content */
 .dasha-content {
-  min-height: 500px;
+  min-height: min(500px, 70vh);
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
   display: flex;
   justify-content: center;
 }
@@ -181,10 +357,10 @@
 .vimshottari-tab {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  align-items: center;
+  gap: 1rem;
+  align-items: stretch;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
 }
 
 .vimshottari-loading, .vimshottari-error {
@@ -228,19 +404,20 @@
 /* Current Status Card */
 .current-status-card {
   background: linear-gradient(135deg, #fef7f0 0%, #fed7d7 100%);
-  border-radius: 20px;
-  padding: 2rem;
+  border-radius: 16px;
+  padding: 1rem 1rem 1.25rem;
   border: 2px solid #f97316;
   box-shadow: 0 12px 40px rgba(249, 115, 22, 0.2);
-  margin: 0 auto 2rem auto;
+  margin: 0 auto 1rem auto;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .status-header h3 {
   margin: 0 0 0.5rem 0;
   color: #f97316;
-  font-size: 1.5rem;
+  font-size: clamp(1.05rem, 4vw, 1.5rem);
   font-weight: 700;
 }
 
@@ -326,33 +503,39 @@
 
 .dasha-level {
   background: linear-gradient(135deg, #ffffff 0%, #fefcfb 100%);
-  border-radius: 16px;
-  padding: 1.5rem;
+  border-radius: 14px;
+  padding: 1rem 0.75rem;
   box-shadow: 0 8px 32px rgba(249, 115, 22, 0.1);
   border: 2px solid #fed7d7;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .dasha-level-title {
-  margin: 0 0 1rem 0;
+  margin: 0;
   color: #1a1a1a;
-  font-size: 1.1rem;
+  font-size: clamp(0.95rem, 3.5vw, 1.1rem);
   font-weight: 600;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
   border-bottom: 2px solid #fef7f0;
+  flex: 1;
+  min-width: 0;
 }
 
 .dasha-cards {
   display: flex;
-  gap: 1rem;
+  gap: 0.6rem;
   overflow-x: auto;
-  padding: 0.5rem 0 1rem 0;
+  padding: 0.5rem 0 0.75rem 0;
   scrollbar-width: thin;
   scrollbar-color: #f97316 #fef7f0;
   justify-content: flex-start;
   flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
 }
 
 .dasha-cards::-webkit-scrollbar {
@@ -370,18 +553,21 @@
 }
 
 .dasha-card {
-  min-width: 160px;
-  width: 160px;
+  min-width: 118px;
+  width: 132px;
+  max-width: min(132px, 42vw);
   flex-shrink: 0;
+  scroll-snap-align: start;
   background: linear-gradient(135deg, #fefcfb 0%, #fef7f0 100%);
   border: 2px solid #fed7d7;
-  border-radius: 14px;
-  padding: 1.2rem;
+  border-radius: 12px;
+  padding: 0.65rem 0.5rem;
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
   text-align: center;
   box-shadow: 0 4px 16px rgba(249, 115, 22, 0.08);
+  box-sizing: border-box;
 }
 
 .dasha-card:hover {
@@ -406,8 +592,8 @@
 
 .dasha-planet {
   font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 0.3rem;
+  font-size: clamp(0.8rem, 3.2vw, 0.95rem);
+  margin-bottom: 0.25rem;
 }
 
 .dasha-period {
@@ -447,10 +633,10 @@
 .kalachakra-tab {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  align-items: center;
+  gap: 1.25rem;
+  align-items: stretch;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
 }
 
 .system-toggle {
@@ -593,12 +779,13 @@
 .section {
   background: linear-gradient(135deg, #ffffff 0%, #fefcfb 100%);
   border-radius: 16px;
-  padding: 1.5rem;
+  padding: 1rem 0.85rem;
   box-shadow: 0 8px 32px rgba(249, 115, 22, 0.1);
   border: 2px solid #fed7d7;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .section h4 {
@@ -613,11 +800,13 @@
 .maha-scroll,
 .antar-scroll {
   display: flex;
-  gap: 1rem;
+  gap: 0.65rem;
   overflow-x: auto;
   padding: 0.5rem 0 1rem 0;
   scrollbar-width: thin;
   scrollbar-color: #9c27b0 #f3e5f5;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 }
 
 .maha-scroll::-webkit-scrollbar,
@@ -639,15 +828,19 @@
 
 .maha-chip,
 .antar-chip {
-  min-width: 120px;
+  min-width: 108px;
+  max-width: min(140px, 48vw);
+  flex-shrink: 0;
+  scroll-snap-align: start;
   background: linear-gradient(135deg, #fefcfb 0%, #f3e5f5 100%);
   border: 2px solid #e1bee7;
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.65rem 0.5rem;
   cursor: pointer;
   transition: all 0.3s;
   text-align: center;
   box-shadow: 0 4px 16px rgba(156, 39, 176, 0.08);
+  box-sizing: border-box;
 }
 
 .maha-chip:hover,
@@ -707,10 +900,10 @@
 .yogini-tab {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  align-items: center;
+  gap: 1.25rem;
+  align-items: stretch;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
 }
 
 .yogini-card {
@@ -753,9 +946,11 @@
 
 .dasha-level-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
 }
 
 .scroll-arrows {
@@ -764,8 +959,9 @@
 }
 
 .scroll-arrow {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   border: 2px solid #8E2DE2;
   background: white;
   color: #8E2DE2;
@@ -774,9 +970,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
   transition: all 0.2s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .scroll-arrow:hover {
@@ -785,44 +983,128 @@
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+  /* Tabs: top strip, full width, horizontal scroll */
+  .tabs-section--mobile {
+    display: flex;
+    width: calc(100% + 2 * var(--dasha-pad-x, 0.75rem));
+    margin-left: calc(-1 * var(--dasha-pad-x, 0.75rem));
+    margin-right: calc(-1 * var(--dasha-pad-x, 0.75rem));
+    padding-left: max(0.5rem, var(--dasha-pad-x, 0.75rem));
+    padding-right: max(0.5rem, var(--dasha-pad-x, 0.75rem));
+  }
+
+  .tabs-section--desktop {
+    display: none !important;
+  }
+
+  /* Date row + card only on desktop */
+  .nav-section--desktop {
+    display: none !important;
+  }
+
   .integrated-header {
-    flex-direction: column;
+    display: none !important;
   }
-  
-  .nav-section, .dasha-section, .tabs-section {
-    flex: none;
-    border: none;
-    border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+
+  /* Date controls: full-width row below tabs */
+  .dasha-date-toolbar--mobile {
+    display: flex;
+    width: calc(100% + 2 * var(--dasha-pad-x, 0.75rem));
+    margin-left: calc(-1 * var(--dasha-pad-x, 0.75rem));
+    margin-right: calc(-1 * var(--dasha-pad-x, 0.75rem));
+    padding-left: max(0.35rem, var(--dasha-pad-x, 0.75rem));
+    padding-right: max(0.35rem, var(--dasha-pad-x, 0.75rem));
   }
-  
-  .tabs-section {
-    border-bottom: none;
+}
+
+@media (min-width: 901px) {
+  .tabs-section--mobile {
+    display: none !important;
   }
-  
+}
+
+@media (max-width: 900px) and (min-width: 401px) {
+  .dasha-date-toolbar--mobile .dasha-nav-btn {
+    font-size: 0.62rem;
+  }
+  .dasha-date-toolbar--mobile .dasha-date-btn--compact {
+    font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .dasha-date-toolbar--mobile .dasha-date-btn__text--long {
+    display: none;
+  }
+  .dasha-date-toolbar--mobile .dasha-date-btn__text--short {
+    display: inline;
+  }
+}
+
+@media (max-width: 768px) {
   .dasha-browser {
-    padding: 0.5rem;
+    --dasha-pad-x: 0.35rem;
+    padding: 0.5rem var(--dasha-pad-x) 1.25rem;
   }
-  
+
   .dasha-cards {
     gap: 0.5rem;
+    padding-left: 2px;
+    padding-right: 2px;
   }
-  
+
   .dasha-card {
-    min-width: 100px;
-    padding: 0.6rem;
+    min-width: 108px;
+    width: 118px;
+    max-width: 118px;
+    padding: 0.55rem 0.4rem;
   }
-  
+
+  .dasha-dates {
+    font-size: 0.6rem;
+    line-height: 1.25;
+  }
+
+  .current-dasha-planet {
+    font-size: 0.65rem;
+    padding: 0.4rem 0.45rem;
+  }
+
+  .dasha-arrow {
+    font-size: 0.85rem;
+  }
+
   .kalachakra-pillars {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.65rem;
+    padding: 1rem 0.75rem;
   }
-  
+
   .pillar-center {
     border: none;
     border-top: 1px solid #9c27b0;
     border-bottom: 1px solid #9c27b0;
-    padding: 0.5rem 0;
+    padding: 0.65rem 0;
+  }
+
+  .maha-chip,
+  .antar-chip {
+    min-width: 100px;
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dasha-nav-btn {
+    font-size: 0.62rem;
+    padding: 0.35rem 0.15rem;
+    min-height: 40px;
+  }
+
+  .dasha-date-btn {
+    font-size: 0.72rem;
+    padding: 0.4rem 0.5rem;
   }
 }
 
@@ -831,10 +1113,10 @@
 .chara-tab {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  align-items: center;
+  gap: 1.25rem;
+  align-items: stretch;
   width: 100%;
-  max-width: 90vw;
+  max-width: 100%;
 }
 
 .chara-loading, .chara-error {
@@ -868,12 +1150,13 @@
 
 .sign-card-main {
   display: flex;
-  align-items: center;
-  padding: 1.2rem;
+  align-items: flex-start;
+  padding: 1rem 0.85rem;
   cursor: pointer;
   border-left: 4px solid transparent;
   transition: all 0.3s;
-  gap: 1rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .sign-card-main:hover {
@@ -911,7 +1194,8 @@
 .sign-dates {
   font-size: 0.8rem;
   color: #999;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .sign-progress {

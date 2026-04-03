@@ -31,7 +31,7 @@ export const GridContainer = styled.div`
   grid-template-rows: 52vh auto;
   gap: 0.3rem;
   row-gap: 0.3rem;
-  padding: 0.5rem 0.5rem 0 0.5rem;
+  padding: 0.15rem 0.5rem 0 0.5rem;
   max-width: 100vw;
   margin: 0;
   flex: 1;
@@ -40,8 +40,8 @@ export const GridContainer = styled.div`
     grid-template-columns: 1fr;
     grid-template-rows: repeat(4, 40vh) auto;
     height: auto;
-    padding: 0.5rem 0.25rem;
-    gap: 0.5rem;
+    padding: 0.12rem 0.2rem 0.4rem;
+    gap: 0.4rem;
   }
 `;
 

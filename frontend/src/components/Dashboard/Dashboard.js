@@ -19,8 +19,8 @@ import DashaBrowser from '../DashaBrowser/DashaBrowser';
 
 import TransitAspectsPopup from '../TransitAspectsPopup/TransitAspectsPopup';
 import ClassicalPrediction from '../ClassicalPrediction/ClassicalPrediction';
-import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
 import UnifiedHeader from '../UnifiedHeader/UnifiedHeader';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import UserSettings from '../UserSettings';
 import AdminTab from '../AdminTab/AdminTab';
 import TransitDateControls from '../TransitDateControls/TransitDateControls';
@@ -183,6 +183,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
   const [userSettings, setUserSettings] = useState({ node_type: 'mean', default_chart_style: 'north' });
   const [chartRefHighlight, setChartRefHighlight] = useState(null);
   const [showTransitAspectsPopup, setShowTransitAspectsPopup] = useState(false);
+  const [showBirthFormModal, setShowBirthFormModal] = useState(false);
 
   useEffect(() => {
     if (!birthData || !chartData) {
@@ -247,40 +248,6 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
   const handleSettingsUpdate = async () => {
     await loadUserSettings();
     await refreshChartWithSettings();
-  };
-
-
-
-  const selectExistingChart = async (chart) => {
-    try {
-      const { apiService } = await import('../../services/apiService');
-      
-      const chartData = await apiService.calculateChartOnly({
-        name: chart.name,
-        date: chart.date,
-        time: chart.time,
-        latitude: chart.latitude,
-        longitude: chart.longitude,
-        place: chart.place || ''
-      }, userSettings.node_type);
-      
-      setBirthData({
-        name: chart.name,
-        date: chart.date,
-        time: chart.time,
-        place: chart.place || `${chart.latitude}, ${chart.longitude}`,
-        latitude: chart.latitude,
-        longitude: chart.longitude,
-        timezone: chart.timezone
-      });
-      
-      setChartData(chartData);
-      // Reset cascading data and load fresh data
-      setCascadingDashaData(null);
-      handleTransitDateChange(new Date());
-    } catch (error) {
-      console.error('Failed to load chart:', error);
-    }
   };
 
   const handleLayoutChange = (layout, layouts) => {
@@ -355,7 +322,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
     <DashboardContainer style={{ overflow: 'visible' }}>
       <UnifiedHeader
         currentChart={birthData}
-        onSelectChart={selectExistingChart}
+        onChangeNative={() => setShowBirthFormModal(true)}
         onViewAllCharts={onViewAllCharts}
         onNewChart={onNewChart || onBack}
         onLogout={onLogout}
@@ -367,16 +334,29 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
         onSettings={() => setActiveTab('settings')}
       />
 
+      <BirthFormModal
+        isOpen={showBirthFormModal}
+        onClose={() => setShowBirthFormModal(false)}
+        onSubmit={() => {
+          setTimeout(() => {
+            setCascadingDashaData(null);
+            handleTransitDateChange(transitDate);
+          }, 0);
+        }}
+      />
+
       {/* Tab Navigation */}
       <div style={{ 
         display: 'flex', 
         borderBottom: '3px solid #e91e63',
-        marginBottom: '0.5rem',
         background: '#f8f9fa',
         borderRadius: window.innerWidth <= 768 ? '0' : '8px',
-        padding: window.innerWidth <= 768 ? '0.8rem 0.5rem' : '0.6rem',
-        minHeight: window.innerWidth <= 768 ? '65px' : '50px',
-        margin: window.innerWidth <= 768 ? '0' : '0 0.5rem',
+        padding: window.innerWidth <= 768 ? '0.3rem 0.35rem' : '0.45rem 0.6rem',
+        minHeight: window.innerWidth <= 768 ? '42px' : '46px',
+        marginTop: 0,
+        marginBottom: window.innerWidth <= 768 ? '0.08rem' : '0.2rem',
+        marginLeft: window.innerWidth <= 768 ? 0 : '0.5rem',
+        marginRight: window.innerWidth <= 768 ? 0 : '0.5rem',
         overflowX: 'auto',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
@@ -410,13 +390,13 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: window.innerWidth <= 768 ? '0.7rem 1rem' : '0.6rem 1.2rem',
+              padding: window.innerWidth <= 768 ? '0.4rem 0.65rem' : '0.6rem 1.2rem',
               background: activeTab === tab.id ? '#e91e63' : 'transparent',
               color: activeTab === tab.id ? 'white' : '#e91e63',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+              fontSize: window.innerWidth <= 768 ? '0.78rem' : '1rem',
               fontWeight: '600',
               marginRight: '0.2rem',
               whiteSpace: 'nowrap',
@@ -437,7 +417,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             display: 'flex', 
             flexDirection: 'column', 
             position: 'fixed',
-            top: '185px',
+            top: '128px',
             left: '0',
             right: '0',
             bottom: '80px',
@@ -446,7 +426,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             {/* Main Content Area */}
             <div style={{ 
               flex: 1, 
-              padding: '0.5rem', 
+              padding: '0.08rem 0.35rem 0.35rem', 
               overflow: 'hidden'
             }}>
               {mobileSubTab === 'lagna' && (
@@ -598,8 +578,8 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
               display: 'flex',
               background: 'rgba(255, 255, 255, 0.95)',
               borderTop: '2px solid #e91e63',
-              padding: '0.5rem 0.25rem',
-              gap: '0.25rem',
+              padding: '0.3rem 0.15rem',
+              gap: '0.2rem',
               overflowX: 'auto',
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
@@ -822,9 +802,9 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
           <div style={{ 
             background: 'rgba(255,255,255,0.95)',
             borderRadius: '12px',
-            padding: '1rem',
-            margin: window.innerWidth <= 768 ? '0 0.5rem' : '0 1rem',
-            marginTop: window.innerWidth <= 768 ? '175px' : '0',
+            padding: window.innerWidth <= 768 ? '0.28rem 0.45rem 0.65rem' : '0.4rem 1rem 1rem',
+            margin: window.innerWidth <= 768 ? '0 0.35rem' : '0 1rem',
+            marginTop: window.innerWidth <= 768 ? '128px' : '0',
             minHeight: '70vh',
             boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
           }}>
