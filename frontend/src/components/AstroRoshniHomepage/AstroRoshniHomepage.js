@@ -839,6 +839,38 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <p>Unlock the secrets of your destiny with best in class Vedic Astrology</p>
             <div className="life-categories-divider"></div>
           </div>
+          <div className="native-selector-callout">
+            <div className="native-selector-callout__left">
+              <div className="native-selector-callout__title-row">
+                <span className="native-selector-callout__icon">👤</span>
+                <h4>Your predictions depend on selected native</h4>
+              </div>
+              <p>
+                AstroRoshni works on the native's birth chart. Please select an existing native
+                or add a new one before exploring analysis modules.
+              </p>
+              <div className="native-selector-callout__status">
+                {birthData && birthData.name ? (
+                  <>Current native: <strong>{birthData.name}</strong></>
+                ) : (
+                  <>No native selected yet</>
+                )}
+              </div>
+            </div>
+            <button
+              className="native-selector-callout__btn"
+              onClick={() => {
+                if (!user) {
+                  onLogin();
+                  return;
+                }
+                setBirthFormContext('changeNative');
+                setShowBirthFormModal(true);
+              }}
+            >
+              {birthData && birthData.name ? 'Change Native' : 'Select / Add Native'}
+            </button>
+          </div>
           <div className="life-categories-grid">
             <div className="life-category" onClick={() => user ? navigate('/career-guidance') : onLogin()}>
               <div className="category-icon">💼</div>

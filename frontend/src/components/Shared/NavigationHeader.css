@@ -415,11 +415,28 @@
 }
 
 .logo-text .logo-full {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .logo-text .logo-short {
   display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo-icon-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+  border-radius: 5px;
+}
+
+.logo-text .logo-full,
+.logo-text .logo-short {
+  align-items: center;
 }
 
 .logo-text:hover {
@@ -667,7 +684,7 @@
   }
   
   .logo-text .logo-short {
-    display: inline;
+    display: inline-flex;
   }
   
   .main-nav .container {

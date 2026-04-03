@@ -64,6 +64,11 @@ function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
 
+  const clearAstrologySessionCache = () => {
+    localStorage.removeItem('astrology_birth_data');
+    localStorage.removeItem('astrology_chart_data');
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
@@ -120,6 +125,9 @@ function App() {
   }, []);
 
   const handleLogin = (userData) => {
+    // Reset cached native/chart from any previous session so another account
+    // does not inherit stale localStorage birth details in header.
+    clearAstrologySessionCache();
     setUser(userData);
     
     // Check if user should be redirected after login
@@ -149,6 +157,7 @@ function App() {
 
   const handleLogout = () => {
     authService.logout();
+    clearAstrologySessionCache();
     setUser(null);
     setCurrentView('selector');
   };

@@ -149,10 +149,10 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        🌟 Join AstroVishnu
+        🌟 Join AstroRoshni
       </h2>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} autoComplete="off">
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{
             display: 'block',
@@ -326,6 +326,11 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
               onChange={(e) => setFormData(prev => ({ ...prev, otpCode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }))}
               placeholder="Enter 6-digit OTP"
               maxLength="6"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              autoCorrect="off"
+              spellCheck={false}
+              autoCapitalize="off"
               style={{
                 flex: 1,
                 padding: '0.75rem',

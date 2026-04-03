@@ -45,8 +45,14 @@ const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector,
         <div className="compact-nav">
           <div className="container">
             <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
-              <span className="logo-full">🔮 AstroRoshni</span>
-              <span className="logo-short">🔮 AR</span>
+              <span className="logo-full">
+                <img src="/images/astroroshni-icon.png" alt="AstroRoshni" className="logo-icon-img" />
+                AstroRoshni
+              </span>
+              <span className="logo-short">
+                <img src="/images/astroroshni-icon.png" alt="AR" className="logo-icon-img" />
+                AR
+              </span>
             </button>
             
             <nav className="compact-menu">
@@ -189,8 +195,14 @@ const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector,
         <div className="container">
           <div className="logo-section">
             <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
-              <span className="logo-full">🔮 AstroRoshni</span>
-              <span className="logo-short">🔮 AR</span>
+              <span className="logo-full">
+                <img src="/images/astroroshni-icon.png" alt="AstroRoshni" className="logo-icon-img" />
+                AstroRoshni
+              </span>
+              <span className="logo-short">
+                <img src="/images/astroroshni-icon.png" alt="AR" className="logo-icon-img" />
+                AR
+              </span>
             </button>
           </div>
           <SearchBar user={user} onLogin={onLogin} />

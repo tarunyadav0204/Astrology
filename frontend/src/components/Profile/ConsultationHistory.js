@@ -7,13 +7,22 @@ const ConsultationHistory = ({ user }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     fetchChatHistory();
-  }, []);
+  }, [user?.userid]);
 
   const fetchChatHistory = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/chat-v2/history', {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      // Same-origin /api path so CRA dev proxy forwards auth (matches ChatModal, CreditContext)
+      const response = await fetch('/api/chat-v2/history', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -34,7 +43,7 @@ const ConsultationHistory = ({ user }) => {
   const fetchSessionDetails = async (sessionId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/chat-v2/session/${sessionId}`, {
+      const response = await fetch(`/api/chat-v2/session/${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

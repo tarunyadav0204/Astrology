@@ -6,13 +6,21 @@ const CreditLedger = ({ user }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     fetchTransactionHistory();
-  }, []);
+  }, [user?.userid]);
 
   const fetchTransactionHistory = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/credits/history', {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      const response = await fetch('/api/credits/history', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
