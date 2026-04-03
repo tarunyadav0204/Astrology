@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, ScrollView, Platform, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
@@ -27,34 +28,32 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
 
   return (
     <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
-      {/* Header (Always Visible) */}
+      {/* Header row toggles expand; chips scroll is outside TouchableOpacity so horizontal pan works */}
       <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7}>
-        {/* Row 1: Month name + chevron */}
         <View style={styles.headerRow}>
           <Text style={[styles.monthName, { color: colors.accent }]}>{data.month}</Text>
-          <Ionicons 
-            name={expanded ? "chevron-up" : "chevron-down"} 
-            size={20} 
-            color={colors.textSecondary} 
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={20}
+            color={colors.textSecondary}
           />
         </View>
-        
-        {/* Row 2: All chips in horizontal scroll (only when collapsed) */}
-        {!expanded && tags.length > 0 && (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipsRow}
-            contentContainerStyle={styles.chipsContent}
-          >
-            {tags.map((tag, i) => (
-              <View key={`chip-${i}`} style={[styles.miniTag, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.miniTagText, { color: colors.textSecondary }]}>{tag}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        )}
       </TouchableOpacity>
+      {!expanded && tags.length > 0 && (
+        <GHScrollView
+          horizontal
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsRow}
+          contentContainerStyle={styles.chipsContent}
+        >
+          {tags.map((tag, i) => (
+            <View key={`chip-${i}`} style={[styles.miniTag, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.miniTagText, { color: colors.textSecondary }]}>{tag}</Text>
+            </View>
+          ))}
+        </GHScrollView>
+      )}
 
       {/* Expanded Content */}
       {expanded && (
@@ -180,6 +179,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   chipsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   miniTag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },

@@ -344,7 +344,8 @@ CREATE TABLE "karma_insights" (
     "error" TEXT,
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY ("id")
+    PRIMARY KEY ("id"),
+    CONSTRAINT "karma_insights_chart_user_key" UNIQUE ("chart_id", "user_id")
 );
 
 DROP TABLE IF EXISTS "chat_error_logs" CASCADE;

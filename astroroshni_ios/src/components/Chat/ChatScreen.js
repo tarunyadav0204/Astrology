@@ -1417,7 +1417,9 @@ export default function ChatScreen({ navigation, route }) {
     } else if (option.action === 'numerology') {
       navigation.navigate('Numerology');
     } else if (option.action === 'analysis') {
-      if (option.type === 'trading') {
+      if (option.type === 'karma') {
+        navigation.navigate('KarmaAnalysis', { chartId: birthData?.id });
+      } else if (option.type === 'trading') {
         navigation.navigate('TradingDashboard');
       } else if (option.type === 'financial') {
         navigation.navigate('FinancialDashboard');

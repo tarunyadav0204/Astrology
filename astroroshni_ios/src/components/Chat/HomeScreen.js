@@ -681,6 +681,14 @@ const loadHomeData = async (nativeData = null) => {
   ];
 
   const analysisOptions = [
+    {
+      id: 'karma',
+      title: t('home.analysis.karma.title', 'Past Life Karma'),
+      icon: '🕉️',
+      description: t('home.analysis.karma.description', "Your soul's eternal journey"),
+      gradient: ['#5B21B6', '#9333EA'],
+      cost: pricing.karma ?? pricing.karma_analysis ?? 25,
+    },
     { 
       id: 'career', 
       title: t('home.analysis.career.title', 'Career Analysis'), 
@@ -1009,7 +1017,7 @@ const loadHomeData = async (nativeData = null) => {
             <View style={styles.analysisContainer}>
               <Text style={[styles.analysisTitle, { color: colors.text }]}>{t('home.sections.lifeAnalysis', '🧘 Life Analysis')}</Text>
               <View style={styles.lifeAnalysisGrid}>
-                {analysisOptions.slice(0, 6).map((option, index) => (
+                {analysisOptions.slice(0, 7).map((option, index) => (
                   <LifeAnalysisCard
                     key={option.id}
                     option={option}
@@ -1032,7 +1040,7 @@ const loadHomeData = async (nativeData = null) => {
                 decelerationRate="fast"
                 contentContainerStyle={styles.ribbonScrollContent}
               >
-                {analysisOptions.slice(6).map((option, index) => (
+                {analysisOptions.slice(7).map((option, index) => (
                   <CosmicRibbonCard
                     key={option.id}
                     option={option}
@@ -2256,13 +2264,16 @@ function OptionCard({ option, index, onOptionSelect }) {
 function LifeAnalysisCard({ option, index, onOptionSelect }) {
   const { colors, theme } = useTheme();
   
-  const isLarge = option && (option.id === 'career' || option.id === 'wealth');
-  const isWide = option && (option.id === 'marriage' || option.id === 'progeny');
+  const isLarge = option && (option.id === 'karma' || option.id === 'career' || option.id === 'wealth' || option.id === 'marriage');
+  const isWide = option && option.id === 'progeny';
   
   if (!option) return null;
+
+  const isMarriage = option.id === 'marriage';
   
   return (
     <View 
+      testID={isMarriage ? 'life-analysis-marriage' : `life-analysis-${option.id}`}
       style={[
         styles.lifeAnalysisCard,
         isLarge && styles.lifeAnalysisCardLarge,
@@ -2277,6 +2288,7 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
           colors={option.gradient}
           style={[
             styles.lifeAnalysisGradient,
+            !isLarge && !isWide && styles.lifeAnalysisGradientSmallFixed,
             isLarge && styles.lifeAnalysisGradientLarge,
             isWide && styles.lifeAnalysisGradientWide,
           ]}
@@ -2874,6 +2886,8 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  lifeAnalysisGradientSmallFixed: {
     height: 160,
   },
   lifeAnalysisGradientLarge: {

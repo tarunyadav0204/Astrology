@@ -10,7 +10,10 @@ import {
   Animated,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
@@ -29,6 +32,7 @@ const { width, height } = Dimensions.get('window');
 const KarmaAnalysisScreen = ({ route, navigation }) => {
   useAnalytics('KarmaAnalysisScreen');
   const { theme, colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
   const { chartId } = route.params || {};
   const { credits, fetchBalance } = useCredits();
@@ -519,19 +523,77 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     }
   };
 
+  const headerBorder = isDark ? 'rgba(255,215,0,0.14)' : colors.cardBorder;
+  const headerIconBg = isDark ? 'rgba(255,255,255,0.08)' : colors.surface;
+  const headerIconBorder = isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder;
+
+  const renderKarmaTopBar = ({ nativeInteractive = false, rightSlot }) => (
+    <View
+      style={[
+        styles.karmaTopBar,
+        {
+          paddingTop: Math.max(insets.top, 12) + 6,
+          borderBottomColor: headerBorder,
+        },
+      ]}
+    >
+      <View style={styles.karmaTopBarSide}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.headerIconBtn, { backgroundColor: headerIconBg, borderColor: headerIconBorder }]}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.accent} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.karmaTopBarCenter} pointerEvents="box-none">
+        {nativeInteractive ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })}
+            style={[
+              styles.nameChip,
+              {
+                backgroundColor: isDark ? 'rgba(255,215,0,0.14)' : colors.surface,
+                borderColor: isDark ? 'rgba(255,215,0,0.38)' : colors.cardBorder,
+              },
+            ]}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Change native chart"
+          >
+            <Text style={[styles.nameChipText, { color: colors.accent }]} numberOfLines={1}>
+              {nativeName}
+            </Text>
+            <Ionicons name="chevron-down" size={17} color={colors.accent} style={styles.nameChipChevron} />
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={[
+              styles.nameChip,
+              styles.nameChipStatic,
+              {
+                backgroundColor: isDark ? 'rgba(255,215,0,0.14)' : colors.surface,
+                borderColor: isDark ? 'rgba(255,215,0,0.38)' : colors.cardBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.nameChipText, { color: colors.accent }]} numberOfLines={1}>
+              {nativeName}
+            </Text>
+          </View>
+        )}
+      </View>
+      <View style={[styles.karmaTopBarSide, styles.karmaTopBarSideRight]}>{rightSlot}</View>
+    </View>
+  );
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
-            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
-          </TouchableOpacity>
-          <View style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
-            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
-          </View>
-          <View style={styles.regenerateButton} />
-        </View>
+        {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
         <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
           <View style={[styles.cosmicLoader, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
             <Text style={styles.omSymbol}>🕉️</Text>
@@ -563,15 +625,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
-            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
-          </TouchableOpacity>
-          <View style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
-            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
-          </View>
-          <View style={styles.regenerateButton} />
-        </View>
+        {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={[styles.errorTitle, { color: colors.accent }]}>Unable to Access Records</Text>
@@ -581,8 +635,15 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
               <Text style={[styles.retryText, { color: '#fff' }]}>Try Again</Text>
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={[styles.backText, { color: colors.textSecondary }]}>← Go Back</Text>
+          <TouchableOpacity
+            style={[styles.errorBackRow, { borderColor: headerIconBorder, backgroundColor: headerIconBg }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.accent} />
+            <Text style={[styles.errorBackRowText, { color: colors.textSecondary }]}>Go back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -593,16 +654,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
-            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
-            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
-            <Text style={[styles.nameChipIcon, { color: colors.accent }]}>▼</Text>
-          </TouchableOpacity>
-          <View style={styles.regenerateButton} />
-        </View>
+        {renderKarmaTopBar({
+          nativeInteractive: true,
+          rightSlot: <View style={styles.headerRightSpacer} />,
+        })}
         <View style={styles.startContainer}>
           <Text style={styles.omSymbol}>🕉️</Text>
           <Text style={[styles.startTitle, { color: colors.accent }]}>Past Life Karma Analysis</Text>
@@ -633,23 +688,40 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient colors={screenGradientWithAccent} style={styles.backgroundGradient}>
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
-            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
-            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
-            <Text style={[styles.nameChipIcon, { color: colors.accent }]}>▼</Text>
-          </TouchableOpacity>
-          <View style={styles.topBarActions}>
-            <TouchableOpacity onPress={generateKarmaPDF} style={[styles.shareButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]} disabled={generatingPDF}>
-              <Text style={styles.shareIcon}>{generatingPDF ? '⏳' : '📤'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleRegenerate} style={[styles.regenerateButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
-              <Text style={styles.regenerateIcon}>↻</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {renderKarmaTopBar({
+          nativeInteractive: true,
+          rightSlot: (
+            <>
+              <TouchableOpacity
+                onPress={generateKarmaPDF}
+                style={[
+                  styles.headerIconBtn,
+                  { backgroundColor: headerIconBg, borderColor: headerIconBorder },
+                  generatingPDF && styles.headerIconBtnDisabled,
+                ]}
+                disabled={generatingPDF}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Share or export PDF"
+              >
+                {generatingPDF ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Ionicons name="share-outline" size={21} color={colors.accent} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleRegenerate}
+                style={[styles.headerIconBtn, { backgroundColor: headerIconBg, borderColor: headerIconBorder }]}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Regenerate analysis"
+              >
+                <Ionicons name="refresh" size={22} color={colors.accent} />
+              </TouchableOpacity>
+            </>
+          ),
+        })}
         <CreditModal
           visible={showRegenerateModal}
           onClose={() => setShowRegenerateModal(false)}
@@ -695,7 +767,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
 const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title, colors = {}, isDark = true }) => (
   <Modal visible={visible} transparent animationType="fade">
-    <View style={[styles.modalOverlay, { backgroundColor: colors.overlay || 'rgba(0,0,0,0.6)' }]}>
+    <View style={[styles.modalOverlay, { backgroundColor: '#000000' }]}>
       <View style={[styles.modalContent, { backgroundColor: colors.surface || '#2d1b4e', borderColor: colors.cardBorder || 'rgba(255,215,0,0.3)' }]}>
         <Text style={[styles.modalTitle, { color: colors.accent || '#FFD700' }]}>{title}</Text>
         <Text style={[styles.modalText, { color: colors.text || '#fff' }]}>This will use {cost} credits</Text>
@@ -843,79 +915,80 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 40,
   },
-  topBar: {
+  karmaTopBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
-  backIconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  karmaTopBarSide: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    minWidth: 44,
+  },
+  karmaTopBarSideRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    minWidth: 44,
+  },
+  karmaTopBarCenter: {
+    flexShrink: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    maxWidth: '52%',
+  },
+  headerIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth * 2,
   },
-  backIcon: {
-    fontSize: 24,
-    color: '#FFD700',
+  headerIconBtnDisabled: {
+    opacity: 0.55,
+  },
+  headerRightSpacer: {
+    width: 44,
+    height: 44,
   },
   nameChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    maxWidth: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-    maxWidth: '50%',
+  },
+  nameChipStatic: {
+    paddingRight: 14,
   },
   nameChipText: {
-    color: '#FFD700',
     fontSize: 14,
-    fontWeight: '600',
-    marginRight: 6,
+    fontWeight: '700',
+    flexShrink: 1,
   },
-  nameChipIcon: {
-    color: '#FFD700',
-    fontSize: 10,
-  },
-  topBarActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 215, 0, 0.5)',
-  },
-  shareIcon: {
-    fontSize: 20,
-    color: '#FFD700',
-  },
-  regenerateButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
-  },
-  regenerateIcon: {
-    fontSize: 24,
-    color: '#FFD700',
-    fontWeight: 'bold',
+  nameChipChevron: {
+    marginLeft: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -1173,12 +1246,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a0033',
   },
-  backButton: {
+  errorBackRow: {
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth * 2,
   },
-  backText: {
+  errorBackRowText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
   },
   startContainer: {
     flex: 1,
@@ -1215,7 +1295,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },

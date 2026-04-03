@@ -8,10 +8,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
-  FlatList,
   Alert,
   Modal
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -400,29 +400,30 @@ export default function EventScreen({ route }) {
 
   const years = React.useMemo(() => Array.from({length: 101}, (_, i) => START_YEAR + i), []);
 
+  const scrollYearStripToIndex = useCallback((index, animated) => {
+    const ref = yearSliderRef.current;
+    if (!ref) return;
+    const padding = SIDE_PADDING;
+    const itemOffset = padding + index * TOTAL_ITEM_SIZE;
+    const desired = itemOffset - (width - ITEM_WIDTH) / 2;
+    const contentW = padding * 2 + years.length * TOTAL_ITEM_SIZE;
+    const maxScroll = Math.max(0, contentW - width);
+    const x = Math.max(0, Math.min(maxScroll, desired));
+    ref.scrollTo({ x, animated });
+  }, [years.length]);
+
   useEffect(() => {
-    if (yearSliderRef.current && !analysisStarted && readingMode === 'yearly') {
-      const index = selectedYear - START_YEAR;
-      setTimeout(() => {
-        yearSliderRef.current?.scrollToIndex({ 
-          index, 
-          animated: false,
-          // 0.5 tends to place the selected chip near the center.
-          viewPosition: 0.5
-        });
-      }, 100);
-    }
-  }, [analysisStarted, readingMode, selectedYear]);
+    if (analysisStarted || readingMode !== 'yearly') return;
+    const index = selectedYear - START_YEAR;
+    const t = setTimeout(() => scrollYearStripToIndex(index, false), 100);
+    return () => clearTimeout(t);
+  }, [analysisStarted, readingMode, selectedYear, scrollYearStripToIndex]);
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
     setMonthlyData(null); // Clear data when year changes
     const index = year - START_YEAR;
-    yearSliderRef.current?.scrollToIndex({ 
-      index, 
-      animated: true, 
-      viewPosition: 0.5
-    });
+    scrollYearStripToIndex(index, true);
   };
 
   const handleMonthlyContinue = () => {
@@ -696,36 +697,21 @@ export default function EventScreen({ route }) {
             <>
               {/* Year Picker - Horizontal Chips */}
               <View style={styles.yearChipsContainer}>
-                <FlatList
+                <GHScrollView
                   ref={yearSliderRef}
                   horizontal
-                  data={years}
-                  keyExtractor={(item) => item.toString()}
+                  nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.yearChipsContent}
                   decelerationRate="fast"
-                  getItemLayout={(data, index) => ({
-                    length: TOTAL_ITEM_SIZE,
-                    offset: TOTAL_ITEM_SIZE * index,
-                    index,
-                  })}
-                  onScrollToIndexFailed={(info) => {
-                    const wait = new Promise(resolve => setTimeout(resolve, 500));
-                    wait.then(() => {
-                      yearSliderRef.current?.scrollToIndex({
-                        index: info.index,
-                        animated: true,
-                        viewPosition: 0
-                      });
-                    });
-                  }}
-                  renderItem={({ item }) => (
-                    <View style={{ width: TOTAL_ITEM_SIZE }}>
+                  contentContainerStyle={styles.yearChipsContent}
+                >
+                  {years.map((item) => (
+                    <View key={item} style={{ width: TOTAL_ITEM_SIZE }}>
                       <TouchableOpacity
                         style={[
                           styles.yearChip,
                           { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
-                    selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
+                          selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
                           { width: ITEM_WIDTH }
                         ]}
                         onPress={() => handleYearChange(item)}
@@ -739,8 +725,8 @@ export default function EventScreen({ route }) {
                         </Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                />
+                  ))}
+                </GHScrollView>
               </View>
 
               {/* Quick Select */}
@@ -765,19 +751,21 @@ export default function EventScreen({ route }) {
                 {t('eventScreen.pickMonth', `Pick a month in ${deviceYear}`)}
               </Text>
               <View style={styles.monthChipsContainer}>
-                <FlatList
+                <GHScrollView
                   horizontal
-                  data={deviceMonths}
-                  keyExtractor={(item) => item.toString()}
+                  nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
                   contentContainerStyle={styles.monthChipsContent}
-                  renderItem={({ item }) => (
-                    <View style={{ width: ITEM_WIDTH }}>
+                >
+                  {deviceMonths.map((item) => (
+                    <View key={item} style={{ width: ITEM_WIDTH + ITEM_GAP }}>
                       <TouchableOpacity
                         style={[
                           styles.monthChip,
                           { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
                           selectedMonth === item && { backgroundColor: colors.primary, borderColor: colors.primary },
+                          { width: ITEM_WIDTH }
                         ]}
                         onPress={() => setSelectedMonth(item)}
                       >
@@ -790,8 +778,8 @@ export default function EventScreen({ route }) {
                         </Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                />
+                  ))}
+                </GHScrollView>
               </View>
             </>
           )}
@@ -844,7 +832,8 @@ export default function EventScreen({ route }) {
           </View>
         </View>
       ) : (
-        <ScrollView 
+        <ScrollView
+        nestedScrollEnabled
         contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
@@ -1085,9 +1074,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     height: 56,
     justifyContent: 'center',
+    width: '100%',
   },
   monthChipsContent: {
     paddingHorizontal: (width - ITEM_WIDTH) / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   monthChip: {
     paddingVertical: 12,
@@ -1105,10 +1097,13 @@ const styles = StyleSheet.create({
   },
   yearChipsContainer: {
     marginBottom: 16,
-    height: 56
+    height: 56,
+    width: '100%',
   },
   yearChipsContent: {
-    paddingHorizontal: (width - 80) / 2
+    paddingHorizontal: (width - 80) / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   yearChip: {
     paddingVertical: 12,

@@ -655,6 +655,7 @@ class UserCreate(BaseModel):
     phone: str
     password: str
     email: Optional[str] = None
+    otp_token: Optional[str] = None
     role: str = "user"
 
 class UserLogin(BaseModel):
@@ -969,6 +970,23 @@ class UserRegistrationWithBirth(BaseModel):
 @app.post("/api/register")
 async def register(user_data: UserCreate):
     with get_conn() as conn:
+        # Enforce OTP verification for web registration: token must belong to phone and be unused/unexpired.
+        if not (user_data.otp_token or "").strip():
+            raise HTTPException(status_code=400, detail="OTP verification is required for registration")
+
+        cur = execute(
+            conn,
+            """
+                SELECT token FROM password_reset_codes
+                WHERE phone = %s AND token = %s AND expires_at > %s
+                  AND COALESCE(LOWER(TRIM(used::text)), '') NOT IN ('true', '1', 't', 'yes')
+            """,
+            (user_data.phone, user_data.otp_token.strip(), datetime.utcnow()),
+        )
+        otp_row = cur.fetchone()
+        if not otp_row:
+            raise HTTPException(status_code=400, detail="Invalid or expired OTP verification")
+
         cur = execute(conn, "SELECT phone FROM users WHERE phone = %s", (user_data.phone,))
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Phone number already registered")
@@ -1020,6 +1038,13 @@ async def register(user_data: UserCreate):
                 "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
                 (user[0], astroroshni_free[0], start_date, end_date),
             )
+
+        # Consume OTP token so it cannot be reused for another registration.
+        execute(
+            conn,
+            "UPDATE password_reset_codes SET used = 'TRUE' WHERE token = %s",
+            (user_data.otp_token.strip(),),
+        )
 
         conn.commit()
 

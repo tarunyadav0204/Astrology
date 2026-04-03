@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-  Dimensions,
   StatusBar,
   Platform,
 } from 'react-native';
@@ -18,10 +17,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { blogAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
-import { COLORS } from '../../utils/constants';
-
-const { width } = Dimensions.get('window');
-
 export default function BlogListScreen({ navigation }) {
   const { theme, colors } = useTheme();
   const [posts, setPosts] = useState([]);
@@ -68,6 +63,36 @@ export default function BlogListScreen({ navigation }) {
     const newCategory = selectedCategory === category ? null : category;
     setSelectedCategory(newCategory);
     fetchPosts(newCategory);
+  };
+
+  const renderCategoryHeader = () => {
+    if (!categories || categories.length === 0) return null;
+    return (
+      <View style={styles.categoriesContainer}>
+        <GHScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+          style={styles.categoriesScrollView}
+        >
+          {categories.map((category) => {
+            const isSelected = selectedCategory === category;
+            return (
+              <TouchableOpacity
+                key={String(category)}
+                style={[styles.categoryChip, isSelected && { backgroundColor: '#ff6b35' }]}
+                onPress={() => handleCategorySelect(category)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.categoryText, { color: isSelected ? '#fff' : colors.text }]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </GHScrollView>
+      </View>
+    );
   };
 
   const renderPostItem = ({ item }) => (

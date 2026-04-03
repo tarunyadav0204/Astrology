@@ -795,6 +795,15 @@ const loadHomeData = async (nativeData = null) => {
   ];
 
   const analysisOptions = [
+    {
+      id: 'karma',
+      title: t('home.analysis.karma.title', 'Past Life Karma'),
+      icon: '🕉️',
+      description: t('home.analysis.karma.description', "Your soul's eternal journey"),
+      gradient: ['#5B21B6', '#9333EA'],
+      cost: pricing.karma ?? 25,
+      originalCost: pricingOriginal.karma,
+    },
     { id: 'career', title: t('home.analysis.career.title', 'Career Analysis'), icon: '💼', description: t('home.analysis.career.description', 'Professional success & opportunities'), gradient: ['#6366F1', '#8B5CF6'], cost: pricing.career ?? 12, originalCost: pricingOriginal.career },
     { id: 'wealth', title: t('home.analysis.wealth.title', 'Wealth Analysis'), icon: '💰', description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'), gradient: ['#0EA5E9', '#38BDF8'], cost: pricing.wealth ?? 5, originalCost: pricingOriginal.wealth },
     { id: 'marriage', title: t('home.analysis.marriage.title', 'Marriage Analysis'), icon: '💕', description: t('home.analysis.marriage.description', 'Relationship compatibility & timing'), gradient: ['#FF69B4', '#DC143C'], cost: pricing.marriage ?? 3, originalCost: pricingOriginal.marriage },
@@ -1019,7 +1028,7 @@ const loadHomeData = async (nativeData = null) => {
         <View style={styles.analysisContainer}>
           <Text style={[styles.analysisTitle, { color: colors.text }]}>{t('home.sections.lifeAnalysis', '🧘 Life Analysis')}</Text>
           <View style={styles.lifeAnalysisGrid}>
-            {analysisOptions.slice(0, 6).map((option, index) => (
+            {analysisOptions.slice(0, 7).map((option, index) => (
               <LifeAnalysisCard
                 key={option.id}
                 option={option}
@@ -1044,7 +1053,7 @@ const loadHomeData = async (nativeData = null) => {
             scrollEventThrottle={16}
             contentContainerStyle={styles.ribbonScrollContent}
           >
-            {analysisOptions.slice(6).map((option, index) => (
+            {analysisOptions.slice(7).map((option, index) => (
               <CosmicRibbonCard
                 key={option.id}
                 option={option}
@@ -2362,13 +2371,16 @@ function OptionCard({ option, index, onOptionSelect }) {
 function LifeAnalysisCard({ option, index, onOptionSelect }) {
   const { colors, theme } = useTheme();
   
-  const isLarge = option && (option.id === 'career' || option.id === 'wealth');
-  const isWide = option && (option.id === 'marriage' || option.id === 'progeny');
+  const isLarge = option && (option.id === 'karma' || option.id === 'career' || option.id === 'wealth' || option.id === 'marriage');
+  const isWide = option && option.id === 'progeny';
   
   if (!option) return null;
+
+  const isMarriage = option.id === 'marriage';
   
   return (
     <View 
+      testID={isMarriage ? 'life-analysis-marriage' : `life-analysis-${option.id}`}
       style={[
         styles.lifeAnalysisCard,
         isLarge && styles.lifeAnalysisCardLarge,
@@ -2383,6 +2395,7 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
           colors={option.gradient}
           style={[
             styles.lifeAnalysisGradient,
+            !isLarge && !isWide && styles.lifeAnalysisGradientSmallFixed,
             isLarge && styles.lifeAnalysisGradientLarge,
             isWide && styles.lifeAnalysisGradientWide,
           ]}
@@ -2980,6 +2993,8 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  lifeAnalysisGradientSmallFixed: {
     height: 160,
   },
   lifeAnalysisGradientLarge: {

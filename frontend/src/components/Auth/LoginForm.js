@@ -22,9 +22,11 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
+  const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
+  const isUsNumber = (phone) => (phone || '').trim().startsWith('+1');
+
   const [biometricSupported, setBiometricSupported] = useState(false);
   
   React.useEffect(() => {
@@ -86,7 +88,12 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      const response = await authService.sendResetCode({ phone: resetData.phone });
+      if (isUsNumber(resetData.phone) && !(resetData.email || '').trim()) {
+        throw new Error('Email is required for US numbers');
+      }
+      const payload = { phone: resetData.phone };
+      if ((resetData.email || '').trim()) payload.email = resetData.email.trim();
+      const response = await authService.sendResetCode(payload);
       toast.success(response.message);
       // Show code if SMS service is unavailable (testing mode)
       if (response.code) {
@@ -132,7 +139,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       toast.success('Password reset successfully!');
       setShowForgotPassword(false);
       setResetStep(1);
-      setResetData({ phone: '', code: '', newPassword: '' });
+      setResetData({ phone: '', email: '', code: '', newPassword: '' });
       setResetToken('');
     } catch (error) {
       toast.error(error.message || 'Password reset failed');
@@ -243,6 +250,31 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 onChange={(e) => setResetData(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="Enter your phone number"
                 required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '2px solid rgba(233, 30, 99, 0.2)',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  background: 'rgba(255, 255, 255, 0.8)'
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: '#e91e63',
+                fontWeight: '600'
+              }}>
+                Email {isUsNumber(resetData.phone) ? '(required for US numbers)' : '(optional)'}
+              </label>
+              <input
+                type="email"
+                value={resetData.email}
+                onChange={(e) => setResetData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Enter your email"
+                required={isUsNumber(resetData.phone)}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -378,7 +410,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             onClick={() => {
               setShowForgotPassword(false);
               setResetStep(1);
-              setResetData({ phone: '', code: '', newPassword: '' });
+              setResetData({ phone: '', email: '', code: '', newPassword: '' });
               setResetToken('');
             }}
             style={{

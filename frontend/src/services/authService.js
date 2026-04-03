@@ -30,6 +30,36 @@ export const authService = {
     return response.json();
   },
 
+  async sendRegistrationOtp(data) {
+    try {
+      const response = await fetch(getEndpoint('/send-registration-otp'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to send OTP';
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        throw new Error('Network error - please check your connection');
+      }
+      throw error;
+    }
+  },
+
   async login(userData) {
     try {
       const response = await fetch(getEndpoint('/login'), {
