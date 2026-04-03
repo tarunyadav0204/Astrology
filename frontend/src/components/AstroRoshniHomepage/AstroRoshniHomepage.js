@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { APP_CONFIG } from '../../config/app.config';
-import { getCurrentDomainConfig } from '../../config/domains.config';
+import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } from '../../config/domains.config';
 import { SEO_CONFIG, generatePageSEO } from '../../config/seo.config';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -19,6 +19,7 @@ import BirthFormModal from '../BirthForm/BirthFormModal';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
+import AuthModalShell from '../Auth/AuthModalShell';
 import { showToast } from '../../utils/toast';
 import TrustBanner from '../TrustBanner/TrustBanner';
 import './AstroRoshniHomepage.css';
@@ -117,6 +118,18 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [birthFormContext, setBirthFormContext] = useState('chart');
   const [showDestinyModal, setShowDestinyModal] = useState(false);
   const [destinyReading, setDestinyReading] = useState(null);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY) !== '1') return;
+      if (!user) return;
+      sessionStorage.removeItem(ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY);
+      setBirthFormContext('changeNative');
+      setShowBirthFormModal(true);
+    } catch {
+      /* ignore */
+    }
+  }, [user]);
 
   const generateTodaysData = useCallback(() => {
     const today = new Date();
@@ -819,6 +832,18 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onCreditsClick={() => setShowCreditsModal(true)}
         onChangeNative={() => { setBirthFormContext('changeNative'); setShowBirthFormModal(true); }}
         birthData={birthData}
+        onAstrologyClick={() => {
+          if (!user) {
+            if (onLogin) onLogin();
+            return;
+          }
+          if (birthData && chartData && setCurrentView) {
+            setCurrentView('dashboard');
+            return;
+          }
+          setBirthFormContext('changeNative');
+          setShowBirthFormModal(true);
+        }}
       />
 
 
@@ -2258,42 +2283,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onClose={() => setShowCreditsModal(false)} 
       />
       
-      {showLoginModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '15px',
-            padding: '30px',
-            maxWidth: '450px',
-            width: '90%',
-            position: 'relative'
-          }}>
-            <button 
-              onClick={() => setShowLoginModal(false)}
-              style={{
-                position: 'absolute',
-                top: '15px',
-                right: '15px',
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#666'
-              }}
-            >
-              ×
-            </button>
+      <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
             <div style={{ marginBottom: '20px' }}>
               <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
@@ -2328,26 +2318,22 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
             {authView === 'login' ? (
               <LoginForm 
-                onLogin={(userData) => {
-                  // Handle login success - this should reload the page or update parent state
+                onLogin={() => {
                   setShowLoginModal(false);
-                  window.location.reload(); // Reload to get updated user state
-                }} 
+                  window.location.reload();
+                }}
                 onSwitchToRegister={() => setAuthView('register')} 
               />
             ) : (
               <RegisterForm 
-                onRegister={(userData) => {
-                  // Handle registration success - this should reload the page or update parent state
+                onRegister={() => {
                   setShowLoginModal(false);
-                  window.location.reload(); // Reload to get updated user state
-                }} 
+                  window.location.reload();
+                }}
                 onSwitchToLogin={() => setAuthView('login')} 
               />
             )}
-          </div>
-        </div>
-      )}
+      </AuthModalShell>
       
       {showChartModal && (
         <div style={{
@@ -2417,8 +2403,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             setShowNumerologyModal(true);
           } else if (birthFormContext === 'chart') {
             setShowChartModal(true);
+          } else if (birthFormContext === 'changeNative' && setCurrentView) {
+            setCurrentView('dashboard');
           }
-          // For 'changeNative' context, just close the modal and stay on homepage
         }}
         title={birthFormContext === 'numerology' ? 'Numerology - Enter Details' : 'Birth Chart - Enter Details'}
         description={birthFormContext === 'numerology' ? 'Please provide birth information for numerology analysis' : 'Please provide your birth information to generate your Vedic birth chart'}

@@ -16,6 +16,25 @@ def sanitize_text(text):
     text = text.replace('\0', '')
     return text.strip()
 
+
+def coerce_chat_birth_details(bd):
+    """
+    Normalize date/time like mobile ChatScreen (YYYY-MM-DD + HH:MM).
+    ISO datetimes in `time` break ChartCalculator, which does time.split(':') for hours/minutes.
+    """
+    if not bd or not isinstance(bd, dict):
+        return bd
+    out = dict(bd)
+    d = out.get("date")
+    if isinstance(d, str) and "T" in d:
+        out["date"] = d.split("T", 1)[0]
+    t = out.get("time")
+    if isinstance(t, str) and "T" in t:
+        after = t.split("T", 1)[1]
+        out["time"] = after[:5] if len(after) >= 5 else t
+    return out
+
+
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
 def init_chat_tables():
@@ -291,6 +310,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     
     if not session_id or not question or not birth_details:
         raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
+
+    birth_details = coerce_chat_birth_details(birth_details)
     
     # Optional fields with defaults
     language = request.get("language", "english")
@@ -307,6 +328,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         'timezone': request.get('partner_timezone') or request.get('partnerTimezone'),
         'gender': request.get('partner_gender') or request.get('partnerGender')
     } if partnership_mode else None
+
+    if partnership_mode and partner_birth_details:
+        partner_birth_details = coerce_chat_birth_details(partner_birth_details)
     
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()

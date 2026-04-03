@@ -14,7 +14,7 @@ const ChatInput = ({
     isMundaneMode = false,
     isLocked = false, // when true, composer is disabled until guided steps are completed
 }) => {
-    const { credits, chatCost, premiumChatCost, partnershipCost, loading: creditsLoading } = useCredits();
+    const { credits, chatCost, premiumChatCost, partnershipCost, loading: creditsLoading, freeQuestionAvailable } = useCredits();
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
     const [showModeSelector, setShowModeSelector] = useState(false);
@@ -41,6 +41,13 @@ const ChatInput = ({
 
     const showPremiumControls = !isPartnershipMode && !isMundaneMode;
     const useCompactPremium = showPremiumControls && isMobileLayout;
+    const useFreeQuestionEligible = showPremiumControls && freeQuestionAvailable;
+
+    useEffect(() => {
+        if (useFreeQuestionEligible && isPremiumAnalysis) {
+            setIsPremiumAnalysis(false);
+        }
+    }, [useFreeQuestionEligible, isPremiumAnalysis]);
 
     const scrollSuggestions = (direction) => {
         const el = suggestionsScrollRef.current;
@@ -56,12 +63,14 @@ const ChatInput = ({
     }, [followUpQuestion, onFollowUpUsed]);
 
     const currentCost = isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost);
-    
+    const effectiveCost = useFreeQuestionEligible ? 0 : currentCost;
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (isLocked) return;
-        if (message.trim() && !isLoading && credits >= currentCost) {
-            onSendMessage(message.trim(), { premium_analysis: isPremiumAnalysis });
+        const premiumForSend = useFreeQuestionEligible ? false : isPremiumAnalysis;
+        if (message.trim() && !isLoading && credits >= effectiveCost) {
+            onSendMessage(message.trim(), { premium_analysis: premiumForSend });
             setMessage('');
         }
     };
@@ -95,9 +104,14 @@ const ChatInput = ({
 
     return (
         <div className="chat-input-container chat-composer">
-            {!creditsLoading && credits < currentCost && (
+            {!creditsLoading && useFreeQuestionEligible && (
+                <div className="credit-warning" style={{ background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.35)' }}>
+                    <span style={{ color: '#166534' }}>Your first standard chart question is free. Premium uses credits.</span>
+                </div>
+            )}
+            {!creditsLoading && credits < effectiveCost && (
                 <div className="credit-warning">
-                    <span>Insufficient credits ({credits}/{currentCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : isPartnershipMode ? 'Partnership Analysis' : 'Standard Analysis'})</span>
+                    <span>Insufficient credits ({credits}/{effectiveCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : isPartnershipMode ? 'Partnership Analysis' : 'Standard Analysis'})</span>
                     <button onClick={onOpenCreditsModal} className="get-credits-btn">
                         Get Credits
                     </button>
@@ -131,14 +145,16 @@ const ChatInput = ({
                         >
                             <span className="chat-premium-mode-pill__label">Standard</span>
                             <span className="chat-premium-mode-pill__cost">
-                                {chatCost} credit{chatCost !== 1 ? 's' : ''}
+                                {useFreeQuestionEligible ? 'Free' : `${chatCost} credit${chatCost !== 1 ? 's' : ''}`}
                             </span>
                         </button>
                         <button
                             type="button"
                             className={`chat-premium-mode-pill ${isPremiumAnalysis ? 'chat-premium-mode-pill--active-premium' : ''}`}
-                            disabled={isLocked}
+                            disabled={isLocked || useFreeQuestionEligible}
+                            title={useFreeQuestionEligible ? 'Use your free standard question first; premium uses credits.' : undefined}
                             onClick={() => {
+                                if (useFreeQuestionEligible) return;
                                 setIsPremiumAnalysis(true);
                                 setShowModeSelector(false);
                             }}
@@ -153,13 +169,23 @@ const ChatInput = ({
 
                 {!useCompactPremium && (
                     <div className="chat-composer-premium-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isLocked ? 'not-allowed' : 'pointer', color: '#111827' }}>
+                        <label
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                cursor: isLocked || useFreeQuestionEligible ? 'not-allowed' : 'pointer',
+                                color: '#111827',
+                                opacity: useFreeQuestionEligible ? 0.65 : 1,
+                            }}
+                            title={useFreeQuestionEligible ? 'First question is free for standard analysis only.' : undefined}
+                        >
                             <input
                                 type="checkbox"
                                 checked={isPremiumAnalysis}
-                                onChange={(e) => setIsPremiumAnalysis(e.target.checked)}
+                                onChange={(e) => !useFreeQuestionEligible && setIsPremiumAnalysis(e.target.checked)}
                                 style={{ transform: 'scale(1.2)' }}
-                                disabled={isLocked}
+                                disabled={isLocked || useFreeQuestionEligible}
                             />
                             <span className="chat-premium-label">🚀 Premium Deep Analysis</span>
                         </label>
@@ -172,7 +198,11 @@ const ChatInput = ({
                             fontWeight: 'bold',
                             boxShadow: isPremiumAnalysis ? '0 2px 8px rgba(255, 107, 53, 0.3)' : 'none'
                         }}>
-                            {isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost)} credits
+                            {isPremiumAnalysis
+                                ? `${premiumChatCost} credits`
+                                : useFreeQuestionEligible && !isPartnershipMode
+                                    ? 'Free'
+                                    : `${isPartnershipMode ? partnershipCost : chatCost} credits`}
                         </span>
                         {isPremiumAnalysis && (
                             <span
@@ -231,7 +261,7 @@ const ChatInput = ({
                             ? 'Complete the guided steps above to unlock chat...'
                             : isLoading
                                 ? "Analyzing your chart..."
-                                : credits < currentCost
+                                : credits < effectiveCost
                                     ? "Insufficient credits"
                                     : useCompactPremium && showModeSelector
                                         ? 'Type here...'
@@ -241,7 +271,7 @@ const ChatInput = ({
                                                 ? "Ask about global events..."
                                                 : "Ask me about your birth chart..."
                     }
-                    disabled={isLoading || credits < currentCost || isLocked}
+                    disabled={isLoading || credits < effectiveCost || isLocked}
                     className={`chat-input${useCompactPremium && showModeSelector ? ' chat-input--mode-select-open' : ''}`}
                 />
                 {useCompactPremium && (
@@ -249,8 +279,9 @@ const ChatInput = ({
                         <button
                             type="button"
                             className={`chat-premium-sp-toggle ${isPremiumAnalysis ? 'chat-premium-sp-toggle--premium' : ''} ${showModeSelector ? 'chat-premium-sp-toggle--open' : ''}`}
-                            onClick={() => !isLocked && setShowModeSelector((v) => !v)}
-                            disabled={isLocked}
+                            onClick={() => !isLocked && !useFreeQuestionEligible && setShowModeSelector((v) => !v)}
+                            disabled={isLocked || useFreeQuestionEligible}
+                            title={useFreeQuestionEligible ? 'First question: standard (free)' : undefined}
                             title={isPremiumAnalysis ? 'Premium mode — tap to change' : 'Standard mode — tap to change'}
                             aria-expanded={showModeSelector}
                             aria-label={isPremiumAnalysis ? 'Premium analysis selected. Open mode picker' : 'Standard analysis. Open mode picker'}
@@ -276,12 +307,12 @@ const ChatInput = ({
                 )}
                 <button 
                     type="submit" 
-                    disabled={!message.trim() || isLoading || credits < currentCost || isLocked}
+                    disabled={!message.trim() || isLoading || credits < effectiveCost || isLocked}
                     className="send-button"
                     aria-label={
                         isLoading
                             ? 'Sending'
-                            : credits < currentCost
+                            : credits < effectiveCost
                                 ? 'Insufficient credits'
                                 : isPremiumAnalysis
                                     ? 'Send premium question'
@@ -295,16 +326,24 @@ const ChatInput = ({
                     }}
                 >
                     <span className="send-button__label-desktop">
-                        {isLoading ? '...' : credits < currentCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : isPartnershipMode ? '💕 Send Partnership' : 'Send'}
+                        {isLoading ? '...' : credits < effectiveCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : isPartnershipMode ? '💕 Send Partnership' : 'Send'}
                     </span>
                     <span className="send-button__label-mobile" aria-hidden="true">
-                        {isLoading ? '…' : credits < currentCost ? '—' : isPremiumAnalysis ? '🚀' : isPartnershipMode ? '💕' : '➤'}
+                        {isLoading ? '…' : credits < effectiveCost ? '—' : isPremiumAnalysis ? '🚀' : isPartnershipMode ? '💕' : '➤'}
                     </span>
                 </button>
             </form>
             {!creditsLoading && (
                 <div className="credit-info chat-composer-footnote">
-                    Credits: {credits} | {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : isPartnershipMode ? `Partnership: ${partnershipCost}` : `Standard: ${chatCost}`} credits per question
+                    Credits: {credits} |{' '}
+                    {isPremiumAnalysis
+                        ? `Premium: ${premiumChatCost}`
+                        : isPartnershipMode
+                            ? `Partnership: ${partnershipCost}`
+                            : useFreeQuestionEligible
+                                ? 'Standard: free (first question)'
+                                : `Standard: ${chatCost}`}{' '}
+                    {!useFreeQuestionEligible || isPremiumAnalysis || isPartnershipMode ? 'credits per question' : ''}
                 </div>
             )}
         </div>

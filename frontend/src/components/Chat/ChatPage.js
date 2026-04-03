@@ -13,6 +13,7 @@ import PartnerChartModal from './PartnerChartModal';
 import { authService } from '../../services/authService';
 import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
+import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
 import './ChatPage.css';
 
 // Enable detailed logging for debugging
@@ -22,7 +23,7 @@ const ChatPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { birthData } = useAstrology();
-    const { credits, chatCost, partnershipCost, fetchBalance } = useCredits();
+    const { credits, chatCost, partnershipCost, fetchBalance, freeQuestionAvailable } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -895,12 +896,14 @@ const ChatPage = () => {
         let chartDataForMessage = personalChartData;
         if (!chartDataForMessage) {
             try {
-                chartDataForMessage = await apiService.calculateChartOnly({
-                    ...birthData,
-                    latitude: birthData.latitude != null ? parseFloat(birthData.latitude) : undefined,
-                    longitude: birthData.longitude != null ? parseFloat(birthData.longitude) : undefined,
-                });
-                setPersonalChartData(chartDataForMessage);
+                const calcNorm = normalizeBirthDetailsForChat(birthData);
+                if (calcNorm && Number.isFinite(calcNorm.latitude) && Number.isFinite(calcNorm.longitude)) {
+                    chartDataForMessage = await apiService.calculateChartOnly({
+                        ...birthData,
+                        ...calcNorm,
+                    });
+                    setPersonalChartData(chartDataForMessage);
+                }
             } catch (e) {
                 console.warn('[ChatPage] Could not calculate chart for processing bubble:', e);
             }
@@ -933,41 +936,67 @@ const ChatPage = () => {
                 ? `[Relationship: ${relationshipLabel}] ${message}`
                 : message;
 
+        const useFreeQuestion = !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
+
+        const birthForAsk = normalizeBirthDetailsForChat(partnershipBirth);
+        if (!birthForAsk || !Number.isFinite(birthForAsk.latitude) || !Number.isFinite(birthForAsk.longitude)) {
+            console.error('[ChatPage] Invalid birth_details for chat-v2/ask', { partnershipBirth, birthForAsk });
+            setIsLoading(false);
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m.processingClientId === processingClientId
+                        ? {
+                              ...m,
+                              content: 'Birth place coordinates are missing or invalid. Please re-select your chart with a valid location.',
+                              isProcessing: false,
+                              isTyping: false,
+                              showRestartButton: true,
+                          }
+                        : m
+                )
+            );
+            return;
+        }
+
         const requestData = {
             session_id: currentSessionId,
             question: questionForApi,
             language: 'english',
             response_style: 'detailed',
-            premium_analysis: !!options.premium_analysis,
+            premium_analysis: useFreeQuestion ? false : !!options.premium_analysis,
             partnership_mode: isPartnershipMode,
-            birth_details: {
-                name: partnershipBirth?.name,
-                date: partnershipBirth?.date,
-                time: partnershipBirth?.time,
-                latitude: parseFloat(partnershipBirth?.latitude),
-                longitude: parseFloat(partnershipBirth?.longitude),
-                place: partnershipBirth?.place || '',
-                gender: partnershipBirth?.gender || '',
-            },
+            native_name: partnershipBirth?.name,
+            birth_details: birthForAsk,
         };
 
-        if (options.premium_analysis) {
-            requestData.premium_analysis = true;
-        }
-
         if (isPartnershipMode && partnershipSecond) {
-            requestData.partner_name = partnershipSecond.name;
-            requestData.partner_date = typeof partnershipSecond.date === 'string'
-                ? partnershipSecond.date.split('T')[0]
-                : partnershipSecond.date;
-            requestData.partner_time = typeof partnershipSecond.time === 'string'
-                ? (partnershipSecond.time.split('T')[1]?.slice(0, 5) || partnershipSecond.time)
-                : partnershipSecond.time;
-            requestData.partner_place = partnershipSecond.place || '';
-            requestData.partner_latitude = parseFloat(partnershipSecond.latitude);
-            requestData.partner_longitude = parseFloat(partnershipSecond.longitude);
+            const partnerNorm = normalizeBirthDetailsForChat(partnershipSecond);
+            if (!partnerNorm || !Number.isFinite(partnerNorm.latitude) || !Number.isFinite(partnerNorm.longitude)) {
+                console.error('[ChatPage] Invalid partner birth_details for chat-v2/ask', { partnershipSecond, partnerNorm });
+                setIsLoading(false);
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.processingClientId === processingClientId
+                            ? {
+                                  ...m,
+                                  content: 'Partner chart coordinates are missing or invalid. Please re-select the second profile.',
+                                  isProcessing: false,
+                                  isTyping: false,
+                                  showRestartButton: true,
+                              }
+                            : m
+                    )
+                );
+                return;
+            }
+            requestData.partner_name = partnerNorm.name;
+            requestData.partner_date = partnerNorm.date;
+            requestData.partner_time = partnerNorm.time;
+            requestData.partner_place = partnerNorm.place || '';
+            requestData.partner_latitude = partnerNorm.latitude;
+            requestData.partner_longitude = partnerNorm.longitude;
             requestData.partner_timezone = partnershipSecond.timezone;
-            requestData.partner_gender = partnershipSecond.gender || '';
+            requestData.partner_gender = partnerNorm.gender || '';
             requestData.partnership_relationship = relationshipLabel || undefined;
         }
 

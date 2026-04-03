@@ -2,7 +2,8 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 1000;
+  /* Below auth/login overlays (typically z-index 1000+) so “Sign in” modal stays visible */
+  z-index: 998;
 }
 
 .floating-chat-btn {

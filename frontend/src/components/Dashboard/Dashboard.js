@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAstrology } from '../../context/AstrologyContext';
 import { DASHBOARD_CONFIG } from '../../config/dashboard.config';
+import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } from '../../config/domains.config';
 import ChartWidget from '../Charts/ChartWidget';
 import DashaWidget from '../DashaTable/DashaWidget';
 import DashaHierarchyBar from '../DashaHierarchyBar/DashaHierarchyBar';
@@ -184,6 +185,23 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
   const [showTransitAspectsPopup, setShowTransitAspectsPopup] = useState(false);
 
   useEffect(() => {
+    if (!birthData || !chartData) {
+      const domainConfig = getCurrentDomainConfig();
+      if (domainConfig.userType === 'general') {
+        try {
+          sessionStorage.setItem(ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY, '1');
+        } catch {
+          /* ignore */
+        }
+        setCurrentView('astroroshnihomepage');
+      } else {
+        setCurrentView('selector');
+      }
+    }
+  }, [birthData, chartData, setCurrentView]);
+
+  useEffect(() => {
+    if (!birthData || !chartData) return;
     // Load saved layout from localStorage
     const savedLayouts = localStorage.getItem('astrology-dashboard-layout');
     if (savedLayouts) {
@@ -193,7 +211,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
     handleTransitDateChange(new Date());
     // Load user settings
     loadUserSettings();
-  }, []);
+  }, [birthData, chartData]);
 
   const loadUserSettings = async () => {
     if (!user?.phone) return;
@@ -325,7 +343,12 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
   };
 
   if (!birthData || !chartData) {
-    return <div>Loading...</div>;
+    const isAstroRoshni = getCurrentDomainConfig().userType === 'general';
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+        {isAstroRoshni ? 'Opening native selector…' : 'Opening chart selector…'}
+      </div>
+    );
   }
 
   return (

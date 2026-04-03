@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { authService } from '../../services/authService';
+import './RegisterForm.css';
 
 const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
@@ -134,9 +135,11 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
 
   return (
     <div style={{
-      maxWidth: '400px',
+      boxSizing: 'border-box',
+      width: '100%',
+      maxWidth: 'min(400px, 100%)',
       margin: '0 auto',
-      padding: '2rem',
+      padding: 'clamp(1rem, 4vw, 2rem)',
       background: 'rgba(255, 255, 255, 0.95)',
       borderRadius: '20px',
       boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)',
@@ -298,13 +301,14 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
           }}>
             OTP Verification
           </label>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', width: '100%', minWidth: 0 }}>
             <button
               type="button"
               onClick={handleSendOtp}
               disabled={sendingOtp || loading}
               style={{
                 flex: 1,
+                minWidth: 0,
                 padding: '0.65rem',
                 background: 'linear-gradient(135deg, #7b1fa2 0%, #512da8 100%)',
                 color: 'white',
@@ -318,7 +322,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
               {sendingOtp ? 'Sending OTP...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
             </button>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="register-otp-row">
             <input
               type="text"
               name="otpCode"
@@ -332,30 +336,37 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
               spellCheck={false}
               autoCapitalize="off"
               style={{
-                flex: 1,
+                minWidth: 0,
+                width: '100%',
+                maxWidth: '100%',
                 padding: '0.75rem',
                 border: '2px solid rgba(233, 30, 99, 0.2)',
                 borderRadius: '12px',
                 fontSize: '1rem',
                 background: 'rgba(255, 255, 255, 0.8)',
                 letterSpacing: '0.2em',
-                textAlign: 'center'
+                textAlign: 'center',
+                boxSizing: 'border-box',
               }}
             />
             <button
               type="button"
+              className="register-otp-verify"
               onClick={handleVerifyOtp}
               disabled={!otpSent || verifyingOtp || loading}
               style={{
-                padding: '0.75rem 0.9rem',
+                padding: '0.75rem 0.65rem',
                 background: otpVerified ? '#2e7d32' : 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
                 fontWeight: '700',
+                fontSize: 'clamp(0.8rem, 2.8vw, 1rem)',
                 cursor: !otpSent || verifyingOtp || loading ? 'not-allowed' : 'pointer',
                 opacity: !otpSent || verifyingOtp || loading ? 0.6 : 1,
-                minWidth: '92px'
+                whiteSpace: 'nowrap',
+                maxWidth: '100%',
+                boxSizing: 'border-box',
               }}
             >
               {otpVerified ? 'Verified' : (verifyingOtp ? 'Verifying...' : 'Verify')}

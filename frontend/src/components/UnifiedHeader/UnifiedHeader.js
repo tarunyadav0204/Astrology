@@ -105,7 +105,8 @@ const UnifiedHeader = ({
       justifyContent: 'space-between',
       position: window.innerWidth <= 768 ? 'fixed' : 'sticky',
       top: 0,
-      zIndex: 100,
+      /* Must be above Dashboard mobile tab bar (z-index 200) so hamburger dropdown isn’t covered */
+      zIndex: isMobile ? 250 : 100,
       width: window.innerWidth <= 768 ? '100%' : 'auto',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       overflowX: 'hidden',
@@ -160,7 +161,7 @@ const UnifiedHeader = ({
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 minWidth: '180px',
-                zIndex: 999999
+                zIndex: 1
               }}>
                 <button
                   onClick={() => {

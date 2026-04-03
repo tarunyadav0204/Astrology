@@ -22,6 +22,7 @@ export const CreditProvider = ({ children }) => {
     const [careerCost, setCareerCost] = useState(12);
     const [podcastCost, setPodcastCost] = useState(2);
     const [loading, setLoading] = useState(true);
+    const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
 
     const fetchBalance = useCallback(async () => {
         try {
@@ -31,6 +32,7 @@ export const CreditProvider = ({ children }) => {
             if (!token) {
                 console.log('🔄 No token found, skipping credit balance fetch');
                 setCredits(0);
+                setFreeQuestionAvailable(false);
                 return;
             }
             
@@ -46,17 +48,21 @@ export const CreditProvider = ({ children }) => {
                 const data = await response.json();
                 console.log('💳 Credit balance data:', data);
                 setCredits(data.credits || 0);
+                setFreeQuestionAvailable(Boolean(data.free_question_available));
             } else if (response.status === 403 || response.status === 401) {
                 // User not authenticated or token expired
                 console.log('💳 Authentication failed, setting credits to 0');
                 setCredits(0);
+                setFreeQuestionAvailable(false);
             } else {
                 console.error('Credit balance fetch failed:', response.status, response.statusText);
                 setCredits(0);
+                setFreeQuestionAvailable(false);
             }
         } catch (error) {
             console.error('Error fetching credit balance:', error);
             setCredits(0);
+            setFreeQuestionAvailable(false);
         }
     }, []);
 
@@ -167,6 +173,7 @@ export const CreditProvider = ({ children }) => {
             educationCost,
             careerCost,
             podcastCost,
+            freeQuestionAvailable,
             loading,
             fetchBalance,
             fetchCosts,

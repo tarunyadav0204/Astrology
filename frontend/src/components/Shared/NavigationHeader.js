@@ -4,7 +4,7 @@ import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData }) => {
+const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData, onAstrologyClick }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -60,7 +60,11 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <div className={`dropdown ${activeDropdown === 'horoscope' ? 'active' : ''}`}>
                 <a href="#horoscope" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('horoscope', e); }}>Horoscope</a>
               </div>
-              <a href="/#astrology">Astrology</a>
+              {onAstrologyClick ? (
+                <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
+              ) : (
+                <a href="/#astrology">Astrology</a>
+              )}
               <div className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
                 <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
               </div>
@@ -229,7 +233,13 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <li className={`dropdown ${activeDropdown === 'horoscope' ? 'active' : ''}`}>
               <a href="#horoscope" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('horoscope', e); }}>Horoscope</a>
             </li>
-            <li><a href="/#astrology">Astrology</a></li>
+            <li>
+              {onAstrologyClick ? (
+                <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
+              ) : (
+                <a href="/#astrology">Astrology</a>
+              )}
+            </li>
             <li className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
               <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
             </li>

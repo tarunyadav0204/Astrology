@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { jsPDF } from 'jspdf';
 import { showToast } from '../../utils/toast';
 import { useCredits } from '../../context/CreditContext';
 import NorthIndianChart from '../Charts/NorthIndianChart';
@@ -9,6 +10,62 @@ import {
     base64ToAudioBlob,
     podcastLangFromUiLanguage,
 } from './podcastPlayback';
+
+/** Lucide-style 24×24 outline icons to match mobile Ionicons outline look */
+const IC = {
+    w: 18,
+    h: 18,
+    vb: '0 0 24 24',
+    s: (props) => ({ fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', ...props }),
+};
+
+const IconCopyOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+);
+const IconShareSocialOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />
+        <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" />
+    </svg>
+);
+const IconRadioOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <path d="M12 12h.01" />
+        <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+    </svg>
+);
+const IconDocumentOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+        <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+        <path d="M10 9H8" />
+        <path d="M16 13H8" />
+        <path d="M16 17H8" />
+    </svg>
+);
+const IconTrashOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <path d="M3 6h18" />
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+        <line x1="10" x2="10" y1="11" y2="17" />
+        <line x1="14" x2="14" y1="11" y2="17" />
+    </svg>
+);
+const IconRefreshOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+        <path d="M21 3v5h-5" />
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+        <path d="M8 16H3v5" />
+    </svg>
+);
 
 const MessageBubble = ({ message, language = 'english', sessionId = null, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
     const { podcastCost, refreshBalance } = useCredits();
@@ -35,6 +92,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
     const [podcastModalOpen, setPodcastModalOpen] = useState(false);
     const [podcastModalMode, setPodcastModalMode] = useState('loading');
     const [podcastLoading, setPodcastLoading] = useState(false);
+    const [pdfGenerating, setPdfGenerating] = useState(false);
     const [podcastCurrentTime, setPodcastCurrentTime] = useState(0);
     const [podcastDuration, setPodcastDuration] = useState(0);
     const [podcastIsPlaying, setPodcastIsPlaying] = useState(false);
@@ -316,14 +374,65 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
             .trim();
     };
     
-    const handleWhatsAppShare = () => {
+    const handleShareMessage = async () => {
         const cleanText = cleanTextForCopy(message.content);
-        const shareText = `🔮 *AstroRoshni Prediction*\n\n${cleanText}\n\n_Shared from AstroRoshni App_`;
-        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-        window.open(whatsappUrl, '_blank');
-        showToast('Opening WhatsApp...', 'success');
+        const shareText = `☀️ AstroRoshni Prediction\n\n${cleanText}\n\nShared from AstroRoshni App`;
+        const waText = `🔮 *AstroRoshni Prediction*\n\n${cleanText}\n\n_Shared from AstroRoshni App_`;
+        const openWhatsApp = () => {
+            window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
+            showToast('Opening WhatsApp...', 'success');
+        };
+        try {
+            if (navigator.share) {
+                await navigator.share({ text: shareText, title: 'AstroRoshni' });
+                showToast('Shared', 'success');
+            } else {
+                openWhatsApp();
+            }
+        } catch (e) {
+            if (e && e.name === 'AbortError') return;
+            openWhatsApp();
+        }
         setShowActions(false);
     };
+
+    const handleMessagePdf = useCallback(async () => {
+        const cleanText = getCleanMessageText();
+        if (!cleanText) return;
+        setPdfGenerating(true);
+        try {
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const margin = 40;
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            const maxWidth = pageW - margin * 2;
+            const lines = doc.splitTextToSize(cleanText, maxWidth);
+            let y = margin;
+            const lineHeight = 16;
+            const title = 'AstroRoshni';
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(title, margin, y);
+            y += lineHeight * 1.25;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            lines.forEach((line) => {
+                if (y > pageH - margin) {
+                    doc.addPage();
+                    y = margin;
+                }
+                doc.text(line, margin, y);
+                y += lineHeight;
+            });
+            doc.save(`astroroshni-message-${Date.now()}.pdf`);
+            showToast('PDF downloaded', 'success');
+        } catch (e) {
+            console.error('[Message PDF]', e);
+            showToast('Could not create PDF', 'error');
+        } finally {
+            setPdfGenerating(false);
+        }
+    }, [getCleanMessageText]);
     
     const handleDeleteMessage = async () => {
         console.log('🔍 MESSAGE BUBBLE DELETE CLICKED:', {
@@ -500,6 +609,78 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
         };
     }, []);
 
+    const showMessageToolbar =
+        !message.isTyping &&
+        !message.isProcessing &&
+        message.messageId &&
+        message.content &&
+        message.content.trim().length > 0;
+
+    const handleCopyClick = async () => {
+        try {
+            const cleanText = cleanTextForCopy(message.content);
+            await navigator.clipboard.writeText(cleanText);
+            showToast('Message copied!', 'success');
+        } catch (err) {
+            showToast('Copy failed', 'error');
+        }
+    };
+
+    const renderMessageToolbar = (placement) => {
+        if (!showMessageToolbar) return null;
+        const isAssistant = message.role === 'assistant';
+        const placementClass = placement === 'top' ? 'message-action-buttons--top' : 'message-action-buttons--bottom';
+        return (
+            <div
+                className={`message-action-buttons ${placementClass}`}
+                role="toolbar"
+                aria-label="Message actions"
+            >
+                {message.showRestartButton && message.messageId && (
+                    <button
+                        type="button"
+                        className="action-btn action-btn--restart"
+                        onClick={() => onRestartPolling && onRestartPolling(message.messageId)}
+                        title="Check for response"
+                    >
+                        <IconRefreshOutline />
+                    </button>
+                )}
+                {isAssistant && (
+                    <button
+                        type="button"
+                        className="action-btn action-btn--podcast"
+                        disabled={podcastLoading}
+                        onClick={handlePodcastButtonClick}
+                        title="Listen as podcast"
+                    >
+                        <IconRadioOutline />
+                    </button>
+                )}
+                <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message">
+                    <IconCopyOutline />
+                </button>
+                <button type="button" className="action-btn action-btn--toolbar" onClick={handleShareMessage} title="Share">
+                    <IconShareSocialOutline />
+                </button>
+                {isAssistant && (
+                    <button
+                        type="button"
+                        className="action-btn action-btn--pdf"
+                        disabled={pdfGenerating}
+                        onClick={handleMessagePdf}
+                        title="Download as PDF"
+                    >
+                        <IconDocumentOutline />
+                    </button>
+                )}
+                <button type="button" className="action-btn action-btn--delete" onClick={handleDeleteMessage} title="Delete message">
+                    <IconTrashOutline />
+                </button>
+            </div>
+        );
+    };
+
     return (
         <div 
             ref={messageRef}
@@ -511,25 +692,25 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                 }
             }}
         >
-            {/* Action buttons */}
+            {/* Long-press quick actions (mobile) */}
             {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
                 <div className="message-actions">
-                    <button 
-                        className="action-btn whatsapp-btn"
-                        onClick={handleWhatsAppShare}
-                        title="Share on WhatsApp"
+                    <button
+                        type="button"
+                        className="action-btn action-btn--toolbar"
+                        onClick={handleShareMessage}
+                        title="Share"
                     >
-                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"/>
-                        </svg>
+                        <IconShareSocialOutline />
                     </button>
                     {message.messageId && (
-                        <button 
-                            className="action-btn delete-btn"
+                        <button
+                            type="button"
+                            className="action-btn action-btn--delete"
                             onClick={handleDeleteMessage}
-                            title="Delete Message"
+                            title="Delete message"
                         >
-                            🗑️
+                            <IconTrashOutline />
                         </button>
                     )}
                 </div>
@@ -569,6 +750,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                         ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
                     </div>
                 )}
+                {renderMessageToolbar('top')}
                 <div 
                     className="message-text enhanced-formatting"
                     onClick={(e) => {
@@ -720,102 +902,9 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                         </>
                     )}
                 </div>
-                
-                {/* Action buttons positioned like mobile */}
-                {!message.isTyping &&
-                    !message.isProcessing &&
-                    message.messageId &&
-                    message.content &&
-                    message.content.trim().length > 0 && (
-                    <div className="message-action-buttons">
-                        <button 
-                            className="action-btn copy-btn"
-                            style={{
-                                width: '20px',
-                                height: '20px',
-                                minWidth: '20px',
-                                padding: '0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                            onClick={async () => {
-                                try {
-                                    const cleanText = cleanTextForCopy(message.content);
-                                    await navigator.clipboard.writeText(cleanText);
-                                    showToast('Message copied!', 'success');
-                                } catch (err) {
-                                    showToast('Copy failed', 'error');
-                                }
-                            }}
-                            title="Copy Message"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                            </svg>
-                        </button>
-                        {message.role === 'assistant' && (
-                            <button
-                                type="button"
-                                className="action-btn podcast-btn"
-                                style={{
-                                    width: '20px',
-                                    height: '20px',
-                                    minWidth: '20px',
-                                    padding: '0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    opacity: podcastLoading ? 0.5 : 1,
-                                }}
-                                disabled={podcastLoading}
-                                onClick={handlePodcastButtonClick}
-                                title="Listen as podcast"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                                    <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zm-1.5 16.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-                                </svg>
-                            </button>
-                        )}
-                        <button
-                            className="action-btn whatsapp-btn"
-                            style={{
-                                width: '20px',
-                                height: '20px',
-                                minWidth: '20px',
-                                padding: '0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
-                            onClick={handleWhatsAppShare}
-                            title="Share on WhatsApp"
-                        >
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"/>
-                            </svg>
-                        </button>
-                        <button 
-                            className="action-btn delete-btn"
-                            style={{
-                                width: '20px',
-                                height: '20px',
-                                minWidth: '20px',
-                                padding: '0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                            onClick={handleDeleteMessage}
-                            title="Delete Message"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
-                        </button>
-                    </div>
-                )}
-                {message.showRestartButton && (
+
+                {renderMessageToolbar('bottom')}
+                {message.showRestartButton && !showMessageToolbar && (
                     <button 
                         onClick={() => onRestartPolling && onRestartPolling(message.messageId)}
                         style={{

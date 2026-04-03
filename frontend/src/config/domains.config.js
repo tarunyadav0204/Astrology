@@ -119,3 +119,6 @@ export const getPrimaryPlatform = (user) => {
   
   return null;
 };
+
+/** sessionStorage flag: open BirthFormModal (change native) after landing on AstroRoshni homepage */
+export const ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY = 'astroroshni_open_native_selector';

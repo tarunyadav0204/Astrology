@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { HelmetProvider } from 'react-helmet-async';
 import AnalyticsTracker from './components/Analytics/AnalyticsTracker';
@@ -13,6 +13,7 @@ import LandingPage from './components/LandingPage/LandingPage';
 import AstroVishnuLanding from './components/AstroVishnu/AstroVishnuLanding';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import AuthModalShell from './components/Auth/AuthModalShell';
 import ChartSelector from './components/ChartSelector/ChartSelector';
 import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
@@ -56,11 +57,19 @@ import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
 import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/domains.config';
 
-/** Hide “Ask Tara” FAB on full-page chat (same route). */
-function FloatingChatButtonUnlessOnChatPage() {
+/** Hide “Ask Tara” FAB on full-page chat (same route). When logged out, open the app login modal like other auth-gated actions. */
+function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   if (pathname === '/chat') return null;
-  return <FloatingChatButton onOpenChat={() => { window.location.href = '/chat'; }} />;
+  const handleOpenChat = () => {
+    if (user) {
+      navigate('/chat');
+    } else if (onRequireLogin) {
+      onRequireLogin();
+    }
+  };
+  return <FloatingChatButton onOpenChat={handleOpenChat} />;
 }
 
 function App() {
@@ -174,6 +183,12 @@ function App() {
     }
   };
 
+  /** Chart selector home (AstroVishnu) vs marketing homepage (AstroRoshni), matching getCurrentDomainConfig(). */
+  const goToDomainHome = () => {
+    const domainConfig = getCurrentDomainConfig();
+    setCurrentView(domainConfig.userType === 'general' ? 'astroroshnihomepage' : 'selector');
+  };
+
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
   }
@@ -197,42 +212,7 @@ function App() {
                     onLogin={() => setShowLoginModal(true)} 
                     showLoginButton={true} 
                   />
-                  {showLoginModal && (
-                    <div style={{
-                      position: 'fixed',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: 'rgba(0,0,0,0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1000
-                    }}>
-                      <div style={{
-                        background: 'white',
-                        borderRadius: '15px',
-                        padding: '30px',
-                        maxWidth: '450px',
-                        width: '90%',
-                        position: 'relative'
-                      }}>
-                        <button 
-                          onClick={() => setShowLoginModal(false)}
-                          style={{
-                            position: 'absolute',
-                            top: '15px',
-                            right: '15px',
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '24px',
-                            cursor: 'pointer',
-                            color: '#666'
-                          }}
-                        >
-                          ×
-                        </button>
+                  <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                         <div style={{ marginBottom: '20px' }}>
                           <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
@@ -282,9 +262,7 @@ function App() {
                             onSwitchToLogin={() => setAuthView('login')} 
                           />
                         )}
-                      </div>
-                    </div>
-                  )}
+                  </AuthModalShell>
                 </>
               ) : domainConfig.userType === 'software' ? (
                 <>
@@ -298,42 +276,7 @@ function App() {
                       setShowLoginModal(true);
                     }} 
                   />
-                  {showLoginModal && (
-                    <div style={{
-                      position: 'fixed',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: 'rgba(0,0,0,0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1000
-                    }}>
-                      <div style={{
-                        background: 'white',
-                        borderRadius: '15px',
-                        padding: '30px',
-                        maxWidth: '450px',
-                        width: '90%',
-                        position: 'relative'
-                      }}>
-                        <button 
-                          onClick={() => setShowLoginModal(false)}
-                          style={{
-                            position: 'absolute',
-                            top: '15px',
-                            right: '15px',
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '24px',
-                            cursor: 'pointer',
-                            color: '#666'
-                          }}
-                        >
-                          ×
-                        </button>
+                  <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                         <div style={{ marginBottom: '20px' }}>
                           <h2 style={{ textAlign: 'center', color: '#ff6b35', marginBottom: '20px' }}>Welcome to AstroVishnu</h2>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
@@ -383,9 +326,7 @@ function App() {
                             onSwitchToLogin={() => setAuthView('login')} 
                           />
                         )}
-                      </div>
-                    </div>
-                  )}
+                  </AuthModalShell>
                 </>
               ) : (
                 <LandingPage onLogin={handleLogin} onRegister={handleLogin} domainConfig={domainConfig} />
@@ -403,42 +344,7 @@ function App() {
                   onLogin={() => setShowLoginModal(true)} 
                   showLoginButton={true} 
                 />
-                {showLoginModal && (
-                  <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                  }}>
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '15px',
-                      padding: '30px',
-                      maxWidth: '450px',
-                      width: '90%',
-                      position: 'relative'
-                    }}>
-                      <button 
-                        onClick={() => setShowLoginModal(false)}
-                        style={{
-                          position: 'absolute',
-                          top: '15px',
-                          right: '15px',
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '24px',
-                          cursor: 'pointer',
-                          color: '#666'
-                        }}
-                      >
-                        ×
-                      </button>
+                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                       <div style={{ marginBottom: '20px' }}>
                         <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
                         <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Marriage Analysis</p>
@@ -491,9 +397,7 @@ function App() {
                           onSwitchToLogin={() => setAuthView('login')} 
                         />
                       )}
-                    </div>
-                  </div>
-                )}
+                </AuthModalShell>
               </>
             } />
             <Route path="/career-guidance" element={
@@ -503,42 +407,7 @@ function App() {
                   onLogin={() => setShowLoginModal(true)} 
                   showLoginButton={true} 
                 />
-                {showLoginModal && (
-                  <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                  }}>
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '15px',
-                      padding: '30px',
-                      maxWidth: '450px',
-                      width: '90%',
-                      position: 'relative'
-                    }}>
-                      <button 
-                        onClick={() => setShowLoginModal(false)}
-                        style={{
-                          position: 'absolute',
-                          top: '15px',
-                          right: '15px',
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '24px',
-                          cursor: 'pointer',
-                          color: '#666'
-                        }}
-                      >
-                        ×
-                      </button>
+                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                       <div style={{ marginBottom: '20px' }}>
                         <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
                         <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Career Guidance</p>
@@ -591,9 +460,7 @@ function App() {
                           onSwitchToLogin={() => setAuthView('login')} 
                         />
                       )}
-                    </div>
-                  </div>
-                )}
+                </AuthModalShell>
               </>
             } />
             <Route path="/panchang" element={
@@ -611,42 +478,7 @@ function App() {
                   onLogin={() => setShowLoginModal(true)} 
                   showLoginButton={true} 
                 />
-                {showLoginModal && (
-                  <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                  }}>
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '15px',
-                      padding: '30px',
-                      maxWidth: '450px',
-                      width: '90%',
-                      position: 'relative'
-                    }}>
-                      <button 
-                        onClick={() => setShowLoginModal(false)}
-                        style={{
-                          position: 'absolute',
-                          top: '15px',
-                          right: '15px',
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '24px',
-                          cursor: 'pointer',
-                          color: '#666'
-                        }}
-                      >
-                        ×
-                      </button>
+                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                       <div style={{ marginBottom: '20px' }}>
                         <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
                         <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Health Analysis</p>
@@ -699,9 +531,7 @@ function App() {
                           onSwitchToLogin={() => setAuthView('login')} 
                         />
                       )}
-                    </div>
-                  </div>
-                )}
+                </AuthModalShell>
               </>
             } />
             <Route path="/wealth-analysis" element={
@@ -711,42 +541,7 @@ function App() {
                   onLogin={() => setShowLoginModal(true)} 
                   showLoginButton={true} 
                 />
-                {showLoginModal && (
-                  <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                  }}>
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '15px',
-                      padding: '30px',
-                      maxWidth: '450px',
-                      width: '90%',
-                      position: 'relative'
-                    }}>
-                      <button 
-                        onClick={() => setShowLoginModal(false)}
-                        style={{
-                          position: 'absolute',
-                          top: '15px',
-                          right: '15px',
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '24px',
-                          cursor: 'pointer',
-                          color: '#666'
-                        }}
-                      >
-                        ×
-                      </button>
+                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                       <div style={{ marginBottom: '20px' }}>
                         <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
                         <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Wealth Analysis</p>
@@ -799,9 +594,7 @@ function App() {
                           onSwitchToLogin={() => setAuthView('login')} 
                         />
                       )}
-                    </div>
-                  </div>
-                )}
+                </AuthModalShell>
               </>
             } />
             <Route path="/lesson/:lessonId" element={<LessonPage />} />
@@ -827,7 +620,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
-              <FloatingChatButtonUnlessOnChatPage />
+              <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
             </CreditProvider>
           </AstrologyProvider>
         </Router>
@@ -985,8 +778,8 @@ function App() {
         )}
         {currentView === 'dashboard' && (
           <Dashboard 
-            onBack={() => setCurrentView('astroroshnihomepage')} 
-            onViewAllCharts={() => setCurrentView('selector')}
+            onBack={goToDomainHome}
+            onViewAllCharts={goToDomainHome}
             onNewChart={() => setCurrentView('form')}
             currentView={currentView} 
             setCurrentView={setCurrentView} 
@@ -1012,7 +805,9 @@ function App() {
             </div>
           } />
             </Routes>
-            {currentView !== 'dashboard' && <FloatingChatButtonUnlessOnChatPage />}
+            {currentView !== 'dashboard' && (
+              <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
+            )}
           </CreditProvider>
         </AstrologyProvider>
       </Router>

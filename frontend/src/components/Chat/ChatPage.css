@@ -903,6 +903,93 @@ button.chat-header-credits.credits-display:active {
     opacity: 1;
 }
 
+.message-action-buttons--top {
+    margin-top: 0;
+    margin-bottom: 10px;
+    justify-content: flex-end;
+}
+
+.message-action-buttons--bottom {
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
+/* Mobile-like toolbar chips (match app ~36px, soft border) */
+.message-action-buttons .action-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    color: #666;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.message-action-buttons .action-btn:hover:not(:disabled) {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.message-action-buttons .action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.message-action-buttons .action-btn--toolbar {
+    color: #666;
+}
+
+.message-action-buttons .action-btn--podcast {
+    background: rgba(255, 107, 53, 0.12);
+    border-color: rgba(255, 107, 53, 0.28);
+    color: #ff6b35;
+}
+
+.message-action-buttons .action-btn--podcast:hover:not(:disabled) {
+    background: rgba(255, 107, 53, 0.18);
+    border-color: rgba(255, 107, 53, 0.4);
+    color: #ea580c;
+}
+
+.message-action-buttons .action-btn--restart {
+    background: rgba(255, 107, 53, 0.08);
+    border-color: rgba(255, 107, 53, 0.22);
+    color: #ff6b35;
+}
+
+.message-action-buttons .action-btn--pdf {
+    border-color: rgba(59, 130, 246, 0.22);
+    color: #666;
+}
+
+.message-action-buttons .action-btn--delete {
+    border-color: rgba(239, 68, 68, 0.22);
+    color: #666;
+}
+
+.message-action-buttons .action-btn--delete:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #dc2626;
+}
+
+.message-bubble .message-actions .action-btn--toolbar,
+.message-bubble .message-actions .action-btn--delete {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 10px;
+    color: #666;
+}
+
 /* Typing / processing indicator (mobile-like dots) */
 .message-bubble.typing,
 .message-bubble.processing {

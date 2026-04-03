@@ -1,0 +1,21 @@
+/* OTP row: avoid horizontal overflow on very narrow phones */
+.register-otp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 360px) {
+  .register-otp-row {
+    grid-template-columns: 1fr;
+  }
+
+  .register-otp-verify {
+    width: 100%;
+    justify-self: stretch;
+  }
+}

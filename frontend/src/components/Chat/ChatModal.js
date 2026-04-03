@@ -13,12 +13,13 @@ import ContextModal from './ContextModal';
 import PartnerChartModal from './PartnerChartModal';
 import ChatPartnerSelector from './ChatPartnerSelector';
 import { apiService } from '../../services/apiService';
+import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
 
 import './ChatModal.css';
 
 const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: parentChartRefClick }) => {
     const { birthData, setBirthData } = useAstrology();
-    const { credits, chatCost, partnershipCost, fetchBalance } = useCredits();
+    const { credits, chatCost, partnershipCost, fetchBalance, freeQuestionAvailable } = useCredits();
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -490,22 +491,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         setTimeout(scrollToBottom, 100);
 
         try {
+            const useFreeQuestion = !isPartnershipMode && freeQuestionAvailable;
+            const birthForAsk = normalizeBirthDetailsForChat(birthData);
+            if (!birthForAsk || !Number.isFinite(birthForAsk.latitude) || !Number.isFinite(birthForAsk.longitude)) {
+                throw new Error('Invalid or incomplete birth details — please set birth place with coordinates.');
+            }
             const requestData = {
                 session_id: currentSessionId,
                 question: message,
                 language,
                 response_style: responseStyle,
-                premium_analysis: options.premium_analysis || false,
+                premium_analysis: useFreeQuestion ? false : !!(options.premium_analysis),
                 partnership_mode: isPartnershipMode,
-                birth_details: {
-                    name: birthData.name,
-                    date: birthData.date,
-                    time: birthData.time,
-                    latitude: parseFloat(birthData.latitude),
-                    longitude: parseFloat(birthData.longitude),
-                    place: birthData.place || '',
-                    gender: birthData.gender || ''
-                }
+                native_name: birthData.name,
+                birth_details: birthForAsk,
             };
             
             if (isPartnershipMode && selectedPartnerChart) {
@@ -649,6 +648,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                             : msg
                     ));
                     setIsLoading(false);
+                    fetchBalance();
                     removePendingMessage(messageId);
                     return;
                 }

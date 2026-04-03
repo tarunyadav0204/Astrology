@@ -1,0 +1,85 @@
+/* Full-viewport scroller so short screens can reach bottom of long register forms */
+.auth-modal-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.auth-modal-shell__panel {
+    background: #fff;
+    border-radius: 15px;
+    max-width: 450px;
+    width: 100%;
+    margin: 0 auto;
+    max-height: min(calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 92vh);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    flex-shrink: 0;
+}
+
+.auth-modal-shell__scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-height: 0;
+    max-height: inherit;
+}
+
+/* Stays at top of the scrolling region so it’s always reachable on mobile */
+.auth-modal-shell__sticky-close {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 6px 0 12px;
+    background: linear-gradient(180deg, #fff 70%, rgba(255, 255, 255, 0.92) 100%);
+}
+
+.auth-modal-shell__close {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.06);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    color: #444;
+}
+
+.auth-modal-shell__close:active {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.auth-modal-shell__body {
+    padding: 4px 20px 20px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+@media (min-width: 480px) {
+    .auth-modal-shell {
+        align-items: center;
+        padding-top: max(16px, env(safe-area-inset-top, 0px));
+    }
+}

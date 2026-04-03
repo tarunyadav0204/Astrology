@@ -2776,13 +2776,13 @@
     }
 }
 
-/* Message Action Buttons - Professional Style */
+/* Message Action Buttons - aligned with ChatPage / mobile app */
 .message-action-buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 8px;
     margin-top: 8px;
-    opacity: 0.8;
+    opacity: 0.95;
     transition: opacity 0.2s ease;
 }
 
@@ -2790,43 +2790,64 @@
     opacity: 1;
 }
 
+.message-action-buttons--top {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.message-action-buttons--bottom {
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
 .message-action-buttons .action-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 6px;
-    width: 24px;
-    height: 24px;
-    display: flex;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 10px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    color: #666;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 
-.message-action-buttons .copy-btn {
-    color: #3b82f6;
-}
-
-.message-action-buttons .copy-btn:hover {
-    background: #3b82f6;
-    color: white;
-    border-color: #3b82f6;
+.message-action-buttons .action-btn:hover:not(:disabled) {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
 }
 
-.message-action-buttons .delete-btn {
-    color: #ef4444;
+.message-action-buttons .action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
-.message-action-buttons .delete-btn:hover {
-    background: #ef4444;
-    color: white;
-    border-color: #ef4444;
-    transform: translateY(-1px);
+.message-action-buttons .action-btn--podcast {
+    background: rgba(255, 107, 53, 0.12);
+    border-color: rgba(255, 107, 53, 0.28);
+    color: #ff6b35;
+}
+
+.message-action-buttons .action-btn--restart {
+    background: rgba(255, 107, 53, 0.08);
+    border-color: rgba(255, 107, 53, 0.22);
+    color: #ff6b35;
+}
+
+.message-action-buttons .action-btn--pdf {
+    border-color: rgba(59, 130, 246, 0.22);
+}
+
+.message-action-buttons .action-btn--delete:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #dc2626;
     box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
 }
 
