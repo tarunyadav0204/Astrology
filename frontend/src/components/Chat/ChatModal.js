@@ -23,7 +23,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId, setSessionId] = useState(null);
-    const [language, setLanguage] = useState('english');
+    const language = 'english';
     const [responseStyle, setResponseStyle] = useState('detailed');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [hoveredMessage, setHoveredMessage] = useState(null);
@@ -61,23 +61,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         };
         checkAdminStatus();
     }, []);
-    
-    const getNextLanguage = (current) => {
-        const languages = ['english', 'hindi', 'telugu', 'gujarati', 'tamil'];
-        const currentIndex = languages.indexOf(current);
-        return languages[(currentIndex + 1) % languages.length];
-    };
-    
-    const getLanguageDisplay = (lang) => {
-        switch(lang) {
-            case 'english': return '🇺🇸 English';
-            case 'hindi': return '🇮🇳 हिंदी';
-            case 'telugu': return '🇮🇳 తెలుగు';
-            case 'gujarati': return '🇮🇳 ગુજરાતી';
-            case 'tamil': return '🇮🇳 தமிழ்';
-            default: return '🇺🇸 English';
-        }
-    };
     
     const downloadChatPDF = async () => {
         // Check if chat contains non-English content
@@ -970,9 +953,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         <button onClick={() => setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed')}>
                             {responseStyle === 'detailed' ? '⚡ Quick' : '📋 Detailed'}
                         </button>
-                        <button onClick={() => setLanguage(getNextLanguage(language))}>
-                            {getLanguageDisplay(getNextLanguage(language))}
-                        </button>
                         <button onClick={downloadChatPDF}>
                             📄 Download PDF
                         </button>
@@ -1100,7 +1080,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         </div>
                                         <MessageList 
                                             messages={messages} 
-                                            language={language} 
+                                            language={language}
+                                            sessionId={sessionId}
                                             onMessageHover={(message, element) => {
                                                 if (!showMobileMenu) {
                                                     setHoveredMessage(message);
@@ -1258,106 +1239,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     >
                         📄 Download Chat
                     </button>
-                    <div>
-                        <div style={{
-                            padding: '10px 15px',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            color: '#666'
-                        }}>
-                            🌐 Language
-                        </div>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setLanguage('english'); setShowMobileMenu(false); }}
-                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('english'); setShowMobileMenu(false); }}
-                            style={{
-                                width: '100%',
-                                padding: '8px 25px',
-                                border: 'none',
-                                background: language === 'english' ? 'rgba(255,107,53,0.1)' : 'transparent',
-                                color: language === 'english' ? '#ff6b35' : '#333',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                touchAction: 'manipulation',
-                                userSelect: 'none'
-                            }}
-                        >
-                            🇺🇸 English
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setLanguage('hindi'); setShowMobileMenu(false); }}
-                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('hindi'); setShowMobileMenu(false); }}
-                            style={{
-                                width: '100%',
-                                padding: '8px 25px',
-                                border: 'none',
-                                background: language === 'hindi' ? 'rgba(255,107,53,0.1)' : 'transparent',
-                                color: language === 'hindi' ? '#ff6b35' : '#333',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                touchAction: 'manipulation',
-                                userSelect: 'none'
-                            }}
-                        >
-                            🇮🇳 हिंदी
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setLanguage('telugu'); setShowMobileMenu(false); }}
-                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('telugu'); setShowMobileMenu(false); }}
-                            style={{
-                                width: '100%',
-                                padding: '8px 25px',
-                                border: 'none',
-                                background: language === 'telugu' ? 'rgba(255,107,53,0.1)' : 'transparent',
-                                color: language === 'telugu' ? '#ff6b35' : '#333',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                touchAction: 'manipulation',
-                                userSelect: 'none'
-                            }}
-                        >
-                            🇮🇳 తెలుగు
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setLanguage('gujarati'); setShowMobileMenu(false); }}
-                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('gujarati'); setShowMobileMenu(false); }}
-                            style={{
-                                width: '100%',
-                                padding: '8px 25px',
-                                border: 'none',
-                                background: language === 'gujarati' ? 'rgba(255,107,53,0.1)' : 'transparent',
-                                color: language === 'gujarati' ? '#ff6b35' : '#333',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                touchAction: 'manipulation',
-                                userSelect: 'none'
-                            }}
-                        >
-                            🇮🇳 ગુજરાતી
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setLanguage('tamil'); setShowMobileMenu(false); }}
-                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('tamil'); setShowMobileMenu(false); }}
-                            style={{
-                                width: '100%',
-                                padding: '8px 25px',
-                                border: 'none',
-                                background: language === 'tamil' ? 'rgba(255,107,53,0.1)' : 'transparent',
-                                color: language === 'tamil' ? '#ff6b35' : '#333',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                touchAction: 'manipulation',
-                                userSelect: 'none'
-                            }}
-                        >
-                            🇮🇳 தமிழ்
-                        </button>
-                    </div>
             </div>
         )}
         

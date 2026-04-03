@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import BirthForm from '../BirthForm/BirthForm';
@@ -20,6 +20,7 @@ import './ChatPage.css';
 
 const ChatPage = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { birthData } = useAstrology();
     const { credits, chatCost, partnershipCost, fetchBalance } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
@@ -29,6 +30,14 @@ const ChatPage = () => {
     const [showContextModal, setShowContextModal] = useState(false);
     const [contextData, setContextData] = useState(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [headerUser, setHeaderUser] = useState(() => {
+        try {
+            const raw = localStorage.getItem('user');
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    });
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
     const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
     const [showPartnerModal, setShowPartnerModal] = useState(false);
@@ -414,6 +423,7 @@ const ChatPage = () => {
                         // console.log('🔐 Invalid token detected, clearing auth...');
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
+                        setHeaderUser(null);
                         window.location.href = '/login';
                     } else if (response.ok) {
                         const userData = await response.json();
@@ -421,6 +431,7 @@ const ChatPage = () => {
                         // console.log('🔑 User role:', userData.role);
                         // console.log('👑 Is admin?', userData.role === 'admin');
                         setIsAdmin(userData.role === 'admin');
+                        setHeaderUser(userData);
                     }
                 } catch (error) {
                     console.log('Token validation failed:', error);
@@ -1594,81 +1605,89 @@ const ChatPage = () => {
 
     return (
         <>
-            <NavigationHeader compact={true} />
+            <NavigationHeader
+                compact
+                variant="chat"
+                user={headerUser}
+                birthData={birthData}
+                onChangeNative={() => setShowBirthFormModal(true)}
+                onCreditsClick={() => setShowCreditsModal(true)}
+                onLogout={() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    setHeaderUser(null);
+                    navigate('/');
+                }}
+                onLogin={() => navigate('/login')}
+                showLoginButton={!headerUser}
+            />
             <div className="chat-page">
-            <div className="chat-header">
+            <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
                 {!wizardCompleted ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <h1 style={{ margin: 0, color: '#111827' }}>AstroRoshni Guided Setup</h1>
-                        <p style={{ margin: 0, color: 'rgba(17,24,39,0.75)' }}>
+                    <div className="chat-wizard-intro">
+                        <h1 className="chat-wizard-intro__title">AstroRoshni Guided Setup</h1>
+                        <p className="chat-wizard-intro__text">
                             Choose your analysis type below. The chat unlocks only after you complete the guided steps.
                         </p>
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ flex: '1 1 auto', minWidth: '200px', textAlign: 'left' }}>
-                            <h1 style={{ margin: 0, textAlign: 'left' }}>
-                                AstroRoshni {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart
-                                    ? `${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`
-                                    : birthData?.name ? `with ${birthData.name}` : 'Consultation'
-                                }
+                    <div className="chat-header-toolbar">
+                        <div className="chat-header-toolbar__info">
+                            {(isMundaneMode || isPartnershipMode) && (
+                                <div className="chat-header-toolbar__mode-chip" aria-hidden="true">
+                                    {isMundaneMode ? 'Mundane' : 'Partnership'}
+                                </div>
+                            )}
+                            <h1 className="chat-header-toolbar__title">
+                                <span className="chat-header-toolbar__title-focus">
+                                    {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart
+                                        ? `${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`
+                                        : birthData?.name || 'Consultation'}
+                                </span>
                             </h1>
-                            <div style={{ fontSize: '10px', color: '#999', textAlign: 'left' }}>
-                                {isMundaneMode ? '🌍 Mundane Mode' : (isPartnershipMode ? '💕 Partnership Mode' : 'Individual Mode')} | Admin: {isAdmin ? 'Yes' : 'No'}
-                            </div>
+                            {(isMundaneMode || isPartnershipMode || isAdmin) && (
+                                <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">
+                                    {isMundaneMode ? 'Mundane context' : isPartnershipMode ? 'Two-chart analysis' : ''}
+                                    {isAdmin &&
+                                        (isMundaneMode || isPartnershipMode ? ' · Admin' : 'Admin')}
+                                </p>
+                            )}
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div className="chat-header-toolbar__actions">
                             <button
+                                type="button"
+                                className="chat-header-btn"
+                                title="Change analysis type"
                                 onClick={() => {
                                     resetThreadForWizard(null);
                                     setWizardMode(null);
                                     setWizardStep(0);
                                 }}
-                                style={{
-                                    background: 'linear-gradient(45deg, #111827, #374151)',
-                                    padding: '8px 12px',
-                                    borderRadius: '20px',
-                                    fontSize: '11px',
-                                    fontWeight: 'bold',
-                                    color: 'white',
-                                    border: '2px solid #111827',
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap',
-                                    zIndex: 9999,
-                                    position: 'relative',
-                                }}
                             >
-                                🔁 Change analysis type
+                                <span className="chat-header-btn__full">Change type</span>
+                                <span className="chat-header-btn__icon" aria-hidden="true">↻</span>
                             </button>
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    className="chat-header-btn"
+                                    title="View Gemini context payload (admin)"
+                                    onClick={() => setShowContextModal(true)}
+                                >
+                                    <span className="chat-header-btn__full">Context</span>
+                                    <span className="chat-header-btn__icon" aria-hidden="true">☰</span>
+                                </button>
+                            )}
                             <button
-                                onClick={() => setShowContextModal(true)}
-                                style={{
-                                    background: 'white',
-                                    padding: '8px 12px',
-                                    borderRadius: '20px',
-                                    fontSize: '11px',
-                                    fontWeight: 'bold',
-                                    color: 'black',
-                                    border: '2px solid black',
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap'
-                                }}
+                                type="button"
+                                className="credits-display chat-header-credits"
+                                title="Credits and per-question cost"
+                                aria-label="Open credits"
+                                onClick={() => setShowCreditsModal(true)}
                             >
-                                📄 MENU
+                                <span className="credits-full">{credits} · {isPartnershipMode ? partnershipCost : chatCost}/q</span>
+                                <span className="credits-short">{credits}</span>
                             </button>
-                            <div className="credits-display" style={{
-                                background: 'rgba(255,107,53,0.1)',
-                                padding: '6px 10px',
-                                borderRadius: '15px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                color: '#ff6b35',
-                                border: '1px solid rgba(255,107,53,0.3)',
-                                whiteSpace: 'nowrap'
-                            }}>
-                                <span className="credits-full">💳 {credits} | {isPartnershipMode ? partnershipCost : chatCost} per question</span>
-                                <span className="credits-short">💳 {credits} Credits</span>
-                            </div>
                         </div>
                     </div>
                 )}
@@ -2128,6 +2147,7 @@ const ChatPage = () => {
                     <>
                         <MessageList
                             messages={messages}
+                            sessionId={isMundaneMode ? mundaneSessionId : chatV2SessionId}
                             onDeleteMessage={handleDeleteMessage}
                         />
                         <div ref={messagesEndRef} />

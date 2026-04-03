@@ -103,6 +103,26 @@
   display: none;
 }
 
+/* Denser top bar on full-page chat (mobile web) */
+.main-header.compact.compact--chat .compact-nav {
+  padding: 6px 0;
+}
+
+.main-header.compact.compact--chat .compact-nav .container {
+  padding-left: 12px;
+  padding-right: 12px;
+  gap: 10px;
+}
+
+.main-header.compact.compact--chat .logo-text {
+  font-size: 15px;
+}
+
+.main-header.compact.compact--chat .logo-icon-img {
+  width: 26px;
+  height: 26px;
+}
+
 @media (max-width: 968px) {
   .compact-menu {
     display: none;

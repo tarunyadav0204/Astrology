@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCredits } from '../../context/CreditContext';
 
+const MOBILE_PREMIUM_MQ = '(max-width: 768px)';
+
 const ChatInput = ({
     onSendMessage,
     isLoading,
@@ -15,7 +17,30 @@ const ChatInput = ({
     const { credits, chatCost, premiumChatCost, partnershipCost, loading: creditsLoading } = useCredits();
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
+    const [showModeSelector, setShowModeSelector] = useState(false);
+    const [isMobileLayout, setIsMobileLayout] = useState(
+        typeof window !== 'undefined' && window.matchMedia(MOBILE_PREMIUM_MQ).matches
+    );
     const suggestionsScrollRef = useRef(null);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mq = window.matchMedia(MOBILE_PREMIUM_MQ);
+        const onChange = () => setIsMobileLayout(mq.matches);
+        onChange();
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+
+    useEffect(() => {
+        if (isPartnershipMode || isMundaneMode) {
+            setIsPremiumAnalysis(false);
+            setShowModeSelector(false);
+        }
+    }, [isPartnershipMode, isMundaneMode]);
+
+    const showPremiumControls = !isPartnershipMode && !isMundaneMode;
+    const useCompactPremium = showPremiumControls && isMobileLayout;
 
     const scrollSuggestions = (direction) => {
         const el = suggestionsScrollRef.current;
@@ -69,7 +94,7 @@ const ChatInput = ({
             ];
 
     return (
-        <div className="chat-input-container">
+        <div className="chat-input-container chat-composer">
             {!creditsLoading && credits < currentCost && (
                 <div className="credit-warning">
                     <span>Insufficient credits ({credits}/{currentCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : isPartnershipMode ? 'Partnership Analysis' : 'Standard Analysis'})</span>
@@ -78,50 +103,88 @@ const ChatInput = ({
                     </button>
                 </div>
             )}
-            <div className="premium-toggle-container" style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: '10px',
-                marginBottom: '10px',
-                padding: '8px 12px',
-                background: 'rgba(255,107,53,0.06)',
-                border: '1px solid rgba(0,0,0,0.06)',
-                borderRadius: '8px',
-                fontSize: '14px'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#111827' }}>
-                        <input
-                            type="checkbox"
-                            checked={isPremiumAnalysis}
-                            onChange={(e) => setIsPremiumAnalysis(e.target.checked)}
-                            style={{ transform: 'scale(1.2)' }}
+            <div
+                className="premium-toggle-container chat-composer-premium"
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    gap: useCompactPremium ? '8px' : '10px',
+                    marginBottom: '10px',
+                    padding: useCompactPremium ? '6px 8px' : '8px 12px',
+                    background: 'rgba(255,107,53,0.06)',
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    borderRadius: '8px',
+                    fontSize: useCompactPremium ? '12px' : '14px',
+                }}
+            >
+                {useCompactPremium && showModeSelector && (
+                    <div className="chat-premium-mode-expanded" role="group" aria-label="Question mode">
+                        <button
+                            type="button"
+                            className={`chat-premium-mode-pill ${!isPremiumAnalysis ? 'chat-premium-mode-pill--active' : ''}`}
                             disabled={isLocked}
-                        />
-                        <span>🚀 Premium Deep Analysis</span>
-                    </label>
-                    <span style={{
-                        background: isPremiumAnalysis ? 'linear-gradient(45deg, #ff6b35, #ffd700)' : '#666',
-                        color: '#ffffff',
-                        padding: '4px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        boxShadow: isPremiumAnalysis ? '0 2px 8px rgba(255, 107, 53, 0.3)' : 'none'
-                    }}>
-                        {isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost)} credits
-                    </span>
-                    {isPremiumAnalysis && (
-                        <span
-                            className="enhanced-analysis-badge"
-                            onClick={() => onShowEnhancedPopup && onShowEnhancedPopup()}
-                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                                setIsPremiumAnalysis(false);
+                                setShowModeSelector(false);
+                            }}
                         >
-                            ✨ Enhanced Analysis
+                            <span className="chat-premium-mode-pill__label">Standard</span>
+                            <span className="chat-premium-mode-pill__cost">
+                                {chatCost} credit{chatCost !== 1 ? 's' : ''}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            className={`chat-premium-mode-pill ${isPremiumAnalysis ? 'chat-premium-mode-pill--active-premium' : ''}`}
+                            disabled={isLocked}
+                            onClick={() => {
+                                setIsPremiumAnalysis(true);
+                                setShowModeSelector(false);
+                            }}
+                        >
+                            <span className="chat-premium-mode-pill__label">Premium</span>
+                            <span className="chat-premium-mode-pill__cost">
+                                {premiumChatCost} credit{premiumChatCost !== 1 ? 's' : ''}
+                            </span>
+                        </button>
+                    </div>
+                )}
+
+                {!useCompactPremium && (
+                    <div className="chat-composer-premium-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isLocked ? 'not-allowed' : 'pointer', color: '#111827' }}>
+                            <input
+                                type="checkbox"
+                                checked={isPremiumAnalysis}
+                                onChange={(e) => setIsPremiumAnalysis(e.target.checked)}
+                                style={{ transform: 'scale(1.2)' }}
+                                disabled={isLocked}
+                            />
+                            <span className="chat-premium-label">🚀 Premium Deep Analysis</span>
+                        </label>
+                        <span style={{
+                            background: isPremiumAnalysis ? 'linear-gradient(45deg, #ff6b35, #ffd700)' : '#666',
+                            color: '#ffffff',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            boxShadow: isPremiumAnalysis ? '0 2px 8px rgba(255, 107, 53, 0.3)' : 'none'
+                        }}>
+                            {isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost)} credits
                         </span>
-                    )}
-                </div>
+                        {isPremiumAnalysis && (
+                            <span
+                                className="enhanced-analysis-badge"
+                                onClick={() => onShowEnhancedPopup && onShowEnhancedPopup()}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                ✨ Enhanced Analysis
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 {!isLoading && !isLocked && (
                     <div className="suggestions-scroll-wrapper">
@@ -170,29 +233,77 @@ const ChatInput = ({
                                 ? "Analyzing your chart..."
                                 : credits < currentCost
                                     ? "Insufficient credits"
-                                    : isPartnershipMode
-                                        ? "Ask about your compatibility..."
-                                        : isMundaneMode
-                                            ? "Ask about global events..."
-                                            : "Ask me about your birth chart..."
+                                    : useCompactPremium && showModeSelector
+                                        ? 'Type here...'
+                                        : isPartnershipMode
+                                            ? "Ask about your compatibility..."
+                                            : isMundaneMode
+                                                ? "Ask about global events..."
+                                                : "Ask me about your birth chart..."
                     }
                     disabled={isLoading || credits < currentCost || isLocked}
-                    className="chat-input"
+                    className={`chat-input${useCompactPremium && showModeSelector ? ' chat-input--mode-select-open' : ''}`}
                 />
+                {useCompactPremium && (
+                    <>
+                        <button
+                            type="button"
+                            className={`chat-premium-sp-toggle ${isPremiumAnalysis ? 'chat-premium-sp-toggle--premium' : ''} ${showModeSelector ? 'chat-premium-sp-toggle--open' : ''}`}
+                            onClick={() => !isLocked && setShowModeSelector((v) => !v)}
+                            disabled={isLocked}
+                            title={isPremiumAnalysis ? 'Premium mode — tap to change' : 'Standard mode — tap to change'}
+                            aria-expanded={showModeSelector}
+                            aria-label={isPremiumAnalysis ? 'Premium analysis selected. Open mode picker' : 'Standard analysis. Open mode picker'}
+                        >
+                            {isPremiumAnalysis ? (
+                                <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--p">P</span>
+                            ) : (
+                                <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--s">S</span>
+                            )}
+                        </button>
+                        {isPremiumAnalysis && onShowEnhancedPopup && (
+                            <button
+                                type="button"
+                                className="chat-premium-enhanced-icon"
+                                onClick={() => onShowEnhancedPopup()}
+                                title="What is enhanced premium analysis?"
+                                aria-label="Premium analysis details"
+                            >
+                                ✨
+                            </button>
+                        )}
+                    </>
+                )}
                 <button 
                     type="submit" 
                     disabled={!message.trim() || isLoading || credits < currentCost || isLocked}
                     className="send-button"
+                    aria-label={
+                        isLoading
+                            ? 'Sending'
+                            : credits < currentCost
+                                ? 'Insufficient credits'
+                                : isPremiumAnalysis
+                                    ? 'Send premium question'
+                                    : isPartnershipMode
+                                        ? 'Send partnership question'
+                                        : 'Send message'
+                    }
                     style={{
                         background: isPremiumAnalysis ? 'linear-gradient(45deg, #ff6b35, #ffd700)' : undefined,
                         boxShadow: isPremiumAnalysis ? '0 2px 12px rgba(255, 107, 53, 0.4)' : undefined
                     }}
                 >
-                    {isLoading ? '...' : credits < currentCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : isPartnershipMode ? '💕 Send Partnership' : 'Send'}
+                    <span className="send-button__label-desktop">
+                        {isLoading ? '...' : credits < currentCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : isPartnershipMode ? '💕 Send Partnership' : 'Send'}
+                    </span>
+                    <span className="send-button__label-mobile" aria-hidden="true">
+                        {isLoading ? '…' : credits < currentCost ? '—' : isPremiumAnalysis ? '🚀' : isPartnershipMode ? '💕' : '➤'}
+                    </span>
                 </button>
             </form>
             {!creditsLoading && (
-                <div className="credit-info">
+                <div className="credit-info chat-composer-footnote">
                     Credits: {credits} | {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : isPartnershipMode ? `Partnership: ${partnershipCost}` : `Standard: ${chatCost}`} credits per question
                 </div>
             )}

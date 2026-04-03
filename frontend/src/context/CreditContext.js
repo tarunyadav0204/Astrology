@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const CreditContext = createContext();
 
@@ -20,9 +20,10 @@ export const CreditProvider = ({ children }) => {
     const [healthCost, setHealthCost] = useState(3);
     const [educationCost, setEducationCost] = useState(3);
     const [careerCost, setCareerCost] = useState(12);
+    const [podcastCost, setPodcastCost] = useState(2);
     const [loading, setLoading] = useState(true);
 
-    const fetchBalance = async () => {
+    const fetchBalance = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             
@@ -57,9 +58,9 @@ export const CreditProvider = ({ children }) => {
             console.error('Error fetching credit balance:', error);
             setCredits(0);
         }
-    };
+    }, []);
 
-    const fetchCosts = async () => {
+    const fetchCosts = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             let pricing = {};
@@ -90,7 +91,7 @@ export const CreditProvider = ({ children }) => {
         } catch (error) {
             console.error('Error fetching pricing:', error);
         }
-    };
+    }, []);
 
     useEffect(() => {
         const loadData = async () => {
@@ -99,7 +100,7 @@ export const CreditProvider = ({ children }) => {
             setLoading(false);
         };
         loadData();
-    }, []);
+    }, [fetchBalance, fetchCosts]);
 
     const spendCredits = async (amount, feature, description) => {
         try {
@@ -152,7 +153,7 @@ export const CreditProvider = ({ children }) => {
             window.removeEventListener('creditUpdated', handleCreditUpdate);
             window.removeEventListener('focus', handleFocus);
         };
-    }, []);
+    }, [fetchBalance, fetchCosts]);
 
     return (
         <CreditContext.Provider value={{
@@ -165,8 +166,10 @@ export const CreditProvider = ({ children }) => {
             healthCost,
             educationCost,
             careerCost,
+            podcastCost,
             loading,
             fetchBalance,
+            fetchCosts,
             refreshBalance,
             spendCredits
         }}>

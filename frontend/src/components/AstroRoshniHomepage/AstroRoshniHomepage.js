@@ -9,7 +9,6 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { apiService } from '../../services/apiService';
 import ChartWidget from '../Charts/ChartWidget';
 import NavigationHeader from '../Shared/NavigationHeader';
-import ChatModal from '../Chat/ChatModal';
 import CreditsModal from '../Credits/CreditsModal';
 import PanchangWidget from '../PanchangWidget/HomePanchangWidget';
 import LoShuGrid from '../Numerology/LoShuGrid';
@@ -34,7 +33,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [horoscopeData, setHoroscopeData] = useState({});
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('daily');
-  const [showChatModal, setShowChatModal] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
@@ -926,7 +924,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <button 
                 className="ask-tara-prominent-btn"
-                onClick={() => user ? setShowChatModal(true) : onLogin()}
+                onClick={() => user ? navigate('/chat') : onLogin()}
                 style={{
                   background: 'white',
                   color: '#e91e63',
@@ -1005,7 +1003,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   if (index === 0) {
                     console.log('Opening Tara chat');
                     if (user) {
-                      setShowChatModal(true);
+                      navigate('/chat');
                     } else {
                       onLogin();
                     }
@@ -1184,7 +1182,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
           
           <div className="consultation-categories">
-            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="consultation-icon">💕</div>
               <h4>Love & Relationships</h4>
               <p>Marriage compatibility, relationship timing, soulmate analysis</p>
@@ -1195,7 +1193,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="ask-btn">Ask Tara</button>
             </div>
             
-            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="consultation-icon">💼</div>
               <h4>Career & Finance</h4>
               <p>Job changes, business success, wealth timing, investment guidance</p>
@@ -1206,7 +1204,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="ask-btn">Ask Tara</button>
             </div>
             
-            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="consultation-icon">🏥</div>
               <h4>Health & Wellness</h4>
               <p>Health predictions, disease timing, remedies, lifestyle guidance</p>
@@ -1217,7 +1215,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="ask-btn">Ask Tara</button>
             </div>
             
-            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="consultation-icon">👶</div>
               <h4>Family & Children</h4>
               <p>Child birth timing, family harmony, parenting guidance</p>
@@ -1228,7 +1226,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="ask-btn">Ask Tara</button>
             </div>
             
-            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="consultation-icon">🎓</div>
               <h4>Education & Growth</h4>
               <p>Study success, exam results, skill development, learning path</p>
@@ -1239,7 +1237,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="ask-btn">Ask Tara</button>
             </div>
             
-            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="consultation-icon">🌟</div>
               <h4>General Predictions</h4>
               <p>Life overview, upcoming events, lucky periods, general guidance</p>
@@ -1338,7 +1336,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
             <button 
               className="start-chat-btn"
-              onClick={() => user ? setShowChatModal(true) : onLogin()}
+              onClick={() => user ? navigate('/chat') : onLogin()}
             >
               ⭐ Ask Tara Now
             </button>
@@ -1428,7 +1426,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
           
           <div className="ai-services-grid">
-            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">❓</div>
               <h4>Prashna Analysis</h4>
               <p>Horary astrology for specific questions and timing</p>
@@ -1440,7 +1438,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="chat-service-btn">Ask Tara</button>
             </div>
             
-            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">📅</div>
               <h4>Varshphal Analysis</h4>
               <p>Annual predictions and yearly forecast insights</p>
@@ -1452,7 +1450,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="chat-service-btn">Ask Tara</button>
             </div>
             
-            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">💕</div>
               <h4>Love & Partnership</h4>
               <p>Relationship compatibility and marriage analysis</p>
@@ -1464,7 +1462,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="chat-service-btn">Ask Tara</button>
             </div>
             
-            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">🏢</div>
               <h4>Business Relationships</h4>
               <p>Partnership analysis and business compatibility</p>
@@ -1476,7 +1474,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="chat-service-btn">Ask Tara</button>
             </div>
             
-            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">🤝</div>
               <h4>Friendship Analysis</h4>
               <p>Social relationships and friendship compatibility</p>
@@ -1488,7 +1486,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="chat-service-btn">Ask Tara</button>
             </div>
             
-            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">💰</div>
               <h4>Wealth & Finance</h4>
               <p>Money matters and financial growth timing</p>
@@ -1508,7 +1506,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
             <button 
               className="start-ai-chat-btn"
-              onClick={() => user ? setShowChatModal(true) : onLogin()}
+              onClick={() => user ? navigate('/chat') : onLogin()}
             >
               🚀 Start Tara Consultation
             </button>
@@ -2042,7 +2040,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
             <button 
               className="start-numerology-btn"
-              onClick={() => user ? setShowChatModal(true) : onLogin()}
+              onClick={() => user ? navigate('/chat') : onLogin()}
             >
               🌟 Explore Numerology with Tara
             </button>
@@ -2183,7 +2181,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
       {/* Live Chat Widget */}
       <div className="live-chat-widget">
-        <button className="chat-widget-btn" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+        <button className="chat-widget-btn" onClick={() => user ? navigate('/chat') : onLogin()}>
           <span className="chat-text-full">⭐ Ask Tara Now</span>
           <span className="chat-text-short">⭐ Ask Tara</span>
           <span className="chat-pulse"></span>
@@ -2254,17 +2252,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
         </div>
       </footer>
-      
-      <ChatModal 
-        isOpen={showChatModal} 
-        onClose={() => setShowChatModal(false)}
-        initialBirthData={null}
-        onChartRefClick={(chartRef) => {
-          setChartRefHighlight(chartRef);
-          setShowChartModal(true);
-          setTimeout(() => setChartRefHighlight(null), 5000);
-        }}
-      />
       
       <CreditsModal 
         isOpen={showCreditsModal} 
@@ -2767,7 +2754,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 gap: '10px'
               }}>
                 <button 
-                  onClick={() => user ? setShowChatModal(true) : onLogin()}
+                  onClick={() => user ? navigate('/chat') : onLogin()}
                   style={{
                     background: 'linear-gradient(135deg, #e91e63, #f06292)',
                     color: 'white',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { HelmetProvider } from 'react-helmet-async';
 import AnalyticsTracker from './components/Analytics/AnalyticsTracker';
@@ -56,6 +56,12 @@ import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
 import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/domains.config';
 
+/** Hide “Ask Tara” FAB on full-page chat (same route). */
+function FloatingChatButtonUnlessOnChatPage() {
+  const { pathname } = useLocation();
+  if (pathname === '/chat') return null;
+  return <FloatingChatButton onOpenChat={() => { window.location.href = '/chat'; }} />;
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -821,7 +827,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
-              <FloatingChatButton onOpenChat={() => { window.location.href = '/chat'; }} />
+              <FloatingChatButtonUnlessOnChatPage />
             </CreditProvider>
           </AstrologyProvider>
         </Router>
@@ -1006,7 +1012,7 @@ function App() {
             </div>
           } />
             </Routes>
-            {currentView !== 'dashboard' && <FloatingChatButton onOpenChat={() => { window.location.href = '/chat'; }} />}
+            {currentView !== 'dashboard' && <FloatingChatButtonUnlessOnChatPage />}
           </CreditProvider>
         </AstrologyProvider>
       </Router>

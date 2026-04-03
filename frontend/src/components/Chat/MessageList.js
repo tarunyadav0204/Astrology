@@ -2,7 +2,7 @@ import React from 'react';
 import MessageBubble from './MessageBubble';
 import FeedbackComponent from './FeedbackComponent';
 
-const MessageList = ({ messages, language = 'english', onMessageHover, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
+const MessageList = ({ messages, language = 'english', sessionId = null, onMessageHover, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
@@ -13,7 +13,8 @@ const MessageList = ({ messages, language = 'english', onMessageHover, onFollowU
                     >
                         <MessageBubble 
                             message={message} 
-                            language={language} 
+                            language={language}
+                            sessionId={sessionId}
                             onFollowUpClick={onFollowUpClick}
                             onChartRefClick={onChartRefClick}
                             onRestartPolling={onRestartPolling}

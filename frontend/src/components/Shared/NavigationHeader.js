@@ -4,7 +4,7 @@ import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData }) => {
+const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -41,7 +41,7 @@ const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector,
 
   if (compact) {
     return (
-      <header className="main-header compact">
+      <header className={`main-header compact${variant === 'chat' ? ' compact--chat' : ''}`}>
         <div className="compact-nav">
           <div className="container">
             <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
@@ -133,7 +133,7 @@ const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector,
                       </button>
                     )}
                     <button className="mobile-menu-item" onClick={() => { navigate('/profile'); setShowMobileMenu(false); }}>👤 Profile</button>
-                    {user.role === 'admin' && (
+                    {user.role === 'admin' && onAdminClick && (
                       <button className="mobile-menu-item" onClick={() => { onAdminClick(); setShowMobileMenu(false); }}>⚙️ Admin Panel</button>
                     )}
                     <button className="mobile-menu-item logout" onClick={() => { onLogout(); setShowMobileMenu(false); }}>🚪 Logout</button>

@@ -1,17 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
-import ResponseRenderer from '../TermTooltip/ResponseRenderer';
+import { useCredits } from '../../context/CreditContext';
 import NorthIndianChart from '../Charts/NorthIndianChart';
+import {
+    stopAndRevokePodcastPlayback,
+    registerPodcastPlayback,
+    base64ToAudioBlob,
+    podcastLangFromUiLanguage,
+} from './podcastPlayback';
 
-const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
-    const [isSpeaking, setIsSpeaking] = useState(false);
-    const [hasError, setHasError] = useState(false);
-    const [selectedVoice, setSelectedVoice] = useState(null);
-    const [voices, setVoices] = useState([]);
-    const [currentChunk, setCurrentChunk] = useState(0);
-    const [totalChunks, setTotalChunks] = useState(0);
+const MessageBubble = ({ message, language = 'english', sessionId = null, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
+    const { podcastCost, refreshBalance } = useCredits();
     const [showActions, setShowActions] = useState(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
@@ -31,73 +31,279 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
 
         return () => clearInterval(interval);
     }, [insightsKey, chartInsights.length]);
-    
-    React.useEffect(() => {
-        const loadVoices = () => {
-            const availableVoices = window.speechSynthesis.getVoices();
-            setVoices(availableVoices);
-            if (!selectedVoice && availableVoices.length > 0) {
-                // Try to find Google US English voice first
-                const googleUSVoice = availableVoices.find(voice => 
-                    voice.name.includes('Google US English') || 
-                    (voice.lang === 'en-US' && voice.name.includes('Google'))
-                );
-                setSelectedVoice(googleUSVoice || availableVoices[0]);
+
+    const [podcastModalOpen, setPodcastModalOpen] = useState(false);
+    const [podcastModalMode, setPodcastModalMode] = useState('loading');
+    const [podcastLoading, setPodcastLoading] = useState(false);
+    const [podcastCurrentTime, setPodcastCurrentTime] = useState(0);
+    const [podcastDuration, setPodcastDuration] = useState(0);
+    const [podcastIsPlaying, setPodcastIsPlaying] = useState(false);
+    const [podcastPlaybackRate, setPodcastPlaybackRate] = useState(1);
+    const podcastAudioRef = useRef(null);
+    const podcastFetchAbortRef = useRef(null);
+    const podcastBlobRef = useRef(null);
+    const podcastSourceKeyRef = useRef(null);
+
+    const getCleanMessageText = useCallback(() => {
+        if (!message?.content) return '';
+        return message.content
+            .replace(/<[^>]*>/g, '')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\*(.*?)\*/g, '$1')
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ')
+            .trim();
+    }, [message?.content]);
+
+    useEffect(() => {
+        return () => {
+            podcastFetchAbortRef.current?.abort();
+            if (podcastAudioRef.current) {
+                podcastAudioRef.current.pause();
+                podcastAudioRef.current.src = '';
+            }
+            if (podcastBlobRef.current) {
+                URL.revokeObjectURL(podcastBlobRef.current);
+                podcastBlobRef.current = null;
             }
         };
-        
-        loadVoices();
-        window.speechSynthesis.onvoiceschanged = loadVoices;
-    }, [selectedVoice]);
-    
-    // Auto-select appropriate voice based on language
-    React.useEffect(() => {
-        if (voices.length > 0) {
-            if (language === 'hindi') {
-                const hindiVoice = voices.find(voice => 
-                    voice.lang.startsWith('hi') || 
-                    voice.name.toLowerCase().includes('hindi') ||
-                    voice.name.toLowerCase().includes('devanagari')
+    }, []);
+
+    const attachPodcastAudioListeners = useCallback((audio) => {
+        audio.ontimeupdate = () => setPodcastCurrentTime(audio.currentTime || 0);
+        audio.onloadedmetadata = () => setPodcastDuration(audio.duration && Number.isFinite(audio.duration) ? audio.duration : 0);
+        audio.onplay = () => setPodcastIsPlaying(true);
+        audio.onpause = () => setPodcastIsPlaying(false);
+        audio.onended = () => {
+            setPodcastIsPlaying(false);
+            setPodcastCurrentTime(0);
+        };
+    }, []);
+
+    const closePodcastModal = useCallback(() => {
+        podcastFetchAbortRef.current?.abort();
+        podcastFetchAbortRef.current = null;
+        stopAndRevokePodcastPlayback();
+        if (podcastAudioRef.current) {
+            podcastAudioRef.current.pause();
+            podcastAudioRef.current.src = '';
+        }
+        podcastBlobRef.current = null;
+        podcastSourceKeyRef.current = null;
+        setPodcastModalOpen(false);
+        setPodcastModalMode('loading');
+        setPodcastLoading(false);
+        setPodcastIsPlaying(false);
+        setPodcastCurrentTime(0);
+        setPodcastDuration(0);
+    }, []);
+
+    const fetchAndPlayPodcast = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showToast('Please log in to listen to podcasts.', 'error');
+            return;
+        }
+        const cleanText = getCleanMessageText();
+        if (!cleanText) return;
+
+        const langCode = podcastLangFromUiLanguage(language);
+        const mid = message.messageId != null ? String(message.messageId) : null;
+
+        podcastFetchAbortRef.current?.abort();
+        const ac = new AbortController();
+        podcastFetchAbortRef.current = ac;
+
+        setPodcastModalOpen(true);
+        setPodcastModalMode('loading');
+        setPodcastLoading(true);
+        setPodcastCurrentTime(0);
+        setPodcastDuration(0);
+
+        try {
+            const res = await fetch('/api/tts/podcast', {
+                method: 'POST',
+                signal: ac.signal,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message_content: cleanText,
+                    language: langCode,
+                    ...(mid ? { message_id: mid } : {}),
+                    ...(sessionId ? { session_id: sessionId } : {}),
+                    preview: (cleanText || message.content || '').slice(0, 150),
+                    ...(message.native_name ? { native_name: message.native_name } : {}),
+                }),
+            });
+
+            if (res.status === 402) {
+                const cost = podcastCost ?? 2;
+                showToast(`Insufficient credits. You need ${cost} credits to generate this podcast.`, 'error');
+                refreshBalance();
+                closePodcastModal();
+                return;
+            }
+
+            if (!res.ok) {
+                const t = await res.text().catch(() => '');
+                throw new Error(t || `Podcast request failed (${res.status})`);
+            }
+
+            const data = await res.json();
+            const b64 = data?.audio;
+            if (!b64 || typeof b64 !== 'string') {
+                throw new Error('No audio in response');
+            }
+
+            const blob = base64ToAudioBlob(b64);
+            const url = URL.createObjectURL(blob);
+
+            if (!podcastAudioRef.current) {
+                podcastAudioRef.current = new Audio();
+                attachPodcastAudioListeners(podcastAudioRef.current);
+            }
+            const audio = podcastAudioRef.current;
+            registerPodcastPlayback(audio, url);
+            podcastBlobRef.current = url;
+            podcastSourceKeyRef.current = `${mid || 'noid'}_${langCode}`;
+
+            audio.playbackRate = podcastPlaybackRate;
+            audio.src = url;
+            await audio.play();
+
+            setPodcastModalMode('playing');
+            setPodcastLoading(false);
+            if (data.cached !== true) {
+                refreshBalance();
+            }
+        } catch (e) {
+            if (e?.name === 'AbortError') {
+                return;
+            }
+            console.error('[Podcast]', e);
+            showToast('Could not play podcast. Please try again.', 'error');
+            closePodcastModal();
+        }
+    }, [
+        attachPodcastAudioListeners,
+        closePodcastModal,
+        getCleanMessageText,
+        language,
+        message.content,
+        message.messageId,
+        message.native_name,
+        podcastCost,
+        podcastPlaybackRate,
+        refreshBalance,
+        sessionId,
+    ]);
+
+    const handlePodcastButtonClick = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showToast('Please log in to listen to podcasts.', 'error');
+            return;
+        }
+        const cleanText = getCleanMessageText();
+        if (!cleanText) return;
+
+        const langCode = podcastLangFromUiLanguage(language);
+        const mid = message.messageId != null ? String(message.messageId) : null;
+        const sourceKey = `${mid || 'noid'}_${langCode}`;
+
+        if (podcastSourceKeyRef.current === sourceKey && podcastAudioRef.current?.src && !podcastLoading) {
+            setPodcastModalOpen(true);
+            setPodcastModalMode('playing');
+            const a = podcastAudioRef.current;
+            if (a.paused) {
+                await a.play().catch(() => {});
+            }
+            return;
+        }
+
+        let cached = false;
+        if (mid) {
+            try {
+                const cr = await fetch(
+                    `/api/tts/podcast/check-cache?message_id=${encodeURIComponent(mid)}&lang=${encodeURIComponent(langCode)}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
                 );
-                if (hindiVoice && selectedVoice !== hindiVoice) {
-                    setSelectedVoice(hindiVoice);
+                if (cr.ok) {
+                    const cd = await cr.json();
+                    cached = cd.cached === true;
                 }
-            } else if (language === 'telugu') {
-                const teluguVoice = voices.find(voice => 
-                    voice.lang.startsWith('te') || 
-                    voice.name.toLowerCase().includes('telugu')
-                );
-                if (teluguVoice && selectedVoice !== teluguVoice) {
-                    setSelectedVoice(teluguVoice);
-                }
-            } else if (language === 'gujarati') {
-                const gujaratiVoice = voices.find(voice => 
-                    voice.lang.startsWith('gu') || 
-                    voice.name.toLowerCase().includes('gujarati')
-                );
-                if (gujaratiVoice && selectedVoice !== gujaratiVoice) {
-                    setSelectedVoice(gujaratiVoice);
-                }
-            } else if (language === 'tamil') {
-                const tamilVoice = voices.find(voice => 
-                    voice.lang.startsWith('ta') || 
-                    voice.name.toLowerCase().includes('tamil')
-                );
-                if (tamilVoice && selectedVoice !== tamilVoice) {
-                    setSelectedVoice(tamilVoice);
-                }
-            } else {
-                const englishVoice = voices.find(voice => 
-                    voice.name.includes('Google US English') || 
-                    (voice.lang === 'en-US' && voice.name.includes('Google'))
-                );
-                if (englishVoice && selectedVoice !== englishVoice) {
-                    setSelectedVoice(englishVoice);
-                }
+            } catch (_) {
+                /* fall through to confirm */
             }
         }
-    }, [language, voices, selectedVoice]);
-    
+
+        if (!cached) {
+            const cost = podcastCost ?? 2;
+            const ok = window.confirm(
+                `Listen as podcast?\n\n${cost} credits will be used when the audio is first generated. Replays are free when already saved.`
+            );
+            if (!ok) return;
+        }
+
+        await fetchAndPlayPodcast();
+    }, [fetchAndPlayPodcast, getCleanMessageText, language, message.messageId, podcastCost, podcastLoading]);
+
+    const handlePodcastTogglePause = () => {
+        const audio = podcastAudioRef.current;
+        if (!audio || !audio.src) return;
+        if (audio.paused) {
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+        }
+    };
+
+    const handlePodcastSeek = (value) => {
+        const audio = podcastAudioRef.current;
+        if (!audio || !Number.isFinite(+value)) return;
+        audio.currentTime = +value;
+        setPodcastCurrentTime(audio.currentTime);
+    };
+
+    const handlePodcastRateChange = (rate) => {
+        const r = parseFloat(rate, 10) || 1;
+        setPodcastPlaybackRate(r);
+        if (podcastAudioRef.current) {
+            podcastAudioRef.current.playbackRate = r;
+        }
+    };
+
+    const handlePodcastShare = async () => {
+        const blobUrl = podcastBlobRef.current;
+        if (!blobUrl) {
+            showToast('Nothing to share yet.', 'error');
+            return;
+        }
+        try {
+            const res = await fetch(blobUrl);
+            const blob = await res.blob();
+            const file = new File([blob], `AstroRoshni-Podcast-${Date.now()}.mp3`, { type: 'audio/mpeg' });
+            if (navigator.share && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: 'AstroRoshni podcast' });
+            } else {
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `AstroRoshni-Podcast-${Date.now()}.mp3`;
+                a.click();
+                showToast('Download started.', 'success');
+            }
+        } catch (e) {
+            console.error('[Podcast share]', e);
+            showToast('Could not share or download.', 'error');
+        }
+    };
+
     const cleanTextForCopy = (content) => {
         return content
             .replace(/\*\*(.*?)\*\*/g, '$1')     // Remove bold
@@ -282,85 +488,6 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         return formatted;
     };
 
-    const handleSpeak = () => {
-        setHasError(false);
-        
-        // Always cancel any existing speech first
-        window.speechSynthesis.cancel();
-        
-        if (isSpeaking) {
-            setIsSpeaking(false);
-        } else {
-            if (message.content && message.content.trim()) {
-                // Clean the text first - remove HTML entities and tags
-                let cleanText = message.content
-                    .replace(/&quot;/g, '"')         // Decode HTML entities
-                    .replace(/&amp;/g, '&')
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>')
-                    .replace(/&#39;/g, "'")
-                    .replace(/&nbsp;/g, ' ')
-                    .replace(/<[^>]*>/g, '')         // Remove all HTML tags
-                    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
-                    .replace(/\*(.*?)\*/g, '$1')     // Remove italics markdown
-                    .replace(/###\s*(.*?)$/gm, '$1') // Remove headers
-                    .replace(/•\s*/g, '')            // Remove bullets
-                    .replace(/\n+/g, '. ')           // Replace line breaks
-                    .replace(/\s+/g, ' ')            // Normalize spaces
-                    .trim();
-                
-                // Break text into chunks for reliable speech synthesis
-                const chunkSize = 1000; // Characters per chunk
-                const chunks = [];
-                for (let i = 0; i < cleanText.length; i += chunkSize) {
-                    chunks.push(cleanText.substring(i, i + chunkSize));
-                }
-                
-                setTotalChunks(chunks.length);
-                setCurrentChunk(0);
-                
-                const speakChunk = (chunkIndex) => {
-                    if (chunkIndex >= chunks.length) {
-                        setIsSpeaking(false);
-                        setCurrentChunk(0);
-                        return;
-                    }
-                    
-                    const utterance = new SpeechSynthesisUtterance(chunks[chunkIndex]);
-                    utterance.rate = 0.9;
-                    utterance.pitch = 1;
-                    utterance.volume = 1;
-                    
-                    if (selectedVoice) {
-                        utterance.voice = selectedVoice;
-                    }
-                    
-                    utterance.onstart = () => {
-                        setIsSpeaking(true);
-                        setCurrentChunk(chunkIndex + 1);
-                    };
-                    
-                    utterance.onend = () => {
-                        // Speak next chunk after a brief pause
-                        setTimeout(() => speakChunk(chunkIndex + 1), 100);
-                    };
-                    
-                    utterance.onerror = (error) => {
-                        if (error.error !== 'interrupted') {
-                            setHasError(true);
-                        }
-                        setIsSpeaking(false);
-                    };
-                    
-                    window.speechSynthesis.speak(utterance);
-                };
-                
-                // Start speaking from first chunk
-                speakChunk(0);
-            }
-        }
-    };
-
     // Handle tooltip clicks with event delegation
     useEffect(() => {
         // Create global function for tooltip clicks
@@ -425,44 +552,6 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                         lineHeight: '16px'
                     }}>
                         ⚠️ BETA NOTICE: Timeline predictions are experimental. Please use logic and discretion.
-                    </div>
-                )}
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && textToSpeech.isSupported && message.content && (
-                    <div style={{ clearfix: 'both', marginBottom: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <select 
-                            value={selectedVoice?.name || ''}
-                            onChange={(e) => {
-                                const voice = voices.find(v => v.name === e.target.value);
-                                setSelectedVoice(voice);
-                            }}
-                            style={{
-                                fontSize: '11px',
-                                padding: '2px 4px',
-                                borderRadius: '3px',
-                                border: '1px solid #ccc',
-                                maxWidth: '120px'
-                            }}
-                        >
-                            {voices.map(voice => (
-                                <option key={voice.name} value={voice.name}>
-                                    {voice.lang} - {voice.name.split(' ')[0]}
-                                </option>
-                            ))}
-                        </select>
-                        <button 
-                            onClick={handleSpeak}
-                            style={{
-                                background: isSpeaking ? '#ff4444' : '#4CAF50',
-                                border: 'none',
-                                color: 'white',
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            {isSpeaking ? `🔇 Stop (${currentChunk}/${totalChunks})` : hasError ? '⚠️ Retry' : '🔊 Listen'}
-                        </button>
                     </div>
                 )}
                 <div 
@@ -650,6 +739,29 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                                 <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                             </svg>
                         </button>
+                        {message.role === 'assistant' && (
+                            <button
+                                type="button"
+                                className="action-btn podcast-btn"
+                                style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    minWidth: '20px',
+                                    padding: '0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: podcastLoading ? 0.5 : 1,
+                                }}
+                                disabled={podcastLoading}
+                                onClick={handlePodcastButtonClick}
+                                title="Listen as podcast"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                    <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7zm-1.5 16.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                                </svg>
+                            </button>
+                        )}
                         <button
                             className="action-btn whatsapp-btn"
                             style={{
@@ -718,6 +830,145 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                 </div>
             </div>
             
+            {podcastModalOpen &&
+                createPortal(
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10001,
+                        }}
+                        onClick={closePodcastModal}
+                        role="presentation"
+                    >
+                        <div
+                            style={{
+                                backgroundColor: 'white',
+                                padding: '22px',
+                                borderRadius: '12px',
+                                maxWidth: '400px',
+                                width: '90%',
+                                margin: '20px',
+                                boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 style={{ margin: '0 0 12px 0', color: '#c2410c', fontSize: '18px' }}>
+                                Podcast
+                            </h3>
+                            {podcastModalMode === 'loading' || podcastLoading ? (
+                                <p style={{ margin: 0, lineHeight: 1.5, color: '#444' }}>
+                                    Generating your podcast… this can take up to a couple of minutes.
+                                </p>
+                            ) : (
+                                <>
+                                    <div style={{ marginBottom: '12px', fontSize: '12px', color: '#666' }}>
+                                        {(() => {
+                                            const fmt = (t) => {
+                                                if (!Number.isFinite(t) || t < 0) return '0:00';
+                                                const m = Math.floor(t / 60);
+                                                const sec = Math.floor(t % 60);
+                                                return `${m}:${sec.toString().padStart(2, '0')}`;
+                                            };
+                                            return (
+                                                <>
+                                                    {fmt(podcastCurrentTime)} / {fmt(podcastDuration)}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={podcastDuration > 0 ? podcastDuration : 1}
+                                        step={0.1}
+                                        value={Math.min(podcastCurrentTime, podcastDuration > 0 ? podcastDuration : 0)}
+                                        onChange={(e) => handlePodcastSeek(parseFloat(e.target.value))}
+                                        style={{ width: '100%', marginBottom: '14px' }}
+                                    />
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            flexWrap: 'wrap',
+                                            gap: '8px',
+                                            alignItems: 'center',
+                                            marginBottom: '12px',
+                                        }}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={handlePodcastTogglePause}
+                                            style={{
+                                                padding: '8px 14px',
+                                                borderRadius: '8px',
+                                                border: 'none',
+                                                background: '#ea580c',
+                                                color: 'white',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                            }}
+                                        >
+                                            {podcastIsPlaying ? 'Pause' : 'Play'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={closePodcastModal}
+                                            style={{
+                                                padding: '8px 14px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #ccc',
+                                                background: '#f3f4f6',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                            }}
+                                        >
+                                            Stop & close
+                                        </button>
+                                        <label style={{ fontSize: '13px', color: '#374151' }}>
+                                            Speed{' '}
+                                            <select
+                                                value={String(podcastPlaybackRate)}
+                                                onChange={(e) => handlePodcastRateChange(e.target.value)}
+                                                style={{ marginLeft: 4 }}
+                                            >
+                                                <option value="0.75">0.75×</option>
+                                                <option value="1">1×</option>
+                                                <option value="1.25">1.25×</option>
+                                                <option value="1.5">1.5×</option>
+                                                <option value="2">2×</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handlePodcastShare}
+                                        style={{
+                                            padding: '8px 14px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #ea580c',
+                                            background: 'white',
+                                            color: '#c2410c',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            width: '100%',
+                                        }}
+                                    >
+                                        Share or download MP3
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>,
+                    document.body
+                )}
+
             {/* Tooltip Modal using Portal */}
             {tooltipModal.show && createPortal(
                 <div 
