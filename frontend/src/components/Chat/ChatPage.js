@@ -222,9 +222,9 @@ const ChatPage = () => {
     const getRelationshipSuggestedQuestions = () => {
         const label = wizardRelationshipText || 'this relationship';
         return [
-            `What are the strongest compatibility factors for ${label}?`,
-            `What timing windows are favorable for key events in ${label}?`,
-            `Which recurring karmic patterns should we consciously work through in ${label}?`
+            `What supportive links show up between the charts in ${label}?`,
+            `What challenges or growth edges are clearest in ${label}?`,
+            `What timing or dasha/transit phases matter most for ${label}?`,
         ];
     };
 
@@ -485,13 +485,35 @@ const ChatPage = () => {
             return;
         }
 
-        // For standard + partnership, reuse the existing per-birth history loading.
         if (wizardMode === 'single') {
             loadChatHistory();
-        } else {
-            addGreetingMessage();
+            return;
         }
-    }, [wizardCompleted, wizardMode, birthData, isMundaneMode, mundaneForm.country]);
+
+        if (
+            wizardMode === 'partnership' &&
+            wizardPrimaryChart &&
+            wizardSecondaryChart &&
+            (wizardRelationshipText || '').trim()
+        ) {
+            const rel = wizardRelationshipText.trim();
+            addGreetingMessage(
+                `Everything set! Analysis for **${wizardPrimaryChart.name}** & **${wizardSecondaryChart.name}** (${rel}) is ready.\n\nAsk any question about your compatibility!`
+            );
+            return;
+        }
+
+        addGreetingMessage();
+    }, [
+        wizardCompleted,
+        wizardMode,
+        birthData,
+        isMundaneMode,
+        mundaneForm.country,
+        wizardPrimaryChart,
+        wizardSecondaryChart,
+        wizardRelationshipText,
+    ]);
 
     const loadChatHistory = async () => {
         try {
@@ -904,10 +926,16 @@ const ChatPage = () => {
         const token = localStorage.getItem('token');
         const partnershipBirth = isPartnershipMode && wizardPrimaryChart ? wizardPrimaryChart : birthData;
         const partnershipSecond = isPartnershipMode && wizardSecondaryChart ? wizardSecondaryChart : selectedPartnerChart;
+        const relationshipLabel = (wizardRelationshipText || '').trim();
+        // Backend chat-v2 does not read partnership_relationship; mobile prepends this for model/context (see ChatScreen.js).
+        const questionForApi =
+            isPartnershipMode && relationshipLabel
+                ? `[Relationship: ${relationshipLabel}] ${message}`
+                : message;
 
         const requestData = {
             session_id: currentSessionId,
-            question: message,
+            question: questionForApi,
             language: 'english',
             response_style: 'detailed',
             premium_analysis: !!options.premium_analysis,
@@ -940,9 +968,7 @@ const ChatPage = () => {
             requestData.partner_longitude = parseFloat(partnershipSecond.longitude);
             requestData.partner_timezone = partnershipSecond.timezone;
             requestData.partner_gender = partnershipSecond.gender || '';
-            requestData.partnership_relationship = wizardRelationshipText
-                ? wizardRelationshipText
-                : undefined;
+            requestData.partnership_relationship = relationshipLabel || undefined;
         }
 
         try {
@@ -1621,7 +1647,7 @@ const ChatPage = () => {
                 onLogin={() => navigate('/login')}
                 showLoginButton={!headerUser}
             />
-            <div className="chat-page">
+            <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}`}>
             <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
                 {!wizardCompleted ? (
                     <div className="chat-wizard-intro">

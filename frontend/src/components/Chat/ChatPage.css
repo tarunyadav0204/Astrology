@@ -30,6 +30,27 @@
     max-height: none;
 }
 
+/* Long wizard (e.g. partnership): scroll setup inside header; thread area stays collapsed */
+.chat-page--wizard .chat-header--wizard {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.chat-page--wizard .chat-container {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.chat-page--wizard .wizard-placeholder {
+    display: none;
+}
+
 .chat-wizard-intro__title {
     margin: 0;
     color: #111827;

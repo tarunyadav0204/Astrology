@@ -77,12 +77,12 @@ const ChatInput = ({
         ]
         : isPartnershipMode
             ? [
-                "Are we compatible for marriage?",
-                "What are our relationship strengths?",
-                "What challenges might we face together?",
-                "When is a good time for us to get married?",
-                "How do our personalities complement each other?",
-                "What does our composite chart reveal?",
+                "What supportive themes show up between these two charts?",
+                "What frictions or blind spots are worth awareness?",
+                "How do communication or emotional needs differ here?",
+                "What timing or planetary periods matter for this connection?",
+                "What karmic or growth patterns appear in this pairing?",
+                "What practical steps would improve mutual understanding?",
             ]
             : [
                 "What does my birth chart say about my career?",
