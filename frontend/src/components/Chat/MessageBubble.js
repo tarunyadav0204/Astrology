@@ -551,7 +551,22 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                         fontWeight: '600',
                         lineHeight: '16px'
                     }}>
-                        ⚠️ BETA NOTICE: Timeline predictions are experimental. Please use logic and discretion.
+                        ⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.
+                    </div>
+                )}
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && (
+                    <div style={{
+                        backgroundColor: 'rgba(156, 39, 176, 0.08)',
+                        borderLeft: '3px solid #9C27B0',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        marginBottom: '12px',
+                        fontSize: '11px',
+                        color: '#6A1B9A',
+                        fontWeight: '600',
+                        lineHeight: '16px'
+                    }}>
+                        ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
                     </div>
                 )}
                 <div 
