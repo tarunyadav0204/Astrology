@@ -596,7 +596,6 @@ const ChatPage = () => {
         setChatV2SessionId(null);
         setWizardMode('single');
         setWizardStep(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intent is only this navigation signal
     }, [location.state]);
 
     useEffect(() => {
