@@ -1,6 +1,6 @@
 # Razorpay — web credit purchases
 
-Web users buy credits through **Razorpay Checkout** (UPI, cards, netbanking). Credit packs match the Android app: **50, 100, 250, 500** credits (`credits_50` … `credits_500` naming in order notes).
+Web users buy credits through **Razorpay Checkout** (UPI, cards, netbanking). Credit packs match the Android app: **50, 100, 250, 500, 999** credits (`credits_N` in order notes).
 
 Mobile continues to use **Google Play Billing**; this is a separate payment channel with the same credit semantics.
 
@@ -13,14 +13,14 @@ Mobile continues to use **Google Play Billing**; this is a separate payment chan
 | `RAZORPAY_WEBHOOK_SECRET` | Strongly recommended | From Razorpay Dashboard → Webhooks → secret for signature verification. |
 | `RAZORPAY_PRICE_PAISE_50` etc. | No | Override default INR prices (values in **paise**: `4900` = ₹49). |
 
-Defaults (paise): 50 → 4900, 100 → 9900, 250 → 22900, 500 → 44900.
+Defaults (paise): 50 → 4900, 100 → 9900, 250 → 22900, 500 → 44900, 999 → 84900. Override with `RAZORPAY_PRICE_PAISE_999` etc. to match Play.
 
 ## API
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
 | GET | `/api/credits/razorpay/catalog` | Bearer | Returns `key_id` + pack list with authoritative `amount_paise` / display strings. |
-| POST | `/api/credits/razorpay/create-order` | Bearer | Body `{ "credits": 50 \| 100 \| 250 \| 500 }`. Creates Razorpay order; notes include `userid`, `credits`, `product_id`. |
+| POST | `/api/credits/razorpay/create-order` | Bearer | Body `{ "credits": 50 \| 100 \| 250 \| 500 \| 999 }`. Creates Razorpay order; notes include `userid`, `credits`, `product_id`. |
 | POST | `/api/credits/razorpay/verify` | Bearer | Body: `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature` from Checkout `handler`. Verifies HMAC, fetches payment, grants credits if captured. Idempotent on `payment_id`. |
 | POST | `/api/credits/razorpay/webhook` | None (signature only) | Raw body; header `X-Razorpay-Signature`. Handles `payment.captured`; same grant logic as verify. |
 
