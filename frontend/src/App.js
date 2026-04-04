@@ -20,10 +20,7 @@ import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
 import AstroRoshniHomepage from './components/AstroRoshniHomepage/AstroRoshniHomepage';
 import HoroscopePage from './components/Horoscope/HoroscopePage';
 import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
-import MarriageAnalysisPage from './components/MarriageAnalysisPage/MarriageAnalysisPage';
-import CareerGuidancePage from './components/CareerGuidancePage/CareerGuidancePage';
-import HealthAnalysisPage from './components/HealthAnalysisPage/HealthAnalysisPage';
-import WealthAnalysisPage from './components/WealthAnalysisPage/WealthAnalysisPage';
+import AnalysisDetailPage from './components/Analysis/AnalysisDetailPage';
 import PanchangPage from './components/Panchang/PanchangPage';
 import MuhuratFinderPage from './components/MuhuratFinder/MuhuratFinderPage';
 import AdminPanel from './components/Admin/AdminPanel';
@@ -38,7 +35,6 @@ import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPag
 import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
-import EducationAnalysisPage from './components/EducationAnalysis/EducationAnalysisPage';
 import CreditsPage from './components/Credits/CreditsPage';
 import PolicyPage from './components/Policy/PolicyPage';
 import DeleteAccountPage from './components/Policy/DeleteAccountPage';
@@ -636,24 +632,27 @@ function App() {
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
           <Route path="/horoscope" element={<HoroscopePage />} />
           <Route path="/marriage-analysis" element={
-            <MarriageAnalysisPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
+            <AnalysisDetailPage
+              analysisType="marriage"
+              user={user}
+              onLogout={handleLogout}
+              onAdminClick={handleAdminClick}
             />
           } />
           <Route path="/career-guidance" element={
-            <CareerGuidancePage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
+            <AnalysisDetailPage
+              analysisType="career"
+              user={user}
+              onLogout={handleLogout}
+              onAdminClick={handleAdminClick}
             />
           } />
           <Route path="/health-analysis" element={
-            <HealthAnalysisPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
+            <AnalysisDetailPage
+              analysisType="health"
+              user={user}
+              onLogout={handleLogout}
+              onAdminClick={handleAdminClick}
             />
           } />
           <Route path="/panchang" element={
@@ -671,10 +670,11 @@ function App() {
             />
           } />
           <Route path="/wealth-analysis" element={
-            <WealthAnalysisPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
+            <AnalysisDetailPage
+              analysisType="wealth"
+              user={user}
+              onLogout={handleLogout}
+              onAdminClick={handleAdminClick}
             />
           } />
           <Route path="/chat" element={<ChatPage />} />
@@ -702,10 +702,11 @@ function App() {
           <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/education" element={
-            <EducationAnalysisPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
+            <AnalysisDetailPage
+              analysisType="education"
+              user={user}
+              onLogout={handleLogout}
+              onAdminClick={handleAdminClick}
             />
           } />
           <Route path="/about" element={<AboutUs user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />

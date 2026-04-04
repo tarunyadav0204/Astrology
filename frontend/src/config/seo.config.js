@@ -54,6 +54,12 @@ export const SEO_CONFIG = {
       description: "Detailed wealth and finance analysis based on Vedic astrology. Discover money-making opportunities and financial growth prospects.",
       keywords: "wealth astrology, finance predictions, money astrology, financial analysis, prosperity predictions, wealth creation"
     },
+
+    educationAnalysis: {
+      title: "Education Analysis - Academic Success & Learning Path | AstroRoshni",
+      description: "Discover your learning potential, academic strengths, and study success factors with Vedic astrology—educational guidance tailored to your birth chart.",
+      keywords: "education astrology, academic success, study guidance, learning path, exam timing, vedic education analysis"
+    },
     
     panchang: {
       title: "Daily Panchang - Hindu Calendar & Auspicious Times | AstroRoshni",

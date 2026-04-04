@@ -59,6 +59,8 @@ const ChatPage = () => {
     const [partnerModalMode, setPartnerModalMode] = useState(null); // 'wizard-first' | 'wizard-second'
     const [showBirthFormModal, setShowBirthFormModal] = useState(false);
     const [pendingFollowUpQuestion, setPendingFollowUpQuestion] = useState('');
+    /** Set when navigating from analysis follow-up chips; consumed when single-chart chat is ready. */
+    const analysisChatIntentRef = useRef(null);
 
     // Mundane wizard state
     const [isMundaneMode, setIsMundaneMode] = useState(false);
@@ -579,6 +581,37 @@ const ChatPage = () => {
             longitude: null,
         }));
     };
+
+    // Universal AI analysis follow-up → Single chart mode + prefill composer (see UniversalAIInsights follow-up chips)
+    useEffect(() => {
+        const st = location.state;
+        if (!st?.openSingleChartChat) return;
+
+        const q = typeof st.followUpQuestion === 'string' ? st.followUpQuestion.trim() : '';
+        analysisChatIntentRef.current = { question: q };
+
+        navigate(location.pathname, { replace: true, state: {} });
+
+        resetThreadForWizard('single');
+        setChatV2SessionId(null);
+        setWizardMode('single');
+        setWizardStep(1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intent is only this navigation signal
+    }, [location.state]);
+
+    useEffect(() => {
+        const intent = analysisChatIntentRef.current;
+        if (!intent) return;
+        if (!birthData?.name || !birthData?.date) return;
+
+        setIsPartnershipMode(false);
+        setIsMundaneMode(false);
+        setWizardCompleted(true);
+        if (intent.question) {
+            setPendingFollowUpQuestion(intent.question);
+        }
+        analysisChatIntentRef.current = null;
+    }, [birthData]);
 
     const createMundaneSession = async () => {
         const token = localStorage.getItem('token');

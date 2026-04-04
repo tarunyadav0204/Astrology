@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
 import { PDFDownloadLink } from '@react-pdf/renderer';
@@ -233,7 +234,21 @@ const AccordionPanel = ({ qa, index, terms, glossary, onTermClick }) => {
   );
 };
 
-const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFComponent }) => {
+/** Plain text for follow-up chips (API may return HTML snippets). */
+const followUpPlainText = (raw) =>
+  String(raw ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const UniversalAIInsights = ({
+  analysisType,
+  chartData,
+  birthDetails,
+  PDFComponent,
+  hideConfirmationIntro = false
+}) => {
+  const navigate = useNavigate();
   const config = ANALYSIS_CONFIG[analysisType];
   const { credits, loading: creditsLoading, fetchBalance, wealthCost, careerCost, healthCost, marriageCost, educationCost } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
@@ -283,13 +298,14 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
     let stepInterval, dotsInterval;
     
     if (loading) {
+      // Fast enough to show several steps before a typical response (~few–30s); was 8s/step so only step 2 appeared
       stepInterval = setInterval(() => {
         setCurrentStep(prev => prev < config.steps.length - 1 ? prev + 1 : prev);
-      }, 8000);
-      
+      }, 1200);
+
       dotsInterval = setInterval(() => {
-        setDots(prev => prev.length >= 3 ? '' : prev + '.');
-      }, 500);
+        setDots(prev => (prev.length >= 3 ? '' : `${prev}.`));
+      }, 280);
     }
     
     return () => {
@@ -493,7 +509,9 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
       <div className="universal-ai-insights">
         <div className="analysis-confirmation">
           <div className="confirmation-header">
-            <h3>🔄 Regenerate {config.title}</h3>
+            <h3>
+              {hideConfirmationIntro ? '🔄 Regenerate report' : `🔄 Regenerate ${config.title}`}
+            </h3>
             <p>Generate a fresh analysis with updated insights</p>
           </div>
           
@@ -552,10 +570,12 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
     return (
       <div className="universal-ai-insights">
         <div className="analysis-confirmation">
-          <div className="confirmation-header">
-            <h3>{config.title}</h3>
-            <p>{config.description}</p>
-          </div>
+          {!hideConfirmationIntro && (
+            <div className="confirmation-header">
+              <h3>{config.title}</h3>
+              <p>{config.description}</p>
+            </div>
+          )}
           
           <div className="analysis-preview">
             <h4>📊 What You'll Get:</h4>
@@ -585,7 +605,7 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
                 🚀 Start Analysis ({analysisCost} credits)
               </button>
               <p className="analysis-note">
-                ⏱️ Analysis takes 1-2 minutes • 🎯 Personalized to your birth chart
+                ⏱️ Analysis takes up to 30 seconds • 🎯 Personalized to your birth chart
               </p>
             </div>
           ) : (
@@ -656,7 +676,7 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
             ))}
           </div>
           <p className="loading-message">
-            ✨ This comprehensive analysis takes 1-2 minutes to ensure accuracy.<br/>
+            ✨ This analysis typically finishes in up to 30 seconds.<br/>
             🎯 We're creating insights tailored specifically to your birth chart.
           </p>
         </div>
@@ -787,11 +807,27 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
             <div className="follow-up-section">
               <h3>🤔 Follow-up Questions</h3>
               <div className="follow-up-chips">
-                {jsonResponse.follow_up_questions.map((question, index) => (
-                  <button key={index} className="follow-up-chip">
-                    {question}
-                  </button>
-                ))}
+                {jsonResponse.follow_up_questions.map((question, index) => {
+                  const raw = typeof question === 'string' ? question : String(question ?? '');
+                  const textForChat = followUpPlainText(raw);
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      className="follow-up-chip"
+                      onClick={() =>
+                        navigate('/chat', {
+                          state: {
+                            openSingleChartChat: true,
+                            followUpQuestion: textForChat || raw
+                          }
+                        })
+                      }
+                    >
+                      {textForChat || raw}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

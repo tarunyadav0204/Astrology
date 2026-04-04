@@ -526,75 +526,103 @@
   left: 0;
 }
 
-.cost-section {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 25px;
-  border: 1px solid #e9ecef;
-  text-align: center;
+/* Scoped under .universal-ai-insights so tab CSS (.balance-amount { font-size: 16px }) cannot override */
+.universal-ai-insights .cost-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: #f1f3f5;
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 22px;
+  border: 1px solid #dee2e6;
+  text-align: left;
 }
 
-.cost-info, .balance-info {
-  display: inline-block;
-  margin: 0 15px;
+.universal-ai-insights .cost-info,
+.universal-ai-insights .balance-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+  width: 100%;
   font-size: 0.95em;
 }
 
-.cost-label {
-  font-weight: 500;
-  color: white;
-  margin-right: 8px;
+.universal-ai-insights .cost-label {
+  font-weight: 600;
+  color: #495057;
+  margin-right: 0;
 }
 
-.balance-label {
+.universal-ai-insights .balance-label {
   font-weight: 500;
   color: #6c757d;
   margin-right: 8px;
 }
 
-.cost-amount {
+.universal-ai-insights .cost-amount {
   background: #495057;
   color: white;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 2px 9px;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.9em;
+  font-size: 0.85em;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
-.balance-amount {
-  padding: 3px 10px;
-  border-radius: 12px;
+.universal-ai-insights .balance-amount {
+  padding: 2px 9px;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.9em;
+  font-size: 0.85em;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  width: auto;
+  max-width: fit-content;
 }
 
-.balance-amount.sufficient {
+.universal-ai-insights .balance-amount.sufficient {
   background: #28a745;
   color: white;
 }
 
-.balance-amount.insufficient {
+.universal-ai-insights .balance-amount.insufficient {
   background: #dc3545;
   color: white;
 }
 
 .action-section {
   margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .start-analysis-btn {
   background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
   color: white;
   border: none;
-  padding: 15px 30px;
-  border-radius: 25px;
-  font-size: 1.1em;
+  padding: 12px 22px;
+  border-radius: 12px;
+  font-size: 1.05em;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-  margin-bottom: 15px;
+  margin-bottom: 0;
+  line-height: 1.35;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .start-analysis-btn:hover {
@@ -793,34 +821,68 @@
   }
   
   .analysis-confirmation {
-    padding: 30px 20px;
-    margin: 20px;
+    padding: 22px 16px;
+    margin: 0 auto 12px;
+    max-width: 100%;
   }
   
   .confirmation-header h3 {
-    font-size: 1.6em;
+    font-size: 1.45em;
+  }
+  
+  .confirmation-header p {
+    font-size: 1em;
+    margin-bottom: 18px;
   }
   
   .analysis-preview {
-    padding: 20px;
+    padding: 16px 14px;
+    margin-bottom: 18px;
   }
   
-  .cost-info, .balance-info {
-    flex-direction: column;
-    gap: 8px;
-    text-align: center;
+  .analysis-preview h4 {
+    font-size: 1.1em;
+  }
+  
+  .universal-ai-insights .cost-section {
+    padding: 12px 14px;
+    gap: 0.5rem;
+  }
+  
+  .universal-ai-insights .cost-info,
+  .universal-ai-insights .balance-info {
+    font-size: 0.92em;
+    align-items: center;
+  }
+
+  /* Compact credit/cost chips — avoid oversized pills on narrow screens */
+  .universal-ai-insights .cost-amount,
+  .universal-ai-insights .balance-amount {
+    padding: 1px 7px;
+    font-size: 0.8125rem;
+    border-radius: 6px;
+    line-height: 1.25;
+    font-weight: 600;
+  }
+  
+  .action-section {
+    align-items: stretch;
   }
   
   .start-analysis-btn {
     width: 100%;
-    padding: 12px 20px;
+    padding: 10px 16px;
+    font-size: 0.95em;
+    border-radius: 10px;
   }
   
   .cancel-btn {
     width: 100%;
-    padding: 12px 20px;
+    padding: 10px 16px !important;
+    font-size: 0.95em !important;
     margin-left: 0;
-    margin-top: 10px;
+    margin-top: 0;
+    border-radius: 10px !important;
   }
   
   .quick-answer-card,

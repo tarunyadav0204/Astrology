@@ -29,7 +29,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const { trackEvent } = useAnalytics();
-  const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedZodiac, setSelectedZodiac] = useState('aries');
   const [horoscopeData, setHoroscopeData] = useState({});
   const [loading, setLoading] = useState(false);
@@ -44,14 +43,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
     girl: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' }
   });
-
-  const bannerSlides = [
-    { id: 1, image: '/images/banner-tara-consultation.jpg', title: 'Consult Tara - World\'s Most Advanced Digital Vedic Astrologer' },
-    { id: 2, image: '/images/banner-career-2026.jpg', title: 'Your Career Breakthrough in 2026 - Discover Your Professional Destiny' },
-    { id: 3, image: '/images/banner-relationships.jpg', title: 'Your Relationships & Love Life - Find Your Perfect Match' }
-  ];
-
-
 
   const zodiacSigns = [
     { name: 'aries', symbol: '♈', displayName: 'Aries' },
@@ -95,12 +86,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     { name: 'Priya Sharma', location: 'Mumbai', rating: 5, text: 'I haven\'t seen any Astrology product like AstroRoshni.com. Most predictions are so accurate that its unbelievable.', image: 'https://images.unsplash.com/photo-1494790108755-2616c9c0e8e0?w=80&h=80&fit=crop&crop=face' },
     { name: 'Rajesh Kumar', location: 'Delhi', rating: 5, text: 'Being an astrologer I love AstroRoshni because it predicts using multi-layered prediction engine which uses all divisional charts, Vimshottari dasha with Char, Yogini confirmation. This is humanly not possible.', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face' },
     { name: 'Anita Patel', location: 'Ahmedabad', rating: 5, text: 'The AI-powered Tara gives instant answers with Swiss Ephemeris precision. Real-time transit analysis and Nakshatra predictions are incredibly detailed. This combines ancient Vedic wisdom with modern technology perfectly.', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face' }
-  ];
-
-  const vipTiers = [
-    { name: 'Gold', price: '₹999/month', features: ['Priority Support', '50% Off Reports', 'Monthly Consultation'], icon: '🥇' },
-    { name: 'Platinum', price: '₹1999/month', features: ['Celebrity Astrologer Access', 'Unlimited Reports', 'Weekly Consultation'], icon: '🏆' },
-    { name: 'Diamond', price: '₹4999/month', features: ['Personal Astrologer', 'Custom Remedies', 'Daily Guidance'], icon: '💎' }
   ];
 
   const liveOffers = [
@@ -285,14 +270,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     
     return newData;
   });
-
-  // Banner slider effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % bannerSlides.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [bannerSlides.length]);
 
   // Initial data fetch
   useEffect(() => {
@@ -911,7 +888,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category" onClick={() => user ? onLogin() : onLogin()}>
+            <div className="life-category" onClick={() => (user ? navigate('/education') : onLogin())}>
               <div className="category-icon">🎓</div>
               <div className="category-content">
                 <h4>Your Education</h4>
@@ -1005,64 +982,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               `}
             </style>
           </div>
-        </div>
-      </section>
-
-      {/* Banner Slider */}
-      <section className="banner-slider">
-        <div className="slider-container">
-          {bannerSlides.map((slide, index) => {
-            return (
-              <div 
-                key={slide.id}
-                className={`slide ${index === currentSlide ? 'active' : ''}`}
-                style={{ 
-                  cursor: 'pointer',
-                  pointerEvents: 'auto',
-                  zIndex: index === currentSlide ? 10 : 5
-                }}
-                onClick={() => {
-                  console.log('Slide clicked - Index:', index, 'ID:', slide.id, 'Title:', slide.title);
-                  
-                  // Route based on array index
-                  if (index === 0) {
-                    console.log('Opening Tara chat');
-                    if (user) {
-                      navigate('/chat');
-                    } else {
-                      onLogin();
-                    }
-                  } else if (index === 1) {
-                    console.log('Navigating to career');
-                    if (user) {
-                      navigate('/career-guidance');
-                    } else {
-                      onLogin();
-                    }
-                  } else if (index === 2) {
-                    console.log('Navigating to marriage');
-                    if (user) {
-                      navigate('/marriage-analysis');
-                    } else {
-                      onLogin();
-                    }
-                  }
-                }}
-              >
-                <div className="slide-content">
-                  <h2>{slide.title}</h2>
-                  <button 
-                    className="cta-btn"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent double-click
-                    }}
-                  >
-                    {index === 0 ? 'Ask Tara Now' : index === 1 ? 'Explore Career' : 'Find Love'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 
@@ -1273,82 +1192,21 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button className="ask-btn">Ask Tara</button>
             </div>
           </div>
-          
-          {/* Meet Tara Introduction */}
-          <div className="tara-introduction" style={{
-            background: 'linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(156, 39, 176, 0.1))',
-            borderRadius: '20px',
-            padding: '30px',
-            margin: '40px 0',
-            border: '1px solid rgba(233, 30, 99, 0.2)'
-          }}>
-            <div className="tara-intro-content" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '30px',
-              flexWrap: 'wrap'
-            }}>
-              <div className="tara-avatar" style={{
-                position: 'relative',
-                minWidth: '80px',
-                height: '80px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div className="tara-star" style={{
-                  fontSize: '60px',
-                  animation: 'pulse 2s infinite'
-                }}>⭐</div>
+
+          {/* Meet Tara — outside consultation grid so it always full width (grid was squeezing this into one column on tablet) */}
+          <div className="tara-introduction">
+            <div className="tara-intro-content">
+              <div className="tara-avatar">
+                <div className="tara-star">⭐</div>
               </div>
-              <div className="tara-text" style={{ flex: 1 }}>
-                <h3 style={{
-                  color: '#e91e63',
-                  marginBottom: '15px',
-                  fontSize: '24px'
-                }}>Meet Tara - Your Vedic AI Guide</h3>
-                <p style={{
-                  color: '#666',
-                  marginBottom: '20px',
-                  lineHeight: '1.6'
-                }}>Tara is the world's most advanced Digital Astrologer because she processes over 50+ astrological calculation systems simultaneously including Swiss Ephemeris precision, all 16 Divisional Charts (D1-D60), complete Ashtakavarga analysis, 5-level Vimshottari Dasha system, Jaimini Chara Dasha, Yogini Dasha, Nadi Astrology links, Sudarshana Chakra analysis, comprehensive yoga detection, planetary war calculations, Neecha Bhanga analysis, and real-time transit activations with karmic trigger detection - delivering unmatched accuracy through multi-layered synthesis.</p>
-                <div className="tara-features" style={{
-                  display: 'flex',
-                  gap: '15px',
-                  flexWrap: 'wrap'
-                }}>
-                  <span style={{
-                    background: 'rgba(233, 30, 99, 0.1)',
-                    padding: '6px 12px',
-                    borderRadius: '15px',
-                    fontSize: '12px',
-                    color: '#e91e63',
-                    border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>🌟 50+ Calculation Systems</span>
-                  <span style={{
-                    background: 'rgba(233, 30, 99, 0.1)',
-                    padding: '6px 12px',
-                    borderRadius: '15px',
-                    fontSize: '12px',
-                    color: '#e91e63',
-                    border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>⚡ Swiss Ephemeris Precision</span>
-                  <span style={{
-                    background: 'rgba(233, 30, 99, 0.1)',
-                    padding: '6px 12px',
-                    borderRadius: '15px',
-                    fontSize: '12px',
-                    color: '#e91e63',
-                    border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>🎯 Multi-Dasha Synthesis</span>
-                  <span style={{
-                    background: 'rgba(233, 30, 99, 0.1)',
-                    padding: '6px 12px',
-                    borderRadius: '15px',
-                    fontSize: '12px',
-                    color: '#e91e63',
-                    border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>🕉️ Nadi Astrology Links</span>
+              <div className="tara-text">
+                <h3 className="tara-intro-title">Meet Tara - Your Vedic AI Guide</h3>
+                <p className="tara-intro-body">Tara is the world's most advanced Digital Astrologer because she processes over 50+ astrological calculation systems simultaneously including Swiss Ephemeris precision, all 16 Divisional Charts (D1-D60), complete Ashtakavarga analysis, 5-level Vimshottari Dasha system, Jaimini Chara Dasha, Yogini Dasha, Nadi Astrology links, Sudarshana Chakra analysis, comprehensive yoga detection, planetary war calculations, Neecha Bhanga analysis, and real-time transit activations with karmic trigger detection - delivering unmatched accuracy through multi-layered synthesis.</p>
+                <div className="tara-features">
+                  <span className="tara-feature-pill">🌟 50+ Calculation Systems</span>
+                  <span className="tara-feature-pill">⚡ Swiss Ephemeris Precision</span>
+                  <span className="tara-feature-pill">🎯 Multi-Dasha Synthesis</span>
+                  <span className="tara-feature-pill">🕉️ Nadi Astrology Links</span>
                 </div>
               </div>
             </div>
@@ -1393,46 +1251,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      {/* AstroRoshni Software Advertisement */}
-      <section className="astroroshni-ad">
-        <div className="container">
-          <div className="astroroshni-banner">
-            <div className="astroroshni-content">
-              <div className="astroroshni-badge">🌟 WORLD'S #1 ASTROLOGY SOFTWARE</div>
-              <h2>AstroVishnu Professional</h2>
-              <p className="astroroshni-tagline">Advanced Ashtakvarga, Shadbala & Multi-Dasha System with Unique Transit Analysis</p>
-              <div className="astroroshni-features">
-                <span>📊 Complete Ashtakvarga (Natal & Transit)</span>
-                <span>⚖️ Sarvashtakvarga & Bhinnashtakvarga</span>
-                <span>💪 Comprehensive Shadbala Analysis</span>
-                <span>🔄 Vimshottari, Char, Yogini & Kalchakra Dasha</span>
-                <span>🎯 Auto Transit Activation Detection</span>
-                <span>🌟 World's Only Dasha-Transit Integration</span>
-                <span>🌐 Available on Web, iOS & Android</span>
-              </div>
-              <div className="astroroshni-pricing">
-                <span className="old-price">₹4,999</span>
-                <span className="new-price">₹2,999</span>
-                <span className="discount">40% OFF</span>
-              </div>
-              <button className="astroroshni-btn" onClick={() => window.open('/astroroshni', '_blank')}>
-                🚀 EXPLORE ASTROVISHNU
-              </button>
-            </div>
-            <div className="astroroshni-visual">
-              <div className="software-mockup">
-                <div className="mockup-screen">
-                  <div className="chart-preview">📊</div>
-                  <div className="feature-icons">
-                    <span>🌙</span><span>⭐</span><span>🪐</span><span>🌟</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* AI Chat Services */}
       <section className="ai-chat-services">
         <div className="container">
@@ -1451,18 +1269,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
           
           <div className="ai-services-grid">
-            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="service-icon">❓</div>
-              <h4>Prashna Analysis</h4>
-              <p>Horary astrology for specific questions and timing</p>
-              <div className="service-examples">
-                <span>"When will I get married?"</span>
-                <span>"Should I invest in this business?"</span>
-                <span>"Will I get the job?"</span>
-              </div>
-              <button className="chat-service-btn">Ask Tara</button>
-            </div>
-            
             <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
               <div className="service-icon">📅</div>
               <h4>Varshphal Analysis</h4>
@@ -2097,28 +1903,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
       {/* Trust & Transparency Banner */}
       <TrustBanner />
-
-      {/* VIP Membership */}
-      <section className="vip-section">
-        <div className="container">
-          <h2>VIP Membership Plans</h2>
-          <div className="vip-grid">
-            {vipTiers.map((tier, index) => (
-              <div key={index} className="vip-card">
-                <div className="vip-icon">{tier.icon}</div>
-                <h3>{tier.name}</h3>
-                <div className="vip-price">{tier.price}</div>
-                <ul className="vip-features">
-                  {tier.features.map((feature, i) => (
-                    <li key={i}>✓ {feature}</li>
-                  ))}
-                </ul>
-                <button className="vip-btn">Choose Plan</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Educational Content */}
       <section className="education-section">

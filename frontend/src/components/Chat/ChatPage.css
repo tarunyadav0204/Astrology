@@ -4,6 +4,8 @@
     flex-direction: column;
     height: 100dvh;
     max-height: 100dvh;
+    width: 100%;
+    min-width: 0;
     overflow: hidden;
     background: #f4f6fb;
     padding-top: calc(52px + env(safe-area-inset-top, 0px));
@@ -191,12 +193,16 @@ button.chat-header-credits.credits-display:active {
 .chat-container {
     flex: 1 1 0;
     min-height: 0;
+    min-width: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
     padding: 16px 18px 12px;
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg, #eef2f7 0%, #f8fafc 48%, #ffffff 100%);
+    overscroll-behavior-x: contain;
 }
 
 .message-list {
@@ -206,11 +212,16 @@ button.chat-header-credits.credits-display:active {
     max-width: 800px;
     margin: 0 auto;
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .message-bubble {
     display: flex;
     margin-bottom: 10px;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .message-bubble.user {
@@ -223,9 +234,11 @@ button.chat-header-credits.credits-display:active {
 
 .message-content {
     max-width: 70%;
+    min-width: 0;
     padding: 15px 20px;
     border-radius: 20px;
     position: relative;
+    box-sizing: border-box;
 }
 
 .message-bubble.user .message-content {
@@ -449,6 +462,9 @@ button.chat-header-credits.credits-display:active {
 
 .chat-input-container {
     flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     background: rgba(255, 255, 255, 0.97);
     backdrop-filter: blur(12px);
     padding: 10px 12px calc(18px + env(safe-area-inset-bottom, 0px));
@@ -935,7 +951,6 @@ button.chat-header-credits.credits-display:active {
 .message-action-buttons .action-btn:hover:not(:disabled) {
     background: #fff;
     border-color: rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
 }
 
 .message-action-buttons .action-btn:disabled {
@@ -1069,6 +1084,8 @@ button.chat-header-credits.credits-display:active {
     align-items: center;
     gap: 10px;
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .suggestions-arrow-btn{
@@ -1090,9 +1107,11 @@ button.chat-header-credits.credits-display:active {
 
 .suggestions-scroll-row{
     flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     gap: 10px;
     overflow-x: auto;
+    overflow-y: hidden;
     padding: 6px 0;
     scroll-behavior: smooth;
 }
@@ -1111,15 +1130,18 @@ button.chat-header-credits.credits-display:active {
 
 .suggestion-button:hover {
     background: rgba(255, 107, 53, 0.12);
-    transform: translateY(-2px);
+    /* Avoid translateY: it can trigger subpixel reflow next to overflow scrollers */
 }
 
 .chat-input-form {
     display: flex;
     gap: 8px;
     max-width: 800px;
+    width: 100%;
+    min-width: 0;
     margin: 0 auto;
     align-items: center;
+    box-sizing: border-box;
 }
 
 .chat-input {
@@ -1312,7 +1334,7 @@ button.chat-header-credits.credits-display:active {
 
 .action-btn:hover {
     background: rgba(255, 255, 255, 1);
-    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .delete-btn {
