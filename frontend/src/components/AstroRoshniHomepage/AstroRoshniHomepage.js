@@ -2060,9 +2060,10 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </footer>
       
-      <CreditsModal 
-        isOpen={showCreditsModal} 
-        onClose={() => setShowCreditsModal(false)} 
+      <CreditsModal
+        isOpen={showCreditsModal}
+        onClose={() => setShowCreditsModal(false)}
+        onLogin={onLogin}
       />
       
       <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>

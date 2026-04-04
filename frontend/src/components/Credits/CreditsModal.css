@@ -17,7 +17,7 @@
   background: #fff;
   border-radius: 15px;
   padding: 24px;
-  max-width: 450px;
+  max-width: min(520px, 100%);
   width: 100%;
   position: relative;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
@@ -261,4 +261,137 @@
   color: #6b7280;
   font-size: 14px;
   margin: 0;
+}
+
+/* Razorpay — buy packs */
+.credits-modal-buy-section {
+  margin-bottom: 22px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.credits-modal-buy-lead {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.credits-modal-buy-loading {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.credits-modal-buy-guest {
+  padding: 14px;
+  background: #fef3c7;
+  border-radius: 10px;
+  border: 1px solid #fcd34d;
+  text-align: center;
+}
+
+.credits-modal-buy-guest-text {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #92400e;
+}
+
+.credits-modal-btn-signin {
+  background: linear-gradient(135deg, #e91e63, #f06292);
+  color: #fff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.credits-modal-btn-signin:hover {
+  filter: brightness(1.05);
+}
+
+.credits-modal-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 400px) {
+  .credits-modal-pack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+.credits-modal-pack-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 16px 12px;
+  min-height: 108px;
+  border: 2px solid #fde68a;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 55%);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.credits-modal-pack-card:hover:not(:disabled) {
+  border-color: #f472b6;
+  box-shadow: 0 6px 18px rgba(233, 30, 99, 0.12);
+  transform: translateY(-2px);
+}
+
+.credits-modal-pack-card:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.credits-modal-pack-credits {
+  font-size: 26px;
+  font-weight: 800;
+  color: #be185d;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.credits-modal-pack-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9ca3af;
+}
+
+.credits-modal-pack-price {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #374151;
+}
+
+.credits-modal-pack-busy {
+  position: absolute;
+  bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e91e63;
+}
+
+.credits-modal-razorpay-badge {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+  letter-spacing: 0.04em;
 }

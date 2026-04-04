@@ -73,6 +73,7 @@ except Exception as _e:
     AdminDeviceMiddleware = None
     list_allowed_devices = add_allowed_device = remove_allowed_device = remove_allowed_device_by_id = register_this_device = None
 from credits.routes import router as credits_router
+from credits.razorpay_routes import router as razorpay_credits_router
 from tts.routes import router as tts_router
 from credits.credit_request_routes import router as credit_request_router
 from blank_chart.routes import router as blank_chart_router
@@ -413,6 +414,7 @@ app.include_router(chat_admin_router, prefix="/api")
 if _activity_admin_available and activity_admin_router:
     app.include_router(activity_admin_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
+app.include_router(razorpay_credits_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")
 app.include_router(blank_chart_router, prefix="/api")
