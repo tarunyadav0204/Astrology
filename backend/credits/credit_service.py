@@ -621,6 +621,135 @@ class CreditService:
 
             return True, deduct, original_amount
 
+    def is_razorpay_payment_reversed(self, userid: int, payment_id: str) -> bool:
+        """True if we already have a razorpay_refund transaction for this user and payment id."""
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            cursor = execute(
+                conn,
+                """
+                SELECT 1 FROM credit_transactions
+                WHERE userid = ? AND source = 'razorpay_refund' AND reference_id = ?
+                LIMIT 1
+                """,
+                (userid, payment_id),
+            )
+            return cursor.fetchone() is not None
+
+    def get_razorpay_earned_snapshot(self, userid: int, payment_id: str) -> Optional[Dict[str, Any]]:
+        """Original Razorpay web credit grant row for admin refund (credits + metadata)."""
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT amount, metadata FROM credit_transactions
+                WHERE userid = ? AND source = 'razorpay' AND reference_id = ? AND transaction_type = 'earned'
+                LIMIT 1
+                """,
+                (userid, payment_id),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        credits, metadata_json = row[0], row[1]
+        amount_paise = None
+        order_id = None
+        product_id = None
+        if metadata_json:
+            try:
+                meta = json.loads(metadata_json)
+                amount_paise = meta.get("amount_paise")
+                if amount_paise is not None:
+                    try:
+                        amount_paise = int(amount_paise)
+                    except (TypeError, ValueError):
+                        amount_paise = None
+                order_id = meta.get("order_id")
+                product_id = meta.get("product_id")
+            except Exception:
+                pass
+        return {
+            "credits": credits,
+            "amount_paise": amount_paise,
+            "order_id": order_id or "",
+            "product_id": product_id or "",
+        }
+
+    def reverse_razorpay_purchase(
+        self, userid: int, payment_id: str, amount: Optional[int] = None, reason: Optional[str] = None
+    ):
+        """
+        Reverse a Razorpay web credit grant (after refund via Razorpay Dashboard or API).
+        Idempotent: returns error if payment not found or already reversed.
+        Returns: (True, amount_deducted, original_amount) or (False, error_message, None).
+        """
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            execute(
+                conn,
+                """
+                SELECT amount FROM credit_transactions
+                WHERE userid = ? AND source = 'razorpay' AND reference_id = ? AND transaction_type = 'earned'
+                LIMIT 1
+                """,
+                (userid, payment_id),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False, "Payment not found or not a Razorpay credit transaction", None
+
+            original_amount = row[0]
+            deduct = amount if amount is not None else original_amount
+            if deduct <= 0 or deduct > original_amount:
+                return False, "Invalid amount (must be positive and not exceed original)", None
+
+            execute(
+                conn,
+                """
+                SELECT 1 FROM credit_transactions
+                WHERE userid = ? AND source = 'razorpay_refund' AND reference_id = ?
+                LIMIT 1
+                """,
+                (userid, payment_id),
+            )
+            if cursor.fetchone():
+                return False, "This payment was already reversed", None
+
+            current_balance = self.get_user_credits(userid)
+            deduct = min(deduct, current_balance)
+            if deduct <= 0:
+                return False, "User has no credits left to take back", None
+
+            new_balance = current_balance - deduct
+            desc = f"Reversal: Razorpay refund for payment {payment_id}"
+            if reason and reason.strip():
+                desc = f"{desc}. Reason: {reason.strip()}"
+
+            execute(
+                conn,
+                """
+                UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?
+                """,
+                (new_balance, userid),
+            )
+            execute(
+                conn,
+                """
+                INSERT INTO credit_transactions
+                (userid, transaction_type, amount, balance_after, source, reference_id, description)
+                VALUES (?, 'spent', ?, ?, 'razorpay_refund', ?, ?)
+                """,
+                (userid, -deduct, new_balance, payment_id, desc),
+            )
+            conn.commit()
+
+            return True, deduct, original_amount
+
     def redeem_promo_code(self, userid: int, code: str) -> Dict:
         """Redeem promo code for credits"""
         from db import get_conn, execute
@@ -993,6 +1122,97 @@ class CreditService:
                     "price_currency": price_currency,
                     "localized_price": localized_price,
                 })
+            return out
+
+    def get_razorpay_transactions(
+        self,
+        from_date: str,
+        to_date: str,
+        query: Optional[str] = None,
+        payment_id_filter: Optional[str] = None,
+        limit: int = 500,
+    ) -> List[Dict[str, Any]]:
+        """
+        List Razorpay web credit transactions (source='razorpay') with user info and reversal status.
+        """
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            sql = """
+            SELECT ct.id, ct.userid, u.name, u.phone,
+                   ct.reference_id, ct.amount, ct.metadata, ct.created_at
+            FROM credit_transactions ct
+            LEFT JOIN users u ON u.userid = ct.userid
+            WHERE ct.source = 'razorpay'
+              AND ct.transaction_type = 'earned'
+              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+            """
+            params: List[Any] = [from_date, to_date]
+            if query and query.strip():
+                like = f"%{query.strip()}%"
+                sql += " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
+                params.extend([like, like])
+            if payment_id_filter and payment_id_filter.strip():
+                sql += " AND ct.reference_id ILIKE ?"
+                params.append(f"%{payment_id_filter.strip()}%")
+            sql += " ORDER BY ct.created_at DESC LIMIT ?"
+            params.append(limit)
+            cur = execute(conn, sql, params)
+            rows = cur.fetchall()
+
+            reversed_amounts: Dict[tuple, int] = {}
+            cur_rev = execute(
+                conn,
+                """
+                SELECT userid, reference_id, SUM(ABS(amount)) FROM credit_transactions
+                WHERE source = 'razorpay_refund' AND reference_id IS NOT NULL
+                GROUP BY userid, reference_id
+                """,
+                (),
+            )
+            for r in cur_rev.fetchall():
+                reversed_amounts[(r[0], r[1])] = r[2]
+            out: List[Dict[str, Any]] = []
+            for row in rows:
+                tx_id, userid, name, phone, pay_id, amount, metadata_json, created_at = row
+                order_id = ""
+                amount_paise = None
+                currency = None
+                product_id = None
+                if metadata_json:
+                    try:
+                        meta = json.loads(metadata_json)
+                        order_id = meta.get("order_id") or ""
+                        ap = meta.get("amount_paise")
+                        if ap is not None:
+                            try:
+                                amount_paise = int(ap)
+                            except (TypeError, ValueError):
+                                amount_paise = None
+                        currency = meta.get("currency")
+                        product_id = meta.get("product_id")
+                    except Exception:
+                        pass
+                key = (userid, pay_id)
+                reversed_amt = reversed_amounts.get(key, 0)
+                status = "Reversed" if reversed_amt else "Credited"
+                out.append(
+                    {
+                        "id": tx_id,
+                        "userid": userid,
+                        "user_name": name or "",
+                        "user_phone": phone or "",
+                        "payment_id": pay_id or "",
+                        "order_id": order_id,
+                        "amount": amount,
+                        "amount_paise": amount_paise,
+                        "currency": currency or "INR",
+                        "product_id": product_id or "",
+                        "created_at": created_at,
+                        "status": status,
+                        "reversed_amount": reversed_amt if reversed_amt else None,
+                    }
+                )
             return out
 
     def get_dashboard_stats(self, from_date: str, to_date: str) -> Dict:

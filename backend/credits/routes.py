@@ -11,6 +11,7 @@ from .admin.promo_manager import PromoCodeManager
 from utils.env_json import parse_json_from_env
 from activity.publisher import publish_activity
 from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
+from .razorpay_routes import refund_razorpay_payment, fetch_razorpay_payment
 
 router = APIRouter()
 credit_service = CreditService()
@@ -1032,6 +1033,106 @@ async def admin_google_play_refund_full(request: dict, current_user: User = Depe
     }
 
 
+@router.post("/admin/reverse-razorpay-purchase")
+async def admin_reverse_razorpay_purchase(request: dict, current_user: User = Depends(get_current_user)):
+    """
+    Take back credits after you refunded the payment in Razorpay Dashboard (no Razorpay API call).
+    Idempotent per payment id.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    userid = request.get("userid")
+    payment_id = (request.get("payment_id") or "").strip()
+    amount = request.get("amount")
+    reason = (request.get("reason") or "").strip() or None
+    if userid is None or not payment_id:
+        raise HTTPException(status_code=400, detail="userid and payment_id are required")
+    success, deduct_or_msg, _ = credit_service.reverse_razorpay_purchase(
+        int(userid), payment_id, amount=amount, reason=reason
+    )
+    if success:
+        return {
+            "message": f"Reversed: {deduct_or_msg} credits deducted for payment {payment_id}",
+            "credits_deducted": deduct_or_msg,
+        }
+    raise HTTPException(status_code=400, detail=deduct_or_msg)
+
+
+@router.post("/admin/razorpay-refund")
+async def admin_razorpay_refund(request: dict, current_user: User = Depends(get_current_user)):
+    """
+    Refund payment via Razorpay API, then deduct credits. Idempotent if credits already reversed.
+    Partial credits: proportional INR refund in paise when metadata or payment fetch supplies amount.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    userid = request.get("userid")
+    payment_id = (request.get("payment_id") or "").strip()
+    amount = request.get("amount")
+    reason = (request.get("reason") or "").strip() or None
+    if userid is None:
+        raise HTTPException(status_code=400, detail="userid is required")
+    if not payment_id:
+        raise HTTPException(status_code=400, detail="payment_id is required")
+    userid = int(userid) if not isinstance(userid, int) else userid
+
+    if credit_service.is_razorpay_payment_reversed(userid, payment_id):
+        return {
+            "razorpay": "Already refunded",
+            "astroroshni": "Credits already taken back",
+            "credits_deducted": 0,
+        }
+
+    snap = credit_service.get_razorpay_earned_snapshot(userid, payment_id)
+    if not snap:
+        raise HTTPException(status_code=400, detail="Payment not found or not a Razorpay credit transaction")
+
+    original_credits = snap["credits"]
+    try:
+        credits_to_reverse = int(amount) if amount is not None else original_credits
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid amount")
+    if credits_to_reverse < 1 or credits_to_reverse > original_credits:
+        raise HTTPException(status_code=400, detail="Invalid credits amount (must be 1 to original pack size)")
+
+    original_paise = snap.get("amount_paise")
+    if original_paise is None or original_paise < 1:
+        try:
+            pay = fetch_razorpay_payment(payment_id)
+            original_paise = int(pay.get("amount") or 0)
+        except HTTPException:
+            original_paise = None
+
+    if credits_to_reverse < original_credits:
+        if not original_paise or original_paise < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot compute partial INR refund. Refund in Razorpay Dashboard, then use reverse-razorpay-purchase (credits only).",
+            )
+        refund_paise = max(1, int(round(original_paise * credits_to_reverse / original_credits)))
+    else:
+        refund_paise = None
+
+    rp_ok, rp_msg, _ = refund_razorpay_payment(payment_id, refund_paise)
+    if not rp_ok:
+        raise HTTPException(status_code=400, detail=f"Razorpay: {rp_msg}")
+
+    ok, credits_deducted, original_amount = credit_service.reverse_razorpay_purchase(
+        userid, payment_id, amount=credits_to_reverse, reason=reason
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=500,
+            detail="Razorpay refund succeeded but credit reversal failed. Use reverse-razorpay-purchase to reconcile, or retry.",
+        )
+    return {
+        "razorpay": rp_msg,
+        "astroroshni": "Credits taken back",
+        "credits_deducted": credits_deducted,
+        "original_amount": original_amount,
+    }
+
+
 @router.get("/admin/settings")
 async def get_credit_settings(current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
@@ -1531,6 +1632,60 @@ async def get_google_play_transactions(
         query=query,
         order_id_filter=order_id,
         currency_filter=currency,
+    )
+    return {
+        "from_date": fd.isoformat(),
+        "to_date": td.isoformat(),
+        "transactions": transactions,
+    }
+
+
+@router.get("/admin/razorpay-transactions")
+async def get_razorpay_transactions(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    query: Optional[str] = None,
+    payment_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """List Razorpay web credit purchases for the refund screen. Default range: last 730 days."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from datetime import date as date_type, timedelta
+
+    today = date_type.today()
+    default_start = today - timedelta(days=730)
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = default_start
+            td = today
+    elif from_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = today
+        except ValueError:
+            fd = default_start
+            td = today
+    elif to_date:
+        try:
+            td = date_type.fromisoformat(to_date)
+            fd = td - timedelta(days=730)
+        except ValueError:
+            fd = default_start
+            td = today
+    else:
+        fd = default_start
+        td = today
+    transactions = credit_service.get_razorpay_transactions(
+        fd.isoformat(),
+        td.isoformat(),
+        query=query,
+        payment_id_filter=payment_id,
     )
     return {
         "from_date": fd.isoformat(),

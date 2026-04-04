@@ -8,6 +8,7 @@ import AdminActivity from './AdminActivity';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
+import AdminRazorpayRefund from './AdminRazorpayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import AdminChatPerformance from './AdminChatPerformance';
@@ -1256,6 +1257,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Google Play refund
           </button>
+          <button 
+            className={`subtab ${activeSubTab === 'razorpayRefund' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('razorpayRefund')}
+          >
+            Razorpay credit return
+          </button>
         </div>
       )}
 
@@ -2130,6 +2137,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'playRefund' && (
           <AdminGooglePlayRefund />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'razorpayRefund' && (
+          <AdminRazorpayRefund />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'requests' && (

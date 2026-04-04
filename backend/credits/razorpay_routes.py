@@ -388,3 +388,52 @@ async def razorpay_webhook(request: Request):
         )
 
     return {"status": "ok", "credits_added": result.get("credits_added", 0)}
+
+
+def fetch_razorpay_payment(payment_id: str) -> Dict[str, Any]:
+    """GET /v1/payments/{id} — used by admin refund to resolve amounts when metadata is missing."""
+    return _fetch_payment(payment_id)
+
+
+def refund_razorpay_payment(payment_id: str, amount_paise: Optional[int] = None) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """
+    POST /v1/payments/{id}/refund. amount_paise None = full refund (omit amount in body).
+    Returns (success, message, response_json_or_none).
+    """
+    key_id, key_secret = _get_razorpay_keys()
+    if not key_id or not key_secret:
+        return False, "Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)", None
+    pid = (payment_id or "").strip()
+    if not pid:
+        return False, "Missing payment id", None
+    url = f"{RAZORPAY_API_BASE}/payments/{pid}/refund"
+    payload: Dict[str, Any] = {}
+    if amount_paise is not None:
+        ap = int(amount_paise)
+        if ap < 1:
+            return False, "Invalid refund amount (paise)", None
+        payload["amount"] = ap
+    try:
+        r = requests.post(url, auth=HTTPBasicAuth(key_id, key_secret), json=payload, timeout=45)
+    except requests.RequestException as e:
+        logger.exception("Razorpay refund POST failed: %s", e)
+        return False, str(e), None
+    try:
+        data = r.json() if r.text else {}
+    except json.JSONDecodeError:
+        data = {}
+    if r.status_code in (200, 201):
+        st = (data.get("status") or "created") if isinstance(data, dict) else "ok"
+        return True, str(st), data if isinstance(data, dict) else None
+    err_obj = data.get("error") if isinstance(data, dict) else None
+    desc = ""
+    if isinstance(err_obj, dict):
+        desc = (err_obj.get("description") or err_obj.get("code") or "") or ""
+    if not desc and isinstance(data, dict):
+        desc = str(data.get("message") or "")
+    if not desc:
+        desc = (r.text or "")[:500]
+    err_l = desc.lower()
+    if "already been fully refunded" in err_l or "already refunded" in err_l or "full refund" in err_l:
+        return True, "Already refunded", data if isinstance(data, dict) else None
+    return False, desc, data if isinstance(data, dict) else None
