@@ -44,11 +44,6 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
     const [promoLoading, setPromoLoading] = useState(false);
     const [message, setMessage] = useState('');
 
-    const [requestAmount, setRequestAmount] = useState('');
-    const [requestReason, setRequestReason] = useState('');
-    const [requestLoading, setRequestLoading] = useState(false);
-    const [requestMessage, setRequestMessage] = useState('');
-
     const [razorpayCatalog, setRazorpayCatalog] = useState(null);
     const [razorpayCatalogLoading, setRazorpayCatalogLoading] = useState(false);
     const [razorpayCatalogError, setRazorpayCatalogError] = useState('');
@@ -164,57 +159,6 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
             setMessage('❌ Error redeeming promo code');
         } finally {
             setPromoLoading(false);
-        }
-    };
-
-    const validateReason = (reason) => {
-        return reason
-            .replace(/<[^>]*>/g, '')
-            .replace(/[<>'"]/g, '')
-            .trim()
-            .substring(0, 500);
-    };
-
-    const handleCreditRequest = async (e) => {
-        e.preventDefault();
-        if (!requestAmount || !requestReason.trim()) return;
-
-        const sanitizedReason = validateReason(requestReason);
-        if (sanitizedReason.length < 10) {
-            setRequestMessage('❌ Reason must be at least 10 characters');
-            return;
-        }
-
-        setRequestLoading(true);
-        setRequestMessage('');
-
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('/api/credits/request', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token && { Authorization: `Bearer ${token}` }),
-                },
-                body: JSON.stringify({
-                    amount: parseInt(requestAmount, 10),
-                    reason: sanitizedReason,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setRequestMessage(`✅ ${data.message}`);
-                setRequestAmount('');
-                setRequestReason('');
-            } else {
-                setRequestMessage(`❌ ${data.message}`);
-            }
-        } catch (error) {
-            setRequestMessage('❌ Error submitting request');
-        } finally {
-            setRequestLoading(false);
         }
     };
 
@@ -397,52 +341,6 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
                             }`}
                         >
                             {message}
-                        </div>
-                    )}
-                </div>
-
-                <div style={{ marginBottom: '20px' }}>
-                    <h3 className="credits-modal-section-title">Request credits</h3>
-                    <form
-                        onSubmit={handleCreditRequest}
-                        style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}
-                    >
-                        <input
-                            type="number"
-                            value={requestAmount}
-                            onChange={(e) => setRequestAmount(e.target.value)}
-                            placeholder="Credits needed (1–100)"
-                            min="1"
-                            max="100"
-                            className="credits-modal-input"
-                            disabled={requestLoading}
-                        />
-                        <textarea
-                            value={requestReason}
-                            onChange={(e) => setRequestReason(e.target.value)}
-                            placeholder="Reason for request (e.g., student discount, financial hardship)"
-                            rows={3}
-                            className="credits-modal-textarea"
-                            disabled={requestLoading}
-                            maxLength={500}
-                        />
-                        <button
-                            type="submit"
-                            disabled={requestLoading || !requestAmount || !requestReason.trim()}
-                            className="credits-modal-btn-green"
-                        >
-                            {requestLoading ? 'Submitting…' : 'Submit request'}
-                        </button>
-                    </form>
-                    {requestMessage && (
-                        <div
-                            className={`credits-modal-message ${
-                                requestMessage.includes('✅')
-                                    ? 'credits-modal-message--ok'
-                                    : 'credits-modal-message--err'
-                            }`}
-                        >
-                            {requestMessage}
                         </div>
                     )}
                 </div>

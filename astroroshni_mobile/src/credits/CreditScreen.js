@@ -886,23 +886,6 @@ const CreditScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Request Credits Section */}
-            <View style={styles.requestSection}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Need More Credits?</Text>
-              <TouchableOpacity
-                style={styles.requestButton}
-                onPress={() => navigation.navigate('CreditRequest')}
-              >
-                <LinearGradient
-                  colors={[colors.success, '#34ce57']}
-                  style={styles.requestGradient}
-                >
-                  <Ionicons name="hand-right" size={20} color="white" style={styles.requestIcon} />
-                  <Text style={styles.requestText}>Request Credits</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
             {/* Transaction History */}
             <View style={styles.historySection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Transaction History</Text>
@@ -1243,28 +1226,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-  },
-  requestSection: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  requestButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  requestGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  requestIcon: {
-    marginRight: 8,
-  },
-  requestText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
   },
   promoCard: {
     borderRadius: 16,
