@@ -42,6 +42,7 @@ import ContactPage from './components/Contact/ContactPage';
 import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
 import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
+import EventsTimelinePage from './components/Events/EventsTimelinePage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import BlogList from './components/Blog/BlogList';
 import BlogPost from './components/Blog/BlogPost';
@@ -605,6 +606,10 @@ function App() {
           <Route path="/festivals" element={<FestivalsPage />} />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
+          <Route
+            path="/life-events"
+            element={<EventsTimelinePage onLogin={() => setShowLoginModal(true)} />}
+          />
           <Route path="/policy" element={<PolicyPage />} />
           <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -698,6 +703,17 @@ function App() {
           } />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
+          <Route
+            path="/life-events"
+            element={
+              <EventsTimelinePage
+                user={user}
+                onLogout={handleLogout}
+                onAdminClick={handleAdminClick}
+                onLogin={() => setShowLoginModal(true)}
+              />
+            }
+          />
           <Route path="/policy" element={<PolicyPage />} />
           <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />

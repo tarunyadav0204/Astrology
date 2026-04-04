@@ -839,6 +839,33 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <p>Unlock the secrets of your destiny with best in class Vedic Astrology</p>
             <div className="life-categories-divider"></div>
           </div>
+
+          <button
+            type="button"
+            className="life-events-cosmic-card"
+            onClick={() => (user ? navigate('/life-events') : onLogin())}
+          >
+            <span className="life-events-cosmic-card__glow" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--1" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--2" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--3" aria-hidden />
+            <div className="life-events-cosmic-card__inner">
+              <p className="life-events-cosmic-card__eyebrow">Predictions follow your native</p>
+              <h4 className="life-events-cosmic-card__title">Your predictions depend on the native you select</h4>
+              <p className="life-events-cosmic-card__text">
+                Every timeline is cast from one birth chart. Choose your saved native, then walk through a full year of
+                themes—or dive one month deep into events, dasha, and transits.
+              </p>
+              <span className="life-events-cosmic-card__cta">
+                <span className="life-events-cosmic-card__cta-icon" aria-hidden>
+                  ✦
+                </span>
+                Yearly & monthly life timeline
+                <span className="life-events-cosmic-card__cta-arrow">→</span>
+              </span>
+            </div>
+          </button>
+
           <div className="native-selector-callout">
             <div className="native-selector-callout__left">
               <div className="native-selector-callout__title-row">
@@ -1211,19 +1238,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
           </div>
-          
-          <div className="consultation-cta">
-            <div className="cta-content">
-              <h3>🌟 Unlimited Questions • Instant Answers • 24/7 Available</h3>
-              <p>Powered by advanced Vedic AI trained on classical texts</p>
-            </div>
-            <button 
-              className="start-chat-btn"
-              onClick={() => user ? navigate('/chat') : onLogin()}
-            >
-              ⭐ Ask Tara Now
-            </button>
-          </div>
         </div>
       </section>
 
@@ -1247,100 +1261,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <span className="karma-arrow">→</span>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* AI Chat Services */}
-      <section className="ai-chat-services">
-        <div className="container">
-          <div className="ai-services-header">
-            <span className="service-symbol service-symbol-1">🌟</span>
-            <span className="service-symbol service-symbol-2">📊</span>
-            <span className="service-symbol service-symbol-3">💎</span>
-            <span className="service-symbol service-symbol-4">🌟</span>
-            <span className="service-symbol service-symbol-5">📋</span>
-            <span className="service-symbol service-symbol-6">💫</span>
-            <span className="service-symbol service-symbol-7">🎯</span>
-            <span className="service-symbol service-symbol-8">✨</span>
-            <h2 className="ai-services-title">Astrological Services for Accurate Answers</h2>
-            <p className="ai-services-subtitle">All available through Tara - ask anything, get instant Vedic insights</p>
-            <div className="ai-services-divider"></div>
-          </div>
-          
-          <div className="ai-services-grid">
-            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="service-icon">📅</div>
-              <h4>Varshphal Analysis</h4>
-              <p>Annual predictions and yearly forecast insights</p>
-              <div className="service-examples">
-                <span>"What does 2024 hold for me?"</span>
-                <span>"Career prospects this year?"</span>
-                <span>"Health predictions for 2024?"</span>
-              </div>
-              <button className="chat-service-btn">Ask Tara</button>
-            </div>
-            
-            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="service-icon">💕</div>
-              <h4>Love & Partnership</h4>
-              <p>Relationship compatibility and marriage analysis</p>
-              <div className="service-examples">
-                <span>"Are we compatible for marriage?"</span>
-                <span>"When will I find love?"</span>
-                <span>"Relationship problems solutions?"</span>
-              </div>
-              <button className="chat-service-btn">Ask Tara</button>
-            </div>
-            
-            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="service-icon">🏢</div>
-              <h4>Business Relationships</h4>
-              <p>Partnership analysis and business compatibility</p>
-              <div className="service-examples">
-                <span>"Should I partner with them?"</span>
-                <span>"Business venture timing?"</span>
-                <span>"Team compatibility analysis?"</span>
-              </div>
-              <button className="chat-service-btn">Ask Tara</button>
-            </div>
-            
-            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="service-icon">🤝</div>
-              <h4>Friendship Analysis</h4>
-              <p>Social relationships and friendship compatibility</p>
-              <div className="service-examples">
-                <span>"Why do I have friend conflicts?"</span>
-                <span>"Building better friendships?"</span>
-                <span>"Social circle analysis?"</span>
-              </div>
-              <button className="chat-service-btn">Ask Tara</button>
-            </div>
-            
-            <div className="ai-service-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="service-icon">💰</div>
-              <h4>Wealth & Finance</h4>
-              <p>Money matters and financial growth timing</p>
-              <div className="service-examples">
-                <span>"When will I become wealthy?"</span>
-                <span>"Investment timing guidance?"</span>
-                <span>"Financial stability analysis?"</span>
-              </div>
-              <button className="chat-service-btn">Ask Tara</button>
-            </div>
-          </div>
-          
-          <div className="ai-services-cta">
-            <div className="cta-content">
-              <h3>🤖 Powered by Advanced Vedic AI • Instant Responses • Available 24/7</h3>
-              <p>All these services and more are available through Tara</p>
-            </div>
-            <button 
-              className="start-ai-chat-btn"
-              onClick={() => user ? navigate('/chat') : onLogin()}
-            >
-              🚀 Start Tara Consultation
-            </button>
           </div>
         </div>
       </section>

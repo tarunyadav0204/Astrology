@@ -60,6 +60,12 @@ export const SEO_CONFIG = {
       description: "Discover your learning potential, academic strengths, and study success factors with Vedic astrology—educational guidance tailored to your birth chart.",
       keywords: "education astrology, academic success, study guidance, learning path, exam timing, vedic education analysis"
     },
+
+    lifeEvents: {
+      title: "Life Events Timeline — Yearly & Monthly Vedic Predictions | AstroRoshni",
+      description: "Explore major life events, monthly story arcs, and optional one-month deep dives using Parashari, Nadi, and Jaimini methods—personalized to your saved birth chart.",
+      keywords: "life events astrology, yearly predictions, monthly forecast, vedic timeline, dasha events, transit predictions"
+    },
     
     panchang: {
       title: "Daily Panchang - Hindu Calendar & Auspicious Times | AstroRoshni",

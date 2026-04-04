@@ -1,12 +1,21 @@
 import axios from 'axios';
 import { APP_CONFIG } from '../config/app.config';
 
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? APP_CONFIG.api.prod 
-  : APP_CONFIG.api.dev;
+/**
+ * In development, use same-origin `/api/...` (see package.json "proxy") so requests
+ * are not cross-origin from localhost:3001 → localhost:8001. Otherwise the browser may
+ * omit `Authorization` and FastAPI returns {"detail":"Not authenticated"}.
+ * Set REACT_APP_API_BASE_URL to override (e.g. direct backend URL when not using proxy).
+ */
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL !== undefined && process.env.REACT_APP_API_BASE_URL !== ''
+    ? process.env.REACT_APP_API_BASE_URL
+    : process.env.NODE_ENV === 'production'
+      ? APP_CONFIG.api.prod
+      : '';
 
 console.log('Environment:', process.env.NODE_ENV);
-console.log('API Base URL:', API_BASE_URL);
+console.log('API Base URL:', API_BASE_URL || '(same-origin /api)');
 
 // Helper function to handle API endpoints for both dev and production
 const getEndpoint = (path) => {
@@ -490,6 +499,22 @@ export const apiService = {
   
   getGrihaPraveshMuhurat: async (date, latitude, longitude) => {
     const response = await apiClient.get(`${getEndpoint('/panchang/griha-pravesh-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+
+  /** Event timeline (yearly 12-month or single-month deep) — same API as mobile EventScreen */
+  startEventTimeline: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/chat/monthly-events'), payload);
+    return response.data;
+  },
+
+  getEventTimelineStatus: async (jobId) => {
+    const response = await apiClient.get(getEndpoint(`/chat/monthly-events/status/${jobId}`));
+    return response.data;
+  },
+
+  getCachedEventTimeline: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/chat/monthly-events/cached'), payload);
     return response.data;
   }
 };

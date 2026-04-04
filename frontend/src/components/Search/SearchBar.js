@@ -8,6 +8,7 @@ const SEARCH_DATA = [
   { title: 'Wealth Analysis', path: '/wealth-analysis', keywords: ['wealth', 'money', 'finance', 'prosperity', 'income'] },
   { title: 'Health Analysis', path: '/health-analysis', keywords: ['health', 'medical', 'wellness', 'disease', 'fitness'] },
   { title: 'Education Analysis', path: '/education', keywords: ['education', 'study', 'learning', 'academic', 'school'] },
+  { title: 'Life Events Timeline', path: '/life-events', keywords: ['life events', 'timeline', 'yearly', 'monthly', 'predictions', 'manifest', 'forecast'] },
   { title: 'Daily Horoscope', path: '/horoscope?period=daily', keywords: ['horoscope', 'daily', 'prediction', 'zodiac', 'rashi'] },
   { title: 'Panchang', path: '/panchang', keywords: ['panchang', 'calendar', 'tithi', 'nakshatra', 'muhurat'] },
   { title: 'Muhurat Finder', path: '/muhurat-finder', keywords: ['muhurat', 'auspicious', 'timing', 'shubh'] },

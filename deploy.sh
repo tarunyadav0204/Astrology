@@ -43,6 +43,15 @@ elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/'; then
   fi
 fi
 
+# Backend pip: skip when this deploy only touches paths outside backend/ (saves minutes of resolver I/O).
+# Still run when requirements or any backend file changed, first deploy (no PREV_HEAD), or FORCE_FULL_DEPLOY.
+needs_backend_pip=true
+if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ -z "${PREV_HEAD}" ]; then
+  needs_backend_pip=true
+elif echo "${CHANGED_FILES}" | grep -q . && ! echo "${CHANGED_FILES}" | grep -qE '^backend/'; then
+  needs_backend_pip=false
+fi
+
 # Backend deployment
 echo "🐍 Setting up backend..."
 cd backend
@@ -54,9 +63,13 @@ fi
 
 # Activate virtual environment and install dependencies
 source venv/bin/activate
-echo "📦 Installing backend dependencies (always; idempotent)..."
-pip3 install -r requirements.txt
-echo "✅ Backend dependencies installed"
+if [ "${needs_backend_pip}" = "true" ]; then
+  echo "📦 Installing backend dependencies..."
+  PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install -q -r requirements.txt
+  echo "✅ Backend dependencies installed"
+else
+  echo "⏭️ No backend/ changes; skipping pip install (venv unchanged)"
+fi
 
 # Setup encryption (idempotent - safe to run multiple times)
 echo "🔐 Setting up encryption..."
@@ -79,6 +92,10 @@ fi
 
 if [ "${needs_frontend_build}" = "true" ]; then
   echo "🏗️ Frontend changed; building..."
+  # Faster production build: no browser sourcemaps, CI mode trims checks slightly in CRA
+  export CI=true
+  export GENERATE_SOURCEMAP=false
+  export INLINE_RUNTIME_CHUNK=true
   npm run build
 else
   echo "⏭️ Frontend unchanged; skipping build"

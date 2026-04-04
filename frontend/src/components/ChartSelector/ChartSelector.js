@@ -183,13 +183,15 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, onAdminClick, use
       });
       
       setBirthData({
+        id: chart.id,
         name: chart.name,
         date: chart.date,
         time: chart.time,
         place: chart.place || `${chart.latitude}, ${chart.longitude}`,
         latitude: chart.latitude,
         longitude: chart.longitude,
-        timezone: chart.timezone
+        timezone: chart.timezone,
+        gender: chart.gender || ''
       });
       
       setChartData(chartData);
