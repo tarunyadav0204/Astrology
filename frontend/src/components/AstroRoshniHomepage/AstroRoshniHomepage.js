@@ -25,6 +25,18 @@ import TrustBanner from '../TrustBanner/TrustBanner';
 import './AstroRoshniHomepage.css';
 import './search-section.css';
 
+/** Demo ticker content for the life-events card preview (not user-specific). */
+const LIFE_EVENTS_PREVIEW_YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
+
+const LIFE_EVENTS_PREVIEW_THEMES = [
+  'In June — Venus antardasha. Venus returns to its natal place in the 2nd house, favouring wealth creation and clear speech.',
+  'Saturn transits the 10th house — career structure, authority, and long-term reputation come into focus.',
+  'Jupiter aspects your Lagna — confidence grows; teachers and guides appear at the right time.',
+  'Rahu–Ketu axis stirs travel; short journeys may unlock unexpected professional or karmic links.',
+  'Mars period: channel drive into decisive action — sidestep impulsive clashes in the middle of the month.',
+  'Mercury sub-period — contracts, study, and commerce favour careful, well-documented deals.',
+];
+
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
@@ -89,8 +101,19 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   ];
 
   const liveOffers = [
-    { title: 'First Consultation FREE', desc: 'Limited time offer for new users', timer: '23:45:12', color: '#f44336' },
-    { title: '50% OFF Premium Reports', desc: 'Valid till midnight today', timer: '11:23:45', color: '#ff9800' }
+    {
+      title: 'First Consultation FREE',
+      desc: 'Limited time offer for new users',
+      timer: '23:45:12',
+      color: '#f44336',
+      linkToChat: true
+    },
+    {
+      title: '50% Off Every Consultation This Month',
+      desc: 'Limited time — discount applies to each session',
+      timer: '11:23:45',
+      color: '#ff9800'
+    }
   ];
 
   const [planetaryPositions, setPlanetaryPositions] = useState([]);
@@ -840,32 +863,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="life-categories-divider"></div>
           </div>
 
-          <button
-            type="button"
-            className="life-events-cosmic-card"
-            onClick={() => (user ? navigate('/life-events') : onLogin())}
-          >
-            <span className="life-events-cosmic-card__glow" aria-hidden />
-            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--1" aria-hidden />
-            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--2" aria-hidden />
-            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--3" aria-hidden />
-            <div className="life-events-cosmic-card__inner">
-              <p className="life-events-cosmic-card__eyebrow">Predictions follow your native</p>
-              <h4 className="life-events-cosmic-card__title">Your predictions depend on the native you select</h4>
-              <p className="life-events-cosmic-card__text">
-                Every timeline is cast from one birth chart. Choose your saved native, then walk through a full year of
-                themes—or dive one month deep into events, dasha, and transits.
-              </p>
-              <span className="life-events-cosmic-card__cta">
-                <span className="life-events-cosmic-card__cta-icon" aria-hidden>
-                  ✦
-                </span>
-                Yearly & monthly life timeline
-                <span className="life-events-cosmic-card__cta-arrow">→</span>
-              </span>
-            </div>
-          </button>
-
           <div className="native-selector-callout">
             <div className="native-selector-callout__left">
               <div className="native-selector-callout__title-row">
@@ -898,6 +895,69 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               {birthData && birthData.name ? 'Change Native' : 'Select / Add Native'}
             </button>
           </div>
+
+          <button
+            type="button"
+            className="life-events-cosmic-card"
+            onClick={() => (user ? navigate('/life-events') : onLogin())}
+          >
+            <span className="life-events-cosmic-card__accent-bar" aria-hidden />
+            <span className="life-events-cosmic-card__glow" aria-hidden />
+            <span className="life-events-cosmic-card__mesh" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--1" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--2" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--3" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--4" aria-hidden />
+            <span className="life-events-cosmic-card__star life-events-cosmic-card__star--5" aria-hidden />
+            <div className="life-events-cosmic-card__inner">
+              <div className="life-events-cosmic-card__copy">
+                <p className="life-events-cosmic-card__eyebrow">
+                  <span className="life-events-cosmic-card__eyebrow-pulse" aria-hidden />
+                  Life timeline
+                </p>
+                <h4 className="life-events-cosmic-card__title">Your year, month by month</h4>
+                <p className="life-events-cosmic-card__text">
+                  Scroll a full year of themes, turning points, dasha periods, and transit highlights—or open any month
+                  for events and timing detail grounded in classical Vedic techniques.
+                </p>
+                <span className="life-events-cosmic-card__cta">
+                  <span className="life-events-cosmic-card__cta-icon" aria-hidden>
+                    ✦
+                  </span>
+                  <span className="life-events-cosmic-card__cta-label">Yearly & monthly life timeline</span>
+                  <span className="life-events-cosmic-card__cta-arrow">→</span>
+                </span>
+              </div>
+              <div className="life-events-cosmic-card__decor" aria-hidden>
+                <div className="life-events-cosmic-card__preview">
+                  <div className="life-events-cosmic-card__preview-col life-events-cosmic-card__preview-col--years">
+                    <span className="life-events-cosmic-card__preview-label">Year</span>
+                    <div className="life-events-cosmic-card__years-mask">
+                      <div className="life-events-cosmic-card__years-track">
+                        {[...LIFE_EVENTS_PREVIEW_YEARS, ...LIFE_EVENTS_PREVIEW_YEARS].map((y, i) => (
+                          <span key={`le-year-${i}`} className="life-events-cosmic-card__year-item">
+                            {y}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="life-events-cosmic-card__preview-col life-events-cosmic-card__preview-col--themes">
+                    <span className="life-events-cosmic-card__preview-label">Themes</span>
+                    <div className="life-events-cosmic-card__themes-mask">
+                      <div className="life-events-cosmic-card__themes-track">
+                        {[...LIFE_EVENTS_PREVIEW_THEMES, ...LIFE_EVENTS_PREVIEW_THEMES].map((text, i) => (
+                          <p key={`le-theme-${i}`} className="life-events-cosmic-card__theme-item">
+                            {text}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </button>
           <div className="life-categories-grid">
             <div className="life-category" onClick={() => user ? navigate('/career-guidance') : onLogin()}>
               <div className="category-icon">💼</div>
@@ -1485,18 +1545,36 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       <section className="live-offers">
         <div className="container">
           <div className="offers-scroll">
-            {liveOffers.map((offer, index) => (
-              <div key={index} className="offer-banner" style={{borderColor: offer.color}}>
-                <div className="offer-content">
-                  <h3>{offer.title}</h3>
-                  <p>{offer.desc}</p>
-                  <div className="timer" style={{color: offer.color}}>
-                    ⏰ {offer.timer}
+            {liveOffers.map((offer, index) => {
+              const goChat = () => {
+                if (user) navigate('/chat');
+                else if (onLogin) onLogin();
+              };
+              const onClaim = (e) => {
+                e.stopPropagation();
+                if (offer.linkToChat) goChat();
+                else setShowCreditsModal(true);
+              };
+              return (
+                <div
+                  key={index}
+                  className={`offer-banner${offer.linkToChat ? ' offer-banner--clickable' : ''}`}
+                  style={{ borderColor: offer.color }}
+                  {...(offer.linkToChat ? { onClick: goChat } : {})}
+                >
+                  <div className="offer-content">
+                    <h3>{offer.title}</h3>
+                    <p>{offer.desc}</p>
+                    <div className="timer" style={{ color: offer.color }}>
+                      ⏰ {offer.timer}
+                    </div>
                   </div>
+                  <button type="button" className="claim-btn" style={{ background: offer.color }} onClick={onClaim}>
+                    CLAIM NOW
+                  </button>
                 </div>
-                <button className="claim-btn" style={{background: offer.color}}>CLAIM NOW</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

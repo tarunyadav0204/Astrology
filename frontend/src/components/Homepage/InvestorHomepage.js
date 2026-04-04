@@ -75,7 +75,12 @@ const InvestorHomepage = () => {
 
   const liveOffers = [
     { title: 'First Consultation FREE', desc: 'Limited time offer for new users', timer: '23:45:12', color: '#f44336' },
-    { title: '50% OFF Premium Reports', desc: 'Valid till midnight today', timer: '11:23:45', color: '#ff9800' }
+    {
+      title: '50% Off Every Consultation This Month',
+      desc: 'Limited time — discount applies to each session',
+      timer: '11:23:45',
+      color: '#ff9800'
+    }
   ];
 
   const todaysData = {

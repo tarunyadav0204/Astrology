@@ -2195,6 +2195,15 @@
   gap: 15px;
 }
 
+.offer-banner--clickable {
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.offer-banner--clickable:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
 .offer-content h3 {
   color: white;
   margin: 0;
@@ -3575,40 +3584,44 @@
   box-shadow: 0 2px 15px rgba(255, 215, 0, 0.4);
 }
 
-/* CTA → /life-events — light yellow card on life-categories gradient */
+/* CTA → /life-events — premium timeline card */
 .life-events-cosmic-card {
   display: block;
   width: 100%;
   max-width: 1100px;
-  margin: 0 auto 20px auto;
+  margin: 0 auto 24px auto;
   padding: 0;
   border: none;
   cursor: pointer;
   text-align: left;
   position: relative;
   z-index: 10;
-  border-radius: 18px;
+  border-radius: 20px;
   overflow: hidden;
-  background: linear-gradient(
-    155deg,
-    #fffef5 0%,
-    #fff9e6 38%,
-    #fff3d6 72%,
-    #ffecb8 100%
-  );
-  border: 1px solid rgba(255, 213, 79, 0.65);
+  background:
+    radial-gradient(ellipse 90% 100% at 100% -10%, rgba(255, 171, 64, 0.22), transparent 52%),
+    radial-gradient(ellipse 70% 90% at -5% 105%, rgba(233, 30, 99, 0.1), transparent 48%),
+    linear-gradient(158deg, #fffefb 0%, #fff4dc 42%, #ffe8c4 100%);
+  border: 1px solid rgba(255, 193, 7, 0.45);
   box-shadow:
-    0 8px 26px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+    0 10px 32px rgba(93, 64, 55, 0.1),
+    0 2px 8px rgba(233, 30, 99, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(255, 183, 77, 0.12);
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1),
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
 }
 
 .life-events-cosmic-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-5px);
+  border-color: rgba(233, 30, 99, 0.28);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.16),
-    0 0 0 1px rgba(255, 193, 7, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    0 22px 48px rgba(233, 30, 99, 0.14),
+    0 12px 28px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 213, 79, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
 }
 
 .life-events-cosmic-card:focus-visible {
@@ -3616,13 +3629,54 @@
   outline-offset: 3px;
 }
 
+.life-events-cosmic-card__accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(
+    90deg,
+    #ffd54f 0%,
+    #ff9800 22%,
+    #e91e63 55%,
+    #9c27b0 100%
+  );
+  z-index: 5;
+  box-shadow: 0 2px 12px rgba(233, 30, 99, 0.35);
+}
+
 .life-events-cosmic-card__glow {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 65% 50% at 90% 12%, rgba(255, 255, 255, 0.55), transparent 50%),
-    radial-gradient(ellipse 50% 40% at 8% 88%, rgba(255, 224, 130, 0.35), transparent 48%);
+    radial-gradient(ellipse 70% 55% at 92% 8%, rgba(255, 255, 255, 0.65), transparent 52%),
+    radial-gradient(ellipse 55% 45% at 6% 92%, rgba(255, 213, 79, 0.28), transparent 50%);
   pointer-events: none;
+  z-index: 0;
+}
+
+.life-events-cosmic-card__mesh {
+  position: absolute;
+  inset: 0;
+  opacity: 0.055;
+  background-image:
+    repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 3px,
+      rgba(156, 39, 176, 0.35) 3px,
+      rgba(156, 39, 176, 0.35) 4px
+    ),
+    repeating-linear-gradient(
+      18deg,
+      transparent,
+      transparent 3px,
+      rgba(233, 30, 99, 0.25) 3px,
+      rgba(233, 30, 99, 0.25) 4px
+    );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .life-events-cosmic-card__star {
@@ -3631,10 +3685,11 @@
   height: 4px;
   background: #e91e63;
   border-radius: 50%;
-  opacity: 0.45;
-  box-shadow: 0 0 6px 1px rgba(233, 30, 99, 0.35);
+  opacity: 0.5;
+  box-shadow: 0 0 8px 2px rgba(233, 30, 99, 0.45);
   pointer-events: none;
   animation: cosmic-twinkle 4s ease-in-out infinite;
+  z-index: 2;
 }
 
 .life-events-cosmic-card__star--1 {
@@ -3659,6 +3714,20 @@
   animation-delay: 2.4s;
 }
 
+.life-events-cosmic-card__star--4 {
+  top: 48%;
+  right: 26%;
+  width: 3px;
+  height: 3px;
+  animation-delay: 0.8s;
+}
+
+.life-events-cosmic-card__star--5 {
+  bottom: 14%;
+  right: 14%;
+  animation-delay: 3.1s;
+}
+
 @keyframes cosmic-twinkle {
   0%,
   100% {
@@ -3673,57 +3742,271 @@
 
 .life-events-cosmic-card__inner {
   position: relative;
-  padding: 22px 24px 20px;
-  z-index: 1;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px 32px;
+  padding: 28px 28px 26px;
+  min-height: 0;
+}
+
+.life-events-cosmic-card__copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .life-events-cosmic-card__eyebrow {
-  margin: 0 0 8px 0;
-  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px 0;
+  font-size: 0.7rem;
   font-weight: 800;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: #ad1457;
 }
 
+.life-events-cosmic-card__eyebrow-pulse {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e91e63, #ff9800);
+  box-shadow: 0 0 10px rgba(233, 30, 99, 0.55);
+  animation: life-events-eyebrow-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes life-events-eyebrow-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.2);
+  }
+}
+
 .life-events-cosmic-card__title {
-  margin: 0 0 10px 0;
-  font-size: 1.2rem;
+  margin: 0 0 12px 0;
+  font-size: 1.35rem;
   font-weight: 800;
-  line-height: 1.3;
-  color: #4e342e;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: #3e2723;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .life-events-cosmic-card__text {
-  margin: 0 0 16px 0;
-  font-size: 0.95rem;
-  line-height: 1.55;
+  margin: 0 0 18px 0;
+  font-size: 0.96rem;
+  line-height: 1.58;
   color: #5d4037;
-  max-width: 52rem;
+  max-width: 42rem;
 }
 
 .life-events-cosmic-card__cta {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.95rem;
+  padding: 11px 18px 11px 14px;
+  font-size: 0.92rem;
   font-weight: 800;
-  color: #c2185b;
-  letter-spacing: 0.02em;
+  color: #ad1457;
+  letter-spacing: 0.03em;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  border: 1px solid rgba(233, 30, 99, 0.18);
+  box-shadow: 0 2px 14px rgba(233, 30, 99, 0.1);
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    color 0.3s ease;
+}
+
+.life-events-cosmic-card:hover .life-events-cosmic-card__cta {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(233, 30, 99, 0.32);
+  color: #880e4f;
+  box-shadow: 0 4px 22px rgba(233, 30, 99, 0.16);
 }
 
 .life-events-cosmic-card__cta-icon {
   font-size: 1rem;
-  opacity: 0.9;
+  opacity: 0.95;
+}
+
+.life-events-cosmic-card__cta-label {
+  flex: 1;
 }
 
 .life-events-cosmic-card__cta-arrow {
   display: inline-block;
-  transition: transform 0.2s ease;
+  transition: transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
 .life-events-cosmic-card:hover .life-events-cosmic-card__cta-arrow {
-  transform: translateX(5px);
+  transform: translateX(6px);
+}
+
+/* Right column: scrolling years + scrolling theme snippets (demo preview) */
+.life-events-cosmic-card__decor {
+  flex-shrink: 0;
+  width: min(100%, 280px);
+  min-width: 220px;
+  pointer-events: none;
+}
+
+.life-events-cosmic-card__preview {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  height: 148px;
+}
+
+.life-events-cosmic-card__preview-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.life-events-cosmic-card__preview-col--years {
+  flex: 0 0 76px;
+}
+
+.life-events-cosmic-card__preview-col--themes {
+  flex: 1;
+}
+
+.life-events-cosmic-card__preview-label {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(173, 20, 87, 0.85);
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.life-events-cosmic-card__preview-col--themes .life-events-cosmic-card__preview-label {
+  text-align: left;
+}
+
+.life-events-cosmic-card__years-mask,
+.life-events-cosmic-card__themes-mask {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(233, 30, 99, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+}
+
+.life-events-cosmic-card__years-track,
+.life-events-cosmic-card__themes-track {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.life-events-cosmic-card__years-track {
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  animation: life-events-years-scroll 16s linear infinite;
+}
+
+.life-events-cosmic-card__year-item {
+  flex-shrink: 0;
+  height: 34px;
+  line-height: 34px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #6d4c41 0%, #ad1457 55%, #e91e63 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.life-events-cosmic-card__themes-track {
+  gap: 8px;
+  padding: 6px 0;
+  animation: life-events-themes-scroll 42s linear infinite;
+}
+
+.life-events-cosmic-card__theme-item {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 5.35rem;
+  margin: 0 6px;
+  padding: 8px 10px;
+  font-size: 0.62rem;
+  line-height: 1.38;
+  color: #4e342e;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 243, 224, 0.78));
+  border-radius: 10px;
+  border: 1px solid rgba(233, 30, 99, 0.12);
+  box-shadow: 0 2px 10px rgba(233, 30, 99, 0.07);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.life-events-cosmic-card:hover .life-events-cosmic-card__theme-item {
+  border-color: rgba(233, 30, 99, 0.2);
+  box-shadow: 0 3px 14px rgba(233, 30, 99, 0.12);
+}
+
+/* Pause tickers while hovering the card so text is readable */
+.life-events-cosmic-card:hover .life-events-cosmic-card__years-track,
+.life-events-cosmic-card:hover .life-events-cosmic-card__themes-track {
+  animation-play-state: paused;
+}
+
+@keyframes life-events-years-scroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes life-events-themes-scroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .life-events-cosmic-card__years-track,
+  .life-events-cosmic-card__themes-track {
+    animation: none !important;
+  }
+
+  .life-events-cosmic-card__eyebrow-pulse,
+  .life-events-cosmic-card__star {
+    animation: none;
+  }
+
+  .life-events-cosmic-card:hover {
+    transform: none;
+  }
 }
 
 .native-selector-callout {
@@ -3963,15 +4246,86 @@
   }
 
   .life-events-cosmic-card__inner {
-    padding: 18px 16px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 22px 18px 20px;
+    gap: 18px;
+  }
+
+  .life-events-cosmic-card__decor {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    align-self: stretch;
+  }
+
+  /* Keep years + themes in one row so the block stays short vertically */
+  .life-events-cosmic-card__preview {
+    flex-direction: row;
+    align-items: stretch;
+    height: 108px;
+    gap: 8px;
+  }
+
+  .life-events-cosmic-card__preview-col--years {
+    flex: 0 0 54px;
+    width: auto;
+    max-width: none;
+    align-self: stretch;
+  }
+
+  .life-events-cosmic-card__preview-label {
+    font-size: 0.5rem;
+    margin-bottom: 4px;
+    letter-spacing: 0.12em;
+  }
+
+  .life-events-cosmic-card__years-mask {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+    border-radius: 10px;
+  }
+
+  .life-events-cosmic-card__themes-mask {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    border-radius: 10px;
+  }
+
+  .life-events-cosmic-card__year-item {
+    height: 24px;
+    line-height: 24px;
+    font-size: 0.82rem;
+  }
+
+  .life-events-cosmic-card__years-track {
+    gap: 5px;
+    padding: 4px 0;
+  }
+
+  .life-events-cosmic-card__theme-item {
+    height: 4.65rem;
+    margin: 0 4px;
+    padding: 6px 8px;
+    font-size: 0.56rem;
+    line-height: 1.32;
+    -webkit-line-clamp: 3;
   }
 
   .life-events-cosmic-card__title {
-    font-size: 1.05rem;
+    font-size: 1.12rem;
   }
 
   .life-events-cosmic-card__text {
     font-size: 0.9rem;
+  }
+
+  .life-events-cosmic-card__cta {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .native-selector-callout {
@@ -3999,6 +4353,15 @@
   .life-categories-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .life-events-cosmic-card__preview {
+    height: 96px;
+    gap: 6px;
+  }
+
+  .life-events-cosmic-card__preview-col--years {
+    flex-basis: 48px;
   }
 }
 
