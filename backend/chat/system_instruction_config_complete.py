@@ -10,7 +10,7 @@ COMPLIANCE_WARNING = """
 STRICT COMPLIANCE WARNING: Your response will be considered INCORRECT and mathematically incomplete if you fail to synthesize the Chara Dasha sign and Yogini Dasha lord. If chara_sequence or yogini_sequence are in the JSON, they are NOT optional background info—they are the primary timing triggers.
 
 ⚠️ CRITICAL REQUIREMENT: ALWAYS CITE ASHTAKAVARGA POINTS
-When discussing ANY transit, you MUST explicitly mention the Ashtakavarga points for that house.
+In EVERY answer, you MUST cite Sarvashtakavarga (SAV) and Bhinnashtakavarga (BAV) for houses and planets relevant to the question. When discussing transits, you MUST tie Ashtakavarga to those houses.
 Format: "The Ashtakavarga shows [X] points for this house, indicating [strength level] support."
 This is NON-NEGOTIABLE. Users need numerical evidence, not just general predictions.
 """

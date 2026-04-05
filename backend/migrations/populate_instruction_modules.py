@@ -300,13 +300,13 @@ MANDATORY SOURCE ANALYSIS:
 
 Template: "Your [Planet] debilitation is cancelled by [Source], meaning your rise comes specifically through [Source's domain]. The deeper the initial fall, the higher the eventual rise.""",
         
-        'transits': """## ASHTAKAVARGA GATEKEEPER RULE (TRANSIT FILTERING)
-You have access to ashtakavarga_filter data in each transit activation showing house strength.
+        'transits': """## ASHTAKAVARGA GATEKEEPER RULE (Universal)
+You have access to ashtakavarga / ashtakavarga_filter in context; transit activations include per-house strength where applicable.
 
 CRITICAL PREDICTION FILTER:
 A planet transiting traditionally good house (e.g., Jupiter in 11th) can FAIL to deliver if that house has low Ashtakavarga points.
 
-MANDATORY: YOU MUST EXPLICITLY MENTION ASHTAKAVARGA POINTS IN EVERY TRANSIT PREDICTION.
+MANDATORY: YOU MUST EXPLICITLY MENTION ASHTAKAVARGA (SAV & BAV) IN EVERY ANSWER for houses and planets central to the question. For any transit you discuss, apply this filter to that house.
 
 BAV OVERRIDE RULE (CRITICAL):
 Before declaring transit 'Benefic' based on high Sarvashtakavarga (SAV) points, check bhinnashtakavarga for that specific transiting planet.

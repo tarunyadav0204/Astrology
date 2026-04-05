@@ -91,6 +91,7 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
 3. ### Analysis Steps: [A bulleted list of 3-4 key astrological calculation steps taken to generate the response, e.g., "- Analyzing Dasha periods", "- Calculating planetary dignities", "- Cross-referencing Navamsa chart".]
 4. ### Astrological Analysis: [Use #### for all subsections below]
    - #### The Parashari View: [Provide a detailed analysis explaining the 'why' behind each prediction. Mention specific house lordships, planetary placements, and aspects in D1 and D9. Explicitly discuss the planet's happiness (Friendship) in its current sign using the provided `friendship_analysis` (Panchadha Maitri).]
+   - #### Ashtakavarga (SAV & BAV): [MANDATORY every time. For houses and planets central to the question: cite Sarvashtakavarga (SAV) bindus for the relevant house(s); cite the concerned planet's Bhinnashtakavarga (BAV) in that house/sign where applicable. State whether bindus support or weaken the Parashari conclusions. Apply the BAV override: if BAV < 3 in the focus house, stress obstacles even if SAV is high. When transits are discussed, tie SAV/BAV to those houses.]
    - #### The Jaimini View: [Explain the influence of the current Chara Dasha (MD & AD) and the role of relevant Chara Karakas like Atmakaraka or Darakaraka in the context of the query.]
    - #### KP Stellar Perspective: [Provide a technically detailed analysis. Explicitly mention the Cusp Sub-Lord (CSL) of the primary house, its Star Lord, and the specific houses they signify (e.g., 2, 7, 11). Apply the 4-Step Theory for the current Dasha/Antardasha lords to show the flow of results.]
    - #### Nadi Interpretation: [Bulleted list, one for each planetary combination]
@@ -154,6 +155,7 @@ Your response must be a chronological analysis of the specific event requested a
 
 3. ### 🔍 Technical Deep Dive
 - **Primary Dasha Promise**: [Analysis of the Mahadasha/Antardasha lords responsible]
+- **Ashtakavarga (SAV & BAV)**: [MANDATORY: Cite SAV for relevant houses and BAV for key planets for the windows discussed; apply BAV override where BAV < 3]
 - **KP Cusp Confirmation**: [Check the relevant Cusp Sub-Lord (CSL) and its significations for the event]
 - **Transit Confirmations**: [Analysis of Jupiter/Saturn/Rahu transits for the key windows]
 - **Divisional Confirmation**: [Brief mention of D9/D10/D7 support]

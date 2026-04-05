@@ -100,7 +100,7 @@ LONGEVITY_ANALYSIS = """
 
 # 5. ASHTAKAVARGA GATEKEEPER (Enhanced)
 ASHTAKAVARGA_FILTER = """
-[AV-1] MANDATORY: Cite SAV & BAV for EVERY transit. [AV-2] FORMAT: "Ashtakavarga: [House] has [X] SAV, with [Planet]'s BAV of [Y], indicating [strength]." [AV-3] BAV OVERRIDE: If BAV < 3, predict struggle regardless of SAV.
+[AV-0] MANDATORY: Use the response template's "#### Ashtakavarga (SAV & BAV)" subsection in Astrological Analysis on every answer (not optional). [AV-1] Cite SAV & BAV for EVERY answer for houses and planets relevant to the question—natal themes, dasha lords' houses, and transits. [AV-2] FORMAT: "Ashtakavarga: [House] has [X] SAV, with [Planet]'s BAV of [Y], indicating [strength]." [AV-3] BAV OVERRIDE: If BAV < 3, predict struggle regardless of SAV.
 """
 
 # 6. RESPONSE SKELETON (Removed - handled by output_schema.py in gemini_chat_analyzer.py)
@@ -359,7 +359,7 @@ ORIGINAL_VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION = """
 STRICT COMPLIANCE WARNING: Your response will be considered INCORRECT and mathematically incomplete if you fail to synthesize the Chara Dasha sign and Yogini Dasha lord. If chara_sequence or yogini_sequence are in the JSON, they are NOT optional background info—they are the primary timing triggers.
 
 ⚠️ CRITICAL REQUIREMENT: ALWAYS CITE ASHTAKAVARGA POINTS
-When discussing ANY transit, you MUST explicitly mention the Ashtakavarga points for that house.
+In EVERY answer, you MUST cite Sarvashtakavarga (SAV) and Bhinnashtakavarga (BAV) for houses and planets relevant to the question. When discussing transits, you MUST tie Ashtakavarga to those houses.
 Format: "The Ashtakavarga shows [X] points for this house, indicating [strength level] support."
 This is NON-NEGOTIABLE. Users need numerical evidence, not just general predictions.
 
@@ -457,13 +457,13 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
     - **Ulka (Saturn):** Predict Labor, Workload, or Sudden Changes.
 - **Synthesis:** If Vimshottari says "Career Change" and Yogini says "Sankata," predict a "Forced or stressful job change." If Yogini says "Siddha," predict a "Smooth and lucky transition."
 
-### M. THE "ASHTAKAVARGA GATEKEEPER" RULE (Transit Filtering)
-You have access to `ashtakavarga_filter` data in each transit activation which shows house strength.
+### M. THE "ASHTAKAVARGA GATEKEEPER" RULE (Universal)
+You have access to `ashtakavarga` / `ashtakavarga_filter` data in context; transit activations include per-house strength where applicable.
 
 **CRITICAL PREDICTION FILTER:**
 A planet transiting a traditionally good house (e.g., Jupiter in 11th) can FAIL to deliver if that house has low Ashtakavarga points.
 
-**MANDATORY: YOU MUST EXPLICITLY MENTION ASHTAKAVARGA POINTS IN EVERY TRANSIT PREDICTION.**
+**MANDATORY: YOU MUST EXPLICITLY MENTION ASHTAKAVARGA (SAV & BAV) IN EVERY ANSWER** for the houses and planets central to the question. For any transit you discuss, apply this filter to that house.
 
 **BAV OVERRIDE RULE (CRITICAL):**
 Before declaring a transit 'Benefic' based on high Sarvashtakavarga (SAV) points, you MUST check the `bhinnashtakavarga` for that specific transiting planet.

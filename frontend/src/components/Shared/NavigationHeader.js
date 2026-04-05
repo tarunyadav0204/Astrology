@@ -132,6 +132,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 <button className="close-menu-btn" onClick={() => setShowMobileMenu(false)}>×</button>
               </div>
               <div className="mobile-menu-items">
+                <button className="mobile-menu-item" onClick={() => { navigate('/contact'); setShowMobileMenu(false); }}>
+                  📧 Contact us
+                </button>
                 {user ? (
                   <>
                     {!creditsLoading && onCreditsClick && (
@@ -169,6 +172,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <a href="/horoscope" className="top-link">Rashifal</a>
             <a href="/kundli" className="top-link">Kundli</a>
             <a href="/calendar-2026" className="top-link">Calendar 2026</a>
+            <a href="/contact" className="top-link">Contact us</a>
             <a href="/astroroshni" target="_blank" className="astroroshni-link">
               ⭐ AstroVishnu Pro
             </a>
@@ -270,6 +274,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <li><button onClick={() => navigate('/festivals')}>Festivals</button></li>
             <li><button onClick={() => navigate('/nakshatras')}>Nakshatras</button></li>
             <li><button onClick={() => navigate('/blog')}>Blogs</button></li>
+            <li><button onClick={() => navigate('/contact')}>Contact us</button></li>
           </ul>
         </div>
       </nav>
@@ -344,6 +349,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <button className="close-menu-btn" onClick={() => setShowMobileMenu(false)}>×</button>
             </div>
             <div className="mobile-menu-items">
+              <button className="mobile-menu-item" onClick={() => { navigate('/contact'); setShowMobileMenu(false); }}>
+                📧 Contact us
+              </button>
               {user ? (
                 <>
                   {!creditsLoading && onCreditsClick && (
