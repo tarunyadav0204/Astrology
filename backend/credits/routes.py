@@ -663,8 +663,17 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
                 ("astroroshni",),
             )
             rows = cur.fetchall()
-        except Exception:
-            # Backward compatibility for deployments where tier_name / discount_percent are not present
+        except Exception as e:
+            # First query failed (e.g. missing columns). Postgres aborts the transaction — must rollback
+            # before running the fallback query on the same connection.
+            logger.warning(
+                "subscription-plans primary query failed, using legacy columns: %s",
+                e,
+            )
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             cur = execute(
                 conn,
                 f"""
