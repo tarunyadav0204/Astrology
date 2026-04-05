@@ -651,11 +651,11 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
         try:
             cur = execute(
                 conn,
-                """
+                f"""
                 SELECT plan_id, tier_name, discount_percent, google_play_product_id, price
                 FROM subscription_plans
                 WHERE platform = %s
-                  AND is_active = TRUE
+                  AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                   AND google_play_product_id IS NOT NULL
                   AND google_play_product_id != ''
                 ORDER BY COALESCE(discount_percent, 0) ASC
