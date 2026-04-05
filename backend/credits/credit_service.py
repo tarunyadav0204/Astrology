@@ -575,13 +575,12 @@ class CreditService:
         """
         from db import get_conn, execute
         with get_conn() as conn:
-            cursor = conn.cursor()
-            execute(conn, """
+            cur = execute(conn, """
                 SELECT amount FROM credit_transactions
                 WHERE userid = ? AND source = 'google_play' AND reference_id = ? AND transaction_type = 'earned'
                 LIMIT 1
             """, (userid, order_id))
-            row = cursor.fetchone()
+            row = cur.fetchone()
             if not row:
                 return False, "Order not found or not a Google Play credit transaction", None
 
@@ -590,12 +589,12 @@ class CreditService:
             if deduct <= 0 or deduct > original_amount:
                 return False, "Invalid amount (must be positive and not exceed original)", None
 
-            execute(conn, """
+            cur = execute(conn, """
                 SELECT 1 FROM credit_transactions
                 WHERE userid = ? AND source = 'google_play_refund' AND reference_id = ?
                 LIMIT 1
             """, (userid, order_id))
-            if cursor.fetchone():
+            if cur.fetchone():
                 return False, "This order was already reversed", None
 
             current_balance = self.get_user_credits(userid)
@@ -689,8 +688,8 @@ class CreditService:
         from db import get_conn, execute
 
         with get_conn() as conn:
-            cursor = conn.cursor()
-            execute(
+            # Must use the cursor returned by execute(); conn.cursor() is a different cursor than execute()'s.
+            cur = execute(
                 conn,
                 """
                 SELECT amount FROM credit_transactions
@@ -699,7 +698,7 @@ class CreditService:
                 """,
                 (userid, payment_id),
             )
-            row = cursor.fetchone()
+            row = cur.fetchone()
             if not row:
                 return False, "Payment not found or not a Razorpay credit transaction", None
 
@@ -708,7 +707,7 @@ class CreditService:
             if deduct <= 0 or deduct > original_amount:
                 return False, "Invalid amount (must be positive and not exceed original)", None
 
-            execute(
+            cur = execute(
                 conn,
                 """
                 SELECT 1 FROM credit_transactions
@@ -717,7 +716,7 @@ class CreditService:
                 """,
                 (userid, payment_id),
             )
-            if cursor.fetchone():
+            if cur.fetchone():
                 return False, "This payment was already reversed", None
 
             current_balance = self.get_user_credits(userid)
@@ -755,15 +754,14 @@ class CreditService:
         from db import get_conn, execute
         try:
             with get_conn() as conn:
-                cursor = conn.cursor()
                 # Best-effort transactional safety. In Postgres this becomes a real row lock.
                 execute(conn, "BEGIN")
-            
-                execute(conn, """
+
+                cur = execute(conn, """
                     SELECT id, credits, max_uses, max_uses_per_user, used_count, is_active, expires_at
                     FROM promo_codes WHERE code = ?
                 """, (code,))
-                promo = cursor.fetchone()
+                promo = cur.fetchone()
             
                 if not promo:
                     return {"success": False, "message": "Invalid promo code"}
@@ -782,10 +780,10 @@ class CreditService:
                         pass
             
                 # Check how many times this user has used this promo code
-                execute(conn, """
+                cur = execute(conn, """
                     SELECT COUNT(*) FROM promo_code_usage WHERE promo_code_id = ? AND userid = ?
                 """, (promo_id, userid))
-                user_usage_count = cursor.fetchone()[0]
+                user_usage_count = cur.fetchone()[0]
             
                 if user_usage_count >= max_uses_per_user:
                     return {"success": False, "message": f"You have already used this promo code {max_uses_per_user} time(s)"}
