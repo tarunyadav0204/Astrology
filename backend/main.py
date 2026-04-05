@@ -94,6 +94,7 @@ from charts.routes import router as charts_router
 from birth_charts.routes import router as birth_charts_router
 from karma_analysis.routes import router as karma_router
 from reddit.routes import router as reddit_router
+from support_routes import router as support_router, admin_router as support_admin_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from yoga_routes import router as yoga_router
 from chat_error_logging import router as chat_error_router
@@ -440,6 +441,8 @@ app.include_router(event_prediction_router)
 app.include_router(nudge_engine_router, prefix="/api")
 app.include_router(places_router, prefix="/api")
 app.include_router(reddit_router)
+app.include_router(support_router, prefix="/api/support")
+app.include_router(support_admin_router, prefix="/api")
 
 
 

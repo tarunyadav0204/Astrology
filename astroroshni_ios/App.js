@@ -49,6 +49,7 @@ import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import AboutScreen from './src/components/About/AboutScreen';
+import SupportScreen from './src/components/Support/SupportScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
@@ -491,6 +492,11 @@ export default function App() {
           <Stack.Screen 
             name="BlogPostDetail" 
             component={BlogPostDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Support"
+            component={SupportScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

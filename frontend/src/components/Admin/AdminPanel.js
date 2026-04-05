@@ -15,6 +15,7 @@ import AdminChatPerformance from './AdminChatPerformance';
 import AdminChatPerformanceCharts from './AdminChatPerformanceCharts';
 import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
+import AdminSupportInbox from './AdminSupportInbox';
 import BlogDashboard from '../Blog/BlogDashboard';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
@@ -1146,6 +1147,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('chat')}
         >
           Chat History
+        </button>
+        <button 
+          className={`tab ${activeTab === 'support' ? 'active' : ''}`}
+          onClick={() => setActiveTab('support')}
+        >
+          Support
         </button>
         <button 
           className={`tab ${activeTab === 'performance' ? 'active' : ''}`}
@@ -2606,6 +2613,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             )}
           </div>
         )}
+
+        {activeTab === 'support' && <AdminSupportInbox />}
 
         {activeTab === 'reddit' && (
           <div className="admin-settings">

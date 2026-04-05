@@ -631,4 +631,11 @@ export const blogAPI = {
   getBlogCategories: () => api.get(getEndpoint('/blog/categories')),
 };
 
+export const supportAPI = {
+  listTickets: () => api.get(getEndpoint('/support/tickets')),
+  getTicket: (id) => api.get(getEndpoint(`/support/tickets/${id}`)),
+  createTicket: (payload) => api.post(getEndpoint('/support/tickets'), payload),
+  postMessage: (id, message) => api.post(getEndpoint(`/support/tickets/${id}/messages`), { message }),
+};
+
 export default api;

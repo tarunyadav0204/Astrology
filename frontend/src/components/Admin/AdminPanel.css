@@ -1094,6 +1094,27 @@ select {
   .admin-content {
     padding: 15px;
   }
+
+  /* Support inbox: reclaim horizontal space; remove double-padding from old admin-settings */
+  .admin-content-wrapper:has(.admin-support-inbox) {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .admin-content:has(.admin-support-inbox) {
+    padding: 8px 6px 12px;
+  }
+
+  .admin-support-inbox h2 {
+    color: #e91e63;
+    margin: 0 0 8px 0;
+    font-size: 1.35rem;
+  }
+
+  .admin-support-inbox-hint {
+    font-size: 13px;
+    line-height: 1.4;
+  }
   
   table {
     font-size: 14px;
@@ -1228,6 +1249,12 @@ select {
 /* Settings Styles */
 .admin-settings {
   padding: 20px;
+}
+
+/* Support inbox: do not use .admin-settings (extra 20px padding); title styled here */
+.admin-support-inbox h2 {
+  color: #e91e63;
+  margin: 0 0 14px 0;
 }
 
 .settings-section {

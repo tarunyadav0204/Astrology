@@ -452,4 +452,11 @@ export const kpAPI = {
   getRulingPlanets: (birthData) => api.post(getEndpoint('/kp/ruling-planets'), birthData),
 };
 
+export const supportAPI = {
+  listTickets: () => api.get(getEndpoint('/support/tickets')),
+  getTicket: (id) => api.get(getEndpoint(`/support/tickets/${id}`)),
+  createTicket: (payload) => api.post(getEndpoint('/support/tickets'), payload),
+  postMessage: (id, message) => api.post(getEndpoint(`/support/tickets/${id}/messages`), { message }),
+};
+
 export default api;

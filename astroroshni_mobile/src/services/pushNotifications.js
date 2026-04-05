@@ -164,6 +164,17 @@ async function processNotificationResponse(response, navigationRef) {
       navigationRef.current.navigate('BlogPostDetail', { slug });
       return;
     }
+    // Support ticket: open Support screen on the thread
+    const supportTicketId =
+      data?.support_ticket_id != null ? String(data.support_ticket_id).trim() : '';
+    if (
+      (cta === 'astroroshni://support' || data?.trigger_id === 'support_reply') &&
+      supportTicketId &&
+      navigationRef?.current
+    ) {
+      navigationRef.current.navigate('Support', { ticketId: supportTicketId });
+      return;
+    }
     if (nativeId) {
       // Native-specific event: switch to the chart this notification is for
       let profiles = await storage.getBirthProfiles();
