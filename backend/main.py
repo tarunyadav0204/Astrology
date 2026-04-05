@@ -143,42 +143,13 @@ def _is_us_number(phone: str) -> bool:
 def _send_otp_email(to_email: str, code: str) -> bool:
     if not to_email:
         return False
+    from utils.smtp_mail import send_plain_text_email
 
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    from_email = os.getenv("SMTP_FROM_EMAIL") or smtp_user
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes")
-
-    if not smtp_host or not from_email:
-        logger.warning("OTP email not sent: SMTP env not configured")
-        return False
-
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-
-        message = MIMEText(
-            f"Your AstroRoshni verification code is: {code}\n\n"
-            "This code expires in 10 minutes.",
-            "plain",
-            "utf-8",
-        )
-        message["Subject"] = "Your AstroRoshni OTP Code"
-        message["From"] = from_email
-        message["To"] = to_email
-
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-            if use_tls:
-                server.starttls()
-            if smtp_user and smtp_password:
-                server.login(smtp_user, smtp_password)
-            server.sendmail(from_email, [to_email], message.as_string())
-        return True
-    except Exception:
-        logger.exception("Failed sending OTP email to %s", to_email)
-        return False
+    body = (
+        f"Your AstroRoshni verification code is: {code}\n\n"
+        "This code expires in 10 minutes."
+    )
+    return send_plain_text_email(to_email, "Your AstroRoshni OTP Code", body)
 
 def log_shutdown(reason):
     logger.critical(f"SERVER SHUTDOWN: {reason}")
@@ -282,6 +253,7 @@ class AppConfigResponse(BaseModel):
 
     min_android_version_code: int
     min_ios_build_number: int
+    app_update_release_notes: str = ""
 
 
 @app.get("/api/app/config", response_model=AppConfigResponse)
@@ -293,6 +265,7 @@ async def get_app_config() -> AppConfigResponse:
     variables used only as a fallback default:
       - admin_settings.min_android_version_code or MIN_ANDROID_VERSION_CODE
       - admin_settings.min_ios_build_number or MIN_IOS_BUILD_NUMBER
+      - admin_settings.app_update_release_notes (optional; shown on forced update screen)
 
     Set values to 0 (or leave unset) to disable forced updates.
     """
@@ -310,9 +283,13 @@ async def get_app_config() -> AppConfigResponse:
     except ValueError:
       min_ios = MIN_IOS_BUILD_NUMBER
 
+    notes_setting = get_setting("app_update_release_notes")
+    release_notes = (notes_setting or "").strip()
+
     return AppConfigResponse(
         min_android_version_code=min_android,
         min_ios_build_number=min_ios,
+        app_update_release_notes=release_notes,
     )
 
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)

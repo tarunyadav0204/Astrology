@@ -94,6 +94,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [debugLogging, setDebugLogging] = useState(false);
   const [androidMinVersion, setAndroidMinVersion] = useState('');
   const [iosMinVersion, setIosMinVersion] = useState('');
+  const [appUpdateReleaseNotes, setAppUpdateReleaseNotes] = useState('');
   const [geminiModelOptions, setGeminiModelOptions] = useState([]);
   const [geminiChatModel, setGeminiChatModel] = useState('');
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
@@ -294,8 +295,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setDebugLogging(debugSetting?.value === 'true');
       const androidMin = data.settings.find(s => s.key === 'min_android_version_code');
       const iosMin = data.settings.find(s => s.key === 'min_ios_build_number');
+      const releaseNotes = data.settings.find(s => s.key === 'app_update_release_notes');
       setAndroidMinVersion(androidMin?.value ?? '');
       setIosMinVersion(iosMin?.value ?? '');
+      setAppUpdateReleaseNotes(releaseNotes?.value ?? '');
       setGeminiModelOptions(data.gemini_model_options || []);
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
@@ -403,6 +406,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const handleSaveAppVersionConfig = async () => {
     const androidValue = androidMinVersion?.toString().trim();
     const iosValue = iosMinVersion?.toString().trim();
+    const notesValue = appUpdateReleaseNotes?.toString() ?? '';
 
     const payloads = [];
     if (androidValue !== '') {
@@ -419,9 +423,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         description: 'Minimum required iOS build number for mobile app',
       });
     }
+    payloads.push({
+      key: 'app_update_release_notes',
+      value: notesValue,
+      description: 'Release notes shown on the forced “Update required” screen (mobile)',
+    });
 
-    if (payloads.length === 0) {
-      alert('Enter at least one minimum version (Android versionCode or iOS build number).');
+    const hasVersion = androidValue !== '' || iosValue !== '';
+    if (!hasVersion && !notesValue.trim()) {
+      alert('Enter at least one minimum version (Android versionCode or iOS build number), and/or release notes for the update screen.');
       return;
     }
     try {
@@ -443,7 +453,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         alert('Failed to save: ' + (err.detail || failed.statusText || 'unknown error'));
         return;
       }
-      alert('App version config saved. Users below these versions will be forced to update.');
+      alert('App version config saved. Users below these versions will be forced to update; release notes appear on the update screen when set.');
       fetchAdminSettings();
     } catch (error) {
       console.error('Error saving app version config:', error);
@@ -2829,7 +2839,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <h3>App Version Config</h3>
               <p className="settings-hint">
                 Set the minimum allowed app versions. Users on older builds will see a blocking “Update required” screen.
-                Leave a field empty to disable the gate for that platform.
+                Leave a field empty to disable the gate for that platform. Optional release notes (bullets or short paragraphs) are shown on that screen so users know what changed.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
@@ -2855,6 +2865,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   onChange={(e) => setIosMinVersion(e.target.value)}
                   placeholder="e.g. 77"
                   style={{ width: '120px' }}
+                />
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info" style={{ flex: '1 1 220px' }}>
+                  <strong>Release notes (update screen)</strong>
+                  <p>Shown to users on the blocking update screen. Use line breaks or bullet lines; plain text only.</p>
+                </div>
+                <textarea
+                  value={appUpdateReleaseNotes}
+                  onChange={(e) => setAppUpdateReleaseNotes(e.target.value)}
+                  placeholder={'e.g.\n• Faster chart loading\n• Bug fixes for chat history'}
+                  rows={6}
+                  style={{ width: '100%', maxWidth: '480px', minHeight: '120px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
                 />
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>

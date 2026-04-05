@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking } from 'react-native';
+import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -108,6 +108,8 @@ export default function App() {
 
       const minAndroid = Number(data?.min_android_version_code || 0);
       const minIos = Number(data?.min_ios_build_number || 0);
+      const releaseNotes =
+        typeof data?.app_update_release_notes === 'string' ? data.app_update_release_notes.trim() : '';
 
       if (Platform.OS === 'android') {
         const current = Number(Constants.expoConfig?.android?.versionCode || 0);
@@ -116,6 +118,7 @@ export default function App() {
             platform: 'android',
             currentVersion: current,
             minVersion: minAndroid,
+            releaseNotes,
           });
         }
       } else if (Platform.OS === 'ios') {
@@ -125,6 +128,7 @@ export default function App() {
             platform: 'ios',
             currentVersion: current,
             minVersion: minIos,
+            releaseNotes,
           });
         }
       }
@@ -277,27 +281,51 @@ export default function App() {
   }
 
   if (forceUpdateInfo) {
+    const rn = forceUpdateInfo.releaseNotes;
     return (
       <SafeAreaProvider>
         <StatusBar barStyle="dark-content" backgroundColor="#ffedd5" />
-        <View style={{ flex: 1, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 12, textAlign: 'center', color: '#7c2d12' }}>
-            Update required
-          </Text>
-          <Text style={{ fontSize: 15, textAlign: 'center', color: '#7c2d12', marginBottom: 24 }}>
-            A new version of AstroRoshni is available. Please update the app to continue.
-          </Text>
-          <TouchableOpacity
-            onPress={handleUpdatePress}
-            style={{
-              backgroundColor: '#f97316',
-              borderRadius: 999,
-              paddingHorizontal: 24,
-              paddingVertical: 12,
-            }}
+        <View style={{ flex: 1, backgroundColor: '#fff7ed', padding: 24 }}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 24 }}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>Update app</Text>
-          </TouchableOpacity>
+            <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 12, textAlign: 'center', color: '#7c2d12' }}>
+              Update required
+            </Text>
+            <Text style={{ fontSize: 15, textAlign: 'center', color: '#7c2d12', marginBottom: rn ? 16 : 24 }}>
+              A new version of AstroRoshni is available. Please update the app to continue.
+            </Text>
+            {rn ? (
+              <View
+                style={{
+                  width: '100%',
+                  maxWidth: 400,
+                  backgroundColor: '#ffedd5',
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 24,
+                  borderWidth: 1,
+                  borderColor: '#fdba74',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#9a3412', marginBottom: 8 }}>{'What\u2019s new'}</Text>
+                <Text style={{ fontSize: 14, lineHeight: 22, color: '#431407' }}>{rn}</Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              onPress={handleUpdatePress}
+              style={{
+                backgroundColor: '#f97316',
+                borderRadius: 999,
+                paddingHorizontal: 24,
+                paddingVertical: 12,
+                alignSelf: 'center',
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>Update app</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </SafeAreaProvider>
     );

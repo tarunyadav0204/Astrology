@@ -5,8 +5,9 @@ All user text is sanitized (plain text, length caps, control-char strip).
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
-from typing import Any, List, Optional
+import os
+from datetime import date
+from typing import Any, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -14,8 +15,14 @@ from pydantic import BaseModel, Field
 from auth import User, get_current_user
 from db import get_conn, execute
 from utils.support_text import sanitize_support_body, sanitize_support_subject
+from utils.smtp_mail import send_plain_text_email
 
 logger = logging.getLogger(__name__)
+
+# Inbox for new tickets and user replies (override via env).
+SUPPORT_HELP_EMAIL = (os.getenv("SUPPORT_HELP_EMAIL") or "help@astroroshni.com").strip()
+# Link shown in emails to the ticket owner (Contact / support UI on web).
+PUBLIC_WEB_BASE_URL = (os.getenv("PUBLIC_WEB_BASE_URL") or "https://astroroshni.com").rstrip("/")
 
 router = APIRouter(tags=["support"])
 
@@ -87,6 +94,133 @@ def _preview(text: str, n: int = 120) -> str:
     if len(t) <= n:
         return t
     return t[: n - 1] + "…"
+
+
+def _email_clip(text: str, max_len: int = 8000) -> str:
+    t = text or ""
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1] + "…"
+
+
+def _safe_email_subject(s: str, max_len: int = 200) -> str:
+    line = " ".join((s or "").splitlines()).strip()
+    if len(line) > max_len:
+        return line[: max_len - 1] + "…"
+    return line or "(no subject)"
+
+
+def _fetch_user_contact(conn, userid: int) -> Tuple[Optional[str], str, str]:
+    cur = execute(conn, "SELECT email, name, phone FROM users WHERE userid = %s", (userid,))
+    row = cur.fetchone()
+    if not row:
+        return None, "", ""
+    raw_email = (row[0] or "").strip()
+    email = raw_email if raw_email else None
+    name = (row[1] or "").strip()
+    phone = (row[2] or "").strip()
+    return email, name, phone
+
+
+def _notify_help_staff_new_ticket(
+    ticket_id: int,
+    subject: str,
+    userid: int,
+    user_name: str,
+    user_phone: str,
+    user_email: Optional[str],
+    source: str,
+    message: str,
+) -> None:
+    if not SUPPORT_HELP_EMAIL:
+        return
+    subj = _safe_email_subject(f"[Support #{ticket_id}] New ticket: {subject}")
+    lines = [
+        f"New support ticket #{ticket_id}",
+        "",
+        f"Subject: {subject}",
+        f"User ID: {userid}",
+        f"Name: {user_name or '—'}",
+        f"Phone: {user_phone or '—'}",
+        f"Email on file: {user_email or '—'}",
+        f"Source: {source}",
+        "",
+        "Message:",
+        _email_clip(message),
+    ]
+    body = "\n".join(lines)
+    try:
+        ok = send_plain_text_email(SUPPORT_HELP_EMAIL, subj, body)
+        if not ok:
+            logger.warning("Help desk email not sent (SMTP) for new ticket %s", ticket_id)
+    except Exception:
+        logger.exception("Help desk email failed for new ticket %s", ticket_id)
+
+
+def _notify_help_staff_user_reply(
+    ticket_id: int,
+    subject: str,
+    userid: int,
+    user_name: str,
+    user_phone: str,
+    user_email: Optional[str],
+    message: str,
+) -> None:
+    if not SUPPORT_HELP_EMAIL:
+        return
+    subj = _safe_email_subject(f"[Support #{ticket_id}] User replied: {subject}")
+    lines = [
+        f"User replied on ticket #{ticket_id}",
+        "",
+        f"Subject: {subject}",
+        f"User ID: {userid}",
+        f"Name: {user_name or '—'}",
+        f"Phone: {user_phone or '—'}",
+        f"Email on file: {user_email or '—'}",
+        "",
+        "Message:",
+        _email_clip(message),
+    ]
+    body = "\n".join(lines)
+    try:
+        ok = send_plain_text_email(SUPPORT_HELP_EMAIL, subj, body)
+        if not ok:
+            logger.warning("Help desk email not sent (SMTP) for user reply ticket %s", ticket_id)
+    except Exception:
+        logger.exception("Help desk email failed for user reply ticket %s", ticket_id)
+
+
+def _notify_ticket_owner_email(
+    to_email: Optional[str],
+    ticket_id: int,
+    subject: str,
+    headline: str,
+    message_body: str,
+) -> None:
+    if not to_email:
+        logger.info("Ticket owner has no email; skipping notification email for ticket %s", ticket_id)
+        return
+    subj = _safe_email_subject(f"AstroRoshni support — {subject}")
+    support_url = f"{PUBLIC_WEB_BASE_URL}/contact"
+    lines = [
+        headline,
+        "",
+        f"Ticket #{ticket_id}: {subject}",
+        "",
+        "Message:",
+        _email_clip(message_body, max_len=6000),
+        "",
+        f"Open the app or visit {support_url} to view the full thread and reply.",
+        "",
+        "— AstroRoshni",
+    ]
+    body = "\n".join(lines)
+    try:
+        ok = send_plain_text_email(to_email, subj, body)
+        if not ok:
+            logger.warning("User notification email not sent (SMTP) for ticket %s", ticket_id)
+    except Exception:
+        logger.exception("User notification email failed for ticket %s", ticket_id)
 
 
 def _notify_ticket_owner_support_reply(owner_userid: int, ticket_id: int, reply_preview: str) -> None:
@@ -236,7 +370,19 @@ async def create_ticket(body: CreateTicketBody, current_user: User = Depends(get
             """,
             (tid, current_user.userid, message),
         )
+        u_email, u_name, u_phone = _fetch_user_contact(conn, current_user.userid)
         conn.commit()
+
+    _notify_help_staff_new_ticket(
+        tid,
+        subject,
+        current_user.userid,
+        u_name,
+        u_phone,
+        u_email,
+        src,
+        message,
+    )
     return {"ticket_id": tid, "message": "Ticket created"}
 
 
@@ -374,7 +520,25 @@ async def post_user_message(
             """,
             (new_status, _preview(message), ticket_id),
         )
+        cur_sub = execute(
+            conn,
+            "SELECT subject FROM support_tickets WHERE id = %s",
+            (ticket_id,),
+        )
+        sub_row = cur_sub.fetchone()
+        ticket_subject = (sub_row[0] if sub_row else "") or ""
+        u_email, u_name, u_phone = _fetch_user_contact(conn, current_user.userid)
         conn.commit()
+
+    _notify_help_staff_user_reply(
+        ticket_id,
+        ticket_subject,
+        current_user.userid,
+        u_name,
+        u_phone,
+        u_email,
+        message,
+    )
     return {"message": "Sent"}
 
 
@@ -505,17 +669,27 @@ async def admin_post_message(
         raise HTTPException(status_code=400, detail="Message is required")
 
     owner_userid: int
+    owner_email: Optional[str] = None
+    ticket_subject = ""
     with get_conn() as conn:
         _ensure_tables(conn)
         cur = execute(
             conn,
-            "SELECT id, userid FROM support_tickets WHERE id = %s",
+            """
+            SELECT st.id, st.userid, st.subject, u.email
+            FROM support_tickets st
+            LEFT JOIN users u ON u.userid = st.userid
+            WHERE st.id = %s
+            """,
             (ticket_id,),
         )
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Ticket not found")
         owner_userid = int(row[1])
+        ticket_subject = (row[2] or "").strip()
+        raw_em = (row[3] or "").strip()
+        owner_email = raw_em if raw_em else None
         execute(
             conn,
             """
@@ -538,6 +712,13 @@ async def admin_post_message(
         conn.commit()
 
     _notify_ticket_owner_support_reply(owner_userid, ticket_id, _preview(message))
+    _notify_ticket_owner_email(
+        owner_email,
+        ticket_id,
+        ticket_subject,
+        "Support has replied to your ticket.",
+        message,
+    )
     return {"message": "Reply sent"}
 
 
