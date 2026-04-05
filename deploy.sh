@@ -3,7 +3,21 @@
 # Automated deployment script for Astrology App
 set -e
 
+# Timestamps: wall clock, seconds since deploy start, seconds since previous timing line.
+DEPLOY_T0=$(date +%s)
+LAST_T=$DEPLOY_T0
+deploy_timing() {
+  local now wall total step
+  now=$(date +%s)
+  wall=$(date '+%Y-%m-%d %H:%M:%S')
+  total=$((now - DEPLOY_T0))
+  step=$((now - LAST_T))
+  echo "⏱️  ${wall}  | +${total}s total  | +${step}s last step  — ${1}"
+  LAST_T=$now
+}
+
 echo "🚀 Starting deployment..."
+deploy_timing "deploy script started"
 
 # Deploy branch on the server (default: main).
 # Can be overridden by setting DEPLOY_BRANCH in the SSH script, e.g.:
@@ -24,6 +38,7 @@ CHANGED_FILES=""
 if [ -n "${PREV_HEAD}" ]; then
   CHANGED_FILES="$(git diff --name-only "${PREV_HEAD}" "${NEW_HEAD}" || true)"
 fi
+deploy_timing "git fetch/reset and diff complete"
 
 # Backend: always `pip install -r requirements.txt` on every deploy.
 # Relying only on git-diff for requirements.txt misses cases (e.g. merge order,
@@ -52,6 +67,8 @@ elif echo "${CHANGED_FILES}" | grep -q . && ! echo "${CHANGED_FILES}" | grep -qE
   needs_backend_pip=false
 fi
 
+echo "📋 needs_backend_pip=${needs_backend_pip} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build}"
+
 # Backend deployment
 echo "🐍 Setting up backend..."
 cd backend
@@ -70,6 +87,7 @@ if [ "${needs_backend_pip}" = "true" ]; then
 else
   echo "⏭️ No backend/ changes; skipping pip install (venv unchanged)"
 fi
+deploy_timing "backend pip (or skip) finished"
 
 # Setup encryption (idempotent - safe to run multiple times)
 echo "🔐 Setting up encryption..."
@@ -79,6 +97,7 @@ if [ $? -eq 0 ]; then
 else
     echo "⚠️ Encryption setup failed, continuing without encryption"
 fi
+deploy_timing "encryption setup finished"
 
 # Frontend deployment
 echo "⚛️ Building frontend..."
@@ -86,8 +105,10 @@ cd ../frontend
 if [ "${needs_frontend_install}" = "true" ]; then
   echo "📦 Installing frontend dependencies..."
   npm install
+  deploy_timing "npm install finished"
 else
   echo "⏭️ Frontend dependencies unchanged; skipping npm install"
+  deploy_timing "npm install skipped"
 fi
 
 if [ "${needs_frontend_build}" = "true" ]; then
@@ -97,8 +118,10 @@ if [ "${needs_frontend_build}" = "true" ]; then
   export GENERATE_SOURCEMAP=false
   export INLINE_RUNTIME_CHUNK=true
   npm run build
+  deploy_timing "npm run build finished"
 else
   echo "⏭️ Frontend unchanged; skipping build"
+  deploy_timing "npm build skipped"
 fi
 echo "✅ Frontend built successfully"
 
@@ -126,6 +149,7 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
   fi
   sleep 1
 done
+deploy_timing "old processes stopped, ports free"
 
 # Start backend
 cd backend
@@ -171,6 +195,7 @@ if ps -p $BACKEND_PID > /dev/null; then
       tail -80 ../logs/backend.log
       exit 1
     fi
+    deploy_timing "backend up and /api/health OK"
 else
     echo "❌ Backend failed to start. Check logs:"
     tail -20 ../logs/backend.log
@@ -181,6 +206,7 @@ fi
 cd ../frontend
 nohup npx serve -s build -l 3001 > ../logs/frontend.log 2>&1 &
 echo "✅ Frontend started on port 3001"
+deploy_timing "npx serve (frontend static) started"
 
 # Start auto-restart monitor
 echo "🔄 Starting auto-restart monitor..."
@@ -190,8 +216,10 @@ cd ..
 nohup ./restart_server.sh > logs/monitor.log 2>&1 &
 MONITOR_PID=$!
 echo "✅ Auto-restart monitor started with PID: $MONITOR_PID"
+deploy_timing "restart monitor started"
 
-echo "🎉 Deployment completed successfully!"
+TOTAL=$(( $(date +%s) - DEPLOY_T0 ))
+echo "🎉 Deployment completed successfully! (total wall time: ${TOTAL}s)"
 echo "📊 Backend: http://localhost:8001"
 echo "🌐 Frontend: http://localhost:3001"
 echo "🔄 Monitor: PID $MONITOR_PID (logs/monitor.log)"

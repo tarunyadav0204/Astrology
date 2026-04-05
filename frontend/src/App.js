@@ -1,3 +1,4 @@
+// Harmless touch to verify frontend deploy pipeline (no user-facing change).
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
