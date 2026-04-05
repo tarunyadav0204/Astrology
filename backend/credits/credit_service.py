@@ -1138,11 +1138,25 @@ class CreditService:
         from db import get_conn, execute
 
         with get_conn() as conn:
+            # Join reversal totals in SQL with TRIM(reference_id) so earned vs refund rows always
+            # match (avoids Python dict key misses from whitespace / type quirks).
             sql = """
             SELECT ct.id, ct.userid, u.name, u.phone,
-                   ct.reference_id, ct.amount, ct.metadata, ct.created_at
+                   ct.reference_id, ct.amount, ct.metadata, ct.created_at,
+                   COALESCE(rev.rev_sum, 0) AS reversed_amt
             FROM credit_transactions ct
             LEFT JOIN users u ON u.userid = ct.userid
+            LEFT JOIN (
+                SELECT userid,
+                       TRIM(BOTH FROM COALESCE(reference_id, '')) AS ref_trim,
+                       SUM(ABS(amount))::bigint AS rev_sum
+                FROM credit_transactions
+                WHERE source = 'razorpay_refund'
+                  AND reference_id IS NOT NULL
+                  AND TRIM(BOTH FROM COALESCE(reference_id, '')) <> ''
+                GROUP BY userid, TRIM(BOTH FROM COALESCE(reference_id, ''))
+            ) rev ON rev.userid = ct.userid
+               AND TRIM(BOTH FROM COALESCE(ct.reference_id, '')) = rev.ref_trim
             WHERE ct.source = 'razorpay'
               AND ct.transaction_type = 'earned'
               AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
@@ -1160,21 +1174,13 @@ class CreditService:
             cur = execute(conn, sql, params)
             rows = cur.fetchall()
 
-            reversed_amounts: Dict[tuple, int] = {}
-            cur_rev = execute(
-                conn,
-                """
-                SELECT userid, reference_id, SUM(ABS(amount)) FROM credit_transactions
-                WHERE source = 'razorpay_refund' AND reference_id IS NOT NULL
-                GROUP BY userid, reference_id
-                """,
-                (),
-            )
-            for r in cur_rev.fetchall():
-                reversed_amounts[(r[0], r[1])] = r[2]
             out: List[Dict[str, Any]] = []
             for row in rows:
-                tx_id, userid, name, phone, pay_id, amount, metadata_json, created_at = row
+                tx_id, userid, name, phone, pay_id, amount, metadata_json, created_at, reversed_raw = row
+                try:
+                    reversed_amt = int(reversed_raw or 0)
+                except (TypeError, ValueError):
+                    reversed_amt = 0
                 order_id = ""
                 amount_paise = None
                 currency = None
@@ -1193,16 +1199,14 @@ class CreditService:
                         product_id = meta.get("product_id")
                     except Exception:
                         pass
-                key = (userid, pay_id)
-                reversed_amt = reversed_amounts.get(key, 0)
-                status = "Reversed" if reversed_amt else "Credited"
+                status = "Reversed" if reversed_amt > 0 else "Credited"
                 out.append(
                     {
                         "id": tx_id,
                         "userid": userid,
                         "user_name": name or "",
                         "user_phone": phone or "",
-                        "payment_id": pay_id or "",
+                        "payment_id": (pay_id or "").strip(),
                         "order_id": order_id,
                         "amount": amount,
                         "amount_paise": amount_paise,
@@ -1210,7 +1214,7 @@ class CreditService:
                         "product_id": product_id or "",
                         "created_at": created_at,
                         "status": status,
-                        "reversed_amount": reversed_amt if reversed_amt else None,
+                        "reversed_amount": reversed_amt if reversed_amt > 0 else None,
                     }
                 )
             return out

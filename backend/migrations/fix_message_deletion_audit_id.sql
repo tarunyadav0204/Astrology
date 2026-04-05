@@ -3,9 +3,10 @@
 -- Safe to run if sequence already exists: adjust or skip manually.
 
 CREATE SEQUENCE IF NOT EXISTS message_deletion_audit_audit_id_seq;
+-- Next nextval() will be MAX(audit_id)+1. If table is empty, MAX is NULL → 0 → next id is 1.
 SELECT setval(
     'message_deletion_audit_audit_id_seq',
-    GREATEST(COALESCE((SELECT MAX(audit_id) FROM message_deletion_audit), 0), 1)
+    COALESCE((SELECT MAX(audit_id) FROM message_deletion_audit), 0)
 );
 ALTER TABLE message_deletion_audit
   ALTER COLUMN audit_id SET DEFAULT nextval('message_deletion_audit_audit_id_seq');
