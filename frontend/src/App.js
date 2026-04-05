@@ -68,7 +68,7 @@ function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   };
   return <FloatingChatButton onOpenChat={handleOpenChat} />;
 }
-
+//Harmless touch
 function App() {
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('selector'); // user-home, selector, form, dashboard, predictions

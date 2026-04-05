@@ -21,5 +21,8 @@ jobs:
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
+          echo "========== GitHub Actions: deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           cd AstrologyApp
           bash deploy.sh
+          echo "========== GitHub Actions: deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') exit code $? =========="
+          echo "========== (Timestamps above are the runner clock; lines starting with ⏱️ are from deploy.sh on the server.) =========="
