@@ -276,7 +276,7 @@ CREATE TABLE "market_forecast_metadata" (
 
 DROP TABLE IF EXISTS "message_deletion_audit" CASCADE;
 CREATE TABLE "message_deletion_audit" (
-    "audit_id" INTEGER,
+    "audit_id" SERIAL PRIMARY KEY,
     "message_id" INTEGER NOT NULL,
     "user_id" INTEGER NOT NULL,
     "session_id" TEXT NOT NULL,
@@ -284,8 +284,7 @@ CREATE TABLE "message_deletion_audit" (
     "message_type" TEXT,
     "sender" TEXT,
     "deleted_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "deleted_by_ip" TEXT,
-    PRIMARY KEY ("audit_id")
+    "deleted_by_ip" TEXT
 );
 
 DROP TABLE IF EXISTS "blog_posts" CASCADE;

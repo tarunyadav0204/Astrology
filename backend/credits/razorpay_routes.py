@@ -434,6 +434,14 @@ def refund_razorpay_payment(payment_id: str, amount_paise: Optional[int] = None)
     if not desc:
         desc = (r.text or "")[:500]
     err_l = desc.lower()
-    if "already been fully refunded" in err_l or "already refunded" in err_l or "full refund" in err_l:
+    # Razorpay wording varies, e.g. "The payment has been fully refunded already" (no "already refunded" substring).
+    if (
+        "already been fully refunded" in err_l
+        or "already refunded" in err_l
+        or "full refund" in err_l
+        or "fully refunded" in err_l
+        or "refunded already" in err_l
+        or ("fully" in err_l and "refund" in err_l and "payment" in err_l)
+    ):
         return True, "Already refunded", data if isinstance(data, dict) else None
     return False, desc, data if isinstance(data, dict) else None

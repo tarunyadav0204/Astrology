@@ -1117,13 +1117,17 @@ async def admin_razorpay_refund(request: dict, current_user: User = Depends(get_
     if not rp_ok:
         raise HTTPException(status_code=400, detail=f"Razorpay: {rp_msg}")
 
-    ok, credits_deducted, original_amount = credit_service.reverse_razorpay_purchase(
+    ok, credits_deducted_or_err, original_amount = credit_service.reverse_razorpay_purchase(
         userid, payment_id, amount=credits_to_reverse, reason=reason
     )
     if not ok:
+        # Money may already be refunded on Razorpay; surface the real reason (e.g. no credits left).
         raise HTTPException(
-            status_code=500,
-            detail="Razorpay refund succeeded but credit reversal failed. Use reverse-razorpay-purchase to reconcile, or retry.",
+            status_code=400,
+            detail=(
+                f"Razorpay refund ok, but credit reversal failed: {credits_deducted_or_err}. "
+                "If money was refunded, use “Credits only” after the issue is fixed, or contact support."
+            ),
         )
     return {
         "razorpay": rp_msg,

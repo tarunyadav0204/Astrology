@@ -1646,6 +1646,9 @@ async def delete_message(message_id: int, current_user = Depends(get_current_use
             if msg_details:
                 content, msg_type, sender = msg_details
                 print(f"🗑️ DELETE STEP 6: Inserting audit record")
+                # SAVEPOINT: if audit INSERT fails (e.g. audit_id not serial on DB), Postgres marks the
+                # transaction aborted; ROLLBACK TO SAVEPOINT clears that so DELETE can still run.
+                execute(conn, "SAVEPOINT sp_message_deletion_audit")
                 try:
                     execute(
                         conn,
@@ -1657,8 +1660,10 @@ async def delete_message(message_id: int, current_user = Depends(get_current_use
                         (message_id, current_user.userid, session_id, None, msg_type, sender),
                     )
                     print(f"🗑️ DELETE STEP 7: Audit record inserted successfully")
+                    execute(conn, "RELEASE SAVEPOINT sp_message_deletion_audit")
                 except Exception as audit_error:
                     print(f"❌ DELETE STEP 7 ERROR: Audit insert failed: {audit_error}")
+                    execute(conn, "ROLLBACK TO SAVEPOINT sp_message_deletion_audit")
 
             print(f"🗑️ DELETE STEP 8: Performing actual deletion")
             cur = execute(conn, "DELETE FROM chat_messages WHERE message_id = %s", (message_id,))
