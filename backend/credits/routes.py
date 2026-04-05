@@ -1132,7 +1132,7 @@ async def admin_razorpay_refund(request: dict, current_user: User = Depends(get_
     return {
         "razorpay": rp_msg,
         "astroroshni": "Credits taken back",
-        "credits_deducted": credits_deducted,
+        "credits_deducted": credits_deducted_or_err,
         "original_amount": original_amount,
     }
 
