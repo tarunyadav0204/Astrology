@@ -40,29 +40,52 @@ def _row_dict(row: Any) -> Dict[str, Any]:
     return {}
 
 
+# Store purchases use add_credits → transaction_type "earned" with these sources.
+_CREDIT_PURCHASE_SOURCES = frozenset({"google_play", "razorpay"})
+
+
 def _credit_rollups(transactions: List[Dict[str, Any]]) -> Dict[str, int]:
     """
-    Match credits/credit_service dashboard: earned+refund = credits in; spent rows store negative amount.
+    Credits in: add_credits always uses transaction_type "earned" (even for admin adjustments).
+    refund_credits uses transaction_type "refund". Spent rows store negative amount.
+    Split "earned" by source so purchases (Play/Razorpay) are separate from admin/promo/refund rows.
     """
-    earned = 0
-    refund = 0
+    purchased = 0
+    refund_svc = 0
+    promo = 0
+    admin_grants = 0
+    other_earned = 0
     spent = 0
     for t in transactions:
         tt = (t.get("transaction_type") or "").strip().lower()
+        src = (t.get("source") or "").strip().lower()
         try:
             amt = int(t.get("amount") or 0)
         except (TypeError, ValueError):
             amt = 0
-        if tt == "earned":
-            earned += amt
-        elif tt == "refund":
-            refund += amt
-        elif tt == "spent":
+        if tt == "spent":
             spent += -amt
+        elif tt == "refund":
+            refund_svc += amt
+        elif tt == "earned":
+            if src in _CREDIT_PURCHASE_SOURCES:
+                purchased += amt
+            elif src == "promo_code":
+                promo += amt
+            elif src in ("admin_adjustment", "admin_approval"):
+                admin_grants += amt
+            else:
+                other_earned += amt
+    non_store = refund_svc + promo + admin_grants + other_earned
+    received_total = purchased + non_store
     return {
-        "credits_purchased_earned": earned,
-        "credits_refunds": refund,
-        "credits_received": earned + refund,
+        "credits_purchased": purchased,
+        "credits_refunds": refund_svc,
+        "credits_promo": promo,
+        "credits_admin_grants": admin_grants,
+        "credits_other_received": other_earned,
+        "credits_non_store_total": non_store,
+        "credits_received_total": received_total,
         "credits_spent": spent,
     }
 
@@ -313,9 +336,13 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
         "karma_insights_count": len(profile["karma_insights"]),
         "event_timeline_jobs_count": len(profile["event_timeline_jobs"]),
         "credit_transactions_count": len(profile["credit_transactions"]),
-        "credits_purchased_earned": credit_r["credits_purchased_earned"],
+        "credits_purchased": credit_r["credits_purchased"],
         "credits_refunds": credit_r["credits_refunds"],
-        "credits_received": credit_r["credits_received"],
+        "credits_promo": credit_r["credits_promo"],
+        "credits_admin_grants": credit_r["credits_admin_grants"],
+        "credits_other_received": credit_r["credits_other_received"],
+        "credits_non_store_total": credit_r["credits_non_store_total"],
+        "credits_received_total": credit_r["credits_received_total"],
         "credits_spent": credit_r["credits_spent"],
         "trading_daily_count": len(profile["trading"]["daily"]),
         "trading_monthly_count": len(profile["trading"]["monthly"]),

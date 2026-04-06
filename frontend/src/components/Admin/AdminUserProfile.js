@@ -232,11 +232,27 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
               <div>Karma: <strong>{summary?.karma_insights_count ?? 0}</strong></div>
               <div>Event timeline jobs: <strong>{summary?.event_timeline_jobs_count ?? 0}</strong></div>
               <div className="admin-user-profile-summary-credits">
-                <span className="admin-user-profile-summary-credits-label">Credits purchase (earned + refunds)</span>
-                <strong>{summary?.credits_received ?? 0}</strong>
-                <span className="admin-user-profile-summary-credits-sub">
-                  earned {summary?.credits_purchased_earned ?? 0}, refunds {summary?.credits_refunds ?? 0}
+                <span className="admin-user-profile-summary-credits-label">
+                  Purchased (Google Play &amp; Razorpay)
                 </span>
+                <strong>{summary?.credits_purchased ?? 0}</strong>
+              </div>
+              <div className="admin-user-profile-summary-credits">
+                <span className="admin-user-profile-summary-credits-label">
+                  Credits back / not from store purchase
+                </span>
+                <strong>{summary?.credits_non_store_total ?? 0}</strong>
+                <span className="admin-user-profile-summary-credits-sub">
+                  service refunds {summary?.credits_refunds ?? 0} · admin &amp; approvals{' '}
+                  {summary?.credits_admin_grants ?? 0} · promo {summary?.credits_promo ?? 0}
+                  {Number(summary?.credits_other_received) > 0 && (
+                    <> · other {summary?.credits_other_received}</>
+                  )}
+                </span>
+              </div>
+              <div className="admin-user-profile-summary-credits">
+                <span className="admin-user-profile-summary-credits-label">Total credits received (in range)</span>
+                <strong>{summary?.credits_received_total ?? 0}</strong>
               </div>
               <div className="admin-user-profile-summary-credits">
                 <span className="admin-user-profile-summary-credits-label">Credits spent</span>
