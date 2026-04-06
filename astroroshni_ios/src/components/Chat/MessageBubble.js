@@ -314,9 +314,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');
     formatted = formatted.replace(/<div class="final-thoughts-card">(.*?)<\/div>/gs, '<finalthoughts>$1</finalthoughts>');
     
-    // Strip markdown header hashes from start of every line so #### / ### / ## never appear in UI
-    formatted = formatted.replace(/^#+\s*(.*)$/gm, '$1');
-    
     return formatted;
   };
 
@@ -536,66 +533,60 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     return elements;
   };
   
-  const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
+  /** One line of text → inline Text nodes (tooltips, bold, italic). */
+  const buildInlineElementsForLine = (line, keyPrefix, baseTextStyle, textStyle) => {
     const elements = [];
-    // Strip markdown header hashes so #### / ### / ## never show (e.g. in table cells or paragraph text)
-    text = (text || '').replace(/^#+\s*/, '').replace(/\s+#+\s+/g, ' ').trim();
-    const textStyle = baseTextStyle ? [styles.regularText, baseTextStyle, message.role === 'user' && styles.userText] : [styles.regularText, message.role === 'user' && styles.userText];
-    
-    // Handle tooltip tags first (data-term only; definition looked up from glossary to avoid attribute escaping issues)
+    const textLine = (line || '').replace(/^#+\s*/, '').replace(/\s+#+\s+/g, ' ').trim();
     const tooltipRegex = /<tooltip data-term="([^"]+)">([^<]+)<\/tooltip>/g;
-    const parts = text.split(tooltipRegex);
-    
+    const parts = textLine.split(tooltipRegex);
+
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      // Parts: [textBefore, termId, innerText, textAfter, termId, innerText, ...] so i % 3 === 2 is innerText, i % 3 === 1 is termId
-      if (i % 3 === 2) { // Tooltip inner text (term display)
+      if (i % 3 === 2) {
         const termId = parts[i - 1];
         const definition = (message.glossary && message.glossary[termId]) ? message.glossary[termId] : '';
         elements.push(
           <Text
-            key={`tooltip-${startIndex}-${i}`}
+            key={`tooltip-${keyPrefix}-${i}`}
             onPress={() => setTooltipModal({ show: true, term: part, definition: definition })}
             style={[styles.tooltipText, baseTextStyle]}
           >
             {part} ⓘ
           </Text>
         );
-      } else if (i % 3 === 0 && part) { // Regular text
-        // Handle markdown bold formatting
+      } else if (i % 3 === 0 && part) {
         const boldRegex = /\*\*(.*?)\*\*/gs;
         const boldParts = part.split(boldRegex);
-        
+
         boldParts.forEach((boldPart, boldIndex) => {
-          if (boldIndex % 2 === 1) { // Odd indices are bold text
+          if (boldIndex % 2 === 1) {
             elements.push(
-              <Text 
-                key={`bold-${startIndex}-${i}-${boldIndex}`} 
+              <Text
+                key={`bold-${keyPrefix}-${i}-${boldIndex}`}
                 style={[
                   styles.boldText,
                   baseTextStyle,
                   message.role === 'user' && styles.userText,
-                  message.role === 'user' && { fontWeight: '700' }
+                  message.role === 'user' && { fontWeight: '700' },
                 ]}
               >
                 {boldPart}
               </Text>
             );
           } else if (boldPart) {
-            // Handle italics within regular text
             const italicRegex = /\*(.*?)\*/g;
             const italicParts = boldPart.split(italicRegex);
-            
+
             italicParts.forEach((italicPart, italicIndex) => {
-              if (italicIndex % 2 === 1) { // Odd indices are italic text
+              if (italicIndex % 2 === 1) {
                 elements.push(
-                  <Text 
-                    key={`italic-${startIndex}-${i}-${boldIndex}-${italicIndex}`} 
+                  <Text
+                    key={`italic-${keyPrefix}-${i}-${boldIndex}-${italicIndex}`}
                     style={[
-                      styles.regularText, 
+                      styles.regularText,
                       baseTextStyle,
                       { fontStyle: 'italic' },
-                      message.role === 'user' && styles.userText
+                      message.role === 'user' && styles.userText,
                     ]}
                   >
                     {italicPart}
@@ -603,8 +594,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                 );
               } else if (italicPart) {
                 elements.push(
-                  <Text 
-                    key={`text-${startIndex}-${i}-${boldIndex}-${italicIndex}`} 
+                  <Text
+                    key={`text-${keyPrefix}-${i}-${boldIndex}-${italicIndex}`}
                     style={textStyle}
                   >
                     {italicPart}
@@ -616,15 +607,26 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         });
       }
     }
-    
-    return elements.length > 0 ? [
-      <Text 
-        key={`line-${startIndex}`} 
-        style={textStyle}
-      >
-        {elements}
-      </Text>
-    ] : [];
+    return elements;
+  };
+
+  const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
+    const textStyle = baseTextStyle
+      ? [styles.regularText, baseTextStyle, message.role === 'user' && styles.userText]
+      : [styles.regularText, message.role === 'user' && styles.userText];
+    const raw = (text || '');
+    const lines = raw.split('\n');
+    const allChildren = [];
+    lines.forEach((line, li) => {
+      if (li > 0) allChildren.push('\n');
+      allChildren.push(...buildInlineElementsForLine(line, `${startIndex}-${li}`, baseTextStyle, textStyle));
+    });
+    if (allChildren.length === 0) return [];
+    return [
+      <Text key={`line-${startIndex}`} style={textStyle}>
+        {allChildren}
+      </Text>,
+    ];
   };
 
   const AnimatedIcon = ({ symbol }) => {
@@ -772,14 +774,60 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     return '✨'; // Default symbol
   };
 
+  const normalizeNativePlainChunk = (raw) => {
+    if (!raw || !String(raw).trim()) return '';
+    let out = String(raw);
+    out = out.replace(/<br\s*\/?>/gi, '\n');
+    out = out.replace(/<\/p>\s*<p[^>]*>/gi, '\n\n');
+    out = out.replace(/<p[^>]*>/gi, '\n');
+    out = out.replace(/<\/p>/gi, '\n');
+    out = out.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/gi, (_, inner) => {
+      const lines = inner.split(/\n/).map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean);
+      if (!lines.length) return '';
+      return `\n\n${lines.map((l) => `- ${l.replace(/<(?!\/?tooltip\b)[^>]+>/gi, '').trim()}`).join('\n')}`;
+    });
+    out = out.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_, ul) => {
+      const chunks = [];
+      ul.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_m, li) => {
+        let t = li.replace(/<(?!\/?tooltip\b)[^>]+>/gi, '').trim();
+        while (/^[\u2022•]\s*/.test(t)) t = t.replace(/^[\u2022•]\s*/, '');
+        chunks.push(`\n- ${t}`);
+        return '';
+      });
+      return chunks.join('');
+    });
+    out = out.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n\n### $1\n\n');
+    out = out.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n\n#### $1\n\n');
+    out = out.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**');
+    out = out.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*');
+    out = out.replace(/<div class="chat-response">\s*/gi, '');
+    out = out.replace(/\s*<\/div>\s*$/i, '');
+    out = out.replace(/<\/div>/gi, '\n');
+    out = out.replace(/<div[^>]*>/gi, '\n');
+    out = out.replace(/<(?!\/?tooltip\b)[^>]+>/gi, '');
+    return out;
+  };
+
+  const stripLeadingListMarkersForNativeRow = (line) => {
+    let s = String(line || '').trim();
+    s = s.replace(/^\d+\.\s*/, '');
+    for (let n = 0; n < 12; n++) {
+      const prev = s;
+      s = s.replace(/^[-*]\s+/, '');
+      s = s.replace(/^[\u2022•]\s*/, '');
+      if (s === prev) break;
+    }
+    return s.trim();
+  };
+
   const parseRegularText = (text, startIndex) => {
     const elements = [];
     let currentIndex = startIndex;
     let listCounter = 0;
+
+    text = normalizeNativePlainChunk(text);
     
-    // Split by headers and paragraphs - include markdown headers up to level 4
-    // We use [^:\n]+ to stop at a colon or newline so the content after a header isn't swallowed
-    const parts = text.split(/(<h3>.*?<\/h3>|##\s+[^:\n]+|###\s+[^:\n]+|####\s+[^:\n]+|\n\n+)/).filter(part => {
+    const parts = text.split(/(<h3>.*?<\/h3>|##\s+[^\n]+|###\s+[^\n]+|####\s+[^\n]+|\n\n+)/).filter(part => {
       const trimmed = part.trim();
       // Filter out standalone # symbols
       return trimmed && trimmed !== '#';
@@ -825,19 +873,25 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         let cleanPart = part.replace(/^\s*[:：]\s*/, '');
         if (!cleanPart.trim()) continue;
 
-        const lines = cleanPart.split('\n').filter(line => line.trim());
+        const lines = cleanPart.split('\n');
         
         for (const line of lines) {
           const trimmedLine = line.trim();
-          if (!trimmedLine) continue;
+          if (!trimmedLine) {
+            elements.push(<View key={`para-gap-${currentIndex++}`} style={{ height: 8 }} />);
+            continue;
+          }
           
-          if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('* ') || trimmedLine.match(/^\d+\./)) {
+          const isMarkdownBullet =
+            trimmedLine.startsWith('•') ||
+            /^[-*]\s+/.test(trimmedLine) ||
+            /^\d+\.\s*/.test(trimmedLine);
+          if (isMarkdownBullet) {
             const isNumbered = trimmedLine.match(/^(\d+)\./);
             const number = isNumbered ? isNumbered[1] : null;
             
             listCounter++;
-            let cleanListText = trimmedLine
-              .replace(/^([•\-\*]|\d+\.)\s*/, '') // Remove exactly one bullet or number and trailing space
+            let cleanListText = stripLeadingListMarkersForNativeRow(trimmedLine)
               .replace(/&lt;/g, '<')
               .replace(/&gt;/g, '>')
               .replace(/&quot;/g, '"')

@@ -2235,6 +2235,7 @@ const ChatPage = () => {
                         <MessageList
                             messages={messages}
                             sessionId={isMundaneMode ? mundaneSessionId : chatV2SessionId}
+                            onFollowUpClick={(q) => setPendingFollowUpQuestion(q)}
                             onDeleteMessage={handleDeleteMessage}
                         />
                         <div ref={messagesEndRef} />

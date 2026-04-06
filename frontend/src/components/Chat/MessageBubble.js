@@ -67,6 +67,57 @@ const IconRefreshOutline = (p) => (
     </svg>
 );
 
+/** Split follow-up block into separate chip labels (newline list or single-line emoji-led segments). */
+const splitFollowUpQuestionsBlock = (inner) => {
+    const raw = (inner || '').trim();
+    if (!raw) return [];
+    const byLines = raw.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    let items;
+    if (byLines.length > 1) {
+        items = byLines;
+    } else {
+        const one = byLines[0] || raw;
+        const splitMulti = one
+            .split(/(?=[📅🔮💼🌟❓💡🎯⭐🔆📆💎🤔✨📌🔔])/u)
+            .map((s) => s.trim())
+            .filter(Boolean);
+        items = splitMulti.length > 1 ? splitMulti : [one];
+    }
+    return items.map((q) => q.replace(/^-\s*/, '').trim()).filter(Boolean);
+};
+
+const escapeHtmlTextContent = (s) =>
+    String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+/** Ensure glossary is a non-array object; API/history may omit or stringify oddly. */
+const normalizeGlossaryObject = (g) => {
+    if (g == null) return {};
+    if (typeof g === 'string') {
+        try {
+            const p = JSON.parse(g);
+            return typeof p === 'object' && p !== null && !Array.isArray(p) ? p : {};
+        } catch {
+            return {};
+        }
+    }
+    if (typeof g !== 'object' || Array.isArray(g)) return {};
+    return g;
+};
+
+const getGlossaryDefinition = (glossary, termId) => {
+    if (!termId || !glossary) return undefined;
+    const raw = String(termId).trim();
+    if (glossary[raw] !== undefined) return { key: raw, definition: glossary[raw] };
+    const low = raw.toLowerCase();
+    const found = Object.keys(glossary).find((k) => k.toLowerCase() === low);
+    if (found !== undefined) return { key: found, definition: glossary[found] };
+    return undefined;
+};
+
 const MessageBubble = ({ message, language = 'english', sessionId = null, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
     const { podcastCost, refreshBalance } = useCredits();
     const [showActions, setShowActions] = useState(false);
@@ -523,9 +574,12 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
         // 3. Normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         
-        // 4. Handle Follow-up Questions
+        // 4. Handle Follow-up Questions (chips; click handled in message-text onClick)
         formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
-            const questionList = questions.trim().split('\n').filter(q => q.trim()).map(q => `<button class="follow-up-btn">${q.trim()}</button>`).join('');
+            const parts = splitFollowUpQuestionsBlock(questions);
+            const questionList = parts
+                .map((q) => `<button type="button" class="follow-up-btn">${escapeHtmlTextContent(q)}</button>`)
+                .join('');
             return `<div class="follow-up-questions">${questionList}</div>`;
         });
         
@@ -541,37 +595,39 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
         
         // console.log('🔍 After markdown, before terms:', formatted.substring(0, 300));
         
-        // 7. PROCESS TERMS - auto-wrap terms found in glossary
-        if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
-            // console.log('🔍 Processing terms:', message.terms);
-            
+        // 7. PROCESS TERMS — glossary alone is enough (do not require message.terms; history often omits it)
+        const glossary = normalizeGlossaryObject(message.glossary);
+        if (Object.keys(glossary).length > 0) {
             // First try to find existing <term> tags
             const termRegex = /<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi;
             let termCount = 0;
             formatted = formatted.replace(termRegex, (match, termId, termText) => {
-                const normalizedId = termId.toLowerCase().trim();
-                if (message.glossary[normalizedId]) {
+                const resolved = getGlossaryDefinition(glossary, termId);
+                if (resolved && resolved.definition != null && String(resolved.definition).trim() !== '') {
                     termCount++;
-                    const definition = message.glossary[normalizedId].replace(/"/g, '&quot;');
-                    return `<span class="tooltip-wrapper" data-term="${normalizedId}" data-definition="${definition}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${termText}</span></span>`;
+                    const defEsc = String(resolved.definition).replace(/"/g, '&quot;');
+                    const dataKey = resolved.key.replace(/"/g, '&quot;');
+                    return `<span class="tooltip-wrapper" data-term="${dataKey}" data-definition="${defEsc}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${termText}</span></span>`;
                 }
                 return termText;
             });
-            
-            // If no tags found, auto-wrap terms from glossary keys
+
+            // Auto-wrap plain-text mentions when the model did not emit <term> tags (longer phrases first)
             if (termCount === 0) {
-                Object.keys(message.glossary).forEach(termKey => {
-                    const definition = message.glossary[termKey].replace(/"/g, '&quot;');
-                    // Create case-insensitive regex for the term
-                    const termPattern = new RegExp(`\\b(${termKey.replace(/[()]/g, '\\$&')})\\b`, 'gi');
+                const sortedKeys = Object.keys(glossary).sort((a, b) => b.length - a.length);
+                sortedKeys.forEach((termKey) => {
+                    const defRaw = glossary[termKey];
+                    if (defRaw == null || String(defRaw).trim() === '') return;
+                    const definition = String(defRaw).replace(/"/g, '&quot;');
+                    const dataKey = termKey.replace(/"/g, '&quot;');
+                    const escaped = termKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const termPattern = new RegExp(`\\b(${escaped})\\b`, 'gi');
                     formatted = formatted.replace(termPattern, (match) => {
                         termCount++;
-                        return `<span class="tooltip-wrapper" data-term="${termKey}" data-definition="${definition}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${match}</span></span>`;
+                        return `<span class="tooltip-wrapper" data-term="${dataKey}" data-definition="${definition}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${match}</span></span>`;
                     });
                 });
             }
-            
-            console.log('🔍 Terms replaced:', termCount);
         }
         
         // 8. Headings (lighter, non-overwhelming)
@@ -751,6 +807,14 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                 <div 
                     className="message-text enhanced-formatting"
                     onClick={(e) => {
+                        const followBtn = e.target.closest('.follow-up-btn');
+                        if (followBtn && onFollowUpClick) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const text = (followBtn.textContent || '').trim();
+                            if (text) onFollowUpClick(text);
+                            return;
+                        }
                         // Check for tooltip wrapper clicks
                         if (e.target.classList.contains('tooltip-wrapper')) {
                             const term = e.target.querySelector('.term-tooltip').textContent;
@@ -767,8 +831,6 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                             setTooltipModal({ show: true, term, definition });
                             return;
                         }
-                        
-                        console.log('No tooltip found');
                     }}
                 >
                     {(message.isTyping || message.isProcessing) ? (

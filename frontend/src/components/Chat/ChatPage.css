@@ -296,6 +296,13 @@ button.chat-header-credits.credits-display:active {
     color: #333 !important;
 }
 
+/* Glossary term chips must stay visible inside bold/strong (chat-bold uses !important) */
+.message-bubble.assistant .message-content .tooltip-wrapper,
+.message-bubble.assistant .message-content .tooltip-wrapper .term-tooltip {
+    color: #e91e63 !important;
+    font-weight: 700 !important;
+}
+
 /* Enhanced formatting styles */
 .enhanced-formatting .chat-header {
     color: #e91e63 !important;
@@ -316,10 +323,22 @@ button.chat-header-credits.credits-display:active {
     border-radius: 3px;
 }
 
+.enhanced-formatting .chat-bold .term-tooltip,
+.enhanced-formatting .chat-bold .tooltip-wrapper {
+    color: #e91e63 !important;
+    background: rgba(233, 30, 99, 0.12) !important;
+}
+
 .enhanced-formatting .chat-italic {
     color: #8e44ad !important;
     font-style: italic;
     font-weight: 500;
+}
+
+.enhanced-formatting ul.chat-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 10px 0;
 }
 
 .enhanced-formatting .chat-list {
@@ -330,10 +349,13 @@ button.chat-header-credits.credits-display:active {
     border-left: 3px solid #3498db;
 }
 
+/* Bullets are in the HTML (•); do not add a second marker via list-style */
 .enhanced-formatting .chat-bullet {
     color: #2c3e50 !important;
     margin: 5px 0;
     padding-left: 5px;
+    display: block;
+    list-style: none;
 }
 
 .enhanced-formatting .chat-summary {
@@ -446,6 +468,20 @@ button.chat-header-credits.credits-display:active {
     .enhanced-formatting .chat-summary h4,
     .enhanced-formatting .chat-insights h4 {
         font-size: 14px;
+    }
+
+    .message-text.enhanced-formatting .chat-response {
+        padding: 12px;
+    }
+
+    .message-text.enhanced-formatting ul.chat-list {
+        padding: 8px 12px;
+        margin: 8px 0;
+    }
+
+    .message-text.enhanced-formatting .chat-bullet {
+        margin: 6px 0;
+        line-height: 1.45;
     }
 }
 
@@ -569,18 +605,24 @@ button.chat-header-credits.credits-display:active {
     }
 
     .chat-container {
-        padding: 10px 10px 8px;
+        padding: 10px 6px 8px;
     }
 
     .message-list {
         gap: 12px;
+        max-width: 100%;
     }
 
     .message-content {
-        max-width: 92%;
-        padding: 12px 14px;
-        border-radius: 18px;
+        max-width: 100%;
+        padding: 12px 12px;
+        border-radius: 16px;
         font-size: 15px;
+    }
+
+    /* User bubbles: keep a natural max width so short lines don’t span the screen */
+    .message-bubble.user .message-content {
+        max-width: min(100%, 92vw);
     }
 
     .chat-composer {
@@ -1003,6 +1045,60 @@ button.chat-header-credits.credits-display:active {
     min-width: 36px;
     border-radius: 10px;
     color: #666;
+}
+
+/* Follow-up question chips inside assistant HTML (MessageBubble formatContent) */
+.message-text .follow-up-questions,
+.chat-response .follow-up-questions {
+    margin: 16px 0 10px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.message-text .follow-up-btn,
+.chat-response .follow-up-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(248, 250, 252, 0.95);
+    border: 1px solid rgba(255, 107, 53, 0.22);
+    color: #334155;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    line-height: 1.35;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+    white-space: normal;
+    text-align: left;
+    flex-shrink: 1;
+    font-weight: 600;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.message-text .follow-up-btn:hover,
+.chat-response .follow-up-btn:hover {
+    background: #fff;
+    border-color: rgba(255, 107, 53, 0.45);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.message-bubble.user .follow-up-btn {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #7c2d12;
+}
+
+.message-bubble.user .follow-up-btn:hover {
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(124, 45, 18, 0.15);
 }
 
 /* Typing / processing indicator (mobile-like dots) */
