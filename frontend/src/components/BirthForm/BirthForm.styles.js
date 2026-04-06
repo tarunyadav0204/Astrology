@@ -217,17 +217,18 @@ export const AutocompleteContainer = styled.div`
 
 export const SuggestionList = styled.ul`
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 8px);
+  top: auto;
   left: 0;
   right: 0;
   background: white;
   border-radius: 12px;
   padding: 8px;
   list-style: none;
-  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.2);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
   border: 1px solid #e2e8f0;
-  z-index: 100;
-  max-height: 240px;
+  z-index: 2000;
+  max-height: min(240px, 40vh);
   overflow-y: auto;
 `;
 

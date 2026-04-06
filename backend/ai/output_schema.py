@@ -375,7 +375,19 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
             return obj.isoformat()
         raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
-    language_instruction = f"LANGUAGE: Respond in {language}.\n\n"
+    _lang = str(language or "english").strip() or "english"
+    language_instruction = f"""LANGUAGE PREFERENCE (explicit, from the client—NOT inferred from the question text):
+The value "{_lang}" is the only language setting passed to you. It means: the user selected this as their preferred reply language in the AstroRoshni app (e.g. english vs hindi). You do not see the app's UI; you only see this string and the user's message. Therefore: treat "{_lang}" as the default language for your answer when the CURRENT QUESTION below is not clearly Hindi. Do not assume the question language matches "{_lang}"—always infer the question's language from the question text itself.
+
+HINDI REPLY OVERRIDE (mandatory when applicable): If the CURRENT QUESTION is in Hindi, ignore a non-Hindi "{_lang}" preference. Hindi includes:
+- Devanagari script (standard Hindi), or
+- Roman / Latin letters (Roman Hindi, Hinglish), e.g. phrases like "mera career kaisa rahega", "shaadi kab hogi", "dasha ka result", or clear Hindi grammar/word choice in Latin script.
+
+When this applies, write the full substantive answer in Hindi using Devanagari script (हिंदी) for all Hindi prose—even if the user wrote their question in Roman Hindi or Hinglish. Do not reply in Latin/Roman script for Hindi content. Astrological terms may use standard Devanagari or established transliterations where customary. Do not answer only in English just because "{_lang}" is english.
+
+If the question is clearly not Hindi, follow LANGUAGE PREFERENCE using "{_lang}".
+
+"""
     
     elaborate_instruction = """
 CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):

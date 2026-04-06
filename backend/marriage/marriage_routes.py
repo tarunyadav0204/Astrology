@@ -259,3 +259,49 @@ Escape quotes properly: \"text\"
             "X-Accel-Buffering": "no"
         }
     )
+
+
+@router.post("/check-cache")
+async def check_marriage_cache(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
+    """Return cached marriage insights if present (same birth hash as /analyze). Used by UniversalAIInsights."""
+    try:
+        import hashlib
+
+        birth_hash = hashlib.md5(
+            f"{request.date}_{request.time}_{request.place}".encode()
+        ).hexdigest()
+
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS ai_marriage_insights (
+                    id SERIAL PRIMARY KEY,
+                    userid INTEGER NOT NULL DEFAULT 0,
+                    birth_hash TEXT NOT NULL,
+                    insights_data TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(userid, birth_hash)
+                )
+                """,
+            )
+            cur = execute(
+                conn,
+                """
+                SELECT insights_data FROM ai_marriage_insights
+                WHERE userid = %s AND birth_hash = %s
+                """,
+                (current_user.userid, birth_hash),
+            )
+            row = cur.fetchone()
+
+        if not row or not row[0]:
+            return {"success": False, "message": "No cached data found"}
+
+        stored = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+        # Match shape expected by frontend: top-level `analysis` (full blob from analyze stream `data`)
+        return {"success": True, "cached": True, "analysis": stored}
+    except Exception as e:
+        print(f"❌ Marriage check-cache error: {e}")
+        return {"success": False, "message": str(e)}

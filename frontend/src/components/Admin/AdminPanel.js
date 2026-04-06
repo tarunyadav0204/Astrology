@@ -127,12 +127,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [selectedBlogNotifUserIds, setSelectedBlogNotifUserIds] = useState([]); // multi-select for blog tab
   const [blogNotifSending, setBlogNotifSending] = useState(false);
   const [blogNotifResult, setBlogNotifResult] = useState(null);
-  const [redditDrafts, setRedditDrafts] = useState([]);
-  const [redditDraftsLoading, setRedditDraftsLoading] = useState(false);
-  const [redditCollecting, setRedditCollecting] = useState(false);
-  const [redditCollectResult, setRedditCollectResult] = useState(null);
-  const [redditEditingId, setRedditEditingId] = useState(null);
-  const [redditEditMarkdown, setRedditEditMarkdown] = useState('');
   const [deviceAccessStatus, setDeviceAccessStatus] = useState('pending'); // 'pending' | 'allowed' | 'blocked'
   const [blockedDeviceId, setBlockedDeviceId] = useState(null);
   const [blockedUserId, setBlockedUserId] = useState(null);
@@ -160,82 +154,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     checkDeviceAccess();
   }, [checkDeviceAccess]);
 
-  const fetchRedditDrafts = async () => {
-    setRedditDraftsLoading(true);
-    try {
-      const res = await fetch('/api/admin/reddit/answers/drafts?limit=50', {
-        headers: getAdminAuthHeaders(),
-      });
-      const data = await res.json();
-      setRedditDrafts(data.drafts || []);
-    } catch (e) {
-      console.error('Fetch Reddit drafts failed:', e);
-      setRedditDrafts([]);
-    } finally {
-      setRedditDraftsLoading(false);
-    }
-  };
-
-  const runRedditCollect = async () => {
-    setRedditCollecting(true);
-    setRedditCollectResult(null);
-    try {
-      const res = await fetch('/api/admin/reddit/collect?days_back=7&limit_per_sub=100', {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setRedditCollectResult(data);
-        fetchRedditDrafts();
-      } else {
-        setRedditCollectResult({ error: data.detail || 'Collect failed' });
-      }
-    } catch (e) {
-      setRedditCollectResult({ error: e.message || 'Request failed' });
-    } finally {
-      setRedditCollecting(false);
-    }
-  };
-
-  const approveRedditAnswer = async (answerId, editedMarkdown) => {
-    try {
-      const res = await fetch(`/api/admin/reddit/answers/${answerId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAdminAuthHeaders(),
-        },
-        body: JSON.stringify({ edited_markdown: editedMarkdown }),
-      });
-      if (res.ok) {
-        setRedditEditingId(null);
-        fetchRedditDrafts();
-      } else {
-        const d = await res.json();
-        alert(d.detail || 'Approve failed');
-      }
-    } catch (e) {
-      alert(e.message || 'Request failed');
-    }
-  };
-
-  const rejectRedditAnswer = async (answerId) => {
-    if (!window.confirm('Reject this draft? It will not be posted.')) return;
-    try {
-      const res = await fetch(`/api/admin/reddit/answers/${answerId}/reject`, {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-      });
-      if (res.ok) {
-        setRedditEditingId(null);
-        fetchRedditDrafts();
-      }
-    } catch (e) {
-      alert(e.message || 'Request failed');
-    }
-  };
-
   useEffect(() => {
     if (activeTab === 'users') {
       if (activeSubTab === 'management') {
@@ -262,8 +180,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } else if (activeTab === 'settings') {
       fetchAdminSettings();
       fetchAllowedDevices();
-    } else if (activeTab === 'reddit') {
-      fetchRedditDrafts();
     } else if (activeTab === 'notifications') {
       fetchUsersForNotifications();
       fetchNotifUserIdsWithTokens();
@@ -1214,12 +1130,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('notifications')}
         >
           Notifications
-        </button>
-        <button 
-          className={`tab ${activeTab === 'reddit' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reddit')}
-        >
-          Reddit
         </button>
         <button 
           className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
@@ -2625,85 +2535,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'support' && <AdminSupportInbox />}
-
-        {activeTab === 'reddit' && (
-          <div className="admin-settings">
-            <h2>Reddit Outreach</h2>
-            <div className="settings-section">
-              <h3>Collect questions</h3>
-              <p className="settings-hint">
-                Fetch recent posts from astrology subreddits (last 7 days). Requires REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT in backend .env.
-              </p>
-              <div className="form-buttons" style={{ marginBottom: 12 }}>
-                <button type="button" className="create-btn" onClick={runRedditCollect} disabled={redditCollecting}>
-                  {redditCollecting ? 'Collecting…' : 'Run collector (last 7 days)'}
-                </button>
-              </div>
-              {redditCollectResult && (
-                <div style={{ padding: 12, background: redditCollectResult.error ? '#fff0f0' : '#f0f8f0', borderRadius: 8, marginTop: 8 }}>
-                  {redditCollectResult.error ? (
-                    <strong>Error:</strong>
-                  ) : null}
-                  {redditCollectResult.error ? ` ${redditCollectResult.error}` : null}
-                  {redditCollectResult.ok && (
-                    <>Collected {redditCollectResult.collected} posts, {redditCollectResult.with_birth_data} with birth data.</>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="settings-section">
-              <h3>Draft answers (human review)</h3>
-              <p className="settings-hint">Review and approve or reject draft answers before they are posted to Reddit.</p>
-              {redditDraftsLoading ? (
-                <p>Loading drafts…</p>
-              ) : redditDrafts.length === 0 ? (
-                <p>No draft answers to review.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                  {redditDrafts.map((d) => (
-                    <div key={d.answer_id} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fafafa' }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <strong>r/{d.subreddit}</strong>
-                        {d.url && (
-                          <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 8 }}>Open post</a>
-                        )}
-                      </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <strong>Question:</strong>
-                        <div style={{ whiteSpace: 'pre-wrap', marginTop: 4, padding: 8, background: '#fff', borderRadius: 4 }}>{d.title || '(no title)'}{(d.body || '').slice(0, 500)}{(d.body && d.body.length > 500) ? '…' : ''}</div>
-                      </div>
-                      <div style={{ marginBottom: 12 }}>
-                        <strong>Draft answer:</strong>
-                        {redditEditingId === d.answer_id ? (
-                          <div style={{ marginTop: 4 }}>
-                            <textarea
-                              value={redditEditMarkdown}
-                              onChange={(e) => setRedditEditMarkdown(e.target.value)}
-                              rows={8}
-                              style={{ width: '100%', padding: 8, borderRadius: 4 }}
-                            />
-                            <div style={{ marginTop: 8 }}>
-                              <button type="button" className="create-btn" onClick={() => approveRedditAnswer(d.answer_id, redditEditMarkdown)}>Approve &amp; save</button>
-                              <button type="button" style={{ marginLeft: 8 }} onClick={() => { setRedditEditingId(null); setRedditEditMarkdown(''); }}>Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ whiteSpace: 'pre-wrap', marginTop: 4, padding: 8, background: '#fff', borderRadius: 4 }}>{(d.draft_markdown || '').slice(0, 1500)}{(d.draft_markdown && d.draft_markdown.length > 1500) ? '…' : ''}</div>
-                        )}
-                      </div>
-                      {redditEditingId !== d.answer_id && (
-                        <div>
-                          <button type="button" className="create-btn" onClick={() => { setRedditEditingId(d.answer_id); setRedditEditMarkdown(d.draft_markdown || ''); }}>Edit &amp; approve</button>
-                          <button type="button" style={{ marginLeft: 8 }} onClick={() => rejectRedditAnswer(d.answer_id)}>Reject</button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {activeTab === 'settings' && (
           <div className="admin-settings">
