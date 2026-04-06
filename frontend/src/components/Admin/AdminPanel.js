@@ -1275,10 +1275,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     />
                   </label>
                   <label>
-                    <span>Name</span>
+                    <span>Name or email</span>
                     <input
                       type="text"
-                      placeholder="Search by name"
+                      placeholder="Search by name or email"
                       value={usersSearchName}
                       onChange={(e) => setUsersSearchName(e.target.value)}
                     />

@@ -145,6 +145,7 @@ export default function AdminActivity() {
       <h2>Activity</h2>
       <p className="admin-activity-description">
         Today&apos;s activity by default. Use filters and column headers to sort.
+        The username filter matches logged display name and also resolves <strong>name or email</strong> from the users database (so rows with empty logged name but matching user id/phone still appear).
         Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
         The <strong>Users in date range</strong> table lists distinct users (name and phone) who had any
         matching API activity between the selected dates (same filters as below).
@@ -171,10 +172,10 @@ export default function AdminActivity() {
             />
           </label>
           <label>
-            <span>Username</span>
+            <span>Name or email</span>
             <input
               type="text"
-              placeholder="Filter by username"
+              placeholder="Name, email, or logged username"
               value={filterUserName}
               onChange={(e) => setFilterUserName(e.target.value)}
             />

@@ -126,7 +126,7 @@ ACTIVITY_COLUMNS = [
 async def get_activity(
     date_from: Optional[str] = Query(None, description="Start date YYYY-MM-DD (default: today)"),
     date_to: Optional[str] = Query(None, description="End date YYYY-MM-DD (default: today)"),
-    user_name: Optional[str] = Query(None, description="Filter by username (partial match)"),
+    user_name: Optional[str] = Query(None, description="Filter by logged user_name; also matches users.name/email in DB via user_id/phone"),
     user_phone: Optional[str] = Query(None, description="Filter by phone (partial match)"),
     action: Optional[str] = Query(None, description="Filter by action (e.g. api_request, podcast_generated)"),
     resource_id: Optional[str] = Query(None, description="Filter by resource id (e.g. Google Play order id)"),
@@ -155,10 +155,50 @@ async def get_activity(
     order_col = sort_by if sort_by in ACTIVITY_COLUMNS else "created_at"
     cols = ", ".join(ACTIVITY_COLUMNS)
 
+    # Resolve name/email to user ids + phone digits (Postgres) so we still match BigQuery rows
+    # where user_name was empty but user_id / phone was logged.
+    resolved_user_ids: List[int] = []
+    resolved_phone_digits: List[str] = []
+    if user_name and user_name.strip():
+        pat = f"%{user_name.strip()}%"
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT userid,
+                           regexp_replace(COALESCE(phone::text, ''), '[^0-9]', '', 'g')
+                    FROM users
+                    WHERE name ILIKE %s OR COALESCE(email, '') ILIKE %s
+                    """,
+                    (pat, pat),
+                )
+                seen_ph = set()
+                for row in cur.fetchall() or []:
+                    if row[0] is not None:
+                        try:
+                            resolved_user_ids.append(int(row[0]))
+                        except (TypeError, ValueError):
+                            pass
+                    dig = (row[1] or "").strip()
+                    if dig and dig not in seen_ph:
+                        seen_ph.add(dig)
+                        resolved_phone_digits.append(dig)
+                resolved_user_ids = list(dict.fromkeys(resolved_user_ids))
+        except Exception as e:
+            logger.warning("Activity: resolve users by name/email failed: %s", e)
+
     # Build SQL with @param placeholders; params list built below
     where_parts = ["DATE(created_at) >= @from_date", "DATE(created_at) <= @to_date"]
     if user_name and user_name.strip():
-        where_parts.append("LOWER(COALESCE(user_name, '')) LIKE LOWER(@user_name)")
+        name_or_parts = ["LOWER(COALESCE(user_name, '')) LIKE LOWER(@user_name)"]
+        if resolved_user_ids:
+            name_or_parts.append("user_id IN UNNEST(@resolved_user_ids)")
+        if resolved_phone_digits:
+            name_or_parts.append(
+                "REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '') IN UNNEST(@resolved_phone_digits)"
+            )
+        where_parts.append(f"({' OR '.join(name_or_parts)})")
     if user_phone and user_phone.strip():
         where_parts.append("COALESCE(user_phone, '') LIKE @user_phone")
     if action and action.strip():
@@ -237,6 +277,14 @@ async def get_activity(
         ]
         if user_name and user_name.strip():
             filter_params.append(bigquery.ScalarQueryParameter("user_name", "STRING", f"%{user_name.strip()}%"))
+            if resolved_user_ids:
+                filter_params.append(
+                    bigquery.ArrayQueryParameter("resolved_user_ids", "INT64", resolved_user_ids)
+                )
+            if resolved_phone_digits:
+                filter_params.append(
+                    bigquery.ArrayQueryParameter("resolved_phone_digits", "STRING", resolved_phone_digits)
+                )
         if user_phone and user_phone.strip():
             filter_params.append(bigquery.ScalarQueryParameter("user_phone", "STRING", f"%{user_phone.strip()}%"))
         if action and action.strip():

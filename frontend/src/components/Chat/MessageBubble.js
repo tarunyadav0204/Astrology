@@ -469,7 +469,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
     // Close actions menu when clicking outside on mobile
     React.useEffect(() => {
         const handleClickOutside = (event) => {
-            if (showActions && isMobile() && !event.target.closest('.message-actions')) {
+            if (showActions && isMobile() && !event.target.closest('.message-bubble-mobile-actions')) {
                 setShowActions(false);
             }
         };
@@ -692,33 +692,30 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                 }
             }}
         >
-            {/* Long-press quick actions (mobile) */}
-            {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
-                <div className="message-actions">
-                    <button
-                        type="button"
-                        className="action-btn action-btn--toolbar"
-                        onClick={handleShareMessage}
-                        title="Share"
-                    >
-                        <IconShareSocialOutline />
-                    </button>
-                    {message.messageId && (
+            <div className="message-content">
+                {/* Mobile share/delete overlay (positioned inside card so layout does not shift) */}
+                {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
+                    <div className="message-bubble-mobile-actions" role="toolbar" aria-label="Message quick actions">
                         <button
                             type="button"
-                            className="action-btn action-btn--delete"
-                            onClick={handleDeleteMessage}
-                            title="Delete message"
+                            className="action-btn action-btn--toolbar"
+                            onClick={handleShareMessage}
+                            title="Share"
                         >
-                            <IconTrashOutline />
+                            <IconShareSocialOutline />
                         </button>
-                    )}
-                </div>
-            )}
-            
-
-            
-            <div className="message-content">
+                        {message.messageId && (
+                            <button
+                                type="button"
+                                className="action-btn action-btn--delete"
+                                onClick={handleDeleteMessage}
+                                title="Delete message"
+                            >
+                                <IconTrashOutline />
+                            </button>
+                        )}
+                    </div>
+                )}
                 {/* Beta Notice for Timeline Predictions */}
                 {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && (
                     <div style={{

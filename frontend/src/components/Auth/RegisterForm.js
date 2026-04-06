@@ -34,7 +34,11 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
     }
   };
 
-  const isUsNumber = (phone) => (phone || '').trim().startsWith('+1');
+  const isValidEmail = (value) => {
+    const v = (value || '').trim();
+    if (!v) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  };
 
   const handleSendOtp = async () => {
     const phone = formData.phone.trim();
@@ -43,15 +47,18 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       toast.error('Please enter phone number first');
       return;
     }
-    if (isUsNumber(phone) && !email) {
-      toast.error('Email is required for US numbers');
+    if (!email) {
+      toast.error('Please enter your email address');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      toast.error('Please enter a valid email address');
       return;
     }
 
     setSendingOtp(true);
     try {
-      const payload = { phone };
-      if (email) payload.email = email;
+      const payload = { phone, email };
       const response = await authService.sendRegistrationOtp(payload);
       setOtpSent(true);
       setOtpVerified(false);
@@ -111,6 +118,15 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       toast.error('Verified OTP token missing. Please verify OTP again.');
       return;
     }
+    const emailTrim = formData.email.trim();
+    if (!emailTrim) {
+      toast.error('Email is required');
+      return;
+    }
+    if (!isValidEmail(emailTrim)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
 
     setLoading(true);
 
@@ -118,7 +134,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       const response = await authService.register({
         name: formData.name,
         phone: formData.phone.trim(),
-        email: formData.email.trim() || undefined,
+        email: emailTrim,
         otp_token: otpToken,
         password: formData.password
       });
@@ -272,7 +288,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             color: '#e91e63',
             fontWeight: '600'
           }}>
-            Email {isUsNumber(formData.phone) ? '(required for US numbers)' : '(optional)'}
+            Email (required)
           </label>
           <input
             type="email"
@@ -280,7 +296,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             value={formData.email}
             onChange={handleInputChange}
             placeholder="Enter your email"
-            required={isUsNumber(formData.phone)}
+            required
             style={{
               width: '100%',
               padding: '0.75rem',

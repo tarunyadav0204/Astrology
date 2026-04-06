@@ -996,8 +996,8 @@ button.chat-header-credits.credits-display:active {
     color: #dc2626;
 }
 
-.message-bubble .message-actions .action-btn--toolbar,
-.message-bubble .message-actions .action-btn--delete {
+.message-bubble .message-bubble-mobile-actions .action-btn--toolbar,
+.message-bubble .message-bubble-mobile-actions .action-btn--delete {
     width: 36px;
     height: 36px;
     min-width: 36px;
@@ -1298,19 +1298,16 @@ button.chat-header-credits.credits-display:active {
     margin-top: 10px;
 }
 
-/* Action buttons */
-.message-actions {
+/* Mobile-only share/delete overlay (inside .message-content; does not affect flex layout) */
+.message-bubble-mobile-actions {
     position: absolute;
-    top: 5px;
-    right: 5px;
+    top: 8px;
+    right: 8px;
+    z-index: 4;
     display: flex;
-    gap: 5px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.message-bubble:hover .message-actions {
-    opacity: 1;
+    gap: 6px;
+    align-items: center;
+    pointer-events: auto;
 }
 
 .desktop-actions {
@@ -1418,15 +1415,6 @@ button.chat-header-credits.credits-display:active {
     .term-tooltip::before {
         left: 20px;
         transform: none;
-    }
-    
-    .message-actions {
-        position: relative;
-        top: auto;
-        right: auto;
-        margin-top: 10px;
-        justify-content: flex-end;
-        opacity: 1;
     }
     
     .action-btn {

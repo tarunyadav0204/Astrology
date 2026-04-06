@@ -973,12 +973,18 @@ async def register(user_data: UserCreate):
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
+        email_clean = (user_data.email or "").strip()
+        if not email_clean:
+            raise HTTPException(status_code=400, detail="Email is required for registration")
+        if "@" not in email_clean or "." not in email_clean.split("@")[-1]:
+            raise HTTPException(status_code=400, detail="Please provide a valid email address")
+
         hashed_password = hash_password(user_data.password)
         try:
             execute(
                 conn,
                 "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
-                (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
+                (user_data.name, user_data.phone, hashed_password, user_data.role, email_clean),
             )
         except pg_errors.UniqueViolation:
             conn.rollback()
@@ -3701,11 +3707,14 @@ async def get_admin_users(
         conditions = []
         params = []
         if phone and phone.strip():
-            conditions.append("u.phone LIKE ?")
+            conditions.append("u.phone ILIKE ?")
             params.append(f"%{phone.strip()}%")
         if name and name.strip():
-            conditions.append("u.name LIKE ?")
-            params.append(f"%{name.strip()}%")
+            pat = f"%{name.strip()}%"
+            # Match display name or email (admin "username" search); ILIKE = case-insensitive
+            conditions.append("(u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)")
+            params.append(pat)
+            params.append(pat)
         if role and role.strip():
             conditions.append("u.role = ?")
             params.append(role.strip())
