@@ -86,7 +86,7 @@ def _search_users_by_query(q: str, limit: int = 40) -> List[Dict[str, Any]]:
     if not q:
         return []
     pat = f"%{q}%"
-    phone_digits = "".join(ch for c in q if c.isdigit())
+    phone_digits = "".join(c for c in q if c.isdigit())
     digit_pat = f"%{phone_digits}%" if len(phone_digits) >= 3 else None
     with get_conn_dict() as conn:
         cur = conn.cursor()
