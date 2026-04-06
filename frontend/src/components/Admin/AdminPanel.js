@@ -5,6 +5,7 @@ import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
 import AdminActivity from './AdminActivity';
+import AdminUserProfile from './AdminUserProfile';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
@@ -74,6 +75,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [pendingSubscription, setPendingSubscription] = useState(null);
   const [seedVipLoading, setSeedVipLoading] = useState(false);
+  /** Set when opening User profile from User Management (today’s date range + auto-load). Cleared when opening the tab manually. */
+  const [profileJumpContext, setProfileJumpContext] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editingPlanDiscount, setEditingPlanDiscount] = useState('');
   const [savingPlanDiscount, setSavingPlanDiscount] = useState(false);
@@ -1217,6 +1220,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Activity
           </button>
+          <button 
+            className={`subtab ${activeSubTab === 'userProfile' ? 'active' : ''}`}
+            onClick={() => {
+              setProfileJumpContext(null);
+              setActiveSubTab('userProfile');
+            }}
+          >
+            User profile
+          </button>
         </div>
       )}
 
@@ -1367,11 +1379,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <tr><td colSpan={7} className="users-table-empty">No users match the search.</td></tr>
                     ) : (
                       users.map(user => (
-                      <tr key={user.phone}>
+                      <tr
+                        key={user.userid ?? user.phone}
+                        className="users-table-row-clickable"
+                        onClick={() => {
+                          const t = new Date().toISOString().slice(0, 10);
+                          setProfileJumpContext({
+                            userId: String(user.userid ?? ''),
+                            dateFrom: t,
+                            dateTo: t,
+                            nonce: Date.now(),
+                          });
+                          setActiveSubTab('userProfile');
+                        }}
+                      >
                         <td>{user.phone}</td>
                         <td>{user.name || user.phone || '—'}</td>
                         <td>{user.email || '—'}</td>
-                        <td>
+                        <td onClick={(e) => editingUser === user.phone && e.stopPropagation()}>
                           {editingUser === user.phone ? (
                             <select 
                               defaultValue={user.role || 'user'}
@@ -1384,7 +1409,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             user.role || 'user'
                           )}
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <div className="subscriptions">
                             {user.subscriptions && Object.keys(user.subscriptions).length > 0 ? (
                               Object.entries(user.subscriptions).map(([platform, sub]) => (
@@ -1476,7 +1501,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           </div>
                         </td>
                         <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="edit-btn"
+                            onClick={() => {
+                              const t = new Date().toISOString().slice(0, 10);
+                              setProfileJumpContext({
+                                userId: String(user.userid ?? ''),
+                                dateFrom: t,
+                                dateTo: t,
+                                nonce: Date.now(),
+                              });
+                              setActiveSubTab('userProfile');
+                            }}
+                          >
+                            Profile
+                          </button>
                           <button 
                             onClick={() => setEditingUser(editingUser === user.phone ? null : user.phone)}
                             className="edit-btn"
@@ -1520,6 +1561,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'users' && activeSubTab === 'activity' && (
           <AdminActivity />
+        )}
+
+        {activeTab === 'users' && activeSubTab === 'userProfile' && (
+          <AdminUserProfile
+            initialUserId={profileJumpContext?.userId ?? ''}
+            initialDateFrom={profileJumpContext?.dateFrom}
+            initialDateTo={profileJumpContext?.dateTo}
+            key={profileJumpContext ? `profile-jump-${profileJumpContext.nonce}` : 'profile-browse'}
+          />
         )}
 
         {activeTab === 'users' && activeSubTab === 'facts' && (

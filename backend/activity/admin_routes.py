@@ -126,6 +126,7 @@ ACTIVITY_COLUMNS = [
 async def get_activity(
     date_from: Optional[str] = Query(None, description="Start date YYYY-MM-DD (default: today)"),
     date_to: Optional[str] = Query(None, description="End date YYYY-MM-DD (default: today)"),
+    user_id: Optional[int] = Query(None, description="Filter by BigQuery user_id (exact match)"),
     user_name: Optional[str] = Query(None, description="Filter by logged user_name; also matches users.name/email in DB via user_id/phone"),
     user_phone: Optional[str] = Query(None, description="Filter by phone (partial match)"),
     action: Optional[str] = Query(None, description="Filter by action (e.g. api_request, podcast_generated)"),
@@ -190,6 +191,8 @@ async def get_activity(
 
     # Build SQL with @param placeholders; params list built below
     where_parts = ["DATE(created_at) >= @from_date", "DATE(created_at) <= @to_date"]
+    if user_id is not None:
+        where_parts.append("user_id = @filter_user_id")
     if user_name and user_name.strip():
         name_or_parts = ["LOWER(COALESCE(user_name, '')) LIKE LOWER(@user_name)"]
         if resolved_user_ids:
@@ -275,6 +278,8 @@ async def get_activity(
             bigquery.ScalarQueryParameter("from_date", "DATE", from_date),
             bigquery.ScalarQueryParameter("to_date", "DATE", to_date),
         ]
+        if user_id is not None:
+            filter_params.append(bigquery.ScalarQueryParameter("filter_user_id", "INT64", int(user_id)))
         if user_name and user_name.strip():
             filter_params.append(bigquery.ScalarQueryParameter("user_name", "STRING", f"%{user_name.strip()}%"))
             if resolved_user_ids:
@@ -349,3 +354,74 @@ async def get_activity(
         "distinct_users": distinct_out,
         "distinct_user_count": len(distinct_out),
     }
+
+
+def fetch_activity_rows_for_user(
+    user_id: int,
+    from_date: str,
+    to_date: str,
+    limit: int = 2000,
+) -> List[Dict[str, Any]]:
+    """
+    BigQuery activity rows for a single user (used by admin user profile).
+    Returns an empty list if BigQuery is not configured or the query fails.
+    """
+    table = _get_bigquery_table()
+    if not table:
+        return []
+
+    def _serialize(v: Any) -> Any:
+        if v is None:
+            return None
+        if isinstance(v, (datetime, date)):
+            return v.isoformat() if hasattr(v, "isoformat") else str(v)
+        if isinstance(v, dict):
+            return {k: _serialize(vk) for k, vk in v.items()}
+        return v
+
+    cols = ", ".join(ACTIVITY_COLUMNS)
+    query = f"""
+        SELECT {cols}
+        FROM {table}
+        WHERE DATE(created_at) >= @from_date
+          AND DATE(created_at) <= @to_date
+          AND user_id = @filter_user_id
+        ORDER BY created_at DESC
+        LIMIT @limit_param
+    """
+    try:
+        from google.cloud import bigquery
+        from google.oauth2 import service_account
+        from utils.env_json import parse_json_from_env
+
+        project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID", "").strip()
+        key = os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_TTS_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "")
+        creds = None
+        if key and str(key).strip():
+            raw = str(key).strip()
+            info = parse_json_from_env(raw)
+            if info and isinstance(info, dict):
+                creds = service_account.Credentials.from_service_account_info(info)
+            elif os.path.isfile(raw):
+                creds = service_account.Credentials.from_service_account_file(raw)
+        client = bigquery.Client(project=project, credentials=creds) if creds else bigquery.Client(project=project)
+
+        job_params = [
+            bigquery.ScalarQueryParameter("from_date", "DATE", from_date),
+            bigquery.ScalarQueryParameter("to_date", "DATE", to_date),
+            bigquery.ScalarQueryParameter("filter_user_id", "INT64", int(user_id)),
+            bigquery.ScalarQueryParameter("limit_param", "INT64", int(limit)),
+        ]
+        job_config = bigquery.QueryJobConfig(query_parameters=job_params)
+        rows = list(client.query(query, job_config=job_config))
+    except Exception as e:
+        logger.warning("fetch_activity_rows_for_user failed: %s", e)
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        d = dict(row)
+        row_dict = {col: d.get(col) or d.get(col.lower()) for col in ACTIVITY_COLUMNS}
+        out.append({k: _serialize(v) for k, v in row_dict.items()})
+    _enrich_activity_user_ids(out)
+    return out

@@ -57,6 +57,12 @@ except Exception as _e:
     _activity_admin_available = False
     activity_admin_router = None
 try:
+    from admin_user_profile_routes import router as admin_user_profile_router
+    _admin_user_profile_available = True
+except Exception as _e:
+    _admin_user_profile_available = False
+    admin_user_profile_router = None
+try:
     from admin_device import (
         ensure_table as ensure_admin_device_table,
         AdminDeviceMiddleware,
@@ -391,6 +397,8 @@ app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
 if _activity_admin_available and activity_admin_router:
     app.include_router(activity_admin_router, prefix="/api")
+if _admin_user_profile_available and admin_user_profile_router:
+    app.include_router(admin_user_profile_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(razorpay_credits_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
