@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { APP_CONFIG } from '../../config/app.config';
 import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } from '../../config/domains.config';
@@ -39,6 +39,7 @@ const LIFE_EVENTS_PREVIEW_THEMES = [
 
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { chartData, birthData } = useAstrology();
   const { trackEvent } = useAnalytics();
   const [selectedZodiac, setSelectedZodiac] = useState('aries');
@@ -138,6 +139,49 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       /* ignore */
     }
   }, [user]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fromQuery = params.get('birthChart');
+
+    if (!user) {
+      if (fromQuery === 'create' || fromQuery === 'select') {
+        try {
+          sessionStorage.setItem('pendingBirthChart', fromQuery);
+        } catch (_) {}
+        navigate('/', { replace: true });
+        if (onLogin) onLogin();
+      }
+      return;
+    }
+
+    let mode = fromQuery;
+    if (!mode) {
+      try {
+        mode = sessionStorage.getItem('pendingBirthChart');
+        if (mode) sessionStorage.removeItem('pendingBirthChart');
+      } catch (_) {
+        mode = null;
+      }
+    }
+
+    if (mode === 'create' || mode === 'select') {
+      setBirthFormContext(mode === 'create' ? 'chart' : 'changeNative');
+      setShowBirthFormModal(true);
+      if (fromQuery) navigate('/', { replace: true });
+    }
+  }, [user, location.search, navigate, onLogin]);
+
+  useEffect(() => {
+    const raw = (location.hash || '').replace(/^#/, '');
+    if (!raw) return;
+    const id = decodeURIComponent(raw);
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [location.hash]);
 
   const generateTodaysData = useCallback(() => {
     const today = new Date();
@@ -844,12 +888,34 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           setBirthFormContext('changeNative');
           setShowBirthFormModal(true);
         }}
+        onCreateBirthChart={() => {
+          if (!user) {
+            try {
+              sessionStorage.setItem('pendingBirthChart', 'create');
+            } catch (_) {}
+            if (onLogin) onLogin();
+            return;
+          }
+          setBirthFormContext('chart');
+          setShowBirthFormModal(true);
+        }}
+        onSelectBirthChart={() => {
+          if (!user) {
+            try {
+              sessionStorage.setItem('pendingBirthChart', 'select');
+            } catch (_) {}
+            if (onLogin) onLogin();
+            return;
+          }
+          setBirthFormContext('changeNative');
+          setShowBirthFormModal(true);
+        }}
       />
 
 
 
-      {/* Your Life Categories */}
-      <section className="life-categories">
+      {/* Your Life Categories — in-app anchor for main nav “Astrology” */}
+      <section id="astrology" className="life-categories">
         <div className="container">
           <div className="life-categories-header">
             <span className="life-path-symbol life-path-symbol-1">🌟</span>
@@ -1773,8 +1839,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      {/* Numerology Section */}
-      <section className="numerology-section">
+      {/* Numerology Section — in-app anchor for main nav / hamburger */}
+      <section id="numerology" className="numerology-section">
         <div className="container">
           <div className="numerology-header">
             <span className="numerology-symbol numerology-symbol-1">🔢</span>

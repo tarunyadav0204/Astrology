@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { apiService } from '../../services/apiService';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -143,6 +144,8 @@ if (typeof document !== 'undefined') {
 }
 
 const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, onAdminClick, user, onEditChart }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { setBirthData, setChartData } = useAstrology();
   const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +154,25 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, onAdminClick, use
   useEffect(() => {
     loadCharts();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    let mode = params.get('birthChart');
+    if (!mode) {
+      try {
+        mode = sessionStorage.getItem('pendingBirthChart');
+        if (mode) sessionStorage.removeItem('pendingBirthChart');
+      } catch (_) {
+        mode = null;
+      }
+    }
+    if (mode === 'create' && onCreateNew) {
+      onCreateNew();
+      if (params.get('birthChart')) navigate('/', { replace: true });
+    } else if (mode === 'select' && params.get('birthChart')) {
+      navigate('/', { replace: true });
+    }
+  }, [location.search, onCreateNew, navigate]);
 
   const loadCharts = async (search = '') => {
     try {
