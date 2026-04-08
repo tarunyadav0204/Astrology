@@ -175,6 +175,37 @@ export const apiService = {
     const response = await apiClient.post(`${getEndpoint('/calculate-chart-only')}?node_type=${nodeType}`, birthDataWithoutTimezone);
     return response.data;
   },
+
+  /** Vimshottari hierarchy for a date (maha → prana); used by chat header chips. */
+  calculateCascadingDashas: async (birthData, targetDateStr) => {
+    const rawDate = birthData?.date != null ? String(birthData.date) : '';
+    const dateStr = rawDate.includes('T') ? rawDate.split('T')[0] : rawDate;
+    let timeStr = birthData?.time != null ? String(birthData.time) : '';
+    if (timeStr.includes('T')) {
+      try {
+        timeStr = new Date(timeStr).toTimeString().slice(0, 5);
+      } catch {
+        timeStr = timeStr.slice(11, 16) || timeStr;
+      }
+    }
+    const payload = {
+      name: birthData?.name || 'Unknown',
+      date: dateStr,
+      time: timeStr,
+      latitude: parseFloat(birthData.latitude),
+      longitude: parseFloat(birthData.longitude),
+      place: birthData.place || 'Unknown',
+    };
+    const target =
+      targetDateStr && String(targetDateStr).trim()
+        ? String(targetDateStr).split('T')[0]
+        : new Date().toISOString().split('T')[0];
+    const response = await apiClient.post(getEndpoint('/calculate-cascading-dashas'), {
+      birth_data: payload,
+      target_date: target,
+    });
+    return response.data;
+  },
   
   calculateTransits: async (transitRequest) => {
     const response = await apiClient.post(getEndpoint('/calculate-transits'), transitRequest);

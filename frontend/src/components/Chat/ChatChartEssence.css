@@ -1,0 +1,131 @@
+.chat-chart-essence {
+    box-sizing: border-box;
+    flex-shrink: 0;
+    margin-bottom: 0;
+    width: 100%;
+    min-width: 0;
+    border-radius: 16px;
+    /* Avoid clipping chip shadows, descenders, and horizontal scroll gutters */
+    overflow: visible;
+}
+
+.chat-chart-essence__gradient {
+    padding: 16px 16px 18px;
+    background: linear-gradient(
+        135deg,
+        rgba(249, 115, 22, 0.15) 0%,
+        rgba(249, 115, 22, 0.08) 50%,
+        rgba(255, 255, 255, 0.65) 100%
+    );
+    border: 1px solid rgba(255, 107, 53, 0.22);
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(255, 107, 53, 0.08);
+}
+
+.chat-chart-essence__title {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
+    color: #7c2d12;
+}
+
+.chat-chart-essence__signs {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.chat-chart-essence__sign {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+}
+
+.chat-chart-essence__sign-label {
+    font-size: 12px;
+    color: rgba(124, 45, 18, 0.75);
+    margin-bottom: 4px;
+}
+
+.chat-chart-essence__sign-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #431407;
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.chat-chart-essence__dasha-scroll {
+    margin-top: 14px;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    padding: 4px 2px 10px;
+    margin-left: -2px;
+    margin-right: -2px;
+    scrollbar-width: thin;
+}
+
+.chat-chart-essence__dasha-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 8px;
+    padding: 2px;
+    min-height: 4.5rem;
+}
+
+.chat-chart-essence__chip {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    min-width: 104px;
+    max-width: 140px;
+    border-width: 2px;
+    border-style: solid;
+    border-radius: 16px;
+    padding: 10px 10px 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font: inherit;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.chat-chart-essence__chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-chart-essence__chip:active {
+    transform: translateY(0);
+}
+
+.chat-chart-essence__chip-planet {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.chat-chart-essence__chip-date {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(67, 20, 7, 0.78);
+    line-height: 1.2;
+}
+
+@media (max-width: 480px) {
+    .chat-chart-essence__gradient {
+        padding: 14px 12px 16px;
+    }
+
+    .chat-chart-essence__sign-value {
+        font-size: 12px;
+    }
+}

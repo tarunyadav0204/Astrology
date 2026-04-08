@@ -1,0 +1,637 @@
+/* AstroVastu V1 — aligns with Astro Roshni pink accent */
+
+/* Compact header (~56–72px fixed) — same offset as Events / Analysis detail pages */
+.astrovastu-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-top: calc(80px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(160deg, #fff8f5 0%, #fce4ec 35%, #fff 100%);
+}
+
+.astrovastu-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 100px;
+}
+
+.astrovastu-page h1 {
+  color: #ad1457;
+  font-size: 1.5rem;
+  margin: 0 0 8px;
+}
+
+.astrovastu-lead {
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.astrovastu-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 8px 28px rgba(173, 20, 87, 0.1);
+  border: 1px solid #f8bbd9;
+  margin-bottom: 16px;
+}
+
+.astrovastu-card h2 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  color: #880e4f;
+}
+
+.astrovastu-card--dim {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.astrovastu-regenerating-bar {
+  margin: 0 auto 12px;
+  max-width: 720px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #fce4ec, #f3e5f5);
+  border: 1px solid #f8bbd0;
+  color: #880e4f;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.astrovastu-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.astrovastu-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #fafafa;
+}
+
+.astrovastu-option.selected {
+  border-color: #e91e63;
+  background: #fff5f8;
+}
+
+.astrovastu-door-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.astrovastu-door-btn {
+  padding: 12px 8px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.astrovastu-door-btn.active {
+  border-color: #e91e63;
+  background: #fce4ec;
+  color: #880e4f;
+}
+
+.astrovastu-zone-row {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.astrovastu-zone-row strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.astrovastu-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.astrovastu-tag-chips label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.astrovastu-primary {
+  width: 100%;
+  padding: 14px 20px;
+  background: #e91e63;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.astrovastu-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.astrovastu-secondary {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: #e91e63;
+  border: 1px solid #e91e63;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.astrovastu-hero {
+  background: linear-gradient(135deg, #fce4ec, #fff);
+  border: 2px solid #f48fb1;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.astrovastu-hero h3 {
+  margin: 0 0 10px;
+  color: #ad1457;
+}
+
+.astrovastu-compass {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 16px 0;
+}
+
+.astrovastu-compass-cell {
+  padding: 10px 6px;
+  text-align: center;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #e0e0e0;
+}
+
+.astrovastu-score-low {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.astrovastu-score-mid {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.astrovastu-score-high {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.astrovastu-remedy-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #424242;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.astrovastu-meta {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 16px;
+}
+
+.astrovastu-error {
+  background: #ffebee;
+  color: #b71c1c;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.astrovastu-saved-card {
+  background: linear-gradient(135deg, #e8f5e9 0%, #fff 50%, #e3f2fd 100%);
+  border: 1px solid #81c784;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.08);
+}
+
+.astrovastu-saved-title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  color: #1b5e20;
+}
+
+.astrovastu-saved-meta {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #424242;
+  line-height: 1.45;
+}
+
+.astrovastu-saved-meta code {
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.astrovastu-saved-match,
+.astrovastu-saved-diff {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #333;
+}
+
+.astrovastu-saved-diff {
+  color: #5d4037;
+}
+
+.astrovastu-saved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.astrovastu-saved-actions .astrovastu-primary,
+.astrovastu-saved-actions .astrovastu-secondary {
+  width: auto;
+  min-width: 140px;
+  margin-top: 0;
+}
+
+.astrovastu-methodology {
+  background: #fff;
+  border: 1px solid #f8bbd9;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 16px rgba(173, 20, 87, 0.06);
+}
+
+.astrovastu-methodology-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #880e4f;
+}
+
+.astrovastu-methodology-text {
+  margin: 0 0 10px;
+  color: #444;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.astrovastu-methodology-cycle {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: #555;
+  line-height: 1.45;
+}
+
+.astrovastu-methodology-label {
+  font-weight: 600;
+  color: #ad1457;
+}
+
+.astrovastu-methodology-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #777;
+  line-height: 1.45;
+}
+
+.astrovastu-ai-exec {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #333;
+  font-weight: 500;
+}
+
+.astrovastu-ai-full {
+  margin: 0 0 12px;
+}
+
+.astrovastu-home-svg {
+  width: 100%;
+  max-width: 560px;
+  display: block;
+  margin: 0 auto 14px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(173, 20, 87, 0.12);
+}
+
+.astrovastu-svg-chip-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.astrovastu-svg-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 1.1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.astrovastu-svg-chip--sign {
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border-color: #e1bee7;
+}
+
+.astrovastu-svg-chip--planet {
+  background: #e3f2fd;
+  color: #0d47a1;
+  border-color: #bbdefb;
+}
+
+.astrovastu-svg-chip--house {
+  background: #fff3e0;
+  color: #e65100;
+  border-color: #ffcc80;
+}
+
+.astrovastu-ai-paragraph {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  color: #444;
+  line-height: 1.55;
+}
+
+.astrovastu-section-card {
+  background: #fff;
+  border: 1px solid #f8bbd9;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+
+.astrovastu-section-card h3 {
+  margin: 0 0 10px;
+  color: #880e4f;
+  font-size: 1rem;
+}
+
+.astrovastu-area-block {
+  border-top: 1px solid #f6e0ea;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.astrovastu-hero-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.astrovastu-hero-head h3 {
+  margin: 0;
+}
+
+.astrovastu-priority-pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(173, 20, 87, 0.12);
+  color: #ad1457;
+}
+
+.astrovastu-hero-goal {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: #444;
+}
+
+.astrovastu-hero-goal-note {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #555;
+}
+
+.astrovastu-hero-summary {
+  margin: 0 0 12px;
+  line-height: 1.55;
+  color: #333;
+}
+
+.astrovastu-hero-note {
+  font-size: 0.88rem;
+  color: #666;
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.astrovastu-breakdown-list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.astrovastu-breakdown-item {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #333;
+}
+
+.astrovastu-breakdown-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.astrovastu-breakdown-meta {
+  color: #888;
+  font-size: 0.82rem;
+}
+
+.astrovastu-breakdown-detail {
+  margin-top: 6px;
+  padding-left: 0;
+  font-size: 0.84rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+.astrovastu-hero-why {
+  margin-bottom: 12px;
+}
+
+.astrovastu-why-heading {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #ad1457;
+  margin-bottom: 6px;
+}
+
+.astrovastu-why-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: #424242;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.astrovastu-why-list li {
+  margin-bottom: 6px;
+}
+
+.astrovastu-hero-planets {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0 0 10px;
+}
+
+.astrovastu-directions-intro {
+  font-size: 0.88rem;
+  color: #666;
+  line-height: 1.45;
+  margin: 0 0 14px;
+}
+
+.astrovastu-direction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.astrovastu-direction-block {
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.astrovastu-direction-toggle {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 12px 14px;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font: inherit;
+}
+
+.astrovastu-direction-toggle:hover {
+  background: #fff8fb;
+}
+
+.astrovastu-direction-toggle-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.astrovastu-dir-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #666;
+}
+
+.astrovastu-direction-toggle-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.astrovastu-score-muted {
+  font-size: 0.72rem;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.astrovastu-direction-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.astrovastu-dir-section {
+  margin-bottom: 14px;
+}
+
+.astrovastu-dir-section:last-child {
+  margin-bottom: 0;
+}
+
+.astrovastu-dir-section-title {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #880e4f;
+  margin-bottom: 8px;
+}
+
+.astrovastu-dir-foot {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.astrovastu-compass-mini {
+  margin: 20px 0 8px;
+}
+
+.astrovastu-compass-mini-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #999;
+  margin-bottom: 8px;
+}

@@ -43,6 +43,7 @@ import ContactPage from './components/Contact/ContactPage';
 import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
 import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
+import AstroVastuTool from './components/AstroVastu/AstroVastuTool';
 import EventsTimelinePage from './components/Events/EventsTimelinePage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import BlogList from './components/Blog/BlogList';
@@ -608,6 +609,17 @@ function App() {
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
           <Route
+            path="/astrovastu"
+            element={
+              <AstroVastuTool
+                user={null}
+                onLogout={() => {}}
+                onAdminClick={() => {}}
+                onLogin={() => setShowLoginModal(true)}
+              />
+            }
+          />
+          <Route
             path="/life-events"
             element={<EventsTimelinePage onLogin={() => setShowLoginModal(true)} />}
           />
@@ -704,6 +716,17 @@ function App() {
           } />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
+          <Route
+            path="/astrovastu"
+            element={
+              <AstroVastuTool
+                user={user}
+                onLogout={handleLogout}
+                onAdminClick={handleAdminClick}
+                onLogin={() => setShowLoginModal(true)}
+              />
+            }
+          />
           <Route
             path="/life-events"
             element={

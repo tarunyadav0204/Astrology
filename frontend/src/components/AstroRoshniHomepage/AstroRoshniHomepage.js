@@ -1325,6 +1325,48 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
+      {/*
+      TEMP: AstroVastu hidden from homepage — route /astrovastu still exists in App.js for direct access / later launch.
+      AstroVastu — chart mapped to eight directions
+      <section className="astrovastu-discovery-section">
+        <div className="container">
+          <div
+            className="astrovastu-home-card"
+            onClick={() => (user ? navigate('/astrovastu') : onLogin())}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (user) navigate('/astrovastu');
+                else onLogin();
+              }
+            }}
+          >
+            <div className="astrovastu-home-glow" aria-hidden />
+            <div className="astrovastu-home-content">
+              <div className="astrovastu-home-icon" aria-hidden>
+                🧭
+              </div>
+              <h2 className="astrovastu-home-title">AstroVastu</h2>
+              <p className="astrovastu-home-subtitle">
+                Your birth chart, rotated to your main door — eight directions, one priority map for your goal.
+              </p>
+              <div className="astrovastu-home-features">
+                <span>Door-facing alignment</span>
+                <span>Zone tags (optional)</span>
+                <span>Personalized remedies</span>
+              </div>
+              <div className="astrovastu-home-cta">
+                <span className="astrovastu-home-badge">V1 · Logged-in</span>
+                <span className="astrovastu-home-arrow">→</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      */}
+
       {/* Main Content */}
       <div className="main-content">
         <div className="container">

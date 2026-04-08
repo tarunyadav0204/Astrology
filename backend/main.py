@@ -99,6 +99,7 @@ from Dashas.routes.chara_dasha_routes import router as chara_dasha_router
 from charts.routes import router as charts_router
 from birth_charts.routes import router as birth_charts_router
 from karma_analysis.routes import router as karma_router
+from astrovastu.routes import router as astrovastu_router
 from reddit.routes import router as reddit_router
 from support_routes import router as support_router, admin_router as support_admin_router
 from ashtakavarga_routes import router as ashtakavarga_router
@@ -417,6 +418,7 @@ app.include_router(chara_dasha_router, prefix="/api")
 app.include_router(mundane_router)
 app.include_router(financial_router)
 app.include_router(karma_router, prefix="/api", tags=["karma"])
+app.include_router(astrovastu_router, prefix="/api")
 app.include_router(ashtakavarga_router, prefix="/api", tags=["ashtakavarga"])
 app.include_router(yoga_router, prefix="/api", tags=["yogas"])
 app.include_router(chat_error_router, prefix="/api", tags=["chat_errors"])

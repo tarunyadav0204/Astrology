@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
+import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
-import BirthForm from '../BirthForm/BirthForm';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import NavigationHeader from '../Shared/NavigationHeader';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -14,7 +14,55 @@ import { authService } from '../../services/authService';
 import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
 import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
+import '../Shared/nativeSelectorChip.css';
 import './ChatPage.css';
+
+/** Single-chart wizard: empty `{}` is truthy in JS — require real fields before showing a “profile ready” card. */
+function isBirthChartReadyForChat(data) {
+    const norm = normalizeBirthDetailsForChat(data);
+    if (!norm) return false;
+    if (!norm.date || !String(norm.date).trim()) return false;
+    if (!norm.time || !String(norm.time).trim()) return false;
+    const hasCoords = Number.isFinite(norm.latitude) && Number.isFinite(norm.longitude);
+    const hasPlace = norm.place && String(norm.place).trim().length > 0;
+    return hasCoords || hasPlace;
+}
+
+function singleChartProfileDisplay(b) {
+    if (!b) return { name: 'Your chart', initials: '?', metaLine: '' };
+    const name = (b.name && String(b.name).trim()) || 'Your chart';
+    const parts = name.split(/\s+/).filter(Boolean);
+    const initials =
+        parts.length >= 2
+            ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+            : (parts[0] && parts[0][0] ? parts[0][0].toUpperCase() : '?');
+
+    let dateLabel = b.date || '';
+    try {
+        const raw = String(dateLabel).split('T')[0];
+        const seg = raw.split('-').map((x) => parseInt(x, 10));
+        if (seg.length === 3 && seg.every((n) => !Number.isNaN(n))) {
+            const [yy, mm, dd] = seg;
+            dateLabel = new Date(yy, mm - 1, dd).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+            });
+        }
+    } catch {
+        /* keep raw */
+    }
+    const rawTime = b.time != null ? String(b.time) : '';
+    const timeMatch = rawTime.match(/(\d{1,2}:\d{2})/);
+    const timeShort = timeMatch ? timeMatch[1] : rawTime.slice(0, 5);
+    const loc = b.place && String(b.place).trim();
+    const coordFallback =
+        !loc && b.latitude != null && b.longitude != null
+            ? `${Number(b.latitude).toFixed(4)}, ${Number(b.longitude).toFixed(4)}`
+            : '';
+    const metaLine = [dateLabel, timeShort, loc || coordFallback].filter(Boolean).join(' · ');
+    return { name, initials, metaLine };
+}
 
 // Enable detailed logging for debugging
 // console.log('ChatPage component loaded - debugging enabled');
@@ -23,6 +71,7 @@ const ChatPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { birthData } = useAstrology();
+    const singleChartWizardProfile = useMemo(() => singleChartProfileDisplay(birthData), [birthData]);
     const { credits, chatCost, partnershipCost, fetchBalance, freeQuestionAvailable } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
     const [messages, setMessages] = useState([]);
@@ -300,26 +349,57 @@ const ChatPage = () => {
     // --- chat-v2 async flow (mobile parity) ---
     const [chatV2SessionId, setChatV2SessionId] = useState(null);
     const [personalChartData, setPersonalChartData] = useState(null);
+    const [chatDashaData, setChatDashaData] = useState(null);
+    const [chartEssenceLoading, setChartEssenceLoading] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
+
+        if (!wizardCompleted || isMundaneMode || !isBirthChartReadyForChat(birthData)) {
+            setPersonalChartData(null);
+            setChatDashaData(null);
+            setChartEssenceLoading(false);
+            return;
+        }
+
         const run = async () => {
-            if (!wizardCompleted) return;
-            if (isMundaneMode) return;
-            if (!birthData) return;
+            setChartEssenceLoading(true);
+            setPersonalChartData(null);
+            setChatDashaData(null);
 
             try {
-                setPersonalChartData(null);
-                const chart = await apiService.calculateChartOnly({
+                const chartPayload = {
                     ...birthData,
                     latitude: birthData.latitude != null ? parseFloat(birthData.latitude) : undefined,
                     longitude: birthData.longitude != null ? parseFloat(birthData.longitude) : undefined,
-                });
-                if (!cancelled) setPersonalChartData(chart);
-            } catch (e) {
-                console.error('[ChatPage] Failed to calculate chart only:', e);
+                };
+                const today = new Date().toISOString().split('T')[0];
+
+                const [chartResult, dashaResult] = await Promise.allSettled([
+                    apiService.calculateChartOnly(chartPayload),
+                    /* Same normalized birth payload as chart (mobile Safari / form quirks). */
+                    apiService.calculateCascadingDashas(chartPayload, today),
+                ]);
+
+                if (cancelled) return;
+
+                if (chartResult.status === 'fulfilled') {
+                    setPersonalChartData(chartResult.value);
+                } else {
+                    console.error('[ChatPage] Failed to calculate chart only:', chartResult.reason);
+                }
+
+                if (dashaResult.status === 'fulfilled') {
+                    const d = dashaResult.value;
+                    if (d && !d.error) setChatDashaData(d);
+                } else {
+                    console.error('[ChatPage] Failed to calculate cascading dashas:', dashaResult.reason);
+                }
+            } finally {
+                if (!cancelled) setChartEssenceLoading(false);
             }
         };
+
         run();
         return () => {
             cancelled = true;
@@ -1711,75 +1791,14 @@ const ChatPage = () => {
             <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}`}>
             <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
                 {!wizardCompleted ? (
-                    <div className="chat-wizard-intro">
-                        <h1 className="chat-wizard-intro__title">AstroRoshni Guided Setup</h1>
-                        <p className="chat-wizard-intro__text">
-                            Choose your analysis type below. The chat unlocks only after you complete the guided steps.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="chat-header-toolbar">
-                        <div className="chat-header-toolbar__info">
-                            {(isMundaneMode || isPartnershipMode) && (
-                                <div className="chat-header-toolbar__mode-chip" aria-hidden="true">
-                                    {isMundaneMode ? 'Mundane' : 'Partnership'}
-                                </div>
-                            )}
-                            <h1 className="chat-header-toolbar__title">
-                                <span className="chat-header-toolbar__title-focus">
-                                    {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart
-                                        ? `${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`
-                                        : birthData?.name || 'Consultation'}
-                                </span>
-                            </h1>
-                            {(isMundaneMode || isPartnershipMode || isAdmin) && (
-                                <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">
-                                    {isMundaneMode ? 'Mundane context' : isPartnershipMode ? 'Two-chart analysis' : ''}
-                                    {isAdmin &&
-                                        (isMundaneMode || isPartnershipMode ? ' · Admin' : 'Admin')}
-                                </p>
-                            )}
+                    <div className="chat-wizard-flow">
+                        <div className="chat-wizard-intro">
+                            <h1 className="chat-wizard-intro__title">AstroRoshni Guided Setup</h1>
+                            <p className="chat-wizard-intro__text">
+                                Choose your analysis type below. The chat unlocks only after you complete the guided steps.
+                            </p>
                         </div>
-                        <div className="chat-header-toolbar__actions">
-                            <button
-                                type="button"
-                                className="chat-header-btn"
-                                title="Change analysis type"
-                                onClick={() => {
-                                    resetThreadForWizard(null);
-                                    setWizardMode(null);
-                                    setWizardStep(0);
-                                }}
-                            >
-                                <span className="chat-header-btn__full">Change type</span>
-                                <span className="chat-header-btn__icon" aria-hidden="true">↻</span>
-                            </button>
-                            {isAdmin && (
-                                <button
-                                    type="button"
-                                    className="chat-header-btn"
-                                    title="View Gemini context payload (admin)"
-                                    onClick={() => setShowContextModal(true)}
-                                >
-                                    <span className="chat-header-btn__full">Context</span>
-                                    <span className="chat-header-btn__icon" aria-hidden="true">☰</span>
-                                </button>
-                            )}
-                            <button
-                                type="button"
-                                className="credits-display chat-header-credits"
-                                title="Credits and per-question cost"
-                                aria-label="Open credits"
-                                onClick={() => setShowCreditsModal(true)}
-                            >
-                                <span className="credits-full">{credits} · {isPartnershipMode ? partnershipCost : chatCost}/q</span>
-                                <span className="credits-short">{credits}</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
-                {!wizardCompleted && (
-                    <div className="wizard-mode-grid">
+                        <div className="wizard-mode-grid">
                         <button
                             type="button"
                             className={`wizard-mode-card ${wizardMode === 'single' ? 'active' : ''}`}
@@ -1816,63 +1835,74 @@ const ChatPage = () => {
                             <div className="wizard-mode-title">🌍 Mundane</div>
                             <div className="wizard-mode-subtitle">Global events + trend dynamics</div>
                         </button>
-                    </div>
-                )}
-                {!wizardCompleted && (
-                    <div className="wizard-step">
+                        </div>
+                        <div className="wizard-step">
                         {wizardMode === 'single' && (
                             <>
-                                <div className="wizard-step-title">Step 1: Choose your birth chart profile</div>
-                                {birthData ? (
-                                    <div className="wizard-inline-card">
-                                        <div style={{ color: '#6b7280', fontSize: 12, fontWeight: 700, letterSpacing: 0.2, marginBottom: 6 }}>
-                                            Current chart profile
+                                <div className="wizard-step-title">Single Chart — set up this session</div>
+                                {isBirthChartReadyForChat(birthData) ? (
+                                    <div className="wizard-inline-card wizard-inline-card--single-ready">
+                                        <p className="single-chart-intro">
+                                            <span className="single-chart-intro__badge" aria-hidden="true">
+                                                ✨
+                                            </span>
+                                            <span>
+                                                You’re in <strong>Single Chart</strong> mode — every reply is cast for <strong>one</strong> birth
+                                                chart. This is the profile we’ll use for this session.
+                                            </span>
+                                        </p>
+                                        <div className="single-chart-profile-panel" role="group" aria-label="Selected birth chart">
+                                            <div className="single-chart-profile-panel__top">
+                                                <span className="single-chart-profile-panel__label">Chart for this session</span>
+                                            </div>
+                                            <div className="single-chart-profile-row">
+                                                <div className="single-chart-profile-main">
+                                                    <div className="single-chart-avatar" aria-hidden="true">
+                                                        {singleChartWizardProfile.initials}
+                                                    </div>
+                                                    <div className="single-chart-profile-copy">
+                                                        <p className="single-chart-profile-name">{singleChartWizardProfile.name}</p>
+                                                        <p className="single-chart-profile-meta">{singleChartWizardProfile.metaLine}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="single-chart-change-btn"
+                                                    onClick={() => setShowBirthFormModal(true)}
+                                                >
+                                                    Change chart
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div style={{ fontWeight: 800, marginBottom: 4, color: '#111827' }}>
-                                            {birthData.name}
-                                        </div>
-                                        <div style={{ color: '#6b7280', fontSize: 12, lineHeight: 1.5 }}>
-                                            {(birthData.date || '')}{birthData.time ? ` • ${birthData.time}` : ''}{birthData.place ? ` • ${birthData.place}` : ''}
-                                        </div>
-                                        <div style={{ color: '#555', fontSize: 13, lineHeight: 1.5 }}>
-                                            Why this matters: precise birth time/place lets us compute the correct chart angles and house placements.
-                                        </div>
-                                        <div style={{ marginTop: 10 }}>
-                                            <button
-                                                className="wizard-link-btn"
-                                                onClick={() => setShowBirthFormModal(true)}
-                                            >
-                                                Change profile
-                                            </button>
-                                        </div>
-                                        <div style={{ marginTop: 12 }}>
-                                            <button
-                                                className="wizard-primary-btn"
-                                                onClick={() => {
-                                                    setIsPartnershipMode(false);
-                                                    setIsMundaneMode(false);
-                                                    setWizardCompleted(true);
-                                                }}
-                                            >
-                                                Use this profile & start chat
-                                            </button>
-                                        </div>
+                                        <button
+                                            type="button"
+                                            className="wizard-primary-btn single-chart-start-btn"
+                                            onClick={() => {
+                                                setIsPartnershipMode(false);
+                                                setIsMundaneMode(false);
+                                                setWizardCompleted(true);
+                                            }}
+                                        >
+                                            Start chat with this chart
+                                        </button>
                                     </div>
                                 ) : (
-                                    <div className="wizard-inline-card">
-                                        <div style={{ color: '#555', fontSize: 13, lineHeight: 1.5 }}>
-                                            You don’t have a saved birth profile yet. Enter details so I can generate your chart.
-                                        </div>
-                                        <div style={{ marginTop: 12 }}>
-                                            <BirthForm
-                                                onSubmit={() => {
-                                                    setIsPartnershipMode(false);
-                                                    setIsMundaneMode(false);
-                                                    setWizardCompleted(true);
-                                                }}
-                                                onLogout={() => {}}
-                                            />
-                                        </div>
+                                    <div className="wizard-inline-card wizard-inline-card--single-setup">
+                                        <p className="single-chart-setup-title">Personal chart Q&amp;A</p>
+                                        <p className="single-chart-setup-lead">
+                                            Choose <strong>Single Chart</strong> when you want answers from <strong>your</strong> horoscope — houses,
+                                            dasha, and timing — not generic astrology. Add your date, time, and place once (saved chart or new).
+                                        </p>
+                                        <button
+                                            type="button"
+                                            className="wizard-primary-btn single-chart-setup-cta"
+                                            onClick={() => setShowBirthFormModal(true)}
+                                        >
+                                            Choose or add birth chart…
+                                        </button>
+                                        <p className="single-chart-setup-hint">
+                                            After your chart is saved, tap <strong>Start chat with this chart</strong> to begin.
+                                        </p>
                                     </div>
                                 )}
                             </>
@@ -2226,12 +2256,109 @@ const ChatPage = () => {
                             </>
                         )}
                     </div>
+                    </div>
+                ) : (
+                    <div className="chat-header-toolbar">
+                        <div className="chat-header-toolbar__info">
+                            {(isMundaneMode || isPartnershipMode) && (
+                                <div className="chat-header-toolbar__mode-chip" aria-hidden="true">
+                                    {isMundaneMode ? 'Mundane' : 'Partnership'}
+                                </div>
+                            )}
+                            <h1 className="chat-header-toolbar__title">
+                                {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart ? (
+                                    <span className="chat-header-toolbar__title-focus">
+                                        {`${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`}
+                                    </span>
+                                ) : isMundaneMode ? (
+                                    <span className="chat-header-toolbar__title-focus">
+                                        {birthData?.name || 'Consultation'}
+                                    </span>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="native-selector-chip chat-header-native-chip"
+                                        onClick={() => setShowBirthFormModal(true)}
+                                        title="Change birth chart / native"
+                                        aria-haspopup="dialog"
+                                        aria-label={`Selected native ${birthData?.name || 'chart'}. Choose a different chart.`}
+                                    >
+                                        <span className="native-selector-chip__icon" aria-hidden="true">
+                                            👤
+                                        </span>
+                                        <span className="native-selector-chip__name">
+                                            {(birthData?.name && String(birthData.name).trim()) ||
+                                                'Select chart'}
+                                        </span>
+                                        <span className="native-selector-chip__chevron" aria-hidden="true">
+                                            ▾
+                                        </span>
+                                    </button>
+                                )}
+                            </h1>
+                            {(isMundaneMode || isPartnershipMode || isAdmin) && (
+                                <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">
+                                    {isMundaneMode ? 'Mundane context' : isPartnershipMode ? 'Two-chart analysis' : ''}
+                                    {isAdmin &&
+                                        (isMundaneMode || isPartnershipMode ? ' · Admin' : 'Admin')}
+                                </p>
+                            )}
+                        </div>
+                        <div className="chat-header-toolbar__actions">
+                            <button
+                                type="button"
+                                className="chat-header-btn"
+                                title="Change analysis type"
+                                onClick={() => {
+                                    resetThreadForWizard(null);
+                                    setWizardMode(null);
+                                    setWizardStep(0);
+                                }}
+                            >
+                                <span className="chat-header-btn__full">Change type</span>
+                                <span className="chat-header-btn__icon" aria-hidden="true">↻</span>
+                            </button>
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    className="chat-header-btn"
+                                    title="View Gemini context payload (admin)"
+                                    onClick={() => setShowContextModal(true)}
+                                >
+                                    <span className="chat-header-btn__full">Context</span>
+                                    <span className="chat-header-btn__icon" aria-hidden="true">☰</span>
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="credits-display chat-header-credits"
+                                title="Credits and per-question cost"
+                                aria-label="Open credits"
+                                onClick={() => setShowCreditsModal(true)}
+                            >
+                                <span className="credits-full">{credits} · {isPartnershipMode ? partnershipCost : chatCost}/q</span>
+                                <span className="credits-short">{credits}</span>
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
             <div className="chat-container">
                 {wizardCompleted ? (
-                    <>
+                    <div className="chat-thread">
+                        {!isMundaneMode && isBirthChartReadyForChat(birthData) && (
+                            <div className="message-bubble assistant chat-chart-essence-wrap">
+                                <div className="message-content chat-chart-essence-wrap__content">
+                                    <ChatChartEssence
+                                        chartData={personalChartData}
+                                        dashaData={chatDashaData}
+                                        personName={birthData?.name}
+                                        isLoading={chartEssenceLoading}
+                                    />
+                                </div>
+                            </div>
+                        )}
                         <MessageList
                             messages={messages}
                             sessionId={isMundaneMode ? mundaneSessionId : chatV2SessionId}
@@ -2239,7 +2366,7 @@ const ChatPage = () => {
                             onDeleteMessage={handleDeleteMessage}
                         />
                         <div ref={messagesEndRef} />
-                    </>
+                    </div>
                 ) : (
                     <div className="wizard-placeholder">
                         {/* Wizard UI is rendered inside the header. Keep the thread area empty to avoid confusion. */}
@@ -2247,17 +2374,20 @@ const ChatPage = () => {
                 )}
             </div>
 
-            <ChatInput
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                followUpQuestion={pendingFollowUpQuestion}
-                onFollowUpUsed={() => setPendingFollowUpQuestion('')}
-                onOpenCreditsModal={() => setShowCreditsModal(true)}
-                isPartnershipMode={isPartnershipMode}
-                isMundaneMode={isMundaneMode}
-                isLocked={isWizardLocked}
-            />
-            
+            {/* No mode chosen yet — hide composer (premium row + placeholder) so setup stays the only focus */}
+            {(wizardCompleted || wizardMode) && (
+                <ChatInput
+                    onSendMessage={handleSendMessage}
+                    isLoading={isLoading}
+                    followUpQuestion={pendingFollowUpQuestion}
+                    onFollowUpUsed={() => setPendingFollowUpQuestion('')}
+                    onOpenCreditsModal={() => setShowCreditsModal(true)}
+                    isPartnershipMode={isPartnershipMode}
+                    isMundaneMode={isMundaneMode}
+                    isLocked={isWizardLocked}
+                />
+            )}
+
             {/* Credits Modal */}
             <CreditsModal 
                 isOpen={showCreditsModal} 
@@ -2284,8 +2414,8 @@ const ChatPage = () => {
                     onSubmit={() => {
                         setChatV2SessionId(null); // refresh chat-v2 session for newly selected native
                     }}
-                    title="Select Birth Profile"
-                    description="Choose your existing birth profile or create a new one"
+                    title="Birth chart for chat"
+                    description="Select a saved chart or enter details. This sets the chart used for Single Chart answers."
                 />
             </div>
         </>
