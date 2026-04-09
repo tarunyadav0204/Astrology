@@ -554,8 +554,14 @@ async def get_all_user_facts(
         where_clause = ""
         params: List[Any] = []
         if search:
-            where_clause = " WHERE (u.name LIKE %s OR u.phone LIKE %s OR bc.name LIKE %s)"
-            params = [f"%{search}%", f"%{search}%", f"%{search}%"]
+            # Postgres: ILIKE is case-insensitive (LIKE alone is case-sensitive and often fails username search).
+            # Match account name, phone, email, chart name (may be ciphertext), and stored fact text.
+            pat = f"%{search}%"
+            where_clause = (
+                " WHERE (u.name ILIKE %s OR u.phone ILIKE %s OR COALESCE(u.email, '') ILIKE %s "
+                "OR bc.name ILIKE %s OR uf.fact ILIKE %s)"
+            )
+            params = [pat, pat, pat, pat, pat]
 
         with get_conn() as conn:
             cur = execute(
@@ -608,13 +614,14 @@ async def get_all_user_facts(
                 'extracted_at': row[7],
             })
 
+        total_pages = max(1, (total + limit - 1) // limit) if total else 1
         return {
             'success': True,
             'facts': facts,
             'page': page,
             'limit': limit,
             'total': total,
-            'total_pages': (total + limit - 1) // limit,
+            'total_pages': total_pages,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching facts: {str(e)}")

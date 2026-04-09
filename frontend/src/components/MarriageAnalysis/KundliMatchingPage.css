@@ -1,0 +1,48 @@
+/* Fixed compact header — same offset as AnalysisDetailPage / AstroVastu */
+.kundli-matching-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-top: calc(80px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(135deg, #fff8f5 0%, #ffe8f0 50%, #fce4ec 100%);
+}
+
+.kundli-matching-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+}
+
+.kundli-matching-hero {
+  margin-bottom: 20px;
+}
+
+.kundli-matching-back {
+  display: block;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: #ad1457;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.kundli-matching-hero h1 {
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  color: #880e4f;
+}
+
+.kundli-matching-sub {
+  margin: 0;
+  color: #6d4c41;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.kundli-matching-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(136, 14, 79, 0.08);
+}

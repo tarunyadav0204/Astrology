@@ -60,6 +60,7 @@ function FullHamburgerMenuItems({
     >
       ✨ Astrology
     </button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching'); onClose(); }}>💕 Kundli matching</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/#numerology'); onClose(); }}>🔢 Numerology</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/panchang'); onClose(); }}>🌅 Panchang</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/muhurat-finder'); onClose(); }}>⏳ Muhurat Finder</button>
@@ -181,6 +182,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
               <button onClick={() => navigate('/festivals')}>Festivals</button>
               <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
+              <button type="button" onClick={() => navigate('/kundli-matching')}>Kundli matching</button>
               {onAstrologyClick ? (
                 <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
               ) : (
@@ -395,6 +397,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
             <li><button onClick={() => navigate('/festivals')}>Festivals</button></li>
             <li><button onClick={() => navigate('/nakshatras')}>Nakshatras</button></li>
+            <li><button type="button" onClick={() => navigate('/kundli-matching')}>Kundli matching</button></li>
             <li>
               {onAstrologyClick ? (
                 <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>

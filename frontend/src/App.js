@@ -44,6 +44,7 @@ import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
 import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
 import AstroVastuTool from './components/AstroVastu/AstroVastuTool';
+import KundliMatchingPage from './components/MarriageAnalysis/KundliMatchingPage';
 import EventsTimelinePage from './components/Events/EventsTimelinePage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import BlogList from './components/Blog/BlogList';
@@ -609,6 +610,18 @@ function App() {
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
           <Route
+            path="/kundli-matching"
+            element={
+              <KundliMatchingPage
+                user={null}
+                onLogout={() => {}}
+                onAdminClick={() => {}}
+                onLogin={() => setShowLoginModal(true)}
+                showLoginButton
+              />
+            }
+          />
+          <Route
             path="/astrovastu"
             element={
               <AstroVastuTool
@@ -716,6 +729,18 @@ function App() {
           } />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
+          <Route
+            path="/kundli-matching"
+            element={
+              <KundliMatchingPage
+                user={user}
+                onLogout={handleLogout}
+                onAdminClick={handleAdminClick}
+                onLogin={() => setShowLoginModal(true)}
+                showLoginButton
+              />
+            }
+          />
           <Route
             path="/astrovastu"
             element={

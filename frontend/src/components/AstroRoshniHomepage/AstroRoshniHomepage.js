@@ -763,6 +763,13 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     }
   };
 
+  const normalizePrefillTime = (timeStr) => {
+    if (!timeStr) return '';
+    const parts = String(timeStr).split(':');
+    if (parts.length === 2) return `${timeStr}:00`;
+    return timeStr;
+  };
+
   const handleMatchingSubmit = (e) => {
     e.preventDefault();
     // Navigate to marriage analysis with pre-populated data
@@ -780,6 +787,32 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             date: `${matchingData.girl.year}-${matchingData.girl.month.padStart(2, '0')}-${matchingData.girl.day.padStart(2, '0')}`,
             time: `${matchingData.girl.hours.padStart(2, '0')}:${matchingData.girl.minutes.padStart(2, '0')}:${matchingData.girl.seconds.padStart(2, '0')}`,
             place: matchingData.girl.place
+          }
+        }
+      }
+    });
+  };
+
+  /** Opens dedicated Ashtakoot / Guna Milan tool (`/kundli-matching`), with optional prefill from the form. */
+  const handlePartnerFormSubmit = (boyData, girlData) => {
+    navigate('/kundli-matching', {
+      state: {
+        prefilledData: {
+          person1: {
+            name: boyData.name,
+            date: boyData.date,
+            time: normalizePrefillTime(boyData.time),
+            place: boyData.place,
+            latitude: boyData.latitude,
+            longitude: boyData.longitude
+          },
+          person2: {
+            name: girlData.name,
+            date: girlData.date,
+            time: normalizePrefillTime(girlData.time),
+            place: girlData.place,
+            latitude: girlData.latitude,
+            longitude: girlData.longitude
           }
         }
       }
@@ -1452,7 +1485,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="form-card matching-compact">
               <h3>Kundli Matching</h3>
               <PartnerForm 
-                onSubmit={() => navigate('/marriage-analysis')} 
+                onSubmit={handlePartnerFormSubmit}
                 user={user}
                 onLogin={() => setShowLoginModal(true)}
               />

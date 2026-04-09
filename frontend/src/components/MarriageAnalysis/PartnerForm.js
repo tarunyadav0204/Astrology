@@ -3,24 +3,32 @@ import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
 import { APP_CONFIG } from '../../config/app.config';
 
-const PartnerForm = ({ onSubmit, user, onLogin }) => {
-  const [boyData, setBoyData] = useState({
-    name: '',
-    date: '',
-    time: '',
-    place: '',
-    latitude: null,
-    longitude: null
-  });
+const emptyPartner = () => ({
+  name: '',
+  date: '',
+  time: '',
+  place: '',
+  latitude: null,
+  longitude: null
+});
 
-  const [girlData, setGirlData] = useState({
-    name: '',
-    date: '',
-    time: '',
-    place: '',
-    latitude: null,
-    longitude: null
-  });
+const mergePartnerState = (base, initial) => {
+  if (!initial || typeof initial !== 'object') return base;
+  return {
+    ...base,
+    name: initial.name ?? base.name,
+    date: initial.date ?? base.date,
+    time: initial.time ?? base.time,
+    place: initial.place ?? base.place,
+    latitude: initial.latitude !== undefined && initial.latitude !== '' ? initial.latitude : base.latitude,
+    longitude: initial.longitude !== undefined && initial.longitude !== '' ? initial.longitude : base.longitude
+  };
+};
+
+const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
+  const [boyData, setBoyData] = useState(() => mergePartnerState(emptyPartner(), initialBoy));
+
+  const [girlData, setGirlData] = useState(() => mergePartnerState(emptyPartner(), initialGirl));
 
   const [boySuggestions, setBoySuggestions] = useState([]);
   const [girlSuggestions, setGirlSuggestions] = useState([]);

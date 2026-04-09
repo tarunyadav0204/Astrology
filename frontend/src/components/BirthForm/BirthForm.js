@@ -55,8 +55,8 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         date: prefilledData.person1.date || '',
         time: prefilledData.person1.time || '',
         place: prefilledData.person1.place || '',
-        latitude: null,
-        longitude: null,
+        latitude: prefilledData.person1.latitude ?? null,
+        longitude: prefilledData.person1.longitude ?? null,
         gender: 'Male'
       });
     }

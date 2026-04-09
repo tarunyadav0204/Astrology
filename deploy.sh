@@ -2,9 +2,10 @@
 
 # Automated deployment script for Astrology App
 #
-# Order: (1) backend venv/pip + encryption → (2) restart backend + /api/health —
+# Order: (1) backend venv/pip + encryption → (2) restart backend + /api/health if needed —
 # then (3) frontend npm build → (4) restart static server only if build ran or 3001
-# is down. Mobile clients keep talking to a live API while the web bundle rebuilds.
+# is down. Frontend-only deploys skip (2) when /api/health is already OK so mobile
+# keeps the same API process during long npm build.
 set -e
 
 # Timestamps: wall clock, seconds since deploy start, seconds since previous timing line.
@@ -142,67 +143,83 @@ else
 fi
 deploy_timing "encryption setup finished"
 
-# --- Phase 2: restart backend first (API live before frontend work — least impact on mobile) ---
-echo "🔄 Restarting backend (frontend left running until new build is ready)..."
+# --- Phase 2: restart backend when backend/ changed or API unhealthy (skip for frontend-only) ---
+restart_backend=true
+if [ -n "${PREV_HEAD}" ] && [ "${FORCE_FULL_DEPLOY}" != "true" ] && [ -n "${CHANGED_FILES}" ]; then
+  if ! echo "${CHANGED_FILES}" | grep -qE '^backend/'; then
+    if curl -fsS --max-time 5 http://localhost:8001/api/health >/dev/null 2>&1; then
+      restart_backend=false
+      echo "⏭️ No backend/ files in this deploy and /api/health OK — skipping backend restart (keeps API up during frontend build)"
+    else
+      echo "⚠️ No backend/ changes but /api/health failed — restarting backend"
+    fi
+  fi
+fi
+
 cd "${APP_ROOT}"
 
 echo "Stopping restart monitor..."
 pkill -f restart_server.sh 2>/dev/null || true
 sleep 1
 
-echo "Stopping existing backend on 8001..."
-fuser -k 8001/tcp 2>/dev/null || true
-pkill -f "python main.py" 2>/dev/null || true
-pkill -f "uvicorn.*8001" 2>/dev/null || true
+if [ "${restart_backend}" = "true" ]; then
+  echo "🔄 Restarting backend (frontend left running until new build is ready)..."
+  echo "Stopping existing backend on 8001..."
+  fuser -k 8001/tcp 2>/dev/null || true
+  pkill -f "python main.py" 2>/dev/null || true
+  pkill -f "uvicorn.*8001" 2>/dev/null || true
 
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if ! ss -ltn 2>/dev/null | grep -qE ':8001\s'; then
-    break
-  fi
-  sleep 1
-done
-deploy_timing "backend port cleared"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    if ! ss -ltn 2>/dev/null | grep -qE ':8001\s'; then
+      break
+    fi
+    sleep 1
+  done
+  deploy_timing "backend port cleared"
 
-cd "${APP_ROOT}/backend"
-source venv/bin/activate
+  cd "${APP_ROOT}/backend"
+  source venv/bin/activate
 
-mkdir -p "${APP_ROOT}/logs"
+  mkdir -p "${APP_ROOT}/logs"
 
-export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-/home/tarun_yadav/play-billing-key.json}"
+  export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-/home/tarun_yadav/play-billing-key.json}"
 
-echo "Starting backend..."
-nohup python main.py > "${APP_ROOT}/logs/backend.log" 2>&1 &
-BACKEND_PID=$!
-echo "Backend PID: $BACKEND_PID"
-sleep 2
+  echo "Starting backend..."
+  nohup python main.py > "${APP_ROOT}/logs/backend.log" 2>&1 &
+  BACKEND_PID=$!
+  echo "Backend PID: $BACKEND_PID"
+  sleep 2
 
-if ps -p $BACKEND_PID > /dev/null; then
-    echo "✅ Backend started successfully on port 8001"
-    backend_ready=false
-    for i in $(seq 1 20); do
-      if curl -fsS http://localhost:8001/api/health >/dev/null; then
-        echo "✅ Backend health check passed"
-        backend_ready=true
-        break
-      fi
-      if ! ps -p $BACKEND_PID > /dev/null; then
-        echo "❌ Backend process exited before health check passed"
+  if ps -p $BACKEND_PID > /dev/null; then
+      echo "✅ Backend started successfully on port 8001"
+      backend_ready=false
+      for i in $(seq 1 20); do
+        if curl -fsS http://localhost:8001/api/health >/dev/null; then
+          echo "✅ Backend health check passed"
+          backend_ready=true
+          break
+        fi
+        if ! ps -p $BACKEND_PID > /dev/null; then
+          echo "❌ Backend process exited before health check passed"
+          tail -80 "${APP_ROOT}/logs/backend.log"
+          exit 1
+        fi
+        sleep 2
+      done
+
+      if [ "$backend_ready" != "true" ]; then
+        echo "❌ Health check did not pass in time"
         tail -80 "${APP_ROOT}/logs/backend.log"
         exit 1
       fi
-      sleep 2
-    done
-
-    if [ "$backend_ready" != "true" ]; then
-      echo "❌ Health check did not pass in time"
-      tail -80 "${APP_ROOT}/logs/backend.log"
+      deploy_timing "backend up and /api/health OK"
+  else
+      echo "❌ Backend failed to start. Check logs:"
+      tail -20 "${APP_ROOT}/logs/backend.log"
       exit 1
-    fi
-    deploy_timing "backend up and /api/health OK"
+  fi
 else
-    echo "❌ Backend failed to start. Check logs:"
-    tail -20 "${APP_ROOT}/logs/backend.log"
-    exit 1
+  deploy_timing "backend restart skipped (frontend-only deploy)"
 fi
 
 # --- Phase 3: frontend install/build (API already serving new code) ---

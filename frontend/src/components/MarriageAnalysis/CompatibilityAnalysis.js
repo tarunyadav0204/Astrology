@@ -1,13 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PartnerForm from './PartnerForm';
 import GunaScoreCard from './GunaScoreCard';
 import CompatibilityReport from './CompatibilityReport';
 
-const CompatibilityAnalysis = () => {
+const timeForPartnerInput = (t) => {
+  if (t == null || t === '') return '';
+  const s = String(t);
+  if (s.length >= 8 && s[5] === ':' && s[7] === ':') return s.slice(0, 5);
+  return s;
+};
+
+const personToPartnerInitial = (p) => {
+  if (!p || typeof p !== 'object') return undefined;
+  return {
+    name: p.name || '',
+    date: p.date || '',
+    time: timeForPartnerInput(p.time),
+    place: p.place || '',
+    latitude: p.latitude ?? null,
+    longitude: p.longitude ?? null
+  };
+};
+
+const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { initialBoy, initialGirl } = useMemo(() => {
+    const pref = location.state?.prefilledData;
+    if (!pref) return { initialBoy: undefined, initialGirl: undefined };
+    return {
+      initialBoy: personToPartnerInitial(pref.person1),
+      initialGirl: personToPartnerInitial(pref.person2)
+    };
+  }, [location.state]);
+
   const [partnerData, setPartnerData] = useState(null);
   const [compatibilityResult, setCompatibilityResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [formKey, setFormKey] = useState(0);
 
   const handlePartnerSubmit = async (boyData, girlData) => {
     setLoading(true);
@@ -27,6 +59,9 @@ const CompatibilityAnalysis = () => {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Please sign in to run Kundli matching (Ashtakoot Milan).');
+        }
         throw new Error('Failed to analyze compatibility');
       }
 
@@ -44,6 +79,10 @@ const CompatibilityAnalysis = () => {
     setPartnerData(null);
     setCompatibilityResult(null);
     setError(null);
+    if (location.pathname === '/kundli-matching') {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    setFormKey((k) => k + 1);
   };
 
   if (loading) {
@@ -60,13 +99,27 @@ const CompatibilityAnalysis = () => {
       <div className="compatibility-error">
         <h4>Error</h4>
         <p>{error}</p>
+        {onLogin && String(error).toLowerCase().includes('sign in') && (
+          <button type="button" className="btn-reset" onClick={onLogin} style={{ marginRight: 8 }}>
+            Sign in
+          </button>
+        )}
         <button onClick={handleReset} className="btn-reset">Try Again</button>
       </div>
     );
   }
 
   if (!compatibilityResult) {
-    return <PartnerForm onSubmit={handlePartnerSubmit} />;
+    return (
+      <PartnerForm
+        key={formKey}
+        onSubmit={handlePartnerSubmit}
+        user={user}
+        onLogin={onLogin}
+        initialBoy={initialBoy}
+        initialGirl={initialGirl}
+      />
+    );
   }
 
   return (

@@ -4,6 +4,7 @@ import './SearchBar.css';
 
 const SEARCH_DATA = [
   { title: 'Marriage Analysis', path: '/marriage-analysis', keywords: ['marriage', 'spouse', 'compatibility', 'wedding', 'partner'] },
+  { title: 'Kundli Matching (Ashtakoot)', path: '/kundli-matching', keywords: ['kundli', 'matching', 'ashtakoot', 'guna', 'milan', 'gun milan', 'horoscope match'] },
   { title: 'Career Guidance', path: '/career-guidance', keywords: ['career', 'job', 'profession', 'work', 'business'] },
   { title: 'Wealth Analysis', path: '/wealth-analysis', keywords: ['wealth', 'money', 'finance', 'prosperity', 'income'] },
   { title: 'Health Analysis', path: '/health-analysis', keywords: ['health', 'medical', 'wellness', 'disease', 'fitness'] },

@@ -162,8 +162,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       if (activeSubTab === 'management') {
         fetchUsers();
         fetchSubscriptionPlans();
-      } else if (activeSubTab === 'facts') {
-        fetchUserFacts();
       }
     } else if (activeTab === 'charts') {
       fetchCharts();
@@ -458,22 +456,47 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const fetchUserFacts = async () => {
+  const fetchUserFacts = async (overrides = {}) => {
+    const page = overrides.page != null ? overrides.page : factsPage;
+    const search =
+      overrides.search !== undefined ? overrides.search : factsSearch;
     setFactsLoading(true);
     try {
-      const response = await fetch(`/api/admin/facts?search=${factsSearch}&page=${factsPage}&limit=20`, {
+      const params = new URLSearchParams();
+      const q = String(search || '').trim();
+      if (q) params.set('search', q);
+      params.set('page', String(page));
+      params.set('limit', '20');
+      const response = await fetch(`/api/admin/facts?${params.toString()}`, {
         headers: getAdminAuthHeaders()
       });
+      if (!response.ok) {
+        console.error('Facts API error', response.status);
+        setUserFacts([]);
+        setFactsTotalPages(1);
+        return;
+      }
       const data = await response.json();
       setUserFacts(data.facts || []);
-      setFactsTotalPages(data.total_pages || 1);
+      const tp = data.total_pages;
+      setFactsTotalPages(
+        typeof tp === 'number' && tp >= 1 ? tp : Math.max(1, Math.ceil((data.total || 0) / 20))
+      );
     } catch (error) {
       console.error('Error fetching user facts:', error);
       setUserFacts([]);
+      setFactsTotalPages(1);
     } finally {
       setFactsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'users' && activeSubTab === 'facts') {
+      fetchUserFacts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch on tab/page only; Search calls fetchUserFacts explicitly
+  }, [activeTab, activeSubTab, factsPage]);
 
   const fetchCharts = async (pageOverride = null) => {
     setLoading(true);
@@ -1590,12 +1613,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <div className="facts-search">
               <input
                 type="text"
-                placeholder="Search by username, phone, or native name..."
+                placeholder="Search by username, phone, email, or fact text..."
                 value={factsSearch}
                 onChange={(e) => setFactsSearch(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && fetchUserFacts()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setFactsPage(1);
+                    fetchUserFacts({ page: 1 });
+                  }
+                }}
               />
-              <button onClick={fetchUserFacts}>Search</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFactsPage(1);
+                  fetchUserFacts({ page: 1 });
+                }}
+              >
+                Search
+              </button>
             </div>
 
             {factsLoading ? (
