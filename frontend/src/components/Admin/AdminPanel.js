@@ -495,7 +495,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     if (activeTab === 'users' && activeSubTab === 'facts') {
       fetchUserFacts();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch on tab/page only; Search calls fetchUserFacts explicitly
   }, [activeTab, activeSubTab, factsPage]);
 
   const fetchCharts = async (pageOverride = null) => {
