@@ -79,7 +79,6 @@ async def get_facts(birth_chart_id: int, current_user: dict = Depends(get_curren
 @router.post("/facts")
 async def add_fact(fact_data: FactCreate, current_user: dict = Depends(get_current_user)):
     """Add a new fact"""
-    conn = None
     try:
         verify_chart_ownership(fact_data.birth_chart_id, current_user.userid)
         with get_db_connection() as conn:
@@ -99,114 +98,99 @@ async def add_fact(fact_data: FactCreate, current_user: dict = Depends(get_curre
             )
             row = cur.fetchone()
             fact_id = row[0] if row else None
-        
+            conn.commit()
+
         return {"success": True, "fact_id": fact_id, "message": "Fact added"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error adding fact for chart {fact_data.birth_chart_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to add fact")
-    finally:
-        if conn:
-            conn.close()
 
 @router.put("/facts/{fact_id}")
 async def update_fact(fact_id: int, fact_data: FactUpdate, current_user: dict = Depends(get_current_user)):
     """Update an existing fact"""
-    conn = None
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Verify ownership
-        cur = execute(
-            conn,
-            """
-            SELECT bc.userid
-            FROM user_facts uf
-            JOIN birth_charts bc ON bc.id = uf.birth_chart_id
-            WHERE uf.id = %s
-            """,
-            (fact_id,),
-        )
-        result = cur.fetchone()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Fact not found")
-        if result[0] != current_user.userid:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Build update query
-        updates = []
-        params = []
-        if fact_data.category is not None:
-            updates.append("category = %s")
-            params.append(fact_data.category)
-        if fact_data.fact is not None:
-            updates.append("fact = %s")
-            params.append(fact_data.fact)
-        if fact_data.confidence is not None:
-            updates.append("confidence = %s")
-            params.append(fact_data.confidence)
-        
-        if not updates:
-            raise HTTPException(status_code=400, detail="No fields to update")
-        
-        params.append(fact_id)
-        execute(
-            conn,
-            f"UPDATE user_facts SET {', '.join(updates)} WHERE id = %s",
-            params,
-        )
-        conn.commit()
-        
+        with get_db_connection() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT bc.userid
+                FROM user_facts uf
+                JOIN birth_charts bc ON bc.id = uf.birth_chart_id
+                WHERE uf.id = %s
+                """,
+                (fact_id,),
+            )
+            result = cur.fetchone()
+
+            if not result:
+                raise HTTPException(status_code=404, detail="Fact not found")
+            if result[0] != current_user.userid:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+            updates = []
+            params = []
+            if fact_data.category is not None:
+                updates.append("category = %s")
+                params.append(fact_data.category)
+            if fact_data.fact is not None:
+                updates.append("fact = %s")
+                params.append(fact_data.fact)
+            if fact_data.confidence is not None:
+                updates.append("confidence = %s")
+                params.append(fact_data.confidence)
+
+            if not updates:
+                raise HTTPException(status_code=400, detail="No fields to update")
+
+            params.append(fact_id)
+            execute(
+                conn,
+                f"UPDATE user_facts SET {', '.join(updates)} WHERE id = %s",
+                params,
+            )
+            conn.commit()
+
         return {"success": True, "message": "Fact updated"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating fact {fact_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update fact")
-    finally:
-        if conn:
-            conn.close()
 
 @router.delete("/facts/{fact_id}")
 async def delete_fact(fact_id: int, current_user: dict = Depends(get_current_user)):
     """Delete a fact"""
-    conn = None
     try:
-        conn = get_db_connection()
-        # Verify ownership
-        cur = execute(
-            conn,
-            """
-            SELECT bc.userid
-            FROM user_facts uf
-            JOIN birth_charts bc ON bc.id = uf.birth_chart_id
-            WHERE uf.id = %s
-            """,
-            (fact_id,),
-        )
-        result = cur.fetchone()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Fact not found")
-        if result[0] != current_user.userid:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        execute(
-            conn,
-            "DELETE FROM user_facts WHERE id = %s",
-            (fact_id,),
-        )
-        conn.commit()
-        
+        with get_db_connection() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT bc.userid
+                FROM user_facts uf
+                JOIN birth_charts bc ON bc.id = uf.birth_chart_id
+                WHERE uf.id = %s
+                """,
+                (fact_id,),
+            )
+            result = cur.fetchone()
+
+            if not result:
+                raise HTTPException(status_code=404, detail="Fact not found")
+            if result[0] != current_user.userid:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+            execute(
+                conn,
+                "DELETE FROM user_facts WHERE id = %s",
+                (fact_id,),
+            )
+            conn.commit()
+
         return {"success": True, "message": "Fact deleted"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting fact {fact_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to delete fact")
-    finally:
-        if conn:
-            conn.close()
