@@ -36,7 +36,8 @@ def verify_chart_ownership(birth_chart_id: int, user_id: int):
     
     if not result:
         raise HTTPException(status_code=404, detail="Birth chart not found")
-    if result['userid'] != user_id:
+    # psycopg2 default cursor returns tuples, not dict rows
+    if result[0] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
 @router.get("/facts/{birth_chart_id}")
