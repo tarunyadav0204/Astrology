@@ -306,7 +306,6 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             ☰
           </button>
           <div className="top-links">
-            <a href="/kundli" className="top-link">Kundli</a>
             <a href="/calendar-2026" className="top-link">Calendar 2026</a>
             <a href="/contact" className="top-link">Contact us</a>
             {/* <a href="/astroroshni" target="_blank" className="astroroshni-link">
