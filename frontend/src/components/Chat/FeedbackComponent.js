@@ -1,5 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FeedbackComponent.css';
+
+/** Listing for the Android app (same as AstroRoshni homepage CTA). */
+const GOOGLE_PLAY_LISTING_URL =
+  'https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share';
+
+const FeedbackPlayStoreLink = () => (
+  <div className="feedback-play-row">
+    <a
+      className="feedback-play-link"
+      href={GOOGLE_PLAY_LISTING_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span className="feedback-play-icon" aria-hidden>
+        ▶
+      </span>
+      Leave a rating on Google Play
+    </a>
+    <span className="feedback-play-hint">Helps others discover the app</span>
+  </div>
+);
 
 const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
   const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
@@ -67,7 +88,10 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
   return (
     <div className={`feedback-component ${fadeClass}`}>
       {feedback.submitted ? (
-        <div className="feedback-thanks">Thanks for your feedback! 🙏</div>
+        <>
+          <div className="feedback-thanks">Thanks for your feedback! 🙏</div>
+          <FeedbackPlayStoreLink />
+        </>
       ) : (
         <>
           <div className="feedback-title">How was this answer?</div>
@@ -101,6 +125,8 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
               </div>
             </>
           )}
+          <div className="feedback-play-divider" aria-hidden />
+          <FeedbackPlayStoreLink />
         </>
       )}
     </div>

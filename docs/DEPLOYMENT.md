@@ -28,7 +28,11 @@ bash deploy.sh
 ## How It Works
 
 - **Push to main** → GitHub Actions → SSH to server → Auto deployment
-- **deploy.sh** pulls latest code and restarts services
+- **deploy.sh** pulls latest code, restarts the **backend** and waits for `/api/health`, then builds/restarts the **frontend** static server (so the API is updated before long `npm run build`; mobile is less affected)
+- **`pip install -r backend/requirements.txt`** runs only when `backend/requirements.txt` changed, on **first deploy** (no previous HEAD), or when **`FORCE_FULL_DEPLOY=true`**. Ordinary backend-only Python changes skip pip to speed deploys.
+- **Force pip on a push**: put **`[pip]`**, **`[deps]`**, or **`[full-pip]`** in the commit message (any of these tags).
+- **Skip pip when safe**: **`[skip-pip]`** in the commit message is ignored if `requirements.txt` changed or it is the first deploy.
+- **Manual deploy**: Actions → **Deploy to GCP** → **Run workflow** → enable **Force backend pip** if you need a fresh venv install without editing `requirements.txt`.
 - **systemd service** keeps backend running
 - **Logs** stored in `logs/` directory
 

@@ -289,6 +289,43 @@ button.chat-header-credits.credits-display:active {
     box-sizing: border-box;
 }
 
+/* One column for bubble + feedback: same width as the bubble card (70% of thread max). */
+.message-list-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.message-list-item--assistant {
+    align-items: flex-start;
+}
+
+.message-list-item--user {
+    align-items: flex-end;
+}
+
+.message-list-item__stack {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 70%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Inside this stack the thread cap is already 70%; fill the stack so we don’t “70% of 70%”. */
+.message-list-item__stack .message-content {
+    max-width: 100%;
+}
+
+.message-list-item__stack .feedback-component {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
 .message-bubble {
     display: flex;
     margin-bottom: 10px;
@@ -746,6 +783,14 @@ button.chat-header-credits.credits-display:active {
         padding: 12px 12px;
         border-radius: 16px;
         font-size: 15px;
+    }
+
+    .message-list-item__stack {
+        max-width: 100%;
+    }
+
+    .message-list-item__stack .feedback-component {
+        max-width: none;
     }
 
     /* Chart essence: full thread width, no message bubble padding shrinking the card */

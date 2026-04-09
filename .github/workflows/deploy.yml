@@ -1,4 +1,6 @@
-# Push to main runs deploy.sh on the server (restart backend + frontend).
+# Push to main runs deploy.sh on the server (backend restart + health first, then frontend).
+# Pip install runs only when backend/requirements.txt changed (or first deploy), unless you
+# add [pip] to the commit message or use "Run workflow" → Force backend pip.
 # Do NOT git pull/reset before deploy.sh: deploy.sh records PREV_HEAD then
 # fetches/resets so CHANGED_FILES is non-empty and frontend rebuilds when
 # frontend/ changed. A pre-reset makes PREV_HEAD == NEW_HEAD and skips npm build.
@@ -7,7 +9,12 @@ name: Deploy to GCP
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # "Run workflow" button in GitHub Actions
+  workflow_dispatch:
+    inputs:
+      force_backend_pip:
+        description: 'Run pip install -r backend/requirements.txt (even if file unchanged)'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -23,6 +30,7 @@ jobs:
         script: |
           echo "========== GitHub Actions: deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           cd AstrologyApp
+          export FORCE_BACKEND_PIP="${{ github.event.inputs.force_backend_pip == 'true' && 'true' || 'false' }}"
           bash deploy.sh
           echo "========== GitHub Actions: deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') exit code $? =========="
           echo "========== (Timestamps above are the runner clock; lines starting with ⏱️ are from deploy.sh on the server.) =========="

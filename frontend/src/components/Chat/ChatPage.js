@@ -28,6 +28,48 @@ function isBirthChartReadyForChat(data) {
     return hasCoords || hasPlace;
 }
 
+/**
+ * `/api/chat/history` (legacy session store) returns rows like `{ question, response, timestamp }`.
+ * MessageBubble expects `{ role, content, timestamp }`; without this, `content` is missing and only the
+ * per-row clock (toLocaleTimeString) appears under chart essence.
+ */
+function normalizeLegacyChatHistoryItems(items) {
+    if (!Array.isArray(items)) return [];
+    const out = [];
+    let seq = 0;
+    const nid = () => `hist-${Date.now()}-${seq++}`;
+
+    for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+
+        if (item.role === 'user' || item.role === 'assistant') {
+            out.push({
+                ...item,
+                messageId: item.messageId ?? item.message_id ?? nid(),
+                timestamp: item.timestamp || new Date().toISOString(),
+            });
+            continue;
+        }
+
+        const ts = item.timestamp || new Date().toISOString();
+        const q = item.question != null ? String(item.question).trim() : '';
+        const r = item.response != null ? String(item.response).trim() : '';
+        if (q) {
+            out.push({ role: 'user', content: q, timestamp: ts, messageId: nid() });
+        }
+        if (r) {
+            out.push({
+                role: 'assistant',
+                content: r,
+                timestamp: ts,
+                messageId: nid(),
+                message_type: item.message_type || 'answer',
+            });
+        }
+    }
+    return out;
+}
+
 function singleChartProfileDisplay(b) {
     if (!b) return { name: 'Your chart', initials: '?', metaLine: '' };
     const name = (b.name && String(b.name).trim()) || 'Your chart';
@@ -617,7 +659,7 @@ const ChatPage = () => {
             
             const data = await response.json();
             // console.log('Chat history response:', data);
-            const existingMessages = data.history || data.messages || [];
+            const existingMessages = normalizeLegacyChatHistoryItems(data.history || data.messages || []);
             setMessages(existingMessages);
             
             // Add greeting if no existing messages
@@ -883,13 +925,20 @@ const ChatPage = () => {
                 });
 
                 if (status.status === 'completed') {
+                    const raw =
+                        status.content != null && String(status.content).trim() !== ''
+                            ? status.content
+                            : '';
+                    const content =
+                        raw ||
+                        "This answer didn't save any text. Please try your question again, or contact support if it keeps happening.";
                     setMessages(prev =>
                         prev.map(m =>
                             m.processingClientId === processingClientId
                                 ? {
                                     ...m,
                                     messageId: assistantMessageId,
-                                    content: status.content || '',
+                                    content,
                                     isProcessing: false,
                                     isTyping: false,
                                     message_type: status.message_type || 'answer',

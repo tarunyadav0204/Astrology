@@ -24,7 +24,16 @@ function formatTotalDurationMs(ms) {
   return `${s.toFixed(digits)} s`;
 }
 
-export default function AdminActivity() {
+/** Returns positive integer user id or null if missing / invalid. */
+function parseActivityUserId(row) {
+  const v = row?.user_id;
+  if (v == null || v === '') return null;
+  const n = parseInt(String(v).trim(), 10);
+  if (!n || Number.isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+export default function AdminActivity({ onOpenUserProfile }) {
   const [activity, setActivity] = useState([]);
   const [distinctUsers, setDistinctUsers] = useState([]);
   const [distinctUserCount, setDistinctUserCount] = useState(0);
@@ -253,8 +262,20 @@ export default function AdminActivity() {
                       </td>
                     </tr>
                   ) : (
-                    distinctUsers.map((row, idx) => (
-                      <tr key={`${row.user_id ?? ''}-${row.user_phone ?? ''}-${idx}`}>
+                    distinctUsers.map((row, idx) => {
+                      const uid = parseActivityUserId(row);
+                      const openProfile = () => {
+                        if (uid != null && typeof onOpenUserProfile === 'function') {
+                          onOpenUserProfile(uid);
+                        }
+                      };
+                      return (
+                      <tr
+                        key={`${row.user_id ?? ''}-${row.user_phone ?? ''}-${idx}`}
+                        className={uid != null ? 'admin-activity-tr-clickable' : 'admin-activity-tr-no-user'}
+                        onClick={uid != null ? openProfile : undefined}
+                        title={uid != null ? 'Open user profile (today’s date range)' : 'No user ID — open profile from User management after lookup'}
+                      >
                         <td className="admin-activity-td" title={row.user_name || ''}>
                           {row.user_name != null && String(row.user_name).trim() !== ''
                             ? String(row.user_name)
@@ -280,7 +301,8 @@ export default function AdminActivity() {
                           {formatTotalDurationMs(row.total_duration_ms)}
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -316,15 +338,28 @@ export default function AdminActivity() {
                   </td>
                 </tr>
               ) : (
-                activity.map((row, idx) => (
-                  <tr key={row.event_id || idx}>
+                activity.map((row, idx) => {
+                  const uid = parseActivityUserId(row);
+                  const openProfile = () => {
+                    if (uid != null && typeof onOpenUserProfile === 'function') {
+                      onOpenUserProfile(uid);
+                    }
+                  };
+                  return (
+                  <tr
+                    key={row.event_id || idx}
+                    className={uid != null ? 'admin-activity-tr-clickable' : 'admin-activity-tr-no-user'}
+                    onClick={uid != null ? openProfile : undefined}
+                    title={uid != null ? 'Open user profile (today’s date range)' : 'No user ID on this row'}
+                  >
                     {COLUMNS.map((col) => (
                       <td key={col} className="admin-activity-td" title={renderCell(row, col)}>
                         {renderCell(row, col)}
                       </td>
                     ))}
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

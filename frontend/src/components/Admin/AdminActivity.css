@@ -153,3 +153,15 @@
 .admin-activity-distinct-table .admin-activity-th {
   max-width: none;
 }
+
+.admin-activity-tr-clickable {
+  cursor: pointer;
+}
+
+.admin-activity-tr-clickable:hover {
+  background: #f1f3f5;
+}
+
+.admin-activity-tr-no-user {
+  cursor: default;
+}

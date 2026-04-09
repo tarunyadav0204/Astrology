@@ -50,37 +50,23 @@ function parseDashaYmd(iso) {
     return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
 }
 
-function endOfDashaDay(iso) {
-    const base = parseDashaYmd(iso);
-    if (!base) return null;
-    return new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999);
-}
-
-/** Prefer API `current` flag; fall back to date range (fixes rare mobile / parsing gaps). */
-function pickCurrentDasha(list, refDate = new Date()) {
+/**
+ * Match mobile ChatScreen: use the row the API marked current (truthy `current` only).
+ * Do not infer from local clock + date strings — that diverges from the server and produced wrong chips on web.
+ */
+function pickCurrentDasha(list) {
     if (!Array.isArray(list) || list.length === 0) return null;
-    const byFlag = list.find((d) => d && (d.current === true || d.current === 'true'));
-    if (byFlag) return byFlag;
-    const t = refDate.getTime();
-    return (
-        list.find((d) => {
-            if (!d?.planet) return false;
-            const start = parseDashaYmd(d.start);
-            const end = endOfDashaDay(d.end);
-            if (!start || !end) return false;
-            return start.getTime() <= t && t <= end.getTime();
-        }) || null
-    );
+    return list.find((d) => d && d.current) || null;
 }
 
-function currentDashaChips(dashaData, refDate = new Date()) {
+function currentDashaChips(dashaData) {
     if (!dashaData) return [];
     return [
-        pickCurrentDasha(dashaData.maha_dashas, refDate),
-        pickCurrentDasha(dashaData.antar_dashas, refDate),
-        pickCurrentDasha(dashaData.pratyantar_dashas, refDate),
-        pickCurrentDasha(dashaData.sookshma_dashas, refDate),
-        pickCurrentDasha(dashaData.prana_dashas, refDate),
+        pickCurrentDasha(dashaData.maha_dashas),
+        pickCurrentDasha(dashaData.antar_dashas),
+        pickCurrentDasha(dashaData.pratyantar_dashas),
+        pickCurrentDasha(dashaData.sookshma_dashas),
+        pickCurrentDasha(dashaData.prana_dashas),
     ].filter(Boolean);
 }
 
@@ -104,7 +90,7 @@ const ChatChartEssence = ({ chartData, dashaData, personName, isLoading }) => {
     const moon = formatPlanetSign(chartData, 'Moon');
     const asc = formatAsc(chartData);
 
-    const chips = currentDashaChips(dashaData, new Date());
+    const chips = currentDashaChips(dashaData);
 
     const handleChipClick = () => {
         navigate('/dashboard');

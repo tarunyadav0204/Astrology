@@ -7,10 +7,49 @@ import {
   Animated,
   Alert,
   StyleSheet,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
+
+/** Same listing as web chat + AstroRoshni homepage CTA. */
+const GOOGLE_PLAY_LISTING_URL =
+  'https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share';
+
+function FeedbackPlayStoreRow({ colors, theme }) {
+  const openPlay = () => {
+    Linking.openURL(GOOGLE_PLAY_LISTING_URL).catch(() => {});
+  };
+  return (
+    <>
+      <View style={styles.playDivider} />
+      <TouchableOpacity
+        style={[
+          styles.playLinkButton,
+          {
+            borderColor: theme === 'dark' ? 'rgba(96, 165, 250, 0.45)' : 'rgba(15, 71, 160, 0.25)',
+            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.85)',
+          },
+        ]}
+        onPress={openPlay}
+        activeOpacity={0.85}
+        accessibilityRole="link"
+        accessibilityLabel="Leave a rating on Google Play"
+      >
+        <View style={styles.playIconBadge}>
+          <Text style={styles.playIconText}>▶</Text>
+        </View>
+        <Text style={[styles.playLinkLabel, { color: theme === 'dark' ? '#93c5fd' : '#0f47a0' }]}>
+          Leave a rating on Google Play
+        </Text>
+      </TouchableOpacity>
+      <Text style={[styles.playHint, { color: colors.textSecondary || '#6b7280' }]}>
+        Helps others discover the app
+      </Text>
+    </>
+  );
+}
 
 export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   const { theme, colors } = useTheme();
@@ -97,7 +136,10 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
       borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.3)'
     }]}>
       {feedback.submitted ? (
-        <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>
+        <>
+          <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>
+          <FeedbackPlayStoreRow colors={colors} theme={theme} />
+        </>
       ) : (
         <>
           <Text style={[styles.title, { color: colors.text }]}>How was this answer?</Text>
@@ -139,6 +181,7 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
               </View>
             </>
           )}
+          <FeedbackPlayStoreRow colors={colors} theme={theme} />
         </>
       )}
     </Animated.View>
@@ -211,5 +254,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontWeight: '600',
+    marginBottom: 4,
+  },
+  playDivider: {
+    height: 1,
+    marginTop: 14,
+    marginBottom: 12,
+    backgroundColor: 'rgba(249, 115, 22, 0.22)',
+  },
+  playLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 320,
+  },
+  playIconBadge: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
+    borderRadius: 4,
+    backgroundColor: '#01875f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playIconText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+    marginLeft: 1,
+  },
+  playLinkLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  playHint: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 15,
+    paddingHorizontal: 8,
   },
 });

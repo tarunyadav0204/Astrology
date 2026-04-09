@@ -1560,7 +1560,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'users' && activeSubTab === 'activity' && (
-          <AdminActivity />
+          <AdminActivity
+            onOpenUserProfile={(userId) => {
+              const t = new Date().toISOString().slice(0, 10);
+              setProfileJumpContext({
+                userId: String(userId),
+                dateFrom: t,
+                dateTo: t,
+                nonce: Date.now(),
+              });
+              setActiveSubTab('userProfile');
+            }}
+          />
         )}
 
         {activeTab === 'users' && activeSubTab === 'userProfile' && (
