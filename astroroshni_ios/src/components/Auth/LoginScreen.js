@@ -188,11 +188,12 @@ export default function LoginScreen({ navigation }) {
         // Register with birth details
         response = await authAPI.registerWithBirth({
           ...registrationData,
-          birth_details: birthDetails
+          birth_details: birthDetails,
+          signup_client: 'mobile',
         });
       } else {
         // Regular registration
-        response = await authAPI.register(registrationData);
+        response = await authAPI.register({ ...registrationData, signup_client: 'mobile' });
       }
       
       await storage.setAuthToken(response.data.access_token);

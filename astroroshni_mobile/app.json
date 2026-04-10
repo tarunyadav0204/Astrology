@@ -39,7 +39,7 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "versionCode": 111,
+      "versionCode": 112,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": ["com.android.vending.BILLING"]

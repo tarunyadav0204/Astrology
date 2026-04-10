@@ -9,6 +9,7 @@ CREATE TABLE "users" (
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     "name" TEXT DEFAULT '',
     "email" TEXT,
+    "signup_client" TEXT,
     PRIMARY KEY ("userid")
 );
 

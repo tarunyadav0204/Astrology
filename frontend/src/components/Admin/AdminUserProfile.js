@@ -217,6 +217,15 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
               {' · '}
               <span>role {user.role || 'user'}</span>
               {' · '}
+              <span>
+                signup{' '}
+                {user.signup_client === 'web'
+                  ? 'Web'
+                  : user.signup_client === 'mobile'
+                    ? 'Mobile app'
+                    : '—'}
+              </span>
+              {' · '}
               <span>credits {user.credits_balance ?? '—'}</span>
               {' · '}
               <span>userid {user.userid}</span>

@@ -150,7 +150,8 @@ export default function PasswordScreen({
             phone: fullPhone,
             password: formData.password,
             email: formData.email,
-            role: 'user'
+            role: 'user',
+            signup_client: 'mobile',
           });
           
           await storage.setAuthToken(response.data.access_token);

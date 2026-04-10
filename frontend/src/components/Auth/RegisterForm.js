@@ -136,7 +136,8 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
         phone: formData.phone.trim(),
         email: emailTrim,
         otp_token: otpToken,
-        password: formData.password
+        password: formData.password,
+        signup_client: 'web',
       });
       localStorage.setItem('token', response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));

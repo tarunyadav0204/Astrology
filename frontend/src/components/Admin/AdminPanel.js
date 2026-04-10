@@ -1390,15 +1390,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <th>Phone</th>
                       <th>Name</th>
                       <th>Email</th>
+                      <th title="Recorded at account creation from the registering app (web vs mobile).">
+                        Signup
+                      </th>
                       <th>Role</th>
                       <th>Subscriptions</th>
+                      <th
+                        title="Mobile app platforms with a registered Expo push token. Blank can mean web-only or app without push."
+                      >
+                        App (push)
+                      </th>
                       <th>Created</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.length === 0 ? (
-                      <tr><td colSpan={7} className="users-table-empty">No users match the search.</td></tr>
+                      <tr><td colSpan={9} className="users-table-empty">No users match the search.</td></tr>
                     ) : (
                       users.map(user => (
                       <tr
@@ -1418,6 +1426,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         <td>{user.phone}</td>
                         <td>{user.name || user.phone || '—'}</td>
                         <td>{user.email || '—'}</td>
+                        <td>
+                          {user.signup_client === 'web'
+                            ? 'Web'
+                            : user.signup_client === 'mobile'
+                              ? 'Mobile app'
+                              : '—'}
+                        </td>
                         <td onClick={(e) => editingUser === user.phone && e.stopPropagation()}>
                           {editingUser === user.phone ? (
                             <select 
@@ -1521,6 +1536,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                               </div>
                             )}
                           </div>
+                        </td>
+                        <td title={Array.isArray(user.app_push_platforms) && user.app_push_platforms.length ? user.app_push_platforms.join(', ') : ''}>
+                          {Array.isArray(user.app_push_platforms) && user.app_push_platforms.length > 0
+                            ? user.app_push_platforms
+                                .map((p) => (p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : p))
+                                .join(', ')
+                            : '—'}
                         </td>
                         <td>{new Date(user.created_at).toLocaleDateString()}</td>
                         <td onClick={(e) => e.stopPropagation()}>

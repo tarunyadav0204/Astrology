@@ -172,7 +172,7 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT u.userid, u.name, u.phone, u.email, u.role, u.created_at,
+                SELECT u.userid, u.name, u.phone, u.email, u.role, u.created_at, u.signup_client,
                        COALESCE(uc.credits, 0) AS credits_balance,
                        COALESCE(uc.free_chat_question_used, 0) AS free_chat_question_used
                 FROM users u

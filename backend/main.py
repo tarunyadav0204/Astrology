@@ -208,10 +208,24 @@ MIN_ANDROID_VERSION_CODE = int(os.getenv("MIN_ANDROID_VERSION_CODE", "0"))
 MIN_IOS_BUILD_NUMBER = int(os.getenv("MIN_IOS_BUILD_NUMBER", "0"))
 
 
+def ensure_users_signup_client_column() -> None:
+    """Add signup_client (web | mobile) for registration source; safe to run repeatedly."""
+    try:
+        with get_conn() as conn:
+            execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_client TEXT")
+            conn.commit()
+    except Exception as e:
+        logger.warning("Could not ensure users.signup_client column: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
     # Startup
+    try:
+        ensure_users_signup_client_column()
+    except Exception as e:
+        print(f"Warning: signup_client schema check failed: {e}")
     try:
         prediction_engine = DailyPredictionEngine()
         prediction_engine.reset_prediction_rules()
@@ -649,6 +663,17 @@ class UserCreate(BaseModel):
     email: Optional[str] = None
     otp_token: Optional[str] = None
     role: str = "user"
+    signup_client: Optional[str] = None
+
+    @field_validator("signup_client", mode="before")
+    @classmethod
+    def _normalize_signup_client(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str) and not str(v).strip():
+            return None
+        s = str(v).strip().lower()
+        return s if s in ("web", "mobile") else None
 
 class UserLogin(BaseModel):
     phone: str
@@ -958,6 +983,17 @@ class UserRegistrationWithBirth(BaseModel):
     email: str
     birth_details: Optional[BirthData] = None
     role: str = "user"
+    signup_client: Optional[str] = None
+
+    @field_validator("signup_client", mode="before")
+    @classmethod
+    def _normalize_signup_client_registration(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str) and not str(v).strip():
+            return None
+        s = str(v).strip().lower()
+        return s if s in ("web", "mobile") else None
 
 @app.post("/api/register")
 async def register(user_data: UserCreate):
@@ -993,8 +1029,15 @@ async def register(user_data: UserCreate):
         try:
             execute(
                 conn,
-                "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
-                (user_data.name, user_data.phone, hashed_password, user_data.role, email_clean),
+                "INSERT INTO users (name, phone, password, role, email, signup_client) VALUES (%s, %s, %s, %s, %s, %s)",
+                (
+                    user_data.name,
+                    user_data.phone,
+                    hashed_password,
+                    user_data.role,
+                    email_clean,
+                    user_data.signup_client,
+                ),
             )
         except pg_errors.UniqueViolation:
             conn.rollback()
@@ -1003,7 +1046,11 @@ async def register(user_data: UserCreate):
                 detail="Unable to complete registration. Try signing in, or contact support if this persists.",
             )
 
-        cur = execute(conn, "SELECT userid, name, phone, role, email FROM users WHERE phone = %s", (user_data.phone,))
+        cur = execute(
+            conn,
+            "SELECT userid, name, phone, role, email, signup_client FROM users WHERE phone = %s",
+            (user_data.phone,),
+        )
         user = cur.fetchone()
 
         # Get free plans for both platforms
@@ -1056,7 +1103,8 @@ async def register(user_data: UserCreate):
             "name": user[1],
             "phone": user[2],
             "role": user[3],
-            "email": user[4] if len(user) > 4 else None
+            "email": user[4] if len(user) > 4 else None,
+            "signup_client": user[5] if len(user) > 5 else None,
         },
         "self_birth_chart": None  # No birth chart in regular registration
     }
@@ -1074,8 +1122,15 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
         try:
             execute(
                 conn,
-                "INSERT INTO users (name, phone, password, role, email) VALUES (%s, %s, %s, %s, %s)",
-                (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email),
+                "INSERT INTO users (name, phone, password, role, email, signup_client) VALUES (%s, %s, %s, %s, %s, %s)",
+                (
+                    user_data.name,
+                    user_data.phone,
+                    hashed_password,
+                    user_data.role,
+                    user_data.email,
+                    user_data.signup_client,
+                ),
             )
         except pg_errors.UniqueViolation:
             conn.rollback()
@@ -1085,7 +1140,11 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             )
         conn.commit()
 
-        cur = execute(conn, "SELECT userid, name, phone, role, email FROM users WHERE phone = %s", (user_data.phone,))
+        cur = execute(
+            conn,
+            "SELECT userid, name, phone, role, email, signup_client FROM users WHERE phone = %s",
+            (user_data.phone,),
+        )
         user = cur.fetchone()
 
         birth_chart_data = None
@@ -1165,7 +1224,8 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             "name": user[1],
             "phone": user[2],
             "role": user[3],
-            "email": user[4] if len(user) > 4 else None
+            "email": user[4] if len(user) > 4 else None,
+            "signup_client": user[5] if len(user) > 5 else None,
         },
         "self_birth_chart": birth_chart_data
     }
@@ -1261,7 +1321,7 @@ async def login(user_data: UserLogin):
         with get_conn() as conn:
             cur = execute(
                 conn,
-                "SELECT userid, name, phone, password, role, email FROM users WHERE phone = %s",
+                "SELECT userid, name, phone, password, role, email, signup_client FROM users WHERE phone = %s",
                 (user_data.phone,),
             )
             user = cur.fetchone()
@@ -1368,6 +1428,7 @@ async def login(user_data: UserLogin):
                 "phone": user[2],
                 "role": user[4],
                 "email": user[5] if len(user) > 5 else None,
+                "signup_client": user[6] if len(user) > 6 else None,
                 "subscriptions": user_subscriptions
             },
             "self_birth_chart": birth_chart_data
@@ -3763,10 +3824,32 @@ async def get_admin_users(
         offset = (page - 1) * limit
         cur = execute(
             conn,
-            f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.created_at {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
+            f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.signup_client, u.created_at {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
             params + [limit, offset],
         )
         rows = cur.fetchall() or []
+
+        user_ids = [r[0] for r in rows]
+        push_platforms_by_user: dict = {uid: [] for uid in user_ids}
+        if user_ids:
+            placeholders = ",".join(["?"] * len(user_ids))
+            cur = execute(
+                conn,
+                f"SELECT userid, platform FROM device_tokens WHERE userid IN ({placeholders})",
+                user_ids,
+            )
+            _plat_order = {"ios": 0, "android": 1}
+            for token_row in cur.fetchall() or []:
+                uid, plat = token_row[0], (token_row[1] or "").strip().lower()
+                if uid not in push_platforms_by_user:
+                    continue
+                if plat and plat not in push_platforms_by_user[uid]:
+                    push_platforms_by_user[uid].append(plat)
+            for uid in push_platforms_by_user:
+                push_platforms_by_user[uid] = sorted(
+                    push_platforms_by_user[uid],
+                    key=lambda p: _plat_order.get(p, 99),
+                )
 
         users = []
         for row in rows:
@@ -3793,8 +3876,12 @@ async def get_admin_users(
                 'phone': row[2],
                 'role': row[3],
                 'email': row[4],
-                'created_at': row[5],
-                'subscriptions': subscriptions
+                'signup_client': row[5],
+                'created_at': row[6],
+                'subscriptions': subscriptions,
+                # From device_tokens (Expo push). Not set on users table; empty ≠ "web-only"
+                # (mobile user may not have registered push).
+                'app_push_platforms': push_platforms_by_user.get(row[0], []),
             })
 
     total_pages = (total + limit - 1) // limit if limit else 0
