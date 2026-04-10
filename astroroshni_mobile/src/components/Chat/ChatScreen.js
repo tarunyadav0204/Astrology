@@ -1824,24 +1824,7 @@ export default function ChatScreen({ navigation, route }) {
             }
           };
 
-          const analysisSteps = status.analysis_steps || [];
-          if (analysisSteps.length > 0) {
-            let stepIndex = 0;
-            const stepInterval = setInterval(() => {
-              if (stepIndex < analysisSteps.length) {
-                const stepMessage = `⚙️ ${analysisSteps[stepIndex]}...`;
-                setMessagesWithStorage(prev => prev.map(msg => 
-                  msg.messageId === messageId ? { ...msg, content: stepMessage } : msg
-                ));
-                stepIndex++;
-              } else {
-                clearInterval(stepInterval);
-                showFinalMessage();
-              }
-            }, 1500);
-          } else {
-            showFinalMessage();
-          }
+          showFinalMessage();
           
           return;
         }

@@ -8,12 +8,14 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../../utils/constants';
 
 export default function WelcomeAfterRegistrationScreen({ 
   formData, 
   navigation 
 }) {
+  const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -75,27 +77,26 @@ export default function WelcomeAfterRegistrationScreen({
 
           {/* Welcome Message */}
           <Text style={styles.welcomeTitle}>
-            Welcome to AstroRoshni, {formData.name}!
+            {t('authOnboarding.welcomeTitle', { name: formData.name || '' })}
           </Text>
           
           <Text style={styles.welcomeSubtitle}>
-            Your account has been created successfully.{'\n'}
-            Let's create your personalized birth chart to unlock cosmic insights.
+            {t('authOnboarding.welcomeSubtitle')}
           </Text>
 
           {/* Features List */}
           <View style={styles.featuresList}>
             <View style={styles.featureItem}>
               <Text style={styles.featureIcon}>📊</Text>
-              <Text style={styles.featureText}>Detailed Birth Chart Analysis</Text>
+              <Text style={styles.featureText}>{t('authOnboarding.featureChart')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureIcon}>🔮</Text>
-              <Text style={styles.featureText}>AI-Powered Predictions</Text>
+              <Text style={styles.featureText}>{t('authOnboarding.featureAi')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureIcon}>💫</Text>
-              <Text style={styles.featureText}>Daily Cosmic Guidance</Text>
+              <Text style={styles.featureText}>{t('authOnboarding.featureDaily')}</Text>
             </View>
           </View>
 
@@ -108,7 +109,7 @@ export default function WelcomeAfterRegistrationScreen({
               colors={['#ff6b35', '#ff8c5a']}
               style={styles.buttonGradient}
             >
-              <Text style={styles.buttonText}>Create My Birth Chart</Text>
+              <Text style={styles.buttonText}>{t('authOnboarding.createBirthChart')}</Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
             </LinearGradient>
           </TouchableOpacity>
@@ -118,7 +119,7 @@ export default function WelcomeAfterRegistrationScreen({
             style={styles.skipButton}
             onPress={() => navigation.replace('Home')}
           >
-            <Text style={styles.skipText}>Skip for now</Text>
+            <Text style={styles.skipText}>{t('authOnboarding.skipForNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

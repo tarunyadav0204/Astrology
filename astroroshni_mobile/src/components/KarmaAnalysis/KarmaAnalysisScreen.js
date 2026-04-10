@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../locales/i18n';
 import {
   View,
   Text,
@@ -27,10 +29,25 @@ import { pricingAPI } from '../../services/api';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent } from '../../utils/analytics';
 
+/** Map AI/backend section heading to karmaAnalysis.sectionTitles.<slug> */
+function karmaSectionTitleSlug(title) {
+  if (title == null || title === '') return 'unknown';
+  const s = String(title).trim();
+  if (/^introduction$/i.test(s)) return 'introduction';
+  const core = s.replace(/^\d+\.\s*/, '').trim();
+  const slug = core
+    .toLowerCase()
+    .replace(/'/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  return slug || 'unknown';
+}
+
 const { width, height } = Dimensions.get('window');
 
 const KarmaAnalysisScreen = ({ route, navigation }) => {
   useAnalytics('KarmaAnalysisScreen');
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
@@ -49,7 +66,17 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [nativeName, setNativeName] = useState('Native');
+  const [nativeName, setNativeName] = useState(() =>
+    i18n.t('karmaAnalysis.defaultNativeName', 'Native')
+  );
+
+  const resolveSectionTitle = useCallback(
+    (sectionTitle) => {
+      const slug = karmaSectionTitleSlug(sectionTitle);
+      return t(`karmaAnalysis.sectionTitles.${slug}`, sectionTitle);
+    },
+    [t]
+  );
   const [selectedChartId, setSelectedChartId] = useState(chartId);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
@@ -139,7 +166,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const checkExistingAnalysis = async () => {
     try {
       if (!selectedChartId) {
-        setError('Chart not found. Please select a native from the home screen.');
+        setError(t('karmaAnalysis.chartNotFound'));
         return;
       };
       
@@ -187,10 +214,14 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   const handleStartAnalysis = () => {
     if (credits < karmaCost) {
-      Alert.alert('Insufficient Credits', `You need ${karmaCost} credits for karma analysis.`, [
-        { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
-        { text: 'Cancel', style: 'cancel' }
-      ]);
+      Alert.alert(
+        t('karmaAnalysis.insufficientCreditsTitle'),
+        t('karmaAnalysis.insufficientCreditsBody', { cost: karmaCost }),
+        [
+          { text: t('karmaAnalysis.getCredits'), onPress: () => navigation.navigate('Credits') },
+          { text: t('karmaAnalysis.cancel'), style: 'cancel' },
+        ]
+      );
       return;
     }
     setShowStartModal(true);
@@ -211,10 +242,14 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   const handleRegenerate = () => {
     if (credits < karmaCost) {
-      Alert.alert('Insufficient Credits', `You need ${karmaCost} credits for karma analysis.`, [
-        { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
-        { text: 'Cancel', style: 'cancel' }
-      ]);
+      Alert.alert(
+        t('karmaAnalysis.insufficientCreditsTitle'),
+        t('karmaAnalysis.insufficientCreditsBody', { cost: karmaCost }),
+        [
+          { text: t('karmaAnalysis.getCredits'), onPress: () => navigation.navigate('Credits') },
+          { text: t('karmaAnalysis.cancel'), style: 'cancel' },
+        ]
+      );
       return;
     }
     setShowRegenerateModal(true);
@@ -243,7 +278,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   const initiateAnalysis = async (forceRegenerate = false) => {
     if (!selectedChartId) {
-      setError('Chart not found. Please select a native from the home screen.');
+      setError(t('karmaAnalysis.chartNotFound'));
       setLoading(false);
       return;
     }
@@ -265,7 +300,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to initiate analysis');
+        throw new Error(errorData.detail || i18n.t('karmaAnalysis.initiateFailed'));
       }
       
       const data = await response.json();
@@ -279,7 +314,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       } else if (data.status === 'pending') {
         startPolling();
       } else {
-        throw new Error('Unexpected response status');
+        throw new Error(i18n.t('karmaAnalysis.unexpectedResponse'));
       }
     } catch (err) {
       stopProgressBar();
@@ -376,10 +411,12 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
           .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
           .replace(/\n/g, '<br>');
-        
+
+        const sectionHeading = resolveSectionTitle(title);
+
         contentHTML += `
           <div class="karma-section">
-            <h2 class="section-title">🕉️ ${title}</h2>
+            <h2 class="section-title">🕉️ ${sectionHeading}</h2>
             <div class="section-content">${formattedContent}</div>
           </div>
         `;
@@ -482,15 +519,15 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <div class="container">
               <div class="header">
                 <div class="logo">🕉️</div>
-                <div class="title">Past Life Karma Analysis</div>
-                <div class="subtitle">Your Soul's Eternal Journey</div>
+                <div class="title">${t('karmaAnalysis.pdfDocTitle')}</div>
+                <div class="subtitle">${t('karmaAnalysis.pdfDocSubtitle')}</div>
                 <div class="native-name">${nativeName}</div>
                 <div class="timestamp">${new Date().toLocaleString()}</div>
               </div>
               ${contentHTML}
               <div class="footer">
-                ✨ Analyzed by AstroRoshni<br>
-                Artificial Intelligence • Vedic Astrology
+                ${t('karmaAnalysis.pdfFooterLine1')}<br>
+                ${t('karmaAnalysis.pdfFooterLine2')}
               </div>
             </div>
           </body>
@@ -501,7 +538,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       const { uri } = await Promise.race([
         Print.printToFileAsync({ html }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('PDF generation timeout after 30s')), 30000)
+          setTimeout(() => reject(new Error(i18n.t('karmaAnalysis.pdfTimeoutError'))), 30000)
         )
       ]);
       
@@ -510,7 +547,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       
       await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
-        dialogTitle: 'Share Karma Analysis',
+        dialogTitle: t('karmaAnalysis.pdfShareTitle'),
         UTI: 'com.adobe.pdf',
       });
       
@@ -519,7 +556,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     } catch (error) {
       console.error('[PDF] Error:', error);
       setGeneratingPDF(false);
-      Alert.alert('Error', `Failed to generate PDF: ${error.message}`);
+      Alert.alert(
+        t('karmaAnalysis.pdfErrorTitle'),
+        t('karmaAnalysis.pdfErrorBody', { message: error.message })
+      );
     }
   };
 
@@ -543,7 +583,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           style={[styles.headerIconBtn, { backgroundColor: headerIconBg, borderColor: headerIconBorder }]}
           activeOpacity={0.75}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('karmaAnalysis.a11yGoBack')}
         >
           <Ionicons name="arrow-back" size={22} color={colors.accent} />
         </TouchableOpacity>
@@ -561,7 +601,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             ]}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Change native chart"
+            accessibilityLabel={t('karmaAnalysis.a11yChangeNative')}
           >
             <Text style={[styles.nameChipText, { color: colors.accent }]} numberOfLines={1}>
               {nativeName}
@@ -599,9 +639,9 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <Text style={styles.omSymbol}>🕉️</Text>
           </View>
           <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
-          <Text style={[styles.loadingTitle, { color: colors.accent }]}>Accessing Akashic Records</Text>
+          <Text style={[styles.loadingTitle, { color: colors.accent }]}>{t('karmaAnalysis.loadingTitle')}</Text>
           <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
-            {showProgress ? 'Analyzing your soul\'s journey through time...' : 'This is taking longer than usual...'}
+            {showProgress ? t('karmaAnalysis.loadingSubtitleProgress') : t('karmaAnalysis.loadingSubtitleSlow')}
           </Text>
           {showProgress && (
             <View style={styles.progressBarContainer}>
@@ -628,11 +668,11 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={[styles.errorTitle, { color: colors.accent }]}>Unable to Access Records</Text>
+          <Text style={[styles.errorTitle, { color: colors.accent }]}>{t('karmaAnalysis.errorTitle')}</Text>
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={initiateAnalysis}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => initiateAnalysis(false)}>
             <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.retryGradient}>
-              <Text style={[styles.retryText, { color: '#fff' }]}>Try Again</Text>
+              <Text style={[styles.retryText, { color: '#fff' }]}>{t('karmaAnalysis.tryAgain')}</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity
@@ -640,10 +680,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
             activeOpacity={0.75}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('karmaAnalysis.a11yGoBack')}
           >
             <Ionicons name="arrow-back" size={20} color={colors.accent} />
-            <Text style={[styles.errorBackRowText, { color: colors.textSecondary }]}>Go back</Text>
+            <Text style={[styles.errorBackRowText, { color: colors.textSecondary }]}>{t('karmaAnalysis.goBack')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -660,11 +700,11 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         })}
         <View style={styles.startContainer}>
           <Text style={styles.omSymbol}>🕉️</Text>
-          <Text style={[styles.startTitle, { color: colors.accent }]}>Past Life Karma Analysis</Text>
-          <Text style={[styles.startSubtitle, { color: colors.textSecondary }]}>Discover your soul's eternal journey</Text>
+          <Text style={[styles.startTitle, { color: colors.accent }]}>{t('karmaAnalysis.startTitle')}</Text>
+          <Text style={[styles.startSubtitle, { color: colors.textSecondary }]}>{t('karmaAnalysis.startSubtitle')}</Text>
           <TouchableOpacity style={styles.startButton} onPress={handleStartAnalysis}>
             <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.startGradient}>
-              <Text style={[styles.startButtonText, { color: '#fff' }]}>Start Analysis</Text>
+              <Text style={[styles.startButtonText, { color: '#fff' }]}>{t('karmaAnalysis.startButton')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -674,7 +714,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           onConfirm={confirmStartAnalysis}
           credits={credits}
           cost={karmaCost}
-          title="Start Karma Analysis"
+          title={t('karmaAnalysis.confirmStartTitle')}
           colors={colors}
           isDark={isDark}
         />
@@ -702,7 +742,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
                 disabled={generatingPDF}
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel="Share or export PDF"
+                accessibilityLabel={t('karmaAnalysis.a11ySharePdf')}
               >
                 {generatingPDF ? (
                   <ActivityIndicator size="small" color={colors.accent} />
@@ -715,7 +755,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
                 style={[styles.headerIconBtn, { backgroundColor: headerIconBg, borderColor: headerIconBorder }]}
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel="Regenerate analysis"
+                accessibilityLabel={t('karmaAnalysis.a11yRegenerate')}
               >
                 <Ionicons name="refresh" size={22} color={colors.accent} />
               </TouchableOpacity>
@@ -728,7 +768,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           onConfirm={confirmRegenerate}
           credits={credits}
           cost={karmaCost}
-          title="Regenerate Karma Analysis"
+          title={t('karmaAnalysis.confirmRegenerateTitle')}
           colors={colors}
           isDark={isDark}
         />
@@ -741,21 +781,29 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <View style={[styles.headerContainer, { backgroundColor: isDark ? 'rgba(255,215,0,0.08)' : colors.surface }]}>
               <View style={[styles.headerGlow, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
                 <Text style={styles.omHeader}>🕉️</Text>
-                <Text style={[styles.title, { color: colors.accent }]}>Past Life Karma</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your Soul's Eternal Journey</Text>
+                <Text style={[styles.title, { color: colors.accent }]}>{t('karmaAnalysis.resultTitle')}</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('karmaAnalysis.resultSubtitle')}</Text>
                 <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]} />
               </View>
             </View>
 
             {sectionKeys.map((key, index) => (
-              <KarmaCard key={index} title={key} content={sections[key]} index={index} colors={colors} isDark={isDark} />
+              <KarmaCard
+                key={index}
+                title={key}
+                content={sections[key]}
+                index={index}
+                colors={colors}
+                isDark={isDark}
+                resolveSectionTitle={resolveSectionTitle}
+              />
             ))}
 
             <View style={styles.footerContainer}>
               <View style={[styles.footerGradient, { backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.15)' : colors.cardBorder }]}>
                 <Text style={styles.footerIcon}>✨</Text>
-                <Text style={[styles.footerText, { color: colors.textSecondary }]}>Analyzed by AstroRoshni</Text>
-                <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>Artificial Intelligence</Text>
+                <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('karmaAnalysis.footerAnalyzedBy')}</Text>
+                <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>{t('karmaAnalysis.footerAI')}</Text>
               </View>
             </View>
           </Animated.View>
@@ -765,30 +813,38 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   );
 };
 
-const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title, colors = {}, isDark = true }) => (
-  <Modal visible={visible} transparent animationType="fade">
-    <View style={[styles.modalOverlay, { backgroundColor: '#000000' }]}>
-      <View style={[styles.modalContent, { backgroundColor: colors.surface || '#2d1b4e', borderColor: colors.cardBorder || 'rgba(255,215,0,0.3)' }]}>
-        <Text style={[styles.modalTitle, { color: colors.accent || '#FFD700' }]}>{title}</Text>
-        <Text style={[styles.modalText, { color: colors.text || '#fff' }]}>This will use {cost} credits</Text>
-        <Text style={[styles.modalBalance, { color: colors.textSecondary || '#ccc' }]}>Your balance: {credits} credits</Text>
-        <View style={styles.modalButtons}>
-          <TouchableOpacity style={[styles.modalButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, borderColor: colors.cardBorder }]} onPress={onClose}>
-            <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: colors.primary }]} onPress={onConfirm}>
-            <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary, { color: '#fff' }]}>Confirm</Text>
-          </TouchableOpacity>
+const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title, colors = {}, isDark = true }) => {
+  const { t } = useTranslation();
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={[styles.modalOverlay, { backgroundColor: '#000000' }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.surface || '#2d1b4e', borderColor: colors.cardBorder || 'rgba(255,215,0,0.3)' }]}>
+          <Text style={[styles.modalTitle, { color: colors.accent || '#FFD700' }]}>{title}</Text>
+          <Text style={[styles.modalText, { color: colors.text || '#fff' }]}>
+            {t('karmaAnalysis.creditsModalWillUse', { cost })}
+          </Text>
+          <Text style={[styles.modalBalance, { color: colors.textSecondary || '#ccc' }]}>
+            {t('karmaAnalysis.creditsModalBalance', { credits })}
+          </Text>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity style={[styles.modalButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, borderColor: colors.cardBorder }]} onPress={onClose}>
+              <Text style={[styles.modalButtonText, { color: colors.text }]}>{t('karmaAnalysis.creditsModalCancel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: colors.primary }]} onPress={onConfirm}>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary, { color: '#fff' }]}>{t('karmaAnalysis.creditsModalConfirm')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
-const KarmaCard = ({ title, content, index, colors = {}, isDark = true }) => {
+const KarmaCard = ({ title, content, index, colors = {}, isDark = true, resolveSectionTitle }) => {
   const [expanded, setExpanded] = useState(true);
   const icons = ['🕉️', '🌟', '🎯', '⚖️', '💎', '🔱', '👪', '🦋', '🙏', '⏳', '🕉️'];
   
+  const displayTitle = resolveSectionTitle ? resolveSectionTitle(title) : title;
   const isIntroduction = title === 'Introduction';
   const cardStyle = isIntroduction 
     ? { backgroundColor: isDark ? 'rgba(218, 165, 32, 0.9)' : (colors.cardBackground || colors.surface), borderColor: isDark ? 'rgba(218, 165, 32, 1)' : (colors.cardBorder || colors.primary) }
@@ -888,7 +944,7 @@ const KarmaCard = ({ title, content, index, colors = {}, isDark = true }) => {
           <View style={[styles.iconCircle, isIntroduction && styles.introIconCircle, iconCircleStyle]}>
             <Text style={styles.cardIcon}>{icons[index % icons.length]}</Text>
           </View>
-          <Text style={[styles.cardTitle, { color: colors.text || '#fff' }]}>{title}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text || '#fff' }]}>{displayTitle}</Text>
           <Text style={[styles.expandIcon, { color: colors.textSecondary || 'rgba(255,255,255,0.8)' }]}>{expanded ? '▼' : '▶'}</Text>
         </TouchableOpacity>
         {expanded && (

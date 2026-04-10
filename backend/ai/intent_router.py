@@ -1,7 +1,35 @@
 import google.generativeai as genai
 import json
 import os
+import re
 from typing import Dict
+
+# Roman Hindi / Hinglish cues; app often sends language="english" for UI i18n while user types Hindi in Latin script.
+_HINGLISH_HINT_WORDS = frozenset({
+    "mera", "meri", "mere", "main", "mein", "hum", "aap", "tum", "tera", "teri", "tere",
+    "hai", "hain", "ho", "tha", "thi", "the", "hun", "hoon",
+    "kab", "kya", "kyun", "kyaa", "kaun", "kahan", "kaise", "kaisa", "kaisi",
+    "ko", "ka", "ki", "ke", "se", "par",
+    "batao", "bata", "btao", "sab", "saari", "saara", "kuch", "sba",  # sba: typo for sab
+    "dasha", "dasa", "mahadasha", "antar", "vishleshan", "vichar", "shaadi", "shadi",
+    "rahega", "hogi", "hoga", "kar", "karo", "karna",
+    "merko", "mujhe", "mujhko", "apna", "apni", "apne",
+})
+
+
+def _user_question_suggests_hindi(user_question: str) -> bool:
+    text = (user_question or "").strip()
+    if not text:
+        return False
+    for ch in text:
+        if "\u0900" <= ch <= "\u097f":
+            return True
+    low = text.lower()
+    words = set(re.findall(r"[a-z]+", low))
+    if words & _HINGLISH_HINT_WORDS:
+        return True
+    return False
+
 
 class IntentRouter:
     """
@@ -98,7 +126,54 @@ DO NOT generate a "clarification_question" field.
 PROCEED WITH ANALYSIS NOW.
 """
         
-        language_instruction = f"IMPORTANT: If you generate a clarification question, it MUST be in the following language: {language}"
+        _lang = str(language or "english").strip() or "english"
+        is_hindi_question = _user_question_suggests_hindi(user_question)
+        if is_hindi_question:
+            language_instruction = """🚨 HINDI / HINGLISH USER — ALL USER-VISIBLE TEXT IN JSON MUST BE HINDI (Devanagari):
+
+The user's question is Hindi or Hinglish. The client may send language "english" for app UI only—ignore that for any strings the end user reads.
+
+1) If status is "CLARIFY": "clarification_question" MUST be Hindi (Devanagari).
+
+2) If status is "READY": Every "message" inside "chart_insights" MUST be Hindi (Devanagari). These lines rotate under the birth chart while the full answer loads—do NOT write them in English. Keep insights specific to the chart; use natural Hindi for Jyotish terms where appropriate.
+
+Follow the Hindi "Example" block below for chart_insights (not the English shape-only note). JSON keys stay English; only string values must be Devanagari Hindi.
+"""
+        else:
+            language_instruction = (
+                f"IMPORTANT: If you generate a clarification question, it MUST be in the following language: {_lang}"
+            )
+
+        if is_hindi_question:
+            chart_insights_message_spec = (
+                '- message: इस जातक की वास्तविक कुंडली के आधार पर विशिष्ट अंतर्दृष्टि; पूरा वाक्य हिंदी देवनागरी में। '
+                "Roman/Latin script में हिंदी न लिखें। ग्रह/भाव नाम हिंदी में लिखें (जैसे मंगल, द्वितीय भाव)।"
+            )
+            chart_insights_example_block = """
+        Example (chart_insights — सभी message हिंदी देवनागरी में; यही शैली अपनाएँ):
+        "chart_insights": [
+            {"house_number": 1, "message": "कन्या लग्न विश्लेषणात्मक प्रवृत्ति और स्वास्थ्य के प्रति सजगता दर्शाता है।", "highlight_type": "ascendant"},
+            {"house_number": 2, "message": "द्वितीय भाव में सिंह राशि में मंगल, गुरु, शनि और राहु धन तथा वाणी के मामलों में गहन और जटिल प्रभाव बनाते हैं।", "highlight_type": "planets"},
+            {"house_number": 5, "message": "पंचम भाव में गुरु बुद्धिमान संतान और रचनात्मक ज्ञान का आशीर्वाद देता है।", "highlight_type": "planets"},
+            {"house_number": 7, "message": "सप्तम भाव में शनि परिपक्व और जिम्मेदार साझेदारी का संकेत देता है।", "highlight_type": "planets"},
+            {"house_number": 10, "message": "दशम भाव में चंद्र सार्वजनिक मान्यता और करियर में भावनात्मक संतोष से जुड़ा है।", "highlight_type": "planets"}
+        ]
+        """
+        else:
+            chart_insights_message_spec = (
+                '- message: SPECIFIC insight about THIS native\'s chart (e.g., "Sun in 10th house in Capricorn indicates strong career '
+                'ambitions and leadership in professional life")'
+            )
+            chart_insights_example_block = """
+        Example:
+        "chart_insights": [
+            {"house_number": 1, "message": "Virgo Ascendant reflects analytical nature and health consciousness", "highlight_type": "ascendant"},
+            {"house_number": 2, "message": "Leo in 2nd house with Sun, Mercury, Venus, Mars - strong wealth potential through leadership", "highlight_type": "planets"},
+            {"house_number": 5, "message": "Jupiter in 5th house blesses with intelligent children and creative wisdom", "highlight_type": "planets"},
+            {"house_number": 7, "message": "Saturn in 7th house indicates mature, responsible partnerships", "highlight_type": "planets"},
+            {"house_number": 10, "message": "Moon in 10th house creates public recognition and emotional career fulfillment", "highlight_type": "planets"}
+        ]
+        """
 
         force_ready_instruction = ""
         if force_ready:
@@ -215,25 +290,17 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         
         Each object MUST have:
         - house_number: (1-12)
-        - message: SPECIFIC insight about THIS native's chart (e.g., "Sun in 10th house in Capricorn indicates strong career ambitions and leadership in professional life")
+        {chart_insights_message_spec}
         - highlight_type: "ascendant" | "planets" | "empty"
         
         DO NOT give generic house meanings. Analyze the ACTUAL planetary placements in the chart.
-        
-        Example:
-        "chart_insights": [
-            {{"house_number": 1, "message": "Virgo Ascendant reflects analytical nature and health consciousness", "highlight_type": "ascendant"}},
-            {{"house_number": 2, "message": "Leo in 2nd house with Sun, Mercury, Venus, Mars - strong wealth potential through leadership", "highlight_type": "planets"}},
-            {{"house_number": 5, "message": "Jupiter in 5th house blesses with intelligent children and creative wisdom", "highlight_type": "planets"}},
-            {{"house_number": 7, "message": "Saturn in 7th house indicates mature, responsible partnerships", "highlight_type": "planets"}},
-            {{"house_number": 10, "message": "Moon in 10th house creates public recognition and emotional career fulfillment", "highlight_type": "planets"}}
-        ]
+        {chart_insights_example_block}
 
         Return ONLY a JSON object:
         {{
             "status": "CLARIFY" or "READY",
-            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
-            "chart_insights": [{{"house_number": 1, "message": "...", "highlight_type": "ascendant"}}],
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY; if user wrote Hindi/Hinglish, this string must be Devanagari Hindi)",
+            "chart_insights": [{{"house_number": 1, "message": "Devanagari Hindi prose for Hinglish users; English for English-only questions", "highlight_type": "ascendant"}}],
             "mode": "PREDICT_DAILY" or "PREDICT_EVENT_TIMING" or "ANALYZE_PERSONALITY",
             "extracted_context": {{ "timeframe": "2025", "aspect": "promotion" }},
             "context_type": "annual" or "birth",

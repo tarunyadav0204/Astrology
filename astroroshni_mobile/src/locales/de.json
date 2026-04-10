@@ -1,691 +1,931 @@
 {
-    "birthProfileIntro": {
-      "title": "Dein Geburtshoroskop optimiert dein Erlebnis",
-      "body": "Wir nutzen dein Geburtsdatum, deine Geburtszeit und deinen Geburtsort, um dein vedisches Horoskop zu berechnen und Einblicke zu personalisieren. Du kannst dies jederzeit in deinem Profil hinzufügen oder ändern.",
-      "continue": "Weiter",
-      "skip": "Vorerst überspringen",
-      "skipSubtext": "Erkunde die App und füge dein Profil später hinzu",
-      "emptyStateTitle": "Geburtsprofil hinzufügen",
-      "emptyStateBody": "Dein Geburtsdatum, deine Geburtszeit und dein Geburtsort schalten dein vedisches Horoskop, personalisierte Einblicke und kosmische Führung frei. Du kannst dies jederzeit hinzufügen oder ändern.",
-      "emptyStateCta": "Geburtsprofil hinzufügen"
+  "birthProfileIntro": {
+    "title": "Dein Geburtshoroskop optimiert dein Erlebnis",
+    "body": "Wir nutzen dein Geburtsdatum, deine Geburtszeit und deinen Geburtsort, um dein vedisches Horoskop zu berechnen und Einblicke zu personalisieren. Du kannst dies jederzeit in deinem Profil hinzufügen oder ändern.",
+    "continue": "Weiter",
+    "skip": "Vorerst überspringen",
+    "skipSubtext": "Erkunde die App und füge dein Profil später hinzu",
+    "emptyStateTitle": "Geburtsprofil hinzufügen",
+    "emptyStateBody": "Dein Geburtsdatum, deine Geburtszeit und dein Geburtsort schalten dein vedisches Horoskop, personalisierte Einblicke und kosmische Führung frei. Du kannst dies jederzeit hinzufügen oder ändern.",
+    "emptyStateCta": "Geburtsprofil hinzufügen"
+  },
+  "menu": {
+    "title": "Kosmisches Menü",
+    "subtitle": "Navigiere auf deinem Weg",
+    "myProfile": "Mein Profil",
+    "selectNative": "Person auswählen",
+    "newNative": "Neue Person",
+    "viewChart": "Horoskop ansehen",
+    "dashaBrowser": "Dasha-Browser",
+    "ashtakvarga": "Ashtakvarga",
+    "shadbala": "Shadbala",
+    "kotaChakra": "Kota Chakra",
+    "yogas": "Yogas",
+    "lifeAnalysis": "Lebensanalyse",
+    "kpSystem": "KP-System",
+    "pastLifeRegression": "Karma-Analyse früherer Leben",
+    "numerology": "Numerologie",
+    "chatHistory": "Chat-Verlauf",
+    "podcastHistory": "Podcast-Verlauf",
+    "partnershipOn": "Partnerschaft Ein",
+    "partnershipOff": "Partnerschaft Aus",
+    "blog": "Blog & Wissen",
+    "credits": "Credits",
+    "support": "Support",
+    "logout": "Abmelden"
+  },
+  "support": {
+    "title": "Support",
+    "newTicket": "Neues Support-Ticket",
+    "noTickets": "Noch keine Tickets. Tippe unten, um das Team zu kontaktieren.",
+    "subject": "Betreff",
+    "subjectPlaceholder": "Kurze Zusammenfassung",
+    "message": "Nachricht",
+    "messagePlaceholder": "Beschreibe dein Anliegen (nur Klartext)",
+    "send": "Senden",
+    "back": "Zurück zur Liste",
+    "status": "Status",
+    "roleAdmin": "Team",
+    "roleYou": "Du",
+    "reply": "Deine Antwort",
+    "replyPlaceholder": "Nachricht schreiben",
+    "sendReply": "Antwort senden",
+    "closedHint": "Dieses Ticket ist geschlossen. Öffne ein neues Ticket, wenn du weitere Hilfe brauchst.",
+    "closedTicket": "Dieses Ticket ist geschlossen.",
+    "enterMessage": "Bitte gib eine Nachricht ein.",
+    "fillBoth": "Bitte Betreff und Nachricht ausfüllen.",
+    "loadFailed": "Dieses Ticket konnte nicht geladen werden.",
+    "backToList": "Zurück zu den Tickets",
+    "requestFailed": "Anfrage fehlgeschlagen",
+    "statusOpen": "Offen",
+    "statusClosed": "Geschlossen",
+    "statusPending": "Ausstehend",
+    "sourceIos": "iOS",
+    "sourceAndroid": "Android"
+  },
+  "blog": {
+    "screenTitle": "Blog & Wissen",
+    "detailNavTitle": "Blog",
+    "readMore": "Weiterlesen",
+    "empty": "Noch keine Artikel.",
+    "defaultCategory": "Astrologie",
+    "seeAll": "Alle anzeigen",
+    "postNotFound": "Beitrag nicht gefunden",
+    "goBack": "Zurück",
+    "authorTeam": "AstroRoshni-Team",
+    "keyTakeaway": "Kernaussage",
+    "shareMessage": "Auf AstroRoshni lesen: {{title}}\n\n{{url}}"
+  },
+  "quickActions": {
+    "language": "Sprache",
+    "chart": "Horoskop",
+    "dasha": "Dasha",
+    "partnership": "Partnerschaft",
+    "partner": "Partner",
+    "history": "Chat-Verlauf"
+  },
+  "chartTypes": {
+    "lagna": {
+      "name": "Lagna (D1)",
+      "description": "Haupt-Geburtshoroskop"
     },
-    "menu": {
-      "title": "Kosmisches Menü",
-      "subtitle": "Navigiere auf deinem Weg",
-      "myProfile": "Mein Profil",
-      "selectNative": "Person auswählen",
-      "newNative": "Neue Person",
-      "viewChart": "Horoskop ansehen",
-      "dashaBrowser": "Dasha-Browser",
-      "ashtakvarga": "Ashtakvarga",
-      "shadbala": "Shadbala",
-      "kotaChakra": "Kota Chakra",
-      "yogas": "Yogas",
-      "lifeAnalysis": "Lebensanalyse",
-      "kpSystem": "KP-System",
-      "pastLifeRegression": "Karma-Analyse früherer Leben",
-      "numerology": "Numerologie",
-      "chatHistory": "Chat-Verlauf",
-      "partnershipOn": "Partnerschaft Ein",
-      "partnershipOff": "Partnerschaft Aus",
-      "credits": "Credits",
-      "logout": "Abmelden"
+    "navamsa": {
+      "name": "Navamsa (D9)",
+      "description": "Ehe & Spiritualität"
     },
+    "transit": {
+      "name": "Transit",
+      "description": "Aktuelle Planetenstände"
+    },
+    "karkamsa": {
+      "name": "Karkamsa",
+      "description": "Spiritueller Pfad & Dharma"
+    },
+    "swamsa": {
+      "name": "Swamsa",
+      "description": "Väterliche Abstammung & Ahnen"
+    },
+    "hora": {
+      "name": "Hora (D2)",
+      "description": "Wohlstand & Familie"
+    },
+    "drekkana": {
+      "name": "Drekkana (D3)",
+      "description": "Geschwister & Glück"
+    },
+    "chaturthamsa": {
+      "name": "Chaturthamsa (D4)",
+      "description": "Schicksal & Besitz"
+    },
+    "dashamsa": {
+      "name": "Dashamsa (D10)",
+      "description": "Karriere & Beruf"
+    },
+    "dwadashamsa": {
+      "name": "Dwadashamsa (D12)",
+      "description": "Eltern & Herkunft"
+    },
+    "shodamsa": {
+      "name": "Shodamsa (D16)",
+      "description": "Fahrzeuge & Komfort"
+    },
+    "vimsamsa": {
+      "name": "Vimsamsa (D20)",
+      "description": "Spirituelle Praktiken"
+    },
+    "chaturvimsamsa": {
+      "name": "Chaturvimsamsa (D24)",
+      "description": "Lernen & Bildung"
+    },
+    "trimsamsa": {
+      "name": "Trimsamsa (D30)",
+      "description": "Unglück & Schwierigkeiten"
+    },
+    "khavedamsa": {
+      "name": "Khavedamsa (D40)",
+      "description": "Günstig & Ungünstig"
+    },
+    "akshavedamsa": {
+      "name": "Akshavedamsa (D45)",
+      "description": "Charakter & Verhalten"
+    },
+    "shashtyamsa": {
+      "name": "Shashtyamsa (D60)",
+      "description": "Karma aus früheren Leben"
+    }
+  },
+  "chartScreen": {
+    "loadingText": "Berechne kosmische Ausrichtungen...",
+    "loadingSubtext": "Lese Planetenpositionen",
+    "emptyTitle": "Keine Horoskop-Daten",
+    "emptyText": "Bitte Geburtsdaten hinzufügen, um Horoskope zu sehen",
+    "transit": "Transit",
+    "dasha": "Dasha",
+    "karakas": "Karakas",
+    "positions": "Positionen"
+  },
+  "planets": {
+    "Sun": "So",
+    "Moon": "Mo",
+    "Mars": "Ma",
+    "Mercury": "Me",
+    "Jupiter": "Ju",
+    "Venus": "Ve",
+    "Saturn": "Sa",
+    "Rahu": "Ra",
+    "Ketu": "Ke",
+    "Gulika": "Gu",
+    "Mandi": "Mn",
+    "InduLagna": "IL"
+  },
+  "shadbalaAnalysis": "Shadbala-Analyse",
+  "classicalPlanetaryStrength": "Klassische Planetenstärke (7 sichtbare Planeten)",
+  "rupas": "Rupas",
+  "points": "Punkte",
+  "grades": {
+    "Excellent": "Exzellent",
+    "Good": "Gut",
+    "Average": "Durchschnittlich",
+    "Weak": "Schwach"
+  },
+  "strengthComponents": "Stärke-Komponenten",
+  "components": {
+    "sthana_bala": "Sthana Bala",
+    "dig_bala": "Dig Bala",
+    "kala_bala": "Kala Bala",
+    "chesta_bala": "Chesta Bala",
+    "naisargika_bala": "Naisargika Bala",
+    "drik_bala": "Drik Bala",
+    "uccha_bala": "Uccha Bala",
+    "saptavargaja_bala": "Saptavargaja Bala",
+    "ojha_yugma_bala": "Ojha Yugma Bala",
+    "kendradi_bala": "Kendradi Bala",
+    "drekkana_bala": "Drekkana Bala"
+  },
+  "sthanaBalaBreakdown": "Sthana Bala Aufschlüsselung",
+  "kalaBalaBreakdown": "Kala Bala Aufschlüsselung",
+  "profile": {
+    "myProfile": "Mein Profil",
+    "birthDateNotSet": "Geburtsdatum nicht festgelegt",
+    "connectChart": "Horoskop mit Profil verknüpfen",
+    "availableCredits": "Verfügbare Credits",
+    "add": "+ Hinzufügen",
+    "chats": "Chats",
+    "charts": "Horoskope",
+    "days": "Tage",
+    "user": "Benutzer",
+    "questions": "Fragen",
+    "quickActionsTitle": "Schnellaktionen",
+    "dashaLevels": {
+      "Maha": "Maha",
+      "Antar": "Antar",
+      "Pratyantar": "Pratyantar",
+      "Sookshma": "Sookshma",
+      "Prana": "Prana"
+    },
+    "birthChartEssence": "Kern des Geburtshoroskops",
+    "viewFullChart": "Vollständiges Horoskop ansehen",
+    "sunSign": "Sonnenzeichen",
+    "moonSign": "Mondzeichen",
+    "ascendant": "Aszendent",
+    "calculating": "Berechne...",
+    "currentRunningDashas": "Aktuell laufende Dashas",
+    "loading": "Lädt...",
     "quickActions": {
-      "language": "Sprache",
-      "chart": "Horoskop",
-      "dasha": "Dasha",
-      "partnership": "Partnerschaft",
-      "partner": "Partner",
-      "history": "Chat-Verlauf"
+      "newChat": "Neuer Chat",
+      "viewChart": "Horoskop ansehen",
+      "dashas": "Dashas",
+      "history": "Verlauf",
+      "myFacts": "Meine Fakten",
+      "language": "Sprache"
     },
-    "chartTypes": {
-      "lagna": {
-        "name": "Lagna (D1)",
-        "description": "Haupt-Geburtshoroskop"
-      },
-      "navamsa": {
-        "name": "Navamsa (D9)",
-        "description": "Ehe & Spiritualität"
-      },
-      "transit": {
-        "name": "Transit",
-        "description": "Aktuelle Planetenstände"
-      },
-      "karkamsa": {
-        "name": "Karkamsa",
-        "description": "Spiritueller Pfad & Dharma"
-      },
-      "swamsa": {
-        "name": "Swamsa",
-        "description": "Väterliche Abstammung & Ahnen"
-      },
-      "hora": {
-        "name": "Hora (D2)",
-        "description": "Wohlstand & Familie"
-      },
-      "drekkana": {
-        "name": "Drekkana (D3)",
-        "description": "Geschwister & Glück"
-      },
-      "chaturthamsa": {
-        "name": "Chaturthamsa (D4)",
-        "description": "Schicksal & Besitz"
-      },
-      "dashamsa": {
-        "name": "Dashamsa (D10)",
-        "description": "Karriere & Beruf"
-      },
-      "dwadashamsa": {
-        "name": "Dwadashamsa (D12)",
-        "description": "Eltern & Herkunft"
-      },
-      "shodamsa": {
-        "name": "Shodamsa (D16)",
-        "description": "Fahrzeuge & Komfort"
-      },
-      "vimsamsa": {
-        "name": "Vimsamsa (D20)",
-        "description": "Spirituelle Praktiken"
-      },
-      "chaturvimsamsa": {
-        "name": "Chaturvimsamsa (D24)",
-        "description": "Lernen & Bildung"
-      },
-      "trimsamsa": {
-        "name": "Trimsamsa (D30)",
-        "description": "Unglück & Schwierigkeiten"
-      },
-      "khavedamsa": {
-        "name": "Khavedamsa (D40)",
-        "description": "Günstig & Ungünstig"
-      },
-      "akshavedamsa": {
-        "name": "Akshavedamsa (D45)",
-        "description": "Charakter & Verhalten"
-      },
-      "shashtyamsa": {
-        "name": "Shashtyamsa (D60)",
-        "description": "Karma aus früheren Leben"
+    "birthDataRequired": "Geburtsdaten erforderlich",
+    "dashasAlert": "Bitte verknüpfe dein Geburtshoroskop, um Dashas zu sehen.",
+    "factsAlert": "Bitte verknüpfe dein Geburtshoroskop, um Fakten zu verwalten.",
+    "settings": "Einstellungen",
+    "lightTheme": "Helles Design",
+    "darkTheme": "Dunkles Design",
+    "editBirthDetails": "Geburtsdaten bearbeiten",
+    "notificationHistory": "Benachrichtigungsverlauf",
+    "turnOnNotifications": "Benachrichtigungen einschalten",
+    "turningOnNotifications": "Wird eingeschaltet…",
+    "aboutApp": "Über AstroRoshni",
+    "logout": "Abmelden"
+  },
+  "about": {
+    "title": "Über AstroRoshni",
+    "version": "Version {{version}}",
+    "versionWithCode": "Version {{version}} (Code {{code}})",
+    "versionWithBuild": "Version {{version}} (Build {{build}})",
+    "description": "AstroRoshni kombiniert vedische Astrologie mit intelligenter Führung, um dir zu helfen, deinen Lebensweg, dein Timing und verborgene Potenziale zu verstehen.",
+    "legalHeading": "Rechtliches & Richtlinien",
+    "privacyPolicy": "Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen",
+    "supportHeading": "Support",
+    "contactSupport": "Support kontaktieren",
+    "visitWebsite": "Website besuchen"
+  },
+  "languageModal": {
+    "title": "Sprache auswählen",
+    "close": "Schließen"
+  },
+  "authOnboarding": {
+    "chooseLanguageTitle": "Sprache wählen",
+    "chooseLanguageSubtitle": "Wir verwenden sie in der gesamten App. Du kannst sie jederzeit im Profil ändern.",
+    "continue": "Weiter",
+    "welcomeTitle": "Willkommen bei AstroRoshni, {{name}}!",
+    "welcomeSubtitle": "Dein Konto wurde erfolgreich erstellt.\nLass uns dein persönliches Geburtshoroskop anlegen, um kosmische Einblicke freizuschalten.",
+    "featureChart": "Detaillierte Geburtshoroskop-Analyse",
+    "featureAi": "KI-gestützte Vorhersagen",
+    "featureDaily": "Tägliche kosmische Führung",
+    "createBirthChart": "Mein Geburtshoroskop erstellen",
+    "skipForNow": "Jetzt überspringen"
+  },
+  "chat": {
+    "chartEssence": "{{name}}s Horoskop-Kern",
+    "welcomeMessage": "🌟 Willkommen {{name}}! Ich bin hier, um dir zu helfen, dein Geburtshoroskop zu verstehen und astrologische Einblicke zu geben.\\n\\nDu kannst mich alles fragen zu:\\n\\n• Persönlichkeitsmerkmale und Eigenschaften\\n• Karriere- und Berufsberatung\\n• Beziehungen und Kompatibilität\\n• Gesundheits- und Wellness-Einblicke\\n• Timing für wichtige Entscheidungen\\n• Aktuelle Planeten-Transite\\n• Stärken und Wachstumsbereiche\\n\\nWas möchtest du zuerst erkunden?",
+    "betaNotice": "⚠️ BETA: Zeitachsen-Vorhersagen sind experimentell. Nutze Logik und Diskretion.",
+    "disclaimerNotice": "⚖️ HAFTUNGSAUSSCHLUSS: Astrologie ist ein probabilistisches Werkzeug zur Orientierung. Kein Ersatz für medizinische, rechtliche, finanzielle oder psychologische Beratung. Konsultiere Fachleute für wichtige Entscheidungen.",
+    "verified": "AstroRoshni Verifiziert",
+    "inquiry": "AstroRoshni Anfrage",
+    "you": "Du",
+    "preparingInsights": "Bereite deine kosmischen Einblicke vor...",
+    "fascinatingInsights": "In der Zwischenzeit zeige ich dir einige faszinierende Details über dein Horoskop...",
+    "thankYou": "Vielen Dank, dass du dich mit deiner Frage an AstroRoshni gewandt hast.",
+    "deeplyAnalyzing": "Ich analysiere dein Himmelsdiagramm tiefgehend, um dir die genauesten Einblicke zu geben. Dieser heilige Prozess dauert einen Moment..."
+  },
+  "home": {
+    "greeting": {
+      "subtitle": "Dein kosmischer Bauplan wartet. Wähle deinen Pfad zur Erkenntnis.",
+      "lifePath": "{{name}}s Lebensweg"
+    },
+    "firstQuestionFree": {
+      "title": "Deine erste Frage ist kostenlos!",
+      "subtext": "Frag einfach los — keine Credits nötig.\nErhalte jetzt persönliche astrologische Beratung.",
+      "cta": "Stelle deine erste Frage kostenlos",
+      "later": "Vielleicht später"
+    },
+    "monthlyWelcome": {
+      "hello": "Hallo, {{name}} 👋",
+      "helloAnonymous": "Hallo 👋",
+      "headline": "Möchtest du entdecken, was {{month}} für dich bereithält?",
+      "body": "Wir analysieren tiefgehend deine Teilungsdiagramme, Dashas und Transite mit Parashari-, Nadi- und Jaimini-Methoden — und zeigen wahrscheinliche Ereignisse und Zeitfenster, die sich in {{month}} manifestieren könnten.",
+      "bullet1": "Zeitlinien für Beruf, Liebe, Geld und Gesundheit.",
+      "bullet2": "Sieh genau, welche Dashas und Häuser aktiv sind.",
+      "bullet3": "Mehrere Szenarien, damit du dich klar vorbereiten kannst.",
+      "cta": "{{month}}-Vorhersagen erkunden",
+      "later": "Vielleicht später",
+      "disclaimer": "Nur zur Orientierung — kein Ersatz für medizinische, rechtliche oder finanzielle Beratung.",
+      "months": {
+        "1": "Januar",
+        "2": "Februar",
+        "3": "März",
+        "4": "April",
+        "5": "Mai",
+        "6": "Juni",
+        "7": "Juli",
+        "8": "August",
+        "9": "September",
+        "10": "Oktober",
+        "11": "November",
+        "12": "Dezember"
       }
     },
-    "chartScreen": {
-      "loadingText": "Berechne kosmische Ausrichtungen...",
-      "loadingSubtext": "Lese Planetenpositionen",
-      "emptyTitle": "Keine Horoskop-Daten",
-      "emptyText": "Bitte Geburtsdaten hinzufügen, um Horoskope zu sehen",
-      "transit": "Transit",
-      "dasha": "Dasha",
-      "karakas": "Karakas",
-      "positions": "Positionen"
+    "multiChartTip": {
+      "title": "Charts für Familie & Freunde hinzufügen",
+      "body": "Du kannst in AstroRoshni mehr als ein Geburtsprofil speichern. Füge Partner, Kinder, Eltern oder Freunde hinzu, um Vorhersagen für sie zu erhalten, oder wechsle jederzeit das Profil über die Startüberschrift.",
+      "cta": "Geburtsprofil hinzufügen",
+      "gotIt": "Ich weiß Bescheid",
+      "neverAgain": "Nicht mehr anzeigen"
     },
-    "planets": {
-      "Sun": "So",
-      "Moon": "Mo",
-      "Mars": "Ma",
-      "Mercury": "Me",
-      "Jupiter": "Ju",
-      "Venus": "Ve",
-      "Saturn": "Sa",
-      "Rahu": "Ra",
-      "Ketu": "Ke",
-      "Gulika": "Gu",
-      "Mandi": "Mn",
-      "InduLagna": "IL"
+    "sections": {
+      "choosePath": "Wähle deinen Pfad",
+      "lifeAnalysis": "🧘 Lebensanalyse",
+      "timingPlanners": "⏰ Timing-Planer",
+      "cosmicDashboard": "✨ Dein kosmisches Dashboard",
+      "currentDasha": "⏰ Aktuelle Dasha-Perioden",
+      "astrologyTools": "🔧 Astrologie-Werkzeuge",
+      "planetaryTransits": "🪐 Aktuelle Planeten-Transite",
+      "blog": "Blog & Wissen"
     },
-    "shadbalaAnalysis": "Shadbala-Analyse",
-    "classicalPlanetaryStrength": "Klassische Planetenstärke (7 sichtbare Planeten)",
-    "rupas": "Rupas",
-    "points": "Punkte",
-    "grades": {
-      "Excellent": "Exzellent",
-      "Good": "Gut",
-      "Average": "Durchschnittlich",
-      "Weak": "Schwach"
-    },
-    "strengthComponents": "Stärke-Komponenten",
-    "components": {
-      "sthana_bala": "Sthana Bala",
-      "dig_bala": "Dig Bala",
-      "kala_bala": "Kala Bala",
-      "chesta_bala": "Chesta Bala",
-      "naisargika_bala": "Naisargika Bala",
-      "drik_bala": "Drik Bala",
-      "uccha_bala": "Uccha Bala",
-      "saptavargaja_bala": "Saptavargaja Bala",
-      "ojha_yugma_bala": "Ojha Yugma Bala",
-      "kendradi_bala": "Kendradi Bala",
-      "drekkana_bala": "Drekkana Bala"
-    },
-    "sthanaBalaBreakdown": "Sthana Bala Aufschlüsselung",
-    "kalaBalaBreakdown": "Kala Bala Aufschlüsselung",
-    "profile": {
-      "myProfile": "Mein Profil",
-      "birthDateNotSet": "Geburtsdatum nicht festgelegt",
-      "connectChart": "Horoskop mit Profil verknüpfen",
-      "availableCredits": "Verfügbare Credits",
-      "add": "+ Hinzufügen",
-      "chats": "Chats",
-      "charts": "Horoskope",
-      "days": "Tage",
-      "birthChartEssence": "Kern des Geburtshoroskops",
-      "viewFullChart": "Vollständiges Horoskop ansehen",
-      "sunSign": "Sonnenzeichen",
-      "moonSign": "Mondzeichen",
-      "ascendant": "Asz",
-      "calculating": "Berechne...",
-      "currentRunningDashas": "Aktuell laufende Dashas",
-      "loading": "Lädt...",
-      "quickActions": {
-        "newChat": "Neuer Chat",
-        "viewChart": "Horoskop ansehen",
-        "dashas": "Dashas",
-        "history": "Verlauf",
-        "myFacts": "Meine Fakten",
-        "language": "Sprache"
+    "options": {
+      "question": {
+        "title": "Stelle jede beliebige Frage",
+        "description": "Erhalte Einblicke in deine Persönlichkeit, Beziehungen, Karriere oder jedes astrologische Thema"
       },
-      "birthDataRequired": "Geburtsdaten erforderlich",
-      "dashasAlert": "Bitte verknüpfe dein Geburtshoroskop, um Dashas zu sehen.",
-      "factsAlert": "Bitte verknüpfe dein Geburtshoroskop, um Fakten zu verwalten.",
-      "settings": "Einstellungen",
-      "lightTheme": "Helles Design",
-      "darkTheme": "Dunkles Design",
-      "editBirthDetails": "Geburtsdaten bearbeiten",
-      "aboutApp": "Über AstroRoshni",
-      "logout": "Abmelden"
-    },
-    "about": {
-      "title": "Über AstroRoshni",
-      "version": "Version {{version}}",
-      "versionWithCode": "Version {{version}} (Code {{code}})",
-      "versionWithBuild": "Version {{version}} (Build {{build}})",
-      "description": "AstroRoshni kombiniert vedische Astrologie mit intelligenter Führung, um dir zu helfen, deinen Lebensweg, dein Timing und verborgene Potenziale zu verstehen.",
-      "legalHeading": "Rechtliches & Richtlinien",
-      "privacyPolicy": "Datenschutzrichtlinie",
-      "termsOfService": "Nutzungsbedingungen",
-      "supportHeading": "Support",
-      "contactSupport": "Support kontaktieren",
-      "visitWebsite": "Website besuchen"
-    },
-    "languageModal": {
-      "title": "Sprache auswählen",
-      "close": "Schließen"
-    },
-    "chat": {
-      "chartEssence": "{{name}}s Horoskop-Kern",
-      "welcomeMessage": "🌟 Willkommen {{name}}! Ich bin hier, um dir zu helfen, dein Geburtshoroskop zu verstehen und astrologische Einblicke zu geben.\\n\\nDu kannst mich alles fragen zu:\\n\\n• Persönlichkeitsmerkmale und Eigenschaften\\n• Karriere- und Berufsberatung\\n• Beziehungen und Kompatibilität\\n• Gesundheits- und Wellness-Einblicke\\n• Timing für wichtige Entscheidungen\\n• Aktuelle Planeten-Transite\\n• Stärken und Wachstumsbereiche\\n\\nWas möchtest du zuerst erkunden?",
-      "betaNotice": "⚠️ BETA: Zeitachsen-Vorhersagen sind experimentell. Nutze Logik und Diskretion.",
-      "disclaimerNotice": "⚖️ HAFTUNGSAUSSCHLUSS: Astrologie ist ein probabilistisches Werkzeug zur Orientierung. Kein Ersatz für medizinische, rechtliche, finanzielle oder psychologische Beratung. Konsultiere Fachleute für wichtige Entscheidungen.",
-      "verified": "AstroRoshni Verifiziert",
-      "inquiry": "AstroRoshni Anfrage",
-      "you": "Du",
-      "preparingInsights": "Bereite deine kosmischen Einblicke vor...",
-      "fascinatingInsights": "In der Zwischenzeit zeige ich dir einige faszinierende Details über dein Horoskop...",
-      "thankYou": "Vielen Dank, dass du dich mit deiner Frage an AstroRoshni gewandt hast.",
-      "deeplyAnalyzing": "Ich analysiere dein Himmelsdiagramm tiefgehend, um dir die genauesten Einblicke zu geben. Dieser heilige Prozess dauert einen Moment..."
-    },
-    "home": {
-      "greeting": {
-        "subtitle": "Dein kosmischer Bauplan wartet. Wähle deinen Pfad zur Erkenntnis.",
-        "lifePath": "{{name}}s Lebensweg"
+      "partnership": {
+        "title": "Partnerschafts-Analyse",
+        "description": "Analysiere Kompatibilität und Beziehungsdynamik zwischen zwei Personen"
       },
-      "sections": {
-        "choosePath": "Wähle deinen Pfad",
-        "lifeAnalysis": "🧘 Lebensanalyse",
-        "timingPlanners": "⏰ Timing-Planer",
-        "cosmicDashboard": "✨ Dein kosmisches Dashboard",
-        "currentDasha": "⏰ Aktuelle Dasha-Perioden",
-        "astrologyTools": "🔧 Astrologie-Werkzeuge",
-        "planetaryTransits": "🪐 Aktuelle Planeten-Transite"
+      "mundane": {
+        "title": "Globale Märkte & Ereignisse",
+        "description": "Analysiere Weltereignisse, Aktienmärkte, Politik und wirtschaftliche Trends"
       },
-      "options": {
-        "question": {
-          "title": "Stelle jede beliebige Frage",
-          "description": "Erhalte Einblicke in deine Persönlichkeit, Beziehungen, Karriere oder jedes astrologische Thema"
-        },
-        "partnership": {
-          "title": "Partnerschafts-Analyse",
-          "description": "Analysiere Kompatibilität und Beziehungsdynamik zwischen zwei Personen"
-        },
-        "mundane": {
-          "title": "Globale Märkte & Ereignisse",
-          "description": "Analysiere Weltereignisse, Aktienmärkte, Politik und wirtschaftliche Trends"
-        },
-        "events": {
-          "title": "Was sich manifestieren wird",
-          "description": "Sieh, was das Jahr bringt — Karriere, Liebe, Geld, Gesundheit — Monat für Monat."
-        }
-      },
-      "analysis": {
-        "career": {
-          "title": "Karriere-Analyse",
-          "description": "Beruflicher Erfolg & Möglichkeiten"
-        },
-        "wealth": {
-          "title": "Wohlstands-Analyse",
-          "description": "Finanzielle Aussichten & Chancen"
-        },
-        "health": {
-          "title": "Gesundheits-Analyse",
-          "description": "Wellness-Einblicke & Vorsichtsmaßnahmen"
-        },
-        "marriage": {
-          "title": "Ehe-Analyse",
-          "description": "Beziehungskompatibilität & Timing"
-        },
-        "education": {
-          "title": "Bildungs-Analyse",
-          "description": "Lernpfad & Berufsberatung"
-        },
-        "progeny": {
-          "title": "Nachkommen-Analyse",
-          "description": "Fruchtbarkeitspotenzial & Familienerweiterung"
-        },
-        "trading": {
-          "title": "Handels-Prognose",
-          "description": "Aktienmarkt-Vorhersagen & Timing"
-        },
-        "financial": {
-          "title": "Markt-Astrologie",
-          "description": "Branchenprognosen & Investitions-Timing"
-        },
-        "childbirth": {
-          "title": "Geburts-Planer",
-          "description": "Günstige Termine für die Entbindung"
-        },
-        "muhurat": {
-          "title": "Muhurat-Planer",
-          "description": "Günstiges Timing für alle Ereignisse"
-        }
-      },
-      "planet_names": {
-          "Sun": "Sonne",
-          "Moon": "Mond",
-          "Mars": "Mars",
-          "Mercury": "Merkur",
-          "Jupiter": "Jupiter",
-          "Venus": "Venus",
-          "Saturn": "Saturn",
-          "Rahu": "Rahu",
-          "Ketu": "Ketu"
-      },
-      "signs": {
-        "ascendant": "Asz",
-        "moon": "Mond",
-        "sun": "Sonne"
-      },
-      "ascendantDescriptions": {
-          "Aries": "Beherrscht vom Mars. Deine körperliche Konstitution ist aktiv, athletisch und neigt zu schnellen Bewegungen. Du begegnest der Welt mit einer bahnbrechenden, direkten Haltung. Dein äußeres Verhalten ist unabhängig, aufrichtig und entschlossen.",
-          "Taurus": "Beherrscht von der Venus. Du besitzt einen stabilen, geerdeten Körperbau und oft eine angenehme Stimme oder Gesichtsstruktur. Dein äußeres Verhalten ist langsam, methodisch und lässt sich nicht hetzen.",
-          "Gemini": "Beherrscht vom Merkur. Dein körperliches Erscheinungsbild bleibt oft jugendlich und deine Bewegungen sind schnell und ausdrucksstark. Du trittst durch Kommunikation und Anpassungsfähigkeit mit der Welt in Kontakt.",
-          "Cancer": "Beherrscht vom Mond. Dein Körper ist oft weicher, mit einer Tendenz zu Wassereinlagerungen, und du hast ein sanftes, zugängliches Auftreten. Du navigierst mit einem vorsichtigen, schützenden Instinkt durch die Welt.",
-          "Leo": "Beherrscht von der Sonne. Du hast eine königliche, aufrechte Haltung und oft eine starke physische Präsenz. Du interagierst mit natürlicher Autorität und Vitalität mit deiner Umgebung.",
-          "Virgo": "Beherrscht vom Merkur. Du hast ein gepflegtes äußeres Erscheinungsbild und ein sehr beobachtendes Auftreten. Du navigierst durch Analyse und praktischen Dienst durch das Leben.",
-          "Libra": "Beherrscht von der Venus. Deine körperlichen Merkmale sind oft symmetrisch und dein Ausdruck ist natürlich charmant und diplomatisch. Du suchst nach Balance und vermeidest Konflikte.",
-          "Scorpio": "Beherrscht vom Mars. Du hast eine widerstandsfähige Konstitution und einen intensiven, durchdringenden Blick. Du navigierst vorsichtig durch die Welt und hältst deine wahren Motive oft verborgen.",
-          "Sagittarius": "Beherrscht vom Jupiter. Du hast oft einen großen Körperbau und ein aktives, unruhiges Wesen. Du betrachtest die Welt durch die Linse der Expansion und Erforschung.",
-          "Capricorn": "Beherrscht vom Saturn. Dein Körperbau ist eher hager und du wirkst oft reifer als du bist. Du navigierst mit enormer Disziplin und Ausdauer durch die Welt.",
-          "Aquarius": "Beherrscht vom Saturn. Du hast oft ein unkonventionelles Erscheinungsbild oder einen einzigartigen Stil. Du interagierst objektiv und beobachtend mit deiner Umwelt.",
-          "Pisces": "Beherrscht vom Jupiter. Du besitzt eine weichere körperliche Konstitution, oft mit großen oder verträumten Augen. Du bist extrem anpassungsfähig und intuitiv."
-      },
-      "moonDescriptions": {
-          "Aries": "Dein Geist ist schnell, leidenschaftlich und blüht bei Action auf. Du findest emotionalen Trost in Unabhängigkeit und dem unmittelbaren Ausdruck deiner Gefühle.",
-          "Taurus": "Hier ist der Mond erhöht. Dein Geist sucht Frieden, Stabilität und sinnlichen Komfort. Du verarbeitest Emotionen langsam und findest Sicherheit in Routinen und der Natur.",
-          "Gemini": "Dein Geist ist unruhig, neugierig und ständig aktiv. Du verarbeitest deine Emotionen intellektuell und findest Trost in Kommunikation und Lernen.",
-          "Cancer": "Dies ist das eigene Zeichen des Mondes. Deine innere Welt ist tief sensibel, empathisch und intuitiv. Du findest Trost in einem sicheren Zuhause und engen Familienbanden.",
-          "Leo": "Dein Geist ist großzügig, stolz und ausdrucksstark. Du findest emotionalen Trost darin, geschätzt, geliebt und kreativ engagiert zu sein.",
-          "Virgo": "Dein Geist ist analytisch, praktisch und detailorientiert. Du verarbeitest Emotionen, indem du deine Umgebung organisierst und anderen dienst.",
-          "Libra": "Dein Geist sucht ständig nach Balance, Harmonie und Gesellschaft. Du findest emotionalen Trost in friedlicher Umgebung und starken Eins-zu-eins-Beziehungen.",
-          "Scorpio": "Hier ist der Mond im Fall. Deine innere Welt ist intensiv tief, leidenschaftlich und privat. Du erlebst Emotionen in Extremen und besitzt eine enorme emotionale Resilienz.",
-          "Sagittarius": "Dein Geist ist optimistisch, philosophisch und unruhig. Du findest emotionalen Trost in Freiheit, Reisen und der Suche nach höherer Bedeutung.",
-          "Capricorn": "Deine innere Welt ist ernst, diszipliniert und vorsichtig. Du verarbeitest Emotionen, indem du dich auf Pflichten, Verantwortlichkeiten und greifbare Leistungen konzentrierst.",
-          "Aquarius": "Dein Geist ist objektiv, innovativ und sozialbewusst. Du verarbeitest deine Emotionen intellektuell und betrachtest sie oft aus einer distanzierten Perspektive.",
-          "Pisces": "Deine innere Welt ist hochgradig phantasievoll, mitfühlend und spirituell. Du hast sehr durchlässige emotionale Grenzen und findest Trost in Kunst und Meditation."
-      },
-      "sunDescriptions": {
-          "Aries": "Hier ist die Sonne erhöht. Deine Kernidentität ist strahlend, mutig und hochgradig unabhängig. Deine Seelenaufgabe wird durch Führung und das Meistern von Herausforderungen vorangetrieben.",
-          "Taurus": "Deine Kernidentität ist geerdet, einfallsreich und wertorientiert. Deine Seelenaufgabe ist es, dauerhafte Stabilität aufzubauen, sei es durch materiellen Wohlstand oder die Künste.",
-          "Gemini": "Deine Kernidentität ist hochgradig intellektuell und kommunikativ. Deine Seelenaufgabe dreht sich um das Sammeln von Wissen, Netzwerken und den Ausdruck von Ideen.",
-          "Cancer": "Deine Kernidentität ist tief schützend und emotional verankert. Deine Seelenaufgabe ist es, durch Empathie zu pflegen, zu sichern und zu führen.",
-          "Leo": "Dies ist das eigene Zeichen der Sonne. Deine Kernidentität ist königlich, stolz und kreativ lebendig. Deine Seelenaufgabe ist es, zu strahlen, zu führen und andere zu inspirieren.",
-          "Virgo": "Deine Kernidentität ist rein, analytisch und dienstleistungsorientiert. Deine Seelenaufgabe ist es, Dinge zu verbessern, zu organisieren und zu heilen.",
-          "Libra": "Hier ist die Sonne im Fall. Deine Kernidentität ist an Partnerschaften, Harmonie und Diplomatie gebunden. Deine Seelenaufgabe ist es, Balance und Fairness zu schaffen.",
-          "Scorpio": "Deine Kernidentität ist intensiv, belastbar und transformativ. Deine Seelenaufgabe beinhaltet das Aufdecken verborgener Wahrheiten und tiefe persönliche Metamorphosen.",
-          "Sagittarius": "Deine Kernidentität ist optimistisch, philosophisch und von einem starken moralischen Kompass geleitet. Deine Seelenaufgabe ist es, nach höherer Weisheit zu suchen.",
-          "Capricorn": "Deine Kernidentität ist diszipliniert, ehrgeizig und hochgradig pragmatisch. Deine Seelenaufgabe ist es, greifbaren Erfolg, Status und strukturelle Autorität zu erreichen.",
-          "Aquarius": "Deine Kernidentität ist kollektiv, innovativ und etwas distanziert. Deine Seelenaufgabe ist es, der Menschheit zu dienen und progressive Ideen zu verbreiten.",
-          "Pisces": "Deine Kernidentität ist mitfühlend, spirituell und grenzenlos. Deine Seelenaufgabe ist es, die materielle Welt zu transzendieren und göttliche Liebe zu schenken."
-      },
-      "tools": {
-        "charts": "Horoskope",
-        "dashas": "Dashas",
-        "ashtakvarga": "Ashtak-\nvarga",
-        "positions": "Positionen",
-        "cosmicRing": "Kosmischer\nRing"
-      },
-      "cosmicRing": {
-        "viewRing": "Ring"
-      },
-      "panchang": {
-        "title": "🌅 Heutiges Panchang",
-        "sunrise": "Sonnenaufgang",
-        "sunset": "Sonnenuntergang",
-        "moonrise": "Mondaufgang",
-        "moonset": "Monduntergang",
-        "elements": "🕉️ Panchang-Elemente",
-        "nakshatra": "⭐ Nakshatra:",
-        "tithi": "🌙 Tithi:",
-        "yoga": "🧘 Yoga:",
-        "karana": "⚡ Karana:",
-        "fullMoon": "Vollmond",
-        "dayProgress": "Tagesfortschritt",
-        "auspiciousTimes": "🕉️ Günstige Zeiten",
-        "brahmaMuhurta": "Brahma Muhurta:",
-        "abhijitMuhurta": "Abhijit Muhurta:",
-        "inauspiciousTimes": "⚠️ Ungünstige Zeiten",
-        "rahuKaal": "Rahu Kaal:",
-        "durMuhurta": "Dur Muhurta:",
-        "varjyam": "Varjyam:",
-        "dayQuality": "Tagesqualität Zeitachse",
-        "auspicious": "Günstig",
-        "inauspicious": "Ungünstig",
-        "illuminated": "Erleuchtet"
-      },
-      "loading": {
-        "transits": "Lade Transite...",
-        "noTransitData": "Keine Transitdaten verfügbar",
-        "ticker": "Lade Ticker..."
-      },
-      "ticker": {
-        "sadeSati": "Sade Sati",
-        "activeMahadasha": "Aktives Mahadasha",
-        "moonPhase": "Mondphase",
-        "todaysNakshatra": "Heutiges Nakshatra",
-        "noSadeSati": "Kein aktives Sade Sati",
-        "active": "Aktiv"
-      },
-      "sadeSati": {
-        "title": "Sade-Sati-Perioden",
-        "loadError": "Sade-Sati-Perioden konnten nicht geladen werden.",
-        "noPeriods": "Keine Perioden gefunden.",
-        "ctaHeadline": "Wird mein Sade Sati herausfordernd oder eher überschaubar?",
-        "ctaSubtext": "Erhalte eine Lesung basierend auf deinem Horoskop – Intensität, Timing und Abhilfen.",
-        "ctaButton": "Im Chat fragen",
-        "infoTitle": "Was ist Sade Sati?",
-        "infoBody": "Sade Sati ist der etwa 7,5-jährige Zeitraum, in dem der transitierende Saturn durch das Mondzeichen, das Zeichen davor und das Zeichen danach in deinem Geburtshoroskop wandert. In der vedischen Astrologie gilt dies als bedeutender Transit, der Herausforderungen, Verzögerungen und Lebenslektionen, aber auch Reife und Wachstum bringen kann. Intensität und Auswirkungen hängen von deinem Horoskop ab."
-      },
-      "nakshatra": {
-        "title": "Nakshatra-Kalender",
-        "loadError": "Nakshatra-Kalender konnte nicht geladen werden.",
-        "noData": "Keine Nakshatra-Daten für diesen Monat.",
-        "begins": "Beginnt",
-        "ends": "Endet",
-        "at": "um"
-      },
-      "tabs": {
-        "ask": "Fragen",
-        "charts": "Horoskope",
-        "events": "Vorhersagen",
-        "dashas": "Dashas",
-        "you": "Du"
-      },
-      "askFAB": "AstroRoshni fragen"
-    },
-    "eventScreen": {
-      "headerTitle": "Wichtige Lebensereignisse",
-      "headerPredictions": "{{year}} Vorhersagen",
-      "monthlyGuide": "Monatliche Übersicht",
-      "selectYear": "Wähle dein Jahr",
-      "selectYearSubtitle": "Welches Jahr möchtest du erkunden?",
-      "continue": "Weiter",
-      "regenerateTitle": "Vorhersagen neu erstellen?",
-      "regenerateMessage": "Das kostet {{cost}} Credits für frische Vorhersagen für {{year}}.",
-      "cancel": "Abbrechen",
-      "confirm": "Bestätigen",
-      "whatsIncluded": "Was enthalten ist:",
-      "monthlyForecasts": "12 monatliche Vorhersagen",
-      "majorLifeEvents": "Wichtige Lebensereignisse",
-      "timingGuidance": "Zeitliche Orientierung",
-      "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
-      "thisYear": "Dieses Jahr",
-      "nextYear": "Nächstes Jahr",
-      "noPredictions": "Keine Vorhersagen erstellt. Bitte erneut versuchen.",
-      "almostThere": "Fast fertig..."
-    },
-    "monthlyAccordion": {
-      "focus": "FOKUS:",
-      "possibleScenarios": "Mögliche Szenarien ({{count}})",
-      "askQuestions": "Fragen stellen",
-      "diveDeep": "In diesen Monat eintauchen",
-      "why": "Warum:"
-    },
-    "monthlyDeepScreen": {
-      "loading": "Laden...",
-      "headerDeepDive": "{{monthYear}} — Tiefenanalyse",
-      "headerMonthlyDeepDive": "Monatliche Tiefenanalyse",
-      "emptyTitle": "Tief in {{monthYear}} eintauchen",
-      "emptyDesc": "Jeden Auslöser und alle möglichen Manifestationen für diesen Monat. Kostet {{cost}} Credits.",
-      "generateDeepDive": "Tiefenanalyse erstellen",
-      "generateConfirmTitle": "Tiefenanalyse erstellen",
-      "generateConfirmMessage": "Das kostet {{cost}} Credits, um alle Manifestationen für {{monthYear}} zu erstellen.",
-      "cancel": "Abbrechen",
-      "continue": "Weiter",
-      "loadingAnalyzing": "Dieser Monat wird vertieft analysiert...",
-      "loadingMapping": "Jeder Auslöser und jede Manifestation wird erfasst...",
-      "loadingExamining": "Alle Hausaktivierungen werden geprüft..."
-    },
-    "birthForm": {
-      "headerTitle": {
-        "updateGender": "Geschlecht aktualisieren",
-        "editProfile": "Profil bearbeiten",
-        "birthDetails": "Geburtsdaten"
-      },
-      "progressText": "Schritt {{step}} von 5",
-      "stepTitle": {
-        "name": "Wie heißt du?",
-        "gender": "Wähle dein Geschlecht",
-        "date": "Wann wurdest du geboren?",
-        "time": "Um wie viel Uhr wurdest du geboren?",
-        "place": "Wo wurdest du geboren?"
-      },
-      "namePlaceholder": "Vollständigen Namen eingeben",
-      "placePlaceholder": "Stadt, Bundesland, Land",
-      "gender": {
-        "male": "Männlich",
-        "female": "Weiblich"
-      },
-      "selectedLocation": "Ausgewählter Ort",
-      "buttons": {
-        "back": "Zurück",
-        "processing": "Wird verarbeitet...",
-        "complete": "Fertigstellen",
-        "next": "Weiter"
-      },
-      "alerts": {
-        "invalidLocation": {
-          "title": "Ungültiger Ort",
-          "suggestions": "Bitte wähle einen Ort aus den Vorschlägen aus, um genaue Berechnungen zu gewährleisten.",
-          "noSelection": "Bitte wähle einen Ort aus den Vorschlägen."
-        },
-        "success": {
-          "title": "Erfolg",
-          "genderUpdated": "Geschlecht erfolgreich aktualisiert!",
-          "profileUpdated": "Profil erfolgreich aktualisiert!",
-          "chartCalculated": "Geburtshoroskop erfolgreich berechnet!"
-        },
-        "error": {
-          "title": "Fehler",
-          "default": "Geburtsdaten konnten nicht verarbeitet werden"
-        },
-        "ok": "OK"
-      },
-      "picker": {
-        "cancel": "Abbrechen",
-        "done": "Fertig"
-      },
-      "coords": {
-        "lat": "Breite:",
-        "long": "Länge:"
+      "events": {
+        "title": "Was sich manifestieren wird",
+        "description": "Sieh, was das Jahr bringt — Karriere, Liebe, Geld, Gesundheit — Monat für Monat."
       }
     },
-    "common": {
-      "current": "Aktuell",
-      "unknown": "Unbekannt",
-      "ends": "Endet: ",
-      "notAvailable": "Nicht verfügbar"
+    "analysis": {
+      "career": {
+        "title": "Karriere-Analyse",
+        "description": "Beruflicher Erfolg & Möglichkeiten"
+      },
+      "wealth": {
+        "title": "Wohlstands-Analyse",
+        "description": "Finanzielle Aussichten & Chancen"
+      },
+      "health": {
+        "title": "Gesundheits-Analyse",
+        "description": "Wellness-Einblicke & Vorsichtsmaßnahmen"
+      },
+      "marriage": {
+        "title": "Ehe-Analyse",
+        "description": "Beziehungskompatibilität & Timing"
+      },
+      "education": {
+        "title": "Bildungs-Analyse",
+        "description": "Lernpfad & Berufsberatung"
+      },
+      "progeny": {
+        "title": "Nachkommen-Analyse",
+        "description": "Fruchtbarkeitspotenzial & Familienerweiterung"
+      },
+      "trading": {
+        "title": "Handels-Prognose",
+        "description": "Aktienmarkt-Vorhersagen & Timing"
+      },
+      "financial": {
+        "title": "Markt-Astrologie",
+        "description": "Branchenprognosen & Investitions-Timing"
+      },
+      "childbirth": {
+        "title": "Geburts-Planer",
+        "description": "Günstige Termine für die Entbindung"
+      },
+      "muhurat": {
+        "title": "Muhurat-Planer",
+        "description": "Günstiges Timing für alle Ereignisse"
+      }
     },
-    "dasha": {
-      "vimshottari": "Vimshottari",
-      "kalchakra": "BPHS Kalchakra",
-      "yogini": "Yogini",
-      "chara": "Chara",
-      "currentBPHSKalachakra": "Aktuelles BPHS Kalchakra",
-      "maha": "Maha",
-      "antar": "Antar",
-      "selectDashas": "Dashas wählen, um Hierarchie zu sehen",
-      "kalchakraMahadasha": "BPHS Kalchakra Mahadasha (Zeichenbasiert)",
-      "kalchakraAntardasha": "BPHS Kalchakra Antardasha",
-      "noPeriodsAvailable": "Keine Perioden verfügbar",
-      "mahaDasha": "Maha Dasha",
-      "antarDasha": "Antar Dasha",
-      "pratyantarDasha": "Pratyantar Dasha",
-      "sookshmaDasha": "Sookshma Dasha",
-      "pranaDasha": "Prana Dasha",
-      "browserFor": "Dasha-Browser",
-      "browserTitle": "Dasha-Browser",
-      "birthDataRequired": "Geburtsdaten erforderlich, um Dashas zu sehen.",
-      "addBirthProfileHint": "Füge dein Geburtsprofil vom Startbildschirm hinzu, um fortzufahren.",
-      "completed": "Abgeschlossen",
-      "remaining": "Verbleibend",
-      "yearShort": "J",
-      "monthShort": "M",
-      "dayShort": "T",
-      "nakshatra": "Nakshatra",
-      "chakra": "Chakra",
-      "forward": "Vorwärts",
-      "backward": "Rückwärts",
-      "yearCompleteCycle": "Jahr Kompletter Zyklus",
-      "deha": "Deha",
-      "jeeva": "Jeeva",
-      "periods": "Zeiträume",
-      "wheel": "Rad",
-      "timeline": "Zeitachse",
-      "kalchakraTimeline": "Kalchakra Zeitachse",
-      "sign": "Zeichen",
-      "gati": "Gati",
-      "duration": "Dauer",
-      "period": "Zeitraum",
-      "kalchakraWheel": "Kalchakra Rad",
-      "currentMaha": "Aktuelles Maha",
-      "currentAntar": "Aktuelles Antar",
-      "mahadashas": "Mahadashas",
-      "gatiAnalysis": "Gati-Analyse",
-      "details": "Details",
-      "lifetimeGatiAnalysis": "Lebenszeit Gati-Analyse",
-      "summary": "Zusammenfassung",
-      "percentCompleted": "{{percentage}}% Abgeschlossen",
-      "currentlyRunning": "Aktuell laufend",
-      "loading": "Lade Dashas...",
-      "loadingYogini": "Lade Yogini Dasha Daten...",
-      "dataStructureError": "Datenstrukturfehler. Prüfe die Konsole.",
-      "availableKeys": "Verfügbare Schlüssel: ",
-      "currentYoginiPhase": "Aktuelle Yogini Phase",
-      "mahadasha": "Mahadasha",
-      "antardasha": "Antardasha",
-      "criticalTiming": "Kritisches Timing",
-      "remedies": "Heilmittel",
-      "analysis": "Analyse",
-      "yoginiCycle": "Yogini-Zyklus (36 Jahre)"
-    },
-    "yogini": {
-      "success": "Erfolg",
-      "aggression": "Aggression",
-      "wealth": "Wohlstand",
-      "travel": "Reise",
-      "career": "Karriere",
-      "workload": "Arbeitsbelastung",
-      "victory": "Sieg",
-      "crisis": "Krise",
-      "mangala": "Mangala",
-      "pingala": "Pingala",
-      "dhanya": "Dhanya",
-      "bhramari": "Bhramari",
-      "bhadrika": "Bhadrika",
-      "ulka": "Ulka",
-      "siddha": "Siddha",
-      "sankata": "Sankata"
+    "planet_names": {
+      "Sun": "Sonne",
+      "Moon": "Mond",
+      "Mars": "Mars",
+      "Mercury": "Merkur",
+      "Jupiter": "Jupiter",
+      "Venus": "Venus",
+      "Saturn": "Saturn",
+      "Rahu": "Rahu",
+      "Ketu": "Ketu"
     },
     "signs": {
-      "Aries": "Widder",
-      "Taurus": "Stier",
-      "Gemini": "Zwillinge",
-      "Cancer": "Krebs",
-      "Leo": "Löwe",
-      "Virgo": "Jungfrau",
-      "Libra": "Waage",
-      "Scorpio": "Skorpion",
-      "Sagittarius": "Schütze",
-      "Capricorn": "Steinbock",
-      "Aquarius": "Wassermann",
-      "Pisces": "Fische",
-      "Ari": "Wid",
-      "Tau": "Sti",
-      "Gem": "Zwi",
-      "Can": "Kre",
-      "Vir": "Jun",
-      "Lib": "Waa",
-      "Sco": "Sko",
-      "Sag": "Sch",
-      "Cap": "Ste",
-      "Aqu": "Was",
-      "Pis": "Fis"
+      "ascendant": "Asz",
+      "moon": "Mond",
+      "sun": "Sonne"
     },
-    "yogas": {
-      "raj_yogas": "Raj Yogas",
-      "dhana_yogas": "Dhana Yogas",
-      "mahapurusha_yogas": "Mahapurusha Yogas",
-      "neecha_bhanga_yogas": "Neecha Bhanga Yogas",
-      "gaja_kesari_yogas": "Gaja Kesari Yogas",
-      "amala_yogas": "Amala Yogas",
-      "viparita_raja_yogas": "Viparita Raja Yogas",
-      "dharma_karma_yogas": "Dharma Karma Yogas",
-      "nabhasa_yogas": "Nabhasa Yogas",
-      "chandra_yogas": "Chandra Yogas",
-      "surya_yogas": "Surya Yogas",
-      "parivartana_yogas": "Parivartana Yogas",
-      "career_specific_yogas": "Karriere-spezifische Yogas",
-      "health_yogas": "Gesundheits-Yogas",
-      "education_yogas": "Bildungs-Yogas",
-      "marriage_yogas": "Ehe-Yogas",
-      "major_doshas": "Wichtige Doshas",
-      "sankhya_yogas": "Sankhya Yogas",
-      "akriti_yogas": "Akriti Yogas",
-      "ashraya_yogas": "Ashraya Yogas",
-      "maha_yogas": "Maha Yogas",
-      "dainya_yogas": "Dainya Yogas",
-      "khala_yogas": "Khala Yogas",
-      "other_parivartana_yogas": "Weitere Parivartana Yogas"
+    "ascendantDescriptions": {
+      "Aries": "Beherrscht vom Mars. Deine körperliche Konstitution ist aktiv, athletisch und neigt zu schnellen Bewegungen. Du begegnest der Welt mit einer bahnbrechenden, direkten Haltung. Dein äußeres Verhalten ist unabhängig, aufrichtig und entschlossen.",
+      "Taurus": "Beherrscht von der Venus. Du besitzt einen stabilen, geerdeten Körperbau und oft eine angenehme Stimme oder Gesichtsstruktur. Dein äußeres Verhalten ist langsam, methodisch und lässt sich nicht hetzen.",
+      "Gemini": "Beherrscht vom Merkur. Dein körperliches Erscheinungsbild bleibt oft jugendlich und deine Bewegungen sind schnell und ausdrucksstark. Du trittst durch Kommunikation und Anpassungsfähigkeit mit der Welt in Kontakt.",
+      "Cancer": "Beherrscht vom Mond. Dein Körper ist oft weicher, mit einer Tendenz zu Wassereinlagerungen, und du hast ein sanftes, zugängliches Auftreten. Du navigierst mit einem vorsichtigen, schützenden Instinkt durch die Welt.",
+      "Leo": "Beherrscht von der Sonne. Du hast eine königliche, aufrechte Haltung und oft eine starke physische Präsenz. Du interagierst mit natürlicher Autorität und Vitalität mit deiner Umgebung.",
+      "Virgo": "Beherrscht vom Merkur. Du hast ein gepflegtes äußeres Erscheinungsbild und ein sehr beobachtendes Auftreten. Du navigierst durch Analyse und praktischen Dienst durch das Leben.",
+      "Libra": "Beherrscht von der Venus. Deine körperlichen Merkmale sind oft symmetrisch und dein Ausdruck ist natürlich charmant und diplomatisch. Du suchst nach Balance und vermeidest Konflikte.",
+      "Scorpio": "Beherrscht vom Mars. Du hast eine widerstandsfähige Konstitution und einen intensiven, durchdringenden Blick. Du navigierst vorsichtig durch die Welt und hältst deine wahren Motive oft verborgen.",
+      "Sagittarius": "Beherrscht vom Jupiter. Du hast oft einen großen Körperbau und ein aktives, unruhiges Wesen. Du betrachtest die Welt durch die Linse der Expansion und Erforschung.",
+      "Capricorn": "Beherrscht vom Saturn. Dein Körperbau ist eher hager und du wirkst oft reifer als du bist. Du navigierst mit enormer Disziplin und Ausdauer durch die Welt.",
+      "Aquarius": "Beherrscht vom Saturn. Du hast oft ein unkonventionelles Erscheinungsbild oder einen einzigartigen Stil. Du interagierst objektiv und beobachtend mit deiner Umwelt.",
+      "Pisces": "Beherrscht vom Jupiter. Du besitzt eine weichere körperliche Konstitution, oft mit großen oder verträumten Augen. Du bist extrem anpassungsfähig und intuitiv."
     },
-    "kp": {
-      "title": "KP-System",
-      "planetaryScript": "Planeten-Skript",
-      "cuspalScript": "Kuspal-Skript",
-      "significators": "Signifikatoren",
-      "rulingPlanets": "Herrschende Planeten (RP)",
-      "columns": {
-        "planet": "Planet",
-        "cusp": "Spitze",
-        "sign": "Zeichen",
-        "degree": "Grad",
-        "starLord": "StL",
-        "subLord": "SbL",
-        "subSubLord": "SSL"
+    "moonDescriptions": {
+      "Aries": "Dein Geist ist schnell, leidenschaftlich und blüht bei Action auf. Du findest emotionalen Trost in Unabhängigkeit und dem unmittelbaren Ausdruck deiner Gefühle.",
+      "Taurus": "Hier ist der Mond erhöht. Dein Geist sucht Frieden, Stabilität und sinnlichen Komfort. Du verarbeitest Emotionen langsam und findest Sicherheit in Routinen und der Natur.",
+      "Gemini": "Dein Geist ist unruhig, neugierig und ständig aktiv. Du verarbeitest deine Emotionen intellektuell und findest Trost in Kommunikation und Lernen.",
+      "Cancer": "Dies ist das eigene Zeichen des Mondes. Deine innere Welt ist tief sensibel, empathisch und intuitiv. Du findest Trost in einem sicheren Zuhause und engen Familienbanden.",
+      "Leo": "Dein Geist ist großzügig, stolz und ausdrucksstark. Du findest emotionalen Trost darin, geschätzt, geliebt und kreativ engagiert zu sein.",
+      "Virgo": "Dein Geist ist analytisch, praktisch und detailorientiert. Du verarbeitest Emotionen, indem du deine Umgebung organisierst und anderen dienst.",
+      "Libra": "Dein Geist sucht ständig nach Balance, Harmonie und Gesellschaft. Du findest emotionalen Trost in friedlicher Umgebung und starken Eins-zu-eins-Beziehungen.",
+      "Scorpio": "Hier ist der Mond im Fall. Deine innere Welt ist intensiv tief, leidenschaftlich und privat. Du erlebst Emotionen in Extremen und besitzt eine enorme emotionale Resilienz.",
+      "Sagittarius": "Dein Geist ist optimistisch, philosophisch und unruhig. Du findest emotionalen Trost in Freiheit, Reisen und der Suche nach höherer Bedeutung.",
+      "Capricorn": "Deine innere Welt ist ernst, diszipliniert und vorsichtig. Du verarbeitest Emotionen, indem du dich auf Pflichten, Verantwortlichkeiten und greifbare Leistungen konzentrierst.",
+      "Aquarius": "Dein Geist ist objektiv, innovativ und sozialbewusst. Du verarbeitest deine Emotionen intellektuell und betrachtest sie oft aus einer distanzierten Perspektive.",
+      "Pisces": "Deine innere Welt ist hochgradig phantasievoll, mitfühlend und spirituell. Du hast sehr durchlässige emotionale Grenzen und findest Trost in Kunst und Meditation."
+    },
+    "sunDescriptions": {
+      "Aries": "Hier ist die Sonne erhöht. Deine Kernidentität ist strahlend, mutig und hochgradig unabhängig. Deine Seelenaufgabe wird durch Führung und das Meistern von Herausforderungen vorangetrieben.",
+      "Taurus": "Deine Kernidentität ist geerdet, einfallsreich und wertorientiert. Deine Seelenaufgabe ist es, dauerhafte Stabilität aufzubauen, sei es durch materiellen Wohlstand oder die Künste.",
+      "Gemini": "Deine Kernidentität ist hochgradig intellektuell und kommunikativ. Deine Seelenaufgabe dreht sich um das Sammeln von Wissen, Netzwerken und den Ausdruck von Ideen.",
+      "Cancer": "Deine Kernidentität ist tief schützend und emotional verankert. Deine Seelenaufgabe ist es, durch Empathie zu pflegen, zu sichern und zu führen.",
+      "Leo": "Dies ist das eigene Zeichen der Sonne. Deine Kernidentität ist königlich, stolz und kreativ lebendig. Deine Seelenaufgabe ist es, zu strahlen, zu führen und andere zu inspirieren.",
+      "Virgo": "Deine Kernidentität ist rein, analytisch und dienstleistungsorientiert. Deine Seelenaufgabe ist es, Dinge zu verbessern, zu organisieren und zu heilen.",
+      "Libra": "Hier ist die Sonne im Fall. Deine Kernidentität ist an Partnerschaften, Harmonie und Diplomatie gebunden. Deine Seelenaufgabe ist es, Balance und Fairness zu schaffen.",
+      "Scorpio": "Deine Kernidentität ist intensiv, belastbar und transformativ. Deine Seelenaufgabe beinhaltet das Aufdecken verborgener Wahrheiten und tiefe persönliche Metamorphosen.",
+      "Sagittarius": "Deine Kernidentität ist optimistisch, philosophisch und von einem starken moralischen Kompass geleitet. Deine Seelenaufgabe ist es, nach höherer Weisheit zu suchen.",
+      "Capricorn": "Deine Kernidentität ist diszipliniert, ehrgeizig und hochgradig pragmatisch. Deine Seelenaufgabe ist es, greifbaren Erfolg, Status und strukturelle Autorität zu erreichen.",
+      "Aquarius": "Deine Kernidentität ist kollektiv, innovativ und etwas distanziert. Deine Seelenaufgabe ist es, der Menschheit zu dienen und progressive Ideen zu verbreiten.",
+      "Pisces": "Deine Kernidentität ist mitfühlend, spirituell und grenzenlos. Deine Seelenaufgabe ist es, die materielle Welt zu transzendieren und göttliche Liebe zu schenken."
+    },
+    "tools": {
+      "charts": "Horoskope",
+      "dashas": "Dashas",
+      "ashtakvarga": "Ashtak-\nvarga",
+      "positions": "Positionen",
+      "cosmicRing": "Kosmischer\nRing"
+    },
+    "cosmicRing": {
+      "viewRing": "Ring"
+    },
+    "panchang": {
+      "title": "🌅 Heutiges Panchang",
+      "sunrise": "Sonnenaufgang",
+      "sunset": "Sonnenuntergang",
+      "moonrise": "Mondaufgang",
+      "moonset": "Monduntergang",
+      "elements": "🕉️ Panchang-Elemente",
+      "nakshatra": "⭐ Nakshatra:",
+      "tithi": "🌙 Tithi:",
+      "yoga": "🧘 Yoga:",
+      "karana": "⚡ Karana:",
+      "fullMoon": "Vollmond",
+      "dayProgress": "Tagesfortschritt",
+      "auspiciousTimes": "🕉️ Günstige Zeiten",
+      "brahmaMuhurta": "Brahma Muhurta:",
+      "abhijitMuhurta": "Abhijit Muhurta:",
+      "inauspiciousTimes": "⚠️ Ungünstige Zeiten",
+      "rahuKaal": "Rahu Kaal:",
+      "durMuhurta": "Dur Muhurta:",
+      "varjyam": "Varjyam:",
+      "dayQuality": "Tagesqualität Zeitachse",
+      "auspicious": "Günstig",
+      "inauspicious": "Ungünstig",
+      "illuminated": "Erleuchtet"
+    },
+    "loading": {
+      "transits": "Lade Transite...",
+      "noTransitData": "Keine Transitdaten verfügbar",
+      "ticker": "Lade Ticker..."
+    },
+    "ticker": {
+      "sadeSati": "Sade Sati",
+      "activeMahadasha": "Aktives Mahadasha",
+      "moonPhase": "Mondphase",
+      "todaysNakshatra": "Heutiges Nakshatra",
+      "noSadeSati": "Kein aktives Sade Sati",
+      "active": "Aktiv"
+    },
+    "sadeSati": {
+      "title": "Sade-Sati-Perioden",
+      "loadError": "Sade-Sati-Perioden konnten nicht geladen werden.",
+      "noPeriods": "Keine Perioden gefunden.",
+      "ctaHeadline": "Wird mein Sade Sati herausfordernd oder eher überschaubar?",
+      "ctaSubtext": "Erhalte eine Lesung basierend auf deinem Horoskop – Intensität, Timing und Abhilfen.",
+      "ctaButton": "Im Chat fragen",
+      "infoTitle": "Was ist Sade Sati?",
+      "infoBody": "Sade Sati ist der etwa 7,5-jährige Zeitraum, in dem der transitierende Saturn durch das Mondzeichen, das Zeichen davor und das Zeichen danach in deinem Geburtshoroskop wandert. In der vedischen Astrologie gilt dies als bedeutender Transit, der Herausforderungen, Verzögerungen und Lebenslektionen, aber auch Reife und Wachstum bringen kann. Intensität und Auswirkungen hängen von deinem Horoskop ab."
+    },
+    "nakshatra": {
+      "title": "Nakshatra-Kalender",
+      "loadError": "Nakshatra-Kalender konnte nicht geladen werden.",
+      "noData": "Keine Nakshatra-Daten für diesen Monat.",
+      "begins": "Beginnt",
+      "ends": "Endet",
+      "at": "um"
+    },
+    "tabs": {
+      "ask": "Fragen",
+      "charts": "Horoskope",
+      "events": "Vorhersagen",
+      "dashas": "Dashas",
+      "you": "Du"
+    },
+    "askFAB": "AstroRoshni fragen"
+  },
+  "eventScreen": {
+    "headerTitle": "Wichtige Lebensereignisse",
+    "headerPredictions": "{{year}} Vorhersagen",
+    "monthlyGuide": "Monatliche Übersicht",
+    "selectYear": "Wähle dein Jahr",
+    "selectYearSubtitle": "Welches Jahr möchtest du erkunden?",
+    "continue": "Weiter",
+    "regenerateTitle": "Vorhersagen neu erstellen?",
+    "regenerateMessage": "Das kostet {{cost}} Credits für frische Vorhersagen für {{year}}.",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "whatsIncluded": "Was enthalten ist:",
+    "monthlyForecasts": "12 monatliche Vorhersagen",
+    "majorLifeEvents": "Wichtige Lebensereignisse",
+    "timingGuidance": "Zeitliche Orientierung",
+    "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
+    "thisYear": "Dieses Jahr",
+    "nextYear": "Nächstes Jahr",
+    "noPredictions": "Keine Vorhersagen erstellt. Bitte erneut versuchen.",
+    "almostThere": "Fast fertig..."
+  },
+  "monthlyAccordion": {
+    "focus": "FOKUS:",
+    "possibleScenarios": "Mögliche Szenarien ({{count}})",
+    "askQuestions": "Fragen stellen",
+    "diveDeep": "In diesen Monat eintauchen",
+    "why": "Warum:"
+  },
+  "monthlyDeepScreen": {
+    "loading": "Laden...",
+    "headerDeepDive": "{{monthYear}} — Tiefenanalyse",
+    "headerMonthlyDeepDive": "Monatliche Tiefenanalyse",
+    "emptyTitle": "Tief in {{monthYear}} eintauchen",
+    "emptyDesc": "Jeden Auslöser und alle möglichen Manifestationen für diesen Monat. Kostet {{cost}} Credits.",
+    "generateDeepDive": "Tiefenanalyse erstellen",
+    "generateConfirmTitle": "Tiefenanalyse erstellen",
+    "generateConfirmMessage": "Das kostet {{cost}} Credits, um alle Manifestationen für {{monthYear}} zu erstellen.",
+    "cancel": "Abbrechen",
+    "continue": "Weiter",
+    "loadingAnalyzing": "Dieser Monat wird vertieft analysiert...",
+    "loadingMapping": "Jeder Auslöser und jede Manifestation wird erfasst...",
+    "loadingExamining": "Alle Hausaktivierungen werden geprüft..."
+  },
+  "credits": {
+    "page": {
+      "title": "Kosmische Credits",
+      "subtitle": "Tanken Sie Ihre astrologische Reise",
+      "yourBalance": "Ihr Guthaben",
+      "creditsLabel": "Credits",
+      "promoHeading": "Haben Sie einen Promo-Code?",
+      "promoPlaceholder": "Promo-Code eingeben",
+      "redeem": "Einlösen",
+      "redeeming": "Wird eingelöst...",
+      "transactionHistory": "Transaktionsverlauf",
+      "noTransactions": "Noch keine Transaktionen",
+      "historyHint": "Ihr Credit-Verlauf erscheint hier",
+      "subscriptionBenefit": "{{percent}}% Rabatt auf alle Funktionen — Karriere, Ehe, Gesundheit, Ereignis-Zeitleiste und jede kostenpflichtige Analyse.",
+      "subscribedOn": "Abonniert am {{date}}",
+      "renewsOn": "Verlängert am {{date}}",
+      "manageSubscription": "Abo verwalten oder kündigen",
+      "refreshing": "Aktualisiert…",
+      "refreshSubscriptionStatus": "Abostatus aktualisieren",
+      "vipDiscountBadge": "{{tier}} — {{percent}}% Rabatt auf alles",
+      "vipPlans": "VIP-Pläne",
+      "loadingPlans": "Pläne werden geladen…",
+      "noSubscriptionPlansStore": "Keine Abo-Pläne im Store verfügbar.",
+      "buyCredits": "Credits kaufen",
+      "loadingProducts": "Produkte werden geladen…",
+      "noProducts": "Keine Produkte verfügbar. Später erneut versuchen.",
+      "productTitleFallback": "{{count}} Credits",
+      "creditsCount": "{{count}} Credits",
+      "currentPlan": "Aktueller Plan",
+      "processing": "Wird verarbeitet…",
+      "subscribe": "Abonnieren",
+      "buy": "Kaufen",
+      "vipFallback": "VIP",
+      "offPercent": "{{percent}}% Rabatt",
+      "modalGotIt": "Verstanden",
+      "modalCreditsAdded": "+{{count}} Credits",
+      "purchaseThankYou": "Danke!",
+      "purchaseAlreadyCreditedTitle": "Bereits gutgeschrieben",
+      "purchaseAlreadyCreditedBody": "Dieser Kauf wurde bereits Ihrem Guthaben hinzugefügt.",
+      "purchaseCreditsAddedSuffix": "{{count}} Credits wurden Ihrem Guthaben hinzugefügt.",
+      "purchaseCreditsAddedDefault": "Credits hinzugefügt.",
+      "purchaseVerifyFailed": "Kaufverifizierung fehlgeschlagen",
+      "failedAddCredits": "Credits konnten nicht hinzugefügt werden",
+      "subscribedTitle": "Abonniert!",
+      "subscribedMessage": "Sie sind jetzt bei {{tier}}. Rabatt auf alle Credit-Käufe.",
+      "subscriptionVerifyFailed": "Abo-Verifizierung fehlgeschlagen",
+      "failedActivateSubscription": "Abo konnte nicht aktiviert werden",
+      "subscriptionStatusUpdated": "Abostatus aktualisiert",
+      "subscriptionStatusUpdatedBody": "Wenn Sie bei Google Play gekündigt haben, wurde der Status aktualisiert.",
+      "couldNotRefresh": "Aktualisierung nicht möglich",
+      "refreshFailed": "Aktualisierung fehlgeschlagen",
+      "alertError": "Fehler",
+      "enterPromoCode": "Bitte Promo-Code eingeben",
+      "alertSuccess": "Erfolg",
+      "promoRedeemedDefault": "Promo-Code erfolgreich eingelöst!",
+      "failedRedeem": "Einlösung fehlgeschlagen",
+      "promoAlreadyUsed": "Sie haben diesen Code bereits verwendet.",
+      "promoInvalid": "Ungültiger Promo-Code.",
+      "promoExpired": "Dieser Promo-Code ist abgelaufen.",
+      "serverError": "Serverfehler. Bitte später erneut versuchen.",
+      "redemptionFailed": "Einlösung fehlgeschlagen",
+      "notAvailable": "Nicht verfügbar",
+      "iapNotAvailable": "In-App-Käufe auf diesem Gerät nicht verfügbar.",
+      "storeLoadingTitle": "Lädt…",
+      "storeLoadingBody": "Store wird geladen. Bitte kurz warten.",
+      "purchaseFailed": "Kauf fehlgeschlagen",
+      "couldNotStartPurchase": "Kauf konnte nicht gestartet werden.",
+      "subscriptionUnavailable": "Abo nicht verfügbar",
+      "subscriptionUnavailableBody": "Dieser Plan konnte nicht aus dem Store geladen werden.",
+      "subscriptionFailed": "Abo fehlgeschlagen",
+      "couldNotStartSubscription": "Abo konnte nicht gestartet werden.",
+      "transactionBalance": "Guthaben: {{amount}}"
+    }
+  },
+  "birthForm": {
+    "headerTitle": {
+      "updateGender": "Geschlecht aktualisieren",
+      "editProfile": "Profil bearbeiten",
+      "birthDetails": "Geburtsdaten"
+    },
+    "progressText": "Schritt {{step}} von 5",
+    "stepTitle": {
+      "name": "Wie heißt du?",
+      "gender": "Wähle dein Geschlecht",
+      "date": "Wann wurdest du geboren?",
+      "time": "Um wie viel Uhr wurdest du geboren?",
+      "place": "Wo wurdest du geboren?"
+    },
+    "namePlaceholder": "Vollständigen Namen eingeben",
+    "placePlaceholder": "Stadt, Bundesland, Land",
+    "gender": {
+      "male": "Männlich",
+      "female": "Weiblich"
+    },
+    "selectedLocation": "Ausgewählter Ort",
+    "buttons": {
+      "back": "Zurück",
+      "processing": "Wird verarbeitet...",
+      "complete": "Fertigstellen",
+      "next": "Weiter"
+    },
+    "alerts": {
+      "invalidLocation": {
+        "title": "Ungültiger Ort",
+        "suggestions": "Bitte wähle einen Ort aus den Vorschlägen aus, um genaue Berechnungen zu gewährleisten.",
+        "noSelection": "Bitte wähle einen Ort aus den Vorschlägen."
       },
-      "levels": {
-        "level1": "L1 (Im Stern des Bewohners)",
-        "level2": "L2 (Bewohner)",
-        "level3": "L3 (Im Stern des Besitzers)",
-        "level4": "L4 (Besitzer)"
-      }
+      "success": {
+        "title": "Erfolg",
+        "genderUpdated": "Geschlecht erfolgreich aktualisiert!",
+        "profileUpdated": "Profil erfolgreich aktualisiert!",
+        "chartCalculated": "Geburtshoroskop erfolgreich berechnet!"
+      },
+      "error": {
+        "title": "Fehler",
+        "default": "Geburtsdaten konnten nicht verarbeitet werden"
+      },
+      "ok": "OK"
+    },
+    "picker": {
+      "cancel": "Abbrechen",
+      "done": "Fertig"
+    },
+    "coords": {
+      "lat": "Breite:",
+      "long": "Länge:"
+    }
+  },
+  "common": {
+    "current": "Aktuell",
+    "unknown": "Unbekannt",
+    "ends": "Endet: ",
+    "notAvailable": "Nicht verfügbar"
+  },
+  "dasha": {
+    "vimshottari": "Vimshottari",
+    "kalchakra": "BPHS Kalchakra",
+    "yogini": "Yogini",
+    "chara": "Chara",
+    "currentBPHSKalachakra": "Aktuelles BPHS Kalchakra",
+    "maha": "Maha",
+    "antar": "Antar",
+    "selectDashas": "Dashas wählen, um Hierarchie zu sehen",
+    "kalchakraMahadasha": "BPHS Kalchakra Mahadasha (Zeichenbasiert)",
+    "kalchakraAntardasha": "BPHS Kalchakra Antardasha",
+    "noPeriodsAvailable": "Keine Perioden verfügbar",
+    "mahaDasha": "Maha Dasha",
+    "antarDasha": "Antar Dasha",
+    "pratyantarDasha": "Pratyantar Dasha",
+    "sookshmaDasha": "Sookshma Dasha",
+    "pranaDasha": "Prana Dasha",
+    "browserFor": "Dasha-Browser",
+    "browserTitle": "Dasha-Browser",
+    "birthDataRequired": "Geburtsdaten erforderlich, um Dashas zu sehen.",
+    "addBirthProfileHint": "Füge dein Geburtsprofil vom Startbildschirm hinzu, um fortzufahren.",
+    "completed": "Abgeschlossen",
+    "remaining": "Verbleibend",
+    "yearShort": "J",
+    "monthShort": "M",
+    "dayShort": "T",
+    "nakshatra": "Nakshatra",
+    "chakra": "Chakra",
+    "forward": "Vorwärts",
+    "backward": "Rückwärts",
+    "yearCompleteCycle": "Jahr Kompletter Zyklus",
+    "deha": "Deha",
+    "jeeva": "Jeeva",
+    "periods": "Zeiträume",
+    "wheel": "Rad",
+    "timeline": "Zeitachse",
+    "kalchakraTimeline": "Kalchakra Zeitachse",
+    "sign": "Zeichen",
+    "gati": "Gati",
+    "duration": "Dauer",
+    "period": "Zeitraum",
+    "kalchakraWheel": "Kalchakra Rad",
+    "currentMaha": "Aktuelles Maha",
+    "currentAntar": "Aktuelles Antar",
+    "mahadashas": "Mahadashas",
+    "gatiAnalysis": "Gati-Analyse",
+    "details": "Details",
+    "lifetimeGatiAnalysis": "Lebenszeit Gati-Analyse",
+    "summary": "Zusammenfassung",
+    "percentCompleted": "{{percentage}}% Abgeschlossen",
+    "currentlyRunning": "Aktuell laufend",
+    "loading": "Lade Dashas...",
+    "loadingYogini": "Lade Yogini Dasha Daten...",
+    "dataStructureError": "Datenstrukturfehler. Prüfe die Konsole.",
+    "availableKeys": "Verfügbare Schlüssel: ",
+    "currentYoginiPhase": "Aktuelle Yogini Phase",
+    "mahadasha": "Mahadasha",
+    "antardasha": "Antardasha",
+    "criticalTiming": "Kritisches Timing",
+    "remedies": "Heilmittel",
+    "analysis": "Analyse",
+    "yoginiCycle": "Yogini-Zyklus (36 Jahre)"
+  },
+  "yogini": {
+    "success": "Erfolg",
+    "aggression": "Aggression",
+    "wealth": "Wohlstand",
+    "travel": "Reise",
+    "career": "Karriere",
+    "workload": "Arbeitsbelastung",
+    "victory": "Sieg",
+    "crisis": "Krise",
+    "mangala": "Mangala",
+    "pingala": "Pingala",
+    "dhanya": "Dhanya",
+    "bhramari": "Bhramari",
+    "bhadrika": "Bhadrika",
+    "ulka": "Ulka",
+    "siddha": "Siddha",
+    "sankata": "Sankata"
+  },
+  "signs": {
+    "Aries": "Widder",
+    "Taurus": "Stier",
+    "Gemini": "Zwillinge",
+    "Cancer": "Krebs",
+    "Leo": "Löwe",
+    "Virgo": "Jungfrau",
+    "Libra": "Waage",
+    "Scorpio": "Skorpion",
+    "Sagittarius": "Schütze",
+    "Capricorn": "Steinbock",
+    "Aquarius": "Wassermann",
+    "Pisces": "Fische",
+    "Ari": "Wid",
+    "Tau": "Sti",
+    "Gem": "Zwi",
+    "Can": "Kre",
+    "Vir": "Jun",
+    "Lib": "Waa",
+    "Sco": "Sko",
+    "Sag": "Sch",
+    "Cap": "Ste",
+    "Aqu": "Was",
+    "Pis": "Fis"
+  },
+  "yogas": {
+    "raj_yogas": "Raj Yogas",
+    "dhana_yogas": "Dhana Yogas",
+    "mahapurusha_yogas": "Mahapurusha Yogas",
+    "neecha_bhanga_yogas": "Neecha Bhanga Yogas",
+    "gaja_kesari_yogas": "Gaja Kesari Yogas",
+    "amala_yogas": "Amala Yogas",
+    "viparita_raja_yogas": "Viparita Raja Yogas",
+    "dharma_karma_yogas": "Dharma Karma Yogas",
+    "nabhasa_yogas": "Nabhasa Yogas",
+    "chandra_yogas": "Chandra Yogas",
+    "surya_yogas": "Surya Yogas",
+    "parivartana_yogas": "Parivartana Yogas",
+    "career_specific_yogas": "Karriere-spezifische Yogas",
+    "health_yogas": "Gesundheits-Yogas",
+    "education_yogas": "Bildungs-Yogas",
+    "marriage_yogas": "Ehe-Yogas",
+    "major_doshas": "Wichtige Doshas",
+    "sankhya_yogas": "Sankhya Yogas",
+    "akriti_yogas": "Akriti Yogas",
+    "ashraya_yogas": "Ashraya Yogas",
+    "maha_yogas": "Maha Yogas",
+    "dainya_yogas": "Dainya Yogas",
+    "khala_yogas": "Khala Yogas",
+    "other_parivartana_yogas": "Weitere Parivartana Yogas"
+  },
+  "kp": {
+    "title": "KP-System",
+    "planetaryScript": "Planeten-Skript",
+    "cuspalScript": "Kuspal-Skript",
+    "significators": "Signifikatoren",
+    "rulingPlanets": "Herrschende Planeten (RP)",
+    "columns": {
+      "planet": "Planet",
+      "cusp": "Spitze",
+      "sign": "Zeichen",
+      "degree": "Grad",
+      "starLord": "StL",
+      "subLord": "SbL",
+      "subSubLord": "SSL"
+    },
+    "levels": {
+      "level1": "L1 (Im Stern des Bewohners)",
+      "level2": "L2 (Bewohner)",
+      "level3": "L3 (Im Stern des Besitzers)",
+      "level4": "L4 (Besitzer)"
+    }
+  },
+  "karmaAnalysis": {
+    "defaultNativeName": "Person",
+    "chartNotFound": "Horoskop nicht gefunden. Bitte wähle eine Person vom Startbildschirm.",
+    "insufficientCreditsTitle": "Nicht genug Credits",
+    "insufficientCreditsBody": "Du brauchst {{cost}} Credits für die Karma-Analyse.",
+    "getCredits": "Credits holen",
+    "cancel": "Abbrechen",
+    "pdfShareTitle": "Karma-Analyse teilen",
+    "pdfErrorTitle": "Fehler",
+    "pdfErrorBody": "PDF konnte nicht erstellt werden: {{message}}",
+    "pdfTimeoutError": "Zeitüberschreitung bei der PDF-Erstellung. Bitte erneut versuchen.",
+    "pdfDocTitle": "Karma-Analyse vergangener Leben",
+    "pdfDocSubtitle": "Die ewige Reise deiner Seele",
+    "pdfFooterLine1": "✨ Analysiert von AstroRoshni",
+    "pdfFooterLine2": "Künstliche Intelligenz • Vedische Astrologie",
+    "loadingTitle": "Zugriff auf die Akasha-Akten",
+    "loadingSubtitleProgress": "Die Reise deiner Seele durch die Zeit wird analysiert…",
+    "loadingSubtitleSlow": "Das dauert länger als üblich…",
+    "errorTitle": "Akten nicht erreichbar",
+    "tryAgain": "Erneut versuchen",
+    "goBack": "Zurück",
+    "startTitle": "Karma-Analyse vergangener Leben",
+    "startSubtitle": "Entdecke die ewige Reise deiner Seele",
+    "startButton": "Analyse starten",
+    "confirmStartTitle": "Karma-Analyse starten",
+    "confirmRegenerateTitle": "Karma-Analyse neu erstellen",
+    "resultTitle": "Karma vergangener Leben",
+    "resultSubtitle": "Die ewige Reise deiner Seele",
+    "footerAnalyzedBy": "Analysiert von AstroRoshni",
+    "footerAI": "Künstliche Intelligenz",
+    "a11yGoBack": "Zurück",
+    "a11yChangeNative": "Person wechseln",
+    "a11ySharePdf": "PDF teilen oder exportieren",
+    "a11yRegenerate": "Analyse neu erstellen",
+    "creditsModalWillUse": "Dies verbraucht {{cost}} Credits",
+    "creditsModalBalance": "Dein Guthaben: {{credits}} Credits",
+    "creditsModalCancel": "Abbrechen",
+    "creditsModalConfirm": "Bestätigen",
+    "selectNativePrompt": "Person für Karma-Analyse wählen",
+    "initiateFailed": "Analyse konnte nicht gestartet werden",
+    "unexpectedResponse": "Unerwarteter Antwortstatus",
+    "sectionTitles": {
+      "introduction": "Einleitung",
+      "past_life_overview": "Überblick vergangene Leben",
+      "souls_mission": "Mission der Seele",
+      "nakshatra_karma_analysis": "Nakshatra-Karma-Analyse",
+      "karmic_debts": "Karmische Schulden",
+      "soul_talents": "Talente der Seele",
+      "karmic_obstacles": "Karmische Hindernisse",
+      "ancestral_patterns": "Ahnenmuster",
+      "transformation_path": "Weg der Transformation",
+      "spiritual_evolution": "Spirituelle Entwicklung",
+      "timing_of_events": "Zeitpunkt der Ereignisse",
+      "remedial_measures": "Heilende Maßnahmen"
     }
   }
+}

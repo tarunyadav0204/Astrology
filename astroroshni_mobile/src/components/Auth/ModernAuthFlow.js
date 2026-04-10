@@ -19,6 +19,7 @@ import BirthLocationScreen from './screens/BirthLocationScreen';
 import GenderScreen from './screens/GenderScreen';
 import SuccessScreen from './screens/SuccessScreen';
 import WelcomeAfterRegistrationScreen from './screens/WelcomeAfterRegistrationScreen';
+import ChooseLanguageScreen from './screens/ChooseLanguageScreen';
 
 import { COLORS } from '../../utils/constants';
 
@@ -178,6 +179,8 @@ export default function ModernAuthFlow({ navigation, route }) {
         return <SuccessScreen {...screenProps} />;
       case 'welcomeAfterRegistration':
         return <WelcomeAfterRegistrationScreen {...screenProps} />;
+      case 'chooseLanguage':
+        return <ChooseLanguageScreen {...screenProps} />;
       default:
         return <WelcomeScreen {...screenProps} />;
     }

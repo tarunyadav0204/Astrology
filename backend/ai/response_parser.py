@@ -108,6 +108,28 @@ class ResponseParser:
             return text, None
 
     @staticmethod
+    def _strip_analysis_steps_section(content: str) -> str:
+        """Remove Analysis Steps blocks (###/##/plain heading, * or • bullets)."""
+        stripped = content
+        heading = r'Analysis Steps'
+        stop = r'(?=\n(?:###|##)\s|\Z)'
+        patterns = [
+            rf'(?:^|\n)###\s*{heading}\s*:?[^\n]*\n([\s\S]*?){stop}',
+            rf'(?:^|\n)##\s*{heading}\s*:?[^\n]*\n([\s\S]*?){stop}',
+            rf'(?:^|\n)\*\*{heading}\*\*\s*:?[^\n]*\n([\s\S]*?){stop}',
+            rf'(?:^|\n){heading}\s*:?\s*\n([\s\S]*?){stop}',
+            rf'(?:^|\n)###\s*{heading}\s*:[^\n]*{stop}',
+        ]
+        for _ in range(6):
+            prev = stripped
+            for pat in patterns:
+                stripped = re.sub(pat, '\n', stripped, flags=re.IGNORECASE | re.MULTILINE)
+            stripped = re.sub(r'\n{3,}', '\n\n', stripped)
+            if stripped == prev:
+                break
+        return stripped
+
+    @staticmethod
     def parse_images_in_chat_response(text: str) -> Dict:
         """
         Specialized, robust parser for chat responses. Extracts structured data
@@ -129,8 +151,6 @@ class ResponseParser:
         parsed_glossary = {}
         term_ids = []
         follow_up_questions = []
-        analysis_steps = []
-
         # 1. Extract Summary Image Prompt
         if 'SUMMARY_IMAGE_START' in content and 'SUMMARY_IMAGE_END' in content:
             try:
@@ -218,13 +238,8 @@ class ResponseParser:
         if follow_up_questions:
             print(f"   📋 Questions: {follow_up_questions}")
 
-        # 4. Extract Analysis Steps
-        steps_match = re.search(r'### Analysis Steps\s*\n([\s\S]*?)(?=\n###|\Z)', content, re.IGNORECASE)
-        if steps_match:
-            steps_text = steps_match.group(1)
-            analysis_steps = [line.replace('-', '').strip() for line in steps_text.split('\n') if line.strip().startswith('-')]
-            content = re.sub(r'### Analysis Steps\s*\n([\s\S]*?)(?=\n###|\Z)', '', content, re.IGNORECASE)
-            print(f"   ✅ Extracted {len(analysis_steps)} analysis steps.")
+        # 4. Strip Analysis Steps section (never shown; models may still emit variants)
+        content = ResponseParser._strip_analysis_steps_section(content)
 
         # 5. Get all Term IDs from the content and glossary
         term_ids_from_content = re.findall(r'<term id="([^"]+)">', content)
@@ -242,7 +257,7 @@ class ResponseParser:
             'glossary': parsed_glossary,
             'summary_image_prompt': summary_image_prompt,
             'follow_up_questions': follow_up_questions,
-            'analysis_steps': analysis_steps,
+            'analysis_steps': [],
         }
         
         return result

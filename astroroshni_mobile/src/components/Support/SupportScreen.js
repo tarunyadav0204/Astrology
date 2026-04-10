@@ -19,11 +19,11 @@ import { useTranslation } from 'react-i18next';
 import { supportAPI } from '../../services/api';
 import { sanitizeSupportBody, sanitizeSupportSubject } from '../../utils/supportText';
 
-function formatApiError(e) {
+function formatApiError(e, t) {
   const d = e.response?.data?.detail;
   if (typeof d === 'string') return d;
   if (Array.isArray(d)) return d.map((x) => x.msg || String(x)).join(' ');
-  return e.message || 'Request failed';
+  return e.message || (t ? t('support.requestFailed') : 'Request failed');
 }
 
 export default function SupportScreen({ navigation }) {
@@ -54,13 +54,13 @@ export default function SupportScreen({ navigation }) {
       const { data } = await supportAPI.listTickets();
       setTickets(data.tickets || []);
     } catch (e) {
-      setError(formatApiError(e));
+      setError(formatApiError(e, t));
       setTickets([]);
     } finally {
       setListLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadTickets();
@@ -77,13 +77,13 @@ export default function SupportScreen({ navigation }) {
       setTicketMeta(data.ticket);
       setMessages(data.messages || []);
     } catch (e) {
-      setError(formatApiError(e));
+      setError(formatApiError(e, t));
       setTicketMeta(null);
       setMessages([]);
     } finally {
       setThreadLoading(false);
     }
-  }, []);
+  }, [t]);
 
   /** Push notification tap: open this ticket’s thread with latest messages */
   useLayoutEffect(() => {
@@ -104,8 +104,25 @@ export default function SupportScreen({ navigation }) {
       setTicketMeta(data.ticket);
       setMessages(data.messages || []);
     } catch (e) {
-      setError(formatApiError(e));
+      setError(formatApiError(e, t));
     }
+  };
+
+  const ticketStatusLabel = (status) => {
+    if (!status) return '';
+    const s = String(status).toLowerCase();
+    if (s === 'open') return t('support.statusOpen');
+    if (s === 'closed') return t('support.statusClosed');
+    if (s === 'pending') return t('support.statusPending');
+    return status;
+  };
+
+  const ticketSourceLabel = (src) => {
+    if (!src) return '';
+    const s = String(src).toLowerCase();
+    if (s === 'ios') return t('support.sourceIos');
+    if (s === 'android') return t('support.sourceAndroid');
+    return src;
   };
 
   const submitNew = async () => {
@@ -124,7 +141,7 @@ export default function SupportScreen({ navigation }) {
       setView('list');
       await loadTickets();
     } catch (e) {
-      setError(formatApiError(e));
+      setError(formatApiError(e, t));
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +165,7 @@ export default function SupportScreen({ navigation }) {
       await refreshThread();
       await loadTickets();
     } catch (e) {
-      setError(formatApiError(e));
+      setError(formatApiError(e, t));
     } finally {
       setSubmitting(false);
     }
@@ -196,7 +213,7 @@ export default function SupportScreen({ navigation }) {
               {tk.subject}
             </Text>
             <Text style={[styles.ticketMeta, { color: colors.textSecondary }]}>
-              #{tk.id} · {tk.status} · {tk.source}
+              #{tk.id} · {ticketStatusLabel(tk.status)} · {ticketSourceLabel(tk.source)}
             </Text>
             {tk.last_message_preview ? (
               <Text style={[styles.preview, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -255,7 +272,7 @@ export default function SupportScreen({ navigation }) {
         <>
           <Text style={[styles.threadTitle, { color: colors.text }]}>{ticketMeta.subject}</Text>
           <Text style={[styles.ticketMeta, { color: colors.textSecondary, marginBottom: 12 }]}>
-            {t('support.status')}: {ticketMeta.status}
+            {t('support.status')}: {ticketStatusLabel(ticketMeta.status)}
           </Text>
           {messages.map((m) => (
             <View

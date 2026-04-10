@@ -36,6 +36,8 @@ import { useCredits } from '../../credits/CreditContext';
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOME_CHART_CACHE_PREFIX = 'home_chart_cache:';
+const MULTI_CHART_TIP_NEVER_KEY = 'home_multi_chart_tip_never';
+const MULTI_CHART_TIP_SNOOZE_KEY = 'home_multi_chart_tip_snooze_until';
 const ordinalSuffix = (n) => {
   if (n >= 11 && n <= 13) return 'th';
   switch (n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
@@ -64,6 +66,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const { freeQuestionAvailable } = useCredits();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
+  const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
 
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -195,10 +198,15 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     const day = now.getDate();
     if (day > 10) {
       const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      return { year: next.getFullYear(), month: next.getMonth() + 1, monthName: MONTH_NAMES[next.getMonth()] };
+      return { year: next.getFullYear(), month: next.getMonth() + 1 };
     }
-    return { year: now.getFullYear(), month: now.getMonth() + 1, monthName: MONTH_NAMES[now.getMonth()] };
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
   }, []);
+
+  const getMonthlyWelcomeMonthLabel = useCallback(() => {
+    const { month } = getMonthlyWelcomeTarget();
+    return t(`home.monthlyWelcome.months.${month}`);
+  }, [getMonthlyWelcomeTarget, t]);
 
   // Smart monthly predictions welcome modal – shown when user is on Home (greeting) view,
   // once per native per (year, month) with a 7-day cooldown so it doesn’t show every time.
@@ -241,6 +249,57 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     }
     setShowMonthlyWelcomeModal(false);
   }, [birthData?.id, getMonthlyWelcomeTarget]);
+
+  // Educate users with only one chart: they can add family/friends for predictions (long delay avoids stacking with other home modals).
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const timer = setTimeout(async () => {
+        try {
+          if (!birthData?.id) return;
+          const never = await AsyncStorage.getItem(MULTI_CHART_TIP_NEVER_KEY);
+          if (never === '1') return;
+          const snoozeUntil = await AsyncStorage.getItem(MULTI_CHART_TIP_SNOOZE_KEY);
+          if (snoozeUntil) {
+            const until = new Date(snoozeUntil);
+            if (!Number.isNaN(until.getTime()) && until > new Date()) return;
+          }
+          const { storage } = require('../../services/storage');
+          const profiles = await storage.getBirthProfiles();
+          const count = Array.isArray(profiles) ? profiles.length : 0;
+          if (count !== 1) return;
+          if (!cancelled) setShowMultiChartTipModal(true);
+        } catch (e) {
+          // ignore
+        }
+      }, 7000);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }, [birthData?.id])
+  );
+
+  const dismissMultiChartTipPermanent = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(MULTI_CHART_TIP_NEVER_KEY, '1');
+      await AsyncStorage.removeItem(MULTI_CHART_TIP_SNOOZE_KEY);
+    } catch (e) {
+      /* ignore */
+    }
+    setShowMultiChartTipModal(false);
+  }, []);
+
+  const dismissMultiChartTipSnooze = useCallback(async () => {
+    try {
+      const d = new Date();
+      d.setDate(d.getDate() + 90);
+      await AsyncStorage.setItem(MULTI_CHART_TIP_SNOOZE_KEY, d.toISOString());
+    } catch (e) {
+      /* ignore */
+    }
+    setShowMultiChartTipModal(false);
+  }, []);
 
   useEffect(() => {
     // Update Panchang daily at midnight
@@ -1069,10 +1128,10 @@ const loadHomeData = async (nativeData = null) => {
           <View style={[styles.blogSection, { marginTop: 30, marginBottom: 30 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 }}>
               <Text style={[styles.analysisTitle, { color: colors.text, marginBottom: 0 }]}>
-                📖 {t('home.sections.blog', 'Blog & Knowledge')}
+                📖 {t('home.sections.blog')}
               </Text>
               <TouchableOpacity onPress={() => navigation.navigate('BlogList')}>
-                <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>See All</Text>
+                <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>{t('blog.seeAll')}</Text>
               </TouchableOpacity>
             </View>
             <GHScrollView
@@ -1097,7 +1156,7 @@ const loadHomeData = async (nativeData = null) => {
                     )}
                   </View>
                   <View style={styles.blogCardContent}>
-                    <Text style={[styles.blogCardCategory, { color: '#ff6b35' }]}>{post.category || 'Astrology'}</Text>
+                    <Text style={[styles.blogCardCategory, { color: '#ff6b35' }]}>{post.category || t('blog.defaultCategory')}</Text>
                     <Text style={[styles.blogCardTitle, { color: colors.text }]} numberOfLines={2}>{post.title}</Text>
                   </View>
                 </TouchableOpacity>
@@ -1180,9 +1239,11 @@ const loadHomeData = async (nativeData = null) => {
                   <View style={styles.firstQuestionFreeModalIconWrap}>
                     <Text style={styles.firstQuestionFreeModalEmoji}>🎁</Text>
                   </View>
-                  <Text style={styles.firstQuestionFreeModalTitle}>Your first question is free!</Text>
+                  <Text style={styles.firstQuestionFreeModalTitle}>
+                    {t('home.firstQuestionFree.title')}
+                  </Text>
                   <Text style={styles.firstQuestionFreeModalSubtext}>
-                    Ask anything — no credits needed. Get personalized astrological guidance right now.
+                    {t('home.firstQuestionFree.subtext')}
                   </Text>
                   <TouchableOpacity
                     style={styles.firstQuestionFreeModalCTA}
@@ -1199,14 +1260,18 @@ const loadHomeData = async (nativeData = null) => {
                       style={styles.firstQuestionFreeModalCTAGradient}
                     >
                       <Icon name="chatbubble-ellipses" size={20} color="#78350f" />
-                      <Text style={styles.firstQuestionFreeModalCTAText}>Ask your first question free</Text>
+                      <Text style={styles.firstQuestionFreeModalCTAText}>
+                        {t('home.firstQuestionFree.cta')}
+                      </Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowFirstQuestionFreeModal(false)}
                     style={styles.firstQuestionFreeModalLater}
                   >
-                    <Text style={styles.firstQuestionFreeModalLaterText}>Maybe later</Text>
+                    <Text style={styles.firstQuestionFreeModalLaterText}>
+                      {t('home.firstQuestionFree.later')}
+                    </Text>
                   </TouchableOpacity>
                 </LinearGradient>
               </TouchableOpacity>
@@ -2058,26 +2123,28 @@ const loadHomeData = async (nativeData = null) => {
                 <Text style={styles.monthlyWelcomeModalEmoji}>🔮</Text>
               </View>
               <Text style={styles.monthlyWelcomeModalTitle}>
-                {`Hello${currentNativeData?.name ? `, ${currentNativeData.name}` : ''} 👋`}
+                {currentNativeData?.name?.trim()
+                  ? t('home.monthlyWelcome.hello', { name: currentNativeData.name.trim() })
+                  : t('home.monthlyWelcome.helloAnonymous')}
               </Text>
               <Text style={styles.monthlyWelcomeModalSubtitle}>
-                {`Ready to explore what ${getMonthlyWelcomeTarget().monthName} has in store for you?`}
+                {t('home.monthlyWelcome.headline', { month: getMonthlyWelcomeMonthLabel() })}
               </Text>
               <Text style={styles.monthlyWelcomeModalSubtext}>
-                We&apos;ll deeply analyze your divisional charts, dashas, and transits using Parashari, Nadi, and Jaimini methods — and reveal high‑probability events and timelines that could manifest in {getMonthlyWelcomeTarget().monthName}.
+                {t('home.monthlyWelcome.body', { month: getMonthlyWelcomeMonthLabel() })}
               </Text>
               <View style={styles.monthlyWelcomeHighlights}>
                 <View style={styles.monthlyWelcomeHighlightRow}>
                   <Text style={styles.monthlyWelcomeHighlightEmoji}>📅</Text>
-                  <Text style={styles.monthlyWelcomeHighlightText}>Career, love, money &amp; health event timelines.</Text>
+                  <Text style={styles.monthlyWelcomeHighlightText}>{t('home.monthlyWelcome.bullet1')}</Text>
                 </View>
                 <View style={styles.monthlyWelcomeHighlightRow}>
                   <Text style={styles.monthlyWelcomeHighlightEmoji}>🔍</Text>
-                  <Text style={styles.monthlyWelcomeHighlightText}>See exactly which dashas and houses are firing.</Text>
+                  <Text style={styles.monthlyWelcomeHighlightText}>{t('home.monthlyWelcome.bullet2')}</Text>
                 </View>
                 <View style={styles.monthlyWelcomeHighlightRow}>
                   <Text style={styles.monthlyWelcomeHighlightEmoji}>✨</Text>
-                  <Text style={styles.monthlyWelcomeHighlightText}>Multiple scenarios so you can prepare with clarity.</Text>
+                  <Text style={styles.monthlyWelcomeHighlightText}>{t('home.monthlyWelcome.bullet3')}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -2097,7 +2164,7 @@ const loadHomeData = async (nativeData = null) => {
                 >
                   <Icon name="calendar" size={20} color="#78350f" />
                   <Text style={styles.monthlyWelcomeModalCTAText}>
-                    {`Explore ${getMonthlyWelcomeTarget().monthName} predictions`}
+                    {t('home.monthlyWelcome.cta', { month: getMonthlyWelcomeMonthLabel() })}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -2105,11 +2172,94 @@ const loadHomeData = async (nativeData = null) => {
                 onPress={closeMonthlyWelcomeModal}
                 style={styles.monthlyWelcomeModalLater}
               >
-                <Text style={styles.monthlyWelcomeModalLaterText}>Maybe later</Text>
+                <Text style={styles.monthlyWelcomeModalLaterText}>{t('home.monthlyWelcome.later')}</Text>
               </TouchableOpacity>
               <Text style={styles.monthlyWelcomeDisclaimer}>
-                For guidance only — not medical, legal or financial advice.
+                {t('home.monthlyWelcome.disclaimer')}
               </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Multi-chart education: one profile only */}
+      <Modal
+        visible={showMultiChartTipModal}
+        transparent
+        animationType="fade"
+        onRequestClose={dismissMultiChartTipSnooze}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.65)' }]}
+          onPress={dismissMultiChartTipSnooze}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.multiChartTipModalCard}
+            onPress={() => {}}
+          >
+            <LinearGradient
+              colors={['#0f172a', '#134e4a', '#0d9488']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.multiChartTipModalGradient}
+            >
+              <TouchableOpacity
+                hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                style={styles.multiChartTipModalClose}
+                onPress={dismissMultiChartTipSnooze}
+              >
+                <Icon name="close" size={22} color="rgba(255,255,255,0.9)" />
+              </TouchableOpacity>
+              <View style={styles.multiChartTipModalIconWrap}>
+                <Text style={styles.multiChartTipModalEmoji}>👨‍👩‍👧</Text>
+              </View>
+              <Text style={styles.multiChartTipModalTitle}>
+                {t('home.multiChartTip.title')}
+              </Text>
+              <Text style={styles.multiChartTipModalBody}>
+                {t('home.multiChartTip.body')}
+              </Text>
+              <TouchableOpacity
+                style={styles.multiChartTipModalCTA}
+                activeOpacity={0.9}
+                onPress={async () => {
+                  try {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 30);
+                    await AsyncStorage.setItem(MULTI_CHART_TIP_SNOOZE_KEY, d.toISOString());
+                  } catch (e) {
+                    /* ignore */
+                  }
+                  setShowMultiChartTipModal(false);
+                  navigation.navigate('BirthForm');
+                }}
+              >
+                <LinearGradient
+                  colors={['#5eead4', '#14b8a6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.multiChartTipModalCTAGradient}
+                >
+                  <Icon name="person-add" size={20} color="#042f2e" />
+                  <Text style={styles.multiChartTipModalCTAText}>
+                    {t('home.multiChartTip.cta')}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={dismissMultiChartTipSnooze}
+                style={styles.multiChartTipModalSecondary}
+              >
+                <Text style={styles.multiChartTipModalSecondaryText}>{t('home.multiChartTip.gotIt')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={dismissMultiChartTipPermanent}
+                style={styles.multiChartTipModalTertiary}
+              >
+                <Text style={styles.multiChartTipModalTertiaryText}>{t('home.multiChartTip.neverAgain')}</Text>
+              </TouchableOpacity>
             </LinearGradient>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -3558,6 +3708,96 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+  multiChartTipModalCard: {
+    width: '88%',
+    maxWidth: 380,
+    borderRadius: 24,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0d9488',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 20,
+      },
+      android: { elevation: 14 },
+    }),
+  },
+  multiChartTipModalGradient: {
+    padding: 24,
+    paddingTop: 28,
+    alignItems: 'center',
+  },
+  multiChartTipModalClose: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 2,
+  },
+  multiChartTipModalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(94, 234, 212, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  multiChartTipModalEmoji: {
+    fontSize: 32,
+  },
+  multiChartTipModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#f0fdfa',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  multiChartTipModalBody: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.92)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+  multiChartTipModalCTA: {
+    width: '100%',
+    marginBottom: 10,
+  },
+  multiChartTipModalCTAGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 999,
+    gap: 8,
+  },
+  multiChartTipModalCTAText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#042f2e',
+  },
+  multiChartTipModalSecondary: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 4,
+  },
+  multiChartTipModalSecondaryText: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  multiChartTipModalTertiary: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 2,
+  },
+  multiChartTipModalTertiaryText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
     textAlign: 'center',
   },
   insightModalContent: {

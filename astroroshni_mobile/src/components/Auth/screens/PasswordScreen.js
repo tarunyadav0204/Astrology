@@ -157,8 +157,8 @@ export default function PasswordScreen({
           await storage.setUserData(response.data.user);
           await refreshCredits();
           
-          // Navigate to welcome screen after successful registration
-          navigateToScreen('welcomeAfterRegistration');
+          // Language selection, then welcome (same preference as Profile → language)
+          navigateToScreen('chooseLanguage');
         } catch (error) {
           if (error.response?.status === 400 && error.response?.data?.detail?.includes('already registered')) {
             // User already exists, navigate to welcome screen

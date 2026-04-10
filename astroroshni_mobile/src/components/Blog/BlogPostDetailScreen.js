@@ -16,16 +16,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { useTranslation } from 'react-i18next';
 import { blogAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
-import { COLORS } from '../../utils/constants';
+import { appLocaleForI18n } from '../../utils/appLocale';
 
 const { width } = Dimensions.get('window');
 
 export default function BlogPostDetailScreen({ route, navigation }) {
+  const { t, i18n } = useTranslation();
   const { slug } = route.params;
   const { theme, colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const dateLocale = appLocaleForI18n(i18n.language);
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [webViewHeight, setWebViewHeight] = useState(600);
@@ -48,10 +51,11 @@ export default function BlogPostDetailScreen({ route, navigation }) {
 
   const handleShare = async () => {
     if (!post) return;
+    const url = `https://astroroshni.com/blog/${post.slug}`;
     try {
       await Share.share({
-        message: `Check out this article on AstroRoshni: ${post.title}\n\nhttps://astroroshni.com/blog/${post.slug}`,
-        url: `https://astroroshni.com/blog/${post.slug}`,
+        message: t('blog.shareMessage', { title: post.title, url }),
+        url,
         title: post.title,
       });
     } catch (error) {
@@ -70,9 +74,9 @@ export default function BlogPostDetailScreen({ route, navigation }) {
   if (!post) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: colors.textSecondary }}>Post not found</Text>
+        <Text style={{ color: colors.textSecondary }}>{t('blog.postNotFound')}</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
-          <Text style={{ color: '#ff6b35', fontWeight: '700' }}>Go Back</Text>
+          <Text style={{ color: '#ff6b35', fontWeight: '700' }}>{t('blog.goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -350,7 +354,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.topHeaderButton}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.topHeaderTitle}>Blog</Text>
+        <Text style={styles.topHeaderTitle}>{t('blog.detailNavTitle')}</Text>
         <TouchableOpacity onPress={handleShare} style={styles.topHeaderButton}>
           <Ionicons name="share-social" size={20} color="#fff" />
         </TouchableOpacity>
@@ -374,10 +378,10 @@ export default function BlogPostDetailScreen({ route, navigation }) {
         <View style={[styles.contentContainer, { backgroundColor: colors.background }, theme === 'light' && styles.contentCardShadow]}>
           <View style={styles.metaContainer}>
             <View style={[styles.categoryBadge, theme === 'dark' && styles.categoryBadgeDark]}>
-              <Text style={styles.categoryText}>{post.category || 'Astrology'}</Text>
+              <Text style={styles.categoryText}>{post.category || t('blog.defaultCategory')}</Text>
             </View>
             <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-              {new Date(post.published_at).toLocaleDateString('en-US', {
+              {new Date(post.published_at).toLocaleDateString(dateLocale, {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric',
@@ -391,7 +395,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             <View style={styles.authorAvatar}>
               <Text style={styles.authorAvatarText}>A</Text>
             </View>
-            <Text style={[styles.authorName, { color: colors.textSecondary }]}>AstroRoshni Team</Text>
+            <Text style={[styles.authorName, { color: colors.textSecondary }]}>{t('blog.authorTeam')}</Text>
           </View>
 
           {post.excerpt ? (
@@ -411,7 +415,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             >
               <View style={styles.excerptPillRow}>
                 <View style={styles.excerptChip}>
-                  <Text style={styles.excerptChipText}>Key Takeaway</Text>
+                  <Text style={styles.excerptChipText}>{t('blog.keyTakeaway')}</Text>
                 </View>
               </View>
               <Text style={[styles.excerptText, { color: colors.text }]}>{post.excerpt}</Text>

@@ -15,10 +15,15 @@ import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { blogAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
+import { appLocaleForI18n } from '../../utils/appLocale';
+
 export default function BlogListScreen({ navigation }) {
+  const { t, i18n } = useTranslation();
   const { theme, colors } = useTheme();
+  const dateLocale = appLocaleForI18n(i18n.language);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -110,15 +115,15 @@ export default function BlogListScreen({ navigation }) {
       )}
       <View style={styles.postContent}>
         <View style={styles.postMeta}>
-          <Text style={[styles.postCategory, { color: '#ff6b35' }]}>{item.category || 'Astrology'}</Text>
+          <Text style={[styles.postCategory, { color: '#ff6b35' }]}>{item.category || t('blog.defaultCategory')}</Text>
           <Text style={[styles.postDate, { color: colors.textSecondary }]}>
-            {new Date(item.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            {new Date(item.published_at).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
         </View>
         <Text style={[styles.postTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
         <Text style={[styles.postExcerpt, { color: colors.textSecondary }]} numberOfLines={3}>{item.excerpt}</Text>
         <View style={styles.readMore}>
-          <Text style={styles.readMoreText}>Read More</Text>
+          <Text style={styles.readMoreText}>{t('blog.readMore')}</Text>
           <Ionicons name="arrow-forward" size={16} color="#ff6b35" />
         </View>
       </View>
@@ -137,7 +142,7 @@ export default function BlogListScreen({ navigation }) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Astrology Blog</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('blog.screenTitle')}</Text>
             <View style={{ width: 40 }} />
           </View>
 
@@ -160,7 +165,7 @@ export default function BlogListScreen({ navigation }) {
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Ionicons name="newspaper-outline" size={64} color={colors.textSecondary} />
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No blog posts found</Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('blog.empty')}</Text>
                 </View>
               }
             />

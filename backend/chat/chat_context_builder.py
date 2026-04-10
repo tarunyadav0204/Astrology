@@ -1080,29 +1080,28 @@ class ChatContextBuilder:
                     "house_synthesis_mandatory": "MUST combine multiple house meanings: 2nd+10th = career income, 4th+7th = home with spouse, 6th+9th = father's health + long travel = father's medical travel, 5th+12th = children's expenses, 3rd+9th = communication with father/mentor, 1st+6th = personal health from work, 6th+9th = service-related long travel, health issues requiring travel, father's work problems, etc.",
                     "comprehensive_event_prediction": "For each transit, predict events from ALL house combinations, not just obvious ones. Example: 6th+9th houses = father's health issues, father's work problems, long travel for medical treatment, legal issues with father, father's service to others, health expenses, work-related travel, educational travel, spiritual journey for healing, etc.",
                     "laymen_summary_mandatory": {
-                        "purpose": "Quick Answer section MUST provide a clear, simple summary for non-astrologers",
-                        "format": "Write as if explaining to someone who knows nothing about astrology",
+                        "purpose": "Quick Answer must be a complete direct answer for non-astrologers—same bar as the main response template: users may read only this card.",
+                        "format": "Plain language first; technical justification belongs in Astrological Analysis sections.",
                         "requirements": [
-                            "Start with: 'Based on your birth chart and upcoming planetary movements:'",
-                            "List 2-3 specific life events with exact date ranges",
-                            "Place Key Insights section IMMEDIATELY after Quick Answer section",
-                            "Use proper markdown: ## Key Insights (with double newline before content)",
-                            "Format Key Insights as: ## Key Insights\n\n• Point 1\n• Point 2\n• Point 3"
-                            "Explain WHY these events are likely (in simple terms)",
-                            "End with: 'These predictions are based on the detailed astrological analysis below.'"
+                            "Open by answering what the user asked (outcomes, timing, or main theme) in simple terms.",
+                            "Cover ALL major predicted events and themes for the period—not limited to 2–3 items if more are strongly indicated.",
+                            "Give specific date ranges or windows whenever the data supports them.",
+                            "State opportunities and challenges clearly; mention mixed or uncertain outcomes if the chart is split.",
+                            "Use enough paragraphs to be complete (often 2–5); do not keep Quick Answer artificially short.",
+                            "Prefer everyday phrases ('career', 'family health', 'travel'); only name planets or dasha if it helps clarity in one short phrase—no technical proof in Quick Answer.",
+                            "Place Key Insights immediately after Quick Answer; follow the app's mandated headers (### Key Insights, etc.).",
+                            "You may end with a single line that deeper technical detail follows below—do not use that as an excuse to omit conclusions here."
                         ],
-                        "example_format": "Based on your birth chart and upcoming planetary movements: Between Jan 15-Mar 20, 2025, you're likely to have a property purchase opportunity through career advancement, as your career planet activates your wealth sector. From Feb 5-25, 2025, expect father's health to need attention with possible travel for treatment, creating family expenses. These predictions are based on the detailed astrological analysis below.",
+                        "example_format": "Based on your chart and the period asked about: [direct verdict]. Between [date range], expect [specific life-area outcomes]. In [window], [second theme]. Watch for [caveat]. More detail on how this is derived appears in the analysis below.",
                         "forbidden_in_summary": [
-                            "Astrological jargon (houses, aspects, dashas, transits)",
-                            "Planet names without context",
-                            "Technical terms like 'benefic', 'malefic', 'conjunction'",
-                            "Philosophical or spiritual language"
+                            "Long technical lists (full KP steps, exhaustive nadi enumerations, house-lord chains)",
+                            "Deferring the core answer with only 'explained below' without stating the conclusion here first"
                         ],
-                        "required_language": "Use everyday language: 'career opportunities', 'family matters', 'health concerns', 'financial gains', 'relationship changes', 'property matters', 'travel plans', etc."
+                        "required_language": "Prefer everyday language: career, relationships, family, money, health, travel, property, legal matters, etc."
                     },
 
                 },
-                "instruction": "MANDATORY: For short-term questions (daily/weekly/monthly), PRIORITIZE period_dasha_activations data over transit_activations. Use dasha planet positions, connections, and probability weights as primary prediction sources. For longer periods, use both systems together. RESPONSE MUST HAVE EXACTLY 6 MAIN SECTIONS IN THIS ORDER: 1) Quick Answer paragraph 2) ## Key Insights 3) ## Astrological Analysis (with sub-sections) 4) ## Nakshatra Insights 5) ## Timing & Guidance 6) ## Final Thoughts. Use standard markdown formatting only.",
+                "instruction": "MANDATORY: For short-term questions (daily/weekly/monthly), PRIORITIZE period_dasha_activations data over transit_activations. Use dasha planet positions, connections, and probability weights as primary prediction sources. For longer periods, use both systems together. ORDER: 1) Quick Answer (complete direct answer in the required card/wrapper—fully satisfying the question, not a teaser) 2) Key Insights 3) Astrological Analysis (with sub-sections) 4) Nakshatra Insights 5) Timing & Guidance 6) Final Thoughts. Use the response structure template's header levels (### / ####) and quick-answer-card wrapper exactly as specified.",
 
             }
         }

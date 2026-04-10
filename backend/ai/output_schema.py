@@ -38,10 +38,10 @@ Synastry Analysis Protocol:
 7. **Ascendant Compatibility**: Check Lagna harmony and mutual aspects
 8. **Inter-chart Aspects**: Analyze how planets from one chart aspect the other
 
-Response Format:
-**Quick Answer**: Overall compatibility percentage and key insight (2-3 sentences)
+Response Format (keep **Quick Answer** label for client compatibility):
+**Quick Answer**: Full direct answer for the couple—not a teaser. Include overall compatibility assessment (you may give a percentage if appropriate), the main emotional and practical verdict, key strengths, main challenges, and timing notes if relevant, in plain language across several sentences or short paragraphs as needed. Do not defer the core verdict only to **Detailed Analysis**.
 
-**Key Insights**: 3-4 bullet points on strengths and challenges
+**Key Insights**: 3-4 bullet points—scannable highlights; avoid duplicating the entire Quick Answer narrative.
 
 **Detailed Analysis**:
 - **Emotional Compatibility (Moon)**: Describe emotional connection quality
@@ -86,10 +86,15 @@ FAQ_META: {"category": "<one of: career, marriage, health, education, progeny, w
 TEMPLATE_DEEP_DIVE = """
 ### 🏛️ RESPONSE STRUCTURE (MANDATORY)
 Your response MUST follow this exact sequence. The subsection headers under "Astrological Analysis" are already provided with ####, do not add them again.
-1. <div class="quick-answer-card">**Quick Answer**: [Comprehensive summary]</div>
-2. ### Key Insights: [3-4 bullets]
-3. ### Analysis Steps: [A bulleted list of 3-4 key astrological calculation steps taken to generate the response, e.g., "- Analyzing Dasha periods", "- Calculating planetary dignities", "- Cross-referencing Navamsa chart".]
-4. ### Astrological Analysis: [Use #### for all subsections below]
+1. <div class="quick-answer-card">**Quick Answer**: [This block is the user's FULL direct answer—not a short teaser. Mobile and web render this inside a highlighted card; keep the wrapper and the exact label **Quick Answer**: for compatibility.]
+   - First sentences: answer the user's exact question (verdict, timing, yes/no, or primary outcome) in plain language.
+   - Include every conclusion a typical reader needs from this reading: important date ranges or windows when relevant, main opportunities, main risks or caveats, and mixed or uncertain outcomes if the chart is contradictory.
+   - Write as coherent prose (usually 2–5 short paragraphs as needed). Do not artificially keep this short.
+   - Do NOT leave essential conclusions only in later sections; do not replace substance with "see Astrological Analysis below." Later sections add technical WHY (houses, dasha, KP, nadi, divisional charts)—not the only place for the answer.
+   - Prefer everyday wording; avoid proof-level technical detail here (save jargon and calculations for ### Astrological Analysis).
+   - The next section (Key Insights) is for scannable bullets only; Quick Answer = one integrated narrative the user could stop after and still be satisfied.</div>
+2. ### Key Insights: [3-4 bullets—distinct from Quick Answer: memorable factors, confirmations, or highlights; not a repeat of the full narrative]
+3. ### Astrological Analysis: [Use #### for all subsections below]
    - #### The Parashari View: [Provide a detailed analysis explaining the 'why' behind each prediction. Mention specific house lordships, planetary placements, and aspects in D1 and D9. Explicitly discuss the planet's happiness (Friendship) in its current sign using the provided `friendship_analysis` (Panchadha Maitri).]
    - #### Ashtakavarga (SAV & BAV): [MANDATORY every time. For houses and planets central to the question: cite Sarvashtakavarga (SAV) bindus for the relevant house(s); cite the concerned planet's Bhinnashtakavarga (BAV) in that house/sign where applicable. State whether bindus support or weaken the Parashari conclusions. Apply the BAV override: if BAV < 3 in the focus house, stress obstacles even if SAV is high. When transits are discussed, tie SAV/BAV to those houses.]
    - #### The Jaimini View: [Explain the influence of the current Chara Dasha (MD & AD) and the role of relevant Chara Karakas like Atmakaraka or Darakaraka in the context of the query.]
@@ -98,9 +103,9 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
    - #### Timing Synthesis: [Synthesize all dasha systems including KP significators]
    - #### Triple Perspective (Sudarshana): [Analyze from Lagna, Moon, Sun]
    - #### Divisional Chart Analysis: [Analyze relevant D-chart]
-5. ### Nakshatra Insights: [Analysis + Remedies. This section is MANDATORY if nakshatra data is available.]
-6. ### Timing & Guidance: [Actionable roadmap]
-7. <div class="final-thoughts-card">**Final Verdict**: [Conclusion based on the HOLISTIC_SYNTHESIS_RULE]</div>
+4. ### Nakshatra Insights: [Analysis + Remedies. This section is MANDATORY if nakshatra data is available.]
+5. ### Timing & Guidance: [Actionable roadmap]
+6. <div class="final-thoughts-card">**Final Verdict**: [Conclusion based on the HOLISTIC_SYNTHESIS_RULE]</div>
 
 ### 🚨 FORMATTING RULES
 - [HEADERS]: Use ### for main headers, #### for subsections.
@@ -376,16 +381,13 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
         raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
     _lang = str(language or "english").strip() or "english"
-    language_instruction = f"""LANGUAGE PREFERENCE (explicit, from the client—NOT inferred from the question text):
-The value "{_lang}" is the only language setting passed to you. It means: the user selected this as their preferred reply language in the AstroRoshni app (e.g. english vs hindi). You do not see the app's UI; you only see this string and the user's message. Therefore: treat "{_lang}" as the default language for your answer when the CURRENT QUESTION below is not clearly Hindi. Do not assume the question language matches "{_lang}"—always infer the question's language from the question text itself.
+    language_instruction = f"""OUTPUT LANGUAGE (you will see CURRENT QUESTION at the end of this prompt—infer language from that text, not only from "{_lang}"):
 
-HINDI REPLY OVERRIDE (mandatory when applicable): If the CURRENT QUESTION is in Hindi, ignore a non-Hindi "{_lang}" preference. Hindi includes:
-- Devanagari script (standard Hindi), or
-- Roman / Latin letters (Roman Hindi, Hinglish), e.g. phrases like "mera career kaisa rahega", "shaadi kab hogi", "dasha ka result", or clear Hindi grammar/word choice in Latin script.
+1) HINDI / HINGLISH OVERRIDE — HIGHEST PRIORITY: If CURRENT QUESTION is Hindi OR Roman Hindi (Hinglish), write the ENTIRE substantive answer in Hindi using Devanagari script (हिंदी). This applies even when "{_lang}" is english (the app often sends english for UI strings while the user types Hindi in Latin script). Do not deliver a primarily English answer in that case. Do not use Latin/Roman script for Hindi prose. Jyotish terms may use natural Hindi or common transliteration.
 
-When this applies, write the full substantive answer in Hindi using Devanagari script (हिंदी) for all Hindi prose—even if the user wrote their question in Roman Hindi or Hinglish. Do not reply in Latin/Roman script for Hindi content. Astrological terms may use standard Devanagari or established transliterations where customary. Do not answer only in English just because "{_lang}" is english.
+   Signals for Hinglish: words like mera/meri/mere, batao/btao, sab/sba kuch, dasha/dasa, shaadi/shadi, kab, kya, kaisa/kaisi, vishleshan, mein/main, hai/hain, or any Devanagari.
 
-If the question is clearly not Hindi, follow LANGUAGE PREFERENCE using "{_lang}".
+2) Otherwise (question clearly all-English): use app language "{_lang}" for the answer.
 
 """
     
@@ -454,6 +456,11 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     prompt_parts.append(f"{language_instruction}{elaborate_instruction}{response_format_instruction}{user_context_instruction}{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}")
     
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
+    prompt_parts.append(
+        "FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION. If it is Hindi or Hinglish, "
+        "your answer must be in Devanagari Hindi—not English—regardless of any English examples "
+        "or English section headers elsewhere in this prompt; you may use Hindi section titles."
+    )
     prompt_parts.append(FAQ_META_INSTRUCTION.strip())
     
     return "\n\n".join(prompt_parts)

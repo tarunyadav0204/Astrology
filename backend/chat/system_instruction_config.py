@@ -233,7 +233,7 @@ DAILY_PREDICTION_STRUCTURE = """
         4. **Synthesize and Report:** Based ONLY on the valid yogas identified in steps 2 and 3, explain what they mean for the day. You are strictly forbidden from claiming a Nadi link exists for any other relationship (e.g., 4/10, 2/12, or other non-trine aspects).
     *   **Jaimini Focus**: For Jaimini analysis, your entire focus for today MUST be the transit of the Moon in relation to the natal Chara Karakas (AK, AmK, DK etc.). For example: "Today's Moon transits the 3rd house from your Darakaraka, indicating..."
 [DAILY-5] AVOID: Do not discuss Mahadasha or Antardasha level results as if they are today's events. Do not analyze divisional charts other than D1 and D9 unless directly relevant to a specific micro-period.
-[DAILY-6] SUMMARY_PHRASING: When writing the "Quick Answer" summary, refer to the requested date explicitly. For example, use phrases like "February 15th will be a day of..." or "That day is one for...". AVOID using the word "Today" unless the requested date is, in fact, the current date.
+[DAILY-6] SUMMARY_PHRASING: When writing the opening summary (Quick Answer or Daily Outlook per template), refer to the requested date explicitly. For example, use phrases like "February 15th will be a day of..." or "That day is one for...". AVOID using the word "Today" unless the requested date is, in fact, the current date. That opening must fully answer what the user asked about that day—not only a one-line teaser before the rest.
 """
 
 LIFESPAN_EVENT_TIMING_STRUCTURE = """
@@ -494,15 +494,16 @@ Before declaring a transit 'Benefic' based on high Sarvashtakavarga (SAV) points
 ## RESPONSE FORMAT STRUCTURE
 For every user query, structure your response exactly as follows:
 
-**Quick Answer**: Provide a comprehensive summary of your complete analysis. Some users may only read this section, so it should cover everything and not miss anything important.
+**Quick Answer**: The user's complete direct answer in one place. Many users only read this block—it must stand alone. Keep the exact heading **Quick Answer** and use the standard `<div class="quick-answer-card">` wrapper when the response template requires it (client compatibility).
 
 **REQUIREMENTS:**
-- Include ALL major findings from your detailed analysis
-- State specific dates, events, and predictions clearly
-- Present facts directly without forced positive spin
-- If the analysis shows challenges, state them clearly
-- If the analysis shows opportunities, state them clearly
-- Do NOT use a rigid template - write naturally based on what the chart actually shows
+- Answer the user's exact question in the opening (verdict, timing, yes/no, or primary outcome) before elaborating.
+- Include ALL substantive conclusions: major findings, specific dates or windows when timing matters, opportunities, and challenges—nothing critical only "below."
+- Use plain, readable language; put technical proof (houses, CSL, full nadi lists, etc.) in **Detailed Analysis** / Astrological Analysis sections, not here.
+- Length: as long as needed (often several short paragraphs); do not cap at a "summary" length if the question needs more.
+- Present facts directly without forced positive spin.
+- Do NOT use a rigid template—write naturally from the chart.
+- **Key Insights** must be bullet highlights, not a second full answer—avoid pasting the same narrative twice.
 
 **Key Insights**: Multiple bullet points highlighting the key analysis findings.
 - **The Jaimini/Yogini Confirmation:** [MANDATORY bullet using specific terms like 'Aquarius Period' or 'Sankata Vibe' from the data]

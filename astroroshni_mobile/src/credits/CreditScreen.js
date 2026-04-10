@@ -23,18 +23,16 @@ import { useTheme } from '../context/ThemeContext';
 import { useCredits } from './CreditContext';
 import { creditAPI } from './creditService';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
+import { appLocaleForI18n } from '../utils/appLocale';
 
 const { width } = Dimensions.get('window');
 
-function formatSubscriptionDate(isoDate) {
+function formatSubscriptionDate(isoDate, locale = 'en-US') {
   if (!isoDate || typeof isoDate !== 'string') return isoDate || '—';
   const d = new Date(isoDate);
   if (isNaN(d.getTime())) return isoDate;
-  const day = d.getDate();
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = months[d.getMonth()];
-  const year = d.getFullYear();
-  return `${day} ${month} ${year}`;
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /** Get subscription price: prefer backend formatted_price (from Google Play), then iapSubscriptions, then plan.price. */
@@ -67,6 +65,8 @@ if (Platform.OS === 'android') {
 
 const CreditScreen = ({ navigation }) => {
   useAnalytics('CreditScreen');
+  const { t, i18n } = useTranslation();
+  const dateLocale = appLocaleForI18n(i18n.language);
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const { credits, loading, redeemCode, fetchBalance, subscriptionTierName, subscriptionDiscountPercent } = useCredits();
@@ -115,21 +115,27 @@ const CreditScreen = ({ navigation }) => {
       await fetchBalance();
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
+      const successMsg = isAlreadyCredited
+        ? t('credits.page.purchaseAlreadyCreditedBody')
+        : (() => {
+            const base = data.message || t('credits.page.purchaseCreditsAddedDefault');
+            return data.credits_added
+              ? `${base} ${t('credits.page.purchaseCreditsAddedSuffix', { count: data.credits_added })}`
+              : base;
+          })();
       setPurchaseModal({
         visible: true,
         type: isAlreadyCredited ? 'already_credited' : 'success',
-        title: isAlreadyCredited ? 'Already credited' : 'Thank you!',
-        message: isAlreadyCredited
-          ? 'This purchase was already added to your balance. Your credits are safe and ready to use.'
-          : `${data.message || 'Credits added.'}${data.credits_added ? ` ${data.credits_added} credits have been added to your balance.` : ''}`,
+        title: isAlreadyCredited ? t('credits.page.purchaseAlreadyCreditedTitle') : t('credits.page.purchaseThankYou'),
+        message: successMsg,
         creditsAdded: data.credits_added || 0,
       });
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to add credits';
+      const msg = err.response?.data?.detail || err.message || t('credits.page.failedAddCredits');
       setPurchaseModal({
         visible: true,
         type: 'error',
-        title: 'Purchase verification failed',
+        title: t('credits.page.purchaseVerifyFailed'),
         message: msg,
         creditsAdded: 0,
       });
@@ -148,20 +154,20 @@ const CreditScreen = ({ navigation }) => {
       const { data } = await creditAPI.verifyGooglePlaySubscription(purchaseToken, productId, orderId);
       await fetchBalance();
       await fetchSubscriptionDetails();
-      const tierName = data?.tier_name || 'VIP';
+      const tierName = data?.tier_name || t('credits.page.vipFallback');
       setPurchaseModal({
         visible: true,
         type: 'success',
-        title: 'Subscribed!',
-        message: `You're now on ${tierName}. You'll get a discount on all credit purchases.`,
+        title: t('credits.page.subscribedTitle'),
+        message: t('credits.page.subscribedMessage', { tier: tierName }),
         creditsAdded: 0,
       });
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to activate subscription';
+      const msg = err.response?.data?.detail || err.message || t('credits.page.failedActivateSubscription');
       setPurchaseModal({
         visible: true,
         type: 'error',
-        title: 'Subscription verification failed',
+        title: t('credits.page.subscriptionVerifyFailed'),
         message: msg,
         creditsAdded: 0,
       });
@@ -397,16 +403,16 @@ const CreditScreen = ({ navigation }) => {
       setPurchaseModal({
         visible: true,
         type: 'success',
-        title: 'Subscription status updated',
-        message: 'If you cancelled on Google Play, your status has been updated.',
+        title: t('credits.page.subscriptionStatusUpdated'),
+        message: t('credits.page.subscriptionStatusUpdatedBody'),
         creditsAdded: 0,
       });
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Could not refresh';
+      const msg = err.response?.data?.detail || err.message || t('credits.page.couldNotRefresh');
       setPurchaseModal({
         visible: true,
         type: 'error',
-        title: 'Refresh failed',
+        title: t('credits.page.refreshFailed'),
         message: msg,
         creditsAdded: 0,
       });
@@ -426,7 +432,7 @@ const CreditScreen = ({ navigation }) => {
 
   const handleRedeemCode = async () => {
     if (!promoCode.trim()) {
-      Alert.alert('Error', 'Please enter a promo code');
+      Alert.alert(t('credits.page.alertError'), t('credits.page.enterPromoCode'));
       return;
     }
 
@@ -434,7 +440,7 @@ const CreditScreen = ({ navigation }) => {
     
     try {
       const result = await redeemCode(promoCode.trim());
-      Alert.alert('Success', result.message || 'Promo code redeemed successfully!');
+      Alert.alert(t('credits.page.alertSuccess'), result.message || t('credits.page.promoRedeemedDefault'));
       setPromoCode('');
       fetchHistory();
     } catch (error) {
@@ -447,7 +453,7 @@ const CreditScreen = ({ navigation }) => {
       });
       
       // Extract error message from different possible sources
-      let errorMessage = error.message || error.detail || 'Failed to redeem code';
+      let errorMessage = error.message || error.detail || t('credits.page.failedRedeem');
       
       
       // Decode HTML entities
@@ -460,16 +466,16 @@ const CreditScreen = ({ navigation }) => {
       
       // Provide user-friendly messages for common errors
       if (errorMessage.toLowerCase().includes('already used') || errorMessage.toLowerCase().includes('already redeemed')) {
-        errorMessage = 'You have already used this promo code. Each code can only be used once per user.';
+        errorMessage = t('credits.page.promoAlreadyUsed');
       } else if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('not found')) {
-        errorMessage = 'Invalid promo code. Please check the code and try again.';
+        errorMessage = t('credits.page.promoInvalid');
       } else if (errorMessage.toLowerCase().includes('expired')) {
-        errorMessage = 'This promo code has expired and is no longer valid.';
+        errorMessage = t('credits.page.promoExpired');
       } else if (errorMessage.toLowerCase().includes('internal server error')) {
-        errorMessage = 'Server error occurred. Please try again later.';
+        errorMessage = t('credits.page.serverError');
       }
       
-      Alert.alert('Redemption Failed', errorMessage);
+      Alert.alert(t('credits.page.redemptionFailed'), errorMessage);
     } finally {
       setRedeeming(false);
     }
@@ -489,11 +495,11 @@ const CreditScreen = ({ navigation }) => {
   const handleBuyCreditsPress = async (product) => {
     if (Platform.OS !== 'android') return;
     if (!RNIap) {
-      Alert.alert('Not available', 'In-app purchase is not available on this device.');
+      Alert.alert(t('credits.page.notAvailable'), t('credits.page.iapNotAvailable'));
       return;
     }
     if (!iapReady) {
-      Alert.alert('Loading…', 'Store is loading. Please try again in a moment.');
+      Alert.alert(t('credits.page.storeLoadingTitle'), t('credits.page.storeLoadingBody'));
       return;
     }
     const productId = product.product_id || product.id;
@@ -502,7 +508,7 @@ const CreditScreen = ({ navigation }) => {
       await RNIap.requestPurchase({ skus: [productId] });
     } catch (e) {
       if (e?.code !== 'E_USER_CANCELLED') {
-        Alert.alert('Purchase failed', e?.message ?? 'Could not start purchase. Try again.');
+        Alert.alert(t('credits.page.purchaseFailed'), e?.message ?? t('credits.page.couldNotStartPurchase'));
       }
       setPurchasingProductId(null);
     }
@@ -511,11 +517,11 @@ const CreditScreen = ({ navigation }) => {
   const handleSubscribePress = async (plan) => {
     if (Platform.OS !== 'android') return;
     if (!RNIap) {
-      Alert.alert('Not available', 'In-app purchase is not available on this device.');
+      Alert.alert(t('credits.page.notAvailable'), t('credits.page.iapNotAvailable'));
       return;
     }
     if (!iapReady) {
-      Alert.alert('Loading…', 'Store is loading. Please try again in a moment.');
+      Alert.alert(t('credits.page.storeLoadingTitle'), t('credits.page.storeLoadingBody'));
       return;
     }
     const productId = plan.google_play_product_id;
@@ -528,8 +534,8 @@ const CreditScreen = ({ navigation }) => {
     const offerToken = offerDetails?.[0]?.offerToken;
     if (!offerToken) {
       Alert.alert(
-        'Subscription unavailable',
-        'This plan could not be loaded from the store. Please try again later or pull to refresh.'
+        t('credits.page.subscriptionUnavailable'),
+        t('credits.page.subscriptionUnavailableBody')
       );
       return;
     }
@@ -540,7 +546,7 @@ const CreditScreen = ({ navigation }) => {
       });
     } catch (e) {
       if (e?.code !== 'E_USER_CANCELLED') {
-        Alert.alert('Subscription failed', e?.message ?? 'Could not start subscription. Try again.');
+        Alert.alert(t('credits.page.subscriptionFailed'), e?.message ?? t('credits.page.couldNotStartSubscription'));
       }
       setPurchasingSubscriptionId(null);
     }
@@ -577,10 +583,10 @@ const CreditScreen = ({ navigation }) => {
         </View>
         <View style={styles.transactionFooter}>
           <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
-            {new Date(item.date).toLocaleDateString()}
+            {new Date(item.date).toLocaleDateString(dateLocale)}
           </Text>
           <Text style={[styles.transactionBalance, { color: colors.textTertiary }]}>
-            Balance: {item.balance_after}
+            {t('credits.page.transactionBalance', { amount: item.balance_after })}
           </Text>
         </View>
       </View>
@@ -642,8 +648,8 @@ const CreditScreen = ({ navigation }) => {
                   </LinearGradient>
                 </View>
 
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Cosmic Credits</Text>
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Fuel your astrological journey</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('credits.page.title')}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{t('credits.page.subtitle')}</Text>
               </View>
             </Animated.View>
 
@@ -662,9 +668,9 @@ const CreditScreen = ({ navigation }) => {
                 style={styles.balanceGradient}
               >
                 <View style={styles.balanceContent}>
-                  <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Your Balance</Text>
+                  <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>{t('credits.page.yourBalance')}</Text>
                   <Text style={[styles.balanceAmount, { color: colors.primary }]}>{credits}</Text>
-                  <Text style={[styles.balanceCreditsText, { color: colors.textTertiary }]}>Credits</Text>
+                  <Text style={[styles.balanceCreditsText, { color: colors.textTertiary }]}>{t('credits.page.creditsLabel')}</Text>
                 </View>
 
                 <View style={styles.balanceDecoration}>
@@ -683,17 +689,17 @@ const CreditScreen = ({ navigation }) => {
                   <Text style={[styles.subscriptionCardTitle, { color: colors.text }]}>{subscriptionDetails.tier_name}</Text>
                 </View>
                 <Text style={[styles.subscriptionCardBenefit, { color: colors.textSecondary }]}>
-                  {subscriptionDetails.discount_percent}% off on all features — Career, Marriage, Health, Event Timeline, and every paid analysis.
+                  {t('credits.page.subscriptionBenefit', { percent: subscriptionDetails.discount_percent })}
                 </Text>
                 <View style={[styles.subscriptionCardDates, { borderTopColor: colors.cardBorder }]}>
                   {subscriptionDetails.start_date ? (
                     <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
-                      Subscribed on {formatSubscriptionDate(subscriptionDetails.start_date)}
+                      {t('credits.page.subscribedOn', { date: formatSubscriptionDate(subscriptionDetails.start_date, dateLocale) })}
                     </Text>
                   ) : null}
                   {subscriptionDetails.end_date ? (
                     <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
-                      Renews on {formatSubscriptionDate(subscriptionDetails.end_date)}
+                      {t('credits.page.renewsOn', { date: formatSubscriptionDate(subscriptionDetails.end_date, dateLocale) })}
                     </Text>
                   ) : null}
                 </View>
@@ -704,7 +710,7 @@ const CreditScreen = ({ navigation }) => {
                       onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
                     >
                       <Ionicons name="open-outline" size={18} color={colors.primary} />
-                      <Text style={[styles.manageSubscriptionButtonText, { color: colors.primary }]}>Manage or cancel subscription</Text>
+                      <Text style={[styles.manageSubscriptionButtonText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 8 }]}
@@ -713,7 +719,7 @@ const CreditScreen = ({ navigation }) => {
                     >
                       <Ionicons name="refresh-outline" size={16} color={colors.primary} />
                       <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
-                        {refreshSubscriptionStatusLoading ? 'Refreshing…' : 'Refresh subscription status'}
+                        {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -724,7 +730,7 @@ const CreditScreen = ({ navigation }) => {
                 <View style={[styles.vipBadge, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(255,193,7,0.2)', borderColor: isDark ? 'rgba(255,215,0,0.4)' : 'rgba(255,193,7,0.5)' }]}>
                   <Ionicons name="shield-checkmark" size={20} color={colors.primary} style={styles.vipBadgeIcon} />
                   <Text style={[styles.vipBadgeText, { color: colors.text }]}>
-                    {subscriptionTierName} — {subscriptionDiscountPercent}% off on all features
+                    {t('credits.page.vipDiscountBadge', { tier: subscriptionTierName, percent: subscriptionDiscountPercent })}
                   </Text>
                 </View>
                 {Platform.OS === 'android' && (
@@ -734,7 +740,7 @@ const CreditScreen = ({ navigation }) => {
                       onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
                     >
                       <Ionicons name="open-outline" size={16} color={colors.primary} />
-                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Manage or cancel subscription</Text>
+                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
@@ -743,7 +749,7 @@ const CreditScreen = ({ navigation }) => {
                     >
                       <Ionicons name="refresh-outline" size={16} color={colors.primary} />
                       <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
-                        {refreshSubscriptionStatusLoading ? 'Refreshing…' : 'Refresh subscription status'}
+                        {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -754,12 +760,12 @@ const CreditScreen = ({ navigation }) => {
             {/* VIP subscription plans — subscribe for discount (Android only) */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>VIP Plans</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.vipPlans')}</Text>
                 {subscriptionPlansLoading ? (
-                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading plans…</Text>
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingPlans')}</Text>
                 ) : subscriptionPlansFromPlay.length === 0 ? (
                   subscriptionPlans.length > 0 && iapReady ? (
-                    <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No subscription plans available from the store.</Text>
+                    <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noSubscriptionPlansStore')}</Text>
                   ) : null
                 ) : (
                   <>
@@ -775,8 +781,8 @@ const CreditScreen = ({ navigation }) => {
                             onPress={() => handleSubscribePress(plan)}
                             disabled={isCurrentPlan || isPurchasing}
                           >
-                            <Text style={[styles.buyProductLabel, { color: colors.text }]}>{plan.tier_name || 'VIP'}</Text>
-                            <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{plan.discount_percent ?? 0}% off</Text>
+                            <Text style={[styles.buyProductLabel, { color: colors.text }]}>{plan.tier_name || t('credits.page.vipFallback')}</Text>
+                            <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{t('credits.page.offPercent', { percent: plan.discount_percent ?? 0 })}</Text>
                             {(() => {
                               const displayPrice = getSubscriptionDisplayPrice(plan, iapSubscriptions);
                               return displayPrice != null && displayPrice !== '' ? (
@@ -785,7 +791,7 @@ const CreditScreen = ({ navigation }) => {
                             })()}
                             <View style={[styles.buyProductButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
                               <Text style={styles.buyProductButtonText}>
-                                {isCurrentPlan ? 'Current plan' : isPurchasing ? 'Processing…' : 'Subscribe'}
+                                {isCurrentPlan ? t('credits.page.currentPlan') : isPurchasing ? t('credits.page.processing') : t('credits.page.subscribe')}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -799,7 +805,7 @@ const CreditScreen = ({ navigation }) => {
                           onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
                         >
                           <Ionicons name="open-outline" size={16} color={colors.primary} />
-                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Manage or cancel subscription</Text>
+                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
@@ -808,7 +814,7 @@ const CreditScreen = ({ navigation }) => {
                         >
                           <Ionicons name="refresh-outline" size={16} color={colors.primary} />
                           <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
-                            {refreshSubscriptionStatusLoading ? 'Refreshing…' : 'Refresh subscription status'}
+                            {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
                           </Text>
                         </TouchableOpacity>
                       </>
@@ -821,11 +827,11 @@ const CreditScreen = ({ navigation }) => {
             {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy Credits</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.buyCredits')}</Text>
                 {productsLoading ? (
-                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading products…</Text>
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingProducts')}</Text>
                 ) : googlePlayProducts.length === 0 ? (
-                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No products available. Check back later.</Text>
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noProducts')}</Text>
                 ) : (
                   <View style={styles.buyProductGrid}>
                     {googlePlayProducts.map((product) => (
@@ -835,11 +841,11 @@ const CreditScreen = ({ navigation }) => {
                         onPress={() => handleBuyCreditsPress(product)}
                         disabled={purchasingProductId === product.product_id}
                       >
-                        <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || `${product.credits} Credits`}</Text>
-                        <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{product.credits} credits</Text>
+                        <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || t('credits.page.productTitleFallback', { count: product.credits })}</Text>
+                        <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{t('credits.page.creditsCount', { count: product.credits })}</Text>
                         <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
                           <Text style={styles.buyProductButtonText}>
-                            {purchasingProductId === product.product_id ? 'Processing…' : 'Buy'}
+                            {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -851,13 +857,13 @@ const CreditScreen = ({ navigation }) => {
 
             {/* Promo Code Section */}
             <View style={styles.promoSection}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Have a Promo Code?</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.promoHeading')}</Text>
               <View style={[styles.promoCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
                 <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
                   <Ionicons name="ticket" size={20} color={colors.primary} style={styles.promoIcon} />
                   <TextInput
                     style={[styles.promoInput, { color: colors.text }]}
-                    placeholder="Enter promo code"
+                    placeholder={t('credits.page.promoPlaceholder')}
                     placeholderTextColor={colors.textTertiary}
                     value={promoCode}
                     onChangeText={setPromoCode}
@@ -879,7 +885,7 @@ const CreditScreen = ({ navigation }) => {
                     style={styles.redeemGradient}
                   >
                     <Text style={styles.redeemText}>
-                      {redeeming ? 'Redeeming...' : 'Redeem'}
+                      {redeeming ? t('credits.page.redeeming') : t('credits.page.redeem')}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -888,7 +894,7 @@ const CreditScreen = ({ navigation }) => {
 
             {/* Transaction History */}
             <View style={styles.historySection}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Transaction History</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.transactionHistory')}</Text>
               {history.length > 0 ? (
                 <View style={[styles.historyCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
                   {history.map((item, index) => (
@@ -901,8 +907,8 @@ const CreditScreen = ({ navigation }) => {
               ) : (
                 <View style={[styles.emptyState, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
                   <Ionicons name="receipt-outline" size={48} color={colors.textTertiary} />
-                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No transactions yet</Text>
-                  <Text style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>Your credit history will appear here</Text>
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>{t('credits.page.noTransactions')}</Text>
+                  <Text style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>{t('credits.page.historyHint')}</Text>
                 </View>
               )}
             </View>
@@ -936,7 +942,7 @@ const CreditScreen = ({ navigation }) => {
               <Text style={[styles.purchaseModalMessage, { color: colors.textSecondary }]}>{purchaseModal.message}</Text>
               {purchaseModal.creditsAdded > 0 && (
                 <View style={[styles.purchaseModalCreditsBadge, { backgroundColor: isDark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.15)' }]}>
-                  <Text style={[styles.purchaseModalCreditsText, { color: colors.success }]}>+{purchaseModal.creditsAdded} credits</Text>
+                  <Text style={[styles.purchaseModalCreditsText, { color: colors.success }]}>{t('credits.page.modalCreditsAdded', { count: purchaseModal.creditsAdded })}</Text>
                 </View>
               )}
               <TouchableOpacity
@@ -948,7 +954,7 @@ const CreditScreen = ({ navigation }) => {
                   colors={purchaseModal.type === 'error' ? [colors.primary, colors.secondary] : [colors.success, '#22c55e']}
                   style={styles.purchaseModalButton}
                 >
-                  <Text style={styles.purchaseModalButtonText}>Got it</Text>
+                  <Text style={styles.purchaseModalButtonText}>{t('credits.page.modalGotIt')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

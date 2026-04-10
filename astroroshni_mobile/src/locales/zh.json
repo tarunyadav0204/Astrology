@@ -1,691 +1,931 @@
 {
-    "birthProfileIntro": {
-      "title": "您的出生星盘开启专属体验",
-      "body": "我们使用您的出生日期、时间和地点来计算您的吠陀星盘并提供个性化见解。您可以随时在个人资料中添加或更改这些信息。",
-      "continue": "继续",
-      "skip": "暂时跳过",
-      "skipSubtext": "先探索应用，稍后再添加个人资料",
-      "emptyStateTitle": "添加您的出生资料",
-      "emptyStateBody": "您的出生日期、时间和地点将解锁您的吠陀星盘、个性化见解和宇宙指引。您可以随时添加或更改。",
-      "emptyStateCta": "添加出生资料"
+  "birthProfileIntro": {
+    "title": "您的出生星盘开启专属体验",
+    "body": "我们使用您的出生日期、时间和地点来计算您的吠陀星盘并提供个性化见解。您可以随时在个人资料中添加或更改这些信息。",
+    "continue": "继续",
+    "skip": "暂时跳过",
+    "skipSubtext": "先探索应用，稍后再添加个人资料",
+    "emptyStateTitle": "添加您的出生资料",
+    "emptyStateBody": "您的出生日期、时间和地点将解锁您的吠陀星盘、个性化见解和宇宙指引。您可以随时添加或更改。",
+    "emptyStateCta": "添加出生资料"
+  },
+  "menu": {
+    "title": "宇宙菜单",
+    "subtitle": "导航您的旅程",
+    "myProfile": "我的资料",
+    "selectNative": "选择档案",
+    "newNative": "新档案",
+    "viewChart": "查看星盘",
+    "dashaBrowser": "大运浏览器",
+    "ashtakvarga": "八分点 (Ashtakvarga)",
+    "shadbala": "六种力量 (Shadbala)",
+    "kotaChakra": "城堡图 (Kota Chakra)",
+    "yogas": "瑜伽组合 (Yogas)",
+    "lifeAnalysis": "人生分析",
+    "kpSystem": "KP 系统",
+    "pastLifeRegression": "前世业力分析",
+    "numerology": "数字命理学",
+    "chatHistory": "聊天历史",
+    "podcastHistory": "播客历史",
+    "partnershipOn": "合盘模式开启",
+    "partnershipOff": "合盘模式关闭",
+    "blog": "博客与知识",
+    "credits": "积分",
+    "support": "客服支持",
+    "logout": "退出登录"
+  },
+  "support": {
+    "title": "客服支持",
+    "newTicket": "新建支持工单",
+    "noTickets": "暂无工单。点击下方联系团队。",
+    "subject": "主题",
+    "subjectPlaceholder": "简要说明",
+    "message": "留言",
+    "messagePlaceholder": "请描述您的问题（仅纯文本）",
+    "send": "发送",
+    "back": "返回列表",
+    "status": "状态",
+    "roleAdmin": "团队",
+    "roleYou": "您",
+    "reply": "您的回复",
+    "replyPlaceholder": "输入消息",
+    "sendReply": "发送回复",
+    "closedHint": "此工单已关闭。如需更多帮助请新建工单。",
+    "closedTicket": "此工单已关闭。",
+    "enterMessage": "请输入消息。",
+    "fillBoth": "请填写主题和消息。",
+    "loadFailed": "无法加载此工单。",
+    "backToList": "返回工单列表",
+    "requestFailed": "请求失败",
+    "statusOpen": "开放",
+    "statusClosed": "已关闭",
+    "statusPending": "待处理",
+    "sourceIos": "iOS",
+    "sourceAndroid": "Android"
+  },
+  "blog": {
+    "screenTitle": "博客与知识",
+    "detailNavTitle": "博客",
+    "readMore": "阅读更多",
+    "empty": "暂无文章。",
+    "defaultCategory": "占星",
+    "seeAll": "查看全部",
+    "postNotFound": "未找到文章",
+    "goBack": "返回",
+    "authorTeam": "AstroRoshni 团队",
+    "keyTakeaway": "要点",
+    "shareMessage": "在 AstroRoshni 阅读：{{title}}\n\n{{url}}"
+  },
+  "quickActions": {
+    "language": "语言",
+    "chart": "星盘",
+    "dasha": "大运",
+    "partnership": "合盘",
+    "partner": "伴侣",
+    "history": "聊天历史"
+  },
+  "chartTypes": {
+    "lagna": {
+      "name": "本命盘 (D1)",
+      "description": "主要出生星盘"
     },
-    "menu": {
-      "title": "宇宙菜单",
-      "subtitle": "导航您的旅程",
-      "myProfile": "我的资料",
-      "selectNative": "选择档案",
-      "newNative": "新档案",
-      "viewChart": "查看星盘",
-      "dashaBrowser": "大运浏览器",
-      "ashtakvarga": "八分点 (Ashtakvarga)",
-      "shadbala": "六种力量 (Shadbala)",
-      "kotaChakra": "城堡图 (Kota Chakra)",
-      "yogas": "瑜伽组合 (Yogas)",
-      "lifeAnalysis": "人生分析",
-      "kpSystem": "KP 系统",
-      "pastLifeRegression": "前世业力分析",
-      "numerology": "数字命理学",
-      "chatHistory": "聊天历史",
-      "partnershipOn": "合盘模式开启",
-      "partnershipOff": "合盘模式关闭",
-      "credits": "积分",
-      "logout": "退出登录"
+    "navamsa": {
+      "name": "九分盘 (D9)",
+      "description": "婚姻与灵性"
     },
+    "transit": {
+      "name": "流年经过",
+      "description": "当前行星位置"
+    },
+    "karkamsa": {
+      "name": "Karkamsa",
+      "description": "灵性路径与法 (Dharma)"
+    },
+    "swamsa": {
+      "name": "Swamsa",
+      "description": "父系血统与祖先"
+    },
+    "hora": {
+      "name": "二分盘 (D2)",
+      "description": "财富与家庭"
+    },
+    "drekkana": {
+      "name": "三分盘 (D3)",
+      "description": "兄弟姐妹与快乐"
+    },
+    "chaturthamsa": {
+      "name": "四分盘 (D4)",
+      "description": "命运与资产"
+    },
+    "dashamsa": {
+      "name": "十分盘 (D10)",
+      "description": "事业与职业"
+    },
+    "dwadashamsa": {
+      "name": "十二分盘 (D12)",
+      "description": "父母与出身"
+    },
+    "shodamsa": {
+      "name": "十六分盘 (D16)",
+      "description": "车辆与舒适度"
+    },
+    "vimsamsa": {
+      "name": "二十分盘 (D20)",
+      "description": "灵性修行"
+    },
+    "chaturvimsamsa": {
+      "name": "二十四分盘 (D24)",
+      "description": "学问与教育"
+    },
+    "trimsamsa": {
+      "name": "三十分盘 (D30)",
+      "description": "不幸与障碍"
+    },
+    "khavedamsa": {
+      "name": "四十分盘 (D40)",
+      "description": "吉凶祸福"
+    },
+    "akshavedamsa": {
+      "name": "四十五分盘 (D45)",
+      "description": "品行与操守"
+    },
+    "shashtyamsa": {
+      "name": "六十分盘 (D60)",
+      "description": "前世业力"
+    }
+  },
+  "chartScreen": {
+    "loadingText": "正在计算宇宙方位...",
+    "loadingSubtext": "读取行星位置",
+    "emptyTitle": "暂无星盘数据",
+    "emptyText": "请添加出生详情以查看星盘",
+    "transit": "流年",
+    "dasha": "大运",
+    "karakas": "指标星 (Karakas)",
+    "positions": "位置"
+  },
+  "planets": {
+    "Sun": "日",
+    "Moon": "月",
+    "Mars": "火",
+    "Mercury": "水",
+    "Jupiter": "木",
+    "Venus": "金",
+    "Saturn": "土",
+    "Rahu": "罗",
+    "Ketu": "计",
+    "Gulika": "古",
+    "Mandi": "曼",
+    "InduLagna": "财"
+  },
+  "shadbalaAnalysis": "六力 (Shadbala) 分析",
+  "classicalPlanetaryStrength": "古典行星力量 (7颗肉眼可见行星)",
+  "rupas": "力量单位 (Rupas)",
+  "points": "得分",
+  "grades": {
+    "Excellent": "卓越",
+    "Good": "优秀",
+    "Average": "普通",
+    "Weak": "薄弱"
+  },
+  "strengthComponents": "力量组成部分",
+  "components": {
+    "sthana_bala": "位置力",
+    "dig_bala": "方位力",
+    "kala_bala": "时间力",
+    "chesta_bala": "运动力",
+    "naisargika_bala": "自然力",
+    "drik_bala": "相位力",
+    "uccha_bala": "庙旺力",
+    "saptavargaja_bala": "七分盘力",
+    "ojha_yugma_bala": "阴阳力",
+    "kendradi_bala": "宫位等级力",
+    "drekkana_bala": "三分盘力"
+  },
+  "sthanaBalaBreakdown": "位置力明细",
+  "kalaBalaBreakdown": "时间力明细",
+  "profile": {
+    "myProfile": "我的资料",
+    "birthDateNotSet": "出生日期未设置",
+    "connectChart": "将星盘关联至资料",
+    "availableCredits": "可用积分",
+    "add": "+ 添加",
+    "chats": "聊天",
+    "charts": "星盘",
+    "days": "天",
+    "user": "用户",
+    "questions": "问题",
+    "quickActionsTitle": "快捷操作",
+    "dashaLevels": {
+      "Maha": "大运",
+      "Antar": "次运",
+      "Pratyantar": "小运",
+      "Sookshma": "细运",
+      "Prana": "微运"
+    },
+    "birthChartEssence": "出生星盘核心",
+    "viewFullChart": "查看完整星盘",
+    "sunSign": "太阳星座",
+    "moonSign": "月亮星座",
+    "ascendant": "上升",
+    "calculating": "计算中...",
+    "currentRunningDashas": "当前运行的大运",
+    "loading": "加载中...",
     "quickActions": {
-      "language": "语言",
-      "chart": "星盘",
-      "dasha": "大运",
-      "partnership": "合盘",
-      "partner": "伴侣",
-      "history": "聊天历史"
+      "newChat": "新聊天",
+      "viewChart": "查看星盘",
+      "dashas": "大运",
+      "history": "历史",
+      "myFacts": "我的事实",
+      "language": "语言"
     },
-    "chartTypes": {
-      "lagna": {
-        "name": "本命盘 (D1)",
-        "description": "主要出生星盘"
-      },
-      "navamsa": {
-        "name": "九分盘 (D9)",
-        "description": "婚姻与灵性"
-      },
-      "transit": {
-        "name": "流年经过",
-        "description": "当前行星位置"
-      },
-      "karkamsa": {
-        "name": "Karkamsa",
-        "description": "灵性路径与法 (Dharma)"
-      },
-      "swamsa": {
-        "name": "Swamsa",
-        "description": "父系血统与祖先"
-      },
-      "hora": {
-        "name": "二分盘 (D2)",
-        "description": "财富与家庭"
-      },
-      "drekkana": {
-        "name": "三分盘 (D3)",
-        "description": "兄弟姐妹与快乐"
-      },
-      "chaturthamsa": {
-        "name": "四分盘 (D4)",
-        "description": "命运与资产"
-      },
-      "dashamsa": {
-        "name": "十分盘 (D10)",
-        "description": "事业与职业"
-      },
-      "dwadashamsa": {
-        "name": "十二分盘 (D12)",
-        "description": "父母与出身"
-      },
-      "shodamsa": {
-        "name": "十六分盘 (D16)",
-        "description": "车辆与舒适度"
-      },
-      "vimsamsa": {
-        "name": "二十分盘 (D20)",
-        "description": "灵性修行"
-      },
-      "chaturvimsamsa": {
-        "name": "二十四分盘 (D24)",
-        "description": "学问与教育"
-      },
-      "trimsamsa": {
-        "name": "三十分盘 (D30)",
-        "description": "不幸与障碍"
-      },
-      "khavedamsa": {
-        "name": "四十分盘 (D40)",
-        "description": "吉凶祸福"
-      },
-      "akshavedamsa": {
-        "name": "四十五分盘 (D45)",
-        "description": "品行与操守"
-      },
-      "shashtyamsa": {
-        "name": "六十分盘 (D60)",
-        "description": "前世业力"
+    "birthDataRequired": "需要出生数据",
+    "dashasAlert": "请关联您的出生星盘以查看大运。",
+    "factsAlert": "请关联您的出生星盘以管理事实。",
+    "settings": "设置",
+    "lightTheme": "浅色主题",
+    "darkTheme": "深色主题",
+    "editBirthDetails": "编辑出生详情",
+    "notificationHistory": "通知历史",
+    "turnOnNotifications": "开启通知",
+    "turningOnNotifications": "正在开启…",
+    "aboutApp": "关于 AstroRoshni",
+    "logout": "退出登录"
+  },
+  "about": {
+    "title": "关于 AstroRoshni",
+    "version": "版本 {{version}}",
+    "versionWithCode": "版本 {{version}} (代码 {{code}})",
+    "versionWithBuild": "版本 {{version}} (构建 {{build}})",
+    "description": "AstroRoshni 将吠陀占星学与智能引导相结合，帮助您了解自己的人生道路、时机和潜能。",
+    "legalHeading": "法律与政策",
+    "privacyPolicy": "隐私政策",
+    "termsOfService": "服务条款",
+    "supportHeading": "支持",
+    "contactSupport": "联系支持",
+    "visitWebsite": "访问网站"
+  },
+  "languageModal": {
+    "title": "选择语言",
+    "close": "关闭"
+  },
+  "authOnboarding": {
+    "chooseLanguageTitle": "选择您的语言",
+    "chooseLanguageSubtitle": "我们将在整个应用中使用此设置。您可以随时在「个人资料」中更改。",
+    "continue": "继续",
+    "welcomeTitle": "欢迎使用 AstroRoshni，{{name}}！",
+    "welcomeSubtitle": "您的账号已创建成功。\n让我们创建您的专属出生星盘，解锁宇宙洞察。",
+    "featureChart": "详细本命盘分析",
+    "featureAi": "AI 驱动的预测",
+    "featureDaily": "每日宇宙指引",
+    "createBirthChart": "创建我的出生星盘",
+    "skipForNow": "暂时跳过"
+  },
+  "chat": {
+    "chartEssence": "{{name}} 的星盘核心",
+    "welcomeMessage": "🌟 欢迎 {{name}}！我在这里帮助您解读出生星盘并提供占星见解。\\n\\n您可以随时问我关于以下内容：\\n\\n• 人格特质与特征\\n• 职业与事业引导\\n• 关系与匹配度\\n• 健康与福祉见解\\n• 重大决定的时机选择\\n• 当前行星流年\\n• 优势与成长领域\\n\\n您想先探索什么？",
+    "betaNotice": "⚠️ 测试版：时间线预测仅供参考。请运用逻辑和判断。",
+    "disclaimerNotice": "⚖️ 免责声明：占星学是一种概率性的引导工具。它不能替代医疗、法律、财务或心理健康建议。重大决定请咨询专业人士。",
+    "verified": "AstroRoshni 已认证",
+    "inquiry": "AstroRoshni 咨询",
+    "you": "您",
+    "preparingInsights": "正在准备您的宇宙见解...",
+    "fascinatingInsights": "在此期间，让我向您展示一些关于您星盘的有趣事实...",
+    "thankYou": "感谢您向 AstroRoshni 提问。",
+    "deeplyAnalyzing": "我正在深度分析您的星图，以提供最准确的见解。这个神圣的过程需要一点时间..."
+  },
+  "home": {
+    "greeting": {
+      "subtitle": "您的宇宙蓝图已准备就绪。选择您的启迪之路。",
+      "lifePath": "{{name}} 的人生道路"
+    },
+    "firstQuestionFree": {
+      "title": "您的第一个问题免费！",
+      "subtext": "随便问——无需消耗积分。\n立即获得个性化占星指引。",
+      "cta": "免费提出第一个问题",
+      "later": "稍后再说"
+    },
+    "monthlyWelcome": {
+      "hello": "你好，{{name}} 👋",
+      "helloAnonymous": "你好 👋",
+      "headline": "想看看{{month}}为你准备了什么吗？",
+      "body": "我们将运用帕拉沙里、纳迪与杰米尼方法，深入分析你的分盘、大运与行运——并揭示{{month}}可能出现的高概率事件与时间线。",
+      "bullet1": "事业、感情、财运与健康相关事件时间线。",
+      "bullet2": "清楚看到哪些大运与宫位正在引动。",
+      "bullet3": "多种情境，助你心中有数、提前准备。",
+      "cta": "探索{{month}}运势",
+      "later": "稍后再说",
+      "disclaimer": "仅供指引——不能替代医疗、法律或财务专业建议。",
+      "months": {
+        "1": "一月",
+        "2": "二月",
+        "3": "三月",
+        "4": "四月",
+        "5": "五月",
+        "6": "六月",
+        "7": "七月",
+        "8": "八月",
+        "9": "九月",
+        "10": "十月",
+        "11": "十一月",
+        "12": "十二月"
       }
     },
-    "chartScreen": {
-      "loadingText": "正在计算宇宙方位...",
-      "loadingSubtext": "读取行星位置",
-      "emptyTitle": "暂无星盘数据",
-      "emptyText": "请添加出生详情以查看星盘",
-      "transit": "流年",
-      "dasha": "大运",
-      "karakas": "指标星 (Karakas)",
-      "positions": "位置"
+    "multiChartTip": {
+      "title": "添加家人与朋友的星盘",
+      "body": "在 AstroRoshni 中可以保存多个出生档案。添加伴侣、子女、父母或朋友，即可为他们查看运势，或随时从首页标题栏切换档案。",
+      "cta": "添加出生档案",
+      "gotIt": "我知道了",
+      "neverAgain": "不再显示"
     },
-    "planets": {
-      "Sun": "日",
-      "Moon": "月",
-      "Mars": "火",
-      "Mercury": "水",
-      "Jupiter": "木",
-      "Venus": "金",
-      "Saturn": "土",
-      "Rahu": "罗",
-      "Ketu": "计",
-      "Gulika": "古",
-      "Mandi": "曼",
-      "InduLagna": "财"
+    "sections": {
+      "choosePath": "选择您的路径",
+      "lifeAnalysis": "🧘 人生分析",
+      "timingPlanners": "⏰ 时机规划",
+      "cosmicDashboard": "✨ 宇宙仪表盘",
+      "currentDasha": "⏰ 当前大运时期",
+      "astrologyTools": "🔧 占星工具",
+      "planetaryTransits": "🪐 当前行星流年",
+      "blog": "博客与知识"
     },
-    "shadbalaAnalysis": "六力 (Shadbala) 分析",
-    "classicalPlanetaryStrength": "古典行星力量 (7颗肉眼可见行星)",
-    "rupas": "力量单位 (Rupas)",
-    "points": "得分",
-    "grades": {
-      "Excellent": "卓越",
-      "Good": "优秀",
-      "Average": "普通",
-      "Weak": "薄弱"
-    },
-    "strengthComponents": "力量组成部分",
-    "components": {
-      "sthana_bala": "位置力",
-      "dig_bala": "方位力",
-      "kala_bala": "时间力",
-      "chesta_bala": "运动力",
-      "naisargika_bala": "自然力",
-      "drik_bala": "相位力",
-      "uccha_bala": "庙旺力",
-      "saptavargaja_bala": "七分盘力",
-      "ojha_yugma_bala": "阴阳力",
-      "kendradi_bala": "宫位等级力",
-      "drekkana_bala": "三分盘力"
-    },
-    "sthanaBalaBreakdown": "位置力明细",
-    "kalaBalaBreakdown": "时间力明细",
-    "profile": {
-      "myProfile": "我的资料",
-      "birthDateNotSet": "出生日期未设置",
-      "connectChart": "将星盘关联至资料",
-      "availableCredits": "可用积分",
-      "add": "+ 添加",
-      "chats": "聊天",
-      "charts": "星盘",
-      "days": "天",
-      "birthChartEssence": "出生星盘核心",
-      "viewFullChart": "查看完整星盘",
-      "sunSign": "太阳星座",
-      "moonSign": "月亮星座",
-      "ascendant": "上升",
-      "calculating": "计算中...",
-      "currentRunningDashas": "当前运行的大运",
-      "loading": "加载中...",
-      "quickActions": {
-        "newChat": "新聊天",
-        "viewChart": "查看星盘",
-        "dashas": "大运",
-        "history": "历史",
-        "myFacts": "我的事实",
-        "language": "语言"
+    "options": {
+      "question": {
+        "title": "提出任何问题",
+        "description": "获取有关您的性格、关系、事业或任何占星主题的见解"
       },
-      "birthDataRequired": "需要出生数据",
-      "dashasAlert": "请关联您的出生星盘以查看大运。",
-      "factsAlert": "请关联您的出生星盘以管理事实。",
-      "settings": "设置",
-      "lightTheme": "浅色主题",
-      "darkTheme": "深色主题",
-      "editBirthDetails": "编辑出生详情",
-      "aboutApp": "关于 AstroRoshni",
-      "logout": "退出登录"
-    },
-    "about": {
-      "title": "关于 AstroRoshni",
-      "version": "版本 {{version}}",
-      "versionWithCode": "版本 {{version}} (代码 {{code}})",
-      "versionWithBuild": "版本 {{version}} (构建 {{build}})",
-      "description": "AstroRoshni 将吠陀占星学与智能引导相结合，帮助您了解自己的人生道路、时机和潜能。",
-      "legalHeading": "法律与政策",
-      "privacyPolicy": "隐私政策",
-      "termsOfService": "服务条款",
-      "supportHeading": "支持",
-      "contactSupport": "联系支持",
-      "visitWebsite": "访问网站"
-    },
-    "languageModal": {
-      "title": "选择语言",
-      "close": "关闭"
-    },
-    "chat": {
-      "chartEssence": "{{name}} 的星盘核心",
-      "welcomeMessage": "🌟 欢迎 {{name}}！我在这里帮助您解读出生星盘并提供占星见解。\\n\\n您可以随时问我关于以下内容：\\n\\n• 人格特质与特征\\n• 职业与事业引导\\n• 关系与匹配度\\n• 健康与福祉见解\\n• 重大决定的时机选择\\n• 当前行星流年\\n• 优势与成长领域\\n\\n您想先探索什么？",
-      "betaNotice": "⚠️ 测试版：时间线预测仅供参考。请运用逻辑和判断。",
-      "disclaimerNotice": "⚖️ 免责声明：占星学是一种概率性的引导工具。它不能替代医疗、法律、财务或心理健康建议。重大决定请咨询专业人士。",
-      "verified": "AstroRoshni 已认证",
-      "inquiry": "AstroRoshni 咨询",
-      "you": "您",
-      "preparingInsights": "正在准备您的宇宙见解...",
-      "fascinatingInsights": "在此期间，让我向您展示一些关于您星盘的有趣事实...",
-      "thankYou": "感谢您向 AstroRoshni 提问。",
-      "deeplyAnalyzing": "我正在深度分析您的星图，以提供最准确的见解。这个神圣的过程需要一点时间..."
-    },
-    "home": {
-      "greeting": {
-        "subtitle": "您的宇宙蓝图已准备就绪。选择您的启迪之路。",
-        "lifePath": "{{name}} 的人生道路"
+      "partnership": {
+        "title": "合盘分析",
+        "description": "分析两人之间的匹配度和关系动态"
       },
-      "sections": {
-        "choosePath": "选择您的路径",
-        "lifeAnalysis": "🧘 人生分析",
-        "timingPlanners": "⏰ 时机规划",
-        "cosmicDashboard": "✨ 宇宙仪表盘",
-        "currentDasha": "⏰ 当前大运时期",
-        "astrologyTools": "🔧 占星工具",
-        "planetaryTransits": "🪐 当前行星流年"
+      "mundane": {
+        "title": "全球市场与事件",
+        "description": "分析世界事件、股市、政治和经济趋势"
       },
-      "options": {
-        "question": {
-          "title": "提出任何问题",
-          "description": "获取有关您的性格、关系、事业或任何占星主题的见解"
-        },
-        "partnership": {
-          "title": "合盘分析",
-          "description": "分析两人之间的匹配度和关系动态"
-        },
-        "mundane": {
-          "title": "全球市场与事件",
-          "description": "分析世界事件、股市、政治和经济趋势"
-        },
-        "events": {
-          "title": "将显现什么",
-          "description": "看看这一年会带来什么 — 事业、感情、财运、健康 — 逐月呈现。"
-        }
-      },
-      "analysis": {
-        "career": {
-          "title": "事业分析",
-          "description": "职业成功与机遇"
-        },
-        "wealth": {
-          "title": "财富分析",
-          "description": "财务前景与机遇"
-        },
-        "health": {
-          "title": "健康分析",
-          "description": "福祉见解与预防措施"
-        },
-        "marriage": {
-          "title": "婚姻分析",
-          "description": "关系匹配度与时机"
-        },
-        "education": {
-          "title": "教育分析",
-          "description": "学习路径与事业引导"
-        },
-        "progeny": {
-          "title": "子女分析",
-          "description": "生育潜力与家庭扩展"
-        },
-        "trading": {
-          "title": "交易预测",
-          "description": "股市预测与时机"
-        },
-        "financial": {
-          "title": "市场占星",
-          "description": "行业预测与投资时机"
-        },
-        "childbirth": {
-          "title": "分娩规划",
-          "description": "分娩的吉日选择"
-        },
-        "muhurat": {
-          "title": "择日规划 (Muhurat)",
-          "description": "所有活动的吉时选择"
-        }
-      },
-      "planet_names": {
-        "Sun": "太阳",
-        "Moon": "月亮",
-        "Mars": "火星",
-        "Mercury": "水星",
-        "Jupiter": "木星",
-        "Venus": "金星",
-        "Saturn": "土星",
-        "Rahu": "罗睺",
-        "Ketu": "计都"
-      },
-      "signs": {
-        "ascendant": "上升",
-        "moon": "月亮",
-        "sun": "太阳"
-      },
-      "ascendantDescriptions": {
-        "Aries": "受火星主宰。体质活跃，具有运动天赋。您以开拓和果断的态度对待世界。外在表现独立、坦率且坚决。",
-        "Taurus": "受金星主宰。拥有稳重、扎实的身体素质。外在表现稳健、有条不紊。天生追求物质保障和实际成果。",
-        "Gemini": "受水星主宰。外貌常保年轻，动作敏捷。通过交流和适应能力与世界互动。擅长同时处理多项任务。",
-        "Cancer": "受月亮主宰。体质柔软，情感丰富。以谨慎、保护性的本能观察世界。行为很大程度上受保护家庭和亲近的人所驱动。",
-        "Leo": "受太阳主宰。姿态威严挺拔，拥有强大的气场。以天生的权威和生命力与外界互动。寻求关注和领导角色。",
-        "Virgo": "受水星主宰。外表整洁，观察力敏锐。通过分析和务实的务来度过人生。行为精确且注重细节。",
-        "Libra": "受金星主宰。五官对称，具有天然的魅力和外交手段。追求平衡，避免冲突。侧重于建立伙伴关系和维持社会和谐。",
-        "Scorpio": "受火星主宰。体质坚韧，眼神深邃。行事谨慎，常隐藏真实动机。意志坚定，具有强大的转化能力。",
-        "Sagittarius": "受木星主宰。身形高大，生性好动。通过扩张和探索的视角看待世界。外在表现乐观，不断追求高等知识。",
-        "Capricorn": "受土星主宰。身形清瘦，显熟稳重。以极大的自律和忍耐力行事。专注于获得长期地位和事业成功。",
-        "Aquarius": "受土星主宰。外貌或风格独特。以客观观察者的视角与外界互动。受人道主义理想或系统性思维驱动。",
-        "Pisces": "受木星主宰。体质柔软，眼神忧郁梦幻。适应能力极强，直觉敏锐。常被抽象或精神领域所吸引。"
-      },
-      "moonDescriptions": {
-        "Aries": "思维敏捷且充满激情。在独立和直接表达情感中找到安全感。情绪来去匆匆，更愿意向前看。",
-        "Taurus": "月亮在此强势。思维追求和平、稳定和感官舒适。处理情感缓慢，在规律、财富和自然中寻找安全感。",
-        "Gemini": "思维活跃且好奇。通过理性分析处理情感，在交流和学习中找到慰藉。情绪可能随想法快速变化。",
-        "Cancer": "这是月亮的本位星座。内心世界极度敏感且直觉敏锐。在安全的家庭环境和亲密的家庭关系中找到慰藉。",
-        "Leo": "思维慷慨且自豪。在被欣赏、被爱和参与创造中找到安全感。情感热烈，渴望被亲近的人认可。",
-        "Virgo": "思维严谨、务实。通过整理环境和帮助他人来处理情感。在规律和解决问题中找到慰藉。",
-        "Libra": "思维不断寻求平衡与和谐。在和平的环境和稳固的一对一关系中找到情感慰藉。厌恶冲突。",
-        "Scorpio": "月亮在此失势。内心世界极度深邃且私密。情感体验极端，在探索隐藏真相和心理深度中找到慰藉。",
-        "Sagittarius": "思维乐观且富有哲学性。在自由、旅行和追求真理中找到情感慰藉。不喜欢被沉重的情感要求束缚。",
-        "Capricorn": "内心世界严肃自律。通过关注责任和成就来处理情感。在结构和掌控中找到慰藉。",
-        "Aquarius": "思维客观且具有社会意识。理性处理情感，常从旁观者角度看待问题。在理想和友谊中找到慰藉。",
-        "Pisces": "内心世界富有想象力和同情心。情感边界模糊，容易感同身受。在艺术和冥想中找到慰藉。"
-      },
-      "sunDescriptions": {
-        "Aries": "太阳在此强势。核心身份勇敢独立。灵魂目标是领导、克服挑战和发起行动。拥有强大的权威。",
-        "Taurus": "核心身份稳健。灵魂目标是建立持久的稳定性，无论是通过财富、家庭还是艺术。投影出安静的力量。",
-        "Gemini": "核心身份侧重于智力和交流。灵魂目标围绕收集知识、建立网络和表达思想。受逻辑驱动。",
-        "Cancer": "核心身份极具保护性且情感根基深厚。灵魂目标是通过同理心来培养、保障和引导。",
-        "Leo": "这是太阳的本位星座。核心身份尊贵且充满创造活力。灵魂目标是闪耀、领导和激励他人。",
-        "Virgo": "核心身份纯粹且侧重于服务。灵魂目标是改善、组织和治愈。从才干和辛勤工作中获得自我价值感。",
-        "Libra": "太阳在此失势。核心身份与伙伴关系及和谐挂钩。灵魂目标是创造平衡与公正，常把他人需求置于自我之上。",
-        "Scorpio": "核心身份强烈且具有转化力。灵魂目标涉及揭示隐藏真相、负责任地行使权力和经历深刻的自我蜕变。",
-        "Sagittarius": "核心身份乐观且受道德准则引导。灵魂目标是寻求更高智慧、教学和探索。热爱真理。",
-        "Capricorn": "核心身份自律且务实。灵魂目标是获得实际成功、地位和架构权威。通过耐心和忍耐建立自我。",
-        "Aquarius": "核心身份侧重于集体。灵魂目标是服务人类，挑战陈旧结构并传播进步思想。常为大局牺牲个人小我。",
-        "Pisces": "核心身份富有同情心且无边界。灵魂目标是超越物质世界，提供同理心和神圣的爱。身份具有流动性。"
-      },
-      "tools": {
-        "charts": "星盘",
-        "dashas": "大运",
-        "ashtakvarga": "八分\n点图",
-        "positions": "位置",
-        "cosmicRing": "宇宙\n之环"
-      },
-      "cosmicRing": {
-        "viewRing": "查看环"
-      },
-      "panchang": {
-        "title": "🌅 今日黄历 (Panchang)",
-        "sunrise": "日出",
-        "sunset": "日落",
-        "moonrise": "月出",
-        "moonset": "月落",
-        "elements": "🕉️ 五大元素",
-        "nakshatra": "⭐ 星宿 (Nakshatra):",
-        "tithi": "🌙 农历日期 (Tithi):",
-        "yoga": "🧘 瑜伽 (Yoga):",
-        "karana": "⚡ 羯罗那 (Karana):",
-        "fullMoon": "望月",
-        "dayProgress": "今日进度",
-        "auspiciousTimes": "🕉️ 吉时",
-        "brahmaMuhurta": "梵天时 (Brahma Muhurta):",
-        "abhijitMuhurta": "最胜时 (Abhijit Muhurta):",
-        "inauspiciousTimes": "⚠️ 凶时",
-        "rahuKaal": "罗睺时 (Rahu Kaal):",
-        "durMuhurta": "凶时 (Dur Muhurta):",
-        "varjyam": "弃时 (Varjyam):",
-        "dayQuality": "今日质量时间轴",
-        "auspicious": "吉",
-        "inauspicious": "凶",
-        "illuminated": "明亮"
-      },
-      "loading": {
-        "transits": "正在加载流年...",
-        "noTransitData": "暂无流年数据",
-        "ticker": "正在加载滚动条..."
-      },
-      "ticker": {
-        "sadeSati": "萨德萨提 (Sade Sati)",
-        "activeMahadasha": "当前大运",
-        "moonPhase": "月相",
-        "todaysNakshatra": "今日星宿",
-        "noSadeSati": "当前无萨德萨提",
-        "active": "运行中"
-      },
-      "sadeSati": {
-        "title": "萨德萨提时期",
-        "loadError": "无法加载萨德萨提时期。",
-        "noPeriods": "未发现相关时期。",
-        "ctaHeadline": "我的萨德萨提是充满挑战还是较为平稳？",
-        "ctaSubtext": "获取基于您星盘的解读——强度、时机和化解方案。",
-        "ctaButton": "在聊天中咨询",
-        "infoTitle": "什么是萨德萨提 (Sade Sati)？",
-        "infoBody": "萨德萨提是指流年土星经过您月亮星座、前一星座和后一星座的约7.5年时期。在吠陀占星中，这被视为一个重要的时期，可能带来挑战、延迟和人生教训，但也带来成熟和成长。"
-      },
-      "nakshatra": {
-        "title": "星宿日历",
-        "loadError": "无法加载星宿日历。",
-        "noData": "本月暂无星宿数据。",
-        "begins": "开始于",
-        "ends": "结束于",
-        "at": "时间："
-      },
-      "tabs": {
-        "ask": "提问",
-        "charts": "星盘",
-        "events": "预测",
-        "dashas": "大运",
-        "you": "我的"
-      },
-      "askFAB": "咨询 AstroRoshni"
-    },
-    "eventScreen": {
-      "headerTitle": "重大人生事件",
-      "headerPredictions": "{{year}} 预测",
-      "monthlyGuide": "月度指南",
-      "selectYear": "选择年份",
-      "selectYearSubtitle": "你想查看哪一年？",
-      "continue": "继续",
-      "regenerateTitle": "重新生成预测？",
-      "regenerateMessage": "为 {{year}} 生成新预测将消耗 {{cost}} 积分。",
-      "cancel": "取消",
-      "confirm": "确认",
-      "whatsIncluded": "包含内容：",
-      "monthlyForecasts": "12 个月度预测",
-      "majorLifeEvents": "重大人生事件",
-      "timingGuidance": "时间指引",
-      "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
-      "thisYear": "今年",
-      "nextYear": "明年",
-      "noPredictions": "未生成预测。请重试。",
-      "almostThere": "快好了..."
-    },
-    "monthlyAccordion": {
-      "focus": "重点：",
-      "possibleScenarios": "可能情景 ({{count}})",
-      "askQuestions": "提问",
-      "diveDeep": "深入本月",
-      "why": "原因："
-    },
-    "monthlyDeepScreen": {
-      "loading": "加载中...",
-      "headerDeepDive": "{{monthYear}} — 深度解析",
-      "headerMonthlyDeepDive": "月度深度解析",
-      "emptyTitle": "深入 {{monthYear}}",
-      "emptyDesc": "获取本月每个触发因素与所有可能表现。消耗 {{cost}} 积分。",
-      "generateDeepDive": "生成深度解析",
-      "generateConfirmTitle": "生成深度解析",
-      "generateConfirmMessage": "为 {{monthYear}} 生成全部表现将消耗 {{cost}} 积分。",
-      "cancel": "取消",
-      "continue": "继续",
-      "loadingAnalyzing": "正在深度分析本月...",
-      "loadingMapping": "正在映射每个触发与表现...",
-      "loadingExamining": "正在检查所有宫位激活..."
-    },
-    "birthForm": {
-      "headerTitle": {
-        "updateGender": "更新性别",
-        "editProfile": "编辑资料",
-        "birthDetails": "出生详情"
-      },
-      "progressText": "第 {{step}} 步（共 5 步）",
-      "stepTitle": {
-        "name": "您叫什么名字？",
-        "gender": "选择您的性别",
-        "date": "您什么时候出生？",
-        "time": "您出生的时间？",
-        "place": "您出生在哪里？"
-      },
-      "namePlaceholder": "输入您的全名",
-      "placePlaceholder": "城市、州、国家",
-      "gender": {
-        "male": "男",
-        "female": "女"
-      },
-      "selectedLocation": "选定位置",
-      "buttons": {
-        "back": "返回",
-        "processing": "处理中...",
-        "complete": "完成",
-        "next": "下一步"
-      },
-      "alerts": {
-        "invalidLocation": {
-          "title": "位置无效",
-          "suggestions": "请从建议列表中选择一个位置以确保计算精确。",
-          "noSelection": "请从建议中选择一个位置。"
-        },
-        "success": {
-          "title": "成功",
-          "genderUpdated": "性别更新成功！",
-          "profileUpdated": "资料更新成功！",
-          "chartCalculated": "出生星盘计算成功！"
-        },
-        "error": {
-          "title": "错误",
-          "default": "出生详情处理失败"
-        },
-        "ok": "好"
-      },
-      "picker": {
-        "cancel": "取消",
-        "done": "完成"
-      },
-      "coords": {
-        "lat": "纬度：",
-        "long": "经度："
+      "events": {
+        "title": "将显现什么",
+        "description": "看看这一年会带来什么 — 事业、感情、财运、健康 — 逐月呈现。"
       }
     },
-    "common": {
-      "current": "当前",
-      "unknown": "未知",
-      "ends": "结束：",
-      "notAvailable": "不可用"
+    "analysis": {
+      "career": {
+        "title": "事业分析",
+        "description": "职业成功与机遇"
+      },
+      "wealth": {
+        "title": "财富分析",
+        "description": "财务前景与机遇"
+      },
+      "health": {
+        "title": "健康分析",
+        "description": "福祉见解与预防措施"
+      },
+      "marriage": {
+        "title": "婚姻分析",
+        "description": "关系匹配度与时机"
+      },
+      "education": {
+        "title": "教育分析",
+        "description": "学习路径与事业引导"
+      },
+      "progeny": {
+        "title": "子女分析",
+        "description": "生育潜力与家庭扩展"
+      },
+      "trading": {
+        "title": "交易预测",
+        "description": "股市预测与时机"
+      },
+      "financial": {
+        "title": "市场占星",
+        "description": "行业预测与投资时机"
+      },
+      "childbirth": {
+        "title": "分娩规划",
+        "description": "分娩的吉日选择"
+      },
+      "muhurat": {
+        "title": "择日规划 (Muhurat)",
+        "description": "所有活动的吉时选择"
+      }
     },
-    "dasha": {
-      "vimshottari": "五行大运 (Vimshottari)",
-      "kalchakra": "时轮大运 (Kalchakra)",
-      "yogini": "瑜吉尼大运 (Yogini)",
-      "chara": "查拉大运 (Chara)",
-      "currentBPHSKalachakra": "当前时轮大运",
-      "maha": "大运",
-      "antar": "中运",
-      "selectDashas": "选择大运以查看等级",
-      "kalchakraMahadasha": "时轮大运 (基于星座)",
-      "kalchakraAntardasha": "时轮中运",
-      "noPeriodsAvailable": "暂无可用时期",
-      "mahaDasha": "大运时期",
-      "antarDasha": "中运时期",
-      "pratyantarDasha": "小运时期",
-      "sookshmaDasha": "微运时期",
-      "pranaDasha": "刹那运时期",
-      "browserFor": "大运浏览器",
-      "browserTitle": "大运浏览器",
-      "birthDataRequired": "需要出生数据以查看大运。",
-      "addBirthProfileHint": "请在首页添加出生资料以继续。",
-      "completed": "已完成",
-      "remaining": "剩余",
-      "yearShort": "年",
-      "monthShort": "月",
-      "dayShort": "日",
-      "nakshatra": "星宿",
-      "chakra": "查克拉",
-      "forward": "顺行",
-      "backward": "逆行",
-      "yearCompleteCycle": "整年周期",
-      "deha": "身 (Deha)",
-      "jeeva": "命 (Jeeva)",
-      "periods": "时期",
-      "wheel": "轮",
-      "timeline": "时间轴",
-      "kalchakraTimeline": "时轮时间轴",
-      "sign": "星座",
-      "gati": "速度 (Gati)",
-      "duration": "时长",
-      "period": "时期",
-      "kalchakraWheel": "时轮盘",
-      "currentMaha": "当前大运",
-      "currentAntar": "当前中运",
-      "mahadashas": "大运序列",
-      "gatiAnalysis": "Gati 分析",
-      "details": "详情",
-      "lifetimeGatiAnalysis": "终身 Gati 分析",
-      "summary": "摘要",
-      "percentCompleted": "已完成 {{percentage}}%",
-      "currentlyRunning": "当前运行中",
-      "loading": "正在加载大运...",
-      "loadingYogini": "正在加载瑜吉尼大运数据...",
-      "dataStructureError": "数据结构错误。",
-      "availableKeys": "可用键值：",
-      "currentYoginiPhase": "当前瑜吉尼阶段",
-      "mahadasha": "大运",
-      "antardasha": "中运",
-      "criticalTiming": "关键时机",
-      "remedies": "化解方法",
-      "analysis": "分析",
-      "yoginiCycle": "瑜吉尼周期 (36年)"
-    },
-    "yogini": {
-      "success": "成功",
-      "aggression": "进取",
-      "wealth": "财富",
-      "travel": "旅行",
-      "career": "事业",
-      "workload": "工作量",
-      "victory": "胜利",
-      "crisis": "危机",
-      "mangala": "Mangala",
-      "pingala": "Pingala",
-      "dhanya": "Dhanya",
-      "bhramari": "Bhramari",
-      "bhadrika": "Bhadrika",
-      "ulka": "Ulka",
-      "siddha": "Siddha",
-      "sankata": "Sankata"
+    "planet_names": {
+      "Sun": "太阳",
+      "Moon": "月亮",
+      "Mars": "火星",
+      "Mercury": "水星",
+      "Jupiter": "木星",
+      "Venus": "金星",
+      "Saturn": "土星",
+      "Rahu": "罗睺",
+      "Ketu": "计都"
     },
     "signs": {
-      "Aries": "白羊座",
-      "Taurus": "金牛座",
-      "Gemini": "双子座",
-      "Cancer": "巨蟹座",
-      "Leo": "狮子座",
-      "Virgo": "处女座",
-      "Libra": "天秤座",
-      "Scorpio": "天蝎座",
-      "Sagittarius": "射手座",
-      "Capricorn": "摩羯座",
-      "Aquarius": "水瓶座",
-      "Pisces": "双鱼座",
-      "Ari": "白羊",
-      "Tau": "金牛",
-      "Gem": "双子",
-      "Can": "巨蟹",
-      "Vir": "处女",
-      "Lib": "天秤",
-      "Sco": "天蝎",
-      "Sag": "射手",
-      "Cap": "摩羯",
-      "Aqu": "水瓶",
-      "Pis": "双鱼"
+      "ascendant": "上升",
+      "moon": "月亮",
+      "sun": "太阳"
     },
-    "yogas": {
-      "raj_yogas": "王瑜伽 (Raj Yogas)",
-      "dhana_yogas": "财瑜伽 (Dhana Yogas)",
-      "mahapurusha_yogas": "伟人瑜伽 (Mahapurusha Yogas)",
-      "neecha_bhanga_yogas": "落陷化解瑜伽 (Neecha Bhanga)",
-      "gaja_kesari_yogas": "象狮瑜伽 (Gaja Kesari)",
-      "amala_yogas": "无垢瑜伽 (Amala Yogas)",
-      "viparita_raja_yogas": "逆反王瑜伽 (Viparita Raj)",
-      "dharma_karma_yogas": "法行瑜伽 (Dharma Karma)",
-      "nabhasa_yogas": "虚空瑜伽 (Nabhasa Yogas)",
-      "chandra_yogas": "月亮瑜伽 (Chandra Yogas)",
-      "surya_yogas": "太阳瑜伽 (Surya Yogas)",
-      "parivartana_yogas": "互容瑜伽 (Parivartana Yogas)",
-      "career_specific_yogas": "事业专属瑜伽",
-      "health_yogas": "健康瑜伽",
-      "education_yogas": "教育瑜伽",
-      "marriage_yogas": "婚姻瑜伽",
-      "major_doshas": "主要煞气 (Doshas)",
-      "sankhya_yogas": "数字瑜伽 (Sankhya Yogas)",
-      "akriti_yogas": "形状瑜伽 (Akriti Yogas)",
-      "ashraya_yogas": "依附瑜伽 (Ashraya Yogas)",
-      "maha_yogas": "伟大瑜伽 (Maha Yogas)",
-      "dainya_yogas": "贫乏瑜伽 (Dainya Yogas)",
-      "khala_yogas": "凶恶瑜伽 (Khala Yogas)",
-      "other_parivartana_yogas": "其他互容瑜伽"
+    "ascendantDescriptions": {
+      "Aries": "受火星主宰。体质活跃，具有运动天赋。您以开拓和果断的态度对待世界。外在表现独立、坦率且坚决。",
+      "Taurus": "受金星主宰。拥有稳重、扎实的身体素质。外在表现稳健、有条不紊。天生追求物质保障和实际成果。",
+      "Gemini": "受水星主宰。外貌常保年轻，动作敏捷。通过交流和适应能力与世界互动。擅长同时处理多项任务。",
+      "Cancer": "受月亮主宰。体质柔软，情感丰富。以谨慎、保护性的本能观察世界。行为很大程度上受保护家庭和亲近的人所驱动。",
+      "Leo": "受太阳主宰。姿态威严挺拔，拥有强大的气场。以天生的权威和生命力与外界互动。寻求关注和领导角色。",
+      "Virgo": "受水星主宰。外表整洁，观察力敏锐。通过分析和务实的务来度过人生。行为精确且注重细节。",
+      "Libra": "受金星主宰。五官对称，具有天然的魅力和外交手段。追求平衡，避免冲突。侧重于建立伙伴关系和维持社会和谐。",
+      "Scorpio": "受火星主宰。体质坚韧，眼神深邃。行事谨慎，常隐藏真实动机。意志坚定，具有强大的转化能力。",
+      "Sagittarius": "受木星主宰。身形高大，生性好动。通过扩张和探索的视角看待世界。外在表现乐观，不断追求高等知识。",
+      "Capricorn": "受土星主宰。身形清瘦，显熟稳重。以极大的自律和忍耐力行事。专注于获得长期地位和事业成功。",
+      "Aquarius": "受土星主宰。外貌或风格独特。以客观观察者的视角与外界互动。受人道主义理想或系统性思维驱动。",
+      "Pisces": "受木星主宰。体质柔软，眼神忧郁梦幻。适应能力极强，直觉敏锐。常被抽象或精神领域所吸引。"
     },
-    "kp": {
-      "title": "KP 系统",
-      "planetaryScript": "行星剧本",
-      "cuspalScript": "宫位剧本",
-      "significators": "指标星 (Significators)",
-      "rulingPlanets": "主宰行星 (RP)",
-      "columns": {
-        "planet": "行星",
-        "cusp": "宫头",
-        "sign": "星座",
-        "degree": "度数",
-        "starLord": "宿主",
-        "subLord": "分主",
-        "subSubLord": "次分主"
+    "moonDescriptions": {
+      "Aries": "思维敏捷且充满激情。在独立和直接表达情感中找到安全感。情绪来去匆匆，更愿意向前看。",
+      "Taurus": "月亮在此强势。思维追求和平、稳定和感官舒适。处理情感缓慢，在规律、财富和自然中寻找安全感。",
+      "Gemini": "思维活跃且好奇。通过理性分析处理情感，在交流和学习中找到慰藉。情绪可能随想法快速变化。",
+      "Cancer": "这是月亮的本位星座。内心世界极度敏感且直觉敏锐。在安全的家庭环境和亲密的家庭关系中找到慰藉。",
+      "Leo": "思维慷慨且自豪。在被欣赏、被爱和参与创造中找到安全感。情感热烈，渴望被亲近的人认可。",
+      "Virgo": "思维严谨、务实。通过整理环境和帮助他人来处理情感。在规律和解决问题中找到慰藉。",
+      "Libra": "思维不断寻求平衡与和谐。在和平的环境和稳固的一对一关系中找到情感慰藉。厌恶冲突。",
+      "Scorpio": "月亮在此失势。内心世界极度深邃且私密。情感体验极端，在探索隐藏真相和心理深度中找到慰藉。",
+      "Sagittarius": "思维乐观且富有哲学性。在自由、旅行和追求真理中找到情感慰藉。不喜欢被沉重的情感要求束缚。",
+      "Capricorn": "内心世界严肃自律。通过关注责任和成就来处理情感。在结构和掌控中找到慰藉。",
+      "Aquarius": "思维客观且具有社会意识。理性处理情感，常从旁观者角度看待问题。在理想和友谊中找到慰藉。",
+      "Pisces": "内心世界富有想象力和同情心。情感边界模糊，容易感同身受。在艺术和冥想中找到慰藉。"
+    },
+    "sunDescriptions": {
+      "Aries": "太阳在此强势。核心身份勇敢独立。灵魂目标是领导、克服挑战和发起行动。拥有强大的权威。",
+      "Taurus": "核心身份稳健。灵魂目标是建立持久的稳定性，无论是通过财富、家庭还是艺术。投影出安静的力量。",
+      "Gemini": "核心身份侧重于智力和交流。灵魂目标围绕收集知识、建立网络和表达思想。受逻辑驱动。",
+      "Cancer": "核心身份极具保护性且情感根基深厚。灵魂目标是通过同理心来培养、保障和引导。",
+      "Leo": "这是太阳的本位星座。核心身份尊贵且充满创造活力。灵魂目标是闪耀、领导和激励他人。",
+      "Virgo": "核心身份纯粹且侧重于服务。灵魂目标是改善、组织和治愈。从才干和辛勤工作中获得自我价值感。",
+      "Libra": "太阳在此失势。核心身份与伙伴关系及和谐挂钩。灵魂目标是创造平衡与公正，常把他人需求置于自我之上。",
+      "Scorpio": "核心身份强烈且具有转化力。灵魂目标涉及揭示隐藏真相、负责任地行使权力和经历深刻的自我蜕变。",
+      "Sagittarius": "核心身份乐观且受道德准则引导。灵魂目标是寻求更高智慧、教学和探索。热爱真理。",
+      "Capricorn": "核心身份自律且务实。灵魂目标是获得实际成功、地位和架构权威。通过耐心和忍耐建立自我。",
+      "Aquarius": "核心身份侧重于集体。灵魂目标是服务人类，挑战陈旧结构并传播进步思想。常为大局牺牲个人小我。",
+      "Pisces": "核心身份富有同情心且无边界。灵魂目标是超越物质世界，提供同理心和神圣的爱。身份具有流动性。"
+    },
+    "tools": {
+      "charts": "星盘",
+      "dashas": "大运",
+      "ashtakvarga": "八分\n点图",
+      "positions": "位置",
+      "cosmicRing": "宇宙\n之环"
+    },
+    "cosmicRing": {
+      "viewRing": "查看环"
+    },
+    "panchang": {
+      "title": "🌅 今日黄历 (Panchang)",
+      "sunrise": "日出",
+      "sunset": "日落",
+      "moonrise": "月出",
+      "moonset": "月落",
+      "elements": "🕉️ 五大元素",
+      "nakshatra": "⭐ 星宿 (Nakshatra):",
+      "tithi": "🌙 农历日期 (Tithi):",
+      "yoga": "🧘 瑜伽 (Yoga):",
+      "karana": "⚡ 羯罗那 (Karana):",
+      "fullMoon": "望月",
+      "dayProgress": "今日进度",
+      "auspiciousTimes": "🕉️ 吉时",
+      "brahmaMuhurta": "梵天时 (Brahma Muhurta):",
+      "abhijitMuhurta": "最胜时 (Abhijit Muhurta):",
+      "inauspiciousTimes": "⚠️ 凶时",
+      "rahuKaal": "罗睺时 (Rahu Kaal):",
+      "durMuhurta": "凶时 (Dur Muhurta):",
+      "varjyam": "弃时 (Varjyam):",
+      "dayQuality": "今日质量时间轴",
+      "auspicious": "吉",
+      "inauspicious": "凶",
+      "illuminated": "明亮"
+    },
+    "loading": {
+      "transits": "正在加载流年...",
+      "noTransitData": "暂无流年数据",
+      "ticker": "正在加载滚动条..."
+    },
+    "ticker": {
+      "sadeSati": "萨德萨提 (Sade Sati)",
+      "activeMahadasha": "当前大运",
+      "moonPhase": "月相",
+      "todaysNakshatra": "今日星宿",
+      "noSadeSati": "当前无萨德萨提",
+      "active": "运行中"
+    },
+    "sadeSati": {
+      "title": "萨德萨提时期",
+      "loadError": "无法加载萨德萨提时期。",
+      "noPeriods": "未发现相关时期。",
+      "ctaHeadline": "我的萨德萨提是充满挑战还是较为平稳？",
+      "ctaSubtext": "获取基于您星盘的解读——强度、时机和化解方案。",
+      "ctaButton": "在聊天中咨询",
+      "infoTitle": "什么是萨德萨提 (Sade Sati)？",
+      "infoBody": "萨德萨提是指流年土星经过您月亮星座、前一星座和后一星座的约7.5年时期。在吠陀占星中，这被视为一个重要的时期，可能带来挑战、延迟和人生教训，但也带来成熟和成长。"
+    },
+    "nakshatra": {
+      "title": "星宿日历",
+      "loadError": "无法加载星宿日历。",
+      "noData": "本月暂无星宿数据。",
+      "begins": "开始于",
+      "ends": "结束于",
+      "at": "时间："
+    },
+    "tabs": {
+      "ask": "提问",
+      "charts": "星盘",
+      "events": "预测",
+      "dashas": "大运",
+      "you": "我的"
+    },
+    "askFAB": "咨询 AstroRoshni"
+  },
+  "eventScreen": {
+    "headerTitle": "重大人生事件",
+    "headerPredictions": "{{year}} 预测",
+    "monthlyGuide": "月度指南",
+    "selectYear": "选择年份",
+    "selectYearSubtitle": "你想查看哪一年？",
+    "continue": "继续",
+    "regenerateTitle": "重新生成预测？",
+    "regenerateMessage": "为 {{year}} 生成新预测将消耗 {{cost}} 积分。",
+    "cancel": "取消",
+    "confirm": "确认",
+    "whatsIncluded": "包含内容：",
+    "monthlyForecasts": "12 个月度预测",
+    "majorLifeEvents": "重大人生事件",
+    "timingGuidance": "时间指引",
+    "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
+    "thisYear": "今年",
+    "nextYear": "明年",
+    "noPredictions": "未生成预测。请重试。",
+    "almostThere": "快好了..."
+  },
+  "monthlyAccordion": {
+    "focus": "重点：",
+    "possibleScenarios": "可能情景 ({{count}})",
+    "askQuestions": "提问",
+    "diveDeep": "深入本月",
+    "why": "原因："
+  },
+  "monthlyDeepScreen": {
+    "loading": "加载中...",
+    "headerDeepDive": "{{monthYear}} — 深度解析",
+    "headerMonthlyDeepDive": "月度深度解析",
+    "emptyTitle": "深入 {{monthYear}}",
+    "emptyDesc": "获取本月每个触发因素与所有可能表现。消耗 {{cost}} 积分。",
+    "generateDeepDive": "生成深度解析",
+    "generateConfirmTitle": "生成深度解析",
+    "generateConfirmMessage": "为 {{monthYear}} 生成全部表现将消耗 {{cost}} 积分。",
+    "cancel": "取消",
+    "continue": "继续",
+    "loadingAnalyzing": "正在深度分析本月...",
+    "loadingMapping": "正在映射每个触发与表现...",
+    "loadingExamining": "正在检查所有宫位激活..."
+  },
+  "credits": {
+    "page": {
+      "title": "宇宙积分",
+      "subtitle": "为您的占星之旅加油",
+      "yourBalance": "您的余额",
+      "creditsLabel": "积分",
+      "promoHeading": "有优惠码？",
+      "promoPlaceholder": "输入优惠码",
+      "redeem": "兑换",
+      "redeeming": "兑换中...",
+      "transactionHistory": "交易记录",
+      "noTransactions": "暂无交易",
+      "historyHint": "您的积分记录将显示在这里",
+      "subscriptionBenefit": "所有功能享 {{percent}}% 折扣 — 事业、婚姻、健康、事件时间轴及每项付费分析。",
+      "subscribedOn": "订阅于 {{date}}",
+      "renewsOn": "续订于 {{date}}",
+      "manageSubscription": "管理或取消订阅",
+      "refreshing": "刷新中…",
+      "refreshSubscriptionStatus": "刷新订阅状态",
+      "vipDiscountBadge": "{{tier}} — 全功能 {{percent}}% 折扣",
+      "vipPlans": "VIP 方案",
+      "loadingPlans": "正在加载方案…",
+      "noSubscriptionPlansStore": "商店暂无订阅方案。",
+      "buyCredits": "购买积分",
+      "loadingProducts": "正在加载商品…",
+      "noProducts": "暂无商品，请稍后再试。",
+      "productTitleFallback": "{{count}} 积分",
+      "creditsCount": "{{count}} 积分",
+      "currentPlan": "当前方案",
+      "processing": "处理中…",
+      "subscribe": "订阅",
+      "buy": "购买",
+      "vipFallback": "VIP",
+      "offPercent": "{{percent}}% 折扣",
+      "modalGotIt": "知道了",
+      "modalCreditsAdded": "+{{count}} 积分",
+      "purchaseThankYou": "谢谢！",
+      "purchaseAlreadyCreditedTitle": "已到账",
+      "purchaseAlreadyCreditedBody": "该购买已计入您的余额。",
+      "purchaseCreditsAddedSuffix": "已向余额添加 {{count}} 积分。",
+      "purchaseCreditsAddedDefault": "积分已添加。",
+      "purchaseVerifyFailed": "购买验证失败",
+      "failedAddCredits": "无法添加积分",
+      "subscribedTitle": "订阅成功！",
+      "subscribedMessage": "您已订阅 {{tier}}。购买积分可享受折扣。",
+      "subscriptionVerifyFailed": "订阅验证失败",
+      "failedActivateSubscription": "无法激活订阅",
+      "subscriptionStatusUpdated": "订阅状态已更新",
+      "subscriptionStatusUpdatedBody": "若您已在 Google Play 取消，状态已同步。",
+      "couldNotRefresh": "无法刷新",
+      "refreshFailed": "刷新失败",
+      "alertError": "错误",
+      "enterPromoCode": "请输入优惠码",
+      "alertSuccess": "成功",
+      "promoRedeemedDefault": "优惠码兑换成功！",
+      "failedRedeem": "兑换失败",
+      "promoAlreadyUsed": "您已使用过此优惠码。",
+      "promoInvalid": "优惠码无效。",
+      "promoExpired": "此优惠码已过期。",
+      "serverError": "服务器错误，请稍后重试。",
+      "redemptionFailed": "兑换失败",
+      "notAvailable": "不可用",
+      "iapNotAvailable": "此设备不支持应用内购买。",
+      "storeLoadingTitle": "加载中…",
+      "storeLoadingBody": "商店加载中，请稍候。",
+      "purchaseFailed": "购买失败",
+      "couldNotStartPurchase": "无法开始购买。",
+      "subscriptionUnavailable": "订阅不可用",
+      "subscriptionUnavailableBody": "无法从商店加载此方案。",
+      "subscriptionFailed": "订阅失败",
+      "couldNotStartSubscription": "无法开始订阅。",
+      "transactionBalance": "余额：{{amount}}"
+    }
+  },
+  "birthForm": {
+    "headerTitle": {
+      "updateGender": "更新性别",
+      "editProfile": "编辑资料",
+      "birthDetails": "出生详情"
+    },
+    "progressText": "第 {{step}} 步（共 5 步）",
+    "stepTitle": {
+      "name": "您叫什么名字？",
+      "gender": "选择您的性别",
+      "date": "您什么时候出生？",
+      "time": "您出生的时间？",
+      "place": "您出生在哪里？"
+    },
+    "namePlaceholder": "输入您的全名",
+    "placePlaceholder": "城市、州、国家",
+    "gender": {
+      "male": "男",
+      "female": "女"
+    },
+    "selectedLocation": "选定位置",
+    "buttons": {
+      "back": "返回",
+      "processing": "处理中...",
+      "complete": "完成",
+      "next": "下一步"
+    },
+    "alerts": {
+      "invalidLocation": {
+        "title": "位置无效",
+        "suggestions": "请从建议列表中选择一个位置以确保计算精确。",
+        "noSelection": "请从建议中选择一个位置。"
       },
-      "levels": {
-        "level1": "L1 (通过宿主)",
-        "level2": "L2 (通过自身)",
-        "level3": "L3 (通过主星之宿)",
-        "level4": "L4 (通过主星)"
-      }
+      "success": {
+        "title": "成功",
+        "genderUpdated": "性别更新成功！",
+        "profileUpdated": "资料更新成功！",
+        "chartCalculated": "出生星盘计算成功！"
+      },
+      "error": {
+        "title": "错误",
+        "default": "出生详情处理失败"
+      },
+      "ok": "好"
+    },
+    "picker": {
+      "cancel": "取消",
+      "done": "完成"
+    },
+    "coords": {
+      "lat": "纬度：",
+      "long": "经度："
+    }
+  },
+  "common": {
+    "current": "当前",
+    "unknown": "未知",
+    "ends": "结束：",
+    "notAvailable": "不可用"
+  },
+  "dasha": {
+    "vimshottari": "五行大运 (Vimshottari)",
+    "kalchakra": "时轮大运 (Kalchakra)",
+    "yogini": "瑜吉尼大运 (Yogini)",
+    "chara": "查拉大运 (Chara)",
+    "currentBPHSKalachakra": "当前时轮大运",
+    "maha": "大运",
+    "antar": "中运",
+    "selectDashas": "选择大运以查看等级",
+    "kalchakraMahadasha": "时轮大运 (基于星座)",
+    "kalchakraAntardasha": "时轮中运",
+    "noPeriodsAvailable": "暂无可用时期",
+    "mahaDasha": "大运时期",
+    "antarDasha": "中运时期",
+    "pratyantarDasha": "小运时期",
+    "sookshmaDasha": "微运时期",
+    "pranaDasha": "刹那运时期",
+    "browserFor": "大运浏览器",
+    "browserTitle": "大运浏览器",
+    "birthDataRequired": "需要出生数据以查看大运。",
+    "addBirthProfileHint": "请在首页添加出生资料以继续。",
+    "completed": "已完成",
+    "remaining": "剩余",
+    "yearShort": "年",
+    "monthShort": "月",
+    "dayShort": "日",
+    "nakshatra": "星宿",
+    "chakra": "查克拉",
+    "forward": "顺行",
+    "backward": "逆行",
+    "yearCompleteCycle": "整年周期",
+    "deha": "身 (Deha)",
+    "jeeva": "命 (Jeeva)",
+    "periods": "时期",
+    "wheel": "轮",
+    "timeline": "时间轴",
+    "kalchakraTimeline": "时轮时间轴",
+    "sign": "星座",
+    "gati": "速度 (Gati)",
+    "duration": "时长",
+    "period": "时期",
+    "kalchakraWheel": "时轮盘",
+    "currentMaha": "当前大运",
+    "currentAntar": "当前中运",
+    "mahadashas": "大运序列",
+    "gatiAnalysis": "Gati 分析",
+    "details": "详情",
+    "lifetimeGatiAnalysis": "终身 Gati 分析",
+    "summary": "摘要",
+    "percentCompleted": "已完成 {{percentage}}%",
+    "currentlyRunning": "当前运行中",
+    "loading": "正在加载大运...",
+    "loadingYogini": "正在加载瑜吉尼大运数据...",
+    "dataStructureError": "数据结构错误。",
+    "availableKeys": "可用键值：",
+    "currentYoginiPhase": "当前瑜吉尼阶段",
+    "mahadasha": "大运",
+    "antardasha": "中运",
+    "criticalTiming": "关键时机",
+    "remedies": "化解方法",
+    "analysis": "分析",
+    "yoginiCycle": "瑜吉尼周期 (36年)"
+  },
+  "yogini": {
+    "success": "成功",
+    "aggression": "进取",
+    "wealth": "财富",
+    "travel": "旅行",
+    "career": "事业",
+    "workload": "工作量",
+    "victory": "胜利",
+    "crisis": "危机",
+    "mangala": "Mangala",
+    "pingala": "Pingala",
+    "dhanya": "Dhanya",
+    "bhramari": "Bhramari",
+    "bhadrika": "Bhadrika",
+    "ulka": "Ulka",
+    "siddha": "Siddha",
+    "sankata": "Sankata"
+  },
+  "signs": {
+    "Aries": "白羊座",
+    "Taurus": "金牛座",
+    "Gemini": "双子座",
+    "Cancer": "巨蟹座",
+    "Leo": "狮子座",
+    "Virgo": "处女座",
+    "Libra": "天秤座",
+    "Scorpio": "天蝎座",
+    "Sagittarius": "射手座",
+    "Capricorn": "摩羯座",
+    "Aquarius": "水瓶座",
+    "Pisces": "双鱼座",
+    "Ari": "白羊",
+    "Tau": "金牛",
+    "Gem": "双子",
+    "Can": "巨蟹",
+    "Vir": "处女",
+    "Lib": "天秤",
+    "Sco": "天蝎",
+    "Sag": "射手",
+    "Cap": "摩羯",
+    "Aqu": "水瓶",
+    "Pis": "双鱼"
+  },
+  "yogas": {
+    "raj_yogas": "王瑜伽 (Raj Yogas)",
+    "dhana_yogas": "财瑜伽 (Dhana Yogas)",
+    "mahapurusha_yogas": "伟人瑜伽 (Mahapurusha Yogas)",
+    "neecha_bhanga_yogas": "落陷化解瑜伽 (Neecha Bhanga)",
+    "gaja_kesari_yogas": "象狮瑜伽 (Gaja Kesari)",
+    "amala_yogas": "无垢瑜伽 (Amala Yogas)",
+    "viparita_raja_yogas": "逆反王瑜伽 (Viparita Raj)",
+    "dharma_karma_yogas": "法行瑜伽 (Dharma Karma)",
+    "nabhasa_yogas": "虚空瑜伽 (Nabhasa Yogas)",
+    "chandra_yogas": "月亮瑜伽 (Chandra Yogas)",
+    "surya_yogas": "太阳瑜伽 (Surya Yogas)",
+    "parivartana_yogas": "互容瑜伽 (Parivartana Yogas)",
+    "career_specific_yogas": "事业专属瑜伽",
+    "health_yogas": "健康瑜伽",
+    "education_yogas": "教育瑜伽",
+    "marriage_yogas": "婚姻瑜伽",
+    "major_doshas": "主要煞气 (Doshas)",
+    "sankhya_yogas": "数字瑜伽 (Sankhya Yogas)",
+    "akriti_yogas": "形状瑜伽 (Akriti Yogas)",
+    "ashraya_yogas": "依附瑜伽 (Ashraya Yogas)",
+    "maha_yogas": "伟大瑜伽 (Maha Yogas)",
+    "dainya_yogas": "贫乏瑜伽 (Dainya Yogas)",
+    "khala_yogas": "凶恶瑜伽 (Khala Yogas)",
+    "other_parivartana_yogas": "其他互容瑜伽"
+  },
+  "kp": {
+    "title": "KP 系统",
+    "planetaryScript": "行星剧本",
+    "cuspalScript": "宫位剧本",
+    "significators": "指标星 (Significators)",
+    "rulingPlanets": "主宰行星 (RP)",
+    "columns": {
+      "planet": "行星",
+      "cusp": "宫头",
+      "sign": "星座",
+      "degree": "度数",
+      "starLord": "宿主",
+      "subLord": "分主",
+      "subSubLord": "次分主"
+    },
+    "levels": {
+      "level1": "L1 (通过宿主)",
+      "level2": "L2 (通过自身)",
+      "level3": "L3 (通过主星之宿)",
+      "level4": "L4 (通过主星)"
+    }
+  },
+  "karmaAnalysis": {
+    "defaultNativeName": "命主",
+    "chartNotFound": "未找到星盘。请从首页选择命主档案。",
+    "insufficientCreditsTitle": "积分不足",
+    "insufficientCreditsBody": "业力分析需要 {{cost}} 积分。",
+    "getCredits": "获取积分",
+    "cancel": "取消",
+    "pdfShareTitle": "分享业力分析",
+    "pdfErrorTitle": "错误",
+    "pdfErrorBody": "生成 PDF 失败：{{message}}",
+    "pdfTimeoutError": "生成 PDF 超时，请重试。",
+    "pdfDocTitle": "前世业力分析",
+    "pdfDocSubtitle": "灵魂的永恒旅程",
+    "pdfFooterLine1": "✨ 由 AstroRoshni 分析",
+    "pdfFooterLine2": "人工智能 • 吠陀占星",
+    "loadingTitle": "连接阿卡西记录",
+    "loadingSubtitleProgress": "正在解析灵魂在时间中的旅程…",
+    "loadingSubtitleSlow": "耗时比平时更长…",
+    "errorTitle": "无法访问记录",
+    "tryAgain": "重试",
+    "goBack": "返回",
+    "startTitle": "前世业力分析",
+    "startSubtitle": "探索灵魂的永恒旅程",
+    "startButton": "开始分析",
+    "confirmStartTitle": "开始业力分析",
+    "confirmRegenerateTitle": "重新生成业力分析",
+    "resultTitle": "前世业力",
+    "resultSubtitle": "灵魂的永恒旅程",
+    "footerAnalyzedBy": "由 AstroRoshni 分析",
+    "footerAI": "人工智能",
+    "a11yGoBack": "返回",
+    "a11yChangeNative": "切换命主星盘",
+    "a11ySharePdf": "分享或导出 PDF",
+    "a11yRegenerate": "重新生成分析",
+    "creditsModalWillUse": "将消耗 {{cost}} 积分",
+    "creditsModalBalance": "您的余额：{{credits}} 积分",
+    "creditsModalCancel": "取消",
+    "creditsModalConfirm": "确认",
+    "selectNativePrompt": "选择用于业力分析的命主",
+    "initiateFailed": "无法开始分析",
+    "unexpectedResponse": "意外的响应状态",
+    "sectionTitles": {
+      "introduction": "引言",
+      "past_life_overview": "前世概览",
+      "souls_mission": "灵魂使命",
+      "nakshatra_karma_analysis": "宿曜业力分析",
+      "karmic_debts": "业力债务",
+      "soul_talents": "灵魂天赋",
+      "karmic_obstacles": "业力障碍",
+      "ancestral_patterns": "家族模式",
+      "transformation_path": "转化之路",
+      "spiritual_evolution": "灵性成长",
+      "timing_of_events": "事件发生时机",
+      "remedial_measures": "化解建议"
     }
   }
+}

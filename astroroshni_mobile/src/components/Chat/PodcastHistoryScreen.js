@@ -342,7 +342,9 @@ export default function PodcastHistoryScreen({ navigation }) {
             >
               <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Podcast History</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {t('menu.podcastHistory', 'Podcast History')}
+            </Text>
             <View style={styles.placeholder} />
           </View>
           {loading ? (

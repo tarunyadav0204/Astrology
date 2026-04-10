@@ -22,6 +22,7 @@ import { formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, theme, colors }) => {
   return (
@@ -96,6 +97,7 @@ const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign
 };
 
 export default function SelectNativeScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -142,6 +144,9 @@ export default function SelectNativeScreen({ navigation, route }) {
       
       // Add charts from API
       apiCharts.forEach((chart) => {
+        const rel = String(chart.relation ?? '')
+          .trim()
+          .toLowerCase();
         profileList.push({
           id: chart.id || chart._id,
           name: chart.name,
@@ -151,8 +156,8 @@ export default function SelectNativeScreen({ navigation, route }) {
           latitude: chart.latitude,
           longitude: chart.longitude,
           gender: chart.gender,
-          relation: chart.relation,
-          isSelf: chart.relation === 'self'
+          relation: rel || 'other',
+          isSelf: rel === 'self',
         });
       });
       
@@ -288,7 +293,7 @@ export default function SelectNativeScreen({ navigation, route }) {
               await storage.removeBirthProfile(profile.name);
               // Prevent stale selected chart: sync "self" from backend.
               await syncSelfBirthDetails();
-              loadProfiles();
+              loadProfiles({ reset: true });
             } catch (error) {
               Alert.alert('Error', 'Failed to delete profile');
             }
@@ -302,7 +307,8 @@ export default function SelectNativeScreen({ navigation, route }) {
     try {
       await chartAPI.setChartAsSelf(profile.id);
       Alert.alert('Success', '✅ Chart connected to your profile!');
-      loadProfiles();
+      // Must reset list: default loadProfiles() appends next page and never refetches row[0..n], so "You" badge would stay stale.
+      loadProfiles({ reset: true });
     } catch (error) {
       let errorMessage = '❌ Something went wrong. Please try again.';
       
@@ -417,7 +423,11 @@ export default function SelectNativeScreen({ navigation, route }) {
             showsVerticalScrollIndicator={false}
           >
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : returnTo === 'KarmaAnalysis' ? 'Select native for karma analysis' : 'Choose a profile for astrological analysis'}
+              {returnTo === 'ChildbirthPlanner'
+                ? 'Select mother\'s chart'
+                : returnTo === 'KarmaAnalysis'
+                  ? t('karmaAnalysis.selectNativePrompt')
+                  : 'Choose a profile for astrological analysis'}
             </Text>
 
             {(totalCharts > PAGE_SIZE || localSearchQuery.length > 0 || profiles.length > 0) && (

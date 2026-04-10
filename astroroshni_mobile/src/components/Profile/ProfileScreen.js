@@ -163,13 +163,20 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const ZODIAC_KEYS = [
+    'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio',
+    'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
+  ];
+
   const getSignName = (signNumber) => {
-    const signs = {
-      0: 'Aries', 1: 'Taurus', 2: 'Gemini', 3: 'Cancer',
-      4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
-      8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
-    };
-    return signs[signNumber] || signNumber;
+    const en = ZODIAC_KEYS[signNumber];
+    if (en == null) return signNumber;
+    return t(`signs.${en}`, en);
+  };
+
+  const getDashaPlanetLabel = (planet) => {
+    if (!planet) return '...';
+    return t(`home.planet_names.${planet}`, planet);
   };
   
   const getSignIcon = (signNumber) => {
@@ -310,7 +317,9 @@ export default function ProfileScreen({ navigation }) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>My Profile</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {t('profile.myProfile', 'My Profile')}
+            </Text>
             <View style={styles.editButton} />
           </View>
 
@@ -338,7 +347,9 @@ export default function ProfileScreen({ navigation }) {
                   </Text>
                 </View>
               </View>
-              <Text style={[styles.userName, { color: colors.text }]}>{userData?.name || 'User'}</Text>
+              <Text style={[styles.userName, { color: colors.text }]}>
+                {userData?.name || t('profile.user', 'User')}
+              </Text>
               <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>
                 {birthData?.date
                   ? formatBirthDateForDisplay(birthData.date, {
@@ -346,7 +357,7 @@ export default function ProfileScreen({ navigation }) {
                       day: 'numeric',
                       year: 'numeric',
                     })
-                  : 'Birth date not set'}
+                  : t('profile.birthDateNotSet', 'Birth date not set')}
               </Text>
               {birthData?.time && (
                 <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>🕐 {birthData.time}</Text>
@@ -360,7 +371,9 @@ export default function ProfileScreen({ navigation }) {
                     colors={['#ff6b35', '#ff8c5a']}
                     style={styles.connectChartGradient}
                   >
-                    <Text style={styles.connectChartText}>📊 Connect Chart to Profile</Text>
+                    <Text style={styles.connectChartText}>
+                      {`📊 ${t('profile.connectChart', 'Connect Chart to Profile')}`}
+                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -378,27 +391,46 @@ export default function ProfileScreen({ navigation }) {
               >
                 <View style={styles.creditsContent}>
                   <View>
-                    <Text style={styles.creditsLabel}>Available Credits</Text>
+                    <Text style={styles.creditsLabel}>
+                      {t('profile.availableCredits', 'Available Credits')}
+                    </Text>
                     <Text style={styles.creditsValue}>{credits}</Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.addCreditsButton}
                     onPress={() => navigation.navigate('Credits')}
                   >
-                    <Text style={styles.addCreditsText}>+ Add</Text>
+                    <Text style={styles.addCreditsText}>{t('profile.add', '+ Add')}</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
             </Animated.View>
 
             <View style={styles.statsGrid}>
-              <StatCard icon="💬" value={stats.totalChats} label="Chats" color="#4a90e2" />
-              <StatCard iconElement={<ChartIconSvg color="#ffd700" size={32} />} value={stats.chartsViewed} label="Charts" color="#9c27b0" />
-              <StatCard icon="❓" value={stats.questionsAsked} label="Questions" color="#ff6b35" />
+              <StatCard
+                icon="💬"
+                value={stats.totalChats}
+                label={t('profile.chats', 'Chats')}
+                color="#4a90e2"
+              />
+              <StatCard
+                iconElement={<ChartIconSvg color="#ffd700" size={32} />}
+                value={stats.chartsViewed}
+                label={t('profile.charts', 'Charts')}
+                color="#9c27b0"
+              />
+              <StatCard
+                icon="❓"
+                value={stats.questionsAsked}
+                label={t('profile.questions', 'Questions')}
+                color="#ff6b35"
+              />
             </View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>✨ Birth Chart Essence</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {`✨ ${t('profile.birthChartEssence', 'Birth Chart Essence')}`}
+              </Text>
               <View style={styles.chartSummaryCard}>
                 <LinearGradient
                   colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
@@ -423,30 +455,54 @@ export default function ProfileScreen({ navigation }) {
                       <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
                       <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
                     </Svg>
-                    <Text style={[styles.miniChartText, { color: colors.text }]}>View Full Chart</Text>
+                    <Text style={[styles.miniChartText, { color: colors.text }]}>
+                      {t('profile.viewFullChart', 'View Full Chart')}
+                    </Text>
                   </TouchableOpacity>
                   
                   <View style={styles.chartDetails}>
                     <View style={styles.chartDetailRow}>
-                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>☀️ Sun Sign</Text>
-                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}</Text>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>
+                        {`☀️ ${t('profile.sunSign', 'Sun Sign')}`}
+                      </Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>
+                        {loadingChart
+                          ? t('profile.calculating', 'Calculating...')
+                          : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}
+                      </Text>
                     </View>
                     <View style={styles.chartDetailRow}>
-                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>🌙 Moon Sign</Text>
-                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}</Text>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>
+                        {`🌙 ${t('profile.moonSign', 'Moon Sign')}`}
+                      </Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>
+                        {loadingChart
+                          ? t('profile.calculating', 'Calculating...')
+                          : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}
+                      </Text>
                     </View>
                     <View style={styles.chartDetailRow}>
-                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>⬆️ Ascendant</Text>
-                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>
+                        {`⬆️ ${t('profile.ascendant', 'Ascendant')}`}
+                      </Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>
+                        {loadingChart
+                          ? t('profile.calculating', 'Calculating...')
+                          : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}
+                      </Text>
                     </View>
                   </View>
                   
                   {/* Current Running Dashas */}
                   <View style={[styles.dashasContainer, { borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                    <Text style={[styles.dashasTitle, { color: colors.textSecondary }]}>Current Running Dashas</Text>
+                    <Text style={[styles.dashasTitle, { color: colors.textSecondary }]}>
+                      {t('profile.currentRunningDashas', 'Current Running Dashas')}
+                    </Text>
                     <View style={styles.dashasRow}>
                       {loadingDashas ? (
-                        <Text style={styles.dashasLoading}>Loading...</Text>
+                        <Text style={styles.dashasLoading}>
+                          {t('profile.loading', 'Loading...')}
+                        </Text>
                       ) : (
                         [
                           { level: 'Maha', data: dashaData?.maha_dashas?.find(d => d.current) },
@@ -458,9 +514,11 @@ export default function ProfileScreen({ navigation }) {
                           const planetColor = getPlanetColor(dasha.data?.planet);
                           return (
                             <View key={index} style={[styles.dashaChip, { borderColor: planetColor, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' }]}>
-                              <Text style={[styles.dashaLevel, { color: colors.textSecondary }]}>{dasha.level}</Text>
+                              <Text style={[styles.dashaLevel, { color: colors.textSecondary }]}>
+                                {t(`profile.dashaLevels.${dasha.level}`, dasha.level)}
+                              </Text>
                               <Text style={[styles.dashaPlanet, { color: planetColor }]}>
-                                {dasha.data?.planet || '...'}
+                                {getDashaPlanetLabel(dasha.data?.planet)}
                               </Text>
                             </View>
                           );
@@ -473,7 +531,9 @@ export default function ProfileScreen({ navigation }) {
             </Animated.View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>⚡ Quick Actions</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {`⚡ ${t('profile.quickActionsTitle', 'Quick Actions')}`}
+              </Text>
               <View style={styles.actionsGrid}>
                 <ActionButton 
                   icon="chatbubbles" 
@@ -501,7 +561,10 @@ export default function ProfileScreen({ navigation }) {
                       setShowDashaBrowser(true);
                     } else {
                       // Show message that birth data is needed
-                      Alert.alert('Birth Data Required', 'Please connect your birth chart to view dashas.');
+                      Alert.alert(
+                        t('profile.birthDataRequired', 'Birth Data Required'),
+                        t('profile.dashasAlert', 'Please connect your birth chart to view dashas.')
+                      );
                     }
                   }}
                   color="#ff6b35"
@@ -534,7 +597,9 @@ export default function ProfileScreen({ navigation }) {
             </Animated.View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>⚙️ Settings</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {`⚙️ ${t('profile.settings', 'Settings')}`}
+              </Text>
               <View style={[styles.settingsCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
                 <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
                   <View style={styles.settingLeft}>
@@ -554,7 +619,9 @@ export default function ProfileScreen({ navigation }) {
                 >
                   <View style={styles.settingLeft}>
                     <Ionicons name="mail-unread-outline" size={22} color="#ff6b35" />
-                    <Text style={[styles.settingText, { color: colors.text }]}>Notification history</Text>
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.notificationHistory', 'Notification history')}
+                    </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
@@ -596,7 +663,9 @@ export default function ProfileScreen({ navigation }) {
                   <View style={styles.settingLeft}>
                     <Ionicons name="notifications-outline" size={22} color="#ff6b35" />
                     <Text style={[styles.settingText, { color: colors.text }]}>
-                      {pushSyncing ? 'Syncing…' : 'Sync push notifications'}
+                      {pushSyncing
+                        ? t('profile.turningOnNotifications', 'Turning on…')
+                        : t('profile.turnOnNotifications', 'Turn ON Notifications')}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
