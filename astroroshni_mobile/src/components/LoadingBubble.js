@@ -53,6 +53,8 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                 ])
             ).start();
             
+            // Rotate insights slowly; keep a stable min height so the scroll view content
+            // size does not jump (iOS ScrollView would "bounce" as the user reads).
             const interval = setInterval(() => {
                 Animated.timing(fadeAnim, {
                     toValue: 0,
@@ -66,7 +68,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                         useNativeDriver: true,
                     }).start();
                 });
-            }, 10000);
+            }, 15000);
             
             return () => clearInterval(interval);
         } else {
@@ -145,9 +147,11 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                         </Animated.View>
                     )}
                     
-                    <Animated.Text style={[styles.insightText, { color: isDarkMode ? '#fff' : '#1a1a1a', opacity: fadeAnim }]}>
-                        {currentInsight.message}
-                    </Animated.Text>
+                    <View style={styles.insightTextBlock}>
+                        <Animated.Text style={[styles.insightText, { color: isDarkMode ? '#fff' : '#1a1a1a', opacity: fadeAnim }]}>
+                            {currentInsight.message}
+                        </Animated.Text>
+                    </View>
                 </LinearGradient>
             </View>
         );
@@ -346,6 +350,12 @@ const styles = StyleSheet.create({
         width: 300,
         height: 300,
         marginBottom: 16,
+    },
+    insightTextBlock: {
+        // Reserve space for multi-line insights so rotating text does not resize the bubble.
+        minHeight: 220,
+        width: '100%',
+        justifyContent: 'center',
     },
     insightText: {
         fontSize: 15,

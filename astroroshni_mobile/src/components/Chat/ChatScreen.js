@@ -261,7 +261,6 @@ export default function ChatScreen({ navigation, route }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [dynamicLoadingMessages, setDynamicLoadingMessages] = useState(null);
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -301,6 +300,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showGreeting, setShowGreeting] = useState(true);
   const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  /** Keyboard frame height for bottom inset (iOS + Android; edge-to-edge often breaks adjustResize for RN root). */
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -339,8 +340,17 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setIsKeyboardVisible(true);
+      const h = e?.endCoordinates?.height;
+      if (typeof h === 'number' && h > 0) {
+        setKeyboardBottomInset(h);
+      }
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+      setKeyboardBottomInset(0);
+    });
 
     return () => {
       showSub.remove();
@@ -676,6 +686,9 @@ export default function ChatScreen({ navigation, route }) {
                 terms: m.terms,
                 glossary: m.glossary,
                 images: m.images,
+                message_type: m.message_type,
+                intent_gate: m.intent_gate,
+                gate_metadata: m.gate_metadata,
               }));
               setSessionId(responseReadySessionId);
               setMessagesWithStorage(msgs);
@@ -1805,6 +1818,8 @@ export default function ChatScreen({ navigation, route }) {
                       summary_image: status.summary_image || null,
                       follow_up_questions: status.follow_up_questions || [],
                       native_name: chartName,
+                      intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
+                      gate_metadata: status.gate_metadata || null,
                     }
                   : msg
               );
@@ -1813,8 +1828,13 @@ export default function ChatScreen({ navigation, route }) {
             setLoading(false);
             setIsTyping(false);
             removePendingMessage(messageId);
-            fetchBalance();
-            if (freeUsedThisSendRef.current) {
+            const gatedNoCharge = status.message_type === 'native_gate' || status.message_type === 'clarification';
+            if (!gatedNoCharge) {
+              fetchBalance();
+            } else {
+              freeUsedThisSendRef.current = false;
+            }
+            if (freeUsedThisSendRef.current && !gatedNoCharge) {
               freeUsedThisSendRef.current = false;
               Alert.alert(
                 'Free question used',
@@ -1843,11 +1863,6 @@ export default function ChatScreen({ navigation, route }) {
         
         // Still processing - continue polling
         if (status.status === 'processing') {
-          // Check for and set dynamic loading messages once
-          if (status.loading_messages && status.loading_messages.length > 0) {
-            setDynamicLoadingMessages(status.loading_messages);
-          }
-
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
           
           pollCount++;
@@ -2061,9 +2076,42 @@ export default function ChatScreen({ navigation, route }) {
           throw new Error('No message ID received from server');
         }
 
-        // Use dynamic loading messages from backend if available
-        if (loading_messages && loading_messages.length > 0) {
-          setDynamicLoadingMessages(loading_messages);
+        // Native profile gate or clarification returned synchronously (no credit spend / no poll)
+        if (
+          result.status === 'completed' &&
+          (result.message_type === 'native_gate' || result.message_type === 'clarification')
+        ) {
+          freeUsedThisSendRef.current = false;
+          setLoading(false);
+          setIsTyping(false);
+          if (user_message_id) {
+            setMessagesWithStorage((prev) =>
+              prev.map((msg) =>
+                msg.id === userMessageId ? { ...msg, messageId: user_message_id } : msg
+              )
+            );
+          }
+          setMessagesWithStorage((prev) =>
+            prev.map((msg) =>
+              msg.id === processingMessageId
+                ? {
+                    ...msg,
+                    messageId: assistantMessageId,
+                    content: result.content || '',
+                    isTyping: false,
+                    message_type: result.message_type,
+                    terms: [],
+                    glossary: {},
+                    follow_up_questions: [],
+                    chartInsights: [],
+                    intent_gate: result.intent_gate || (result.gate_metadata && result.gate_metadata.intent_gate),
+                    gate_metadata: result.gate_metadata || null,
+                    showSendRetryButton: false,
+                  }
+                : msg
+            )
+          );
+          return;
         }
 
         console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
@@ -2552,6 +2600,12 @@ export default function ChatScreen({ navigation, route }) {
     </TouchableOpacity>
   );
 
+  const inputScopeNativeTrimmed = birthData?.name?.trim() ?? '';
+  const inputScopeNativeShown =
+    inputScopeNativeTrimmed.length > 7
+      ? `${inputScopeNativeTrimmed.slice(0, 7)}...`
+      : inputScopeNativeTrimmed;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
@@ -2759,11 +2813,7 @@ export default function ChatScreen({ navigation, route }) {
           <>
           <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
-            enabled
-            behavior="padding"
-            keyboardVerticalOffset={
-              Platform.OS === 'ios' ? (insets?.bottom ?? 0) : 8
-            }
+            enabled={false}
           >
           {partnershipMode && (
             <View style={styles.floatingBadgesContainer}>
@@ -2815,6 +2865,12 @@ export default function ChatScreen({ navigation, route }) {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="none"
+            {...(Platform.OS === 'ios'
+              ? {
+                  contentInsetAdjustmentBehavior: 'never',
+                  removeClippedSubviews: false,
+                }
+              : {})}
           >
             {/* Calibration Card - COMMENTED OUT */}
             {/* {calibrationEvent && !calibrationEvent.verified && (
@@ -2980,13 +3036,14 @@ export default function ChatScreen({ navigation, route }) {
             })}
           </GHScrollView>
 
-        {/* Suggestions + Input: KeyboardAvoidingView handles keeping above keyboard */}
+        {/* Suggestions + Input: lift by keyboard frame when open (Android needs this with edge-to-edge). */}
         <View
           style={{
           backgroundColor: 'transparent',
           paddingTop: 12,
           marginHorizontal: -12,
           paddingHorizontal: 12,
+          paddingBottom: keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
         }}
         >
         {/* Suggestions (only show when not loading and not showing greeting) */}
@@ -3020,12 +3077,40 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Unified Input Bar */}
         {!showGreeting && (
-          <View
-            style={[
-              styles.unifiedInputContainer,
-              Platform.OS === 'android' && isKeyboardVisible ? { marginBottom: 52 } : null,
-            ]}
-          >
+          <View style={styles.unifiedInputContainer}>
+            {!partnershipMode && !isMundane && birthData && (
+              <Text
+                style={[styles.chatInputScopeHint, { color: colors.textSecondary }]}
+                maxFontSizeMultiplier={1.35}
+              >
+                {t('chat.inputScopeAskAbout', 'Ask about')}{' '}
+                <Text
+                  style={[styles.chatInputScopeName, { color: colors.text }]}
+                  accessibilityLabel={
+                    inputScopeNativeTrimmed.length > 7
+                      ? inputScopeNativeTrimmed
+                      : undefined
+                  }
+                >
+                  {inputScopeNativeTrimmed
+                    ? inputScopeNativeShown
+                    : t('chat.yourChart', 'your chart')}
+                </Text>
+                {' '}
+                {t('chat.inputScopeOr', 'or')}{' '}
+                <Text
+                  onPress={() => navigation.navigate('SelectNative')}
+                  style={[styles.chatInputScopeLink, { color: colors.primary }]}
+                  accessibilityRole="link"
+                  accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
+                >
+                  {t(
+                    'chat.inputScopeSelectChart',
+                    'select or create another birth chart'
+                  )}
+                </Text>
+              </Text>
+            )}
             <LinearGradient
                       colors={Platform.OS === 'android'
                         ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.05)'] : ['rgba(249, 115, 22, 0.04)', 'rgba(249, 115, 22, 0.02)'])
@@ -3104,7 +3189,7 @@ export default function ChatScreen({ navigation, route }) {
                   partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
                   showModeSelector ? "Type here..." : 
                   isMundane ? "Ask about markets, politics, events..." : 
-                  "Ask me anything..."
+                  t('chat.inputPlaceholderShort', 'Type your question...')
                 }
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
                 maxLength={500}
@@ -3173,7 +3258,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
             
-            {effectiveChatCost === 0 && !(Platform.OS === 'android' && isKeyboardVisible) && (
+            {effectiveChatCost === 0 && !isKeyboardVisible && (
               <View style={styles.firstQuestionFreeBanner}>
                 <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
                 <View style={styles.firstQuestionFreeTextWrap}>
@@ -3183,7 +3268,7 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             )}
             
-            {credits < effectiveChatCost && !(Platform.OS === 'android' && isKeyboardVisible) && (
+            {credits < effectiveChatCost && !isKeyboardVisible && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -3192,7 +3277,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             
-            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && !(Platform.OS === 'android' && isKeyboardVisible) && (
+            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && !isKeyboardVisible && (
               <View style={styles.premiumTooltip}>
                 <TouchableOpacity 
                   style={styles.tooltipClose}
@@ -3224,8 +3309,8 @@ export default function ChatScreen({ navigation, route }) {
         </View>
         </KeyboardAvoidingView>
 
-        {/* Quick Actions Bar - outside KeyboardAvoidingView so it stays at bottom after keyboard dismiss on Android */}
-        {!showGreeting && !(Platform.OS === 'android' && isKeyboardVisible) && (
+        {/* Quick Actions Bar - hide while keyboard is open so input isn't sandwiched above system keyboard */}
+        {!showGreeting && !isKeyboardVisible && (
           <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, insets.bottom) }]}>
             <TouchableOpacity 
               style={styles.quickActionButton}
@@ -4696,6 +4781,20 @@ const styles = StyleSheet.create({
   unifiedInputContainer: {
     paddingHorizontal: 12,
     paddingVertical: 6,
+  },
+  chatInputScopeHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+    flexWrap: 'wrap',
+  },
+  chatInputScopeName: {
+    fontWeight: '700',
+  },
+  chatInputScopeLink: {
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   inputBarGradient: {
     flexDirection: 'row',

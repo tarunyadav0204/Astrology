@@ -60,11 +60,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const lastSeekedAtRef = useRef(0);
   /** Set when user closes the modal while "Generating..." so we don't reopen or auto-play when the request completes. */
   const userDismissedGeneratingRef = useRef(false);
-  /** Subtle heartbeat-style pulse for the podcast icon (idle state). */
-  const podcastIconPulse = useRef(new Animated.Value(1)).current;
-  /** Stronger blink so users notice it. */
-  const podcastIconOpacity = useRef(new Animated.Value(1)).current;
-
   useFocusEffect(
     React.useCallback(() => {
       return () => {
@@ -95,45 +90,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       ).start();
     }
   }, [message.summary_image, isImageLoading]);
-
-  useEffect(() => {
-    const heartbeat = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(podcastIconPulse, {
-            toValue: 1.28,
-            duration: 220,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(podcastIconOpacity, {
-            toValue: 0.55,
-            duration: 220,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(podcastIconPulse, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(podcastIconOpacity, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-        // Pause so the blink is noticeable but not constant flashing.
-        Animated.delay(1100),
-      ])
-    );
-    heartbeat.start();
-    return () => heartbeat.stop();
-  }, [podcastIconPulse, podcastIconOpacity]);
 
   // Animated loader for typing indicator
   const dot1Anim = useRef(new Animated.Value(0)).current;
@@ -893,125 +849,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     ];
   };
 
-  const AnimatedIcon = ({ symbol }) => {
-    const rotateAnim = useRef(new Animated.Value(0)).current;
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    
-    useEffect(() => {
-      const rotateAnimation = Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: true,
-        })
-      );
-      
-      const pulseAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(scaleAnim, {
-            toValue: 1.2,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      
-      rotateAnimation.start();
-      pulseAnimation.start();
-      
-      return () => {
-        rotateAnimation.stop();
-        pulseAnimation.stop();
-      };
-    }, []);
-    
-    const rotate = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
-    
-    return (
-      <Animated.Text style={[
-        styles.headerIcon,
-        {
-          transform: [
-            { rotate },
-            { scale: scaleAnim }
-          ]
-        }
-      ]}>
-        {symbol}
-      </Animated.Text>
-    );
-  };
-
-  const AnimatedLightning = () => {
-    const glowAnim = useRef(new Animated.Value(0)).current;
-    const bounceAnim = useRef(new Animated.Value(1)).current;
-    
-    useEffect(() => {
-      const glowAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      
-      const bounceAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(bounceAnim, {
-            toValue: 1.1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      
-      glowAnimation.start();
-      bounceAnimation.start();
-      
-      return () => {
-        glowAnimation.stop();
-        bounceAnimation.stop();
-      };
-    }, []);
-    
-    const glowOpacity = glowAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.6, 1],
-    });
-    
-    return (
-      <Animated.Text style={[
-        styles.lightningIcon,
-        {
-          opacity: glowOpacity,
-          transform: [{ scale: bounceAnim }]
-        }
-      ]}>
-        ⚡
-      </Animated.Text>
-    );
-  };
-
   const getHeaderSymbol = (headerText) => {
     const text = headerText.toLowerCase();
     if (text.includes('life stage') || text.includes('context')) return '🌱';
@@ -1112,7 +949,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
-            <AnimatedIcon symbol={symbol} />
+            <Text style={styles.headerIcon}>{symbol}</Text>
             <Text style={styles.headerText}>{headerText}</Text>
           </View>
         );
@@ -1123,7 +960,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
-            <AnimatedIcon symbol={symbol} />
+            <Text style={styles.headerIcon}>{symbol}</Text>
             <Text style={styles.headerText}>{headerText}</Text>
           </View>
         );
@@ -1252,6 +1089,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 
   // Check if this is a clarification message
   const isClarification = message.message_type === 'clarification';
+  const isNativeGate =
+    message.message_type === 'native_gate' || message.intent_gate === 'create_native';
 
   // Handle empty content for non-typing messages
   if (!message.content || message.content.trim() === '') {
@@ -1356,14 +1195,14 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         )}
         
         {/* Beta Notice for Timeline Predictions */}
-        {message.role === 'assistant' && !isClarification && (
+        {message.role === 'assistant' && !isClarification && !isNativeGate && (
           <View style={styles.betaNotice}>
             <Text style={styles.betaNoticeText}>{t('chat.betaNotice', '⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.')}</Text>
           </View>
         )}
         
         {/* Legal Disclaimer */}
-        {message.role === 'assistant' && !isClarification && (
+        {message.role === 'assistant' && !isClarification && !isNativeGate && (
           <View style={styles.disclaimerNotice}>
             <Text style={styles.disclaimerNoticeText}>
               {t('chat.disclaimerNotice', '⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.')}
@@ -1371,8 +1210,41 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
 
+        {isNativeGate && !message.isTyping && (
+          <TouchableOpacity
+            style={styles.nativeGateCtaOuter}
+            onPress={() => {
+              const hint = message.gate_metadata?.extracted_birth_hint || {};
+              navigation.navigate('BirthForm', {
+                chartGatePrefill: {
+                  name: hint.name || '',
+                  date: hint.date || null,
+                  time: hint.time || null,
+                  place: hint.place || '',
+                },
+                returnTo: 'Home',
+              });
+            }}
+            activeOpacity={0.9}
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.addBirthProfileA11y', 'Add a birth profile')}
+          >
+            <LinearGradient
+              colors={['#ff6b35', '#f97316']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.nativeGateCtaGradient}
+            >
+              <Ionicons name="person-add-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.nativeGateCtaText}>
+                {t('chat.addBirthProfileCta', 'Add birth profile')}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         {/* Quick action buttons under disclaimer (for long messages) - show for assistant messages with content (incl. chat history) */}
-        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && (message.messageId || message.content) && (
+        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {message.showRestartButton && (
               <TouchableOpacity
@@ -1400,9 +1272,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                   {isLoadingPodcast ? (
                     <ActivityIndicator size="small" color="#ff6b35" />
                   ) : (
-                    <Animated.View style={{ transform: [{ scale: podcastIconPulse }], opacity: podcastIconOpacity }}>
-                      <Ionicons name="radio-outline" size={17} color="#ff6b35" />
-                    </Animated.View>
+                    <Ionicons name="radio-outline" size={17} color="#ff6b35" />
                   )}
                 </TouchableOpacity>
               )}
@@ -1580,7 +1450,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         )}
 
         {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
-        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && (message.messageId || message.content) && (
+        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {/* Restart Button for timeout messages */}
             {message.showRestartButton && message.messageId && (
@@ -1611,9 +1481,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                     {isLoadingPodcast ? (
                       <ActivityIndicator size="small" color="#ff6b35" />
                     ) : (
-                      <Animated.View style={{ transform: [{ scale: podcastIconPulse }] }}>
-                        <Ionicons name="radio-outline" size={17} color="#ff6b35" />
-                      </Animated.View>
+                      <Ionicons name="radio-outline" size={17} color="#ff6b35" />
                     )}
                   </TouchableOpacity>
                 )}
@@ -2592,5 +2460,24 @@ const styles = StyleSheet.create({
   imageModalImage: {
     width: Dimensions.get('window').width,
     height: Dimensions.get('window').height * 0.8,
+  },
+  nativeGateCtaOuter: {
+    marginTop: 4,
+    marginBottom: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+  },
+  nativeGateCtaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  nativeGateCtaText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

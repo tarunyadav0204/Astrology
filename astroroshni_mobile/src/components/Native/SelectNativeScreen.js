@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -114,6 +114,7 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const shareSearchDebounceRef = useRef(null);
   const fromProfile = route.params?.fromProfile;
   const returnTo = route.params?.returnTo;
 
@@ -329,29 +330,49 @@ export default function SelectNativeScreen({ navigation, route }) {
     setShowShareModal(true);
   };
 
-  const searchUsers = async (query) => {
+  const searchUsers = useCallback(async (query) => {
     if (query.length < 4) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
-    
+
     setSearching(true);
     try {
-      // console.log('Searching for:', query);
       const response = await chartAPI.searchUsers(query);
-      // console.log('Search response:', response);
-      // console.log('Search data:', response.data);
       const users = response.data?.users || [];
-      // console.log('Users found:', users);
       setSearchResults(users);
     } catch (error) {
-      // console.log('Search error:', error);
       console.log('Error response:', error.response);
       setSearchResults([]);
     } finally {
       setSearching(false);
     }
-  };
+  }, []);
+
+  /** Debounced: typing was firing API + setState every character → re-renders + Android keyboard resize = visible flicker */
+  const onShareSearchChange = useCallback(
+    (text) => {
+      setSearchQuery(text);
+      if (text.length < 4) {
+        if (shareSearchDebounceRef.current) {
+          clearTimeout(shareSearchDebounceRef.current);
+          shareSearchDebounceRef.current = null;
+        }
+        setSearchResults([]);
+        setSearching(false);
+        return;
+      }
+      if (shareSearchDebounceRef.current) {
+        clearTimeout(shareSearchDebounceRef.current);
+      }
+      shareSearchDebounceRef.current = setTimeout(() => {
+        shareSearchDebounceRef.current = null;
+        searchUsers(text);
+      }, 350);
+    },
+    [searchUsers]
+  );
 
   const handleShareWithUser = async (targetUser) => {
     if (!selectedProfileForMenu) {
@@ -588,20 +609,30 @@ export default function SelectNativeScreen({ navigation, route }) {
         transparent
         animationType="slide"
         onRequestClose={() => {
+          if (shareSearchDebounceRef.current) {
+            clearTimeout(shareSearchDebounceRef.current);
+            shareSearchDebounceRef.current = null;
+          }
           setShowShareModal(false);
           setSearchQuery('');
           setSearchResults([]);
         }}
       >
-        <KeyboardAvoidingView 
+        {/* Android: avoid KeyboardAvoidingView + behavior height — fights Modal/window resize and causes full-screen flicker when focusing TextInput */}
+        <KeyboardAvoidingView
           style={styles.shareModalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         >
           <View style={[styles.shareModalContent, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
             <View style={styles.shareModalHeader}>
               <Text style={[styles.shareModalTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Share Chart</Text>
               <TouchableOpacity onPress={() => {
+                if (shareSearchDebounceRef.current) {
+                  clearTimeout(shareSearchDebounceRef.current);
+                  shareSearchDebounceRef.current = null;
+                }
                 setShowShareModal(false);
                 setSearchQuery('');
                 setSearchResults([]);
@@ -620,17 +651,20 @@ export default function SelectNativeScreen({ navigation, route }) {
                 placeholder="Type name or phone number..."
                 placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
-                onChangeText={(text) => {
-                  setSearchQuery(text);
-                  searchUsers(text);
-                }}
+                onChangeText={onShareSearchChange}
+                autoCorrect={false}
                 autoFocus
               />
               {searching && <ActivityIndicator size="small" color="#ff6b35" />}
             </View>
 
             <View style={styles.searchResultsContainer}>
-              <ScrollView showsVerticalScrollIndicator={false} style={styles.searchResultsList}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={styles.searchResultsList}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+              >
                 {searchQuery.length < 4 && (
                   <Text style={[styles.searchHint, { color: colors.textSecondary }]}>Type at least 4 characters to search</Text>
                 )}
@@ -821,8 +855,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
     paddingTop: 20,
-    flex: 1,
-    marginTop: '20%',
+    maxHeight: '88%',
+    marginTop: '12%',
   },
   shareModalHeader: {
     flexDirection: 'row',
@@ -855,11 +889,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   searchResultsContainer: {
-    flex: 1,
-    minHeight: 150,
+    minHeight: 160,
+    maxHeight: 320,
   },
   searchResultsList: {
-    flex: 1,
+    flexGrow: 1,
   },
   searchHint: {
     textAlign: 'center',

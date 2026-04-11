@@ -228,26 +228,45 @@ async def search_users(query: str, current_user: User = Depends(get_current_user
     """Search users by name or phone (minimum 4 characters)"""
     if len(query) < 4:
         return {"users": []}
-    with get_conn() as conn:
-        cursor = conn.cursor()
-
     search_pattern = f"%{query}%"
-    cursor.execute(
-        """
-        SELECT userid, name, phone FROM users
-        WHERE (name ILIKE %s OR phone LIKE %s) AND userid != %s
-        LIMIT 20
-    """,
-        (search_pattern, search_pattern, current_user.userid),
-    )
-    
+    digits_only = "".join(c for c in query if c.isdigit())
+    digit_pattern = f"%{digits_only}%" if len(digits_only) >= 4 else ""
+    with get_conn() as conn:
+        cursor = execute(
+            conn,
+            """
+            SELECT userid, name, phone FROM users
+            WHERE (
+                name ILIKE %s OR phone LIKE %s
+                OR (
+                    CASE WHEN char_length(%s) >= 4
+                    THEN regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') LIKE %s
+                    ELSE FALSE
+                    END
+                )
+            ) AND userid != %s
+            LIMIT 20
+            """,
+            (
+                search_pattern,
+                search_pattern,
+                digits_only,
+                digit_pattern,
+                current_user.userid,
+            ),
+        )
+        rows = cursor.fetchall() or []
+
     users = []
-    for row in cursor.fetchall():
-        users.append({
-            'userid': row[0],
-            'name': row[1],
-            'phone': row[2][-4:]  # Only show last 4 digits for privacy
-        })
+    for row in rows:
+        phone = row[2] or ""
+        users.append(
+            {
+                "userid": row[0],
+                "name": row[1],
+                "phone": phone[-4:] if phone else "",
+            }
+        )
     return {"users": users}
 
 @router.post("/charts/share")

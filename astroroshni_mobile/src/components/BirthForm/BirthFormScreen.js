@@ -37,6 +37,7 @@ export default function BirthFormScreen({ navigation, route }) {
   const { theme, colors, getCardElevation } = useTheme();
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
+  const chartGatePrefill = route?.params?.chartGatePrefill;
   const updateGender = route?.params?.updateGender;
   const returnTo = route?.params?.returnTo;
   const [step, setStep] = useState(updateGender ? 2 : 1); // Start at gender step if updating gender
@@ -64,6 +65,27 @@ export default function BirthFormScreen({ navigation, route }) {
       console.log('📝 Edit mode activated with profile:', editProfile.name);
     }
   }, []);
+
+  useEffect(() => {
+    if (!chartGatePrefill || editProfile || updateGender) return;
+    setFormData((prev) => {
+      const next = { ...prev };
+      if (chartGatePrefill.name) next.name = String(chartGatePrefill.name);
+      if (chartGatePrefill.place) next.place = String(chartGatePrefill.place);
+      if (chartGatePrefill.latitude != null && chartGatePrefill.longitude != null) {
+        next.latitude = Number(chartGatePrefill.latitude);
+        next.longitude = Number(chartGatePrefill.longitude);
+      }
+      if (chartGatePrefill.date) {
+        const parsed = parseCalendarDateInput(String(chartGatePrefill.date));
+        if (parsed && !isNaN(parsed.getTime())) next.date = parsed;
+      }
+      if (chartGatePrefill.time && /^\d{1,2}:\d{2}/.test(String(chartGatePrefill.time))) {
+        next.time = getTimeDate(String(chartGatePrefill.time).slice(0, 5));
+      }
+      return next;
+    });
+  }, [chartGatePrefill, editProfile, updateGender]);
   
   const getPickerDate = () => {
     const d = new Date();

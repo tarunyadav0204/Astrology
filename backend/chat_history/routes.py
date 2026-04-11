@@ -81,6 +81,8 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS language TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent_router_ms REAL")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS gate_metadata TEXT")
 
         # Indexes
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)")
@@ -242,7 +244,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         cur = execute(
             conn,
             """
-                SELECT message_id, sender, content, timestamp, terms, glossary, images
+                SELECT message_id, sender, content, timestamp, terms, glossary, images, message_type, gate_metadata
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -290,6 +292,19 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["images"] = []
         else:
             message_data["images"] = []
+        mt = msg[7] if len(msg) > 7 else None
+        gm = msg[8] if len(msg) > 8 else None
+        message_data["message_type"] = mt
+        if gm:
+            try:
+                meta = json.loads(gm)
+                message_data["gate_metadata"] = meta
+                if isinstance(meta, dict) and meta.get("intent_gate"):
+                    message_data["intent_gate"] = meta.get("intent_gate")
+            except Exception:
+                message_data["gate_metadata"] = None
+        else:
+            message_data["gate_metadata"] = None
         conversation.append(message_data)
 
     return {"session_id": session_id, "native_name": native_name, "messages": conversation}
@@ -465,6 +480,107 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             "content": REFUSAL_MESSAGE,
             "chart_insights": [],
         }
+
+    # Third-party birth vs own-chart timing (standard chat only; skip Lab & partnership)
+    if not partnership_mode and mode != "lab":
+        try:
+            from ai.subject_native_gate import classify_subject_native_gate
+
+            native_name_hint = (birth_details or {}).get("name") or ""
+            gate = await classify_subject_native_gate(
+                sanitize_text(question), native_name_hint, language
+            )
+            pi = gate.get("primary_intent") or ""
+            conf = float(gate.get("confidence") or 0)
+            cta = bool(gate.get("show_create_native_cta"))
+            clarify_q = (gate.get("clarify_question") or "").strip()
+
+            if cta and pi == "third_party_birth_chart_request":
+                expl = (gate.get("user_facing_explanation") or "").strip()
+                content_out = expl or (
+                    "It sounds like you're asking about another person's birth chart. "
+                    "Add them as a saved birth profile first so we can calculate their chart accurately."
+                )
+                meta_payload = {
+                    "intent_gate": "create_native",
+                    "extracted_birth_hint": gate.get("extracted_birth_hint") or {},
+                }
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET content = %s, status = %s, message_type = %s, completed_at = %s, gate_metadata = %s
+                            WHERE message_id = %s
+                        """,
+                        (
+                            sanitize_text(content_out),
+                            "completed",
+                            "native_gate",
+                            datetime.now(),
+                            json.dumps(meta_payload),
+                            assistant_message_id,
+                        ),
+                    )
+                    conn.commit()
+                return {
+                    "user_message_id": user_message_id,
+                    "message_id": assistant_message_id,
+                    "status": "completed",
+                    "message_type": "native_gate",
+                    "content": content_out,
+                    "intent_gate": "create_native",
+                    "gate_metadata": meta_payload,
+                    "chart_insights": [],
+                }
+
+            need_clarify = bool(clarify_q) and (
+                pi == "unclear"
+                or (pi == "third_party_birth_chart_request" and not cta and conf >= 0.5)
+            )
+            if need_clarify and conf < 0.88:
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET content = %s, status = %s, message_type = %s, completed_at = %s
+                            WHERE message_id = %s
+                        """,
+                        (
+                            sanitize_text(clarify_q),
+                            "completed",
+                            "clarification",
+                            datetime.now(),
+                            assistant_message_id,
+                        ),
+                    )
+                    execute(
+                        conn,
+                        """
+                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (session_id) DO UPDATE SET
+                                clarification_count = conversation_state.clarification_count + 1,
+                                extracted_context = EXCLUDED.extracted_context,
+                                last_updated = CURRENT_TIMESTAMP
+                        """,
+                        (session_id, 1, json.dumps({"subject_native_gate": True})),
+                    )
+                    conn.commit()
+                return {
+                    "user_message_id": user_message_id,
+                    "message_id": assistant_message_id,
+                    "status": "completed",
+                    "message_type": "clarification",
+                    "content": clarify_q,
+                    "chart_insights": [],
+                }
+
+        except Exception as e:
+            print(f"⚠️ subject_native_gate skipped: {e}")
+            import traceback
+            traceback.print_exc()
     
     # Get chart insights from intent router BEFORE starting background task
     chart_insights = []
@@ -652,7 +768,8 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 conn,
                 """
                     SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
-                           cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions
+                           cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
+                           cm.gate_metadata
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
                     WHERE cm.message_id = %s
@@ -667,7 +784,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             print(f"❌ [STATUS] Message {message_id} not found")
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -711,6 +828,15 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                     response["follow_up_questions"] = []
             else:
                 response["follow_up_questions"] = []
+
+            if gate_metadata:
+                try:
+                    meta = json.loads(gate_metadata)
+                    response["gate_metadata"] = meta
+                    if isinstance(meta, dict) and meta.get("intent_gate"):
+                        response["intent_gate"] = meta["intent_gate"]
+                except Exception:
+                    pass
                 
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
