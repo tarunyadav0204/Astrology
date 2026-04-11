@@ -410,6 +410,27 @@
   padding-right: max(2px, env(safe-area-inset-right, 0px));
 }
 
+/* Ask Tara: same max width as typical homepage sections; content-grid above stays full-bleed */
+.main-content .chat-consultations {
+  max-width: 1200px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+.main-content .chat-consultations .container {
+  max-width: none;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+}
+
 /* Vedic Astrology Tools Header */
 .vedic-tools-header {
   text-align: center;
@@ -1518,7 +1539,7 @@
 
 /* Karma Analysis Section */
 .karma-analysis-section {
-  padding: 80px 0;
+  padding: 32px 0;
   background: linear-gradient(135deg, #fff9e6 0%, #ffe8cc 50%, #ffd9b3 100%);
 }
 
@@ -1533,8 +1554,8 @@
   position: relative;
   background: linear-gradient(135deg, #fff 0%, #fff9e6 50%, #ffe8cc 100%);
   border-radius: 24px;
-  padding: 40px;
-  margin-bottom: 40px;
+  padding: 32px 40px;
+  margin-bottom: 0;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -5504,21 +5525,28 @@
   }
 }
 
-/* Ashtakavarga (and future rows) under Vedic Astrology Tools header */
+/* Charts & Dashas + Ashtakavarga — same row (two columns when wide enough) */
 .vedic-tools-featured {
   width: 100%;
-  max-width: min(520px, 100%);
+  max-width: min(920px, 100%);
   margin: 0 auto 32px;
   padding: 0 12px;
   box-sizing: border-box;
 }
 
 .astro-tools-hub-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
   width: 100%;
   margin: 0;
+  align-items: stretch;
+}
+
+@media (max-width: 600px) {
+  .astro-tools-hub-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .astro-tools-hub-card {
@@ -5526,6 +5554,7 @@
   align-items: center;
   gap: 14px;
   width: 100%;
+  min-width: 0;
   padding: 16px 18px;
   border: 1px solid rgba(233, 30, 99, 0.2);
   border-radius: 14px;
@@ -5557,6 +5586,12 @@
   font-size: 1.35rem;
   background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
   color: #ad1457;
+}
+
+.astro-tools-hub-card--charts-dashas .astro-tools-hub-card__icon {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  color: #e65100;
+  font-size: 1.4rem;
 }
 
 .astro-tools-hub-card--ashtakavarga .astro-tools-hub-card__icon {

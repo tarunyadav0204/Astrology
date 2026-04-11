@@ -1303,103 +1303,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       </section>
       */}
 
-      {/* Chat Consultation Categories */}
-      <section className="chat-consultations">
-        <div className="container">
-          <div className="section-header">
-            <h2>⭐ Ask Tara Your Questions</h2>
-            <p className="section-subtitle">Get instant AI-powered Vedic insights on any life topic</p>
-          </div>
-          
-          <div className="consultation-categories">
-            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="consultation-icon">💕</div>
-              <h4>Love & Relationships</h4>
-              <p>Marriage compatibility, relationship timing, soulmate analysis</p>
-              <div className="consultation-examples">
-                <span>"When will I get married?"</span>
-                <span>"Is my partner compatible?"</span>
-              </div>
-              <button className="ask-btn">Ask Tara</button>
-            </div>
-            
-            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="consultation-icon">💼</div>
-              <h4>Career & Finance</h4>
-              <p>Job changes, business success, wealth timing, investment guidance</p>
-              <div className="consultation-examples">
-                <span>"Should I change my job?"</span>
-                <span>"When will I get promotion?"</span>
-              </div>
-              <button className="ask-btn">Ask Tara</button>
-            </div>
-            
-            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="consultation-icon">🏥</div>
-              <h4>Health & Wellness</h4>
-              <p>Health predictions, disease timing, remedies, lifestyle guidance</p>
-              <div className="consultation-examples">
-                <span>"What about my health?"</span>
-                <span>"Any health concerns ahead?"</span>
-              </div>
-              <button className="ask-btn">Ask Tara</button>
-            </div>
-            
-            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="consultation-icon">👶</div>
-              <h4>Family & Children</h4>
-              <p>Child birth timing, family harmony, parenting guidance</p>
-              <div className="consultation-examples">
-                <span>"When will I have children?"</span>
-                <span>"Family issues solutions?"</span>
-              </div>
-              <button className="ask-btn">Ask Tara</button>
-            </div>
-            
-            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="consultation-icon">🎓</div>
-              <h4>Education & Growth</h4>
-              <p>Study success, exam results, skill development, learning path</p>
-              <div className="consultation-examples">
-                <span>"Will I pass my exams?"</span>
-                <span>"Best career field for me?"</span>
-              </div>
-              <button className="ask-btn">Ask Tara</button>
-            </div>
-            
-            <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
-              <div className="consultation-icon">🌟</div>
-              <h4>General Predictions</h4>
-              <p>Life overview, upcoming events, lucky periods, general guidance</p>
-              <div className="consultation-examples">
-                <span>"What's ahead in my life?"</span>
-                <span>"Any major changes coming?"</span>
-              </div>
-              <button className="ask-btn">Ask Tara</button>
-            </div>
-          </div>
-
-          {/* Meet Tara — outside consultation grid so it always full width (grid was squeezing this into one column on tablet) */}
-          <div className="tara-introduction">
-            <div className="tara-intro-content">
-              <div className="tara-avatar">
-                <div className="tara-star">⭐</div>
-              </div>
-              <div className="tara-text">
-                <h3 className="tara-intro-title">Meet Tara - Your Vedic AI Guide</h3>
-                <p className="tara-intro-body">Tara is the world's most advanced Digital Astrologer because she processes over 50+ astrological calculation systems simultaneously including Swiss Ephemeris precision, all 16 Divisional Charts (D1-D60), complete Ashtakavarga analysis, 5-level Vimshottari Dasha system, Jaimini Chara Dasha, Yogini Dasha, Nadi Astrology links, Sudarshana Chakra analysis, comprehensive yoga detection, planetary war calculations, Neecha Bhanga analysis, and real-time transit activations with karmic trigger detection - delivering unmatched accuracy through multi-layered synthesis.</p>
-                <div className="tara-features">
-                  <span className="tara-feature-pill">🌟 50+ Calculation Systems</span>
-                  <span className="tara-feature-pill">⚡ Swiss Ephemeris Precision</span>
-                  <span className="tara-feature-pill">🎯 Multi-Dasha Synthesis</span>
-                  <span className="tara-feature-pill">🕉️ Nadi Astrology Links</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Karma Analysis Section */}
       <section className="karma-analysis-section">
         <div className="container">
@@ -1486,6 +1389,35 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="astro-tools-hub-grid">
               <button
                 type="button"
+                className="astro-tools-hub-card astro-tools-hub-card--charts-dashas"
+                onClick={() => {
+                  if (!user) {
+                    if (onLogin) onLogin();
+                    return;
+                  }
+                  if (birthData && chartData && setCurrentView) {
+                    setCurrentView('dashboard');
+                    return;
+                  }
+                  setBirthFormContext('changeNative');
+                  setShowBirthFormModal(true);
+                }}
+              >
+                <span className="astro-tools-hub-card__icon" aria-hidden>
+                  📊
+                </span>
+                <span className="astro-tools-hub-card__body">
+                  <span className="astro-tools-hub-card__name">Charts &amp; Dashas</span>
+                  <span className="astro-tools-hub-card__desc">
+                    AstroVishnu workspace — lagna, divisionals, transit, and Vimshottari dashas in one dashboard
+                  </span>
+                </span>
+                <span className="astro-tools-hub-card__arrow" aria-hidden>
+                  →
+                </span>
+              </button>
+              <button
+                type="button"
                 className="astro-tools-hub-card astro-tools-hub-card--ashtakavarga"
                 onClick={() => navigate('/tools/ashtakavarga')}
               >
@@ -1504,6 +1436,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </button>
             </div>
           </div>
+
           <div className="content-grid">
             {/* Column 1 - Kundli Matching (40%) */}
             <div className="form-card matching-compact">
@@ -1598,6 +1531,102 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             {/* Column 4 - Panchang (20%) */}
             <PanchangWidget />
           </div>
+
+          {/* Ask Tara — below Kundli matching row (content-grid: matching, chart, nakshatra, panchang) */}
+          <section className="chat-consultations">
+            <div className="container">
+              <div className="section-header">
+                <h2>⭐ Ask Tara Your Questions</h2>
+                <p className="section-subtitle">Get instant AI-powered Vedic insights on any life topic</p>
+              </div>
+
+              <div className="consultation-categories">
+                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                  <div className="consultation-icon">💕</div>
+                  <h4>Love & Relationships</h4>
+                  <p>Marriage compatibility, relationship timing, soulmate analysis</p>
+                  <div className="consultation-examples">
+                    <span>"When will I get married?"</span>
+                    <span>"Is my partner compatible?"</span>
+                  </div>
+                  <button type="button" className="ask-btn">Ask Tara</button>
+                </div>
+
+                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                  <div className="consultation-icon">💼</div>
+                  <h4>Career & Finance</h4>
+                  <p>Job changes, business success, wealth timing, investment guidance</p>
+                  <div className="consultation-examples">
+                    <span>"Should I change my job?"</span>
+                    <span>"When will I get promotion?"</span>
+                  </div>
+                  <button type="button" className="ask-btn">Ask Tara</button>
+                </div>
+
+                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                  <div className="consultation-icon">🏥</div>
+                  <h4>Health & Wellness</h4>
+                  <p>Health predictions, disease timing, remedies, lifestyle guidance</p>
+                  <div className="consultation-examples">
+                    <span>"What about my health?"</span>
+                    <span>"Any health concerns ahead?"</span>
+                  </div>
+                  <button type="button" className="ask-btn">Ask Tara</button>
+                </div>
+
+                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                  <div className="consultation-icon">👶</div>
+                  <h4>Family & Children</h4>
+                  <p>Child birth timing, family harmony, parenting guidance</p>
+                  <div className="consultation-examples">
+                    <span>"When will I have children?"</span>
+                    <span>"Family issues solutions?"</span>
+                  </div>
+                  <button type="button" className="ask-btn">Ask Tara</button>
+                </div>
+
+                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                  <div className="consultation-icon">🎓</div>
+                  <h4>Education & Growth</h4>
+                  <p>Study success, exam results, skill development, learning path</p>
+                  <div className="consultation-examples">
+                    <span>"Will I pass my exams?"</span>
+                    <span>"Best career field for me?"</span>
+                  </div>
+                  <button type="button" className="ask-btn">Ask Tara</button>
+                </div>
+
+                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                  <div className="consultation-icon">🌟</div>
+                  <h4>General Predictions</h4>
+                  <p>Life overview, upcoming events, lucky periods, general guidance</p>
+                  <div className="consultation-examples">
+                    <span>"What's ahead in my life?"</span>
+                    <span>"Any major changes coming?"</span>
+                  </div>
+                  <button type="button" className="ask-btn">Ask Tara</button>
+                </div>
+              </div>
+
+              <div className="tara-introduction">
+                <div className="tara-intro-content">
+                  <div className="tara-avatar">
+                    <div className="tara-star">⭐</div>
+                  </div>
+                  <div className="tara-text">
+                    <h3 className="tara-intro-title">Meet Tara - Your Vedic AI Guide</h3>
+                    <p className="tara-intro-body">Tara is the world's most advanced Digital Astrologer because she processes over 50+ astrological calculation systems simultaneously including Swiss Ephemeris precision, all 16 Divisional Charts (D1-D60), complete Ashtakavarga analysis, 5-level Vimshottari Dasha system, Jaimini Chara Dasha, Yogini Dasha, Nadi Astrology links, Sudarshana Chakra analysis, comprehensive yoga detection, planetary war calculations, Neecha Bhanga analysis, and real-time transit activations with karmic trigger detection - delivering unmatched accuracy through multi-layered synthesis.</p>
+                    <div className="tara-features">
+                      <span className="tara-feature-pill">🌟 50+ Calculation Systems</span>
+                      <span className="tara-feature-pill">⚡ Swiss Ephemeris Precision</span>
+                      <span className="tara-feature-pill">🎯 Multi-Dasha Synthesis</span>
+                      <span className="tara-feature-pill">🕉️ Nadi Astrology Links</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
 
