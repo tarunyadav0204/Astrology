@@ -3071,7 +3071,12 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
         sarva = calculator.calculate_sarvashtakavarga()
         analysis = calculator.get_ashtakavarga_analysis(chart_type)
 
-        # Format Ashtakvarga data for chart display
+        # SAV contract for API clients (do not change key semantics without updating consumers):
+        # - ashtakavarga["sarvashtakavarga"] keys "0".."11" are fixed zodiac signs (0=Aries … 11=Pisces), not house ordinals.
+        # - House-from-ascendant for a given sign index sign_num: ((sign_num - ascendant_sign) % 12) + 1
+        #   (ascendant_sign = floor(ascendant_degrees / 30); same rule as AshtakavargaCalculator._analyze_lagna_ashtakavarga).
+        # - chart_ashtakavarga["1".."12"] reindexes by house-from-lagna; each value includes the occupying sign in "sign".
+
         chart_ashtakavarga = {}
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data.get('ascendant') else 0
 
