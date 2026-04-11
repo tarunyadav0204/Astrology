@@ -1424,37 +1424,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      <section className="astro-tools-hub-section" aria-labelledby="astro-tools-hub-heading">
-        <div className="container">
-          <h2 id="astro-tools-hub-heading" className="astro-tools-hub-title">
-            Astrological tools
-          </h2>
-          <p className="astro-tools-hub-subtitle">
-            Open dedicated full-screen calculators — same experience on phone browsers as in the app. More tools coming soon.
-          </p>
-          <div className="astro-tools-hub-grid">
-            <button
-              type="button"
-              className="astro-tools-hub-card astro-tools-hub-card--ashtakavarga"
-              onClick={() => navigate('/tools/ashtakavarga')}
-            >
-              <span className="astro-tools-hub-card__icon" aria-hidden>
-                ⊞
-              </span>
-              <span className="astro-tools-hub-card__body">
-                <span className="astro-tools-hub-card__name">Ashtakavarga</span>
-                <span className="astro-tools-hub-card__desc">
-                  Sarva and BAV bindus, transit vs birth, event timing — full page
-                </span>
-              </span>
-              <span className="astro-tools-hub-card__arrow" aria-hidden>
-                →
-              </span>
-            </button>
-          </div>
-        </div>
-      </section>
-
       {/*
       TEMP: AstroVastu hidden from homepage — route /astrovastu still exists in App.js for direct access / later launch.
       AstroVastu — chart mapped to eight directions
@@ -1507,9 +1476,33 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <span className="vedic-symbol vedic-symbol-4">☸️</span>
             <span className="vedic-symbol vedic-symbol-5">🪔</span>
             <span className="vedic-symbol vedic-symbol-6">🌸</span>
-            <h2 className="vedic-tools-title">📊 Vedic Astrology Tools</h2>
+            <h2 id="vedic-astrology-tools-heading" className="vedic-tools-title">
+              📊 Vedic Astrology Tools
+            </h2>
             <p className="vedic-tools-subtitle">Discover your destiny with authentic Vedic calculations</p>
             <div className="vedic-tools-divider"></div>
+          </div>
+          <div className="vedic-tools-featured">
+            <div className="astro-tools-hub-grid">
+              <button
+                type="button"
+                className="astro-tools-hub-card astro-tools-hub-card--ashtakavarga"
+                onClick={() => navigate('/tools/ashtakavarga')}
+              >
+                <span className="astro-tools-hub-card__icon" aria-hidden>
+                  ⊞
+                </span>
+                <span className="astro-tools-hub-card__body">
+                  <span className="astro-tools-hub-card__name">Ashtakavarga</span>
+                  <span className="astro-tools-hub-card__desc">
+                    Sarva and BAV bindus, transit vs birth, event timing — full page
+                  </span>
+                </span>
+                <span className="astro-tools-hub-card__arrow" aria-hidden>
+                  →
+                </span>
+              </button>
+            </div>
           </div>
           <div className="content-grid">
             {/* Column 1 - Kundli Matching (40%) */}

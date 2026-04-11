@@ -78,6 +78,28 @@ const UnifiedHeader = ({
     flexShrink: 0
   };
 
+  /** Home / New Chart: same fixed height, no wrap — avoids “New Chart” stacking taller than Home */
+  const desktopPrimaryNavButtonStyle = {
+    background: 'rgba(255, 255, 255, 0.2)',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    color: 'white',
+    padding: '0 10px',
+    minHeight: '32px',
+    height: '32px',
+    boxSizing: 'border-box',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '600',
+    lineHeight: 1.2,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0
+  };
+
   // Add CSS animations
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -99,7 +121,7 @@ const UnifiedHeader = ({
     <div style={{
       background: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)',
       borderBottom: '3px solid #d4691a',
-      padding: isMobile ? '8px 12px' : '12px 16px',
+      padding: isMobile ? '8px 12px' : '8px 16px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -110,7 +132,7 @@ const UnifiedHeader = ({
       width: window.innerWidth <= 768 ? '100%' : 'auto',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       overflowX: 'hidden',
-      minHeight: isMobile ? '50px' : '60px'
+      minHeight: isMobile ? '50px' : '52px'
     }}>
       {/* Left Side */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -268,37 +290,13 @@ const UnifiedHeader = ({
           <>
             <button
               onClick={onViewAllCharts}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                color: 'white',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
+              style={desktopPrimaryNavButtonStyle}
             >
               🏠 Home
             </button>
             <button
               onClick={onNewChart}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                color: 'white',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
+              style={desktopPrimaryNavButtonStyle}
             >
               ➕ New Chart
             </button>

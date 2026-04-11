@@ -1,7 +1,8 @@
 import React from 'react';
 
-const TransitDateControls = ({ transitDate, onTransitDateChange, onResetToToday }) => {
+const TransitDateControls = ({ transitDate, onTransitDateChange, onResetToToday, edgeToEdgeMobile = false }) => {
   const isMobile = window.innerWidth <= 768;
+  const bleed = Boolean(edgeToEdgeMobile && isMobile);
 
   const handleDateChange = (operation, unit) => {
     const newDate = new Date(transitDate);
@@ -50,13 +51,17 @@ const TransitDateControls = ({ transitDate, onTransitDateChange, onResetToToday 
       display: 'flex',
       alignItems: 'center',
       gap: isMobile ? '4px' : '6px',
-      padding: '8px 12px',
+      padding: bleed ? '8px 0' : '8px 12px',
       background: '#f8f9fa',
-      borderRadius: '8px',
-      border: '1px solid #e91e63',
-      marginBottom: '12px',
+      borderRadius: bleed ? 0 : '8px',
+      border: bleed ? 'none' : '1px solid #e91e63',
+      borderBottom: bleed ? '1px solid #e5e0e3' : undefined,
+      marginBottom: bleed ? 0 : '12px',
       flexWrap: 'wrap',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
     }}>
       {/* Date Picker */}
       <input

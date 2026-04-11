@@ -2,7 +2,8 @@ export const APP_CONFIG = {
   api: {
     dev: 'http://localhost:8001',
     test: 'https://test.astroroshni.com',
-    prod: 'https://astroroshni.com',  // Production API base URL
+    // Fallback when hostname is not the public site (e.g. raw LB IP). AstroRoshni web app uses window origin in config.js.
+    prod: 'https://astroroshni.com',
     timeout: 30000,
     retries: 3
   },

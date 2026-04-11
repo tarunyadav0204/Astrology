@@ -90,7 +90,7 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
                              dasha.current ? 'rgba(255, 111, 0, 0.15)' : 
                              idx % 2 === 0 ? 'rgba(255, 243, 224, 0.3)' : 'white',
                   border: '1px solid rgba(116, 185, 255, 0.2)',
-                  borderRadius: '8px',
+                  borderRadius: 0,
                   padding: '0.4rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',

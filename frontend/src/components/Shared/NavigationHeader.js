@@ -60,6 +60,7 @@ function FullHamburgerMenuItems({
     >
       ✨ Astrology
     </button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/tools/ashtakavarga'); onClose(); }}>⊞ Ashtakavarga</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching'); onClose(); }}>💕 Kundli matching</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/#numerology'); onClose(); }}>🔢 Numerology</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/panchang'); onClose(); }}>🌅 Panchang</button>
@@ -188,6 +189,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               ) : (
                 <a href="/#astrology">Astrology</a>
               )}
+              <button type="button" onClick={() => navigate('/tools/ashtakavarga')}>Ashtakavarga</button>
               <button type="button" onClick={() => navigate('/#numerology')}>Numerology</button>
               <button onClick={() => navigate('/blog')}>Blogs</button>
             </nav>
@@ -400,6 +402,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 <a href="/#astrology">Astrology</a>
               )}
             </li>
+            <li><button type="button" onClick={() => navigate('/tools/ashtakavarga')}>Ashtakavarga</button></li>
             <li><button type="button" onClick={() => navigate('/#numerology')}>Numerology</button></li>
             <li><button onClick={() => navigate('/blog')}>Blogs</button></li>
             <li><button onClick={() => navigate('/contact')}>Contact us</button></li>

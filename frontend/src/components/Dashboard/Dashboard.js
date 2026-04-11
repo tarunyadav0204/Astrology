@@ -12,8 +12,6 @@ import NakshatrasTab from '../NakshatrasTab/NakshatrasTab';
 import YogasTab from '../YogasTab/YogasTab';
 import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
-import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
-import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
 import NadiTab from '../Nadi/NadiTab';
 import DashaBrowser from '../DashaBrowser/DashaBrowser';
 
@@ -28,7 +26,7 @@ import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem 
 
 
 
-const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefHighlight }) => {
+const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefHighlight, embedInDashboard }) => {
   const [selectedChart, setSelectedChart] = useState('hora');
   const [showDropdown, setShowDropdown] = useState(false);
   const isMobile = window.innerWidth <= 768;
@@ -59,8 +57,16 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
   
   if (isMobile) {
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '0.5rem', background: '#f8f9fa', borderBottom: '1px solid #ddd', position: 'relative' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}>
+        <div
+          style={{
+            padding: embedInDashboard ? '0.35rem 0' : '0.5rem',
+            background: '#f8f9fa',
+            borderBottom: '1px solid #ddd',
+            position: 'relative',
+            boxSizing: 'border-box',
+          }}
+        >
           <button
             onClick={() => setShowDropdown(!showDropdown)}
             style={{
@@ -84,8 +90,8 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
             <div style={{
               position: 'absolute',
               top: '100%',
-              left: '0.5rem',
-              right: '0.5rem',
+              left: embedInDashboard ? 0 : '0.5rem',
+              right: embedInDashboard ? 0 : '0.5rem',
               background: 'white',
               border: '1px solid #ddd',
               borderRadius: '4px',
@@ -117,7 +123,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
             </div>
           )}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column' }}>
           <ChartWidget
             title={titleWithDropdown}
             chartType="divisional"
@@ -126,6 +132,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
             division={currentChart?.division || 9}
             defaultStyle={defaultStyle}
             chartRefHighlight={chartRefHighlight}
+            embedInDashboard={embedInDashboard}
           />
         </div>
       </div>
@@ -167,6 +174,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
       division={currentChart?.division || 9}
       defaultStyle={defaultStyle}
       chartRefHighlight={chartRefHighlight}
+      embedInDashboard={embedInDashboard}
     />
   );
 };
@@ -375,8 +383,6 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
           { id: 'dashboard', label: '🕉️ Parashara', icon: '🕉️' },
           { id: 'dashas', label: '⏰ Dasha Browser', icon: '⏰' },
           { id: 'nadi', label: '🔍 Nadi', icon: '🔍' },
-          { id: 'marriage', label: '💍 Marriage', icon: '💍' },
-          { id: 'health', label: '🏥 Health', icon: '🏥' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
           { id: 'houses', label: '🏠 House Analysis', icon: '🏠' },
           { id: 'relationships', label: '🤝 Relationships', icon: '🤝' },
@@ -424,13 +430,19 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             overflow: 'hidden'
           }}>
             {/* Main Content Area */}
-            <div style={{ 
-              flex: 1, 
-              padding: '0.08rem 0.35rem 0.35rem', 
-              overflow: 'hidden'
-            }}>
+            <div
+              style={{
+                flex: 1,
+                padding: 0,
+                margin: 0,
+                overflow: 'hidden',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box',
+              }}
+            >
               {mobileSubTab === 'lagna' && (
-                <div style={{ height: '100%' }}>
+                <div style={{ height: '100%', width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <ChartWidget
                     title="Lagna Chart"
                     chartType="lagna"
@@ -438,11 +450,12 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                     birthData={birthData}
                     defaultStyle={userSettings.default_chart_style}
                     chartRefHighlight={chartRefHighlight}
+                    embedInDashboard
                   />
                 </div>
               )}
               {mobileSubTab === 'navamsa' && (
-                <div style={{ height: '100%' }}>
+                <div style={{ height: '100%', width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <ChartWidget
                     title="Navamsa Chart"
                     chartType="navamsa"
@@ -450,6 +463,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                     birthData={birthData}
                     defaultStyle={userSettings.default_chart_style}
                     chartRefHighlight={chartRefHighlight}
+                    embedInDashboard
                   />
                 </div>
               )}
@@ -459,8 +473,9 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                     transitDate={transitDate}
                     onTransitDateChange={handleTransitDateChange}
                     onResetToToday={resetToToday}
+                    edgeToEdgeMobile
                   />
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
                     <ChartWidget
                       title="Transit Chart"
                       chartType="transit"
@@ -469,17 +484,19 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                       transitDate={transitDate}
                       defaultStyle={userSettings.default_chart_style}
                       chartRefHighlight={chartRefHighlight}
+                      embedInDashboard
                     />
                   </div>
                 </div>
               )}
               {mobileSubTab === 'divisional' && (
-                <div style={{ height: '100%' }}>
+                <div style={{ height: '100%', width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <DivisionalChartSelector
                     chartData={chartData}
                     birthData={birthData}
                     defaultStyle={userSettings.default_chart_style}
                     chartRefHighlight={chartRefHighlight}
+                    embedInDashboard
                   />
                 </div>
               )}
@@ -489,6 +506,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                     transitDate={transitDate}
                     onTransitDateChange={handleTransitDateChange}
                     onResetToToday={resetToToday}
+                    edgeToEdgeMobile
                   />
                   <DashaHierarchyBar selectedDashas={selectedDashas} transitDate={transitDate} />
                   <div style={{ 
@@ -634,7 +652,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
         ) : (
           // Desktop Layout - Grid
           <GridContainer>
-            <GridItem chart>
+            <GridItem chart chartFlat>
               <ChartWidget
                 title="Lagna Chart"
                 chartType="lagna"
@@ -642,10 +660,11 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 birthData={birthData}
                 defaultStyle={userSettings.default_chart_style}
                 chartRefHighlight={chartRefHighlight}
+                embedInDashboard
               />
             </GridItem>
             
-            <GridItem chart>
+            <GridItem chart chartFlat>
               <ChartWidget
                 title="Navamsa Chart"
                 chartType="navamsa"
@@ -653,10 +672,11 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 birthData={birthData}
                 defaultStyle={userSettings.default_chart_style}
                 chartRefHighlight={chartRefHighlight}
+                embedInDashboard
               />
             </GridItem>
             
-            <GridItem chart>
+            <GridItem chart chartFlat>
               <ChartWidget
                 title="Transit Chart"
                 chartType="transit"
@@ -665,15 +685,17 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 transitDate={transitDate}
                 defaultStyle={userSettings.default_chart_style}
                 chartRefHighlight={chartRefHighlight}
+                embedInDashboard
               />
             </GridItem>
             
-            <GridItem chart>
+            <GridItem chart chartFlat>
               <DivisionalChartSelector
                 chartData={chartData}
                 birthData={birthData}
                 defaultStyle={userSettings.default_chart_style}
                 chartRefHighlight={chartRefHighlight}
+                embedInDashboard
               />
             </GridItem>
             
@@ -694,7 +716,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
               gap: '0.3rem', 
               height: '26vh' 
             }}>
-              <GridItem dasha>
+              <GridItem dasha chartFlat>
                 <DashaWidget
                   title="Maha Dasha"
                   dashaType="maha"
@@ -707,7 +729,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 />
               </GridItem>
               
-              <GridItem dasha>
+              <GridItem dasha chartFlat>
                 <DashaWidget
                   title="Antar Dasha"
                   dashaType="antar"
@@ -720,7 +742,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 />
               </GridItem>
               
-              <GridItem dasha>
+              <GridItem dasha chartFlat>
                 <DashaWidget
                   title="Pratyantar Dasha"
                   dashaType="pratyantar"
@@ -733,7 +755,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 />
               </GridItem>
               
-              <GridItem dasha>
+              <GridItem dasha chartFlat>
                 <DashaWidget
                   title="Sookshma Dasha"
                   dashaType="sookshma"
@@ -746,7 +768,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 />
               </GridItem>
               
-              <GridItem dasha>
+              <GridItem dasha chartFlat>
                 <DashaWidget
                   title="Prana Dasha"
                   dashaType="prana"
@@ -759,10 +781,10 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 />
               </GridItem>
               
-              <GridItem dasha style={{ gridColumn: 'span 2' }}>
+              <GridItem dasha chartFlat style={{ gridColumn: 'span 2' }}>
                 <div style={{
                   background: 'white',
-                  borderRadius: '8px',
+                  borderRadius: 0,
                   padding: '1rem',
                   height: '100%',
                   display: 'flex',
@@ -778,7 +800,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                       background: '#e91e63',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: 0,
                       padding: '0.75rem 1.5rem',
                       fontSize: '1rem',
                       fontWeight: '600',
@@ -811,8 +833,6 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
             {activeTab === 'dashas' && <DashaBrowser birthData={birthData} chartData={chartData} />}
             {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} selectedDashas={selectedDashas} onDashaSelection={handleDashaSelection} />}
-            {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
-            {activeTab === 'health' && <CompleteHealthAnalysisTab chartData={chartData} birthDetails={birthData} />}
             {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'relationships' && <RelationshipsTab chartData={chartData} birthData={birthData} />}

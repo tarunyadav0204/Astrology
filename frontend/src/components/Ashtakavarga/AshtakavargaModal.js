@@ -30,6 +30,30 @@ function formatLifePredictionsError(data) {
   return 'Request failed';
 }
 
+/** Indeterminate progress + message for chart load, transits, and AI steps */
+function AshtakavargaProgressState({ title, description, hint, compact = false, className = '' }) {
+  return (
+    <div
+      className={`ashtakavarga-progress-state${compact ? ' ashtakavarga-progress-state--compact' : ''} ${className}`.trim()}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="ashtakavarga-progress-state__spinner" aria-hidden />
+      <h3 className="ashtakavarga-progress-state__title">{title}</h3>
+      {description ? <p className="ashtakavarga-progress-state__desc">{description}</p> : null}
+      <div className="ashtakavarga-progress-state__track" aria-hidden>
+        <div className="ashtakavarga-progress-state__bar" />
+      </div>
+      {hint != null ? (
+        <p className="ashtakavarga-progress-state__hint">{hint}</p>
+      ) : compact ? null : (
+        <p className="ashtakavarga-progress-state__hint">Usually finishes within a few seconds</p>
+      )}
+    </div>
+  );
+}
+
 const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate, variant = 'modal', onLogin }) => {
   const { credits, fetchBalance } = useCredits();
   const [ashtakavargaData, setAshtakavargaData] = useState(null);
@@ -640,11 +664,32 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
 
     return (
       <div className="ashtakavarga-life-predictions">
-        {loadingLifePredictions && lifePredictions ? (
-          <div className="ashtakavarga-life-regen-overlay" aria-live="polite">
-            <div className="ashtakavarga-life-regen-overlay__inner">Updating reading…</div>
-          </div>
-        ) : null}
+        {loadingLifePredictions && lifePredictions
+          ? createPortal(
+              <div
+                className="ashtakavarga-life-regen-overlay ashtakavarga-life-regen-overlay--viewport"
+                role="alertdialog"
+                aria-busy="true"
+                aria-live="polite"
+                aria-label="Updating reading"
+              >
+                <div className="ashtakavarga-life-regen-overlay__inner">
+                  <div
+                    className="ashtakavarga-progress-state__spinner ashtakavarga-progress-state__spinner--sm"
+                    aria-hidden
+                  />
+                  <p className="ashtakavarga-life-regen-overlay__title">Updating reading…</p>
+                  <div
+                    className="ashtakavarga-progress-state__track ashtakavarga-progress-state__track--overlay"
+                    aria-hidden
+                  >
+                    <div className="ashtakavarga-progress-state__bar" />
+                  </div>
+                </div>
+              </div>,
+              document.body
+            )
+          : null}
 
         {!lifePredictions ? (
           <>
@@ -666,6 +711,19 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
               >
                 {busy ? (lifePredictionsCacheChecking ? 'Checking saved reading…' : 'Generating…') : 'Open life predictions'}
               </button>
+              {busy ? (
+                <AshtakavargaProgressState
+                  compact
+                  className="ashtakavarga-progress-state--hero"
+                  title={lifePredictionsCacheChecking ? 'Checking cache' : 'Generating reading'}
+                  description={
+                    lifePredictionsCacheChecking
+                      ? 'Looking for a saved Dots of Destiny reading for this profile…'
+                      : 'Running the model on your bindus, houses, transits, and dasha. This may take up to a minute.'
+                  }
+                  hint={lifePredictionsCacheChecking ? 'Almost there…' : 'Safe to keep this tab open'}
+                />
+              ) : null}
               <div className="ashtakavarga-life-hero__foot">
                 <p className="ashtakavarga-life-hero__hint">
                   <span className="ashtakavarga-life-hero__hint-credits">{lifePredictionsCreditCost} credits</span>
@@ -717,7 +775,10 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     if (viewMode === 'birth' && !ashtakavargaData) return null;
     if ((viewMode === 'transit' || viewMode === 'comparison') && !transitData) {
       return transitLoading ? (
-        <div className="loading">Loading transit ashtakavarga…</div>
+        <AshtakavargaProgressState
+          title="Loading transit Ashtakavarga"
+          description="Computing transit positions and bindus for your selected date…"
+        />
       ) : (
         <div className="loading">
           <p>Could not load transit data.</p>
@@ -831,7 +892,10 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
   const renderTransitRecommendations = () => {
     if (!transitData) {
       return transitLoading ? (
-        <div className="loading">Loading transit analysis…</div>
+        <AshtakavargaProgressState
+          title="Loading transit analysis"
+          description="Personalized timing, favorable windows, and birth vs transit comparison…"
+        />
       ) : (
         <div className="loading">
           <p>No transit data.</p>
@@ -922,7 +986,11 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
             <label>Select Event Type:</label>
             {eventTypeSelect}
           </div>
-          <div className="loading">Loading predictions…</div>
+          <AshtakavargaProgressState
+            compact
+            title="Loading event predictions"
+            description="Scoring windows for the selected life area…"
+          />
         </div>
       );
     }
@@ -1180,7 +1248,11 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
 
       <div className="modal-content">
         {ashtakLoading && !ashtakavargaData ? (
-          <div className="loading">Calculating Ashtakavarga...</div>
+          <AshtakavargaProgressState
+            title="Computing Ashtakavarga"
+            description="Sarvashtakavarga totals, planetary BAV, and chart context from Swiss Ephemeris…"
+            hint={variant === 'page' ? 'Full-page tool — charts appear below when ready' : undefined}
+          />
         ) : !ashtakavargaData ? (
           <div className="loading">
             <p>Failed to load Ashtakavarga data. Please try again.</p>

@@ -5,7 +5,7 @@ export const WidgetContainer = styled.div`
   display: flex;
   flex-direction: column;
   background: white;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border: 1px solid #e9ecef;
@@ -25,7 +25,7 @@ export const WidgetHeader = styled.div`
   padding: 0.25rem 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   background: linear-gradient(135deg, #ffcc80 0%, #ff8a65 100%);
-  border-radius: 16px 16px 0 0;
+  border-radius: 0;
   
   @media (max-width: 768px) {
     padding: 0.2rem 0.4rem;
@@ -62,7 +62,7 @@ export const DashaContainer = styled.div`
   overflow-y: auto;
   overflow-x: hidden;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 0 0 16px 16px;
+  border-radius: 0;
   backdrop-filter: blur(10px);
   -webkit-overflow-scrolling: touch;
   
@@ -83,7 +83,7 @@ export const DashaTable = styled.table`
   width: 100%;
   border-collapse: collapse;
   font-size: 0.65rem;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   table-layout: fixed;

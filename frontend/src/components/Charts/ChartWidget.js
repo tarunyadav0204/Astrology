@@ -8,7 +8,18 @@ import { WidgetContainer, WidgetHeader, WidgetTitle, StyleToggle, ChartContainer
 import AshtakavargaModal from '../Ashtakavarga/AshtakavargaModal';
 import ShadbalaModal from '../Shadbala/ShadbalaModal';
 
-const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, division, defaultStyle, chartRefHighlight = null }) => {
+const ChartWidget = ({
+  title,
+  chartType,
+  chartData,
+  birthData,
+  transitDate,
+  division,
+  defaultStyle,
+  chartRefHighlight = null,
+  /** Flat toolbar + square corners when embedded in Parashara dashboard (avoids stacked “headers”) */
+  embedInDashboard = false,
+}) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
   const [showMaximized, setShowMaximized] = useState(false);
@@ -140,9 +151,11 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
   };
   
   return (
-    <WidgetContainer>
-      <WidgetHeader>
-        <WidgetTitle title={title}>{title}</WidgetTitle>
+    <WidgetContainer $embedInDashboard={embedInDashboard}>
+      <WidgetHeader $embedInDashboard={embedInDashboard}>
+        <WidgetTitle title={title} $embedInDashboard={embedInDashboard}>
+          {title}
+        </WidgetTitle>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden' }}>
           <button
             onClick={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
@@ -274,7 +287,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
         </div>
       </WidgetHeader>
       
-      <ChartContainer>
+      <ChartContainer $embedInDashboard={embedInDashboard}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#666' }}>
             Calculating divisional chart...

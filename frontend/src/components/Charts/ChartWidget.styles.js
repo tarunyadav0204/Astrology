@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 export const WidgetContainer = styled.div`
   height: 100%;
@@ -7,10 +7,32 @@ export const WidgetContainer = styled.div`
   background: white;
   border-radius: 8px;
   overflow: hidden;
+
+  ${({ $embedInDashboard }) =>
+    $embedInDashboard &&
+    css`
+      border-radius: 0;
+      border: 1px solid #e5e0e3;
+      box-shadow: none;
+      background: #fff;
+    `}
   
   @media (max-width: 768px) {
     min-height: 350px;
     overflow: visible;
+
+    ${({ $embedInDashboard }) =>
+      $embedInDashboard &&
+      css`
+        width: 100%;
+        max-width: 100%;
+        min-height: 0;
+        flex: 1;
+        border: none;
+        border-radius: 0;
+        margin: 0;
+        box-sizing: border-box;
+      `}
   }
   
   .nadi-mobile & {
@@ -32,12 +54,28 @@ export const WidgetHeader = styled.div`
   flex-shrink: 0;
   gap: 0.5rem;
   min-width: 0;
+
+  ${({ $embedInDashboard }) =>
+    $embedInDashboard &&
+    css`
+      background: #f3f1f2;
+      border-bottom: 1px solid #e5e0e3;
+      border-radius: 0;
+      padding: 0.32rem 0.5rem;
+    `}
   
   @media (max-width: 768px) {
     padding: 0.5rem 0.75rem;
     gap: 0.25rem;
     min-height: 44px;
     flex-wrap: nowrap;
+
+    ${({ $embedInDashboard }) =>
+      $embedInDashboard &&
+      css`
+        padding: 0 max(0px, env(safe-area-inset-left, 0px)) 0 max(0px, env(safe-area-inset-right, 0px));
+        min-height: 36px;
+      `}
   }
 `;
 
@@ -52,11 +90,27 @@ export const WidgetTitle = styled.h3`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  ${({ $embedInDashboard }) =>
+    $embedInDashboard &&
+    css`
+      color: #3d3a3c;
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.01em;
+    `}
   
   @media (max-width: 768px) {
     font-size: 0.85rem;
     flex: 0 1 auto;
     max-width: 120px;
+
+    ${({ $embedInDashboard }) =>
+      $embedInDashboard &&
+      css`
+        font-size: 0.78rem;
+        max-width: min(42%, 140px);
+      `}
   }
 `;
 
@@ -99,6 +153,14 @@ export const ChartContainer = styled.div`
   border-radius: 0 0 15px 15px;
   position: relative;
   overflow: hidden;
+
+  ${({ $embedInDashboard }) =>
+    $embedInDashboard &&
+    css`
+      border-radius: 0;
+      background: #fff;
+      padding: 0.15rem 0.2rem 0.35rem;
+    `}
   
   svg {
     width: 100%;
@@ -110,6 +172,16 @@ export const ChartContainer = styled.div`
   
   @media (max-width: 768px) {
     padding: 0;
+
+    ${({ $embedInDashboard }) =>
+      $embedInDashboard &&
+      css`
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      `}
     
     svg {
       min-height: 280px;
@@ -117,5 +189,15 @@ export const ChartContainer = styled.div`
       height: auto;
       aspect-ratio: 1;
     }
+
+    ${({ $embedInDashboard }) =>
+      $embedInDashboard &&
+      css`
+        svg {
+          min-height: 0;
+          width: 100%;
+          max-width: 100%;
+        }
+      `}
   }
 `;

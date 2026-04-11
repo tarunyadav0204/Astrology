@@ -46,7 +46,7 @@ export const GridContainer = styled.div`
 `;
 
 export const GridItem = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['chart', 'dasha', 'chartSpan'].includes(prop),
+  shouldForwardProp: (prop) => !['chart', 'dasha', 'chartSpan', 'chartFlat'].includes(prop),
 })`
   background: rgba(255, 255, 255, 0.95);
   border-radius: 20px;
@@ -74,6 +74,27 @@ export const GridItem = styled.div.withConfig({
     border-color: rgba(255, 255, 255, 0.6);
     background: rgba(255, 255, 255, 1);
   }
+
+  ${(props) =>
+    props.chartFlat &&
+    `
+    border-radius: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e0e3;
+    background: #fff;
+    backdrop-filter: none;
+
+    &::before {
+      display: none;
+    }
+
+    &:hover {
+      transform: none;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      border-color: #dcd6d9;
+      background: #fff;
+    }
+  `}
   
   ${props => props.chart && `
     grid-column: span 1;

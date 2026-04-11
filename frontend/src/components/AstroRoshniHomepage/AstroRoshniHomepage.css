@@ -5504,34 +5504,21 @@
   }
 }
 
-/* Homepage — full-page astrological tools hub */
-.astro-tools-hub-section {
-  padding: 36px 0 8px;
-  background: linear-gradient(180deg, #fff8fb 0%, #ffffff 100%);
-}
-
-.astro-tools-hub-title {
-  margin: 0 0 8px;
-  font-size: 1.5rem;
-  color: #880e4f;
-  text-align: center;
-}
-
-.astro-tools-hub-subtitle {
-  margin: 0 auto 24px;
-  max-width: 520px;
-  text-align: center;
-  color: #666;
-  font-size: 0.95rem;
-  line-height: 1.5;
+/* Ashtakavarga (and future rows) under Vedic Astrology Tools header */
+.vedic-tools-featured {
+  width: 100%;
+  max-width: min(520px, 100%);
+  margin: 0 auto 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
 }
 
 .astro-tools-hub-grid {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 520px;
-  margin: 0 auto 28px;
+  width: 100%;
+  margin: 0;
 }
 
 .astro-tools-hub-card {
