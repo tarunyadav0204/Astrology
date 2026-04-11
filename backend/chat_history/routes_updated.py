@@ -680,7 +680,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             conversation_history=history,
             language=language,
             response_style=response_style,
-            premium_analysis=premium_analysis
+            premium_analysis=premium_analysis,
+            use_thinking_level_high=True,
         )
         
         # Update database with result

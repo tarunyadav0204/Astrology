@@ -46,6 +46,7 @@ import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
 import AstroVastuTool from './components/AstroVastu/AstroVastuTool';
 import KundliMatchingPage from './components/MarriageAnalysis/KundliMatchingPage';
 import EventsTimelinePage from './components/Events/EventsTimelinePage';
+import AshtakavargaToolPage from './components/Ashtakavarga/AshtakavargaToolPage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import BlogList from './components/Blog/BlogList';
 import BlogPost from './components/Blog/BlogPost';
@@ -56,11 +57,11 @@ import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
 import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/domains.config';
 
-/** Hide “Ask Tara” FAB on full-page chat (same route). When logged out, open the app login modal like other auth-gated actions. */
+/** Hide “Ask Tara” FAB on full-page chat and dedicated tool pages (e.g. Ashtakavarga) where it overlaps the UI. */
 function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  if (pathname === '/chat') return null;
+  if (pathname === '/chat' || pathname.startsWith('/tools/')) return null;
   const handleOpenChat = () => {
     if (user) {
       navigate('/chat');
@@ -636,6 +637,17 @@ function App() {
             path="/life-events"
             element={<EventsTimelinePage onLogin={() => setShowLoginModal(true)} />}
           />
+          <Route
+            path="/tools/ashtakavarga"
+            element={
+              <AshtakavargaToolPage
+                user={null}
+                onLogout={() => {}}
+                onAdminClick={() => {}}
+                onLogin={() => setShowLoginModal(true)}
+              />
+            }
+          />
           <Route path="/policy" element={<PolicyPage />} />
           <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -756,6 +768,17 @@ function App() {
             path="/life-events"
             element={
               <EventsTimelinePage
+                user={user}
+                onLogout={handleLogout}
+                onAdminClick={handleAdminClick}
+                onLogin={() => setShowLoginModal(true)}
+              />
+            }
+          />
+          <Route
+            path="/tools/ashtakavarga"
+            element={
+              <AshtakavargaToolPage
                 user={user}
                 onLogout={handleLogout}
                 onAdminClick={handleAdminClick}

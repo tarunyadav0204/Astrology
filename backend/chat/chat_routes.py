@@ -378,7 +378,17 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 # Get mode from intent_result, with a fallback to default
                 mode = intent_result.get('mode', 'default')
                 
-                ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style, user_context, request.premium_analysis, mode=mode)
+                ai_result = await gemini_analyzer.generate_chat_response(
+                    enhanced_question,
+                    context,
+                    history,
+                    request.language,
+                    request.response_style,
+                    user_context,
+                    request.premium_analysis,
+                    mode=mode,
+                    use_thinking_level_high=(intent_result.get('status') == 'READY'),
+                )
                 
                 # print(f"AI result success: {ai_result.get('success')}")
                 # print(f"AI result keys: {list(ai_result.keys())}")

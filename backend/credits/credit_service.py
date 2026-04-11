@@ -209,6 +209,7 @@ class CreditService:
                 ("event_timeline_cost", 100, "Credits per yearly event timeline analysis"),
                 ("partnership_analysis_cost", 2, "Credits per partnership compatibility analysis"),
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
+                ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
             ]
             for key, value, desc in defaults:
@@ -879,7 +880,7 @@ class CreditService:
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
-            'event_timeline_cost', 'karma_analysis_cost', 'podcast_cost'
+            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost'
         )
         placeholders = ", ".join(["?"] * len(keys))
         with get_conn() as conn:

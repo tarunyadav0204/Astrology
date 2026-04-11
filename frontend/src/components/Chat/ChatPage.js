@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
+import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
 import BirthFormModal from '../BirthForm/BirthFormModal';
@@ -520,7 +521,7 @@ const ChatPage = () => {
     };
 
     useEffect(() => {
-        scrollToBottom();
+        return scrollChatThreadAfterMessagesChange(messages, scrollToBottom);
     }, [messages]);
 
     const addGreetingMessage = (overrideText = null) => {
@@ -2272,11 +2273,9 @@ const ChatPage = () => {
                                     </button>
                                 )}
                             </h1>
-                            {(isMundaneMode || isPartnershipMode || isAdmin) && (
+                            {(isMundaneMode || isPartnershipMode) && (
                                 <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">
-                                    {isMundaneMode ? 'Mundane context' : isPartnershipMode ? 'Two-chart analysis' : ''}
-                                    {isAdmin &&
-                                        (isMundaneMode || isPartnershipMode ? ' · Admin' : 'Admin')}
+                                    {isMundaneMode ? 'Mundane context' : 'Two-chart analysis'}
                                 </p>
                             )}
                         </div>

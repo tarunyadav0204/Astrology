@@ -22,6 +22,85 @@ for env_path in env_paths:
         load_dotenv(env_path)
         break
 
+
+def _env_chat_thinking_level_high_enabled() -> bool:
+    """Opt out with GEMINI_CHAT_THINKING_LEVEL_HIGH=false if the REST thinking path misbehaves."""
+    raw = (os.getenv("GEMINI_CHAT_THINKING_LEVEL_HIGH") or "true").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def _normalize_model_id_for_rest(model_name: str) -> str:
+    n = (model_name or "").strip()
+    if n.startswith("models/"):
+        n = n[len("models/") :]
+    return n
+
+
+def _model_supports_gemini3_thinking_level(model_name: str) -> bool:
+    """
+    thinkingConfig.thinkingLevel is for Gemini 3+ (REST). Gemini 2.5 uses thinkingBudget instead;
+    sending thinkingLevel to 2.5 can error, so we only enable for gemini-3* ids.
+    """
+    mid = _normalize_model_id_for_rest(model_name).lower()
+    return "gemini-3" in mid
+
+
+def _extract_text_from_generate_content_json(data: Dict[str, Any]) -> str:
+    chunks: List[str] = []
+    for cand in data.get("candidates") or []:
+        content = cand.get("content") or {}
+        for part in content.get("parts") or []:
+            if part.get("thought"):
+                continue
+            t = part.get("text")
+            if t:
+                chunks.append(t)
+    return "".join(chunks).strip()
+
+
+def _generate_content_rest_v1beta(
+    model_name: str,
+    prompt: str,
+    api_key: str,
+    thinking_level: str = "high",
+) -> str:
+    """Synchronous REST call; run via asyncio.to_thread. Adds thinkingConfig for Gemini 3."""
+    import requests
+
+    mid = _normalize_model_id_for_rest(model_name)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
+    body: Dict[str, Any] = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0,
+            "topP": 0.95,
+            "topK": 40,
+            "thinkingConfig": {"thinkingLevel": thinking_level},
+        },
+    }
+    r = requests.post(url, params={"key": api_key}, json=body, timeout=600)
+    if not r.ok:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise RuntimeError(f"Gemini REST {r.status_code}: {detail}")
+    data = r.json()
+    if data.get("promptFeedback", {}).get("blockReason"):
+        raise RuntimeError(f"Prompt blocked: {data.get('promptFeedback')}")
+    text = _extract_text_from_generate_content_json(data)
+    if not text:
+        raise RuntimeError("Empty candidates/parts in Gemini REST response")
+    return text
+
+
+class _SimpleTextResponse:
+    __slots__ = ("text",)
+
+    def __init__(self, text: str):
+        self.text = text or ""
+
+
 class GeminiChatAnalyzer:
     """Gemini AI integration for astrological chat conversations"""
     
@@ -98,8 +177,25 @@ class GeminiChatAnalyzer:
             print(f"⚠️ Model {name} not available ({e}), using fallback")
             return self.premium_model if premium_analysis and self.premium_model else self.model
     
-    async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False, mode: str = 'default') -> Dict[str, Any]:
-        """Generate chat response using astrological context - ASYNC VERSION"""
+    async def generate_chat_response(
+        self,
+        user_question: str,
+        astrological_context: Dict[str, Any],
+        conversation_history: List[Dict] = None,
+        language: str = "english",
+        response_style: str = "detailed",
+        user_context: Dict = None,
+        premium_analysis: bool = False,
+        mode: str = "default",
+        *,
+        use_thinking_level_high: bool = False,
+    ) -> Dict[str, Any]:
+        """Generate chat response using astrological context - ASYNC VERSION.
+
+        use_thinking_level_high: When True (main chat only, after intent READY — not clarifications),
+        uses REST v1beta with generationConfig.thinkingConfig.thinkingLevel=high for Gemini 3 models.
+        Other models or failures fall back to the standard SDK call.
+        """
         import time
         from utils.admin_settings import is_debug_logging_enabled
         
@@ -213,14 +309,44 @@ class GeminiChatAnalyzer:
                 prompt_char_count = len(prompt)
                 print(f"\n📏 GEMINI REQUEST SIZE: {prompt_char_count:,} characters ({prompt_size / 1024:.1f} KB)")
                 
-            # CALL GEMINI ASYNC DIRECTLY with SDK timeout
-            response = await asyncio.wait_for(
-                selected_model.generate_content_async(
-                    prompt,
-                    request_options={'timeout': 600}
-                ),
-                timeout=600.0
+            api_key = os.getenv("GEMINI_API_KEY") or ""
+            try_high_thinking = (
+                use_thinking_level_high
+                and _env_chat_thinking_level_high_enabled()
+                and bool(api_key)
+                and _model_supports_gemini3_thinking_level(model_name)
             )
+            response = None
+            if try_high_thinking:
+                try:
+                    print(
+                        f"🧩 Gemini chat: using REST thinkingLevel=high (model={model_name})"
+                    )
+                    raw = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            _generate_content_rest_v1beta,
+                            model_name,
+                            prompt,
+                            api_key,
+                            "high",
+                        ),
+                        timeout=600.0,
+                    )
+                    response = _SimpleTextResponse(raw)
+                except Exception as rest_err:
+                    print(
+                        f"⚠️ REST thinkingLevel path failed ({type(rest_err).__name__}: {rest_err}); "
+                        f"falling back to google-generativeai SDK"
+                    )
+            if response is None:
+                # Standard path (clarifications never reach here when caller passes use_thinking_level_high correctly)
+                response = await asyncio.wait_for(
+                    selected_model.generate_content_async(
+                        prompt,
+                        request_options={"timeout": 600},
+                    ),
+                    timeout=600.0,
+                )
             
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start

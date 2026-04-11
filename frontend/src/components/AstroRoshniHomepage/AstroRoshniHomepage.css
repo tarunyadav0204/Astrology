@@ -5503,3 +5503,102 @@
     align-items: center;
   }
 }
+
+/* Homepage — full-page astrological tools hub */
+.astro-tools-hub-section {
+  padding: 36px 0 8px;
+  background: linear-gradient(180deg, #fff8fb 0%, #ffffff 100%);
+}
+
+.astro-tools-hub-title {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  color: #880e4f;
+  text-align: center;
+}
+
+.astro-tools-hub-subtitle {
+  margin: 0 auto 24px;
+  max-width: 520px;
+  text-align: center;
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.astro-tools-hub-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 520px;
+  margin: 0 auto 28px;
+}
+
+.astro-tools-hub-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid rgba(233, 30, 99, 0.2);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(136, 14, 79, 0.08);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.astro-tools-hub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(136, 14, 79, 0.12);
+}
+
+.astro-tools-hub-card:focus-visible {
+  outline: 2px solid #e91e63;
+  outline-offset: 2px;
+}
+
+.astro-tools-hub-card__icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 1.35rem;
+  background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+  color: #ad1457;
+}
+
+.astro-tools-hub-card--ashtakavarga .astro-tools-hub-card__icon {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.astro-tools-hub-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.astro-tools-hub-card__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #880e4f;
+}
+
+.astro-tools-hub-card__desc {
+  font-size: 0.88rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.astro-tools-hub-card__arrow {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  color: #e91e63;
+}

@@ -1,5 +1,35 @@
 import swisseph as swe
 
+
+def _safe_gemini_response_text(response):
+    """
+    Read text from a google-generativeai GenerateContentResponse.
+    Blocked or empty candidates often make .text raise ValueError.
+    """
+    if response is None:
+        return None, "empty response"
+    try:
+        text = response.text
+    except (ValueError, AttributeError) as e:
+        detail = str(e)
+        try:
+            pf = getattr(response, "prompt_feedback", None)
+            if pf is not None:
+                detail = f"{detail} | prompt_feedback={pf}"
+            cands = getattr(response, "candidates", None) or []
+            for c in cands:
+                fr = getattr(c, "finish_reason", None)
+                if fr is not None:
+                    detail = f"{detail} | finish_reason={fr}"
+                    break
+        except Exception:
+            pass
+        return None, detail
+    if text is None or not str(text).strip():
+        return None, "model returned empty text"
+    return str(text).strip(), None
+
+
 class AshtakavargaCalculator:
     def __init__(self, birth_data, chart_data):
         self.birth_data = birth_data
@@ -361,13 +391,15 @@ class AshtakavargaCalculator:
                 return {"error": "Gemini API key not configured"}
             
             genai.configure(api_key=api_key)
-            from utils.admin_settings import get_gemini_analysis_model
-            model = genai.GenerativeModel(get_gemini_analysis_model())
+            from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
+            preferred = get_gemini_analysis_model()
+            model_names = [preferred] + [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != preferred]
             
             # Prepare comprehensive data payload
             sarva = self.calculate_sarvashtakavarga()
             bindus = sarva['sarvashtakavarga']
             individual_charts = sarva['individual_charts']
+            sav_house_reference = self._sav_reference_for_lagna_and_signs(bindus)
             
             # Build complete data package
             data_payload = {
@@ -382,6 +414,12 @@ class AshtakavargaCalculator:
                     "planets": self.chart_data['planets']
                 },
                 "sarvashtakavarga": bindus,
+                "sarvashtakavarga_key_legend": (
+                    "Each key is a ZODIAC SIGN index: 0=Aries, 1=Taurus, 2=Gemini, 3=Cancer, 4=Leo, 5=Virgo, "
+                    "6=Libra, 7=Scorpio, 8=Sagittarius, 9=Capricorn, 10=Aquarius, 11=Pisces. "
+                    "These are NOT house numbers from lagna."
+                ),
+                "sav_per_house_from_ascendant": sav_house_reference,
                 "bhinnashtakavarga": individual_charts,
                 "current_dashas": dasha_data,
                 "current_transits": transit_data,
@@ -394,69 +432,123 @@ Role: You are an expert Vedic Astrologer specializing in the Ashtakavarga system
 
 Task: Analyze the provided JSON data to make predictions for the user's current life phase.
 
+CRITICAL — SARVASHTAKAVARGA NUMBERS AND HOUSES:
+- The object `sarvashtakavarga` uses keys "0" through "11" for the TWELVE ZODIAC SIGNS (fixed wheel), NOT for "House 1" through "House 12" from the ascendant.
+- Whenever you mention a HOUSE NUMBER (1-12 counted from the ascendant / lagna) together with a bindu count, you MUST take `sarvashtakavarga_bindus` ONLY from `sav_per_house_from_ascendant.houses` for that exact `house_from_ascendant`. The `sign_occupied` field must match the same row.
+- Never assign a bindu count from one house or sign to a different house. Never invent or round bindu values.
+- For Saturn/Jupiter transit strength vs SAV, use `sav_per_zodiac_sign` inside `sav_per_house_from_ascendant` together with the transit sign (derive sign from transit longitude).
+
 Methodology:
 
-1. Sarvashtakavarga (SAV) Analysis: Identify "Strong" signs (>30 points) and "Weak" signs (<25 points) as defined in Dots of Destiny.
+1. Sarvashtakavarga (SAV) Analysis: Using ONLY `sav_per_house_from_ascendant.houses`, list strong houses (typically >30 bindus) and weak houses (typically <25). In `strong_areas` / `challenging_areas`, each string MUST follow: "House H (X bindus, SignName) — …" where H, X, and SignName are copied exactly from one row.
 
 2. Transit Logic (The Trigger):
    - Saturn: Analyze Saturn's current transit. If it is in a sign with low SAV points (<25), predict a period of struggle or karmic settlement. If >30, predict structural growth.
    - Jupiter: If Jupiter transits a high-point sign (>30), predict expansion and opportunity.
 
-3. Dasha Synthesis: Weight the Dasha Lord's results based on the Ashtakavarga strength of its natal house.
+3. Dasha Synthesis: Weight the Dasha Lord's results based on the Ashtakavarga strength of its natal house and the house it rules; mention antardasha only if clearly supported by the payload.
 
 4. Kakshya Analysis (Prastar): If precise planetary degrees are available, check which Kakshya (orbital zone) Saturn and Jupiter are transiting. If they transit a Kakshya with a Bindu, predict immediate results (as per Vinay Aditya's Prastar rules).
+
+5. Bhinnashtakavarga (BAV): Use `bhinnashtakavarga` totals and bindu patterns for at least the ascendant lord, the Moon, and the 10th-house lord (from lagna). Explain how their personal Ashtakavarga modifies the raw SAV story (e.g. a weak house in SAV but strong in that graha's BAV suggests partial relief when that planet is active).
+
+6. Rahu and Ketu: Comment briefly on nodes transiting high vs low SAV signs (psychological and event tone), without inventing degrees.
+
+7. Depth and tone: Avoid generic horoscope filler. Every paragraph should tie to concrete houses/bindus or named grahas from the JSON. Prefer practical, specific guidance over vague encouragement.
+
+8. `timing_highlights`: Give 3–5 forward-looking windows (e.g. "next ~3 months", "when Jupiter enters …") grounded in current transits + SAV of the sign being entered.
 
 Data:
 {json.dumps(data_payload, indent=2)}
 
-Provide predictions in this JSON format:
+Provide predictions in this JSON format (fill every top-level key; use substantial text, not one-liners):
 {{
   "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
-  "current_life_phase": "Brief description of current phase",
+  "current_life_phase": "3–6 sentences: dasha + SAV + one transit hook",
   "sav_strength_analysis": {{
-    "strong_areas": ["List of strong life areas"],
-    "challenging_areas": ["List of areas needing attention"],
-    "overall_pattern": "Overall life pattern interpretation"
+    "strong_areas": ["Example: House 12 (35 bindus, Gemini) — … (numbers and sign must match sav_per_house_from_ascendant.houses)"],
+    "challenging_areas": ["Example: House 8 (22 bindus, Aquarius) — …"],
+    "overall_pattern": "4–8 sentences weaving strong vs weak houses into a coherent life story"
   }},
+  "life_domain_insights": {{
+    "vitality_and_personality": "2–5 sentences (house 1; ascendant lord BAV if relevant)",
+    "wealth_family_speech": "2–5 sentences (houses 2, 11 where applicable)",
+    "courage_siblings_skills": "2–5 sentences (house 3)",
+    "home_comfort_mother": "2–5 sentences (house 4)",
+    "children_creativity_speculation": "2–5 sentences (house 5)",
+    "health_service_obstacles": "2–5 sentences (house 6)",
+    "partnerships_marriage": "2–5 sentences (house 7)",
+    "longevity_shared_resources": "2–5 sentences (house 8)",
+    "fortune_dharma_father": "2–5 sentences (house 9)",
+    "career_reputation": "2–5 sentences (house 10; 10th lord BAV)",
+    "gains_network_aspirations": "2–5 sentences (house 11)",
+    "expenses_moksha_rest": "2–5 sentences (house 12)"
+  }},
+  "timing_highlights": [
+    {{"window": "e.g. next 3–4 months", "focus": "what to push or avoid", "ashtakavarga_basis": "cite house/sign/bindu from data only"}}
+  ],
   "transit_predictions": {{
-    "saturn_influence": "Saturn's current impact",
-    "jupiter_influence": "Jupiter's current impact",
-    "timing_recommendations": ["Specific timing advice"]
+    "saturn_influence": "4–8 sentences with sign + SAV bindus for Saturn's current sign",
+    "jupiter_influence": "4–8 sentences with sign + SAV bindus for Jupiter's current sign",
+    "rahu_ketu_influence": "2–4 sentences",
+    "timing_recommendations": ["3–6 bullets, specific and tied to SAV/transits"]
   }},
   "dasha_analysis": {{
-    "current_period_strength": "Strength of current dasha lord",
-    "expected_results": "What to expect in current dasha",
-    "recommendations": ["Specific recommendations"]
+    "current_period_strength": "3–6 sentences",
+    "expected_results": "4–8 sentences",
+    "recommendations": ["3–6 specific recommendations"]
   }},
   "life_predictions": {{
-    "next_6_months": "Predictions for next 6 months",
-    "next_year": "Predictions for next year",
-    "major_themes": ["Key life themes to focus on"]
+    "next_6_months": "Substantial paragraph(s)",
+    "next_year": "Substantial paragraph(s)",
+    "major_themes": ["5–8 concrete themes tied to houses or grahas"]
   }},
-  "remedial_measures": ["Specific remedies based on weak Ashtakavarga areas"]
+  "remedial_measures": ["5–8 remedies: lifestyle, timing, or gentle practices tied to weak houses — avoid medical/legal claims"]
 }}
 """
             
-            # Generate predictions with error logging
+            # Generate predictions with error logging (try admin model, then stable fallbacks)
             print(f"🔮 Calling Gemini API for life predictions...")
             print(f"📊 Prompt length: {len(prompt)} characters")
-            print(f"🎯 Model: {get_gemini_analysis_model()}")
-            print(f"📤 REQUEST PROMPT:\n{prompt[:1000]}...")
-            
-            response = model.generate_content(prompt)
-            
-            print(f"✅ Gemini API call successful")
-            print(f"📝 Response length: {len(response.text) if response and response.text else 0} characters")
-            print(f"📥 RESPONSE TEXT:\n{response.text[:1000] if response and response.text else 'No response'}...")
-            
+            print(f"📤 REQUEST PROMPT (preview):\n{prompt[:1000]}...")
+
+            response_text = None
+            last_model_error = None
+            response = None
+            for model_name in model_names:
+                try:
+                    print(f"🎯 Trying model: {model_name}")
+                    model = genai.GenerativeModel(model_name)
+                    response = model.generate_content(prompt)
+                    response_text, extract_err = _safe_gemini_response_text(response)
+                    if response_text:
+                        print(f"✅ Gemini API call successful with {model_name}")
+                        print(f"📝 Response length: {len(response_text)} characters")
+                        print(f"📥 RESPONSE TEXT (preview):\n{response_text[:1000]}...")
+                        break
+                    last_model_error = extract_err or "no usable text"
+                    print(f"⚠️ Model {model_name}: {last_model_error}")
+                except Exception as call_err:
+                    last_model_error = f"{type(call_err).__name__}: {call_err}"
+                    print(f"⚠️ Model {model_name} failed: {last_model_error}")
+                    continue
+
+            if not response_text:
+                return {
+                    "error": (
+                        "Could not get a valid response from Gemini "
+                        f"(tried {len(model_names)} model(s)). Last error: {last_model_error}"
+                    ),
+                    "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
+                    "error_type": "GeminiNoText",
+                }
+
             # Parse JSON response
             try:
-                # Extract JSON from response
-                response_text = response.text
                 # Find JSON block in response
                 start_idx = response_text.find('{')
                 end_idx = response_text.rfind('}') + 1
-                
+
                 if start_idx != -1 and end_idx != -1:
                     json_str = response_text[start_idx:end_idx]
                     predictions = json.loads(json_str)
@@ -473,7 +565,7 @@ Provide predictions in this JSON format:
                 print(f"📄 JSON string attempted: {json_str[:500] if 'json_str' in locals() else 'N/A'}...")
                 predictions = {
                     "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
-                    "raw_response": response.text,
+                    "raw_response": response_text,
                     "note": "AI response received but JSON parsing failed"
                 }
             
@@ -499,6 +591,49 @@ Provide predictions in this JSON format:
                 "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
                 "error_type": type(e).__name__
             }
+
+    def _sav_reference_for_lagna_and_signs(self, bindus_str_keyed):
+        """
+        SAV totals in this codebase are keyed by zodiac sign index 0=Aries ... 11=Pisces.
+        The app UI shows houses 1-12 from the ascendant. The model must not confuse the two.
+        """
+        sign_names = [
+            'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+            'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
+        ]
+
+        def pts(si):
+            k = str(si)
+            v = bindus_str_keyed.get(k)
+            if v is None:
+                v = bindus_str_keyed.get(si)
+            return int(v) if v is not None else 0
+
+        asc_deg = float(self.chart_data['ascendant'])
+        asc_sign = int(asc_deg / 30) % 12
+
+        houses = []
+        for house in range(1, 13):
+            sign_idx = (asc_sign + house - 1) % 12
+            houses.append({
+                "house_from_ascendant": house,
+                "sign_occupied": sign_names[sign_idx],
+                "sign_index_0_Aries_to_11_Pisces": sign_idx,
+                "sarvashtakavarga_bindus": pts(sign_idx),
+            })
+
+        sav_per_zodiac_sign = {sign_names[i]: pts(i) for i in range(12)}
+
+        return {
+            "note": (
+                "sarvashtakavarga keys 0-11 are ZODIAC SIGNS (not house numbers). "
+                "For house-specific bindus, use only `houses` below."
+            ),
+            "ascendant_sign": sign_names[asc_sign],
+            "ascendant_sign_index": asc_sign,
+            "houses": houses,
+            "sav_per_zodiac_sign": sav_per_zodiac_sign,
+        }
     
     def _get_current_date(self):
         """Get current date for analysis"""

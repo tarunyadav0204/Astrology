@@ -5334,49 +5334,141 @@ async def get_complete_ashtakavarga_oracle(request: dict, current_user: User = D
 
 @app.post("/api/ashtakavarga/life-predictions")
 async def generate_ashtakavarga_life_predictions(request: dict, current_user: User = Depends(get_current_user)):
-    """Generate life predictions using Vinay Aditya's 'Dots of Destiny' methodology"""
+    """Generate or return cached life predictions (Dots of Destiny). Credits only on fresh successful generation."""
+    from calculators.ashtakavarga import AshtakavargaCalculator
+    from calculators.ashtakavarga_life_predictions_cache import (
+        birth_fingerprint,
+        ensure_life_predictions_table,
+        fetch_cached_payload,
+        store_life_predictions_cache,
+        prediction_payload_is_successful,
+    )
+    from credits.credit_service import CreditService
+
+    credit_service = CreditService()
+    methodology_note = "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings"
+    base_cost = max(1, int(credit_service.get_credit_setting("ashtakavarga_life_predictions_cost")))
+    prediction_cost = credit_service.get_effective_cost(
+        current_user.userid, base_cost, "ashtakavarga_life_predictions_cost"
+    )
+
     try:
-        from calculators.ashtakavarga import AshtakavargaCalculator
-        
-        birth_data = BirthData(**request['birth_data'])
-        
-        # Calculate chart data
+        raw_birth = request.get("birth_data")
+        if not raw_birth:
+            raise HTTPException(status_code=400, detail="birth_data is required")
+        force_regenerate = bool(request.get("force_regenerate", False))
+        cache_probe = bool(request.get("cache_probe", False))
+
+        birth_data = BirthData(**raw_birth)
+        bh = birth_fingerprint(
+            {
+                "date": birth_data.date,
+                "time": birth_data.time,
+                "latitude": birth_data.latitude,
+                "longitude": birth_data.longitude,
+            }
+        )
+
+        # Fast path: only check DB — no credits, no generation (mobile uses before credit modal)
+        if cache_probe:
+            if force_regenerate:
+                return {"cached": False, "credit_cost_next": prediction_cost}
+            with get_conn() as conn:
+                ensure_life_predictions_table(conn)
+                cached = fetch_cached_payload(conn, current_user.userid, bh)
+                conn.commit()
+            if cached and prediction_payload_is_successful(cached.get("predictions")):
+                return {
+                    **cached,
+                    "cached": True,
+                    "credits_charged": 0,
+                    "credit_cost_next": prediction_cost,
+                }
+            return {"cached": False, "credit_cost_next": prediction_cost}
+
+        if not force_regenerate:
+            with get_conn() as conn:
+                ensure_life_predictions_table(conn)
+                cached = fetch_cached_payload(conn, current_user.userid, bh)
+                conn.commit()
+            if cached and prediction_payload_is_successful(cached.get("predictions")):
+                return {
+                    **cached,
+                    "cached": True,
+                    "credits_charged": 0,
+                    "credit_cost_next": prediction_cost,
+                }
+
+        user_balance = credit_service.get_user_credits(current_user.userid)
+        if user_balance < prediction_cost:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Insufficient credits. You need {prediction_cost} credits but have {user_balance}.",
+            )
+
         from calculators.chart_calculator import ChartCalculator
-        calculator = ChartCalculator({})
-        chart_data = calculator.calculate_chart(birth_data, 'mean')
-        
-        # Calculate dasha data
+
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(birth_data, "mean")
         dasha_data = await calculate_accurate_dasha(birth_data)
-        
-        # Calculate current transits
         transit_request = TransitRequest(
             birth_data=birth_data,
-            transit_date=datetime.now().strftime('%Y-%m-%d')
+            transit_date=datetime.now().strftime("%Y-%m-%d"),
         )
         transit_data = await calculate_transits(transit_request)
-        
-        # Initialize Ashtakavarga calculator
-        calculator = AshtakavargaCalculator(birth_data, chart_data)
-        
-        # Generate life predictions using Vinay Aditya's methodology
-        predictions = calculator.generate_life_predictions(dasha_data, transit_data['planets'])
-        
-        return {
-            "birth_info": {
-                "name": birth_data.name,
-                "date": birth_data.date
-            },
+        ashtaka_calc = AshtakavargaCalculator(birth_data, chart_data)
+        predictions = ashtaka_calc.generate_life_predictions(dasha_data, transit_data["planets"])
+
+        response_body = {
+            "birth_info": {"name": birth_data.name, "date": birth_data.date},
             "predictions": predictions,
-            "generated_at": datetime.now().isoformat()
+            "generated_at": datetime.now().isoformat(),
+            "cached": False,
+            "credits_charged": 0,
+            "credit_cost_next": prediction_cost,
         }
-        
+
+        if not prediction_payload_is_successful(predictions):
+            return response_body
+
+        spent = credit_service.spend_credits(
+            current_user.userid,
+            prediction_cost,
+            "ashtakavarga_life_predictions",
+            f"Ashtakavarga life predictions for {birth_data.name or 'user'}",
+        )
+        if spent:
+            response_body["credits_charged"] = prediction_cost
+            response_body["credits_remaining"] = credit_service.get_user_credits(current_user.userid)
+            cache_payload = {
+                "birth_info": response_body["birth_info"],
+                "predictions": response_body["predictions"],
+                "generated_at": response_body["generated_at"],
+            }
+            try:
+                with get_conn() as conn:
+                    ensure_life_predictions_table(conn)
+                    store_life_predictions_cache(conn, current_user.userid, bh, cache_payload)
+                    conn.commit()
+            except Exception as cache_err:
+                print(f"⚠️ Life predictions cache save failed: {cache_err}")
+        else:
+            print("❌ Life predictions: spend_credits failed after generation — not caching")
+
+        return response_body
+
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Life predictions error: {str(e)}")
         import traceback
+
         print(f"Traceback: {traceback.format_exc()}")
         return {
             "error": f"Life predictions generation failed: {str(e)}",
-            "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings"
+            "methodology": methodology_note,
+            "cached": False,
+            "credits_charged": 0,
         }
 
 if __name__ == "__main__":

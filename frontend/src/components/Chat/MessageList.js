@@ -22,6 +22,14 @@ const MessageList = ({ messages, language = 'english', sessionId = null, onMessa
                 <div
                     key={message.id || message.messageId || index}
                     className={`message-list-item message-list-item--${message.role === 'user' ? 'user' : 'assistant'}`}
+                    data-chat-message-index={index}
+                    data-chat-scroll-id={
+                        message.messageId != null
+                            ? String(message.messageId)
+                            : message.id != null
+                              ? String(message.id)
+                              : undefined
+                    }
                 >
                     <div className="message-list-item__stack">
                         <div 

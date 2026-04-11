@@ -31,23 +31,59 @@ astroroshni.com → Your Server IP
 ### 2. Web Server Configuration (Nginx/Apache)
 Configure your web server to serve the same React app for both domains:
 
+Use the **`build`** output folder as `root`, not the parent `frontend` directory. Otherwise visitors can see a directory index (e.g. listing `build/`, `favicon.png`, `images/`) instead of the app.
+
+`maintenance.html` is copied into `build/` from `frontend/public/` on each `npm run build`. Point nginx at it when the upstream static server or API is unreachable.
+
 ```nginx
 server {
     listen 80;
     server_name astrovishnu.com astroroshni.com astroclick.com;
-    
-    location / {
-        try_files $uri $uri/ /index.html;
-        root /path/to/your/react/build;
+
+    # Must be the CRA/Webpack output directory (contains index.html, maintenance.html, static/)
+    root /path/to/your/repo/frontend/build;
+    index index.html;
+    autoindex off;
+
+    # When the static server on 3001 is down (connection refused), nginx returns 502 → serve this from disk
+    # (without this, /maintenance.html would be proxied to 3001 and fail again)
+    error_page 502 503 504 /maintenance.html;
+    location = /maintenance.html {
+        root /path/to/your/repo/frontend/build;
     }
-    
-    location /api {
+
+    location /api/ {
         proxy_pass http://localhost:8001;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
+
+    location / {
+        proxy_intercept_errors on;
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
     }
 }
 ```
+
+If you **serve static files directly** from disk (no proxy to `serve`), use this pattern instead for `/`:
+
+```nginx
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+```
+
+### GCP Application Load Balancer
+
+If traffic hits a **global external Application Load Balancer** instead of nginx on the VM, configure **custom error responses** on the URL map (typically a **backend bucket** in GCS serving `maintenance.html` for **502/503/504**). See **`docs/GCP_APPLICATION_LOAD_BALANCER.md`** and [Configure custom error responses](https://cloud.google.com/load-balancing/docs/https/configure-custom-error-responses).
 
 ### 3. User Type Management
 To mark users as software users, update their user_type in the database:

@@ -1,0 +1,3 @@
+# Avoid directory listings (e.g. "Index of /build/") if the docroot points at this folder.
+Options -Indexes
+DirectoryIndex index.html

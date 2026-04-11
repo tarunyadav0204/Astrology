@@ -325,11 +325,6 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 <button className="profile-btn" onClick={() => navigate('/profile')}>
                   👤 {user.name || user.phone}
                 </button>
-                {user.role === 'admin' && (
-                  <button className="admin-btn" onClick={onAdminClick}>
-                    ⚙️ Admin
-                  </button>
-                )}
                 <button className="auth-btn" onClick={onLogout}>Logout</button>
               </div>
             ) : (

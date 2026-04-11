@@ -10,7 +10,8 @@ import {
   StatusBar,
   Clipboard,
   Alert,
-  Platform,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +23,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AshtakvargaChart from './AshtakvargaChart';
 import DateNavigator from '../Common/DateNavigator';
 import { useTheme } from '../../context/ThemeContext';
+import { useCredits } from '../../credits/CreditContext';
+import { pricingAPI } from '../../services/api';
+import CreditModal from '../CreditModal';
 
 const { width, height } = Dimensions.get('window');
+
+/** Labels for `life_domain_insights` keys from backend life-predictions JSON */
+const LIFE_PREDICTION_DOMAIN_LABELS = {
+  vitality_and_personality: 'Vitality & personality',
+  wealth_family_speech: 'Wealth, family & speech',
+  courage_siblings_skills: 'Courage, siblings & skills',
+  home_comfort_mother: 'Home, comfort & mother',
+  children_creativity_speculation: 'Children, creativity & speculation',
+  health_service_obstacles: 'Health, service & obstacles',
+  partnerships_marriage: 'Partnerships & marriage',
+  longevity_shared_resources: 'Longevity & shared resources',
+  fortune_dharma_father: 'Fortune, dharma & father-guru line',
+  career_reputation: 'Career & reputation',
+  gains_network_aspirations: 'Gains, network & aspirations',
+  expenses_moksha_rest: 'Expenses, rest & liberation themes',
+};
 
 const HOUSE_SIGNIFICATIONS = {
   0: { // House 1
@@ -78,6 +98,7 @@ const HOUSE_SIGNIFICATIONS = {
 
 export default function AshtakvargaOracle({ navigation }) {
   const { theme, colors } = useTheme();
+  const { credits, fetchBalance } = useCredits();
   const [activeTab, setActiveTab] = useState(0);
   const [birthData, setBirthData] = useState(null);
   const [oracleData, setOracleData] = useState(null);
@@ -96,16 +117,39 @@ export default function AshtakvargaOracle({ navigation }) {
 
 
 
+  const [lifePredictionsCreditCost, setLifePredictionsCreditCost] = useState(15);
+  /** null | 'open' (main CTA) | 'regenerate' (modal toolbar) */
+  const [lifePredictionsCreditModalMode, setLifePredictionsCreditModalMode] = useState(null);
+  const [lifePredictionsCacheChecking, setLifePredictionsCacheChecking] = useState(false);
+
   useEffect(() => {
     loadBirthData();
     startAnimations();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await pricingAPI.getPricing();
+        const cost = r?.data?.pricing?.ashtakavarga;
+        if (!cancelled && cost != null && !Number.isNaN(Number(cost))) {
+          setLifePredictionsCreditCost(Math.max(1, Number(cost)));
+        }
+      } catch (_) {
+        /* keep default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   
   useEffect(() => {
     if (birthData) {
       fetchAshtakvargaData(birthData, selectedDate);
     }
-  }, [selectedDate]);
+  }, [birthData, selectedDate]);
 
   const startAnimations = () => {
     Animated.loop(
@@ -436,8 +480,87 @@ export default function AshtakvargaOracle({ navigation }) {
           />
         </View>
 
+        {/* CTA right after SAV: users see value before the BAV strip (which is exploratory / advanced) */}
+        <View style={styles.lifePredictionsContainer}>
+          <TouchableOpacity 
+            style={[styles.lifePredictionsButton, (loadingLifePredictions || lifePredictionsCacheChecking) && styles.loadingButton]}
+            onPress={onLifePredictionsMainCta}
+            disabled={loadingLifePredictions || lifePredictionsCacheChecking}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={
+                loadingLifePredictions || lifePredictionsCacheChecking
+                  ? ['#2c3e50', '#34495e', '#5d6d7e']
+                  : ['#5b2c83', '#8e44ad', '#c39bd3']
+              }
+              style={styles.lifePredictionsGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              {loadingLifePredictions ? (
+                <View style={styles.loadingContent}>
+                  <Animated.View 
+                    style={[
+                      styles.loadingIconContainer,
+                      {
+                        transform: [{
+                          rotate: loadingRotateAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0deg', '360deg']
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <Text style={styles.lifePredictionsIconLarge}>✨</Text>
+                  </Animated.View>
+                  <Text style={styles.lifePredictionsText}>
+                    Consulting Dots of Destiny...
+                  </Text>
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View style={[styles.progressFill, { width: `${loadingProgress}%` }]} />
+                    </View>
+                    <Text style={styles.progressText}>{Math.round(loadingProgress)}%</Text>
+                  </View>
+                </View>
+              ) : lifePredictionsCacheChecking ? (
+                <View style={styles.loadingContent}>
+                  <ActivityIndicator size="small" color="#fff" style={{ marginBottom: 8 }} />
+                  <Text style={styles.lifePredictionsText}>Checking saved reading…</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.lifePredictionsIconLarge}>🌟</Text>
+                  <Text style={styles.lifePredictionsHeadline}>Dots of Destiny</Text>
+                  <Text style={styles.lifePredictionsTeaser}>
+                    Full reading from your bindus — career, relationships, timing windows, dasha & remedies.
+                  </Text>
+                  <View style={styles.lifePredictionsChips}>
+                    <Text style={styles.lifePredictionsChip}>12 houses</Text>
+                    <Text style={styles.lifePredictionsChip}>Transits</Text>
+                    <Text style={styles.lifePredictionsChip}>Dasha</Text>
+                  </View>
+                  <View style={styles.lifePredictionsCtaRow}>
+                    <Text style={styles.lifePredictionsCtaText}>Open life predictions</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#fff" style={{ opacity: 0.95, marginLeft: 4 }} />
+                  </View>
+                  <Text style={styles.lifePredictionsCreditHint}>
+                    {lifePredictionsCreditCost} credits first run · saved reading replays free
+                  </Text>
+                  <Text style={styles.lifePredictionsSubtext}>Vinay Aditya · Ashtakavarga methodology</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.planetaryToggle}>
           <Text style={[styles.toggleTitle, { color: colors.text }]}>Bhinnashtakvarga Charts</Text>
+          <Text style={[styles.bavHint, { color: colors.textSecondary }]}>
+            Per-planet bindu breakdowns — tap after you’ve seen your full chart reading above.
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].map(planet => {
               const planetChart = oracleData?.ashtakavarga?.individual_charts?.[planet];
@@ -457,59 +580,6 @@ export default function AshtakvargaOracle({ navigation }) {
             })}
           </ScrollView>
         </View>
-
-        {/* Generate Life Predictions hidden on iOS for App Store compliance */}
-        {Platform.OS !== 'ios' && (
-          <View style={styles.lifePredictionsContainer}>
-            <TouchableOpacity 
-              style={[styles.lifePredictionsButton, loadingLifePredictions && styles.loadingButton]}
-              onPress={generateLifePredictions}
-              disabled={loadingLifePredictions}
-            >
-              <LinearGradient
-                colors={loadingLifePredictions ? ['#2c3e50', '#34495e', '#5d6d7e'] : ['#8e44ad', '#9b59b6', '#af7ac5']}
-                style={styles.lifePredictionsGradient}
-              >
-                {loadingLifePredictions ? (
-                  <View style={styles.loadingContent}>
-                    <Animated.View 
-                      style={[
-                        styles.loadingIconContainer,
-                        {
-                          transform: [{
-                            rotate: loadingRotateAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: ['0deg', '360deg']
-                            })
-                          }]
-                        }
-                      ]}
-                    >
-                      <Text style={styles.lifePredictionsIcon}>✨</Text>
-                    </Animated.View>
-                    <Text style={styles.lifePredictionsText}>
-                      Consulting Dots of Destiny...
-                    </Text>
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: `${loadingProgress}%` }]} />
-                      </View>
-                      <Text style={styles.progressText}>{Math.round(loadingProgress)}%</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <Text style={styles.lifePredictionsIcon}>🌟</Text>
-                    <Text style={styles.lifePredictionsText}>
-                      Generate Life Predictions
-                    </Text>
-                    <Text style={styles.lifePredictionsSubtext}>Vinay Aditya's Methodology</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
     );
   };
@@ -564,7 +634,17 @@ export default function AshtakvargaOracle({ navigation }) {
     return progressInterval;
   };
 
-  const generateLifePredictions = async () => {
+  const buildLifePredictionsBirthPayload = () => ({
+    name: birthData.name,
+    date: normalizeBirthForApi(birthData).date ?? birthData.date,
+    time: birthData.time,
+    latitude: birthData.latitude,
+    longitude: birthData.longitude,
+    place: birthData.place || '',
+    gender: birthData.gender || '',
+  });
+
+  const generateLifePredictions = async (forceRegenerate = false) => {
     if (!birthData) {
       console.error('No birth data available for life predictions');
       return;
@@ -572,37 +652,57 @@ export default function AshtakvargaOracle({ navigation }) {
 
     setLoadingLifePredictions(true);
     const progressInterval = startLoadingAnimation();
-    
+
     try {
       const token = await AsyncStorage.getItem('authToken');
-      
+
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/ashtakavarga/life-predictions')}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          birth_data: {
-            name: birthData.name,
-            date: birthData.date,
-            time: birthData.time,
-            latitude: birthData.latitude,
-            longitude: birthData.longitude,
-            place: birthData.place || '',
-            gender: birthData.gender || ''
-          }
-        })
+          birth_data: buildLifePredictionsBirthPayload(),
+          force_regenerate: Boolean(forceRegenerate),
+        }),
       });
 
+      const data = await response.json().catch(() => ({}));
+
+      if (data.credit_cost_next != null && !Number.isNaN(Number(data.credit_cost_next))) {
+        setLifePredictionsCreditCost(Math.max(1, Number(data.credit_cost_next)));
+      }
+
       if (response.ok) {
-        const predictions = await response.json();
-        // console.log('Life predictions received:', predictions);
-        setLoadingProgress(100);
-        setLifePredictions(predictions);
-        setShowLifePredictions(true);
+        const serverErr =
+          data.error ||
+          data.predictions?.error ||
+          (typeof data.detail === 'string' ? data.detail : null);
+        if (serverErr) {
+          Alert.alert('Life predictions', String(serverErr));
+        } else {
+          setLoadingProgress(100);
+          setLifePredictions(data);
+          setShowLifePredictions(true);
+          if (Number(data.credits_charged) > 0) {
+            fetchBalance();
+          }
+        }
       } else {
-        console.error('Failed to generate life predictions:', response.status);
+        let message = `Request failed (${response.status})`;
+        if (typeof data?.detail === 'string') {
+          message = data.detail;
+        } else if (Array.isArray(data?.detail) && data.detail.length) {
+          message = data.detail.map((d) => d.msg || JSON.stringify(d)).join('\n');
+        } else if (data?.error) {
+          message = String(data.error);
+        }
+        console.error('Failed to generate life predictions:', response.status, message);
+        Alert.alert('Life predictions', message);
+        if (response.status === 402) {
+          fetchBalance();
+        }
       }
     } catch (error) {
       console.error('Error generating life predictions:', error);
@@ -616,6 +716,87 @@ export default function AshtakvargaOracle({ navigation }) {
       }, 500);
     }
   };
+
+  const confirmRegenerateLifePredictions = () => {
+    setLifePredictionsCreditModalMode('regenerate');
+  };
+
+  /** Main CTA: open cached reading immediately, or credit modal only if a new generation is needed */
+  const onLifePredictionsMainCta = async () => {
+    if (!birthData) return;
+    setLifePredictionsCacheChecking(true);
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/ashtakavarga/life-predictions')}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          birth_data: buildLifePredictionsBirthPayload(),
+          cache_probe: true,
+          force_regenerate: false,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (data.credit_cost_next != null && !Number.isNaN(Number(data.credit_cost_next))) {
+        setLifePredictionsCreditCost(Math.max(1, Number(data.credit_cost_next)));
+      }
+
+      if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        if (typeof data?.detail === 'string') {
+          message = data.detail;
+        } else if (Array.isArray(data?.detail) && data.detail.length) {
+          message = data.detail.map((d) => d.msg || JSON.stringify(d)).join('\n');
+        } else if (data?.error) {
+          message = String(data.error);
+        }
+        Alert.alert('Life predictions', message);
+        return;
+      }
+
+      if (
+        data.cached === true &&
+        !data.error &&
+        !data.predictions?.error
+      ) {
+        setLifePredictions(data);
+        setShowLifePredictions(true);
+        return;
+      }
+
+      setLifePredictionsCreditModalMode('open');
+    } catch (err) {
+      console.error('Life predictions cache probe:', err);
+      Alert.alert(
+        'Life predictions',
+        'Could not check for a saved reading. Check your connection and try again.'
+      );
+    } finally {
+      setLifePredictionsCacheChecking(false);
+    }
+  };
+
+  const onConfirmLifePredictionsCreditModal = () => {
+    const mode = lifePredictionsCreditModalMode;
+    setLifePredictionsCreditModalMode(null);
+    generateLifePredictions(mode === 'regenerate');
+  };
+
+  const closeLifePredictionsCreditModal = () => setLifePredictionsCreditModalMode(null);
+
+  const lifePredictionsCreditModalTitle =
+    lifePredictionsCreditModalMode === 'regenerate'
+      ? 'Regenerate Dots of Destiny?'
+      : 'Dots of Destiny reading';
+
+  const lifePredictionsCreditModalDescription =
+    lifePredictionsCreditModalMode === 'regenerate'
+      ? `This runs a fresh AI reading and replaces your saved one. It will use ${lifePredictionsCreditCost} credits if the generation succeeds. Your balance: ${credits} credits.`
+      : `Starting a new AI reading uses up to ${lifePredictionsCreditCost} credits if you do not already have one saved for this profile. Your balance: ${credits} credits.`;
 
   const fetchYearlyStrength = async (houseNumber) => {
     setLoadingYearly(true);
@@ -713,6 +894,15 @@ export default function AshtakvargaOracle({ navigation }) {
 
           {renderDestinyMap()}
 
+          <CreditModal
+            visible={lifePredictionsCreditModalMode !== null}
+            onConfirm={onConfirmLifePredictionsCreditModal}
+            onCancel={closeLifePredictionsCreditModal}
+            cost={lifePredictionsCreditCost}
+            title={lifePredictionsCreditModalTitle}
+            description={lifePredictionsCreditModalDescription}
+          />
+
           <Modal
             visible={showLifePredictions}
             transparent
@@ -725,65 +915,214 @@ export default function AshtakvargaOracle({ navigation }) {
                   colors={['rgba(26, 0, 51, 0.95)', 'rgba(45, 27, 78, 0.9)']}
                   style={styles.predictionsGradient}
                 >
+                  <TouchableOpacity
+                    style={styles.regeneratePredictionButton}
+                    onPress={confirmRegenerateLifePredictions}
+                    disabled={loadingLifePredictions}
+                  >
+                    <Ionicons name="refresh" size={18} color="#ffd700" />
+                    <Text style={styles.regeneratePredictionText}>Regenerate</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity 
                     style={styles.closeButton}
                     onPress={() => setShowLifePredictions(false)}
                   >
                     <Ionicons name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
+
+                  {loadingLifePredictions && lifePredictions ? (
+                    <View style={styles.predictionsRegenOverlay}>
+                      <ActivityIndicator size="large" color="#ffd700" />
+                      <Text style={styles.predictionsRegenOverlayText}>Updating reading…</Text>
+                    </View>
+                  ) : null}
                   
                   <ScrollView showsVerticalScrollIndicator={false}>
                     <Text style={[styles.predictionsTitle, { color: colors.text }]}>Life Predictions</Text>
-                    <Text style={[styles.predictionsSubtitle, { color: colors.primary }]}>{lifePredictions?.methodology || "Vinay Aditya's Dots of Destiny"}</Text>
+                    <Text style={[styles.predictionsSubtitle, { color: colors.primary }]}>{lifePredictions?.methodology || lifePredictions?.predictions?.methodology || "Vinay Aditya's Dots of Destiny"}</Text>
+                    {lifePredictions?.cached ? (
+                      <Text style={[styles.predictionsCachedBadge, { color: colors.textSecondary }]}>
+                        Saved reading — no credits used to view again. Regenerate for a fresh AI pass ({lifePredictionsCreditCost} credits).
+                      </Text>
+                    ) : null}
                     
                     <View style={styles.predictionsContent}>
-                      {lifePredictions?.predictions?.current_life_phase && (
-                        <>
-                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Current Life Phase</Text>
-                          <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{lifePredictions.predictions.current_life_phase}</Text>
-                        </>
-                      )}
-                      
-                      {lifePredictions?.predictions?.sav_strength_analysis?.strong_areas && (
-                        <>
-                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Strong Areas</Text>
-                          {lifePredictions.predictions.sav_strength_analysis.strong_areas.map((area, index) => (
-                            <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {area}</Text>
-                          ))}
-                        </>
-                      )}
-                      
-                      {lifePredictions?.predictions?.sav_strength_analysis?.challenging_areas && (
-                        <>
-                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Challenging Areas</Text>
-                          {lifePredictions.predictions.sav_strength_analysis.challenging_areas.map((area, index) => (
-                            <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {area}</Text>
-                          ))}
-                        </>
-                      )}
-                      
-                      {lifePredictions?.predictions?.life_predictions?.next_6_months && (
-                        <>
-                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Next 6 Months</Text>
-                          <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{lifePredictions.predictions.life_predictions.next_6_months}</Text>
-                        </>
-                      )}
-                      
-                      {lifePredictions?.predictions?.life_predictions?.next_year && (
-                        <>
-                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Next Year</Text>
-                          <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{lifePredictions.predictions.life_predictions.next_year}</Text>
-                        </>
-                      )}
-                      
-                      {lifePredictions?.predictions?.remedial_measures && (
-                        <>
-                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Remedial Measures</Text>
-                          {lifePredictions.predictions.remedial_measures.map((remedy, index) => (
-                            <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {remedy}</Text>
-                          ))}
-                        </>
-                      )}
+                      {(() => {
+                        const pred = lifePredictions?.predictions;
+                        if (!pred) return null;
+                        const insights = pred.life_domain_insights;
+                        const timing = pred.timing_highlights;
+                        const transit = pred.transit_predictions;
+                        const dasha = pred.dasha_analysis;
+                        const sav = pred.sav_strength_analysis;
+                        const life = pred.life_predictions;
+
+                        return (
+                          <>
+                            {pred.current_life_phase ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Current life phase</Text>
+                                <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{pred.current_life_phase}</Text>
+                              </>
+                            ) : null}
+
+                            {sav?.overall_pattern ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>SAV overall pattern</Text>
+                                <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{sav.overall_pattern}</Text>
+                              </>
+                            ) : null}
+
+                            {insights && typeof insights === 'object' ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Life areas (from houses)</Text>
+                                {Object.entries(insights).map(([key, text]) => {
+                                  if (text == null || String(text).trim() === '') return null;
+                                  const label = LIFE_PREDICTION_DOMAIN_LABELS[key] || key.replace(/_/g, ' ');
+                                  return (
+                                    <View key={key} style={styles.predictionDomainCard}>
+                                      <Text style={[styles.predictionDomainTitle, { color: colors.primary }]}>{label}</Text>
+                                      <Text style={[styles.sectionText, { color: colors.textSecondary, marginBottom: 0 }]}>{String(text)}</Text>
+                                    </View>
+                                  );
+                                })}
+                              </>
+                            ) : null}
+
+                            {Array.isArray(timing) && timing.length > 0 ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Timing windows</Text>
+                                {timing.map((item, index) => {
+                                  if (item == null) return null;
+                                  if (typeof item === 'string') {
+                                    return (
+                                      <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {item}</Text>
+                                    );
+                                  }
+                                  const windowLabel = item.window || item.period || item.label || `Period ${index + 1}`;
+                                  const focus = item.focus || item.summary;
+                                  const basis = item.ashtakavarga_basis || item.basis;
+                                  return (
+                                    <View key={index} style={styles.timingHighlightCard}>
+                                      <Text style={[styles.timingHighlightTitle, { color: colors.primary }]}>{windowLabel}</Text>
+                                      {focus ? <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{focus}</Text> : null}
+                                      {basis ? <Text style={[styles.timingHighlightBasis, { color: colors.textSecondary }]}>Ashtakavarga: {basis}</Text> : null}
+                                    </View>
+                                  );
+                                })}
+                              </>
+                            ) : null}
+
+                            {transit ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Transits</Text>
+                                {transit.saturn_influence ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>Saturn</Text>
+                                    <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{transit.saturn_influence}</Text>
+                                  </>
+                                ) : null}
+                                {transit.jupiter_influence ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>Jupiter</Text>
+                                    <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{transit.jupiter_influence}</Text>
+                                  </>
+                                ) : null}
+                                {transit.rahu_ketu_influence ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>Rahu & Ketu</Text>
+                                    <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{transit.rahu_ketu_influence}</Text>
+                                  </>
+                                ) : null}
+                                {Array.isArray(transit.timing_recommendations) && transit.timing_recommendations.length > 0 ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>Timing tips</Text>
+                                    {transit.timing_recommendations.map((line, i) => (
+                                      <Text key={i} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {line}</Text>
+                                    ))}
+                                  </>
+                                ) : null}
+                              </>
+                            ) : null}
+
+                            {dasha ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Dasha</Text>
+                                {dasha.current_period_strength ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>Period strength</Text>
+                                    <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{dasha.current_period_strength}</Text>
+                                  </>
+                                ) : null}
+                                {dasha.expected_results ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>What to expect</Text>
+                                    <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{dasha.expected_results}</Text>
+                                  </>
+                                ) : null}
+                                {Array.isArray(dasha.recommendations) && dasha.recommendations.length > 0 ? (
+                                  <>
+                                    <Text style={[styles.subSectionTitle, { color: colors.text }]}>Dasha recommendations</Text>
+                                    {dasha.recommendations.map((line, i) => (
+                                      <Text key={i} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {line}</Text>
+                                    ))}
+                                  </>
+                                ) : null}
+                              </>
+                            ) : null}
+
+                            {sav?.strong_areas && sav.strong_areas.length > 0 ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Strong areas</Text>
+                                {sav.strong_areas.map((area, index) => (
+                                  <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {area}</Text>
+                                ))}
+                              </>
+                            ) : null}
+
+                            {sav?.challenging_areas && sav.challenging_areas.length > 0 ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Challenging areas</Text>
+                                {sav.challenging_areas.map((area, index) => (
+                                  <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {area}</Text>
+                                ))}
+                              </>
+                            ) : null}
+
+                            {life?.next_6_months ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Next 6 months</Text>
+                                <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{life.next_6_months}</Text>
+                              </>
+                            ) : null}
+
+                            {life?.next_year ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Next year</Text>
+                                <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{life.next_year}</Text>
+                              </>
+                            ) : null}
+
+                            {life?.major_themes && life.major_themes.length > 0 ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Major themes</Text>
+                                {life.major_themes.map((theme, index) => (
+                                  <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {theme}</Text>
+                                ))}
+                              </>
+                            ) : null}
+
+                            {pred.remedial_measures && pred.remedial_measures.length > 0 ? (
+                              <>
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Remedial measures</Text>
+                                {pred.remedial_measures.map((remedy, index) => (
+                                  <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {remedy}</Text>
+                                ))}
+                              </>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </View>
                   </ScrollView>
                 </LinearGradient>
@@ -1146,42 +1485,105 @@ const styles = {
   powerActionsContainer: { marginBottom: 10 },
   
   lifePredictionsContainer: { 
-    marginBottom: 10,
-    marginTop: 5,
+    marginBottom: 18,
+    marginTop: 16,
   },
   lifePredictionsButton: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#8e44ad',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 10,
+    shadowColor: '#6c3483',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
   },
   loadingButton: {
     shadowColor: '#2c3e50',
   },
   lifePredictionsGradient: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   lifePredictionsIcon: {
     fontSize: 18,
     marginBottom: 3,
   },
+  lifePredictionsIconLarge: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  lifePredictionsHeadline: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.white,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
+  lifePredictionsTeaser: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.92)',
+    textAlign: 'center',
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
+  lifePredictionsChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  lifePredictionsChip: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginHorizontal: 4,
+    marginVertical: 4,
+  },
+  lifePredictionsCtaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  lifePredictionsCtaText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.white,
+    letterSpacing: 0.4,
+  },
   lifePredictionsText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
-    marginBottom: 1,
+    marginBottom: 4,
   },
   lifePredictionsSubtext: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.75)',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  lifePredictionsCreditHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.88)',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  bavHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+    opacity: 0.95,
   },
   loadingContent: {
     alignItems: 'center',
@@ -1459,6 +1861,45 @@ const styles = {
   predictionsGradient: {
     padding: 20,
     paddingTop: 50,
+    position: 'relative',
+  },
+  regeneratePredictionButton: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  regeneratePredictionText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffd700',
+  },
+  predictionsRegenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 5, 30, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderRadius: 20,
+  },
+  predictionsRegenOverlayText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: '600',
+  },
+  predictionsCachedBadge: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+    fontStyle: 'italic',
   },
   predictionsTitle: {
     fontSize: 24,
@@ -1496,6 +1937,45 @@ const styles = {
     lineHeight: 18,
     marginBottom: 6,
     paddingLeft: 10,
+  },
+  subSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  predictionDomainCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.22)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  predictionDomainTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  timingHighlightCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(255,215,0,0.55)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  timingHighlightTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  timingHighlightBasis: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 6,
+    opacity: 0.9,
   },
   yearlyButton: {
     borderRadius: 12,

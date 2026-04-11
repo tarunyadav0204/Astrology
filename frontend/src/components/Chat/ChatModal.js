@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MessageList from './MessageList';
+import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatInput from './ChatInput';
 import BirthForm from '../BirthForm/BirthForm';
 import BirthFormModal from '../BirthForm/BirthFormModal';
@@ -241,7 +242,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     };
 
     useEffect(() => {
-        scrollToBottom();
+        return scrollChatThreadAfterMessagesChange(messages, scrollToBottom);
     }, [messages]);
 
     useEffect(() => {
