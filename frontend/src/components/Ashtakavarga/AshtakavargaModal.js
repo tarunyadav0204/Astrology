@@ -20,7 +20,13 @@ const LIFE_PREDICTION_DOMAIN_LABELS = {
   expenses_moksha_rest: 'Expenses, rest & liberation themes',
 };
 
-function formatLifePredictionsError(data) {
+function formatLifePredictionsError(data, status) {
+  if (status === 503) {
+    return 'Predictions are temporarily unavailable (server busy or restarting). Please try again in a moment.';
+  }
+  if (status === 502 || status === 504) {
+    return 'The request timed out or the gateway could not reach the API. Try again; if it keeps happening, the AI step may need a longer proxy timeout on the server.';
+  }
   if (!data) return 'Request failed';
   if (typeof data.detail === 'string') return data.detail;
   if (Array.isArray(data.detail) && data.detail.length) {
@@ -403,7 +409,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
           if (Number(data.credits_charged) > 0) fetchBalance();
         }
       } else {
-        const message = formatLifePredictionsError(data);
+        const message = formatLifePredictionsError(data, response.status);
         showToast(message, 'error');
         if (response.status === 402) fetchBalance();
       }
@@ -443,7 +449,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       applyCreditCostFromResponse(data);
 
       if (!response.ok) {
-        showToast(formatLifePredictionsError(data), 'error');
+        showToast(formatLifePredictionsError(data, response.status), 'error');
         return;
       }
 

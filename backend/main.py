@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -2138,8 +2139,7 @@ async def resource_monitor():
     """Detailed resource monitoring"""
     try:
         import psutil
-        import asyncio
-        
+
         process = psutil.Process()
         
         # Get current event loop info
@@ -5414,7 +5414,9 @@ async def generate_ashtakavarga_life_predictions(request: dict, current_user: Us
         from calculators.chart_calculator import ChartCalculator
 
         chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(birth_data, "mean")
+        # Chart + Gemini are sync and long-running; run off the event loop so the worker
+        # stays responsive (avoids proxy "no healthy upstream" / 503 under concurrent load).
+        chart_data = await asyncio.to_thread(chart_calc.calculate_chart, birth_data, "mean")
         dasha_data = await calculate_accurate_dasha(birth_data)
         transit_request = TransitRequest(
             birth_data=birth_data,
@@ -5422,7 +5424,11 @@ async def generate_ashtakavarga_life_predictions(request: dict, current_user: Us
         )
         transit_data = await calculate_transits(transit_request)
         ashtaka_calc = AshtakavargaCalculator(birth_data, chart_data)
-        predictions = ashtaka_calc.generate_life_predictions(dasha_data, transit_data["planets"])
+        predictions = await asyncio.to_thread(
+            ashtaka_calc.generate_life_predictions,
+            dasha_data,
+            transit_data["planets"],
+        )
 
         response_body = {
             "birth_info": {"name": birth_data.name, "date": birth_data.date},
