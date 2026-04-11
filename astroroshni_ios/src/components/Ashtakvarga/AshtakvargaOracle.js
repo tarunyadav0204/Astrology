@@ -74,6 +74,46 @@ const HOUSE_SIGNIFICATIONS = {
   }
 };
 
+const LIFE_PREDICTIONS_POLL_MS = 3000;
+const LIFE_PREDICTIONS_MAX_POLLS = 120;
+
+function lifePredictionsJobStatusUrl(jobId) {
+  return `${API_BASE_URL}${getEndpoint(`/ashtakavarga/life-predictions/status/${jobId}`)}`;
+}
+
+async function pollLifePredictionsJobApi(jobId, token) {
+  let pollCount = 0;
+  while (pollCount < LIFE_PREDICTIONS_MAX_POLLS) {
+    const res = await fetch(lifePredictionsJobStatusUrl(jobId), {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg =
+        typeof body?.detail === 'string'
+          ? body.detail
+          : body?.error || `Request failed (${res.status})`;
+      throw new Error(msg);
+    }
+    if (body.status === 'completed' && body.result) {
+      return body.result;
+    }
+    if (body.status === 'failed') {
+      throw new Error(
+        String(
+          body.error ||
+            body.result?.error ||
+            body.result?.predictions?.error ||
+            'Generation failed'
+        )
+      );
+    }
+    await new Promise((r) => setTimeout(r, LIFE_PREDICTIONS_POLL_MS));
+    pollCount += 1;
+  }
+  throw new Error('TIMEOUT');
+}
+
 export default function AshtakvargaOracle({ navigation }) {
   const { theme, colors } = useTheme();
   const [activeTab, setActiveTab] = useState(0);
@@ -562,11 +602,26 @@ export default function AshtakvargaOracle({ navigation }) {
       });
 
       if (response.ok) {
-        const predictions = await response.json();
-        // console.log('Life predictions received:', predictions);
-        setLoadingProgress(100);
-        setLifePredictions(predictions);
-        setShowLifePredictions(true);
+        const data = await response.json();
+        if (data.job_id) {
+          try {
+            const result = await pollLifePredictionsJobApi(data.job_id, token);
+            setLoadingProgress(100);
+            setLifePredictions(result);
+            setShowLifePredictions(true);
+          } catch (pollErr) {
+            const msg =
+              pollErr?.message === 'TIMEOUT'
+                ? 'Still processing after 6 minutes. Try again later.'
+                : pollErr?.message || 'Could not complete predictions.';
+            console.error('Life predictions poll:', msg);
+            Alert.alert('Life predictions', msg);
+          }
+        } else {
+          setLoadingProgress(100);
+          setLifePredictions(data);
+          setShowLifePredictions(true);
+        }
       } else {
         console.error('Failed to generate life predictions:', response.status);
       }

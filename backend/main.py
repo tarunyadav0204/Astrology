@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query
+import uuid
+from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator, ValidationError
@@ -5337,21 +5338,199 @@ async def get_complete_ashtakavarga_oracle(request: dict, current_user: User = D
             "error": str(e)
         }
 
-@app.post("/api/ashtakavarga/life-predictions")
-async def generate_ashtakavarga_life_predictions(request: dict, current_user: User = Depends(get_current_user)):
-    """Generate or return cached life predictions (Dots of Destiny). Credits only on fresh successful generation."""
+
+async def process_ashtakavarga_life_prediction_job(
+    job_id: str,
+    userid: int,
+    birth_hash: str,
+    prediction_cost: int,
+    raw_birth: dict,
+):
+    """Background worker: chart + dasha + transits + Gemini; updates job row for polling."""
     from calculators.ashtakavarga import AshtakavargaCalculator
+    from calculators.ashtakavarga_life_prediction_jobs import (
+        update_job_completed,
+        update_job_failed,
+        update_job_processing,
+    )
+    from calculators.ashtakavarga_life_predictions_cache import (
+        ensure_life_predictions_table,
+        prediction_payload_is_successful,
+        store_life_predictions_cache,
+    )
+    from calculators.chart_calculator import ChartCalculator
+    from credits.credit_service import CreditService
+
+    methodology_note = (
+        "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' "
+        "and K.N. Rao's teachings"
+    )
+    credit_service = CreditService()
+    try:
+        with get_conn() as conn:
+            update_job_processing(conn, job_id)
+            conn.commit()
+
+        birth_data = BirthData(**raw_birth)
+        chart_calc = ChartCalculator({})
+        chart_data = await asyncio.to_thread(chart_calc.calculate_chart, birth_data, "mean")
+        dasha_data = await calculate_accurate_dasha(birth_data)
+        transit_request = TransitRequest(
+            birth_data=birth_data,
+            transit_date=datetime.now().strftime("%Y-%m-%d"),
+        )
+        transit_data = await calculate_transits(transit_request)
+        ashtaka_calc = AshtakavargaCalculator(birth_data, chart_data)
+        predictions = await asyncio.to_thread(
+            ashtaka_calc.generate_life_predictions,
+            dasha_data,
+            transit_data["planets"],
+        )
+
+        response_body = {
+            "birth_info": {"name": birth_data.name, "date": birth_data.date},
+            "predictions": predictions,
+            "generated_at": datetime.now().isoformat(),
+            "cached": False,
+            "credits_charged": 0,
+            "credit_cost_next": prediction_cost,
+        }
+
+        if not prediction_payload_is_successful(predictions):
+            with get_conn() as conn:
+                update_job_completed(conn, job_id, response_body)
+                conn.commit()
+            return
+
+        spent = credit_service.spend_credits(
+            userid,
+            prediction_cost,
+            "ashtakavarga_life_predictions",
+            f"Ashtakavarga life predictions for {birth_data.name or 'user'}",
+        )
+        if not spent:
+            with get_conn() as conn:
+                update_job_failed(
+                    conn,
+                    job_id,
+                    "Credit deduction failed after generation",
+                    response_body,
+                )
+                conn.commit()
+            print("❌ Life predictions job: spend_credits failed after generation")
+            return
+
+        response_body["credits_charged"] = prediction_cost
+        response_body["credits_remaining"] = credit_service.get_user_credits(userid)
+        cache_payload = {
+            "birth_info": response_body["birth_info"],
+            "predictions": response_body["predictions"],
+            "generated_at": response_body["generated_at"],
+        }
+        try:
+            with get_conn() as conn:
+                ensure_life_predictions_table(conn)
+                store_life_predictions_cache(conn, userid, birth_hash, cache_payload)
+                update_job_completed(conn, job_id, response_body)
+                conn.commit()
+        except Exception as cache_err:
+            print(f"⚠️ Life predictions job cache save failed: {cache_err}")
+            with get_conn() as conn:
+                update_job_completed(conn, job_id, response_body)
+                conn.commit()
+
+    except Exception as e:
+        print(f"Life predictions job error: {str(e)}")
+        import traceback
+
+        print(traceback.format_exc())
+        try:
+            with get_conn() as conn:
+                update_job_failed(
+                    conn,
+                    job_id,
+                    str(e),
+                    {
+                        "error": f"Life predictions generation failed: {str(e)}",
+                        "methodology": methodology_note,
+                        "cached": False,
+                        "credits_charged": 0,
+                    },
+                )
+                conn.commit()
+        except Exception as mark_err:
+            print(f"Failed to mark life prediction job failed: {mark_err}")
+
+
+@app.get("/api/ashtakavarga/life-predictions/status/{job_id}")
+async def get_ashtakavarga_life_prediction_job_status(
+    job_id: str, current_user: User = Depends(get_current_user)
+):
+    """Poll async life-predictions job (same pattern as chat-v2 / event timeline)."""
+    from calculators.ashtakavarga_life_prediction_jobs import (
+        ensure_life_prediction_jobs_table,
+        fetch_job_for_user,
+    )
+
+    with get_conn() as conn:
+        ensure_life_prediction_jobs_table(conn)
+        row = fetch_job_for_user(conn, job_id, current_user.userid)
+        conn.commit()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    status, result_payload, error_message, started_at, completed_at = row
+    response: dict = {"status": status}
+
+    if status == "completed" and result_payload:
+        try:
+            response["result"] = json.loads(result_payload)
+        except json.JSONDecodeError:
+            response["error"] = "Invalid stored result"
+        if completed_at:
+            response["completed_at"] = completed_at.isoformat()
+    elif status == "failed":
+        response["error"] = error_message or "Generation failed"
+        if completed_at:
+            response["completed_at"] = completed_at.isoformat()
+        if result_payload:
+            try:
+                response["result"] = json.loads(result_payload)
+            except json.JSONDecodeError:
+                pass
+    else:
+        response["message"] = "Generating your Ashtakavarga reading…"
+        if started_at:
+            response["started_at"] = started_at.isoformat()
+
+    return response
+
+
+@app.post("/api/ashtakavarga/life-predictions")
+async def generate_ashtakavarga_life_predictions(
+    request: dict,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Cached hits return immediately; new runs enqueue a background job and return job_id for polling."""
+    from calculators.ashtakavarga_life_prediction_jobs import (
+        ensure_life_prediction_jobs_table,
+        insert_life_prediction_job,
+    )
     from calculators.ashtakavarga_life_predictions_cache import (
         birth_fingerprint,
         ensure_life_predictions_table,
         fetch_cached_payload,
-        store_life_predictions_cache,
         prediction_payload_is_successful,
     )
     from credits.credit_service import CreditService
 
     credit_service = CreditService()
-    methodology_note = "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings"
+    methodology_note = (
+        "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' "
+        "and K.N. Rao's teachings"
+    )
     base_cost = max(1, int(credit_service.get_credit_setting("ashtakavarga_life_predictions_cost")))
     prediction_cost = credit_service.get_effective_cost(
         current_user.userid, base_cost, "ashtakavarga_life_predictions_cost"
@@ -5411,62 +5590,36 @@ async def generate_ashtakavarga_life_predictions(request: dict, current_user: Us
                 detail=f"Insufficient credits. You need {prediction_cost} credits but have {user_balance}.",
             )
 
-        from calculators.chart_calculator import ChartCalculator
+        job_id = str(uuid.uuid4())
+        raw_snapshot = birth_data.model_dump()
+        with get_conn() as conn:
+            ensure_life_prediction_jobs_table(conn)
+            insert_life_prediction_job(
+                conn,
+                job_id,
+                current_user.userid,
+                bh,
+                raw_snapshot,
+                prediction_cost,
+                force_regenerate,
+            )
+            conn.commit()
 
-        chart_calc = ChartCalculator({})
-        # Chart + Gemini are sync and long-running; run off the event loop so the worker
-        # stays responsive (avoids proxy "no healthy upstream" / 503 under concurrent load).
-        chart_data = await asyncio.to_thread(chart_calc.calculate_chart, birth_data, "mean")
-        dasha_data = await calculate_accurate_dasha(birth_data)
-        transit_request = TransitRequest(
-            birth_data=birth_data,
-            transit_date=datetime.now().strftime("%Y-%m-%d"),
-        )
-        transit_data = await calculate_transits(transit_request)
-        ashtaka_calc = AshtakavargaCalculator(birth_data, chart_data)
-        predictions = await asyncio.to_thread(
-            ashtaka_calc.generate_life_predictions,
-            dasha_data,
-            transit_data["planets"],
-        )
-
-        response_body = {
-            "birth_info": {"name": birth_data.name, "date": birth_data.date},
-            "predictions": predictions,
-            "generated_at": datetime.now().isoformat(),
-            "cached": False,
-            "credits_charged": 0,
-            "credit_cost_next": prediction_cost,
-        }
-
-        if not prediction_payload_is_successful(predictions):
-            return response_body
-
-        spent = credit_service.spend_credits(
+        background_tasks.add_task(
+            process_ashtakavarga_life_prediction_job,
+            job_id,
             current_user.userid,
+            bh,
             prediction_cost,
-            "ashtakavarga_life_predictions",
-            f"Ashtakavarga life predictions for {birth_data.name or 'user'}",
+            raw_snapshot,
         )
-        if spent:
-            response_body["credits_charged"] = prediction_cost
-            response_body["credits_remaining"] = credit_service.get_user_credits(current_user.userid)
-            cache_payload = {
-                "birth_info": response_body["birth_info"],
-                "predictions": response_body["predictions"],
-                "generated_at": response_body["generated_at"],
-            }
-            try:
-                with get_conn() as conn:
-                    ensure_life_predictions_table(conn)
-                    store_life_predictions_cache(conn, current_user.userid, bh, cache_payload)
-                    conn.commit()
-            except Exception as cache_err:
-                print(f"⚠️ Life predictions cache save failed: {cache_err}")
-        else:
-            print("❌ Life predictions: spend_credits failed after generation — not caching")
 
-        return response_body
+        return {
+            "job_id": job_id,
+            "status": "pending",
+            "credit_cost_next": prediction_cost,
+            "message": "Generation started — poll status until completed.",
+        }
 
     except HTTPException:
         raise

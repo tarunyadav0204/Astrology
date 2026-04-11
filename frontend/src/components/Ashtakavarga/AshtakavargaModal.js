@@ -36,6 +36,59 @@ function formatLifePredictionsError(data, status) {
   return 'Request failed';
 }
 
+/** Match chat-v2: poll every 3s, stop after 6 minutes */
+const LIFE_PREDICTIONS_POLL_MS = 3000;
+const LIFE_PREDICTIONS_MAX_POLLS = 120;
+
+function lifePredictionsStatusUrl(jobId) {
+  return API_BASE_URL.includes('/api')
+    ? `${API_BASE_URL}/ashtakavarga/life-predictions/status/${jobId}`
+    : `${API_BASE_URL}/api/ashtakavarga/life-predictions/status/${jobId}`;
+}
+
+function pollLifePredictionsJob(jobId) {
+  const token = localStorage.getItem('token');
+  return new Promise((resolve, reject) => {
+    let pollCount = 0;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(lifePredictionsStatusUrl(jobId), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          reject(new Error(formatLifePredictionsError(body, res.status)));
+          return;
+        }
+        if (body.status === 'completed' && body.result) {
+          resolve(body.result);
+          return;
+        }
+        if (body.status === 'failed') {
+          const errMsg =
+            body.error ||
+            body.result?.error ||
+            body.result?.predictions?.error ||
+            'Generation failed';
+          reject(new Error(String(errMsg)));
+          return;
+        }
+        pollCount += 1;
+        if (pollCount >= LIFE_PREDICTIONS_MAX_POLLS) {
+          reject(new Error('TIMEOUT'));
+          return;
+        }
+        setTimeout(() => poll().catch(reject), LIFE_PREDICTIONS_POLL_MS);
+      } catch (e) {
+        reject(e);
+      }
+    };
+
+    poll().catch(reject);
+  });
+}
+
 /** Indeterminate progress + message for chart load, transits, and AI steps */
 function AshtakavargaProgressState({ title, description, hint, compact = false, className = '' }) {
   return (
@@ -398,15 +451,38 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       applyCreditCostFromResponse(data);
 
       if (response.ok) {
-        const serverErr =
-          data.error ||
-          data.predictions?.error ||
-          (typeof data.detail === 'string' ? data.detail : null);
-        if (serverErr) {
-          showToast(String(serverErr), 'error');
+        if (data.job_id) {
+          try {
+            const result = await pollLifePredictionsJob(data.job_id);
+            applyCreditCostFromResponse(result);
+            const serverErr =
+              result.error ||
+              result.predictions?.error ||
+              (typeof result.detail === 'string' ? result.detail : null);
+            if (serverErr) {
+              showToast(String(serverErr), 'error');
+            } else {
+              setLifePredictions(result);
+              if (Number(result.credits_charged) > 0) fetchBalance();
+            }
+          } catch (e) {
+            const msg =
+              e?.message === 'TIMEOUT'
+                ? 'Still processing after 6 minutes. You can close this and open Life predictions again to check for a saved reading.'
+                : e?.message || 'Could not complete predictions. Try again.';
+            showToast(msg, 'error');
+          }
         } else {
-          setLifePredictions(data);
-          if (Number(data.credits_charged) > 0) fetchBalance();
+          const serverErr =
+            data.error ||
+            data.predictions?.error ||
+            (typeof data.detail === 'string' ? data.detail : null);
+          if (serverErr) {
+            showToast(String(serverErr), 'error');
+          } else {
+            setLifePredictions(data);
+            if (Number(data.credits_charged) > 0) fetchBalance();
+          }
         }
       } else {
         const message = formatLifePredictionsError(data, response.status);

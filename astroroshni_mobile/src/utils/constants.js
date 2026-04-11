@@ -66,7 +66,7 @@ const getApiUrl = () => {
 export const API_BASE_URL = getApiUrl();
 
 // Timeout configuration
-export const API_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+export const API_TIMEOUT = 6 * 60 * 1000; // 6 minutes (aligned with chat / life-predictions polling window)
 
 // Helper function to handle API endpoints for both dev and production
 export const getEndpoint = (path) => {

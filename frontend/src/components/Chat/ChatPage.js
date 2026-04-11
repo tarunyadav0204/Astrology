@@ -754,7 +754,7 @@ const ChatPage = () => {
 
     const pollMundaneStatus = async (messageId, assistantMessageIdToUpdate) => {
         const token = localStorage.getItem('token');
-        const maxPolls = 90; // ~4.5 minutes
+        const maxPolls = 120; // 6 minutes (120 * 3s)
         let pollCount = 0;
 
         const poll = async () => {
@@ -905,7 +905,7 @@ const ChatPage = () => {
 
     const pollChatV2Status = async (assistantMessageId, processingClientId) => {
         const token = localStorage.getItem('token');
-        const maxPolls = 90; // ~4.5 minutes (90 * 3s)
+        const maxPolls = 120; // 6 minutes (120 * 3s), aligned with Ashtakavarga life-predictions jobs
         let pollCount = 0;
 
         const poll = async () => {

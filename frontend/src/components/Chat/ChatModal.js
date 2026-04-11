@@ -584,7 +584,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
 
     // Polling function
     const pollForResponse = async (messageId, isResume = false) => {
-        const maxPolls = 80; // 4 minutes max (80 * 3s = 240s)
+        const maxPolls = 120; // 6 minutes (120 * 3s)
         let pollCount = 0;
         
         // Add to pending messages if not resuming

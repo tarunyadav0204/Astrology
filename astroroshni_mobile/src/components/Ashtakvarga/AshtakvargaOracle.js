@@ -45,6 +45,46 @@ const LIFE_PREDICTION_DOMAIN_LABELS = {
   expenses_moksha_rest: 'Expenses, rest & liberation themes',
 };
 
+const LIFE_PREDICTIONS_POLL_MS = 3000;
+const LIFE_PREDICTIONS_MAX_POLLS = 120;
+
+function lifePredictionsJobStatusUrl(jobId) {
+  return `${API_BASE_URL}${getEndpoint(`/ashtakavarga/life-predictions/status/${jobId}`)}`;
+}
+
+async function pollLifePredictionsJobApi(jobId, token) {
+  let pollCount = 0;
+  while (pollCount < LIFE_PREDICTIONS_MAX_POLLS) {
+    const res = await fetch(lifePredictionsJobStatusUrl(jobId), {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg =
+        typeof body?.detail === 'string'
+          ? body.detail
+          : body?.error || `Request failed (${res.status})`;
+      throw new Error(msg);
+    }
+    if (body.status === 'completed' && body.result) {
+      return body.result;
+    }
+    if (body.status === 'failed') {
+      throw new Error(
+        String(
+          body.error ||
+            body.result?.error ||
+            body.result?.predictions?.error ||
+            'Generation failed'
+        )
+      );
+    }
+    await new Promise((r) => setTimeout(r, LIFE_PREDICTIONS_POLL_MS));
+    pollCount += 1;
+  }
+  throw new Error('TIMEOUT');
+}
+
 const HOUSE_SIGNIFICATIONS = {
   0: { // House 1
     name: "Self & Personality",
@@ -675,18 +715,50 @@ export default function AshtakvargaOracle({ navigation }) {
       }
 
       if (response.ok) {
-        const serverErr =
-          data.error ||
-          data.predictions?.error ||
-          (typeof data.detail === 'string' ? data.detail : null);
-        if (serverErr) {
-          Alert.alert('Life predictions', String(serverErr));
+        if (data.job_id) {
+          try {
+            const result = await pollLifePredictionsJobApi(data.job_id, token);
+            if (data.credit_cost_next != null && !Number.isNaN(Number(data.credit_cost_next))) {
+              setLifePredictionsCreditCost(Math.max(1, Number(data.credit_cost_next)));
+            }
+            if (result.credit_cost_next != null && !Number.isNaN(Number(result.credit_cost_next))) {
+              setLifePredictionsCreditCost(Math.max(1, Number(result.credit_cost_next)));
+            }
+            const serverErr =
+              result.error ||
+              result.predictions?.error ||
+              (typeof result.detail === 'string' ? result.detail : null);
+            if (serverErr) {
+              Alert.alert('Life predictions', String(serverErr));
+            } else {
+              setLoadingProgress(100);
+              setLifePredictions(result);
+              setShowLifePredictions(true);
+              if (Number(result.credits_charged) > 0) {
+                fetchBalance();
+              }
+            }
+          } catch (pollErr) {
+            const msg =
+              pollErr?.message === 'TIMEOUT'
+                ? 'Still processing after 6 minutes. Try opening Life predictions again later for your saved reading.'
+                : pollErr?.message || 'Could not complete predictions.';
+            Alert.alert('Life predictions', msg);
+          }
         } else {
-          setLoadingProgress(100);
-          setLifePredictions(data);
-          setShowLifePredictions(true);
-          if (Number(data.credits_charged) > 0) {
-            fetchBalance();
+          const serverErr =
+            data.error ||
+            data.predictions?.error ||
+            (typeof data.detail === 'string' ? data.detail : null);
+          if (serverErr) {
+            Alert.alert('Life predictions', String(serverErr));
+          } else {
+            setLoadingProgress(100);
+            setLifePredictions(data);
+            setShowLifePredictions(true);
+            if (Number(data.credits_charged) > 0) {
+              fetchBalance();
+            }
           }
         }
       } else {
