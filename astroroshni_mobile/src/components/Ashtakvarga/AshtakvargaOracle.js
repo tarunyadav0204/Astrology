@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { storage } from '../../services/storage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
@@ -22,6 +23,7 @@ import { parseCalendarDateInput } from '../../utils/birthDateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AshtakvargaChart from './AshtakvargaChart';
 import DateNavigator from '../Common/DateNavigator';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
 import { pricingAPI } from '../../services/api';
@@ -154,8 +156,8 @@ export default function AshtakvargaOracle({ navigation }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingRotateAnim = useRef(new Animated.Value(0)).current;
-
-
+  const birthDataRef = useRef(null);
+  birthDataRef.current = birthData;
 
   const [lifePredictionsCreditCost, setLifePredictionsCreditCost] = useState(15);
   /** null | 'open' (main CTA) | 'regenerate' (modal toolbar) */
@@ -166,6 +168,41 @@ export default function AshtakvargaOracle({ navigation }) {
     loadBirthData();
     startAnimations();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          let data = await storage.getBirthDetails();
+          if (!data) {
+            const profiles = await storage.getBirthProfiles();
+            if (profiles?.length) {
+              data = profiles.find((p) => p.relation === 'self') || profiles[0];
+            }
+          }
+          if (cancelled) return;
+          if (!data?.name) {
+            navigation.replace('BirthProfileIntro', { returnTo: 'AshtakvargaOracle' });
+            return;
+          }
+          const prev = birthDataRef.current;
+          const unchanged =
+            prev &&
+            String(prev.id ?? '') === String(data.id ?? '') &&
+            prev.name === data.name;
+          if (unchanged) return;
+          setBirthData(data);
+          setSelectedDate(parseCalendarDateInput(data.date) || new Date());
+        } catch (e) {
+          console.error('Error syncing birth data on focus:', e);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [navigation])
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -958,7 +995,17 @@ export default function AshtakvargaOracle({ navigation }) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Ashtakvarga</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              Ashtakvarga
+            </Text>
+            {birthData ? (
+              <NativeSelectorChip
+                birthData={birthData}
+                onPress={() => navigation.navigate('SelectNative', { returnTo: 'AshtakvargaOracle' })}
+                maxLength={10}
+                showIcon={false}
+              />
+            ) : null}
             <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
               <Ionicons name="information-circle-outline" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -1429,6 +1476,8 @@ const styles = {
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
@@ -1442,7 +1491,6 @@ const styles = {
   },
   headerTitle: {
     flex: 1,
-    textAlign: 'center',
     fontSize: 20,
     fontWeight: '700',
     color: COLORS.white,

@@ -8,6 +8,63 @@ import os
 import google.generativeai as genai  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 
+# Shared instruction block for Event Timeline (yearly + monthly deep): disambiguate which life channel
+# a house activation targets (any house H), using karaka + afflicter flavour + topic-appropriate vargas.
+BHAVA_MANIFESTATION_DISAMBIGUATION_BLOCK = """
+### BHAVA-TO-MANIFESTATION DISAMBIGUATION (MANDATORY FOR ANY HOUSE YOU TREAT AS PRIMARY)
+
+A single house has **many** classical significations (bhava themes). Activation or affliction of that house is a **general** signal. Do **not** treat the house number alone as sufficient to name the **exact life channel** (which person, asset, organ, or transaction) when several channels share that house.
+
+Whenever a prediction's main trigger involves a **primary house H** (any house 1–12), you MUST **disambiguate** before stating a specific concrete event. Use this **fixed pipeline** every time.
+
+**STEP 1 — Enumerate threads under house H (brief, in your reasoning)**  
+List the **distinct** classical threads that house H can represent in context (people, places, things, abstract states). Do not collapse them into one vague phrase.
+
+**STEP 2 — Map threads to natural karakas (standard jataka significators)**  
+For each thread you might mention, name the **natural planet(s)** that classically govern that thread (e.g. Moon for mother/mind/fluids; Venus for spouse, vehicles, comforts; Mars for siblings, courage, disputes, heat; Saturn for chronicity, servants, structure; Sun for father/authority; Mercury for speech/commerce; Jupiter for children, wisdom, guru; etc.).  
+**Rule:** The thread whose karaka is **most clearly** stressed or woven into the same trigger chain (conjunction, aspect, lordship bridge, dasha link) gets **higher weight** than threads whose karakas are clean and uninvolved.
+
+**STEP 3 — Read the afflicting or activating planet by flavour**  
+Use the **nature** of the planet driving the pattern (Mars: sudden, heat, cuts, conflict; Saturn: delay, decay, chronic; Rahu/Ketu: sudden, odd, hidden; etc.) to **colour** the scenario—not to **replace** Step 2.
+
+**STEP 4 — Varga confirmation (topic-appropriate; only when D1 is ambiguous or you need specificity)**  
+Do not use one fixed divisional for all houses. Pick divisional(s) that match the **life department** you are about to assert, when present in context:
+
+- Parents / parent-line → favour **D12**
+- Property / land / home as fixed asset → favour **D4**
+- Marriage / partnership essence → favour **D9**
+- Career / status → favour **D10**
+- Progeny → favour **D7**
+- Vehicles / comforts / sukha (when that is the claim) → favour **D16**
+- Health / disease tendency (when that is the claim) → favour **D30**
+
+If the relevant varga is missing from context, state that and **reduce specificity**.
+
+**STEP 5 — Synchronization rule (non-negotiable)**  
+You may state **one primary concrete channel** (specific person, asset, organ, etc.) **only if**:
+
+1. House H is credibly activated or afflicted in D1 for that prediction, **and**
+2. The **natural karaka** for that channel is credibly involved in the same logic chain, **and**
+3. Where data exists, a **topic-appropriate varga** from Step 4 **does not contradict** that channel.
+
+If any of these fail, you MUST either give **ranked possibilities** (most likely / also possible / less likely unless …) or keep the outcome at the **correct bhava level** (accurate but not over-specific).
+
+**STEP 6 — Mandatory one-line tag in trigger_logic (or activation_reasoning / equivalent)**  
+Append:
+
+`[BHAVA-DISAMBIG: H={house_number} | Threads={short list} | Karaka-weight={which planets favoured and why in one clause} | Afflicter-flavour={planet} | Varga={which checked + outcome} → Primary={specific_channel OR general_OR_ranked}]`
+
+Use placeholder labels literally as written so the structure is obvious; fill with real values for that event.
+
+**FORBIDDEN**  
+- Claiming a narrow concrete outcome from **house H alone** without karaka alignment.  
+- Listing every signification of H as an undifferentiated "could be A or B or C" **without** completing Step 6.  
+- Using a **single** divisional chart for all topics regardless of life department.
+
+**NOTE:** Any single house (e.g. 4th: mother vs home vs vehicle) is only an **example** of this rule. Apply the **same pipeline** for **whichever house** is primary for that event.
+"""
+
+
 class EventPredictor:
     """
     AI-Powered Event Predictor using Grand Synthesis method.
@@ -168,6 +225,8 @@ Combine the significations of the activated houses to form specific, real-world 
 * Example: If AD lord Mercury rules the 4th (Home) and transits the 10th (Career), AND recreates a natal aspect with the MD lord -> Predict: "Relocation due to a major career promotion or working from a new home office."
 * Example: If PD lord is Mars (ruling 6th - Health), and transits over its natal position in the 2nd (Face/Throat) with low Ashtakavarga bindus -> Predict: "Acute health flare-up related to teeth, throat, or speech requiring immediate medical attention."
 * CRITICAL COVERAGE RULE: You MUST consider **all significations of ALL activated houses** and systematically combine them. Your goal is to produce a **holistic, exhaustive list of distinct real-world events**, not just 2–3 highlights.
+
+{BHAVA_MANIFESTATION_DISAMBIGUATION_BLOCK}
 
 **OUTPUT REQUIREMENTS (JSON ONLY):**
 1. Return ONLY ONE month object in `monthly_predictions` with `month_id = {month}`.
@@ -749,6 +808,8 @@ In trigger_logic field:
 - 2/3 charts confirm = High intensity
 - 1/3 charts confirm = Medium intensity
 - 0/3 charts confirm = Low intensity (routine maintenance)
+
+{BHAVA_MANIFESTATION_DISAMBIGUATION_BLOCK}
 
 ### OUTPUT JSON STRUCTURE:
 {{
