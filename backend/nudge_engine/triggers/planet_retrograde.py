@@ -74,7 +74,7 @@ class PlanetRetrogradeTrigger(TriggerBase):
                                 f"How will {planet_name}'s retrograde that begins today on "
                                 f"{target_date.isoformat()} affect me personally, and how long will its effects last?"
                             ),
-                            priority=1,
+                            priority=70,
                         )
                     )
                 elif speed_prev < 0 and speed_today >= 0:
@@ -94,7 +94,7 @@ class PlanetRetrogradeTrigger(TriggerBase):
                                 f"How will {planet_name} turning direct today on "
                                 f"{target_date.isoformat()} change its retrograde effects for me, and how long will this shift last?"
                             ),
-                            priority=1,
+                            priority=70,
                         )
                     )
             except Exception as e:

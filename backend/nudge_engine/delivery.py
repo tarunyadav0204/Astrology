@@ -32,6 +32,9 @@ def deliver(
                 push_data = {"trigger_id": ev.trigger_id, "cta": ev.cta_deep_link}
                 if ev.question and (ev.question or "").strip():
                     push_data["question"] = (ev.question or "").strip()[:500]
+                bcid = ev.params.get("birth_chart_id") if ev.params else None
+                if bcid is not None and str(bcid).strip():
+                    push_data["native_id"] = str(bcid).strip()
                 if tokens:
                     for token, platform in tokens:
                         if push_module.send_expo_push(

@@ -81,7 +81,7 @@ class PlanetTransitSignTrigger(TriggerBase):
                                 f"How will {planet_name}'s transit into {sign_name} on "
                                 f"{target_date.isoformat()} affect me, and how long will its effects last?"
                             ),
-                            priority=0,
+                            priority=35,
                         )
                     )
             except Exception as e:

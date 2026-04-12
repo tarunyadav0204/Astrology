@@ -52,8 +52,8 @@ class FestivalTrigger(TriggerBase):
                 continue
             name = f.get("name") or "Festival"
             ftype = f.get("type") or "festival"
-            # Prefer one nudge per day; major festivals get higher priority so dedupe picks them
-            priority = 2 if ftype == "major_festival" else 1
+            # Major festivals beat everything else; minor beats daily moon nakshatra but not stations / strong lunar.
+            priority = 100 if ftype == "major_festival" else 60
             events.append(
                 NudgeEvent(
                     trigger_id="festival",

@@ -5,7 +5,7 @@ Daily notification engine: scans astrology triggers and sends nudges (stored + p
 ## Flow
 
 1. **Scan** — Run all registered triggers for a date (e.g. today). Each trigger returns zero or more `NudgeEvent`s.
-2. **Dedupe** — Global events (`user_ids=None`) are expanded to all users; each user gets at most one nudge per day (highest priority).
+2. **Dedupe** — Global events (`user_ids=None`) are expanded to all users; **every** firing trigger is delivered. Re-running the scan the same day skips rows already stored for that date (same user, `trigger_id`, and `title`).
 3. **Delivery** — For each user: if they have a registered device token, the nudge is sent via **Expo Push API**; it is always stored in `nudge_deliveries` (channel `push` or `stored`).
 
 ## How notifications are sent
@@ -26,7 +26,9 @@ Daily notification engine: scans astrology triggers and sends nudges (stored + p
 - **planet_transit_sign** — Planet enters a new sign (Sun, Mars, Mercury, Jupiter, Venus, Saturn). Uses Swiss Ephemeris, Lahiri ayanamsa.
 - **lunar_phase** — Full Moon (Purnima) or New Moon (Amavasya) day. Sun–Moon elongation at noon UT; one nudge per phase.
 - **planet_retrograde** — Planet turns retrograde or direct (station). Mercury, Venus, Mars, Jupiter, Saturn; compares daily motion vs previous day.
-- **festival** — Hindu festivals on the date (amanta calendar, default India). One nudge per festival; major festivals have higher priority for dedupe.
+- **festival** — Hindu festivals on the date (amanta calendar, default India). One nudge per festival on that date.
+- **natal_planet_return** — **Per user** (self chart only): transiting planet within ~1° of its natal longitude. Sends **once** in the **30 days before** that window starts (with start/end dates in copy). Uses shared ephemeris samples; horizon ~800 days (very slow outer returns may notify only once they enter that window).
+- **natal_whole_sign_return** — **Per user** (self chart): transiting planet **re-enters the sidereal sign** (whole 30°) it occupied at birth. Same 30-day advance notice and horizon as degree return; **ingress into the sign** can occur on a different calendar day than the exact degree return.
 
 ## Adding triggers
 
@@ -77,6 +79,14 @@ jobs:
 **Optional: protect the endpoint**
 
 To avoid random hits triggering the scan, add a secret header (e.g. `X-Cron-Secret: your-secret`) in the route and in your cron request, and reject requests without it.
+
+## Admin: configurable triggers (copy + parameters)
+
+Registered keys: `natal_planet_return`, `natal_whole_sign_return`. Defaults are seeded into `nudge_trigger_definitions` on init.
+
+- `GET /api/nudge/admin/trigger-definitions` — List merged definitions (admin only).
+- `GET /api/nudge/admin/trigger-definitions/{trigger_key}` — One definition + `allowed_placeholders` and `config_schema`.
+- `PUT /api/nudge/admin/trigger-definitions/{trigger_key}` — Update `enabled`, optional `priority` (0–200, omit for built-in default), templates, and `config` JSON. Templates may only use the listed placeholders; config is validated per trigger (orb, advance days, horizon, planet list).
 
 ## API
 

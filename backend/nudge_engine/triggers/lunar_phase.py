@@ -85,7 +85,7 @@ class LunarPhaseTrigger(TriggerBase):
                             f"How will today's New Moon on {target_date.isoformat()} affect me personally, "
                             f"and how long will its effects last?"
                         ),
-                        priority=1,
+                        priority=50,
                     )
                 )
             if in_full_today and not in_full_prev:
@@ -104,7 +104,7 @@ class LunarPhaseTrigger(TriggerBase):
                             f"How will today's Full Moon on {target_date.isoformat()} affect me personally, "
                             f"and how long will its effects last?"
                         ),
-                        priority=1,
+                        priority=50,
                     )
                 )
         except Exception as e:

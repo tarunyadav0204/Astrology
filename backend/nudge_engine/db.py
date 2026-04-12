@@ -8,10 +8,48 @@ from db import get_conn as _get_app_conn, execute
 
 logger = logging.getLogger(__name__)
 
+try:
+    from encryption_utils import EncryptionManager
+
+    _nudge_encryptor = EncryptionManager()
+except (ValueError, ImportError) as e:
+    _nudge_encryptor = None
+    logger.debug("Nudge birth-chart decrypt disabled: %s", e)
+
 
 def get_conn():
     """Return a Postgres connection to the main app database (context-managed)."""
     return _get_app_conn()
+
+
+def _seed_nudge_trigger_definitions(conn) -> None:
+    """Insert default rows for configurable triggers (no-op if already present)."""
+    try:
+        from .trigger_defaults import DEFAULT_SPECS
+    except ImportError:
+        return
+    for spec in DEFAULT_SPECS:
+        try:
+            cfg = json.dumps(spec.default_config, ensure_ascii=False, sort_keys=True)
+            execute(
+                conn,
+                """
+                INSERT INTO nudge_trigger_definitions
+                    (trigger_key, enabled, priority, title_template, body_template,
+                     question_template, config_json)
+                VALUES (%s, TRUE, NULL, %s, %s, %s, %s)
+                ON CONFLICT (trigger_key) DO NOTHING
+                """,
+                (
+                    spec.trigger_key,
+                    spec.title_template,
+                    spec.body_template,
+                    spec.question_template,
+                    cfg,
+                ),
+            )
+        except Exception as e:
+            logger.warning("Seed nudge_trigger_definitions %s: %s", spec.trigger_key, e)
 
 
 def init_nudge_tables(conn) -> None:
@@ -87,6 +125,24 @@ def init_nudge_tables(conn) -> None:
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_unread "
             "ON nudge_deliveries(userid) WHERE read_at IS NULL",
         )
+
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_trigger_definitions (
+                trigger_key TEXT PRIMARY KEY,
+                enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                priority INTEGER,
+                title_template TEXT NOT NULL,
+                body_template TEXT NOT NULL,
+                question_template TEXT NOT NULL,
+                config_json TEXT NOT NULL DEFAULT '{}',
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_by INTEGER
+            )
+            """,
+        )
+        _seed_nudge_trigger_definitions(conn)
     except Exception as e:
         # With autocommit enabled, the exception raised here should be the
         # real failing statement error (not a follow-on InFailedSqlTransaction).
@@ -113,7 +169,7 @@ def get_all_user_ids(conn) -> List[int]:
 def get_user_ids_receiving_nudge_on_date(
     conn, target_date: date
 ) -> Set[int]:
-    """Return set of userids who already received a nudge on target_date (for cap)."""
+    """Return userids with at least one delivery on target_date."""
     try:
         cur = execute(
             conn,
@@ -125,6 +181,123 @@ def get_user_ids_receiving_nudge_on_date(
     except Exception as e:
         logger.warning("Could not fetch deliveries for date %s: %s", target_date, e)
         return set()
+
+
+def get_delivery_fingerprints_on_date(
+    conn, target_date: date
+) -> Set[Tuple[int, str, str]]:
+    """
+    (userid, trigger_id, title) for rows already stored on target_date.
+    Used to skip duplicates if the scan runs more than once the same day.
+    """
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT userid, trigger_id, title
+            FROM nudge_deliveries
+            WHERE sent_at = %s
+            """,
+            (target_date.isoformat(),),
+        )
+        rows = cur.fetchall()
+        return {(int(r[0]), str(r[1]), str(r[2])) for r in rows} if rows else set()
+    except Exception as e:
+        logger.warning("Could not fetch delivery fingerprints for %s: %s", target_date, e)
+        return set()
+
+
+def get_planet_window_dedupe_keys(
+    conn, trigger_id: str, since_date: date
+) -> Set[Tuple[int, str, str]]:
+    """
+    (userid, planet, window_start_iso) already notified for this trigger
+    since since_date (dedupe across days). Expects event_params JSON with planet + window_start.
+    """
+    keys: Set[Tuple[int, str, str]] = set()
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT userid, event_params
+            FROM nudge_deliveries
+            WHERE trigger_id = %s AND sent_at >= %s
+            """,
+            (trigger_id, since_date.isoformat()),
+        )
+        rows = cur.fetchall() or []
+        for userid, raw in rows:
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            planet = obj.get("planet")
+            ws = obj.get("window_start")
+            if planet and ws:
+                keys.add((int(userid), str(planet), str(ws)))
+    except Exception as e:
+        logger.warning("Could not load dedupe keys for %s: %s", trigger_id, e)
+    return keys
+
+
+def get_self_charts_for_nudge(conn) -> List[Dict[str, Any]]:
+    """
+    One row per user: self birth chart for personalized nudges.
+    Returns dicts: birth_chart_id, userid, date, time, latitude, longitude, timezone.
+    """
+    rows: List[Any] = []
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT id, userid, date, time, latitude, longitude, timezone
+            FROM birth_charts
+            WHERE LOWER(COALESCE(relation, '')) = 'self'
+            ORDER BY userid ASC, id ASC
+            """,
+        )
+        rows = cur.fetchall() or []
+    except Exception as e:
+        logger.warning("Could not load self charts for nudges: %s", e)
+        return []
+
+    out: List[Dict[str, Any]] = []
+    enc = _nudge_encryptor
+    seen_users: Set[int] = set()
+    for row in rows:
+        cid, uid, d, t, lat, lon, tz = row
+        uid = int(uid)
+        if uid in seen_users:
+            continue
+        try:
+            if enc:
+                d = enc.decrypt(d) if d else ""
+                t = enc.decrypt(t) if t else ""
+                lat_s = enc.decrypt(str(lat)) if lat is not None else "0"
+                lon_s = enc.decrypt(str(lon)) if lon is not None else "0"
+                lat_f = float(lat_s) if lat_s else 0.0
+                lon_f = float(lon_s) if lon_s else 0.0
+            else:
+                lat_f = float(lat) if lat is not None else 0.0
+                lon_f = float(lon) if lon is not None else 0.0
+            out.append(
+                {
+                    "birth_chart_id": int(cid),
+                    "userid": uid,
+                    "date": (d or "").strip(),
+                    "time": (t or "").strip(),
+                    "latitude": lat_f,
+                    "longitude": lon_f,
+                    "timezone": (tz or "").strip() or "UTC+0",
+                }
+            )
+            seen_users.add(uid)
+        except (TypeError, ValueError) as e:
+            logger.debug("Skip birth chart %s for nudge: %s", cid, e)
+            continue
+    return out
 
 
 def get_device_tokens_for_user(conn, userid: int) -> List[Tuple[str, str]]:
@@ -274,3 +447,65 @@ def mark_deliveries_read(conn, userid: int, ids: Optional[List[int]]) -> int:
         (userid,),
     )
     return cur.rowcount or 0
+
+
+def fetch_trigger_definition_row(
+    conn, trigger_key: str
+) -> Optional[Tuple[Any, ...]]:
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT enabled, priority, title_template, body_template,
+                   question_template, config_json
+            FROM nudge_trigger_definitions
+            WHERE trigger_key = %s
+            """,
+            (trigger_key,),
+        )
+        row = cur.fetchone()
+        return row if row else None
+    except Exception as e:
+        logger.warning("fetch_trigger_definition_row %s: %s", trigger_key, e)
+        return None
+
+
+def upsert_trigger_definition(
+    conn,
+    trigger_key: str,
+    enabled: bool,
+    priority: Optional[int],
+    title_template: str,
+    body_template: str,
+    question_template: str,
+    config_json: str,
+    updated_by: Optional[int],
+) -> None:
+    execute(
+        conn,
+        """
+        INSERT INTO nudge_trigger_definitions
+            (trigger_key, enabled, priority, title_template, body_template,
+             question_template, config_json, updated_at, updated_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s)
+        ON CONFLICT (trigger_key) DO UPDATE SET
+            enabled = EXCLUDED.enabled,
+            priority = EXCLUDED.priority,
+            title_template = EXCLUDED.title_template,
+            body_template = EXCLUDED.body_template,
+            question_template = EXCLUDED.question_template,
+            config_json = EXCLUDED.config_json,
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = EXCLUDED.updated_by
+        """,
+        (
+            trigger_key,
+            enabled,
+            priority,
+            title_template,
+            body_template,
+            question_template,
+            config_json,
+            updated_by,
+        ),
+    )

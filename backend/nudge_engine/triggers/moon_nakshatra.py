@@ -80,7 +80,8 @@ class MoonNakshatraTrigger(TriggerBase):
                             f"How will the Moon transiting through {nak_name} nakshatra today on "
                             f"{target_date.isoformat()} affect me personally, and how long will its effects last?"
                         ),
-                        priority=1,
+                        # Lowest: fires most days; must not crowd out transits / lunar / retrograde.
+                        priority=10,
                     )
                 )
         except Exception as e:

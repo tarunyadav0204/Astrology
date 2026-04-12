@@ -8,13 +8,17 @@ from datetime import date
 from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
 from db import get_conn, execute
 from .service import run_nudge_scan
 from . import db
 from . import push as push_module
+from .config_validate import ConfigValidationError, validate_and_normalize_config
+from .template_render import TemplateRenderError, validate_templates
+from .trigger_defaults import get_spec, list_registered_trigger_keys
+from .trigger_def_loader import load_merged_definition
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,32 @@ class AdminSendBlogNotificationRequest(BaseModel):
 class MarkNudgesReadRequest(BaseModel):
     """If ids is omitted or empty, mark all nudges read for the current user."""
     ids: Optional[List[int]] = None
+
+
+class TriggerDefinitionUpdateRequest(BaseModel):
+    """Admin-editable copy (templates) and JSON config for a registered nudge trigger."""
+
+    enabled: bool = True
+    priority: Optional[int] = Field(None, ge=0, le=200)
+    title_template: str
+    body_template: str
+    question_template: str = ""
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
+def _admin_trigger_dto(merged, spec) -> Dict[str, Any]:
+    return {
+        "trigger_key": merged.trigger_key,
+        "enabled": merged.enabled,
+        "priority": merged.priority,
+        "title_template": merged.title_template,
+        "body_template": merged.body_template,
+        "question_template": merged.question_template,
+        "config": merged.config,
+        "allowed_placeholders": sorted(spec.allowed_placeholders),
+        "config_schema": spec.config_schema,
+        "default_priority": spec.default_priority,
+    }
 
 
 @router.post("/scan")
@@ -381,3 +411,94 @@ async def post_mark_nudges_read(
         updated = db.mark_deliveries_read(conn, current_user.userid, body.ids)
         conn.commit()
     return {"ok": True, "updated": updated}
+
+
+@router.get("/admin/trigger-definitions")
+async def admin_list_trigger_definitions(current_user: User = Depends(get_current_user)):
+    """List configurable nudge triggers with merged DB defaults (admin)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            items = []
+            for key in list_registered_trigger_keys():
+                merged = load_merged_definition(conn, key)
+                spec = get_spec(key)
+                if spec:
+                    items.append(_admin_trigger_dto(merged, spec))
+        return {"triggers": items}
+    except Exception as e:
+        logger.exception("admin_list_trigger_definitions: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load trigger definitions") from e
+
+
+@router.get("/admin/trigger-definitions/{trigger_key}")
+async def admin_get_trigger_definition(
+    trigger_key: str,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    spec = get_spec(trigger_key)
+    if not spec:
+        raise HTTPException(status_code=404, detail="Unknown trigger_key")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            merged = load_merged_definition(conn, trigger_key)
+        return _admin_trigger_dto(merged, spec)
+    except Exception as e:
+        logger.exception("admin_get_trigger_definition: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load trigger definition") from e
+
+
+@router.put("/admin/trigger-definitions/{trigger_key}")
+async def admin_put_trigger_definition(
+    trigger_key: str,
+    body: TriggerDefinitionUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    spec = get_spec(trigger_key)
+    if not spec:
+        raise HTTPException(status_code=404, detail="Unknown trigger_key")
+    title_t = (body.title_template or "").strip()
+    body_t = (body.body_template or "").strip()
+    question_t = (body.question_template or "").strip()
+    if len(title_t) > 200 or len(body_t) > 600 or len(question_t) > 900:
+        raise HTTPException(
+            status_code=400,
+            detail="Template length exceeds limits (title 200, body 600, question 900).",
+        )
+    try:
+        validate_templates(title_t, body_t, question_t or None, spec.allowed_placeholders)
+        norm_config = validate_and_normalize_config(trigger_key, body.config or {})
+    except TemplateRenderError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ConfigValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    cfg_json = json.dumps(norm_config, ensure_ascii=False, sort_keys=True)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            db.upsert_trigger_definition(
+                conn,
+                trigger_key=trigger_key,
+                enabled=body.enabled,
+                priority=body.priority,
+                title_template=title_t,
+                body_template=body_t,
+                question_template=question_t,
+                config_json=cfg_json,
+                updated_by=current_user.userid,
+            )
+            conn.commit()
+            merged = load_merged_definition(conn, trigger_key)
+        return _admin_trigger_dto(merged, spec)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_put_trigger_definition: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save trigger definition") from e

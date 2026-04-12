@@ -18,6 +18,7 @@ import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
 import AdminSupportInbox from './AdminSupportInbox';
 import BlogDashboard from '../Blog/BlogDashboard';
+import AdminNudgeTriggerDefinitions from './AdminNudgeTriggerDefinitions';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
@@ -124,7 +125,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifTotal, setNotifTotal] = useState(0);
   const [notifTotalPages, setNotifTotalPages] = useState(0);
   const [notifUserIdsWithTokens, setNotifUserIdsWithTokens] = useState([]); // userids who have accepted notifications
-  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog'
+  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog' | 'nudge_triggers'
   const [blogNotifSelectedId, setBlogNotifSelectedId] = useState('');
   const [blogNotifAudience, setBlogNotifAudience] = useState('all'); // 'all' | 'eligible'
   const [selectedBlogNotifUserIds, setSelectedBlogNotifUserIds] = useState([]); // multi-select for blog tab
@@ -2322,6 +2323,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               >
                 Blog notifications
               </button>
+              <button
+                type="button"
+                className={`sub-tab ${notifSubTab === 'nudge_triggers' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('nudge_triggers')}
+              >
+                Daily nudge triggers
+              </button>
             </div>
 
             {notifSubTab === 'custom' && (
@@ -2649,6 +2657,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 )}
               </>
             )}
+
+            {notifSubTab === 'nudge_triggers' && <AdminNudgeTriggerDefinitions />}
           </div>
         )}
 
