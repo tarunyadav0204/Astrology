@@ -23,6 +23,10 @@ _MAX_NAME_CACHE = 10_000
 # Skip activity for these paths to reduce noise (health, static, etc.)
 SKIP_PATHS = frozenset({"/", "/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"})
 
+# Alert ops when password reset SMS flow fails (HTTP error or unhandled exception)
+_SEND_RESET_CODE_PATH = "/api/send-reset-code"
+_SEND_RESET_CODE_ALERT_RECIPIENTS = ("anil.asnani@gmail.com", "tarun.yadav@gmail.com")
+
 # Max body size to buffer for activity logging (replay + metadata). Larger bodies pass through unread.
 _MAX_ACTIVITY_BODY = 131_072
 
@@ -191,6 +195,49 @@ def _resource_from_path(path: str) -> tuple[str | None, str | None]:
     return resource_type or None, resource_id
 
 
+def _is_send_reset_code_path(path: str) -> bool:
+    p = (path or "").rstrip("/") or "/"
+    return p == _SEND_RESET_CODE_PATH.rstrip("/") or path == _SEND_RESET_CODE_PATH
+
+
+def _send_reset_code_error_email(
+    status_code: int,
+    req_meta: dict,
+    error_type: str | None = None,
+    error_message: str | None = None,
+    stack_trace: str | None = None,
+) -> None:
+    """
+    Notify ops about send-reset-code failures. Uses same SMTP as OTP (utils.smtp_mail).
+    req_meta already contains redacted JSON/body snapshot from _buffer_request_if_small.
+    Never raises.
+    """
+    try:
+        from utils.smtp_mail import send_plain_text_email
+
+        parts = [
+            "The /api/send-reset-code endpoint returned an error or raised an exception.",
+            f"HTTP status: {status_code}",
+            "",
+            "Request snapshot (passwords, tokens, OTP codes redacted):",
+            json.dumps(req_meta or {}, indent=2, ensure_ascii=False, default=str),
+        ]
+        if error_type or error_message:
+            parts.extend(["", f"Exception type: {error_type or '—'}", f"Exception message: {error_message or '—'}"])
+        if stack_trace:
+            st = stack_trace if len(stack_trace) <= 25_000 else stack_trace[:25_000] + "\n…[truncated]"
+            parts.extend(["", "Stack trace:", st])
+        body = "\n".join(parts)
+        subject = f"[AstroRoshni] send-reset-code error (HTTP {status_code})"
+        send_plain_text_email(
+            list(_SEND_RESET_CODE_ALERT_RECIPIENTS),
+            subject,
+            body,
+        )
+    except Exception:
+        logger.exception("send-reset-code ops alert email failed")
+
+
 def _get_user_from_request(request: Request) -> tuple[str | None, int | None, str | None]:
     """Extract phone (JWT 'sub'), userid (JWT 'userid'), and name (JWT 'name') from Authorization header. Returns (phone, user_id, name)."""
     auth = request.headers.get("Authorization")
@@ -252,6 +299,13 @@ class ActivityMiddleware(BaseHTTPMiddleware):
                     request.headers.get("user-agent"),
                     req_meta,
                 )
+                if _is_send_reset_code_path(path) and response.status_code >= 400:
+                    loop.run_in_executor(
+                        None,
+                        _send_reset_code_error_email,
+                        int(response.status_code),
+                        req_meta,
+                    )
             except Exception as e:
                 logger.debug("Activity: failed to schedule publish: %s", e)
 
@@ -280,6 +334,16 @@ class ActivityMiddleware(BaseHTTPMiddleware):
                     traceback.format_exc(),
                     req_meta,
                 )
+                if _is_send_reset_code_path(path):
+                    loop.run_in_executor(
+                        None,
+                        _send_reset_code_error_email,
+                        500,
+                        req_meta,
+                        type(e).__name__,
+                        str(e),
+                        traceback.format_exc(),
+                    )
             except Exception as schedule_err:
                 logger.debug("Activity: failed to schedule error publish: %s", schedule_err)
 
