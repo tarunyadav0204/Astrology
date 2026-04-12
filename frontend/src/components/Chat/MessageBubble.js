@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { jsPDF } from 'jspdf';
 import { showToast } from '../../utils/toast';
@@ -118,7 +118,17 @@ const getGlossaryDefinition = (glossary, termId) => {
     return undefined;
 };
 
-const MessageBubble = ({ message, language = 'english', sessionId = null, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
+const MessageBubble = ({
+    message,
+    language = 'english',
+    sessionId = null,
+    onFollowUpClick,
+    onChartRefClick,
+    onRestartPolling,
+    onDeleteMessage,
+    onNativeGateOpenSelectNative,
+    onNativeGateOpenAddProfile,
+}) => {
     const { podcastCost, refreshBalance } = useCredits();
     const [showActions, setShowActions] = useState(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
@@ -152,6 +162,14 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
     const podcastFetchAbortRef = useRef(null);
     const podcastBlobRef = useRef(null);
     const podcastSourceKeyRef = useRef(null);
+
+    const isNativeGate = useMemo(
+        () =>
+            message.message_type === 'native_gate' ||
+            message.intent_gate === 'create_native' ||
+            (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native'),
+        [message.message_type, message.intent_gate, message.gate_metadata],
+    );
 
     const getCleanMessageText = useCallback(() => {
         if (!message?.content) return '';
@@ -684,6 +702,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
 
     const renderMessageToolbar = (placement) => {
         if (!showMessageToolbar) return null;
+        if (isNativeGate && placement === 'top') return null;
         const isAssistant = message.role === 'assistant';
         const placementClass = placement === 'top' ? 'message-action-buttons--top' : 'message-action-buttons--bottom';
         return (
@@ -740,7 +759,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
     return (
         <div 
             ref={messageRef}
-            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''} ${message.message_type === 'clarification' ? 'clarification' : ''}`}
+            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''} ${message.message_type === 'clarification' ? 'clarification' : ''} ${isNativeGate ? 'native-gate' : ''}`}
             onTouchStart={isMobile() ? handleLongPress : undefined}
             onClick={(e) => {
                 if (isMobile() && showActions) {
@@ -773,7 +792,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                     </div>
                 )}
                 {/* Beta Notice for Timeline Predictions */}
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && (
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && !isNativeGate && (
                     <div style={{
                         backgroundColor: 'rgba(255, 152, 0, 0.1)',
                         borderLeft: '3px solid #FF9800',
@@ -788,7 +807,7 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                         ⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.
                     </div>
                 )}
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && (
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && !isNativeGate && (
                     <div style={{
                         backgroundColor: 'rgba(156, 39, 176, 0.08)',
                         borderLeft: '3px solid #9C27B0',
@@ -961,6 +980,70 @@ const MessageBubble = ({ message, language = 'english', sessionId = null, onFoll
                         </>
                     )}
                 </div>
+
+                {isNativeGate && !message.isTyping && !message.isProcessing && (onNativeGateOpenSelectNative || onNativeGateOpenAddProfile) && (
+                    <div
+                        className="native-gate-ctas"
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            gap: '10px 14px',
+                            marginTop: 10,
+                            marginBottom: 2,
+                        }}
+                    >
+                        {onNativeGateOpenSelectNative && (
+                            <button
+                                type="button"
+                                onClick={() => onNativeGateOpenSelectNative()}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '4px 0',
+                                    cursor: 'pointer',
+                                    color: '#ea580c',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    textDecoration: 'underline',
+                                }}
+                            >
+                                Select native
+                            </button>
+                        )}
+                        {onNativeGateOpenAddProfile && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const hint = message.gate_metadata?.extracted_birth_hint || {};
+                                    onNativeGateOpenAddProfile(hint);
+                                }}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    padding: '8px 14px',
+                                    borderRadius: 999,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    background: 'linear-gradient(90deg, #ff6b35, #f97316)',
+                                    color: '#fff',
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    lineHeight: 1.2,
+                                    boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
+                                }}
+                            >
+                                <span aria-hidden style={{ fontSize: 15, fontWeight: 700 }}>
+                                    +
+                                </span>
+                                Add new birth profile
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {renderMessageToolbar('bottom')}
                 {message.showRestartButton && !showMessageToolbar && (

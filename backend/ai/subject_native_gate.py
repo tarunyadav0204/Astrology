@@ -86,7 +86,7 @@ Return ONLY valid JSON (no markdown fences):
   "primary_intent": "third_party_birth_chart_request" | "natal_timeline_question" | "general_chart_question" | "unclear",
   "confidence": <number 0-1>,
   "show_create_native_cta": <boolean>,
-  "user_facing_explanation": "<short paragraph explaining we need a saved profile for the OTHER person>",
+  "user_facing_explanation": "<2-4 sentences. If the user clearly names a relationship (son, daughter, spouse, partner, friend, baby, etc.), start with that (e.g. It looks like you are asking for a reading for your son.). Then say that for an accurate analysis they need a separate saved birth profile for that person in the app. Mention they can use Select native to pick an existing chart or add a new profile. Do not include URLs or markdown links>",
   "extracted_birth_hint": {{"name": <string or null>, "date": <string or null>, "time": <string or null>, "place": <string or null>}},
   "clarify_question": <string or null>
 }}
@@ -106,6 +106,7 @@ Rules:
   offering two paths: (1) analyzing the current native around that date vs (2) adding another person's birth profile.
   Otherwise clarify_question MUST be null.
 - Never set show_create_native_cta for natal_timeline_question or general_chart_question.
+- user_facing_explanation must NOT contain raw http(s) URLs; the app will show buttons for Select native and Add profile.
 - {lang_note}
 """
 
@@ -145,8 +146,9 @@ Rules:
     expl = (result.get("user_facing_explanation") or "").strip()
     if not expl and cta:
         expl = (
-            "It sounds like you're asking about another person's birth chart. "
-            "Add them as a saved birth profile (a \"native\") first so we can calculate their chart accurately."
+            "It looks like you're asking for a reading for someone other than the profile currently selected. "
+            "To provide an accurate analysis, we need a separate saved birth profile for them in the app. "
+            "Use **Select native** to choose an existing chart, or **Add new birth profile** to enter their details."
         )
     out["user_facing_explanation"] = expl
 

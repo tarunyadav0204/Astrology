@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MessageList from './MessageList';
 import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatInput from './ChatInput';
@@ -41,7 +41,42 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [showPartnerModal, setShowPartnerModal] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [showChatPartnerSelector, setShowChatPartnerSelector] = useState(false);
-    
+    const [birthFormGatePrefill, setBirthFormGatePrefill] = useState(null);
+    const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
+
+    const openBirthModalEmpty = useCallback(() => {
+        setBirthFormGatePrefill(null);
+        setBirthFormDefaultTab('saved');
+        setShowBirthForm(true);
+    }, []);
+
+    const handleNativeGateOpenAddProfile = useCallback((hint) => {
+        if (hint && typeof hint === 'object') {
+            const name = hint.name != null ? String(hint.name) : '';
+            const date = hint.date != null ? String(hint.date) : '';
+            const time = hint.time != null ? String(hint.time) : '';
+            const place = hint.place != null ? String(hint.place) : '';
+            if (name || date || time || place) {
+                setBirthFormGatePrefill({
+                    person1: {
+                        name,
+                        date,
+                        time,
+                        place,
+                        latitude: null,
+                        longitude: null,
+                    },
+                });
+            } else {
+                setBirthFormGatePrefill(null);
+            }
+        } else {
+            setBirthFormGatePrefill(null);
+        }
+        setBirthFormDefaultTab('new');
+        setShowBirthForm(true);
+    }, []);
+
     // Check admin status
     useEffect(() => {
         const checkAdminStatus = async () => {
@@ -386,6 +421,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 terms: msg.terms || [],
                                 glossary: msg.glossary || {},
                                 message_type: msg.message_type || 'answer',
+                                intent_gate: msg.intent_gate || (msg.gate_metadata && msg.gate_metadata.intent_gate),
+                                gate_metadata: msg.gate_metadata || null,
                                 summary_image: msg.summary_image || null // Add summary_image from database
                             };
                             
@@ -644,6 +681,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 terms: status.terms || [],
                                 glossary: status.glossary || {},
                                 message_type: status.message_type || 'answer',
+                                intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
+                                gate_metadata: status.gate_metadata || null,
                                 summary_image: status.summary_image || null // Add summary_image from backend response
                             }
                             : msg
@@ -1099,6 +1138,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             onChartRefClick={handleChartRefClick}
                                             onRestartPolling={restartPolling}
                                             onDeleteMessage={handleDeleteMessage}
+                                            onNativeGateOpenSelectNative={openBirthModalEmpty}
+                                            onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
                                         />
                                     </div>
                                     <ChatInput 
@@ -1246,8 +1287,14 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         {/* Birth Form Modal */}
         <BirthFormModal
             isOpen={showBirthForm}
-            onClose={() => setShowBirthForm(false)}
+            onClose={() => {
+                setShowBirthForm(false);
+                setBirthFormGatePrefill(null);
+                setBirthFormDefaultTab('saved');
+            }}
             onSubmit={handleBirthFormSubmit}
+            prefilledData={birthFormGatePrefill}
+            defaultActiveTab={birthFormDefaultTab}
             title="Chat - Enter Birth Details"
             description="Please provide your birth information to start chatting with AstroRoshni"
         />

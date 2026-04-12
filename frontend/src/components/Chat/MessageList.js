@@ -14,7 +14,18 @@ function messageRowShouldRender(message) {
     return false;
 }
 
-const MessageList = ({ messages, language = 'english', sessionId = null, onMessageHover, onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
+const MessageList = ({
+    messages,
+    language = 'english',
+    sessionId = null,
+    onMessageHover,
+    onFollowUpClick,
+    onChartRefClick,
+    onRestartPolling,
+    onDeleteMessage,
+    onNativeGateOpenSelectNative,
+    onNativeGateOpenAddProfile,
+}) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
@@ -44,6 +55,8 @@ const MessageList = ({ messages, language = 'english', sessionId = null, onMessa
                                 onChartRefClick={onChartRefClick}
                                 onRestartPolling={onRestartPolling}
                                 onDeleteMessage={onDeleteMessage}
+                                onNativeGateOpenSelectNative={onNativeGateOpenSelectNative}
+                                onNativeGateOpenAddProfile={onNativeGateOpenAddProfile}
                             />
                         </div>
                         <FeedbackComponent 

@@ -7,7 +7,7 @@ import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
 import { FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem, TabContainer, TabNavigation, TabButton, TabContent } from './BirthForm.styles';
 
-const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose }) => {
+const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose, defaultActiveTab = 'saved' }) => {
   const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
   
   const [formData, setFormData] = useState({
@@ -352,7 +352,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     }
   };
 
-  const [activeTab, setActiveTab] = useState('saved');
+  const [activeTab, setActiveTab] = useState(() => (defaultActiveTab === 'new' ? 'new' : 'saved'));
 
   return (
     <TabContainer key="fixed-tabs-v2">

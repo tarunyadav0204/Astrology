@@ -1090,7 +1090,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   // Check if this is a clarification message
   const isClarification = message.message_type === 'clarification';
   const isNativeGate =
-    message.message_type === 'native_gate' || message.intent_gate === 'create_native';
+    message.message_type === 'native_gate' ||
+    message.intent_gate === 'create_native' ||
+    (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native');
 
   // Handle empty content for non-typing messages
   if (!message.content || message.content.trim() === '') {
@@ -1177,7 +1179,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             >
             <Ionicons name="checkmark-circle" size={12} color="#fff" style={styles.verifiedIcon} />
             <Text style={styles.assistantLabel}>
-              {isClarification ? t('chat.inquiry', 'AstroRoshni Inquiry') : t('chat.verified', 'AstroRoshni Verified')}
+              {isClarification
+                ? t('chat.inquiry', 'AstroRoshni Inquiry')
+                : isNativeGate
+                  ? t('chat.nativeGateBadge', 'Saved profile needed')
+                  : t('chat.verified', 'AstroRoshni Verified')}
             </Text>
           </LinearGradient>
             {chartName ? (
@@ -1208,39 +1214,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               {t('chat.disclaimerNotice', '⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.')}
             </Text>
           </View>
-        )}
-
-        {isNativeGate && !message.isTyping && (
-          <TouchableOpacity
-            style={styles.nativeGateCtaOuter}
-            onPress={() => {
-              const hint = message.gate_metadata?.extracted_birth_hint || {};
-              navigation.navigate('BirthForm', {
-                chartGatePrefill: {
-                  name: hint.name || '',
-                  date: hint.date || null,
-                  time: hint.time || null,
-                  place: hint.place || '',
-                },
-                returnTo: 'Home',
-              });
-            }}
-            activeOpacity={0.9}
-            accessibilityRole="button"
-            accessibilityLabel={t('chat.addBirthProfileA11y', 'Add a birth profile')}
-          >
-            <LinearGradient
-              colors={['#ff6b35', '#f97316']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.nativeGateCtaGradient}
-            >
-              <Ionicons name="person-add-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.nativeGateCtaText}>
-                {t('chat.addBirthProfileCta', 'Add birth profile')}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
         )}
 
         {/* Quick action buttons under disclaimer (for long messages) - show for assistant messages with content (incl. chat history) */}
@@ -1406,6 +1379,53 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         <View style={styles.messageContent}>
           {renderedElements}
         </View>
+
+        {isNativeGate && !message.isTyping && (
+          <View style={styles.nativeGateActionsWrap}>
+            <View style={styles.nativeGateActionsRow}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
+                activeOpacity={0.7}
+                accessibilityRole="link"
+                accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
+              >
+                <Text style={[styles.nativeGateLinkText, { color: theme === 'dark' ? '#fdba74' : '#ea580c' }]}>
+                  {t('chat.nativeGateSelectNative', 'Select native')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.nativeGateCtaOuter}
+                onPress={() => {
+                  const hint = message.gate_metadata?.extracted_birth_hint || {};
+                  navigation.navigate('BirthForm', {
+                    chartGatePrefill: {
+                      name: hint.name || '',
+                      date: hint.date || null,
+                      time: hint.time || null,
+                      place: hint.place || '',
+                    },
+                    returnTo: 'Home',
+                  });
+                }}
+                activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.addBirthProfileA11y', 'Add a new birth profile')}
+              >
+                <LinearGradient
+                  colors={['#ff6b35', '#f97316']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.nativeGateCtaGradient}
+                >
+                  <Ionicons name="add" size={17} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.nativeGateCtaText}>
+                    {t('chat.nativeGateAddNewProfile', 'Add new birth profile')}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* NEW: Render Follow-up Questions from the dedicated prop */}
         {message.follow_up_questions && message.follow_up_questions.length > 0 && (
@@ -2461,23 +2481,39 @@ const styles = StyleSheet.create({
     width: Dimensions.get('window').width,
     height: Dimensions.get('window').height * 0.8,
   },
-  nativeGateCtaOuter: {
-    marginTop: 4,
-    marginBottom: 12,
-    borderRadius: 14,
-    overflow: 'hidden',
+  nativeGateActionsWrap: {
+    marginTop: 12,
+    marginBottom: 4,
     alignSelf: 'stretch',
+  },
+  nativeGateActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 12,
+    rowGap: 8,
+  },
+  nativeGateLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  nativeGateCtaOuter: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   nativeGateCtaGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
   },
   nativeGateCtaText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -37,6 +37,12 @@ def coerce_chat_birth_details(bd):
 
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
+
+def _ensure_chat_messages_gate_metadata(conn):
+    """Idempotent DDL — older DBs or skipped startup init may lack this column."""
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS gate_metadata TEXT")
+
+
 def init_chat_tables():
     """Initialize chat history tables with polling support"""
     with get_conn() as conn:
@@ -82,7 +88,7 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent_router_ms REAL")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
-        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS gate_metadata TEXT")
+        _ensure_chat_messages_gate_metadata(conn)
 
         # Indexes
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)")
@@ -240,6 +246,9 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             raise HTTPException(status_code=404, detail="Session not found")
 
         raw_name = session_row[2] if len(session_row) > 2 else None
+
+        _ensure_chat_messages_gate_metadata(conn)
+        conn.commit()
 
         cur = execute(
             conn,
@@ -498,8 +507,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             if cta and pi == "third_party_birth_chart_request":
                 expl = (gate.get("user_facing_explanation") or "").strip()
                 content_out = expl or (
-                    "It sounds like you're asking about another person's birth chart. "
-                    "Add them as a saved birth profile first so we can calculate their chart accurately."
+                    "It looks like you're asking for a reading for someone other than the profile currently selected. "
+                    "To provide an accurate analysis, we need a separate saved birth profile for them in the app. "
+                    "Use **Select native** to choose an existing chart, or **Add new birth profile** to enter their details."
                 )
                 meta_payload = {
                     "intent_gate": "create_native",
@@ -764,6 +774,8 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     try:
         db_start = time.time()
         with get_conn() as conn:
+            _ensure_chat_messages_gate_metadata(conn)
+            conn.commit()
             cur = execute(
                 conn,
                 """

@@ -236,10 +236,14 @@ async def lifespan(app: FastAPI):
         print(f"Warning: Could not initialize prediction engine: {e}")
     try:
         init_house_combinations_db()
-        init_chat_tables()
-        print("House combinations and chat history databases initialized")
+        print("House combinations database initialized")
     except Exception as e:
-        print(f"Warning: Could not initialize additional databases: {e}")
+        print(f"Warning: Could not initialize house combinations database: {e}")
+    try:
+        init_chat_tables()
+        print("Chat history database initialized")
+    except Exception as e:
+        print(f"Warning: Could not initialize chat history database: {e}")
     try:
         from subscription_tier_migration import ensure_subscription_tier_schema
         ensure_subscription_tier_schema()

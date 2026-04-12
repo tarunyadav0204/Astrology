@@ -759,6 +759,7 @@ CREATE TABLE "chat_messages" (
     "language" TEXT,
     "intent_router_ms" DOUBLE PRECISION,
     "client_request_id" TEXT,
+    "gate_metadata" TEXT,
     PRIMARY KEY ("message_id"),
     FOREIGN KEY ("session_id") REFERENCES "chat_sessions" ("session_id")
 );

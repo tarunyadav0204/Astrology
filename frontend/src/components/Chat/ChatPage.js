@@ -150,7 +150,44 @@ const ChatPage = () => {
     const [wizardRelationshipOtherText, setWizardRelationshipOtherText] = useState('');
     const [partnerModalMode, setPartnerModalMode] = useState(null); // 'wizard-first' | 'wizard-second'
     const [showBirthFormModal, setShowBirthFormModal] = useState(false);
+    /** BirthFormModal prefilledData (gate hint) — cleared when modal closes or opening selector without hint */
+    const [birthFormGatePrefill, setBirthFormGatePrefill] = useState(null);
+    /** BirthForm tab: 'saved' = Saved Charts, 'new' = New Chart (native gate Add opens create tab). */
+    const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
     const [pendingFollowUpQuestion, setPendingFollowUpQuestion] = useState('');
+
+    const openBirthModalEmpty = () => {
+        setBirthFormGatePrefill(null);
+        setBirthFormDefaultTab('saved');
+        setShowBirthFormModal(true);
+    };
+
+    const handleNativeGateOpenAddProfile = (hint) => {
+        if (hint && typeof hint === 'object') {
+            const name = hint.name != null ? String(hint.name) : '';
+            const date = hint.date != null ? String(hint.date) : '';
+            const time = hint.time != null ? String(hint.time) : '';
+            const place = hint.place != null ? String(hint.place) : '';
+            if (name || date || time || place) {
+                setBirthFormGatePrefill({
+                    person1: {
+                        name,
+                        date,
+                        time,
+                        place,
+                        latitude: null,
+                        longitude: null,
+                    },
+                });
+            } else {
+                setBirthFormGatePrefill(null);
+            }
+        } else {
+            setBirthFormGatePrefill(null);
+        }
+        setBirthFormDefaultTab('new');
+        setShowBirthFormModal(true);
+    };
     /** Set when navigating from analysis follow-up chips; consumed when single-chart chat is ready. */
     const analysisChatIntentRef = useRef(null);
 
@@ -943,6 +980,8 @@ const ChatPage = () => {
                                     isProcessing: false,
                                     isTyping: false,
                                     message_type: status.message_type || 'answer',
+                                    intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
+                                    gate_metadata: status.gate_metadata || null,
                                     terms: status.terms || [],
                                     glossary: status.glossary || {},
                                     summary_image: status.summary_image || null,
@@ -1754,7 +1793,7 @@ const ChatPage = () => {
                 variant="chat"
                 user={headerUser}
                 birthData={birthData}
-                onChangeNative={() => setShowBirthFormModal(true)}
+                onChangeNative={openBirthModalEmpty}
                 onCreditsClick={() => setShowCreditsModal(true)}
                 onLogout={() => {
                     localStorage.removeItem('token');
@@ -1845,7 +1884,7 @@ const ChatPage = () => {
                                                 <button
                                                     type="button"
                                                     className="single-chart-change-btn"
-                                                    onClick={() => setShowBirthFormModal(true)}
+                                                    onClick={openBirthModalEmpty}
                                                 >
                                                     Change chart
                                                 </button>
@@ -1873,7 +1912,7 @@ const ChatPage = () => {
                                         <button
                                             type="button"
                                             className="wizard-primary-btn single-chart-setup-cta"
-                                            onClick={() => setShowBirthFormModal(true)}
+                                            onClick={openBirthModalEmpty}
                                         >
                                             Choose or add birth chart…
                                         </button>
@@ -2255,7 +2294,7 @@ const ChatPage = () => {
                                     <button
                                         type="button"
                                         className="native-selector-chip chat-header-native-chip"
-                                        onClick={() => setShowBirthFormModal(true)}
+                                        onClick={openBirthModalEmpty}
                                         title="Change birth chart / native"
                                         aria-haspopup="dialog"
                                         aria-label={`Selected native ${birthData?.name || 'chart'}. Choose a different chart.`}
@@ -2339,6 +2378,8 @@ const ChatPage = () => {
                             sessionId={isMundaneMode ? mundaneSessionId : chatV2SessionId}
                             onFollowUpClick={(q) => setPendingFollowUpQuestion(q)}
                             onDeleteMessage={handleDeleteMessage}
+                            onNativeGateOpenSelectNative={openBirthModalEmpty}
+                            onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
                         />
                         <div ref={messagesEndRef} />
                     </div>
@@ -2385,10 +2426,16 @@ const ChatPage = () => {
 
                 <BirthFormModal
                     isOpen={showBirthFormModal}
-                    onClose={() => setShowBirthFormModal(false)}
+                    onClose={() => {
+                        setShowBirthFormModal(false);
+                        setBirthFormGatePrefill(null);
+                        setBirthFormDefaultTab('saved');
+                    }}
                     onSubmit={() => {
                         setChatV2SessionId(null); // refresh chat-v2 session for newly selected native
                     }}
+                    prefilledData={birthFormGatePrefill}
+                    defaultActiveTab={birthFormDefaultTab}
                     title="Birth chart for chat"
                     description="Select a saved chart or enter details. This sets the chart used for Single Chart answers."
                 />
