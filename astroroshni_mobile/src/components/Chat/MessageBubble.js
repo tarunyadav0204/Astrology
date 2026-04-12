@@ -141,8 +141,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       }),
     ]).start();
   }, []);
-  const getCleanMessageText = () =>
-    message.content
+  const getCleanMessageText = () => {
+    const raw = message.content;
+    const s = typeof raw === 'string' ? raw : raw != null ? String(raw) : '';
+    return s
       .replace(/<[^>]*>/g, '')
       .replace(/\*\*(.*?)\*\*/g, '$1')
       .replace(/\*(.*?)\*/g, '$1')
@@ -153,6 +155,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       .replace(/&#39;/g, "'")
       .replace(/&nbsp;/g, ' ')
       .trim();
+  };
 
   const playPodcast = async () => {
     if (isPlayingPodcast) {
@@ -1094,12 +1097,19 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     message.intent_gate === 'create_native' ||
     (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native');
 
-  // Handle empty content for non-typing messages
-  if (!message.content || message.content.trim() === '') {
+  const contentStr =
+    typeof message.content === 'string'
+      ? message.content
+      : message.content != null
+        ? String(message.content)
+        : '';
+
+  // Loading rows use LoadingBubble (isTyping), not MessageBubble — skip empty assistant rows safely.
+  if (!contentStr.trim()) {
     return null;
   }
 
-  const formattedContent = formatContent(message.content);
+  const formattedContent = formatContent(contentStr);
   const renderedElements = renderFormattedText(formattedContent);
 
   const chartName = message.native_name || null;

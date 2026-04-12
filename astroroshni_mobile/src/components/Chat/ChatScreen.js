@@ -338,23 +338,29 @@ export default function ChatScreen({ navigation, route }) {
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
 
   useEffect(() => {
+    const maxKeyboardInset = Math.min(520, Math.round(Dimensions.get('window').height * 0.58));
+    const clearKeyboardInset = () => {
+      setIsKeyboardVisible(false);
+      setKeyboardBottomInset(0);
+    };
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
       setIsKeyboardVisible(true);
       const h = e?.endCoordinates?.height;
       if (typeof h === 'number' && h > 0) {
-        setKeyboardBottomInset(h);
+        setKeyboardBottomInset(Math.min(h, maxKeyboardInset));
       }
     });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setIsKeyboardVisible(false);
-      setKeyboardBottomInset(0);
-    });
+    const hideSub = Keyboard.addListener(hideEvent, clearKeyboardInset);
+    /** iOS Simulator / hardware keyboard: WillHide sometimes never fires; DidHide clears stuck inset. */
+    const hideDidSub =
+      Platform.OS === 'ios' ? Keyboard.addListener('keyboardDidHide', clearKeyboardInset) : null;
 
     return () => {
       showSub.remove();
       hideSub.remove();
+      hideDidSub?.remove();
     };
   }, []);
   // Stop any ongoing TTS playback when leaving the chat screen
@@ -366,6 +372,8 @@ export default function ChatScreen({ navigation, route }) {
         } catch (e) {
           // ignore
         }
+        setKeyboardBottomInset(0);
+        setIsKeyboardVisible(false);
       };
     }, [])
   );
@@ -2179,9 +2187,6 @@ export default function ChatScreen({ navigation, route }) {
       setInputText('');
     }
 
-    // Reset dynamic messages for the new question
-    setDynamicLoadingMessages(null);
-
     setLoading(true);
     setIsTyping(true);
     setShowGreeting(false);
@@ -2470,7 +2475,6 @@ export default function ChatScreen({ navigation, route }) {
     setSessionId(null);
     setLoading(false);
     setIsTyping(false);
-    setDynamicLoadingMessages(null);
     const nativeName = birthData?.name || 'there';
     let welcomeMessage;
     if (isMundaneRef.current) {
