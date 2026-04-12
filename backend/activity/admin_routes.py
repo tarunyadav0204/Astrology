@@ -131,6 +131,10 @@ async def get_activity(
     user_phone: Optional[str] = Query(None, description="Filter by phone (partial match)"),
     action: Optional[str] = Query(None, description="Filter by action (e.g. api_request, podcast_generated)"),
     resource_id: Optional[str] = Query(None, description="Filter by resource id (e.g. Google Play order id)"),
+    errors_only: bool = Query(
+        False,
+        description="If true: rows where action=api_error (unhandled exception) OR action=api_request with HTTP status outside 2xx",
+    ),
     sort_by: Optional[str] = Query("created_at", description="Column to sort by"),
     order: Optional[str] = Query("desc", description="asc or desc"),
     limit: int = Query(500, ge=1, le=2000),
@@ -204,7 +208,16 @@ async def get_activity(
         where_parts.append(f"({' OR '.join(name_or_parts)})")
     if user_phone and user_phone.strip():
         where_parts.append("COALESCE(user_phone, '') LIKE @user_phone")
-    if action and action.strip():
+    if errors_only:
+        # Unhandled exceptions (middleware) + normal FastAPI responses with non-success HTTP status
+        where_parts.append(
+            "("
+            "action = 'api_error' "
+            "OR (action = 'api_request' AND status_code IS NOT NULL "
+            "AND (status_code < 200 OR status_code >= 300))"
+            ")"
+        )
+    elif action and action.strip():
         where_parts.append("COALESCE(action, '') = @action")
     if resource_id and resource_id.strip():
         where_parts.append("COALESCE(resource_id, '') LIKE @resource_id")
@@ -292,7 +305,7 @@ async def get_activity(
                 )
         if user_phone and user_phone.strip():
             filter_params.append(bigquery.ScalarQueryParameter("user_phone", "STRING", f"%{user_phone.strip()}%"))
-        if action and action.strip():
+        if not errors_only and action and action.strip():
             filter_params.append(bigquery.ScalarQueryParameter("action", "STRING", action.strip()))
         if resource_id and resource_id.strip():
             filter_params.append(bigquery.ScalarQueryParameter("resource_id", "STRING", f"%{resource_id.strip()}%"))

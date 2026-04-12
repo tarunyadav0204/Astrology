@@ -149,6 +149,86 @@ def _is_us_number(phone: str) -> bool:
     return normalized.startswith("+1")
 
 
+def _phone_lookup_variants(phone: Optional[str]) -> List[str]:
+    """
+    Build possible DB values for users.phone — legacy rows may store 10-digit local,
+    +91..., 91..., etc. Login often succeeds on a second attempt with a different shape;
+    forgot-password and send-reset-code must match the same way.
+    """
+    if not phone:
+        return []
+    raw = (
+        phone.strip()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+    digits = "".join(c for c in raw if c.isdigit())
+    variants: List[str] = []
+
+    def add(v: Optional[str]) -> None:
+        if v and v not in variants:
+            variants.append(v)
+
+    add(phone.strip())
+    add(raw)
+    if digits:
+        add(digits)
+    if not digits:
+        return variants
+
+    if raw.startswith("+91") or (digits.startswith("91") and len(digits) >= 12):
+        last10 = digits[-10:] if len(digits) >= 10 else digits
+        if len(digits) == 12 and digits.startswith("91"):
+            last10 = digits[2:]
+        elif len(digits) == 10:
+            last10 = digits
+        add(last10)
+        add(f"+91{last10}")
+        add(f"91{last10}")
+        add(f"0{last10}")
+        add(digits)
+        if raw.startswith("+"):
+            add("+" + digits)
+    elif raw.startswith("+1") or _is_us_number(raw) or (len(digits) == 11 and digits.startswith("1")):
+        national = digits[1:] if len(digits) == 11 and digits.startswith("1") else digits
+        if len(national) == 10:
+            add(national)
+            add(f"+1{national}")
+            add(f"1{national}")
+    else:
+        # Ambiguous 10-digit (common: India stored without +91)
+        if len(digits) == 10:
+            add(digits)
+            add(f"+91{digits}")
+            add(f"91{digits}")
+            add(f"0{digits}")
+            add(f"+1{digits}")
+            add(f"1{digits}")
+        elif len(digits) == 12 and digits.startswith("91"):
+            last10 = digits[2:]
+            add(last10)
+            add(f"+91{last10}")
+            add(digits)
+            add(f"+{digits}")
+    return variants
+
+
+def _find_user_row_by_phone_variants(conn, phone: str):
+    """Return one users row (full login shape) or None if no match."""
+    variants = _phone_lookup_variants(phone)
+    if not variants:
+        return None
+    placeholders = ", ".join(["%s"] * len(variants))
+    cur = execute(
+        conn,
+        f"SELECT userid, name, phone, password, role, email, signup_client FROM users WHERE phone IN ({placeholders})",
+        tuple(variants),
+    )
+    return cur.fetchone()
+
+
 def _send_otp_email(to_email: str, code: str) -> bool:
     if not to_email:
         return False
@@ -1325,12 +1405,7 @@ async def delete_own_account(current_user: User = Depends(get_current_user)):
 async def login(user_data: UserLogin):
     try:
         with get_conn() as conn:
-            cur = execute(
-                conn,
-                "SELECT userid, name, phone, password, role, email, signup_client FROM users WHERE phone = %s",
-                (user_data.phone,),
-            )
-            user = cur.fetchone()
+            user = _find_user_row_by_phone_variants(conn, user_data.phone)
         
         if not user:
             print(f"User not found for phone: {user_data.phone}")
@@ -1667,12 +1742,7 @@ async def check_access(request: dict, current_user: User = Depends(get_current_u
 @app.post("/api/forgot-password")
 async def forgot_password(request: ForgotPassword):
     with get_conn() as conn:
-        cur = execute(
-            conn,
-            "SELECT userid, name FROM users WHERE phone = %s",
-            (request.phone,),
-        )
-        user = cur.fetchone()
+        user = _find_user_row_by_phone_variants(conn, request.phone)
 
     if not user:
         raise HTTPException(status_code=404, detail="Phone number not found")
@@ -1686,13 +1756,8 @@ async def send_registration_otp(request: SendResetCode):
     from datetime import datetime, timedelta
     
     with get_conn() as conn:
-        # Check if phone already exists
-        cur = execute(
-            conn,
-            "SELECT userid FROM users WHERE phone = %s",
-            (request.phone,),
-        )
-        existing_user = cur.fetchone()
+        # Check if phone already exists (same shape variants as login / reset)
+        existing_user = _find_user_row_by_phone_variants(conn, request.phone)
 
         if existing_user:
             raise HTTPException(status_code=409, detail="Phone number already registered")
@@ -1742,18 +1807,13 @@ async def send_reset_code(request: SendResetCode):
     from datetime import datetime, timedelta
     
     with get_conn() as conn:
-        cur = execute(
-            conn,
-            "SELECT userid, name, email FROM users WHERE phone = %s",
-            (request.phone,),
-        )
-        user = cur.fetchone()
+        user = _find_user_row_by_phone_variants(conn, request.phone)
 
         if not user:
             raise HTTPException(status_code=404, detail="Phone number not found")
 
         requested_email = (request.email or "").strip().lower()
-        user_email = (user[2] or "").strip().lower() if user[2] else ""
+        user_email = (user[5] or "").strip().lower() if user[5] else ""
         target_email = user_email or requested_email
         if _is_us_number(request.phone) and not target_email:
             raise HTTPException(status_code=400, detail="Email is required for US numbers")
@@ -1765,11 +1825,12 @@ async def send_reset_code(request: SendResetCode):
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
 
-        # Store reset code
+        # Store reset code under canonical users.phone so it matches DB even if client sent +91… vs 10-digit
+        stored_phone = user[2]
         execute(
             conn,
             "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (%s, %s, %s, %s)",
-            (request.phone, code, token, expires_at),
+            (stored_phone, code, token, expires_at),
         )
         conn.commit()
     
@@ -1814,16 +1875,21 @@ async def send_reset_code(request: SendResetCode):
 async def verify_reset_code(request: VerifyResetCode):
     from datetime import datetime
     
+    phone_variants = _phone_lookup_variants(request.phone)
+    if not phone_variants:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
     with get_conn() as conn:
         # `used` may be TEXT ('FALSE'/'TRUE') from SQLite-era migrations or BOOLEAN; avoid `used = FALSE`.
+        ph = ", ".join(["%s"] * len(phone_variants))
         cur = execute(
             conn,
-            """
+            f"""
                 SELECT token FROM password_reset_codes
-                WHERE phone = %s AND code = %s AND expires_at > %s
+                WHERE phone IN ({ph}) AND code = %s AND expires_at > %s
                   AND COALESCE(LOWER(TRIM(used::text)), '') NOT IN ('true', '1', 't', 'yes')
             """,
-            (request.phone, request.code, datetime.utcnow()),
+            tuple(phone_variants) + (request.code, datetime.utcnow()),
         )
         result = cur.fetchone()
 
@@ -1878,12 +1944,7 @@ async def reset_password_with_token(request: ResetPasswordWithToken):
 @app.post("/api/reset-password")
 async def reset_password(request: ResetPassword):
     with get_conn() as conn:
-        cur = execute(
-            conn,
-            "SELECT userid FROM users WHERE phone = %s",
-            (request.phone,),
-        )
-        user = cur.fetchone()
+        user = _find_user_row_by_phone_variants(conn, request.phone)
 
         if not user:
             raise HTTPException(status_code=404, detail="Phone number not found")
@@ -1891,8 +1952,8 @@ async def reset_password(request: ResetPassword):
         hashed_password = hash_password(request.new_password)
         execute(
             conn,
-            "UPDATE users SET password = %s WHERE phone = %s",
-            (hashed_password, request.phone),
+            "UPDATE users SET password = %s WHERE userid = %s",
+            (hashed_password, user[0]),
         )
         conn.commit()
 

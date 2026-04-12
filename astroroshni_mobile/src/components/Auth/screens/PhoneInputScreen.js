@@ -16,20 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
-
-const COUNTRY_CODES = [
-  { code: '+1', country: 'US/CA', flag: '🇺🇸', name: 'United States/Canada' },
-  { code: '+44', country: 'UK', flag: '🇬🇧', name: 'United Kingdom' },
-  { code: '+91', country: 'IN', flag: '🇮🇳', name: 'India' },
-  { code: '+61', country: 'AU', flag: '🇦🇺', name: 'Australia' },
-  { code: '+971', country: 'AE', flag: '🇦🇪', name: 'UAE' },
-  { code: '+65', country: 'SG', flag: '🇸🇬', name: 'Singapore' },
-  { code: '+60', country: 'MY', flag: '🇲🇾', name: 'Malaysia' },
-  { code: '+81', country: 'JP', flag: '🇯🇵', name: 'Japan' },
-  { code: '+86', country: 'CN', flag: '🇨🇳', name: 'China' },
-  { code: '+49', country: 'DE', flag: '🇩🇪', name: 'Germany' },
-  { code: '+33', country: 'FR', flag: '🇫🇷', name: 'France' },
-];
+import {
+  COUNTRY_CODES,
+  getNationalPhoneMaxLength,
+  isNationalPhoneValid,
+} from '../countryCodes';
 
 export default function PhoneInputScreen({ 
   formData, 
@@ -63,8 +54,7 @@ export default function PhoneInputScreen({
   }, []);
 
   useEffect(() => {
-    const minLength = selectedCountry.code === '+1' ? 10 : 8;
-    setIsValid(formData.phone.length >= minLength);
+    setIsValid(isNationalPhoneValid(selectedCountry.code, formData.phone));
   }, [formData.phone, selectedCountry]);
 
   const handleContinue = async () => {
@@ -189,10 +179,14 @@ export default function PhoneInputScreen({
               placeholder="Phone Number"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={formData.phone}
-              onChangeText={(value) => updateFormData('phone', value.replace(/[^0-9]/g, ''))}
+              onChangeText={(value) => {
+                const digits = value.replace(/[^0-9]/g, '');
+                const maxLen = getNationalPhoneMaxLength(selectedCountry.code);
+                updateFormData('phone', digits.slice(0, maxLen));
+              }}
               keyboardType="phone-pad"
               autoFocus
-              maxLength={15}
+              maxLength={getNationalPhoneMaxLength(selectedCountry.code)}
             />
             {isValid && (
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
@@ -260,6 +254,10 @@ export default function PhoneInputScreen({
                   style={styles.countryItem}
                   onPress={() => {
                     setSelectedCountry(item);
+                    updateFormData('countryCode', item.code);
+                    const maxLen = getNationalPhoneMaxLength(item.code);
+                    const current = (formData.phone || '').replace(/[^0-9]/g, '');
+                    updateFormData('phone', current.slice(0, maxLen));
                     setShowCountryPicker(false);
                   }}
                 >

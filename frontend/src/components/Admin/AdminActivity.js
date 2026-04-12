@@ -64,7 +64,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
       if (filterUserName.trim()) params.set('user_name', filterUserName.trim());
       if (filterPhone.trim()) params.set('user_phone', filterPhone.trim());
       if (onlyErrors) {
-        params.set('action', 'api_error');
+        params.set('errors_only', 'true');
       } else if (filterAction.trim()) {
         params.set('action', filterAction.trim());
       }
@@ -156,8 +156,10 @@ export default function AdminActivity({ onOpenUserProfile }) {
         Today&apos;s activity by default. Use filters and column headers to sort.
         The username filter matches logged display name and also resolves <strong>name or email</strong> from the users database (so rows with empty logged name but matching user id/phone still appear).
         Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
-        The <strong>Users in date range</strong> table lists distinct users (name and phone) who had any
-        matching API activity between the selected dates (same filters as below).
+        <strong>Only errors</strong> includes unhandled server exceptions (<code>api_error</code>) and any
+        <code>api_request</code> with an HTTP status outside 2xx (4xx/5xx). The <strong>Users in date range</strong>{' '}
+        table lists distinct users (name and phone) who had any matching activity between the selected dates
+        (same filters as below).
         <strong> Total API time</strong> is the sum of request <code>duration_ms</code> (server processing
         time per logged call), not a measure of how long someone stayed in the app.
       </p>

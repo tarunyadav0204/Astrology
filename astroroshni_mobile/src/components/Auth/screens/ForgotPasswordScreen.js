@@ -9,11 +9,17 @@ import {
   Alert,
   ScrollView,
   Keyboard,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
+import {
+  COUNTRY_CODES,
+  getNationalPhoneMaxLength,
+  isNationalPhoneValid,
+} from '../countryCodes';
 
 export default function ForgotPasswordScreen({ 
   formData, 
@@ -25,12 +31,20 @@ export default function ForgotPasswordScreen({
   const [resetToken, setResetToken] = useState('');
   const [localNewPassword, setLocalNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const normalizedPhone = (formData.phone || '').trim();
-  const normalizedCountryCode = (formData.countryCode || '').trim();
-  const fullPhone = normalizedPhone.startsWith('+')
-    ? normalizedPhone
-    : `${normalizedCountryCode}${normalizedPhone}`;
-  const isUSPhone = fullPhone.startsWith('+1');
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(
+    () => COUNTRY_CODES.find((c) => c.code === (formData.countryCode || '+91')) || COUNTRY_CODES[2]
+  );
+
+  const nationalDigits = (formData.phone || '').replace(/[^0-9]/g, '');
+  const fullPhone = `${selectedCountry.code}${nationalDigits}`;
+  const isUSPhone = selectedCountry.code === '+1';
+  const isPhoneValid = isNationalPhoneValid(selectedCountry.code, nationalDigits);
+
+  useEffect(() => {
+    const match = COUNTRY_CODES.find((c) => c.code === formData.countryCode);
+    if (match) setSelectedCountry(match);
+  }, [formData.countryCode]);
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -64,8 +78,17 @@ export default function ForgotPasswordScreen({
   }, []);
 
   const handleSendCode = async () => {
-    if (!normalizedPhone) {
+    if (!nationalDigits) {
       Alert.alert('Error', 'Please enter phone number');
+      return;
+    }
+    if (!isPhoneValid) {
+      Alert.alert(
+        'Error',
+        selectedCountry.code === '+91' || selectedCountry.code === '+1'
+          ? 'Enter a valid 10-digit phone number'
+          : 'Please enter a valid phone number for the selected country'
+      );
       return;
     }
     if (isUSPhone && !formData.email) {
@@ -75,11 +98,28 @@ export default function ForgotPasswordScreen({
 
     setLoading(true);
     try {
-      const payload = { phone: fullPhone };
-      if (isUSPhone && formData.email) {
-        payload.email = formData.email;
+      const buildPayload = (phoneVal) => {
+        const payload = { phone: phoneVal };
+        if (isUSPhone && formData.email) {
+          payload.email = formData.email;
+        }
+        return payload;
+      };
+      let response;
+      try {
+        response = await authAPI.sendResetCode(buildPayload(fullPhone));
+      } catch (error) {
+        // Match PasswordScreen login: DB may store 10-digit local while UI sends +91…
+        if (
+          error.response?.status === 404 &&
+          nationalDigits &&
+          fullPhone !== nationalDigits
+        ) {
+          response = await authAPI.sendResetCode(buildPayload(nationalDigits));
+        } else {
+          throw error;
+        }
       }
-      const response = await authAPI.sendResetCode(payload);
       Alert.alert('Success', response.data.message);
       setStep(2);
     } catch (error) {
@@ -150,17 +190,42 @@ export default function ForgotPasswordScreen({
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="call-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+              <View style={[styles.inputWrapper, isPhoneValid && styles.inputValid]}>
+                <TouchableOpacity
+                  style={styles.countryCode}
+                  onPress={() => setShowCountryPicker(true)}
+                >
+                  <Text style={styles.countryText}>
+                    {selectedCountry.flag} {selectedCountry.code}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="rgba(255, 255, 255, 0.7)"
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
                 <TextInput
                   style={styles.input}
-                  placeholder="Phone Number"
+                  placeholder={
+                    selectedCountry.code === '+91' || selectedCountry.code === '+1'
+                      ? '10-digit number'
+                      : 'Phone Number'
+                  }
                   placeholderTextColor="rgba(255, 255, 255, 0.5)"
                   value={formData.phone}
-                  onChangeText={(value) => updateFormData('phone', value)}
+                  onChangeText={(value) => {
+                    const digits = value.replace(/[^0-9]/g, '');
+                    const maxLen = getNationalPhoneMaxLength(selectedCountry.code);
+                    updateFormData('phone', digits.slice(0, maxLen));
+                  }}
                   keyboardType="phone-pad"
                   autoFocus
+                  maxLength={getNationalPhoneMaxLength(selectedCountry.code)}
                 />
+                {isPhoneValid ? (
+                  <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                ) : null}
               </View>
             </Animated.View>
 
@@ -183,11 +248,14 @@ export default function ForgotPasswordScreen({
 
             <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
               <TouchableOpacity
-                style={styles.continueButton}
+                style={[styles.continueButton, (!isPhoneValid || loading) && styles.buttonDisabled]}
                 onPress={handleSendCode}
-                disabled={loading}
+                disabled={loading || !isPhoneValid}
               >
-                <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.buttonGradient}>
+                <LinearGradient
+                  colors={isPhoneValid && !loading ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+                  style={styles.buttonGradient}
+                >
                   <Text style={styles.buttonText}>
                     {loading ? 'Sending...' : 'Send Code'}
                   </Text>
@@ -295,24 +363,68 @@ export default function ForgotPasswordScreen({
   };
 
   return (
-    <ScrollView 
-      ref={scrollViewRef}
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigateToScreen('password', 'back')}
+    <>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigateToScreen('password', 'back')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
 
-      <View style={styles.content}>
-        {renderStep()}
-      </View>
-    </ScrollView>
+        <View style={styles.content}>{renderStep()}</View>
+      </ScrollView>
+
+      <Modal
+        visible={showCountryPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCountryPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={COUNTRY_CODES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.countryItem}
+                  onPress={() => {
+                    setSelectedCountry(item);
+                    updateFormData('countryCode', item.code);
+                    const maxLen = getNationalPhoneMaxLength(item.code);
+                    const current = (formData.phone || '').replace(/[^0-9]/g, '');
+                    updateFormData('phone', current.slice(0, maxLen));
+                    setShowCountryPicker(false);
+                  }}
+                >
+                  <Text style={styles.countryFlag}>{item.flag}</Text>
+                  <View style={styles.countryInfo}>
+                    <Text style={styles.countryName}>{item.name}</Text>
+                    <Text style={styles.countryCodeText}>{item.code}</Text>
+                  </View>
+                  {selectedCountry.code === item.code ? (
+                    <Ionicons name="checkmark" size={24} color="#4CAF50" />
+                  ) : null}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -372,7 +484,72 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 16,
     paddingVertical: 4,
-    gap: 12,
+  },
+  inputValid: {
+    borderColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  countryCode: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255, 255, 255, 0.2)',
+    marginRight: 12,
+  },
+  countryText: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  countryFlag: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  countryInfo: {
+    flex: 1,
+  },
+  countryName: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  countryCodeText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   input: {
     flex: 1,
@@ -392,6 +569,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.85,
   },
   buttonGradient: {
     flexDirection: 'row',
