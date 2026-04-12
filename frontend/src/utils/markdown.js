@@ -37,3 +37,40 @@ export const stripMarkdown = (content) => {
         .replace(/\n/g, ' ')
         .trim();
 };
+
+/**
+ * Chat / admin history: decode entities, strip orphan markdown heading lines, then light markdown → HTML.
+ * Models often emit a bare "###" or "#" between sections; those must not survive as visible characters.
+ */
+export function formatChatMessageHtml(content) {
+    if (content == null || content === '') return '';
+
+    let decoded = String(content)
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+
+    // Entire line is only # … ###### (optional spaces) — nothing to show
+    decoded = decoded.replace(/^\s*#{1,6}\s*$/gm, '');
+    decoded = decoded.replace(/\n{3,}/g, '\n\n');
+
+    const toH3 = (title) => {
+        const s = String(title).trim();
+        return s ? `<h3>${s}</h3>` : '';
+    };
+
+    decoded = decoded
+        .replace(/^####\s+(.+)$/gm, (_, t) => toH3(t))
+        .replace(/^###\s+(.+)$/gm, (_, t) => toH3(t))
+        .replace(/^##\s+(.+)$/gm, (_, t) => toH3(t))
+        .replace(/^#\s+(.+)$/gm, (_, t) => toH3(t));
+
+    return decoded
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n\* /g, '<br/>• ')
+        .replace(/\n/g, '<br/>')
+        .replace(/• \*\*(.*?)\*\*/g, '• <strong>$1</strong>');
+}

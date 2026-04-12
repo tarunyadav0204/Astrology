@@ -242,6 +242,40 @@ def get_planet_window_dedupe_keys(
     return keys
 
 
+def get_vimshottari_dasha_dedupe_keys(
+    conn, since_date: date
+) -> Set[Tuple[int, str, str]]:
+    """
+    (userid, level, change_start_iso) for vimshottari_dasha_change since since_date.
+    """
+    keys: Set[Tuple[int, str, str]] = set()
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT userid, event_params
+            FROM nudge_deliveries
+            WHERE trigger_id = %s AND sent_at >= %s
+            """,
+            ("vimshottari_dasha_change", since_date.isoformat()),
+        )
+        rows = cur.fetchall() or []
+        for userid, raw in rows:
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            level = obj.get("level")
+            cs = obj.get("change_start")
+            if level and cs:
+                keys.add((int(userid), str(level), str(cs)))
+    except Exception as e:
+        logger.warning("Could not load vimshottari dasha dedupe keys: %s", e)
+    return keys
+
+
 def get_self_charts_for_nudge(conn) -> List[Dict[str, Any]]:
     """
     One row per user: self birth chart for personalized nudges.

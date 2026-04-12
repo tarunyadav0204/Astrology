@@ -116,6 +116,19 @@ class TestConfigValidate:
                 {"planets": ["Pluto"]},
             )
 
+    def test_vimshottari_dasha_change_defaults(self):
+        c = validate_and_normalize_config("vimshottari_dasha_change", {})
+        assert c["md_lead_days"] == 90
+        assert c["ad_lead_days"] == 30
+        assert c["pd_lead_days"] == 2
+
+    def test_vimshottari_pd_lead_out_of_range(self):
+        with pytest.raises(ConfigValidationError, match="pd_lead_days"):
+            validate_and_normalize_config(
+                "vimshottari_dasha_change",
+                {"pd_lead_days": 20},
+            )
+
 
 class TestMergeRow:
     def test_merge_without_db_row(self):
@@ -126,6 +139,15 @@ class TestMergeRow:
         assert m.priority == spec.default_priority
         assert "{planet}" in m.title_template
         assert m.config["horizon_days"] == 800
+
+    def test_merge_vimshottari_without_db_row(self):
+        spec = get_spec("vimshottari_dasha_change")
+        assert spec is not None
+        m = merge_row(spec, None)
+        assert m.enabled is True
+        assert m.priority == spec.default_priority
+        assert "{to_planet}" in m.title_template
+        assert m.config["md_lead_days"] == 90
 
 
 def test_extract_placeholders():

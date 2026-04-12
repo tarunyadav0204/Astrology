@@ -105,6 +105,40 @@ DEFAULT_SPECS: Tuple[TriggerDefaultSpec, ...] = (
             "planets": "list[str], subset of Sun Moon Mercury Venus Mars Jupiter Saturn",
         },
     ),
+    TriggerDefaultSpec(
+        trigger_key="vimshottari_dasha_change",
+        title_template="{level_label}: {to_planet} period begins {change_date_display}",
+        body_template=(
+            "Your chart moves from {from_planet} to {to_planet} at the {level_short} level on "
+            "{change_date_display}. This is personal to your Vimshottari timeline—worth a focused "
+            "check-in before it lands. Ask in chat what to emphasize as this phase opens."
+        ),
+        question_template=(
+            "How does the shift from {from_planet} to {to_planet} ({level_label}) on {change_start} "
+            "affect me, and what should I prioritize in the first weeks of this new period?"
+        ),
+        default_config={
+            "md_lead_days": 90,
+            "ad_lead_days": 30,
+            "pd_lead_days": 2,
+        },
+        allowed_placeholders=frozenset(
+            {
+                "level_label",
+                "level_short",
+                "from_planet",
+                "to_planet",
+                "change_start",
+                "change_date_display",
+            }
+        ),
+        default_priority=72,
+        config_schema={
+            "md_lead_days": "int, notify when Mahadasha change is within this many days (1–120); default 90 (~3 months)",
+            "ad_lead_days": "int, Antardasha (1–90); default 30 (~1 month)",
+            "pd_lead_days": "int, Pratyantardasha (1–14); default 2 days",
+        },
+    ),
 )
 
 DEFAULTS_BY_KEY: Dict[str, TriggerDefaultSpec] = {s.trigger_key: s for s in DEFAULT_SPECS}

@@ -1040,7 +1040,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         showLoginButton={showLoginButton}
         onHomeClick={handleHomeClick}
       />
-      <div className="admin-content-wrapper">
+      <div
+        className={`admin-content-wrapper${
+          activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
+        }`}
+      >
       {deviceAccessStatus === 'pending' && (
         <div className="admin-device-check">
           <p>Checking access…</p>
@@ -1291,7 +1295,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         </div>
       )}
 
-      <div className="admin-content">
+      <div
+        className={`admin-content${activeTab === 'chat' ? ' admin-content--chat' : ''}`}
+      >
         {activeTab === 'users' && activeSubTab === 'management' && (
           <div className="users-management">
             <h2>User Management</h2>

@@ -6,10 +6,11 @@ const PLANETS = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn']
 const TRIGGER_LABELS = {
   natal_planet_return: 'Natal degree return',
   natal_whole_sign_return: 'Natal whole-sign return',
+  vimshottari_dasha_change: 'Vimshottari dasha change (MD / AD / PD)',
 };
 
 /**
- * Admin: edit automated daily nudge copy and parameters (natal return triggers).
+ * Admin: edit automated daily nudge copy and parameters (natal returns, Vimshottari dasha changes).
  * Backed by GET/PUT /api/nudge/admin/trigger-definitions.
  */
 export default function AdminNudgeTriggerDefinitions() {
@@ -79,13 +80,17 @@ export default function AdminNudgeTriggerDefinitions() {
   const save = async (key) => {
     const t = triggers.find((x) => x.trigger_key === key);
     if (!t) return;
-    const plist = t.config?.planets || [];
-    if (plist.length < 1) {
-      setSaveMsg((m) => ({
-        ...m,
-        [key]: 'Select at least one planet.',
-      }));
-      return;
+    const isNatalReturn =
+      key === 'natal_planet_return' || key === 'natal_whole_sign_return';
+    if (isNatalReturn) {
+      const plist = t.config?.planets || [];
+      if (plist.length < 1) {
+        setSaveMsg((m) => ({
+          ...m,
+          [key]: 'Select at least one planet.',
+        }));
+        return;
+      }
     }
     const pRaw = (priorityStr[key] ?? '').trim();
     let priority = null;
@@ -160,7 +165,8 @@ export default function AdminNudgeTriggerDefinitions() {
   return (
     <div className="nudge-trigger-definitions">
       <p className="notifications-description">
-        Configure copy and timing parameters for personalized daily nudges (natal planetary returns).
+        Configure copy and timing parameters for personalized daily nudges (natal returns and upcoming
+        Vimshottari Mahadasha / Antardasha / Pratyantardasha changes).
         Placeholders in templates must match the allowed set for each trigger. Leave priority empty to
         use each trigger&apos;s built-in default (shown on the field).
       </p>
@@ -169,6 +175,9 @@ export default function AdminNudgeTriggerDefinitions() {
         const key = t.trigger_key;
         const label = TRIGGER_LABELS[key] || key;
         const isPlanetReturn = key === 'natal_planet_return';
+        const isNatalReturn =
+          key === 'natal_planet_return' || key === 'natal_whole_sign_return';
+        const isVimshottari = key === 'vimshottari_dasha_change';
         return (
           <div key={key} className="nudge-def-card">
             <div className="nudge-def-card-header">
@@ -248,7 +257,59 @@ export default function AdminNudgeTriggerDefinitions() {
               <div className="form-field">
                 <label>Parameters</label>
                 <div className="nudge-def-config-grid">
-                  {isPlanetReturn && (
+                  {isVimshottari && (
+                    <>
+                      <div className="nudge-def-config-item">
+                        <span className="nudge-def-config-label">MD lead (days)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={t.config?.md_lead_days ?? ''}
+                          onChange={(e) =>
+                            updateConfig(key, {
+                              md_lead_days:
+                                e.target.value === '' ? 90 : Number(e.target.value),
+                            })
+                          }
+                        />
+                        <small className="form-hint">{t.config_schema?.md_lead_days}</small>
+                      </div>
+                      <div className="nudge-def-config-item">
+                        <span className="nudge-def-config-label">AD lead (days)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={90}
+                          value={t.config?.ad_lead_days ?? ''}
+                          onChange={(e) =>
+                            updateConfig(key, {
+                              ad_lead_days:
+                                e.target.value === '' ? 30 : Number(e.target.value),
+                            })
+                          }
+                        />
+                        <small className="form-hint">{t.config_schema?.ad_lead_days}</small>
+                      </div>
+                      <div className="nudge-def-config-item">
+                        <span className="nudge-def-config-label">PD lead (days)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={14}
+                          value={t.config?.pd_lead_days ?? ''}
+                          onChange={(e) =>
+                            updateConfig(key, {
+                              pd_lead_days:
+                                e.target.value === '' ? 2 : Number(e.target.value),
+                            })
+                          }
+                        />
+                        <small className="form-hint">{t.config_schema?.pd_lead_days}</small>
+                      </div>
+                    </>
+                  )}
+                  {!isVimshottari && isPlanetReturn && (
                     <div className="nudge-def-config-item">
                       <span className="nudge-def-config-label">Orb (degrees)</span>
                       <input
@@ -266,54 +327,60 @@ export default function AdminNudgeTriggerDefinitions() {
                       <small className="form-hint">{t.config_schema?.orb_deg}</small>
                     </div>
                   )}
-                  <div className="nudge-def-config-item">
-                    <span className="nudge-def-config-label">Advance notice (days)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={90}
-                      value={t.config?.advance_notice_days ?? ''}
-                      onChange={(e) =>
-                        updateConfig(key, {
-                          advance_notice_days:
-                            e.target.value === '' ? 30 : Number(e.target.value),
-                        })
-                      }
-                    />
-                    <small className="form-hint">{t.config_schema?.advance_notice_days}</small>
-                  </div>
-                  <div className="nudge-def-config-item">
-                    <span className="nudge-def-config-label">Horizon (days)</span>
-                    <input
-                      type="number"
-                      min={30}
-                      max={2500}
-                      value={t.config?.horizon_days ?? ''}
-                      onChange={(e) =>
-                        updateConfig(key, {
-                          horizon_days: e.target.value === '' ? 800 : Number(e.target.value),
-                        })
-                      }
-                    />
-                    <small className="form-hint">{t.config_schema?.horizon_days}</small>
-                  </div>
-                </div>
-                <div className="nudge-def-planets">
-                  <span className="nudge-def-config-label">Planets</span>
-                  <div className="nudge-def-planet-grid">
-                    {PLANETS.map((planet) => (
-                      <label key={planet} className="nudge-def-planet-label">
+                  {!isVimshottari && isNatalReturn && (
+                    <>
+                      <div className="nudge-def-config-item">
+                        <span className="nudge-def-config-label">Advance notice (days)</span>
                         <input
-                          type="checkbox"
-                          checked={(t.config?.planets || []).includes(planet)}
-                          onChange={() => togglePlanet(key, planet)}
+                          type="number"
+                          min={1}
+                          max={90}
+                          value={t.config?.advance_notice_days ?? ''}
+                          onChange={(e) =>
+                            updateConfig(key, {
+                              advance_notice_days:
+                                e.target.value === '' ? 30 : Number(e.target.value),
+                            })
+                          }
                         />
-                        <span>{planet}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <small className="form-hint">{t.config_schema?.planets}</small>
+                        <small className="form-hint">{t.config_schema?.advance_notice_days}</small>
+                      </div>
+                      <div className="nudge-def-config-item">
+                        <span className="nudge-def-config-label">Horizon (days)</span>
+                        <input
+                          type="number"
+                          min={30}
+                          max={2500}
+                          value={t.config?.horizon_days ?? ''}
+                          onChange={(e) =>
+                            updateConfig(key, {
+                              horizon_days: e.target.value === '' ? 800 : Number(e.target.value),
+                            })
+                          }
+                        />
+                        <small className="form-hint">{t.config_schema?.horizon_days}</small>
+                      </div>
+                    </>
+                  )}
                 </div>
+                {!isVimshottari && isNatalReturn && (
+                  <div className="nudge-def-planets">
+                    <span className="nudge-def-config-label">Planets</span>
+                    <div className="nudge-def-planet-grid">
+                      {PLANETS.map((planet) => (
+                        <label key={planet} className="nudge-def-planet-label">
+                          <input
+                            type="checkbox"
+                            checked={(t.config?.planets || []).includes(planet)}
+                            onChange={() => togglePlanet(key, planet)}
+                          />
+                          <span>{planet}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <small className="form-hint">{t.config_schema?.planets}</small>
+                  </div>
+                )}
               </div>
 
               <div className="form-buttons">

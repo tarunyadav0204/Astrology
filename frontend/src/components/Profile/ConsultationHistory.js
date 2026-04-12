@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatChatMessageHtml } from '../../utils/markdown';
 import './ConsultationHistory.css';
 
 const ConsultationHistory = ({ user }) => {
@@ -69,25 +70,6 @@ const ConsultationHistory = ({ user }) => {
     });
   };
 
-  const formatMessageContent = (content) => {
-    // Decode HTML entities
-    const decoded = content
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'");
-    
-    // Format markdown-style content
-    return decoded
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-      .replace(/### (.*?)\n/g, '<h3>$1</h3>') // Headers
-      .replace(/\n\* /g, '<br/>• ') // Bullet points
-      .replace(/\n/g, '<br/>') // Line breaks
-      .replace(/• \*\*(.*?)\*\*/g, '• <strong>$1</strong>'); // Bold bullets
-  };
-
   if (loading) {
     return (
       <div className="consultation-history">
@@ -146,7 +128,7 @@ const ConsultationHistory = ({ user }) => {
                   >
                     <div 
                       className="message-content"
-                      dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
+                      dangerouslySetInnerHTML={{ __html: formatChatMessageHtml(message.content) }}
                     />
                     <div className="message-time">
                       {new Date(message.timestamp).toLocaleTimeString()}

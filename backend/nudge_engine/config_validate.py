@@ -60,7 +60,7 @@ def validate_and_normalize_config(trigger_key: str, config: Dict[str, Any]) -> D
 
     merged = dict(spec.default_config)
     merged.update(config or {})
-    if merged.get("planets") is None:
+    if "planets" in spec.default_config and merged.get("planets") is None:
         merged["planets"] = list(spec.default_config["planets"])
 
     if trigger_key == "natal_planet_return":
@@ -82,6 +82,18 @@ def validate_and_normalize_config(trigger_key: str, config: Dict[str, Any]) -> D
             merged.get("horizon_days"), "horizon_days", 30, 2500
         )
         merged["planets"] = _as_planet_list(merged.get("planets"), "planets")
+        return merged
+
+    if trigger_key == "vimshottari_dasha_change":
+        merged["md_lead_days"] = _as_int(
+            merged.get("md_lead_days"), "md_lead_days", 1, 120
+        )
+        merged["ad_lead_days"] = _as_int(
+            merged.get("ad_lead_days"), "ad_lead_days", 1, 90
+        )
+        merged["pd_lead_days"] = _as_int(
+            merged.get("pd_lead_days"), "pd_lead_days", 1, 14
+        )
         return merged
 
     raise ConfigValidationError(f"No validator for trigger_key: {trigger_key}")

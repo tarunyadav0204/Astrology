@@ -29,6 +29,7 @@ Daily notification engine: scans astrology triggers and sends nudges (stored + p
 - **festival** — Hindu festivals on the date (amanta calendar, default India). One nudge per festival on that date.
 - **natal_planet_return** — **Per user** (self chart only): transiting planet within ~1° of its natal longitude. Sends **once** in the **30 days before** that window starts (with start/end dates in copy). Uses shared ephemeris samples; horizon ~800 days (very slow outer returns may notify only once they enter that window).
 - **natal_whole_sign_return** — **Per user** (self chart): transiting planet **re-enters the sidereal sign** (whole 30°) it occupied at birth. Same 30-day advance notice and horizon as degree return; **ingress into the sign** can occur on a different calendar day than the exact degree return.
+- **vimshottari_dasha_change** — **Per user** (self chart): next **Mahadasha**, **Antardasha**, or **Pratyantardasha** start from the Vimshottari timeline. One nudge per level when the change falls within a configurable lead window: default **90 days** before MD, **30 days** before AD, **2 days** before PD. Deduped so the same boundary is not re-notified within ~120 days.
 
 ## Adding triggers
 
@@ -82,11 +83,11 @@ To avoid random hits triggering the scan, add a secret header (e.g. `X-Cron-Secr
 
 ## Admin: configurable triggers (copy + parameters)
 
-Registered keys: `natal_planet_return`, `natal_whole_sign_return`. Defaults are seeded into `nudge_trigger_definitions` on init.
+Registered keys: `natal_planet_return`, `natal_whole_sign_return`, `vimshottari_dasha_change`. Defaults are seeded into `nudge_trigger_definitions` on init.
 
 - `GET /api/nudge/admin/trigger-definitions` — List merged definitions (admin only).
 - `GET /api/nudge/admin/trigger-definitions/{trigger_key}` — One definition + `allowed_placeholders` and `config_schema`.
-- `PUT /api/nudge/admin/trigger-definitions/{trigger_key}` — Update `enabled`, optional `priority` (0–200, omit for built-in default), templates, and `config` JSON. Templates may only use the listed placeholders; config is validated per trigger (orb, advance days, horizon, planet list).
+- `PUT /api/nudge/admin/trigger-definitions/{trigger_key}` — Update `enabled`, optional `priority` (0–200, omit for built-in default), templates, and `config` JSON. Templates may only use the listed placeholders; config is validated per trigger (natal: orb, advance days, horizon, planets; vimshottari: `md_lead_days`, `ad_lead_days`, `pd_lead_days`).
 
 ## API
 

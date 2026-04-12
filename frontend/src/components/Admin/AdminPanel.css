@@ -9,6 +9,15 @@
   margin: 0 auto;
 }
 
+/* Chat history tab: wider canvas for reading long assistant replies */
+.admin-content-wrapper--chat-wide {
+  max-width: min(1600px, 100%);
+}
+
+.admin-content--chat {
+  padding: 20px 24px 28px;
+}
+
 /* Credit Management Styles */
 .credits-management {
   padding: 20px;
@@ -1058,6 +1067,9 @@ select {
     margin-right: -20px;
     padding: 0 20px 4px;
     border-bottom: 2px solid #e91e63;
+    scroll-snap-type: x proximity;
+    scroll-padding-left: 20px;
+    scroll-padding-right: 20px;
   }
 
   .admin-tabs::-webkit-scrollbar {
@@ -1070,6 +1082,7 @@ select {
     padding: 6px 12px;
     font-size: 13px;
     border-radius: 0;
+    scroll-snap-align: start;
   }
 
   .admin-subtabs {
@@ -1127,6 +1140,33 @@ select {
   th,
   td {
     padding: 8px 4px;
+  }
+}
+
+/* Chat history: same as “mobile” for narrow OR short viewports (phone landscape) */
+@media (max-width: 900px), (max-height: 700px) {
+  body.admin-chat-mobile-thread-active .admin-panel {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  body.admin-chat-mobile-thread-active .admin-content-wrapper {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+
+  body.admin-chat-mobile-thread-active .admin-content.admin-content--chat {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  body:not(.admin-chat-mobile-thread-active) .admin-content.admin-content--chat {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - 118px);
   }
 }
 
