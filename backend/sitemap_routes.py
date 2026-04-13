@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from fastapi import APIRouter
 from fastapi.responses import Response
 import os
@@ -5,6 +7,18 @@ import os
 from db import get_conn, execute
 
 router = APIRouter()
+
+
+def _lastmod_date(value) -> str:
+    """Sitemap lastmod as YYYY-MM-DD; DB may return datetime, date, or string."""
+    if value is None:
+        return datetime.now().strftime("%Y-%m-%d")
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value.isoformat()
+    s = str(value).strip()
+    return s[:10] if len(s) >= 10 else s
 
 @router.get("/sitemap.xml")
 async def generate_sitemap():
@@ -22,7 +36,6 @@ async def generate_sitemap():
         )
         posts = cur.fetchall() or []
     
-    from datetime import datetime
     today = datetime.now().strftime('%Y-%m-%d')
     
     nakshatras = ['ashwini', 'bharani', 'krittika', 'rohini', 'mrigashira', 'ardra', 'punarvasu', 'pushya', 'ashlesha', 'magha', 'purva-phalguni', 'uttara-phalguni', 'hasta', 'chitra', 'swati', 'vishakha', 'anuradha', 'jyeshtha', 'mula', 'purva-ashadha', 'uttara-ashadha', 'shravana', 'dhanishta', 'shatabhisha', 'purva-bhadrapada', 'uttara-bhadrapada', 'revati']
@@ -135,7 +148,7 @@ async def generate_sitemap():
         sitemap_xml += f'''
   <url>
     <loc>https://astroroshni.com/blog/{post[0]}</loc>
-    <lastmod>{post[1][:10]}</lastmod>
+    <lastmod>{_lastmod_date(post[1])}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>'''
