@@ -81,6 +81,10 @@ def _header_subset(request: Request) -> dict:
         v = request.headers.get(k)
         if v:
             out[k] = str(v)[:500]
+    # Never log the token. For prod 403 debugging: tells you if Authorization reached the app
+    # (vs stripped by a proxy). FastAPI HTTPBearer returns 403 when the header is absent.
+    auth = request.headers.get("Authorization")
+    out["authorization_present"] = bool(auth and str(auth).strip())
     return out
 
 

@@ -13,11 +13,20 @@ const api = axios.create({
   }
 });
 
-// Add auth token to requests
+// Add auth token to requests.
+// Login/register do not need a Bearer token; every other protected route does.
+// Axios 1.x uses AxiosHeaders on React Native; plain `config.headers.Authorization = ...`
+// sometimes does not attach on iOS, while `headers.set` does.
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('authToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const raw = await AsyncStorage.getItem('authToken');
+  const token = raw && String(raw).trim();
+  if (!token) return config;
+  const value = `Bearer ${token}`;
+  const h = config.headers;
+  if (h && typeof h.set === 'function') {
+    h.set('Authorization', value);
+  } else {
+    config.headers.Authorization = value;
   }
   return config;
 });
