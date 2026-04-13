@@ -1179,7 +1179,8 @@ async def register(user_data: UserCreate):
 
         conn.commit()
 
-    access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
+    # JWT sub must match users.phone exactly — get_current_user uses WHERE phone = sub (see login).
+    access_token = create_access_token(data={"sub": user[2], "userid": user[0], "name": user[1]})
 
     return {
         "access_token": access_token,
@@ -1300,7 +1301,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
 
             conn.commit()
 
-    access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
+    access_token = create_access_token(data={"sub": user[2], "userid": user[0], "name": user[1]})
 
     return {
         "access_token": access_token,
@@ -1498,7 +1499,8 @@ async def login(user_data: UserLogin):
                 'created_at': self_birth_chart[10]
             }
 
-        access_token = create_access_token(data={"sub": user_data.phone, "userid": user[0], "name": user[1]})
+        # sub = canonical DB phone; login may match +91… to a 10-digit row — sub must be user[2] not typed phone.
+        access_token = create_access_token(data={"sub": user[2], "userid": user[0], "name": user[1]})
 
         return {
             "access_token": access_token,

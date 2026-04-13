@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, getEndpoint, API_TIMEOUT } from '../utils/constants';
+import { Platform } from 'react-native';
+import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS } from '../utils/constants';
 import { Alert } from 'react-native';
 
 // Same JWT as Authorization; some CDNs/proxies strip Authorization on mobile — backend accepts this too.
@@ -48,6 +49,13 @@ api.interceptors.request.use(async (config) => {
     delete api.defaults.headers.common.Authorization;
     delete api.defaults.headers.common.authorization;
     delete api.defaults.headers.common[AUTH_FALLBACK_HEADER];
+    if (DEBUG_API_REQUESTS) {
+      const path = config.url || '';
+      const fullUrl = `${config.baseURL || ''}${path}`.replace(/([^:])\/{2,}/g, '$1/');
+      console.warn('[API] no authToken in storage for request', config.method?.toUpperCase(), fullUrl, {
+        platform: Platform.OS,
+      });
+    }
     return config;
   }
 
@@ -55,6 +63,16 @@ api.interceptors.request.use(async (config) => {
   api.defaults.headers.common.Authorization = value;
   api.defaults.headers.common[AUTH_FALLBACK_HEADER] = value;
   applyBearerToAxiosConfig(config, value);
+
+  if (DEBUG_API_REQUESTS) {
+    const path = config.url || '';
+    const fullUrl = `${config.baseURL || ''}${path}`.replace(/([^:])\/{2,}/g, '$1/');
+    console.log('[API]', config.method?.toUpperCase(), fullUrl, {
+      platform: Platform.OS,
+      hasToken: true,
+      tokenChars: token.length,
+    });
+  }
   return config;
 });
 
