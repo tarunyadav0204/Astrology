@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from activity.publisher import publish_activity
+from auth import MOBILE_AUTH_FALLBACK_HEADER, extract_request_bearer_token
 from db import get_conn, execute
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,8 @@ def _header_subset(request: Request) -> dict:
     # (vs stripped by a proxy). FastAPI HTTPBearer returns 403 when the header is absent.
     auth = request.headers.get("Authorization")
     out["authorization_present"] = bool(auth and str(auth).strip())
+    xauth = request.headers.get(MOBILE_AUTH_FALLBACK_HEADER)
+    out["x_astro_auth_present"] = bool(xauth and str(xauth).strip())
     return out
 
 
@@ -243,11 +246,8 @@ def _send_reset_code_error_email(
 
 
 def _get_user_from_request(request: Request) -> tuple[str | None, int | None, str | None]:
-    """Extract phone (JWT 'sub'), userid (JWT 'userid'), and name (JWT 'name') from Authorization header. Returns (phone, user_id, name)."""
-    auth = request.headers.get("Authorization")
-    if not auth or not auth.startswith("Bearer "):
-        return None, None, None
-    token = auth[7:].strip()
+    """Extract phone (JWT 'sub'), userid (JWT 'userid'), and name (JWT 'name') from Bearer token (Authorization or X-AstroRoshni-Authorization)."""
+    token = extract_request_bearer_token(request)
     if not token:
         return None, None, None
     try:

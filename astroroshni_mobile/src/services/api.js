@@ -3,6 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT } from '../utils/constants';
 import { Alert } from 'react-native';
 
+// Same JWT as Authorization; some CDNs/proxies strip Authorization on mobile — backend accepts this too.
+const AUTH_FALLBACK_HEADER = 'X-AstroRoshni-Authorization';
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
@@ -15,19 +18,43 @@ const api = axios.create({
 
 // Add auth token to requests.
 // Login/register do not need a Bearer token; every other protected route does.
-// Axios 1.x uses AxiosHeaders on React Native; plain `config.headers.Authorization = ...`
-// sometimes does not attach on iOS, while `headers.set` does.
-api.interceptors.request.use(async (config) => {
-  const raw = await AsyncStorage.getItem('authToken');
-  const token = raw && String(raw).trim();
-  if (!token) return config;
-  const value = `Bearer ${token}`;
+// On React Native iOS, Axios 1.x sometimes drops the header unless it is set in several
+// places the merge pipeline actually reads (defaults.common + per-request + AxiosHeaders.set).
+function applyBearerToAxiosConfig(config, value) {
   const h = config.headers;
   if (h && typeof h.set === 'function') {
     h.set('Authorization', value);
+    h.set(AUTH_FALLBACK_HEADER, value);
   } else {
+    config.headers = config.headers || {};
     config.headers.Authorization = value;
+    config.headers[AUTH_FALLBACK_HEADER] = value;
   }
+  const common = config.headers && config.headers.common;
+  if (common && typeof common === 'object' && typeof common.set === 'function') {
+    common.set('Authorization', value);
+    common.set(AUTH_FALLBACK_HEADER, value);
+  } else if (common && typeof common === 'object') {
+    common.Authorization = value;
+    common[AUTH_FALLBACK_HEADER] = value;
+  }
+}
+
+api.interceptors.request.use(async (config) => {
+  const raw = await AsyncStorage.getItem('authToken');
+  const token = raw && String(raw).trim();
+
+  if (!token) {
+    delete api.defaults.headers.common.Authorization;
+    delete api.defaults.headers.common.authorization;
+    delete api.defaults.headers.common[AUTH_FALLBACK_HEADER];
+    return config;
+  }
+
+  const value = `Bearer ${token}`;
+  api.defaults.headers.common.Authorization = value;
+  api.defaults.headers.common[AUTH_FALLBACK_HEADER] = value;
+  applyBearerToAxiosConfig(config, value);
   return config;
 });
 
