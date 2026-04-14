@@ -66,7 +66,7 @@ const getApiUrl = () => {
 export const API_BASE_URL = getApiUrl();
 
 /** Set true temporarily to log each API call (method, URL, whether token was loaded — never the token value). Watch Metro or Xcode console. Turn off before release. */
-export const DEBUG_API_REQUESTS = true;
+export const DEBUG_API_REQUESTS = false;
 
 // Timeout configuration
 export const API_TIMEOUT = 6 * 60 * 1000; // 6 minutes (aligned with chat / life-predictions polling window)

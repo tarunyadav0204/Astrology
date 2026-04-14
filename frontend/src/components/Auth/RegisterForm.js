@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { authService } from '../../services/authService';
+import PhoneWithCountrySelect from './PhoneWithCountrySelect';
+import { buildFullPhone, isNationalPhoneValid } from '../../utils/countryCodes';
 import './RegisterForm.css';
 
 const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
+  const [countryCode, setCountryCode] = useState('+91');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -26,12 +29,29 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       ...prev,
       [name]: value
     }));
-    if (name === 'phone' || name === 'email') {
+    if (name === 'email') {
       setOtpSent(false);
       setOtpVerified(false);
       setVerifiedPhone('');
       setOtpToken('');
     }
+  };
+
+  const clearOtpState = () => {
+    setOtpSent(false);
+    setOtpVerified(false);
+    setVerifiedPhone('');
+    setOtpToken('');
+  };
+
+  const handleCountryCodeChange = (code) => {
+    setCountryCode(code);
+    clearOtpState();
+  };
+
+  const handleNationalPhoneChange = (digits) => {
+    setFormData((prev) => ({ ...prev, phone: digits }));
+    clearOtpState();
   };
 
   const isValidEmail = (value) => {
@@ -41,10 +61,11 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
   };
 
   const handleSendOtp = async () => {
-    const phone = formData.phone.trim();
+    const national = formData.phone.trim();
+    const fullPhone = buildFullPhone(countryCode, national);
     const email = formData.email.trim();
-    if (!phone) {
-      toast.error('Please enter phone number first');
+    if (!fullPhone || !isNationalPhoneValid(countryCode, national)) {
+      toast.error('Please enter a valid phone number for the selected country');
       return;
     }
     if (!email) {
@@ -58,7 +79,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
 
     setSendingOtp(true);
     try {
-      const payload = { phone, email };
+      const payload = { phone: fullPhone, email };
       const response = await authService.sendRegistrationOtp(payload);
       setOtpSent(true);
       setOtpVerified(false);
@@ -76,17 +97,18 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
   };
 
   const handleVerifyOtp = async () => {
-    const phone = formData.phone.trim();
+    const national = formData.phone.trim();
+    const fullPhone = buildFullPhone(countryCode, national);
     const otpCode = formData.otpCode.trim();
-    if (!phone || !otpCode) {
+    if (!fullPhone || !otpCode) {
       toast.error('Please enter phone and OTP code');
       return;
     }
     setVerifyingOtp(true);
     try {
-      const response = await authService.verifyResetCode({ phone, code: otpCode });
+      const response = await authService.verifyResetCode({ phone: fullPhone, code: otpCode });
       setOtpVerified(true);
-      setVerifiedPhone(phone);
+      setVerifiedPhone(fullPhone);
       setOtpToken(response?.reset_token || '');
       toast.success('OTP verified successfully');
     } catch (error) {
@@ -110,7 +132,8 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       toast.error('Password must be at least 6 characters');
       return;
     }
-    if (!otpVerified || verifiedPhone !== formData.phone.trim()) {
+    const registerFullPhone = buildFullPhone(countryCode, formData.phone.trim());
+    if (!otpVerified || verifiedPhone !== registerFullPhone) {
       toast.error('Please verify OTP before creating your account');
       return;
     }
@@ -133,7 +156,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
     try {
       const response = await authService.register({
         name: formData.name,
-        phone: formData.phone.trim(),
+        phone: registerFullPhone,
         email: emailTrim,
         otp_token: otpToken,
         password: formData.password,
@@ -209,21 +232,13 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
           }}>
             Phone Number
           </label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={handleInputChange}
-            placeholder="Enter your phone number"
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '2px solid rgba(233, 30, 99, 0.2)',
-              borderRadius: '12px',
-              fontSize: '1rem',
-              background: 'rgba(255, 255, 255, 0.8)'
-            }}
+          <PhoneWithCountrySelect
+            countryCode={countryCode}
+            onCountryCodeChange={handleCountryCodeChange}
+            nationalDigits={formData.phone}
+            onNationalDigitsChange={handleNationalPhoneChange}
+            disabled={loading || sendingOtp || verifyingOtp}
+            inputName="phone"
           />
         </div>
 
@@ -327,7 +342,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
                 flex: 1,
                 minWidth: 0,
                 padding: '0.65rem',
-                background: 'linear-gradient(135deg, #7b1fa2 0%, #512da8 100%)',
+                background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '10px',

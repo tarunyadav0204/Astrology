@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { authService } from '../../services/authService';
+import PhoneWithCountrySelect from './PhoneWithCountrySelect';
+import { buildFullPhone, isNationalPhoneValid } from '../../utils/countryCodes';
 
 // Get app name based on domain
 const getAppName = () => {
@@ -15,17 +17,19 @@ const getAppName = () => {
 };
 
 const LoginForm = ({ onLogin, onSwitchToRegister }) => {
+  const [countryCode, setCountryCode] = useState('+91');
   const [formData, setFormData] = useState({
-    phone: '',
+    phone: '', // national digits only (no country code)
     password: ''
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetCountryCode, setResetCountryCode] = useState('+91');
   const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
-  const isUsNumber = (phone) => (phone || '').trim().startsWith('+1');
+  const isUsReset = () => resetCountryCode === '+1';
 
   const [biometricSupported, setBiometricSupported] = useState(false);
   
@@ -53,13 +57,18 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const fullPhone = buildFullPhone(countryCode, formData.phone);
+    if (!fullPhone || !isNationalPhoneValid(countryCode, formData.phone)) {
+      toast.error('Please enter a valid phone number for the selected country');
+      return;
+    }
     setLoading(true);
 
     try {
-      const response = await authService.login(formData);
+      const response = await authService.login({ phone: fullPhone, password: formData.password });
       
       // Check if user is admin (you can modify this condition as needed)
-      const isAdmin = formData.phone === 'admin' || response.user?.role === 'admin';
+      const isAdmin = response.user?.role === 'admin';
       const userWithAdmin = { ...response.user, isAdmin };
       
       localStorage.setItem('token', response.access_token);
@@ -70,7 +79,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         localStorage.setItem('biometric_user', JSON.stringify({
           ...userWithAdmin,
           token: response.access_token,
-          phone: formData.phone
+          phone: fullPhone
         }));
       }
       
@@ -85,13 +94,18 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
   const handleSendCode = async (e) => {
     e.preventDefault();
+    const fullPhone = buildFullPhone(resetCountryCode, resetData.phone);
+    if (!fullPhone || !isNationalPhoneValid(resetCountryCode, resetData.phone)) {
+      toast.error('Please enter a valid phone number for the selected country');
+      return;
+    }
     setLoading(true);
 
     try {
-      if (isUsNumber(resetData.phone) && !(resetData.email || '').trim()) {
+      if (isUsReset() && !(resetData.email || '').trim()) {
         throw new Error('Email is required for US numbers');
       }
-      const payload = { phone: resetData.phone };
+      const payload = { phone: fullPhone };
       if ((resetData.email || '').trim()) payload.email = resetData.email.trim();
       const response = await authService.sendResetCode(payload);
       toast.success(response.message);
@@ -110,11 +124,12 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
   const handleVerifyCode = async (e) => {
     e.preventDefault();
+    const fullPhone = buildFullPhone(resetCountryCode, resetData.phone);
     setLoading(true);
 
     try {
       const response = await authService.verifyResetCode({
-        phone: resetData.phone,
+        phone: fullPhone,
         code: resetData.code
       });
       setResetToken(response.reset_token);
@@ -140,6 +155,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       setShowForgotPassword(false);
       setResetStep(1);
       setResetData({ phone: '', email: '', code: '', newPassword: '' });
+      setResetCountryCode('+91');
       setResetToken('');
     } catch (error) {
       toast.error(error.message || 'Password reset failed');
@@ -244,20 +260,14 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
               }}>
                 Phone Number
               </label>
-              <input
-                type="tel"
-                value={resetData.phone}
-                onChange={(e) => setResetData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="Enter your phone number"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '2px solid rgba(233, 30, 99, 0.2)',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  background: 'rgba(255, 255, 255, 0.8)'
-                }}
+              <PhoneWithCountrySelect
+                countryCode={resetCountryCode}
+                onCountryCodeChange={setResetCountryCode}
+                nationalDigits={resetData.phone}
+                onNationalDigitsChange={(digits) =>
+                  setResetData((prev) => ({ ...prev, phone: digits }))
+                }
+                disabled={loading}
               />
             </div>
             <div style={{ marginBottom: '1.5rem' }}>
@@ -267,14 +277,14 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 color: '#e91e63',
                 fontWeight: '600'
               }}>
-                Email {isUsNumber(resetData.phone) ? '(required for US numbers)' : '(optional)'}
+                Email {isUsReset() ? '(required for US numbers)' : '(optional)'}
               </label>
               <input
                 type="email"
                 value={resetData.email}
                 onChange={(e) => setResetData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="Enter your email"
-                required={isUsNumber(resetData.phone)}
+                required={isUsReset()}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -411,6 +421,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
               setShowForgotPassword(false);
               setResetStep(1);
               setResetData({ phone: '', email: '', code: '', newPassword: '' });
+              setResetCountryCode('+91');
               setResetToken('');
             }}
             style={{
@@ -459,26 +470,15 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
           }}>
             Phone Number
           </label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={handleInputChange}
-            placeholder="Enter your phone number"
-            required
-            autoComplete="tel"
-            inputMode="numeric"
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '2px solid rgba(233, 30, 99, 0.2)',
-              borderRadius: '12px',
-              fontSize: '16px',
-              background: 'rgba(255, 255, 255, 0.8)',
-              WebkitAppearance: 'none',
-              WebkitUserSelect: 'text',
-              WebkitTouchCallout: 'default'
-            }}
+          <PhoneWithCountrySelect
+            countryCode={countryCode}
+            onCountryCodeChange={setCountryCode}
+            nationalDigits={formData.phone}
+            onNationalDigitsChange={(digits) =>
+              setFormData((prev) => ({ ...prev, phone: digits }))
+            }
+            disabled={loading}
+            inputName="phone"
           />
         </div>
 
