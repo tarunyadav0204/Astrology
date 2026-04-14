@@ -41,22 +41,27 @@ class IntentRouter:
     def __init__(self):
         api_key = os.getenv('GEMINI_API_KEY')
         genai.configure(api_key=api_key)
-        from utils.admin_settings import get_gemini_chat_model
+        from utils.admin_settings import get_setting
         self._gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
         self._model_cache = {}
-        model_name = get_gemini_chat_model()
+        # Intent routing must stay fast and deterministic; avoid Pro models here.
+        model_name = (get_setting("gemini_intent_model") or "models/gemini-2.5-flash-lite").strip()
+        if "pro" in model_name.lower():
+            model_name = "models/gemini-2.5-flash-lite"
         try:
             self.model = genai.GenerativeModel(model_name, generation_config=self._gen_config)
             print(f"✅ Intent router fallback model: {model_name}")
         except Exception as e:
-            from utils.admin_settings import DEFAULT_GEMINI_CHAT_MODEL
+            fallback_fast = "models/gemini-2.0-flash-lite-001"
             print(f"⚠️ Intent router model {model_name} not available ({e}), trying default")
-            self.model = genai.GenerativeModel(DEFAULT_GEMINI_CHAT_MODEL, generation_config=self._gen_config)
+            self.model = genai.GenerativeModel(fallback_fast, generation_config=self._gen_config)
 
     def _get_model(self):
-        """Resolve standard chat model from admin settings (no server restart needed)."""
-        from utils.admin_settings import get_gemini_chat_model
-        name = get_gemini_chat_model()
+        """Resolve intent model from admin settings (no restart needed), but keep it non-Pro."""
+        from utils.admin_settings import get_setting
+        name = (get_setting("gemini_intent_model") or "models/gemini-2.5-flash-lite").strip()
+        if "pro" in name.lower():
+            name = "models/gemini-2.5-flash-lite"
         if name in self._model_cache:
             return self._model_cache[name]
         try:
