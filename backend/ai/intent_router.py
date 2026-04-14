@@ -2,6 +2,7 @@ import google.generativeai as genai
 import json
 import os
 import re
+import asyncio
 from typing import Dict
 
 # Roman Hindi / Hinglish cues; app often sends language="english" for UI i18n while user types Hindi in Latin script.
@@ -328,8 +329,14 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         
         try:
             gemini_start = time.time()
-            
-            response = await model.generate_content_async(prompt)
+            # Keep intent classification fast; slow/hung calls should fall back quickly.
+            response = await asyncio.wait_for(
+                model.generate_content_async(
+                    prompt,
+                    request_options={"timeout": 25},
+                ),
+                timeout=30.0,
+            )
             gemini_time = time.time() - gemini_start
             
             cleaned = response.text.replace('```json', '').replace('```', '').strip()

@@ -2510,7 +2510,7 @@
 
 /* Testimonials */
 .testimonials-section {
-  padding: 40px 0;
+  padding: 20px 0 40px;
   background: rgba(255,255,255,0.7);
 }
 
@@ -4925,7 +4925,7 @@
 
 /* Numerology Section Styles */
 .numerology-section {
-  padding: 80px 0;
+  padding: 56px 0;
   background: linear-gradient(135deg, 
     rgba(255, 193, 7, 0.05) 0%, 
     rgba(255, 152, 0, 0.05) 25%,
@@ -4949,7 +4949,7 @@
 
 .numerology-header {
   text-align: center;
-  margin-bottom: 60px;
+  margin-bottom: 36px;
   position: relative;
 }
 
@@ -4998,7 +4998,7 @@
 .numerology-subtitle {
   font-size: 18px;
   color: #666;
-  margin-bottom: 30px;
+  margin-bottom: 18px;
 }
 
 .numerology-divider {
@@ -5011,9 +5011,9 @@
 
 .numerology-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 30px;
-  margin-bottom: 50px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
 }
 
 .numerology-card {

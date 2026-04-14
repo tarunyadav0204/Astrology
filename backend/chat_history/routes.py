@@ -1532,7 +1532,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             response_style=response_style,
             premium_analysis=premium_analysis,
             mode=intent.get('mode', 'default'),
-            use_thinking_level_high=True,
+            use_thinking_level_high=False,
         )
         
         # Update database with result

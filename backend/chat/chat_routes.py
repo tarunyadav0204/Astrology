@@ -187,7 +187,27 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             
             # Use Intent Router to classify question and determine transit needs
             print(f"\n🧠 CLASSIFYING INTENT FOR: {request.question} (clarification_count: {clarification_count})")
-            intent_result = await intent_router.classify_intent(request.question, chat_history=chat_history, clarification_count=clarification_count)
+            try:
+                intent_result = await asyncio.wait_for(
+                    intent_router.classify_intent(
+                        request.question,
+                        chat_history=chat_history,
+                        clarification_count=clarification_count,
+                    ),
+                    timeout=35.0,
+                )
+            except asyncio.TimeoutError:
+                print("⚠️ Intent classification timed out at route layer; using fast fallback")
+                intent_result = {
+                    "status": "READY",
+                    "extracted_context": {},
+                    "mode": "ANALYZE_PERSONALITY",
+                    "context_type": "birth",
+                    "category": "general",
+                    "needs_transits": False,
+                    "divisional_charts": ["D1", "D9"],
+                    "chart_insights": [],
+                }
             print(f"✅ INTENT CLASSIFICATION RESULT: {intent_result}")
             
             # Update clarification count based on result
@@ -387,7 +407,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     user_context,
                     request.premium_analysis,
                     mode=mode,
-                    use_thinking_level_high=(intent_result.get('status') == 'READY'),
+                    use_thinking_level_high=False,
                 )
                 
                 # print(f"AI result success: {ai_result.get('success')}")

@@ -310,12 +310,8 @@ class GeminiChatAnalyzer:
                 print(f"\n📏 GEMINI REQUEST SIZE: {prompt_char_count:,} characters ({prompt_size / 1024:.1f} KB)")
                 
             api_key = os.getenv("GEMINI_API_KEY") or ""
-            try_high_thinking = (
-                use_thinking_level_high
-                and _env_chat_thinking_level_high_enabled()
-                and bool(api_key)
-                and _model_supports_gemini3_thinking_level(model_name)
-            )
+            # High-thinking REST path is disabled globally; always use SDK generation path.
+            try_high_thinking = False
             response = None
             if try_high_thinking:
                 try:
