@@ -1,9 +1,26 @@
+import copy
 import google.generativeai as genai
 import json
 import os
 import re
-from typing import Dict, Any
+from typing import Any, Dict
 from ai.response_parser import ResponseParser
+
+
+def _strip_shadbala_from_context_for_llm(obj: Any) -> Any:
+    """Remove Shadbala / strength_analysis payloads from context sent to Gemini (analysis parity with chat)."""
+    if isinstance(obj, dict):
+        out: Dict[str, Any] = {}
+        for k, v in obj.items():
+            if k == "strength_analysis":
+                continue
+            if "shadbala" in str(k).lower():
+                continue
+            out[k] = _strip_shadbala_from_context_for_llm(v)
+        return out
+    if isinstance(obj, list):
+        return [_strip_shadbala_from_context_for_llm(x) for x in obj]
+    return obj
 
 class StructuredAnalysisAnalyzer:
     """Dedicated analyzer for JSON-only astrological reports"""
@@ -35,8 +52,9 @@ RULES:
 10. Include practical guidance and remedies in each answer
 """
 
-        # Serialize context safely
-        context_json = json.dumps(context, indent=2, default=str)
+        # Serialize context safely (no Shadbala / strength_analysis in LLM payload)
+        context_for_llm = _strip_shadbala_from_context_for_llm(copy.deepcopy(context))
+        context_json = json.dumps(context_for_llm, indent=2, default=str)
         prompt = f"{system_instruction}\n\nCONTEXT:\n{context_json}\n\nREQUIRED FIELDS & QUESTIONS:\n{question}"
 
         try:

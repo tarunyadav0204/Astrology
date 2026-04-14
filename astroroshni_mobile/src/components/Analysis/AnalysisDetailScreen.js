@@ -256,6 +256,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
       const requestBody = {
         ...fixedBirthData,
+        chart_id: fixedBirthData?.chart_id || fixedBirthData?.id || null,
         language: 'english',
         response_style: 'detailed',
         force_regenerate: shouldForceRegenerate,
@@ -280,8 +281,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         ...(token && { 'Authorization': `Bearer ${token}` })
       };
 
-      // Career and progeny use /ai-insights endpoint, others use /analyze
-      const endpoint = (analysisType === 'career' || analysisType === 'progeny') ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`;
+      // Career/progeny use /ai-insights, education uses /ai-analyze, others use /analyze
+      const endpoint = analysisType === 'education'
+        ? '/education/ai-analyze'
+        : ((analysisType === 'career' || analysisType === 'progeny') ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`);
       const fullUrl = `${API_BASE_URL}${getEndpoint(endpoint)}`;
       // console.log('🌐 API URL:', fullUrl);
       
@@ -304,6 +307,235 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         console.error('❌ [DEBUG] API Error Response:', errorText);
         console.error('❌ [DEBUG] Response status:', response.status);
         throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
+      }
+
+      // Wealth: async job + polling (same idea as cosmic timeline) — POST /wealth/analyze returns job_id
+      if (analysisType === 'wealth') {
+        const startJson = await response.json();
+        const jobId = startJson.job_id;
+        if (!jobId) {
+          throw new Error('Invalid start response: missing job_id');
+        }
+        const statusPath = getEndpoint(`/wealth/ai-insights-enhanced/status/${jobId}`);
+        const statusUrl = `${API_BASE_URL}${statusPath}`;
+        for (let pollIdx = 0; pollIdx < 500; pollIdx++) {
+          await new Promise((r) => setTimeout(r, pollIdx === 0 ? 2000 : 3000));
+          const stRes = await fetch(statusUrl, { headers });
+          if (!stRes.ok) {
+            const t = await stRes.text();
+            throw new Error(`Status check failed: ${stRes.status} ${t}`);
+          }
+          const st = await stRes.json();
+          if (st.status === 'completed' && st.data) {
+            const payload = st.data;
+            const analysisData = payload.analysis || payload;
+            const finalResult = {
+              ...analysisData,
+              terms: payload.terms || analysisData.terms || [],
+              glossary: payload.glossary || analysisData.glossary || {},
+            };
+            setAnalysisResult(finalResult);
+            await saveAnalysis(finalResult);
+            if (!st.cached) {
+              fetchBalance();
+            }
+            return;
+          }
+          if (st.status === 'failed') {
+            throw new Error(st.error || 'Wealth analysis failed');
+          }
+        }
+        throw new Error('Wealth analysis timed out');
+      }
+
+      if (analysisType === 'marriage') {
+        const startJson = await response.json();
+        const jobId = startJson.job_id;
+        if (!jobId) {
+          throw new Error('Invalid start response: missing job_id');
+        }
+        const statusPath = getEndpoint(`/marriage/analyze/status/${jobId}`);
+        const statusUrl = `${API_BASE_URL}${statusPath}`;
+        for (let pollIdx = 0; pollIdx < 500; pollIdx++) {
+          await new Promise((r) => setTimeout(r, pollIdx === 0 ? 2000 : 3000));
+          const stRes = await fetch(statusUrl, { headers });
+          if (!stRes.ok) {
+            const t = await stRes.text();
+            throw new Error(`Status check failed: ${stRes.status} ${t}`);
+          }
+          const st = await stRes.json();
+          if (st.status === 'completed' && st.data) {
+            const payload = st.data;
+            const analysisData = payload.analysis || payload;
+            const finalResult = {
+              ...analysisData,
+              terms: payload.terms || analysisData.terms || [],
+              glossary: payload.glossary || analysisData.glossary || {},
+            };
+            setAnalysisResult(finalResult);
+            await saveAnalysis(finalResult);
+            if (!st.cached) {
+              fetchBalance();
+            }
+            return;
+          }
+          if (st.status === 'failed') {
+            throw new Error(st.error || 'Marriage analysis failed');
+          }
+        }
+        throw new Error('Marriage analysis timed out');
+      }
+
+      if (analysisType === 'career') {
+        const startJson = await response.json();
+        const jobId = startJson.job_id;
+        if (!jobId) {
+          throw new Error('Invalid start response: missing job_id');
+        }
+        const statusPath = getEndpoint(`/career/ai-insights/status/${jobId}`);
+        const statusUrl = `${API_BASE_URL}${statusPath}`;
+        for (let pollIdx = 0; pollIdx < 500; pollIdx++) {
+          await new Promise((r) => setTimeout(r, pollIdx === 0 ? 2000 : 3000));
+          const stRes = await fetch(statusUrl, { headers });
+          if (!stRes.ok) {
+            const t = await stRes.text();
+            throw new Error(`Status check failed: ${stRes.status} ${t}`);
+          }
+          const st = await stRes.json();
+          if (st.status === 'completed' && st.data) {
+            const payload = st.data;
+            const analysisData = payload.analysis || payload;
+            const finalResult = {
+              ...analysisData,
+              terms: payload.terms || analysisData.terms || [],
+              glossary: payload.glossary || analysisData.glossary || {},
+            };
+            setAnalysisResult(finalResult);
+            await saveAnalysis(finalResult);
+            if (!st.cached) {
+              fetchBalance();
+            }
+            return;
+          }
+          if (st.status === 'failed') {
+            throw new Error(st.error || 'Career analysis failed');
+          }
+        }
+        throw new Error('Career analysis timed out');
+      }
+
+      if (analysisType === 'progeny') {
+        const startJson = await response.json();
+        const jobId = startJson.job_id;
+        if (!jobId) {
+          throw new Error('Invalid start response: missing job_id');
+        }
+        const statusPath = getEndpoint(`/progeny/ai-insights/status/${jobId}`);
+        const statusUrl = `${API_BASE_URL}${statusPath}`;
+        for (let pollIdx = 0; pollIdx < 500; pollIdx++) {
+          await new Promise((r) => setTimeout(r, pollIdx === 0 ? 2000 : 3000));
+          const stRes = await fetch(statusUrl, { headers });
+          if (!stRes.ok) {
+            const t = await stRes.text();
+            throw new Error(`Status check failed: ${stRes.status} ${t}`);
+          }
+          const st = await stRes.json();
+          if (st.status === 'completed' && st.data) {
+            const payload = st.data;
+            const analysisData = payload.analysis || payload;
+            const finalResult = {
+              ...analysisData,
+              terms: payload.terms || analysisData.terms || [],
+              glossary: payload.glossary || analysisData.glossary || {},
+            };
+            setAnalysisResult(finalResult);
+            await saveAnalysis(finalResult);
+            if (!st.cached) {
+              fetchBalance();
+            }
+            return;
+          }
+          if (st.status === 'failed') {
+            throw new Error(st.error || 'Progeny analysis failed');
+          }
+        }
+        throw new Error('Progeny analysis timed out');
+      }
+
+      if (analysisType === 'education') {
+        const startJson = await response.json();
+        const jobId = startJson.job_id;
+        if (!jobId) {
+          throw new Error('Invalid start response: missing job_id');
+        }
+        const statusPath = getEndpoint(`/education/ai-analyze/status/${jobId}`);
+        const statusUrl = `${API_BASE_URL}${statusPath}`;
+        for (let pollIdx = 0; pollIdx < 500; pollIdx++) {
+          await new Promise((r) => setTimeout(r, pollIdx === 0 ? 2000 : 3000));
+          const stRes = await fetch(statusUrl, { headers });
+          if (!stRes.ok) {
+            const t = await stRes.text();
+            throw new Error(`Status check failed: ${stRes.status} ${t}`);
+          }
+          const st = await stRes.json();
+          if (st.status === 'completed' && st.data) {
+            const payload = st.data;
+            const analysisData = payload.analysis || payload;
+            const finalResult = {
+              ...analysisData,
+              terms: payload.terms || analysisData.terms || [],
+              glossary: payload.glossary || analysisData.glossary || {},
+            };
+            setAnalysisResult(finalResult);
+            await saveAnalysis(finalResult);
+            if (!st.cached) {
+              fetchBalance();
+            }
+            return;
+          }
+          if (st.status === 'failed') {
+            throw new Error(st.error || 'Education analysis failed');
+          }
+        }
+        throw new Error('Education analysis timed out');
+      }
+
+      if (analysisType === 'health') {
+        const startJson = await response.json();
+        const jobId = startJson.job_id;
+        if (!jobId) {
+          throw new Error('Invalid start response: missing job_id');
+        }
+        const statusPath = getEndpoint(`/health/analyze/status/${jobId}`);
+        const statusUrl = `${API_BASE_URL}${statusPath}`;
+        for (let pollIdx = 0; pollIdx < 500; pollIdx++) {
+          await new Promise((r) => setTimeout(r, pollIdx === 0 ? 2000 : 3000));
+          const stRes = await fetch(statusUrl, { headers });
+          if (!stRes.ok) {
+            const t = await stRes.text();
+            throw new Error(`Status check failed: ${stRes.status} ${t}`);
+          }
+          const st = await stRes.json();
+          if (st.status === 'completed' && st.data) {
+            const payload = st.data;
+            const analysisData = payload.analysis || payload;
+            const finalResult = {
+              ...analysisData,
+              terms: payload.terms || analysisData.terms || [],
+              glossary: payload.glossary || analysisData.glossary || {},
+            };
+            setAnalysisResult(finalResult);
+            await saveAnalysis(finalResult);
+            if (!st.cached) {
+              fetchBalance();
+            }
+            return;
+          }
+          if (st.status === 'failed') {
+            throw new Error(st.error || 'Health analysis failed');
+          }
+        }
+        throw new Error('Health analysis timed out');
       }
 
       const responseText = await response.text();

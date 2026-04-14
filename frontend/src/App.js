@@ -698,6 +698,14 @@ function App() {
               onAdminClick={handleAdminClick}
             />
           } />
+          <Route path="/progeny-analysis" element={
+            <AnalysisDetailPage
+              analysisType="progeny"
+              user={user}
+              onLogout={handleLogout}
+              onAdminClick={handleAdminClick}
+            />
+          } />
           <Route path="/panchang" element={
             <PanchangPage 
               user={user} 

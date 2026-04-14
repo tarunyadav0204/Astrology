@@ -20,6 +20,7 @@ const KarmaAnalysis = () => {
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(false);
   const [progressTimer, setProgressTimer] = useState(null);
+  const [currentJobId, setCurrentJobId] = useState(null);
 
   const handleFormSubmit = () => {
     setShowBirthFormModal(false);
@@ -76,11 +77,8 @@ const KarmaAnalysis = () => {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       
-      if (response.data.status === 'complete' && response.data.data) {
+      if ((response.data.status === 'complete' || response.data.status === 'completed') && response.data.data) {
         setAnalysis(response.data.data);
-      } else if (response.data.status === 'pending' || response.data.status === 'processing') {
-        startProgressBar();
-        startPolling();
       }
     } catch (err) {
       console.error('Error checking existing analysis:', err);
@@ -132,19 +130,20 @@ const KarmaAnalysis = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const url = `/api/karma-analysis${forceRegenerate ? '?force_regenerate=true' : ''}`;
-      const response = await axios.post(url, 
-        { chart_id: String(chartId) },
+      const url = '/api/karma-analysis/start';
+      const response = await axios.post(url,
+        { chart_id: String(chartId), force_regenerate: !!forceRegenerate },
         { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
       );
       
-      if (response.data.status === 'complete') {
+      if ((response.data.status === 'complete' || response.data.status === 'completed') && response.data.data) {
         stopProgressBar();
         setAnalysis(response.data.data);
         setLoading(false);
         refreshBalance();
-      } else if (response.data.status === 'pending') {
-        startPolling();
+      } else if (response.data.job_id) {
+        setCurrentJobId(response.data.job_id);
+        startPolling(response.data.job_id);
       }
     } catch (err) {
       stopProgressBar();
@@ -186,26 +185,28 @@ const KarmaAnalysis = () => {
     setProgress(0);
   };
 
-  const startPolling = () => {
+  const startPolling = (jobId) => {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        const chartId = birthData?.chart_id || chartData?.id;
-        const response = await axios.get(`/api/karma-analysis/status?chart_id=${chartId}`, {
+        const response = await axios.get(`/api/karma-analysis/status/${jobId}`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
         
-        if (response.data.status === 'complete') {
+        if ((response.data.status === 'complete' || response.data.status === 'completed') && response.data.data) {
           stopProgressBar();
           setAnalysis(response.data.data);
           setLoading(false);
           clearInterval(interval);
+          setCurrentJobId(null);
           refreshBalance();
-        } else if (response.data.status === 'error') {
+          setCurrentJobId(null);
+        } else if (response.data.status === 'failed' || response.data.status === 'error') {
           stopProgressBar();
           setError(response.data.error);
           setLoading(false);
           clearInterval(interval);
+          setCurrentJobId(null);
         }
       } catch (err) {
         console.error('Polling error:', err);

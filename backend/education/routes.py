@@ -1,15 +1,12 @@
-"""
-Education Analysis API Routes
-"""
+"""Education Analysis API Routes"""
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, Dict
 import sys
 import os
 import json
-import asyncio
+import uuid
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
@@ -19,10 +16,16 @@ from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ai.education_ai_context_generator import EducationAIContextGenerator
-from ai.structured_analyzer import StructuredAnalysisAnalyzer
+from education.education_analysis_execute import (
+    execute_education_analysis,
+    education_birth_hash,
+    education_birth_hash_legacy,
+    ensure_ai_education_insights_table,
+)
+
 
 class EducationAnalysisRequest(BaseModel):
+    chart_id: Optional[int] = None
     name: Optional[str] = None
     date: str
     time: str
@@ -31,330 +34,270 @@ class EducationAnalysisRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
-    language: Optional[str] = None  # Mobile sends this, web doesn't
-    response_style: Optional[str] = None  # Mobile sends this, web doesn't
+    language: Optional[str] = "english"
+    response_style: Optional[str] = "detailed"
+    force_regenerate: Optional[bool] = False
+
 
 router = APIRouter(prefix="/education", tags=["education"])
-
-# Initialize components
-education_context_generator = EducationAIContextGenerator()
 credit_service = CreditService()
+
+
+def _education_credit_check_or_raise(current_user: User) -> int:
+    base_cost = credit_service.get_credit_setting("education_analysis_cost")
+    education_cost = credit_service.get_effective_cost(current_user.userid, base_cost, "education_analysis_cost")
+    user_balance = credit_service.get_user_credits(current_user.userid)
+    if user_balance < education_cost:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient credits. You need {education_cost} credits but have {user_balance}.",
+        )
+    return education_cost
+
+
+def init_education_analysis_jobs_table():
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS education_analysis_jobs (
+                job_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+                request_json TEXT NOT NULL,
+                result_data TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP
+            )
+            """,
+        )
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_education_jobs_user ON education_analysis_jobs (user_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_education_jobs_status ON education_analysis_jobs (status)")
+        conn.commit()
+
+
+async def process_education_analysis_job(job_id: str, user_id: int, request_json: str, education_cost: int):
+    try:
+        req_data = json.loads(request_json)
+        request = EducationAnalysisRequest(**req_data)
+
+        with get_conn() as conn:
+            execute(
+                conn,
+                "UPDATE education_analysis_jobs SET status = %s, started_at = %s WHERE job_id = %s",
+                ("processing", datetime.now(), job_id),
+            )
+            conn.commit()
+
+        result = await execute_education_analysis(
+            user_id,
+            request,
+            education_cost,
+            credit_service=credit_service,
+            get_conn=get_conn,
+            execute_fn=execute,
+        )
+
+        with get_conn() as conn:
+            if result.get("ok"):
+                payload = {
+                    "education_insights": result["education_insights"],
+                    "cached": result.get("cached", False),
+                }
+                execute(
+                    conn,
+                    """
+                    UPDATE education_analysis_jobs
+                    SET status = %s, result_data = %s, completed_at = %s
+                    WHERE job_id = %s
+                    """,
+                    ("completed", json.dumps(payload), datetime.now(), job_id),
+                )
+            else:
+                execute(
+                    conn,
+                    """
+                    UPDATE education_analysis_jobs
+                    SET status = %s, error_message = %s, completed_at = %s
+                    WHERE job_id = %s
+                    """,
+                    ("failed", result.get("error") or "Analysis failed", datetime.now(), job_id),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"❌ process_education_analysis_job: {e}")
+        import traceback
+
+        traceback.print_exc()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE education_analysis_jobs
+                SET status = %s, error_message = %s, completed_at = %s
+                WHERE job_id = %s
+                """,
+                ("failed", str(e), datetime.now(), job_id),
+            )
+            conn.commit()
+
+
+@router.post("/ai-analyze/start")
+async def start_education_analysis_job(
+    request: EducationAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Start education AI in background; poll GET /education/ai-analyze/status/{job_id}."""
+    education_cost = _education_credit_check_or_raise(current_user)
+    init_education_analysis_jobs_table()
+    job_id = str(uuid.uuid4())
+    req_dump = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+    request_json = json.dumps(req_dump)
+
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            INSERT INTO education_analysis_jobs (job_id, user_id, status, request_json)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (job_id, current_user.userid, "pending", request_json),
+        )
+        conn.commit()
+
+    background_tasks.add_task(
+        process_education_analysis_job,
+        job_id,
+        current_user.userid,
+        request_json,
+        education_cost,
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "message": "Education analysis started — poll status until completed.",
+    }
+
+
+@router.get("/ai-analyze/status/{job_id}")
+async def get_education_analysis_job_status(job_id: str, current_user: User = Depends(get_current_user)):
+    init_education_analysis_jobs_table()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT status, result_data, error_message, started_at, completed_at
+            FROM education_analysis_jobs
+            WHERE job_id = %s AND user_id = %s
+            """,
+            (job_id, current_user.userid),
+        )
+        row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    status, result_data, error_message, started_at, completed_at = row
+    out: Dict = {"status": status}
+    if status == "completed" and result_data:
+        payload = json.loads(result_data)
+        out["data"] = payload.get("education_insights")
+        out["cached"] = payload.get("cached", False)
+        out["completed_at"] = completed_at
+    elif status == "failed":
+        out["error"] = error_message or "Analysis failed"
+    elif status in ("pending", "processing"):
+        out["message"] = "Analyzing chart and generating education insights..."
+        if started_at:
+            out["started_at"] = started_at
+    return out
+
+
+@router.post("/ai-analyze")
+async def analyze_education_ai(
+    request: EducationAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Mobile/web: returns job_id — poll GET /education/ai-analyze/status/{job_id}."""
+    return await start_education_analysis_job(request, background_tasks, current_user)
+
 
 @router.post("/analyze")
 async def analyze_education(
     request: EducationAnalysisRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    Analyze education prospects - supports both web and mobile formats
-    Mobile: Uses AI analysis with credits
-    Web: Can use classical analysis (check if has required fields)
-    """
-    # Check if this is a mobile AI request (has name, language, response_style)
-    # Mobile sends EducationAnalysisRequest with these fields
-    if hasattr(request, 'language') and hasattr(request, 'response_style'):
-        # Mobile app - use AI analysis
-        return await analyze_education_ai(request, current_user)
-    
-    # Web app - use classical analysis
+    """Classical education analysis endpoint (non-AI)."""
     try:
         birth_data = {
-            'date': request.date,
-            'time': request.time,
-            'place': request.place,
-            'latitude': request.latitude or 28.6139,
-            'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+0'
+            "date": request.date,
+            "time": request.time,
+            "place": request.place,
+            "latitude": request.latitude or 28.6139,
+            "longitude": request.longitude or 77.2090,
+            "timezone": request.timezone or "UTC+0",
         }
-        
+
         from types import SimpleNamespace
+
         birth_obj = SimpleNamespace(**birth_data)
-        
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
-        
+
         analyzer = EducationAnalyzer(birth_data, chart_data)
         analysis = analyzer.analyze_education()
-        
+
         return {
             "success": True,
             "analysis": analysis,
-            "birth_data": birth_data
+            "birth_data": birth_data,
         }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-@router.post("/ai-analyze")
-async def analyze_education_ai(request: EducationAnalysisRequest, current_user: User = Depends(get_current_user)):
-    """Analyze education prospects with AI - requires credits"""
-    
-    # Check credit cost and user balance (subscription tier discount applied)
-    base_cost = credit_service.get_credit_setting('education_analysis_cost')
-    education_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'education_analysis_cost')
-    user_balance = credit_service.get_user_credits(current_user.userid)
-    
-    if user_balance < education_cost:
-        raise HTTPException(
-            status_code=402, 
-            detail=f"Insufficient credits. You need {education_cost} credits but have {user_balance}."
-        )
-    
-    async def generate_education_analysis():
-        try:
-            # Prepare birth data
-            from datetime import date
-            birth_data = {
-                'name': request.name,
-                'date': request.date,
-                'time': request.time,
-                'place': request.place,
-                'latitude': request.latitude or 28.6139,
-                'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+0',
-                'gender': request.gender,
-                'current_year': date.today().year
-            }
-            
-            # Build education context
-            context = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                education_context_generator.build_education_context,
-                birth_data
-            )
-            
-            # Education-specific AI question
-            education_question = """
-As an expert Vedic astrologer, analyze the birth chart for **Education, Intelligence, and Academic Success**.
-
-CRITICAL DATA UTILIZATION INSTRUCTIONS:
-1. **D-24 (Chaturvimshamsa)**: This is the primary chart for education. Check 'education_charts.d24_analysis'. 
-   - If D-24 Lagna Lord is strong, predict **High Academic Distinctions** (Masters/PhD).
-   - If weak, predict obstacles in higher education.
-2. **Technical vs. Creative**: Check 'subject_analysis' and any 'technical_aptitude' data.
-   - If Mars/Saturn/Rahu influence the 5th/Mercury, suggest **STEM/Engineering**.
-   - If Venus/Moon influence, suggest **Arts/Humanities/Psychology**.
-3. **Learning Style**: Use 'learning_capacity' (Mercury/Moon analysis).
-   - Specify if the native learns better through **Visuals**, **Listening**, or **Rote Memorization**.
-4. **Education Yogas**: Check 'education_yogas' (Saraswati, Budh-Aditya). Mention them by name if present.
-5. **Timing**: Cross-reference 'current_dashas' with 'education_timing'. Identify periods favorable for **Exams** or **Admissions**.
-
-CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
-Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
-{
-  "quick_answer": "Summary of academic potential, best fields of study, and current educational phase.",
-  "detailed_analysis": [
-    {
-      "question": "What is my natural learning potential and intelligence level?",
-      "answer": "Analyze 5th House, Mercury, and **Jupiter**. Mention their Intelligence Type (Analytical vs. Wisdom).",
-      "key_points": ["Strengths", "Weaknesses"],
-      "astrological_basis": "e.g., Mercury in Virgo creates strong analytical logic..."
-    },
-    {
-      "question": "Which subjects or career paths suit me best?",
-      "answer": "Based on **Technical Aptitude** and **Subject Analysis**. Be specific (e.g., Computer Science vs Civil Engineering vs Literature)."
-    },
-    {
-      "question": "Will I have success in higher education (Masters/PhD)?",
-      "answer": "Analyze the **9th House** and **D-24 Chart**. Look for connection between 5th and 9th lords."
-    },
-    {
-      "question": "What is the best way for me to study?",
-      "answer": "Use learning_capacity data. Suggest study hacks based on their Mercury/Moon sign (e.g., Take breaks vs Deep focus)."
-    },
-    {
-      "question": "Are there any obstacles or breaks in education?",
-      "answer": "Check **Saturn/Rahu** influence on 4th/5th houses. Check Dasha periods."
-    }
-  ],
-  "final_thoughts": "Encouraging summary focusing on maximizing their unique intellectual strengths.",
-  "follow_up_questions": [
-    "🎓 Best timing for higher studies?",
-    "📚 Will I succeed in competitive exams?",
-    "🌍 Chances of foreign education?",
-    "🧠 Remedies for concentration?"
-  ]
-}
-
-CRITICAL: Your entire response must be valid JSON starting with { and ending with }.
-Do NOT include any text before or after the JSON object.
-Do NOT use HTML div tags or HTML formatting.
-Use <br> for line breaks within JSON strings.
-Escape quotes properly: \"text\"
-DISCLAIMER: Always mention this is astrological guidance, not career counseling.
-"""
-            
-            # Generate AI response using structured analyzer
-            analyzer = StructuredAnalysisAnalyzer()
-            ai_result = await analyzer.generate_structured_report(
-                education_question, 
-                context, 
-                request.language or 'english'
-            )
-            
-            if ai_result['success']:
-                try:
-                    # Handle structured analyzer response format
-                    if ai_result.get('is_raw'):
-                        # Raw response format (fallback)
-                        parsed_response = {
-                            "quick_answer": "Analysis completed successfully.",
-                            "detailed_analysis": [],
-                            "final_thoughts": "Analysis provided in detailed format.",
-                            "follow_up_questions": []
-                        }
-                    else:
-                        # JSON data format (preferred) - map to mobile expected format
-                        raw_data = ai_result.get('data', {})
-                        
-                        # Map detailed_analysis fields to mobile expected format
-                        detailed_analysis = []
-                        for item in raw_data.get('detailed_analysis', []):
-                            detailed_analysis.append({
-                                "question": item.get('question', ''),
-                                "answer": item.get('answer', '')
-                            })
-                        
-                        parsed_response = {
-                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
-                            "detailed_analysis": detailed_analysis,
-                            "final_thoughts": raw_data.get('final_thoughts', ''),
-                            "follow_up_questions": raw_data.get('follow_up_questions', []),
-                            "terms": ai_result.get('terms', []),
-                            "glossary": ai_result.get('glossary', {})
-                        }
-                    
-                    education_insights = {
-                        'analysis': parsed_response,
-                        'terms': ai_result.get('terms', []),
-                        'glossary': ai_result.get('glossary', {}),
-                        'enhanced_context': True,
-                        'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'structured_analyzer',
-                        'generated_at': datetime.now().isoformat()
-                    }
-                    
-                    # Deduct credits for successful analysis
-                    success = credit_service.spend_credits(
-                        current_user.userid, 
-                        education_cost, 
-                        'education_analysis', 
-                        f"Education analysis for {birth_data.get('name', 'user')}"
-                    )
-                    
-                    if success:
-                        print(f"💳 Credits deducted successfully")
-                    else:
-                        print(f"❌ Credit deduction failed")
-                    
-                    # Cache the analysis
-                    try:
-                        import hashlib
-                        
-                        birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
-                        with get_conn() as conn:
-                            # Table should exist via schema, keep defensive create
-                            execute(
-                                conn,
-                                """
-                                CREATE TABLE IF NOT EXISTS ai_education_insights (
-                                    id SERIAL PRIMARY KEY,
-                                    userid INTEGER NOT NULL DEFAULT 0,
-                                    birth_hash TEXT NOT NULL,
-                                    insights_data TEXT,
-                                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    UNIQUE(userid, birth_hash)
-                                )
-                                """,
-                            )
-                            execute(
-                                conn,
-                                """
-                                INSERT INTO ai_education_insights (userid, birth_hash, insights_data, updated_at)
-                                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                                ON CONFLICT (userid, birth_hash)
-                                DO UPDATE SET insights_data = EXCLUDED.insights_data,
-                                              updated_at = EXCLUDED.updated_at
-                                """,
-                                (current_user.userid, birth_hash, json.dumps(education_insights)),
-                            )
-                            conn.commit()
-                        print(f"💾 Analysis cached successfully")
-                    except Exception as cache_error:
-                        print(f"⚠️ Failed to cache analysis: {cache_error}")
-                    
-                    final_response = {'status': 'complete', 'data': education_insights, 'cached': False}
-                    response_json = json.dumps(final_response)
-                    print(f"🚀 SENDING FINAL EDUCATION RESPONSE: {len(response_json)} chars")
-                    yield f"data: {response_json}\n\n"
-                        
-                except json.JSONDecodeError as e:
-                    print(f"❌ JSON PARSING FAILED: {e}")
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
-                
-            else:
-                error_message = ai_result.get('error', 'AI analysis failed') if ai_result else 'No response from AI'
-                yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
-                
-        except Exception as e:
-            print(f"❌ EDUCATION ANALYSIS ERROR: {type(e).__name__}: {str(e)}")
-            import traceback
-            full_traceback = traceback.format_exc()
-            print(f"Full traceback:\n{full_traceback}")
-            
-            error_message = str(e) if str(e) else 'Unknown error occurred'
-            yield f"data: {json.dumps({'status': 'error', 'error': error_message, 'error_type': type(e).__name__})}\n\n"
-    
-    return StreamingResponse(
-        generate_education_analysis(),
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
 
 @router.post("/get-analysis")
 async def get_previous_education_analysis(request: EducationAnalysisRequest, current_user: User = Depends(get_current_user)):
-    """Get previously generated education analysis if exists"""
-    import hashlib
-    
+    """Get previously generated education analysis if exists."""
     try:
-        birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
+        birth_hash = education_birth_hash(request)
+        legacy_birth_hash = education_birth_hash_legacy(request)
         with get_conn() as conn:
+            ensure_ai_education_insights_table(conn, execute)
             cur = execute(
                 conn,
                 """
                 SELECT insights_data
                 FROM ai_education_insights
-                WHERE userid = %s AND birth_hash = %s
+                WHERE userid = %s AND birth_hash IN (%s, %s)
                 """,
-                (current_user.userid, birth_hash),
+                (current_user.userid, birth_hash, legacy_birth_hash),
             )
             result = cur.fetchone()
-        
+
         if result:
             analysis_data = json.loads(result[0])
-            analysis_data['cached'] = True
+            analysis_data["cached"] = True
             return {"analysis": analysis_data}
-        
+
         return {"analysis": None}
-        
     except Exception as e:
         print(f"Error fetching previous analysis: {e}")
         return {"analysis": None}
 
+
 @router.get("/constants")
 async def get_education_constants():
-    """
-    Get education analysis constants and explanations
-    """
+    """Get education analysis constants and explanations."""
     from .constants import EDUCATION_HOUSES, EDUCATION_PLANETS, SUBJECT_RECOMMENDATIONS
-    
+
     return {
         "houses": EDUCATION_HOUSES,
         "planets": EDUCATION_PLANETS,
-        "subjects": SUBJECT_RECOMMENDATIONS
+        "subjects": SUBJECT_RECOMMENDATIONS,
     }

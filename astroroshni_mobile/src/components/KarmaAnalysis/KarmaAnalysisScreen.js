@@ -65,6 +65,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
+  const [currentJobId, setCurrentJobId] = useState(null);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [nativeName, setNativeName] = useState(() =>
     i18n.t('karmaAnalysis.defaultNativeName', 'Native')
@@ -180,13 +181,9 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       
       if (response.ok) {
         const data = await response.json();
-        if (data.status === 'complete' && data.data) {
+        if ((data.status === 'complete' || data.status === 'completed') && data.data) {
           setAnalysis(data.data);
           await saveAnalysis(data.data);
-        } else if (data.status === 'pending' || data.status === 'processing') {
-          startProgressBar();
-          startPolling();
-          return;
         } else {
           // No analysis exists - keep analysis as null
           setAnalysis(null);
@@ -289,13 +286,13 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       trackAstrologyEvent.analysisRequested(forceRegenerate ? 'karma_regenerate' : 'karma');
       
       const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/karma-analysis')}${forceRegenerate ? '?force_regenerate=true' : ''}`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/karma-analysis/start')}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ chart_id: String(selectedChartId) })
+        body: JSON.stringify({ chart_id: String(selectedChartId), force_regenerate: !!forceRegenerate })
       });
       
       if (!response.ok) {
@@ -305,14 +302,15 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       
       const data = await response.json();
       
-      if (data.status === 'complete') {
+      if ((data.status === 'complete' || data.status === 'completed') && data.data) {
         stopProgressBar();
         setAnalysis(data.data);
         await saveAnalysis(data.data);
         await fetchBalance();
         setLoading(false);
-      } else if (data.status === 'pending') {
-        startPolling();
+      } else if (data.job_id) {
+        setCurrentJobId(data.job_id);
+        startPolling(data.job_id);
       } else {
         throw new Error(i18n.t('karmaAnalysis.unexpectedResponse'));
       }
@@ -352,18 +350,18 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     setProgress(0);
   };
 
-  const startPolling = () => {
+  const startPolling = (jobId) => {
     const interval = setInterval(async () => {
       try {
         const token = await AsyncStorage.getItem('authToken');
-        const response = await fetch(`${API_BASE_URL}${getEndpoint(`/karma-analysis/status?chart_id=${selectedChartId}`)}`, {
+        const response = await fetch(`${API_BASE_URL}${getEndpoint(`/karma-analysis/status/${jobId}`)}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         const data = await response.json();
         
-        if (data.status === 'complete') {
+        if ((data.status === 'complete' || data.status === 'completed') && data.data) {
           stopProgressBar();
           setAnalysis(data.data);
           await saveAnalysis(data.data);
@@ -371,12 +369,14 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           setLoading(false);
           clearInterval(interval);
           setPollingInterval(null);
-        } else if (data.status === 'error') {
+          setCurrentJobId(null);
+        } else if (data.status === 'failed' || data.status === 'error') {
           stopProgressBar();
           setError(data.error);
           setLoading(false);
           clearInterval(interval);
           setPollingInterval(null);
+          setCurrentJobId(null);
         }
       } catch (err) {
         console.error('[KarmaAnalysis] Polling error:', err);

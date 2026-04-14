@@ -50,6 +50,16 @@ const PAGE_META = {
     icon: '💍',
     pdf: MarriageReportPDF
   },
+  progeny: {
+    seoKey: 'progenyAnalysis',
+    path: '/progeny-analysis',
+    headline: 'Progeny Analysis',
+    kicker: 'AI-powered Vedic insights',
+    blurb:
+      'Explore progeny promise, timing windows, and family expansion guidance from your chart—supportive guidance only, not medical advice.',
+    icon: '👶',
+    pdf: null
+  },
   education: {
     seoKey: 'educationAnalysis',
     path: '/education',
@@ -66,6 +76,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
+  const [birthModalTab, setBirthModalTab] = useState('saved');
 
   const meta = PAGE_META[analysisType];
   const seoData = useMemo(
@@ -107,7 +118,18 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick }) => {
         onAdminClick={handleAdminClick}
         onLogout={onLogout}
         birthData={birthData}
-        onChangeNative={() => setShowBirthModal(true)}
+        onChangeNative={(mode) => {
+          setBirthModalTab(mode === 'create' ? 'new' : 'saved');
+          setShowBirthModal(true);
+        }}
+        onCreateBirthChart={() => {
+          setBirthModalTab('new');
+          setShowBirthModal(true);
+        }}
+        onSelectBirthChart={() => {
+          setBirthModalTab('saved');
+          setShowBirthModal(true);
+        }}
         onCreditsClick={() => navigate('/credits')}
       />
 
@@ -163,6 +185,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick }) => {
         isOpen={showBirthModal}
         onClose={() => setShowBirthModal(false)}
         onSubmit={() => setShowBirthModal(false)}
+        defaultActiveTab={birthModalTab}
         title={`${meta.headline} — Birth details`}
         description="Please provide your birth information to generate your personalized analysis."
       />

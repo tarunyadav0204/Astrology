@@ -1074,6 +1074,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
+            <div className="life-category" onClick={() => user ? navigate('/progeny-analysis') : onLogin()}>
+              <div className="category-icon">👶</div>
+              <div className="category-content">
+                <h4>Your Progeny</h4>
+                <p>Children, family growth & parenthood timing</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
             <div className="life-category" onClick={() => (user ? navigate('/education') : onLogin())}>
               <div className="category-icon">🎓</div>
               <div className="category-content">

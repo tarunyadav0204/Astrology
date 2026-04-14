@@ -325,11 +325,7 @@ For every user query, structure your response exactly as follows:
                 'functional_nature': full_analysis['dignity_analysis']['functional_nature'],
                 'strength_multiplier': full_analysis['dignity_analysis']['strength_multiplier']
             },
-            'strength_analysis': {
-                'shadbala_rupas': full_analysis['strength_analysis']['shadbala_rupas'],
-                'shadbala_points': full_analysis['strength_analysis']['shadbala_points'],
-                'shadbala_grade': full_analysis['strength_analysis']['shadbala_grade']
-            },
+            # strength_analysis / Shadbala omitted — not sent to LLM (parity with ChatContextBuilder)
             'house_position_analysis': {
                 'house_number': full_analysis['house_position_analysis']['house_number'],
                 'house_types': full_analysis['house_position_analysis']['house_types']

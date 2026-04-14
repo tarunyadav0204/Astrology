@@ -4316,8 +4316,8 @@
 
 .life-categories-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
   max-width: 1100px;
   margin: 0 auto;
   padding: 0;
@@ -4332,7 +4332,7 @@
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 15px;
-  padding: 20px 15px;
+  padding: 16px 10px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -4363,14 +4363,14 @@
 }
 
 .category-icon {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
+  font-size: 2.2rem;
+  margin-bottom: 8px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .category-content h4 {
   color: white;
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin: 0 0 5px 0;
   font-weight: bold;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);

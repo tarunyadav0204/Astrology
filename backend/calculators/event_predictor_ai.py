@@ -8,6 +8,10 @@ import os
 import google.generativeai as genai  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.event_timeline_context_prune import prune_for_event_timeline
+from utils.local_llm_event_timeline import (
+    event_timeline_uses_local_llm,
+    generate_event_timeline_json,
+)
 
 # Shared instruction block for Event Timeline (yearly + monthly deep): disambiguate which life channel
 # a house activation targets (any house H), using karaka + afflicter flavour + topic-appropriate vargas.
@@ -77,26 +81,30 @@ class EventPredictor:
         self.transit_calc = real_transit_calculator
         self.dasha_calc = dasha_calculator
         self.ashtakavarga_cls = ashtakavarga_calculator_cls
-        
-        # Initialize Gemini safely (use admin-configured model)
+
+        # Local Ollama (e.g. Gemma 4 on server) — no Gemini API; see utils/local_llm_event_timeline.py
+        self._use_local_llm = event_timeline_uses_local_llm()
         self.model = None
-        api_key = os.getenv('GEMINI_API_KEY')
-        if api_key:
-            genai.configure(api_key=api_key)
-            try:
-                # Use the same premium model selection as chat (defaults to Gemini 3.1 Pro)
-                from utils.admin_settings import get_gemini_premium_model, GEMINI_MODEL_OPTIONS
-                name = get_gemini_premium_model()
-                fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
-                for model_name in [name] + fallbacks:
-                    try:
-                        self.model = genai.GenerativeModel(model_name)
-                        print(f"✅ EventPredictor using {model_name}")
-                        break
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+
+        if self._use_local_llm:
+            print("✅ EventPredictor: EVENT_TIMELINE_USE_LOCAL_LLM enabled — using Ollama (no Gemini API for timeline)")
+        else:
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                genai.configure(api_key=api_key)
+                try:
+                    from utils.admin_settings import get_gemini_premium_model, GEMINI_MODEL_OPTIONS
+                    name = get_gemini_premium_model()
+                    fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
+                    for model_name in [name] + fallbacks:
+                        try:
+                            self.model = genai.GenerativeModel(model_name)
+                            print(f"✅ EventPredictor using {model_name}")
+                            break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
 
     async def predict_yearly_events(self, birth_data: Dict, year: int) -> Dict[str, Any]:
         try:
@@ -118,10 +126,24 @@ class EventPredictor:
             prompt = self._create_prediction_prompt(raw_data, year, current_age)
             print(f"✅ Prompt created (length: {len(prompt)} chars)")
             
-            print("\n🔄 Calling Gemini API...")
+            print("\n🔄 Calling timeline LLM...")
             ai_response = await self._get_ai_prediction_async(prompt)
-            print(f"✅ Gemini API returned response")
-            
+            print("✅ Timeline LLM returned response")
+
+            if ai_response.pop("_timeline_invalid", False):
+                return {
+                    "year": year,
+                    "status": "error",
+                    "error": (
+                        "Timeline model returned empty or incomplete JSON (e.g. {}). "
+                        "If using Ollama: set OLLAMA_NUM_PREDICT=65536 (or higher), "
+                        "OLLAMA_NUM_CTX if needed, use a capable model, or disable "
+                        "EVENT_TIMELINE_USE_LOCAL_LLM and use Gemini."
+                    ),
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                }
+
             final_response = {"year": year, "status": "success", **ai_response}
             print(f"\n✅ PREDICTION COMPLETE FOR {year}")
             print(f"   - Final response keys: {list(final_response.keys())}")
@@ -150,7 +172,19 @@ class EventPredictor:
             dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
             prompt = self._create_monthly_deep_prompt(raw_data, year, month, current_age, transit_facts, dasha_facts)
             ai_response = await self._get_ai_prediction_async(prompt)
-            # Always attach backend-calculated facts so frontend can trust them
+            if ai_response.pop("_timeline_invalid", False):
+                return {
+                    "year": year,
+                    "status": "error",
+                    "error": (
+                        "Monthly deep model returned empty or incomplete JSON. "
+                        "Try higher OLLAMA_NUM_PREDICT / OLLAMA_NUM_CTX or use Gemini."
+                    ),
+                    "dasha_facts": dasha_facts,
+                    "transit_facts": transit_facts,
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                }
             final_response = {
                 "year": year,
                 "status": "success",
@@ -394,6 +428,26 @@ Now return a single JSON object with this structure:
 * **11th House:** Signifies **WEALTH/SALARY/GAINS**.
 * **7th House:** Signifies **MARRIAGE/BUSINESS PARTNERS**.
 """
+
+        test_month_raw = (os.getenv("EVENT_TIMELINE_TEST_MONTH") or "").strip()
+        test_month_suffix = ""
+        if test_month_raw.isdigit():
+            tm = int(test_month_raw)
+            if 1 <= tm <= 12:
+                test_month_suffix = f"""
+
+### TEST MODE — SINGLE MONTH ONLY (env EVENT_TIMELINE_TEST_MONTH={tm})
+**Overrides output shape only** where this conflicts with instructions above.
+
+1. `monthly_predictions` MUST contain **exactly one** object; that object's `month_id` must be the integer {tm}.
+2. Include **3 to 8** `events` for that month (testing cap).
+3. Per event, at least **2** `possible_manifestations` (skip the “minimum 6 manifestations” rule for this run).
+4. `macro_trends`: **1 to 3** short strings.
+5. Ignore requirements for **exactly 12 months** in `monthly_predictions`.
+
+Return valid JSON with top-level keys `macro_trends` and `monthly_predictions` only.
+"""
+                print(f"\n🔧 EVENT_TIMELINE_TEST_MONTH={tm} — single-month yearly prompt override active\n")
 
         return f"""
 You are an expert Vedic Astrologer predicting life events for {year}.
@@ -889,6 +943,7 @@ Each item in possible_manifestations MUST be an object with TWO fields:
 **CRITICAL:** EVERY month must have AT LEAST 6 manifestations covering ALL activated houses through lordship, transit, aspects, and conjunctions.
 
 **CRITICAL:** Count your manifestations before finalizing. If you have fewer than the minimum, you MUST add more by exploring additional house combinations.
+{test_month_suffix}
 """
 
     def _get_nakshatra_lord(self, longitude: float) -> str:
@@ -901,23 +956,32 @@ Each item in possible_manifestations MUST be an object with TWO fields:
         return ", ".join([f"{p}:{d['sign_name']}" for p, d in chart['planets'].items() if p in ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn']])
 
     async def _get_ai_prediction_async(self, prompt: str) -> Dict[str, Any]:
-        """Get AI prediction using Gemini (Non-blocking)"""
+        """Gemini API or local Ollama (e.g. Gemma on server); see EVENT_TIMELINE_USE_LOCAL_LLM."""
+
+        def run_sync_local_ollama():
+            print("\n" + "="*100)
+            print("🚀 STARTING LOCAL LLM (OLLAMA) FOR EVENT TIMELINE")
+            print("="*100)
+            print(f"Prompt length: {len(prompt)} characters (format=json)")
+            text = generate_event_timeline_json(prompt)
+            print(f"✅ Ollama completed, response length: {len(text)} characters")
+            return text
+
         def run_sync_gemini():
             print("\n" + "="*100)
             print("🚀 STARTING GEMINI API CALL")
             print("="*100)
-            
+
             if not self.model:
                 print("❌ ERROR: No Gemini model initialized (API Key missing)")
                 raise Exception("No API Key")
-            
+
             print(f"✅ Model initialized: {self.model}")
-            
-            safety = [{"category": c, "threshold": "BLOCK_NONE"} for c in 
-                     ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", 
+
+            safety = [{"category": c, "threshold": "BLOCK_NONE"} for c in
+                     ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
                       "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]]
-            
-            # Debug: print full prompt going to Gemini
+
             print(f"\n📤 FULL REQUEST TO GEMINI:")
             print("="*100)
             print("PROMPT START")
@@ -930,18 +994,17 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             print(f"Safety settings: {len(safety)} categories")
             print(f"Response format: application/json")
             print("="*100)
-            
+
             print("\n⏳ Calling Gemini API...")
             resp = self.model.generate_content(
-                prompt, 
-                generation_config={"response_mime_type": "application/json"}, 
+                prompt,
+                generation_config={"response_mime_type": "application/json"},
                 safety_settings=safety
             )
             print("✅ Gemini API call completed")
-            
+
             response_text = resp.text
-            
-            # Debug: print full raw response from Gemini
+
             print("\n📥 FULL RESPONSE FROM GEMINI:")
             print("="*100)
             print("RESPONSE START")
@@ -952,12 +1015,16 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             print("="*100)
             print(f"Response length: {len(response_text)} characters")
             print("="*100)
-            
+
             return response_text
 
         try:
-            print("\n🔄 Starting async Gemini call...")
-            resp_text = await asyncio.to_thread(run_sync_gemini)
+            if self._use_local_llm:
+                print("\n🔄 Starting async local Ollama call...")
+                resp_text = await asyncio.to_thread(run_sync_local_ollama)
+            else:
+                print("\n🔄 Starting async Gemini call...")
+                resp_text = await asyncio.to_thread(run_sync_gemini)
             
             print("\n🔄 Parsing JSON response...")
             # Gemini sometimes returns valid JSON plus trailing text.
@@ -994,25 +1061,56 @@ Each item in possible_manifestations MUST be an object with TWO fields:
                 else:
                     print(f"   - Empty list, returning empty structure")
                     parsed_response = {"macro_trends": [], "monthly_predictions": []}
-            
+
+            if not isinstance(parsed_response, dict):
+                print(
+                    f"\n⚠️ TIMELINE JSON root is not an object: {type(parsed_response).__name__!r}"
+                )
+                parsed_response = {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                }
+            elif parsed_response == {} or "monthly_predictions" not in parsed_response:
+                print(
+                    "\n⚠️ TIMELINE LLM returned empty object or missing monthly_predictions. "
+                    "Raw text (first 4000 chars):"
+                )
+                print((resp_text or "")[:4000])
+                parsed_response = {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                }
+            else:
+                if "macro_trends" not in parsed_response:
+                    parsed_response["macro_trends"] = []
+                if not isinstance(parsed_response.get("monthly_predictions"), list):
+                    print("\n⚠️ monthly_predictions is not a list; treating as failed parse.")
+                    parsed_response["monthly_predictions"] = []
+                    parsed_response["_timeline_invalid"] = True
+
             print(f"   - Keys in response: {list(parsed_response.keys())}")
-            
+
             if isinstance(parsed_response, dict):
-                if 'macro_trends' in parsed_response:
+                if "macro_trends" in parsed_response:
                     print(f"   - macro_trends count: {len(parsed_response['macro_trends'])}")
-                if 'monthly_predictions' in parsed_response:
-                    print(f"   - monthly_predictions count: {len(parsed_response['monthly_predictions'])}")
-            
-            print("\n✅ GEMINI CALL SUCCESSFUL - Returning parsed response")
+                if "monthly_predictions" in parsed_response:
+                    print(
+                        f"   - monthly_predictions count: {len(parsed_response['monthly_predictions'])}"
+                    )
+
+            label = "OLLAMA" if self._use_local_llm else "GEMINI"
+            print(f"\n✅ TIMELINE LLM OK ({label}) - Returning parsed response")
             return parsed_response
-            
+
         except json.JSONDecodeError as je:
             print(f"\n❌ JSON DECODE ERROR:")
             print(f"   - Error: {str(je)}")
             print(f"   - Response text: {resp_text[:500]}...")
             return {"macro_trends": [], "monthly_predictions": []}
         except Exception as e:
-            print(f"\n❌ GEMINI API ERROR:")
+            print(f"\n❌ TIMELINE LLM ERROR:")
             print(f"   - Error type: {type(e).__name__}")
             print(f"   - Error message: {str(e)}")
             import traceback

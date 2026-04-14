@@ -133,9 +133,10 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         name: chart.name,
         date: chart.date,
         time: chart.time,
-        place: `${chart.latitude}, ${chart.longitude}`,
+        place: chart.place || `${chart.latitude}, ${chart.longitude}`,
         latitude: chart.latitude,
         longitude: chart.longitude,
+        gender: chart.gender || '',
         chart_id: chart.id
       });
       
@@ -323,9 +324,27 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       if (editingChart) {
         const chartData = await apiService.calculateChartOnly(formData);
         await apiService.updateChart(editingChart.id, formData);
+
+        // Keep in-memory context synced with edited values (especially gender) for analysis pages.
+        setBirthData({
+          ...formData,
+          chart_id: editingChart.id,
+        });
+        setChartData({
+          ...chartData,
+          id: editingChart.id,
+        });
+
         toast.success('Chart updated successfully!');
         loadExistingCharts(searchQuery);
-        cancelEdit();
+
+        // Close modal after successful edit; do not reset form first.
+        if (onSubmit) {
+          onSubmit();
+        } else if (onClose) {
+          onClose();
+        }
+        return;
       } else {
         if (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) {
           throw new Error('Coordinates missing - select from suggestions required');

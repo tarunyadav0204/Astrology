@@ -20,6 +20,7 @@ export const CreditProvider = ({ children }) => {
     const [healthCost, setHealthCost] = useState(3);
     const [educationCost, setEducationCost] = useState(3);
     const [careerCost, setCareerCost] = useState(12);
+    const [progenyCost, setProgenyCost] = useState(15);
     const [podcastCost, setPodcastCost] = useState(2);
     const [eventsCost, setEventsCost] = useState(100);
     const [loading, setLoading] = useState(true);
@@ -95,6 +96,7 @@ export const CreditProvider = ({ children }) => {
             if (pricing.health != null) setHealthCost(Number(pricing.health) || 3);
             if (pricing.education != null) setEducationCost(Number(pricing.education) || 3);
             if (pricing.career != null) setCareerCost(Number(pricing.career) || 12);
+            if (pricing.progeny != null) setProgenyCost(Number(pricing.progeny) || 15);
             if (pricing.events != null) setEventsCost(Number(pricing.events) || 100);
         } catch (error) {
             console.error('Error fetching pricing:', error);
@@ -174,6 +176,7 @@ export const CreditProvider = ({ children }) => {
             healthCost,
             educationCost,
             careerCost,
+            progenyCost,
             podcastCost,
             eventsCost,
             freeQuestionAvailable,

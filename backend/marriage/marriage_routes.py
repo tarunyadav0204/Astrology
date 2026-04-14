@@ -1,15 +1,12 @@
-"""
-Marriage Analysis API Routes
-"""
+"""Marriage Analysis API Routes"""
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, Dict
 import sys
 import os
 import json
-import asyncio
+import uuid
 from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
@@ -17,10 +14,16 @@ from db import get_conn, execute
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ai.marriage_ai_context_generator import MarriageAIContextGenerator
-from ai.structured_analyzer import StructuredAnalysisAnalyzer
+from marriage.marriage_analysis_execute import (
+    execute_marriage_analysis,
+    marriage_birth_hash,
+    marriage_birth_hash_legacy,
+    ensure_ai_marriage_insights_table,
+)
+
 
 class MarriageAnalysisRequest(BaseModel):
+    chart_id: Optional[int] = None
     name: Optional[str] = None
     date: str
     time: str
@@ -29,270 +32,215 @@ class MarriageAnalysisRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
-    language: Optional[str] = 'english'
-    response_style: Optional[str] = 'detailed'
+    language: Optional[str] = "english"
+    response_style: Optional[str] = "detailed"
+    force_regenerate: Optional[bool] = False
+
 
 router = APIRouter(prefix="/marriage", tags=["marriage"])
-
-marriage_context_generator = MarriageAIContextGenerator()
 credit_service = CreditService()
 
-@router.post("/analyze")
-async def analyze_marriage(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
-    """Analyze marriage prospects with AI - requires credits"""
-    
-    # Check credit cost and user balance (subscription tier discount applied)
-    base_cost = credit_service.get_credit_setting('marriage_analysis_cost')
-    marriage_cost = credit_service.get_effective_cost(current_user.userid, base_cost, 'marriage_analysis_cost')
+
+def _marriage_credit_check_or_raise(current_user: User) -> int:
+    base_cost = credit_service.get_credit_setting("marriage_analysis_cost")
+    marriage_cost = credit_service.get_effective_cost(current_user.userid, base_cost, "marriage_analysis_cost")
     user_balance = credit_service.get_user_credits(current_user.userid)
-    
     if user_balance < marriage_cost:
         raise HTTPException(
-            status_code=402, 
-            detail=f"Insufficient credits. You need {marriage_cost} credits but have {user_balance}."
+            status_code=402,
+            detail=f"Insufficient credits. You need {marriage_cost} credits but have {user_balance}.",
         )
-    
-    async def generate_marriage_analysis():
-        try:
-            # Prepare birth data
-            from datetime import date
-            birth_data = {
-                'name': request.name,
-                'date': request.date,
-                'time': request.time,
-                'place': request.place,
-                'latitude': request.latitude or 28.6139,
-                'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+0',
-                'gender': request.gender,
-                'current_year': date.today().year
-            }
-            
-            # Build marriage context
-            context = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                marriage_context_generator.build_marriage_context,
-                birth_data
+    return marriage_cost
+
+
+def init_marriage_analysis_jobs_table():
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS marriage_analysis_jobs (
+                job_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+                request_json TEXT NOT NULL,
+                result_data TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP
             )
-            
-            # Marriage-specific AI question (EXACT same format as education)
-            marriage_question = """
-As an expert Vedic astrologer, analyze the birth chart for **Relationship and Marriage Destiny**.
-
-CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
-Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
-{
-  "quick_answer": "Summary of marriage prospects and timing.",
-  "detailed_analysis": [
-    {
-      "question": "What is the timeline for major relationship events?",
-      "answer": "Analyze timing using Vimshottari Dasha and Jupiter/Saturn transits",
-      "key_points": ["Current period", "Best timing"],
-      "astrological_basis": "7th house and lord analysis..."
-    },
-    {
-      "question": "What is the personality and nature of my partner?",
-      "answer": "Describe spouse traits from 7th house and D9 Navamsa"
-    },
-    {
-      "question": "Are there any Doshas affecting harmony?",
-      "answer": "Analyze Mangal Dosha and Saturn aspects"
-    },
-    {
-      "question": "Is my destiny inclined towards Love or Traditional connection?",
-      "answer": "Analyze 5th-7th house connection and relationship style"
-    },
-    {
-      "question": "What is the key to happiness in my specific chart?",
-      "answer": "Guidance based on D9 Navamsa analysis"
-    }
-  ],
-  "final_thoughts": "Encouraging summary focusing on marriage potential.",
-  "follow_up_questions": [
-    "📅 Best timing for marriage?",
-    "❤️ How to improve compatibility?",
-    "💍 What are my partner's key traits?",
-    "⚡ Remedies for relationship peace?"
-  ]
-}
-
-CRITICAL: Your entire response must be valid JSON starting with { and ending with }.
-Do NOT include any text before or after the JSON object.
-Do NOT use HTML div tags or HTML formatting.
-Use <br> for line breaks within JSON strings.
-Escape quotes properly: \"text\"
-"""
-            
-            # Generate AI response using structured analyzer
-            analyzer = StructuredAnalysisAnalyzer()
-            ai_result = await analyzer.generate_structured_report(
-                marriage_question, 
-                context, 
-                request.language or 'english'
-            )
-            
-            if ai_result['success']:
-                try:
-                    # Handle structured analyzer response format
-                    if ai_result.get('is_raw'):
-                        # Raw response format (fallback)
-                        parsed_response = {
-                            "quick_answer": "Analysis completed successfully.",
-                            "detailed_analysis": [],
-                            "final_thoughts": "Analysis provided in detailed format.",
-                            "follow_up_questions": []
-                        }
-                    else:
-                        # JSON data format (preferred) - map to mobile expected format
-                        raw_data = ai_result.get('data', {})
-                        
-                        # Map detailed_analysis fields to mobile expected format
-                        detailed_analysis = []
-                        for item in raw_data.get('detailed_analysis', []):
-                            detailed_analysis.append({
-                                "question": item.get('question', ''),
-                                "answer": item.get('answer', '')
-                            })
-                        
-                        parsed_response = {
-                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
-                            "detailed_analysis": detailed_analysis,
-                            "final_thoughts": raw_data.get('final_thoughts', ''),
-                            "follow_up_questions": raw_data.get('follow_up_questions', []),
-                            "terms": ai_result.get('terms', []),
-                            "glossary": ai_result.get('glossary', {})
-                        }
-                    
-                    marriage_insights = {
-                        'analysis': parsed_response,
-                        'terms': ai_result.get('terms', []),
-                        'glossary': ai_result.get('glossary', {}),
-                        'enhanced_context': True,
-                        'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'structured_analyzer',
-                        'generated_at': datetime.now().isoformat()
-                    }
-                    
-                    # Deduct credits for successful analysis
-                    success = credit_service.spend_credits(
-                        current_user.userid, 
-                        marriage_cost, 
-                        'marriage_analysis', 
-                        f"Marriage analysis for {birth_data.get('name', 'user')}"
-                    )
-                    
-                    if success:
-                        print(f"💳 Credits deducted successfully")
-                    else:
-                        print(f"❌ Credit deduction failed")
-                    
-                    # Cache the analysis
-                    try:
-                        import hashlib
-
-                        birth_hash = hashlib.md5(
-                            f"{request.date}_{request.time}_{request.place}".encode()
-                        ).hexdigest()
-
-                        with get_conn() as conn:
-                            # Table should be present from schema, but keep defensive create
-                            execute(
-                                conn,
-                                """
-                                CREATE TABLE IF NOT EXISTS ai_marriage_insights (
-                                    id SERIAL PRIMARY KEY,
-                                    userid INTEGER NOT NULL DEFAULT 0,
-                                    birth_hash TEXT NOT NULL,
-                                    insights_data TEXT,
-                                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    UNIQUE(userid, birth_hash)
-                                )
-                                """,
-                            )
-
-                            execute(
-                                conn,
-                                """
-                                INSERT INTO ai_marriage_insights (userid, birth_hash, insights_data, updated_at)
-                                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                                ON CONFLICT (userid, birth_hash)
-                                DO UPDATE SET insights_data = EXCLUDED.insights_data,
-                                              updated_at = EXCLUDED.updated_at
-                                """,
-                                (current_user.userid, birth_hash, json.dumps(marriage_insights)),
-                            )
-                            conn.commit()
-
-                        print(f"💾 Analysis cached successfully")
-                    except Exception as cache_error:
-                        print(f"⚠️ Failed to cache analysis: {cache_error}")
-                    
-                    final_response = {'status': 'complete', 'data': marriage_insights, 'cached': False}
-                    response_json = json.dumps(final_response)
-                    print(f"🚀 SENDING FINAL MARRIAGE RESPONSE: {len(response_json)} chars")
-                    yield f"data: {response_json}\n\n"
-                        
-                except json.JSONDecodeError as e:
-                    print(f"❌ JSON PARSING FAILED: {e}")
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
-                
-            else:
-                error_message = ai_result.get('error', 'AI analysis failed') if ai_result else 'No response from AI'
-                yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
-                
-        except Exception as e:
-            print(f"❌ MARRIAGE ANALYSIS ERROR: {type(e).__name__}: {str(e)}")
-            import traceback
-            full_traceback = traceback.format_exc()
-            print(f"Full traceback:\n{full_traceback}")
-            
-            error_message = str(e) if str(e) else 'Unknown error occurred'
-            yield f"data: {json.dumps({'status': 'error', 'error': error_message, 'error_type': type(e).__name__})}\n\n"
-    
-    return StreamingResponse(
-        generate_marriage_analysis(),
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
+            """,
+        )
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_marriage_jobs_user ON marriage_analysis_jobs (user_id)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_marriage_jobs_status ON marriage_analysis_jobs (status)")
+        conn.commit()
 
 
-@router.post("/check-cache")
-async def check_marriage_cache(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
-    """Return cached marriage insights if present (same birth hash as /analyze). Used by UniversalAIInsights."""
+async def process_marriage_analysis_job(job_id: str, user_id: int, request_json: str, marriage_cost: int):
     try:
-        import hashlib
-
-        birth_hash = hashlib.md5(
-            f"{request.date}_{request.time}_{request.place}".encode()
-        ).hexdigest()
+        req_data = json.loads(request_json)
+        request = MarriageAnalysisRequest(**req_data)
 
         with get_conn() as conn:
             execute(
                 conn,
-                """
-                CREATE TABLE IF NOT EXISTS ai_marriage_insights (
-                    id SERIAL PRIMARY KEY,
-                    userid INTEGER NOT NULL DEFAULT 0,
-                    birth_hash TEXT NOT NULL,
-                    insights_data TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(userid, birth_hash)
-                )
-                """,
+                "UPDATE marriage_analysis_jobs SET status = %s, started_at = %s WHERE job_id = %s",
+                ("processing", datetime.now(), job_id),
             )
+            conn.commit()
+
+        result = await execute_marriage_analysis(
+            user_id,
+            request,
+            marriage_cost,
+            credit_service=credit_service,
+            get_conn=get_conn,
+            execute_fn=execute,
+        )
+
+        with get_conn() as conn:
+            if result.get("ok"):
+                payload = {
+                    "marriage_insights": result["marriage_insights"],
+                    "cached": result.get("cached", False),
+                }
+                execute(
+                    conn,
+                    """
+                    UPDATE marriage_analysis_jobs
+                    SET status = %s, result_data = %s, completed_at = %s
+                    WHERE job_id = %s
+                    """,
+                    ("completed", json.dumps(payload), datetime.now(), job_id),
+                )
+            else:
+                execute(
+                    conn,
+                    """
+                    UPDATE marriage_analysis_jobs
+                    SET status = %s, error_message = %s, completed_at = %s
+                    WHERE job_id = %s
+                    """,
+                    ("failed", result.get("error") or "Analysis failed", datetime.now(), job_id),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"❌ process_marriage_analysis_job: {e}")
+        import traceback
+
+        traceback.print_exc()
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE marriage_analysis_jobs
+                SET status = %s, error_message = %s, completed_at = %s
+                WHERE job_id = %s
+                """,
+                ("failed", str(e), datetime.now(), job_id),
+            )
+            conn.commit()
+
+
+@router.post("/analyze/start")
+async def start_marriage_analysis_job(
+    request: MarriageAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Start marriage AI in background; poll GET /marriage/analyze/status/{job_id}."""
+    marriage_cost = _marriage_credit_check_or_raise(current_user)
+    init_marriage_analysis_jobs_table()
+    job_id = str(uuid.uuid4())
+    req_dump = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+    request_json = json.dumps(req_dump)
+
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            INSERT INTO marriage_analysis_jobs (job_id, user_id, status, request_json)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (job_id, current_user.userid, "pending", request_json),
+        )
+        conn.commit()
+
+    background_tasks.add_task(
+        process_marriage_analysis_job,
+        job_id,
+        current_user.userid,
+        request_json,
+        marriage_cost,
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "message": "Marriage analysis started — poll status until completed.",
+    }
+
+
+@router.get("/analyze/status/{job_id}")
+async def get_marriage_analysis_job_status(job_id: str, current_user: User = Depends(get_current_user)):
+    init_marriage_analysis_jobs_table()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT status, result_data, error_message, started_at, completed_at
+            FROM marriage_analysis_jobs
+            WHERE job_id = %s AND user_id = %s
+            """,
+            (job_id, current_user.userid),
+        )
+        row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    status, result_data, error_message, started_at, completed_at = row
+    out: Dict = {"status": status}
+    if status == "completed" and result_data:
+        payload = json.loads(result_data)
+        out["data"] = payload.get("marriage_insights")
+        out["cached"] = payload.get("cached", False)
+        out["completed_at"] = completed_at
+    elif status == "failed":
+        out["error"] = error_message or "Analysis failed"
+    elif status in ("pending", "processing"):
+        out["message"] = "Analyzing chart and generating marriage insights..."
+        if started_at:
+            out["started_at"] = started_at
+    return out
+
+
+@router.post("/analyze")
+async def analyze_marriage(
+    request: MarriageAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Mobile/web: returns job_id — poll GET /marriage/analyze/status/{job_id}."""
+    return await start_marriage_analysis_job(request, background_tasks, current_user)
+
+
+@router.post("/check-cache")
+async def check_marriage_cache(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
+    """Return cached marriage insights if present (same birth hash as /analyze)."""
+    try:
+        birth_hash = marriage_birth_hash(request)
+        legacy_birth_hash = marriage_birth_hash_legacy(request)
+
+        with get_conn() as conn:
+            ensure_ai_marriage_insights_table(conn, execute)
             cur = execute(
                 conn,
                 """
                 SELECT insights_data FROM ai_marriage_insights
-                WHERE userid = %s AND birth_hash = %s
+                WHERE userid = %s AND birth_hash IN (%s, %s)
                 """,
-                (current_user.userid, birth_hash),
+                (current_user.userid, birth_hash, legacy_birth_hash),
             )
             row = cur.fetchone()
 
@@ -300,7 +248,6 @@ async def check_marriage_cache(request: MarriageAnalysisRequest, current_user: U
             return {"success": False, "message": "No cached data found"}
 
         stored = json.loads(row[0]) if isinstance(row[0], str) else row[0]
-        # Match shape expected by frontend: top-level `analysis` (full blob from analyze stream `data`)
         return {"success": True, "cached": True, "analysis": stored}
     except Exception as e:
         print(f"❌ Marriage check-cache error: {e}")

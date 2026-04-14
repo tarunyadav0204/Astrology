@@ -11,6 +11,9 @@ const ANALYSIS_CONFIG = {
     title: '💰 AI Wealth Analysis',
     icon: '💰',
     endpoint: '/api/wealth/ai-insights-enhanced',
+    useJobPolling: true,
+    startEndpoint: '/api/wealth/ai-insights-enhanced/start',
+    statusEndpointBase: '/api/wealth/ai-insights-enhanced/status',
     cacheEndpoint: '/api/wealth/check-cache',
     requestFormat: 'birth_details', // Use birth_date, birth_time, birth_place format
     description: 'Get comprehensive insights about your financial prospects and wealth-building potential',
@@ -35,6 +38,9 @@ const ANALYSIS_CONFIG = {
     title: '💼 AI Career Analysis',
     icon: '💼',
     endpoint: '/api/career/ai-insights',
+    useJobPolling: true,
+    startEndpoint: '/api/career/ai-insights/start',
+    statusEndpointBase: '/api/career/ai-insights/status',
     cacheEndpoint: '/api/career/check-cache',
     description: 'Discover your ideal career path and professional growth opportunities',
     steps: [
@@ -58,6 +64,9 @@ const ANALYSIS_CONFIG = {
     title: '🏥 AI Health Analysis',
     icon: '🏥',
     endpoint: '/api/health/analyze',
+    useJobPolling: true,
+    startEndpoint: '/api/health/analyze/start',
+    statusEndpointBase: '/api/health/analyze/status',
     cacheEndpoint: '/api/health/get-analysis',
     description: 'Understand your health patterns and wellness recommendations',
     steps: [
@@ -81,6 +90,9 @@ const ANALYSIS_CONFIG = {
     title: '💕 AI Marriage Analysis',
     icon: '💕',
     endpoint: '/api/marriage/analyze',
+    useJobPolling: true,
+    startEndpoint: '/api/marriage/analyze/start',
+    statusEndpointBase: '/api/marriage/analyze/status',
     cacheEndpoint: '/api/marriage/check-cache',
     description: 'Explore your relationship patterns and marriage compatibility',
     steps: [
@@ -100,10 +112,38 @@ const ANALYSIS_CONFIG = {
     ],
     disclaimer: 'Marriage insights are for guidance purposes only. Relationships require mutual understanding and effort.'
   },
+  progeny: {
+    title: '👶 AI Progeny Analysis',
+    icon: '👶',
+    endpoint: '/api/progeny/ai-insights',
+    useJobPolling: true,
+    startEndpoint: '/api/progeny/ai-insights/start',
+    statusEndpointBase: '/api/progeny/ai-insights/status',
+    cacheEndpoint: '/api/progeny/check-cache',
+    description: 'Understand progeny promise, timing windows, and family expansion guidance',
+    steps: [
+      '👶 Analyzing 5th house and Jupiter factors',
+      '🧿 Examining D7 (Saptamsa) indicators',
+      '⏳ Mapping dasha and transit windows',
+      '🪔 Identifying obstacles and remedies',
+      '🌸 Generating supportive guidance'
+    ],
+    preview: [
+      '✨ Progeny promise and timing insights',
+      '🧿 D7-based family expansion indicators',
+      '⏳ Favorable periods and caution windows',
+      '🪔 Remedies and practical guidance',
+      '💞 Parenting and family harmony themes'
+    ],
+    disclaimer: 'Progeny insights are for spiritual guidance only and are not medical advice.'
+  },
   education: {
     title: '🎓 AI Education Analysis',
     icon: '🎓',
     endpoint: '/api/education/ai-analyze',
+    useJobPolling: true,
+    startEndpoint: '/api/education/ai-analyze/start',
+    statusEndpointBase: '/api/education/ai-analyze/status',
     cacheEndpoint: '/api/education/get-analysis',
     description: 'Discover your learning potential and academic success factors',
     steps: [
@@ -250,7 +290,7 @@ const UniversalAIInsights = ({
 }) => {
   const navigate = useNavigate();
   const config = ANALYSIS_CONFIG[analysisType];
-  const { credits, loading: creditsLoading, fetchBalance, wealthCost, careerCost, healthCost, marriageCost, educationCost } = useCredits();
+  const { credits, loading: creditsLoading, fetchBalance, wealthCost, careerCost, healthCost, marriageCost, educationCost, progenyCost } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -268,7 +308,8 @@ const UniversalAIInsights = ({
     career: careerCost || 15,
     health: healthCost || 15,
     marriage: marriageCost || 15,
-    education: educationCost || 15
+    education: educationCost || 15,
+    progeny: progenyCost || 15
   }[analysisType] || 15;
   
   // Handle term clicks to show tooltip
@@ -333,7 +374,15 @@ const UniversalAIInsights = ({
     }, 300000);
     
     try {
+      if (analysisType === 'progeny' && !birthDetails?.gender) {
+        clearTimeout(timeoutId);
+        setError('Gender is required for progeny analysis. Please update your birth profile.');
+        setLoading(false);
+        return;
+      }
+
       const requestBody = config.requestFormat === 'birth_details' ? {
+        chart_id: birthDetails?.chart_id || null,
         birth_date: birthDetails?.date || '',
         birth_time: birthDetails?.time || '',
         birth_place: birthDetails?.place || '',
@@ -342,6 +391,7 @@ const UniversalAIInsights = ({
         language: 'english',
         force_regenerate: forceRegenerate
       } : {
+        chart_id: birthDetails?.chart_id || null,
         name: birthDetails?.name || 'User',
         date: birthDetails?.date || '',
         time: birthDetails?.time || '',
@@ -360,12 +410,106 @@ const UniversalAIInsights = ({
       const timeoutSignal = setTimeout(() => controller.abort(), 300000);
       
       const token = localStorage.getItem('token');
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      };
+
+      // Job + polling (same pattern as cosmic timeline): avoids long-lived SSE connections
+      if (config.useJobPolling && config.startEndpoint && config.statusEndpointBase) {
+        const startRes = await fetch(config.startEndpoint, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutSignal);
+        if (!startRes.ok) {
+          let errorData = null;
+          try {
+            errorData = await startRes.json();
+          } catch (_) {}
+
+          if (startRes.status === 402) {
+            setError(errorData?.detail || 'Insufficient credits');
+            setShowCreditWarning(true);
+            setLoading(false);
+            return;
+          }
+
+          const detail = typeof errorData?.detail === 'string'
+            ? errorData.detail
+            : (errorData?.detail?.message || errorData?.message || `Request failed (${startRes.status})`);
+          setError(detail);
+          setLoading(false);
+          return;
+        }
+        const startJson = await startRes.json();
+        const jobId = startJson.job_id;
+        if (!jobId) throw new Error('No job_id from server');
+
+        const pollMs = 3000;
+        let pollChainId = null;
+        let pollingStopped = false;
+
+        const stopJobPolling = () => {
+          pollingStopped = true;
+          if (pollChainId != null) {
+            clearTimeout(pollChainId);
+            pollChainId = null;
+          }
+        };
+
+        const pollOnce = async () => {
+          if (pollingStopped) return;
+          try {
+            const stRes = await fetch(`${config.statusEndpointBase}/${jobId}`, {
+              headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+            });
+            if (!stRes.ok) {
+              stopJobPolling();
+              clearTimeout(timeoutId);
+              setError(`Status request failed (${stRes.status}). Please try again.`);
+              setLoading(false);
+              return;
+            }
+            const st = await stRes.json();
+            if (st.status === 'completed' && st.data) {
+              stopJobPolling();
+              clearTimeout(timeoutId);
+              setAiInsights(st.data);
+              setHasStarted(true);
+              setLoading(false);
+              if (!st.cached) fetchBalance();
+              return;
+            }
+            if (st.status === 'failed') {
+              stopJobPolling();
+              clearTimeout(timeoutId);
+              setError(st.error || `${config.title || 'Analysis'} failed`);
+              setLoading(false);
+              return;
+            }
+            if (!pollingStopped) {
+              pollChainId = setTimeout(() => {
+                pollChainId = null;
+                pollOnce();
+              }, pollMs);
+            }
+          } catch (e) {
+            stopJobPolling();
+            clearTimeout(timeoutId);
+            setError(e?.message || 'Failed to check analysis status');
+            setLoading(false);
+          }
+        };
+        setTimeout(pollOnce, 1500);
+        return;
+      }
+
       const response = await fetch(config.endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
+        headers: authHeaders,
         body: JSON.stringify(requestBody),
         signal: controller.signal
       });
@@ -458,7 +602,15 @@ const UniversalAIInsights = ({
       if (!birthDetails || !config.cacheEndpoint) return;
       
       try {
-        const requestBody = config.requestFormat === 'birth_details' ? {
+        if (analysisType === 'progeny' && !birthDetails?.gender) {
+        clearTimeout(timeoutId);
+        setError('Gender is required for progeny analysis. Please update your birth profile.');
+        setLoading(false);
+        return;
+      }
+
+      const requestBody = config.requestFormat === 'birth_details' ? {
+          chart_id: birthDetails?.chart_id || null,
           birth_date: birthDetails?.date || '',
           birth_time: birthDetails?.time || '',
           birth_place: birthDetails?.place || '',
@@ -466,6 +618,7 @@ const UniversalAIInsights = ({
           longitude: birthDetails?.longitude || 0,
           language: 'english'
         } : {
+          chart_id: birthDetails?.chart_id || null,
           name: birthDetails?.name || 'User',
           date: birthDetails?.date || '',
           time: birthDetails?.time || '',
@@ -489,9 +642,12 @@ const UniversalAIInsights = ({
         
         if (response.ok) {
           const result = await response.json();
-          if (result.analysis) {
-            result.analysis.cached = true;
-            setAiInsights(result.analysis);
+          const cachedPayload = result.analysis || result.data;
+          if (cachedPayload) {
+            setAiInsights({
+              ...cachedPayload,
+              cached: true
+            });
             setHasStarted(true);
           }
         }

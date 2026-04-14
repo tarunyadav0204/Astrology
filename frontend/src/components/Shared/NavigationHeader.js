@@ -42,6 +42,7 @@ function FullHamburgerMenuItems({
     <div className="mobile-menu-section-label">Your Life</div>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/career-guidance') : onLogin && onLogin()); onClose(); }}>💼 Your Career</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/marriage-analysis') : onLogin && onLogin()); onClose(); }}>💍 Your Marriage</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/progeny-analysis') : onLogin && onLogin()); onClose(); }}>👶 Your Progeny</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/education') : onLogin && onLogin()); onClose(); }}>🎓 Your Education</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/health-analysis') : onLogin && onLogin()); onClose(); }}>🏥 Your Health</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/wealth-analysis') : onLogin && onLogin()); onClose(); }}>💰 Your Wealth</button>
@@ -106,6 +107,13 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
       cb();
       return;
     }
+
+    // When already authenticated on a page that supports birth modal, stay on page.
+    if (user && onChangeNative) {
+      onChangeNative(mode);
+      return;
+    }
+
     if (!user) {
       try {
         sessionStorage.setItem('pendingBirthChart', mode);
@@ -114,6 +122,8 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
       else navigate(`/?birthChart=${mode}`);
       return;
     }
+
+    // Fallback for legacy pages that don't expose modal callbacks.
     navigate(`/?birthChart=${mode}`);
   };
 
@@ -242,6 +252,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
             <button onClick={() => { user ? navigate('/career-guidance') : onLogin(); setActiveDropdown(null); }}>💼 Your Career</button>
             <button onClick={() => { user ? navigate('/marriage-analysis') : onLogin(); setActiveDropdown(null); }}>💍 Your Marriage</button>
+            <button onClick={() => { user ? navigate('/progeny-analysis') : onLogin(); setActiveDropdown(null); }}>👶 Your Progeny</button>
             <button onClick={() => { user ? navigate('/education') : (onLogin && onLogin()); setActiveDropdown(null); }}>🎓 Your Education</button>
             <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
             <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
@@ -422,6 +433,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
         <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
           <button onClick={() => { user ? navigate('/career-guidance') : onLogin(); setActiveDropdown(null); }}>💼 Your Career</button>
           <button onClick={() => { user ? navigate('/marriage-analysis') : onLogin(); setActiveDropdown(null); }}>💍 Your Marriage</button>
+          <button onClick={() => { user ? navigate('/progeny-analysis') : onLogin(); setActiveDropdown(null); }}>👶 Your Progeny</button>
           <button onClick={() => { user ? navigate('/education') : (onLogin && onLogin()); setActiveDropdown(null); }}>🎓 Your Education</button>
           <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
           <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
