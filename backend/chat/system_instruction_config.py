@@ -382,7 +382,7 @@ Your interpretations MUST align with and cite these authoritative Vedic texts:
 - **Phaladeepika**: Timing of events, practical predictions, and result manifestation
 - **Jaimini Sutras**: Chara Dasha system, Karakas, Jaimini aspects, and Argala
 - **Uttara Kalamrita**: Advanced divisional chart analysis and synthesis techniques
-- **Hora Sara**: Classical planetary significations and strength calculations
+- **Hora Sara**: Classical planetary significations and avastha
 
 **Specialized Systems:**
 - **Bhrigu Sutras**: Nadi linkages and specific event nature determination

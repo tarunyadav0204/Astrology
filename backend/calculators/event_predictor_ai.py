@@ -7,6 +7,7 @@ import asyncio
 import os
 import google.generativeai as genai  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
+from calculators.event_timeline_context_prune import prune_for_event_timeline
 
 # Shared instruction block for Event Timeline (yearly + monthly deep): disambiguate which life channel
 # a house activation targets (any house H), using karaka + afflicter flavour + topic-appropriate vargas.
@@ -328,8 +329,8 @@ Now return a single JSON object with this structure:
 
     def _prepare_yearly_data(self, birth_data: Dict, year: int) -> str:
         """
-        Use ChatContextBuilder to get comprehensive astrological context.
-        Returns JSON string with all divisional charts, yogas, dashas, and transits.
+        Use ChatContextBuilder for full chart math, then prune payload for event timeline only
+        (yearly + monthly deep share this path). Pruning does not alter builder caches.
         """
         print(f"\n📊 Using ChatContextBuilder for comprehensive {year} analysis...")
         
@@ -343,7 +344,6 @@ Now return a single JSON object with this structure:
         
         context_builder = ChatContextBuilder()
         
-        # Get complete annual context with all divisional charts, yogas, dashas, transits
         full_context = context_builder.build_annual_context(
             birth_data=birth_data,
             target_year=year,
@@ -351,10 +351,13 @@ Now return a single JSON object with this structure:
             intent_result={'mode': 'annual_prediction', 'category': 'yearly_events'}
         )
         
-        print(f"✅ ChatContextBuilder returned context with keys: {list(full_context.keys())}")
+        slim = prune_for_event_timeline(full_context)
+        print(
+            f"✅ Event timeline context: {len(full_context)} top-level keys → "
+            f"{len(slim)} after prune"
+        )
         
-        # Return as formatted JSON string for Gemini with datetime handling
-        return json.dumps(full_context, indent=2, cls=DateTimeEncoder)
+        return json.dumps(slim, indent=2, cls=DateTimeEncoder)
 
     def _create_prediction_prompt(self, raw_data: str, year: int, age: int) -> str:
         """

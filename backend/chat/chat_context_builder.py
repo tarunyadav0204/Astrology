@@ -256,7 +256,7 @@ class ChatContextBuilder:
         chart_data = chart_calc.calculate_chart(birth_obj)
         chart_data_original = chart_data  # Store original before enrichment
         
-        # Initialize divisional calculator first so divisions are available for Shadbala
+        # Initialize divisional calculator first (divisional charts for context + downstream calculators)
         divisional_calc = DivisionalChartCalculator(chart_data)
         chart_data['divisions'] = divisional_calc.calculate_all_divisional_charts()
         
@@ -381,7 +381,7 @@ class ChatContextBuilder:
                 # print(f"   ❌ Failed to calculate {chart_code}: {e}")
                 continue
         
-        # CRITICAL FIX: Add divisions key to chart_data for Shadbala calculator
+        # Compact divisions map on chart_data (D1 + key divisionals) for internal calculators
         # Include D1 from chart_data itself, then add other divisional charts
         divisions_data = {'D1': {p: {'sign': d.get('sign', 0), 'house': d.get('house', 1)} 
                                  for p, d in chart_data.get('planets', {}).items()}}
@@ -613,11 +613,6 @@ class ChatContextBuilder:
                 'dignity': full_analysis['dignity_analysis']['dignity'],
                 'functional_nature': full_analysis['dignity_analysis']['functional_nature'],
                 'strength_multiplier': full_analysis['dignity_analysis']['strength_multiplier']
-            },
-            'strength_analysis': {
-                'shadbala_rupas': full_analysis['strength_analysis']['shadbala_rupas'],
-                'shadbala_points': full_analysis['strength_analysis']['shadbala_points'],
-                'shadbala_grade': full_analysis['strength_analysis']['shadbala_grade']
             },
             'house_position_analysis': {
                 'house_number': full_analysis['house_position_analysis']['house_number'],
@@ -1561,7 +1556,7 @@ class ChatContextBuilder:
         return hashlib.sha256(birth_string.encode()).hexdigest()
     
     def _convert_divisional_charts_to_divisions_format(self, divisional_charts: Dict) -> Dict:
-        """Convert divisional_charts dict to divisions format expected by Shadbala calculator.
+        """Convert divisional_charts dict to a flat divisions map (D2, D3, D7, …).
         
         Input format: {'d9_navamsa': {'divisional_chart': {'planets': {...}}}, ...}
         Output format: {'D9': {'Sun': {'sign': 4, 'house': 10}, 'Moon': {...}}, ...}
