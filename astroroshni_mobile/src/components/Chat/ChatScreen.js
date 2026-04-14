@@ -842,17 +842,19 @@ export default function ChatScreen({ navigation, route }) {
               }
             }, 50);
             
-            // Check for processing messages and resume polling
-            // const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
-            // if (processingMessage) {
-            //   setLoading(true);
-            //   setIsTyping(true);
-            //   // Use personId directly to avoid timing issues
-            //   setTimeout(() => {
-            //     const userMessage = storedMessages.filter(m => m.role === 'user').pop();
-            //     pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
-            //   }, 100);
-            // }
+            // Check for processing messages and resume polling.
+            // This prevents a stuck "Analyzing..." state after app/background refresh.
+            const processingMessage = storedMessages.find(
+              msg => msg.isTyping && msg.messageId && !pendingMessages.has(msg.messageId)
+            );
+            if (processingMessage) {
+              setLoading(true);
+              setIsTyping(true);
+              setTimeout(() => {
+                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
+                pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
+              }, 100);
+            }
           } else {
             setShowGreeting(true);
           }
@@ -943,23 +945,25 @@ export default function ChatScreen({ navigation, route }) {
               }, 50);
             }
             
-            // Only resume polling if not already polling
-            // if (!loading && !isTyping) {
-            //   const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
-            //   if (processingMessage) {
-            //     setLoading(true);
-            //     setIsTyping(true);
-            //     const userMessage = storedMessages.filter(m => m.role === 'user').pop();
-            //     pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
-            //   }
-            // }
+            // Only resume polling if not already polling.
+            if (!loading && !isTyping) {
+              const processingMessage = storedMessages.find(
+                msg => msg.isTyping && msg.messageId && !pendingMessages.has(msg.messageId)
+              );
+              if (processingMessage) {
+                setLoading(true);
+                setIsTyping(true);
+                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
+                pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
+              }
+            }
           }
         });
       }
     });
     
     return unsubscribe;
-  }, [currentPersonId, loading, isTyping, showGreeting]);
+  }, [currentPersonId, loading, isTyping, showGreeting, pendingMessages, sessionId]);
 
   // First question free: standard chat only (not partnership, not mundane)
   const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)

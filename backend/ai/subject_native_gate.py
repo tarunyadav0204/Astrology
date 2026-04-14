@@ -8,6 +8,7 @@ import json
 import os
 import re
 import time
+import asyncio
 from typing import Any, Dict
 
 import google.generativeai as genai
@@ -61,13 +62,21 @@ async def classify_subject_native_gate(
     genai.configure(api_key=api_key)
     from utils.admin_settings import get_gemini_chat_model, DEFAULT_GEMINI_CHAT_MODEL
 
-    model_name = get_gemini_chat_model()
+    # Keep this gate fast and cheap; avoid heavy "pro" routing models here.
+    configured_model = get_gemini_chat_model()
+    model_name = configured_model
+    if "pro" in (configured_model or "").lower():
+        model_name = "models/gemini-2.5-flash-lite"
+
     gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
     try:
         model = genai.GenerativeModel(model_name, generation_config=gen_config)
     except Exception as e:
         print(f"⚠️ subject_native_gate model {model_name} unavailable ({e}), using default")
-        model = genai.GenerativeModel(DEFAULT_GEMINI_CHAT_MODEL, generation_config=gen_config)
+        fallback_model = DEFAULT_GEMINI_CHAT_MODEL
+        if "pro" in (fallback_model or "").lower():
+            fallback_model = "models/gemini-2.0-flash-lite-001"
+        model = genai.GenerativeModel(fallback_model, generation_config=gen_config)
 
     lang_note = (
         f"Write user_facing_explanation and clarify_question in {language} when that language is not english."
@@ -112,7 +121,14 @@ Rules:
 
     t0 = time.time()
     try:
-        resp = await model.generate_content_async(prompt)
+        # Hard timeout so gate failures never block chat response startup.
+        resp = await asyncio.wait_for(
+            model.generate_content_async(
+                prompt,
+                request_options={"timeout": 8},
+            ),
+            timeout=10.0,
+        )
         raw = (resp.text or "").strip()
         result = _parse_json_response(raw)
         elapsed = time.time() - t0

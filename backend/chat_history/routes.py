@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timedelta
 import uuid
 import json
+import asyncio
 from auth import get_current_user
 from db import get_conn, execute
 
@@ -496,8 +497,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             from ai.subject_native_gate import classify_subject_native_gate
 
             native_name_hint = (birth_details or {}).get("name") or ""
-            gate = await classify_subject_native_gate(
-                sanitize_text(question), native_name_hint, language
+            gate = await asyncio.wait_for(
+                classify_subject_native_gate(
+                    sanitize_text(question), native_name_hint, language
+                ),
+                timeout=12.0,
             )
             pi = gate.get("primary_intent") or ""
             conf = float(gate.get("confidence") or 0)
