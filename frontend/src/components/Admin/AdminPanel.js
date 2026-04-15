@@ -14,6 +14,7 @@ import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import AdminChatPerformance from './AdminChatPerformance';
 import AdminChatPerformanceCharts from './AdminChatPerformanceCharts';
+import AdminUserGrowthCharts from './AdminUserGrowthCharts';
 import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
 import AdminSupportInbox from './AdminSupportInbox';
@@ -130,7 +131,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifTotal, setNotifTotal] = useState(0);
   const [notifTotalPages, setNotifTotalPages] = useState(0);
   const [notifUserIdsWithTokens, setNotifUserIdsWithTokens] = useState([]); // userids who have accepted notifications
-  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog' | 'nudge_triggers' | 'nudge_schedule'
+  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog' | 'email_reminder' | 'nudge_triggers' | 'nudge_schedule'
+  const [selectedEmailReminderUserIds, setSelectedEmailReminderUserIds] = useState([]);
+  const [emailReminderSubject, setEmailReminderSubject] = useState('Turn on AstroRoshni notifications for timely life signals');
+  const [emailReminderBody, setEmailReminderBody] = useState(
+    'Hi,\n\nYou are currently missing timely in-app signals from AstroRoshni. Please enable notifications in your device settings so you can receive important alerts about life events, timing windows, and planetary shifts right when they matter.\n\nOpen AstroRoshni > Settings > Notifications and switch alerts ON.\n\nWarm regards,\nTeam AstroRoshni'
+  );
+  const [emailReminderSending, setEmailReminderSending] = useState(false);
+  const [emailReminderBulkLoading, setEmailReminderBulkLoading] = useState(false);
+  const [emailReminderResult, setEmailReminderResult] = useState(null);
   const [blogNotifSelectedId, setBlogNotifSelectedId] = useState('');
   const [blogNotifAudience, setBlogNotifAudience] = useState('all'); // 'all' | 'eligible'
   const [selectedBlogNotifUserIds, setSelectedBlogNotifUserIds] = useState([]); // multi-select for blog tab
@@ -1014,6 +1023,129 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
+  const handleSendEmailReminder = async () => {
+    const userIds = selectedEmailReminderUserIds.map((id) => parseInt(id, 10)).filter(Boolean);
+    if (!userIds.length) {
+      setEmailReminderResult({ ok: false, message: 'Please select at least one user without notifications.' });
+      return;
+    }
+    if (!emailReminderSubject.trim() || !emailReminderBody.trim()) {
+      setEmailReminderResult({ ok: false, message: 'Please enter subject and email body.' });
+      return;
+    }
+    setEmailReminderSending(true);
+    setEmailReminderResult(null);
+    try {
+      const response = await fetch('/api/nudge/admin/send-notification-optin-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({
+          user_ids: userIds,
+          subject: emailReminderSubject.trim().slice(0, 200),
+          body: emailReminderBody.trim().slice(0, 4000),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = data.detail || data.message || 'Failed to send reminder emails';
+        setEmailReminderResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
+        return;
+      }
+      setEmailReminderResult(data);
+    } catch (err) {
+      setEmailReminderResult({ ok: false, message: err.message || 'Request failed' });
+    } finally {
+      setEmailReminderSending(false);
+    }
+  };
+
+  const handleSelectAllEligibleEmailReminders = async () => {
+    setEmailReminderBulkLoading(true);
+    setEmailReminderResult(null);
+    try {
+      const params = new URLSearchParams();
+      const q = notifSearchName.trim();
+      if (q) params.set('name', q);
+      const qs = params.toString();
+      const response = await fetch(
+        `/api/nudge/admin/notification-optin-email-eligible-ids${qs ? `?${qs}` : ''}`,
+        { headers: getAdminAuthHeaders() }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = data.detail || data.message || 'Failed to load eligible users';
+        setEmailReminderResult({
+          ok: false,
+          message: typeof message === 'string' ? message : JSON.stringify(message),
+        });
+        return;
+      }
+      const ids = data.user_ids || [];
+      setSelectedEmailReminderUserIds(ids);
+      if (data.truncated) {
+        setEmailReminderResult({
+          ok: true,
+          message: `Selected ${ids.length} user(s); list was capped (${data.total} total match—narrow search or contact dev to raise limit).`,
+        });
+      } else {
+        setEmailReminderResult({
+          ok: true,
+          message: `Selected ${ids.length} user(s)${q ? ' matching your search' : ''}.`,
+        });
+      }
+    } catch (err) {
+      setEmailReminderResult({ ok: false, message: err.message || 'Request failed' });
+    } finally {
+      setEmailReminderBulkLoading(false);
+    }
+  };
+
+  const handleSendEmailReminderToAllEligible = async () => {
+    if (!emailReminderSubject.trim() || !emailReminderBody.trim()) {
+      setEmailReminderResult({ ok: false, message: 'Please enter subject and email body.' });
+      return;
+    }
+    const q = notifSearchName.trim();
+    const scope = q
+      ? `every user who matches your current search (“${q}”), has a non-empty email, and has no registered push token`
+      : 'every user who has a non-empty email and no registered push token';
+    if (!window.confirm(`Send this reminder email to ${scope}?`)) {
+      return;
+    }
+    setEmailReminderSending(true);
+    setEmailReminderResult(null);
+    try {
+      const payload = {
+        send_all_eligible: true,
+        subject: emailReminderSubject.trim().slice(0, 200),
+        body: emailReminderBody.trim().slice(0, 4000),
+      };
+      if (q) payload.name = q;
+      const response = await fetch('/api/nudge/admin/send-notification-optin-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = data.detail || data.message || 'Failed to send reminder emails';
+        setEmailReminderResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
+        return;
+      }
+      setEmailReminderResult(data);
+    } catch (err) {
+      setEmailReminderResult({ ok: false, message: err.message || 'Request failed' });
+    } finally {
+      setEmailReminderSending(false);
+    }
+  };
+
   const fetchCreditRequests = async () => {
     try {
       const response = await fetch('/api/credits/requests/all', {
@@ -1317,6 +1449,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             }}
           >
             User profile
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'userCharts' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('userCharts')}
+          >
+            Charts
           </button>
         </div>
       )}
@@ -1695,6 +1834,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             key={profileJumpContext ? `profile-jump-${profileJumpContext.nonce}` : 'profile-browse'}
           />
         )}
+
+        {activeTab === 'users' && activeSubTab === 'userCharts' && <AdminUserGrowthCharts />}
 
         {activeTab === 'users' && activeSubTab === 'facts' && (
           <div className="facts-management">
@@ -2393,6 +2534,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </button>
               <button
                 type="button"
+                className={`sub-tab ${notifSubTab === 'email_reminder' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('email_reminder')}
+              >
+                Email users (no notifications)
+              </button>
+              <button
+                type="button"
                 className={`sub-tab ${notifSubTab === 'nudge_triggers' ? 'active' : ''}`}
                 onClick={() => setNotifSubTab('nudge_triggers')}
               >
@@ -2728,6 +2876,160 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 {blogNotifResult && (
                   <div className={`notif-result ${blogNotifResult.ok ? 'success' : 'error'}`}>
                     <strong>{blogNotifResult.message}</strong>
+                  </div>
+                )}
+              </>
+            )}
+
+            {notifSubTab === 'email_reminder' && (
+              <>
+                <p className="notifications-description">
+                  Send reminder emails (via the same SMTP provider as OTP) to users who have not accepted
+                  app notifications on their device.
+                </p>
+                <div className="notifications-form">
+                  <div className="form-field">
+                    <label>Recipients (users without notifications)</label>
+                    <div className="notif-search-row">
+                      <input
+                        type="text"
+                        placeholder="Search by name (DB search)"
+                        value={notifSearchName}
+                        onChange={(e) => setNotifSearchName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchUsersForNotifications(1)}
+                        className="notif-search-input"
+                      />
+                      <button type="button" className="notif-search-btn" onClick={() => fetchUsersForNotifications(1)}>
+                        Search
+                      </button>
+                      <button
+                        type="button"
+                        className="notif-search-btn"
+                        disabled={emailReminderBulkLoading || emailReminderSending}
+                        onClick={handleSelectAllEligibleEmailReminders}
+                        title="Load every eligible user ID from the server (respects search box; not limited to this page)"
+                      >
+                        {emailReminderBulkLoading ? 'Loading…' : 'Select all eligible'}
+                      </button>
+                    </div>
+                    <div className="notif-user-list">
+                      <table className="notif-user-table">
+                        <thead>
+                          <tr>
+                            <th className="notif-th-checkbox">
+                              <input
+                                type="checkbox"
+                                disabled={emailReminderBulkLoading}
+                                checked={
+                                  users.filter((u) => !notifUserIdsWithTokens.includes(u.userid)).length > 0 &&
+                                  users.filter((u) => !notifUserIdsWithTokens.includes(u.userid)).every((u) =>
+                                    selectedEmailReminderUserIds.includes(u.userid)
+                                  )
+                                }
+                                onChange={(e) => {
+                                  const noTokenUsers = users.filter((u) => !notifUserIdsWithTokens.includes(u.userid));
+                                  const ids = noTokenUsers.map((u) => u.userid);
+                                  if (e.target.checked) {
+                                    setSelectedEmailReminderUserIds((prev) => [...new Set([...prev, ...ids])]);
+                                  } else {
+                                    const pageSet = new Set(ids);
+                                    setSelectedEmailReminderUserIds((prev) => prev.filter((id) => !pageSet.has(id)));
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th className="notif-th-name">Name</th>
+                            <th className="notif-th-phone">Phone</th>
+                            <th className="notif-th-name">Email</th>
+                            <th className="notif-th-notifications">Notifications</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users
+                            .filter((u) => !notifUserIdsWithTokens.includes(u.userid))
+                            .map((u) => {
+                              const id = u.userid;
+                              const checked = selectedEmailReminderUserIds.includes(id);
+                              return (
+                                <tr key={id} className="notif-user-row">
+                                  <td className="notif-td-checkbox">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedEmailReminderUserIds((prev) => [...prev, id]);
+                                        } else {
+                                          setSelectedEmailReminderUserIds((prev) => prev.filter((v) => v !== id));
+                                        }
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="notif-td-name">{u.name || 'No name'}</td>
+                                  <td className="notif-td-phone">{u.phone || '-'}</td>
+                                  <td className="notif-td-phone">{u.email || '-'}</td>
+                                  <td className="notif-td-notifications">No</td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="notif-user-summary">
+                      {selectedEmailReminderUserIds.length} selected
+                      <small className="form-hint" style={{ display: 'block', marginTop: '6px' }}>
+                        'Select all eligible' loads IDs from the server (email on file, no push token). Sends always re-check on the server.
+                      </small>
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Email subject</label>
+                    <input
+                      type="text"
+                      maxLength={200}
+                      value={emailReminderSubject}
+                      onChange={(e) => setEmailReminderSubject(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Email body</label>
+                    <textarea
+                      rows={8}
+                      maxLength={4000}
+                      value={emailReminderBody}
+                      onChange={(e) => setEmailReminderBody(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-buttons">
+                    <button
+                      type="button"
+                      onClick={handleSendEmailReminder}
+                      disabled={
+                        emailReminderSending ||
+                        emailReminderBulkLoading ||
+                        selectedEmailReminderUserIds.length === 0
+                      }
+                      className="create-btn"
+                    >
+                      {emailReminderSending ? 'Sending…' : 'Send reminder email (selected)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendEmailReminderToAllEligible}
+                      disabled={emailReminderSending || emailReminderBulkLoading}
+                      className="create-btn"
+                      style={{ marginLeft: '8px' }}
+                    >
+                      {emailReminderSending ? 'Sending…' : 'Send to all eligible'}
+                    </button>
+                  </div>
+                </div>
+                {emailReminderResult && (
+                  <div className={`notif-result ${emailReminderResult.ok ? 'success' : 'error'}`}>
+                    <strong>{emailReminderResult.message || 'Done'}</strong>
                   </div>
                 )}
               </>

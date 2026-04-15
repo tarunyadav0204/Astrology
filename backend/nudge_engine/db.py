@@ -2,12 +2,14 @@
 import json
 import logging
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db import get_conn as _get_app_conn, execute
 from .default_broadcast_nudges import DEFAULT_BROADCAST_NUDGES, DEFAULT_DAILY_SLOTS
 
 logger = logging.getLogger(__name__)
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 try:
     from encryption_utils import EncryptionManager
@@ -113,6 +115,13 @@ def _seed_default_broadcast_schedule(conn, days: int = 30) -> None:
         return
 
     today = date.today()
+    try:
+        # Keep default schedule anchored to IST dates regardless of server timezone.
+        from datetime import datetime
+        today = datetime.now(IST_TZ).date()
+    except Exception:
+        # Fall back to server-local date if timezone data is unavailable.
+        pass
     cursor = 0
     for d in range(max(1, int(days))):
         target_day = today + timedelta(days=d)
@@ -687,6 +696,31 @@ def list_broadcast_templates(conn) -> List[Tuple]:
         """,
     )
     return list(cur.fetchall() or [])
+
+
+def create_broadcast_template(
+    conn,
+    title: str,
+    body: str,
+    category: str = "general",
+    is_active: bool = True,
+    sort_order: Optional[int] = None,
+) -> Optional[int]:
+    cur = execute(conn, "SELECT COALESCE(MAX(sort_order), 0) FROM nudge_broadcast_templates")
+    row = cur.fetchone()
+    next_sort = int(row[0] or 0) + 1
+    so = int(sort_order) if sort_order is not None else next_sort
+    cur = execute(
+        conn,
+        """
+        INSERT INTO nudge_broadcast_templates(title, body, category, is_active, sort_order, updated_at)
+        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+        RETURNING id
+        """,
+        (title, body, category, bool(is_active), so),
+    )
+    created = cur.fetchone()
+    return int(created[0]) if created else None
 
 
 def list_broadcast_schedule(

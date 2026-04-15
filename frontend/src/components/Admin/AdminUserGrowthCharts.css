@@ -1,0 +1,95 @@
+.admin-user-growth {
+  padding: 0 0 24px;
+}
+
+.admin-user-growth h2 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+}
+
+.admin-user-growth-desc {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0 0 20px;
+  max-width: 720px;
+  line-height: 1.45;
+}
+
+.admin-user-growth-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-end;
+  margin-bottom: 28px;
+}
+
+.admin-user-growth-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.admin-user-growth-filters label span {
+  font-weight: 600;
+}
+
+.admin-user-growth-filters input[type='date'],
+.admin-user-growth-filters select {
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.admin-user-growth-filters button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #2c5282;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-user-growth-filters button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-user-growth-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 28px;
+}
+
+.admin-user-growth-chart-card {
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 16px 12px 8px;
+}
+
+.admin-user-growth-chart-card h3 {
+  margin: 0 0 12px 12px;
+  font-size: 1.05rem;
+}
+
+.admin-user-growth-chart-wrap {
+  width: 100%;
+  height: 320px;
+}
+
+.admin-user-growth-error {
+  color: #c0392b;
+  margin: 12px 0;
+  font-size: 0.95rem;
+}
+
+.admin-user-growth-loading {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+}

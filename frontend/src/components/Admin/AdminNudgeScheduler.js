@@ -13,12 +13,16 @@ export default function AdminNudgeScheduler() {
   const [resultOk, setResultOk] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dispatching, setDispatching] = useState(false);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   const [templateId, setTemplateId] = useState('');
   const [sendDate, setSendDate] = useState(todayIso());
   const [sendTime, setSendTime] = useState('07:00');
   const [rangeStart, setRangeStart] = useState(todayIso());
   const [rangeEnd, setRangeEnd] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newBody, setNewBody] = useState('');
+  const [newCategory, setNewCategory] = useState('general');
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => String(t.id) === String(templateId)),
@@ -82,6 +86,20 @@ export default function AdminNudgeScheduler() {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.detail || 'Failed to save schedule item');
+  };
+
+  const createTemplate = async (payload) => {
+    const res = await fetch('/api/nudge/admin/broadcast/templates', {
+      method: 'POST',
+      headers: {
+        ...getAdminAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || 'Failed to create nudge template');
+    return body;
   };
 
   const handleAddOne = async () => {
@@ -174,6 +192,38 @@ export default function AdminNudgeScheduler() {
     }
   };
 
+  const handleCreateTemplate = async () => {
+    const title = newTitle.trim();
+    const body = newBody.trim();
+    const category = (newCategory || 'general').trim();
+    if (!title || !body) {
+      showResult(false, 'Please enter title and description for new nudge.');
+      return;
+    }
+    setCreatingTemplate(true);
+    showResult(true, '');
+    try {
+      const created = await createTemplate({
+        title,
+        body,
+        category,
+        is_active: true,
+      });
+      setNewTitle('');
+      setNewBody('');
+      setNewCategory('general');
+      await load();
+      if (created?.id) {
+        setTemplateId(String(created.id));
+      }
+      showResult(true, 'New nudge template created.');
+    } catch (e) {
+      showResult(false, e.message || 'Template creation failed');
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
   if (loading) {
     return <p className="notifications-description">Loading nudge planner…</p>;
   }
@@ -191,6 +241,51 @@ export default function AdminNudgeScheduler() {
         Plan which nudge goes out on which date and time. The system is pre-seeded on first run with 50 nudges and
         a rolling schedule of 4 nudges/day at 07:00, 13:00, 17:00 and 20:00.
       </p>
+
+      <div className="notifications-form nudge-scheduler-form">
+        <div className="form-field">
+          <label>Create new nudge — Title (max 200)</label>
+          <input
+            type="text"
+            maxLength={200}
+            placeholder="Nudge title"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label>Create new nudge — Description (max 600)</label>
+          <textarea
+            rows={3}
+            maxLength={600}
+            placeholder="Nudge description/body"
+            value={newBody}
+            onChange={(e) => setNewBody(e.target.value)}
+          />
+        </div>
+        <div className="nudge-scheduler-row">
+          <div className="form-field">
+            <label>Category</label>
+            <input
+              type="text"
+              maxLength={80}
+              placeholder="e.g. wealth_prosperity"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+            />
+          </div>
+          <div className="form-buttons" style={{ alignItems: 'end' }}>
+            <button
+              type="button"
+              className="create-btn"
+              onClick={handleCreateTemplate}
+              disabled={creatingTemplate}
+            >
+              {creatingTemplate ? 'Creating…' : 'Add new nudge'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="notifications-form nudge-scheduler-form">
         <div className="form-field">

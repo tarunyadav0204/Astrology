@@ -7,6 +7,7 @@ import logging
 import os
 import hmac
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
@@ -21,8 +22,10 @@ from .config_validate import ConfigValidationError, validate_and_normalize_confi
 from .template_render import TemplateRenderError, validate_templates
 from .trigger_defaults import get_spec, list_registered_trigger_keys
 from .trigger_def_loader import load_merged_definition
+from utils.smtp_mail import send_plain_text_email
 
 logger = logging.getLogger(__name__)
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/nudge", tags=["nudge"])
 
@@ -58,6 +61,36 @@ class AdminSendBlogNotificationRequest(BaseModel):
     user_ids: Optional[List[int]] = None  # optional explicit user selection
 
 
+class AdminEmailNudgeReminderRequest(BaseModel):
+    user_ids: Optional[List[int]] = None  # explicit targeting (must be non-empty unless send_all_eligible)
+    send_all_eligible: bool = False  # send to every user with email and no device token (optional name filter)
+    name: Optional[str] = None  # optional ILIKE filter on display name or email (admin search parity)
+    subject: Optional[str] = None
+    body: Optional[str] = None
+
+
+_ELIGIBLE_OPTIN_FROM_SQL = """
+FROM users u
+LEFT JOIN (
+    SELECT DISTINCT userid FROM device_tokens
+) dt ON dt.userid = u.userid
+"""
+
+
+def _eligible_notification_optin_where(name: Optional[str]) -> tuple[str, List[Any]]:
+    """WHERE clause fragment + params: has email, no device token, optional name/email search."""
+    parts = [
+        "COALESCE(NULLIF(TRIM(u.email), ''), '') <> ''",
+        "dt.userid IS NULL",
+    ]
+    params: List[Any] = []
+    if name and str(name).strip():
+        pat = f"%{str(name).strip()}%"
+        parts.append("(u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)")
+        params.extend([pat, pat])
+    return " AND ".join(parts), params
+
+
 class MarkNudgesReadRequest(BaseModel):
     """If ids is omitted or empty, mark all nudges read for the current user."""
     ids: Optional[List[int]] = None
@@ -78,6 +111,13 @@ class BroadcastScheduleCreateRequest(BaseModel):
     template_id: int
     send_date: str  # YYYY-MM-DD
     send_time: str  # HH:MM
+    is_active: bool = True
+
+
+class BroadcastTemplateCreateRequest(BaseModel):
+    title: str
+    body: str
+    category: str = "general"
     is_active: bool = True
 
 
@@ -360,6 +400,168 @@ async def admin_send_blog_notification(
         raise HTTPException(status_code=500, detail="Failed to send blog notification") from e
 
 
+@router.get("/admin/notification-optin-email-eligible-ids")
+async def admin_notification_optin_email_eligible_ids(
+    current_user: User = Depends(get_current_user),
+    name: Optional[str] = Query(None, description="Filter by display name or email (partial, case-insensitive)"),
+    limit: int = Query(20000, ge=1, le=50000, description="Max user IDs returned"),
+):
+    """
+    List user IDs eligible for the notification opt-in email (has email, no device token).
+    Used by admin UI to select all matching users across pages.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    where_extra, params = _eligible_notification_optin_where(name)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            cur = execute(
+                conn,
+                f"SELECT COUNT(*) {_ELIGIBLE_OPTIN_FROM_SQL} WHERE {where_extra}",
+                tuple(params),
+            )
+            total = int((cur.fetchone() or (0,))[0] or 0)
+
+            cur = execute(
+                conn,
+                f"""
+                SELECT u.userid
+                {_ELIGIBLE_OPTIN_FROM_SQL}
+                WHERE {where_extra}
+                ORDER BY u.userid ASC
+                LIMIT ?
+                """,
+                tuple(params + [limit]),
+            )
+            rows = cur.fetchall() or []
+            ids = [int(r[0]) for r in rows]
+
+        truncated = total > len(ids)
+        return {
+            "ok": True,
+            "total": total,
+            "user_ids": ids,
+            "truncated": truncated,
+            "limit": limit,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_notification_optin_email_eligible_ids failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to list eligible users") from e
+
+
+@router.post("/admin/send-notification-optin-email")
+async def admin_send_notification_optin_email(
+    body: AdminEmailNudgeReminderRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Send an email reminder to users who do not have any registered device token.
+    Uses the same SMTP provider used by OTP/support emails.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    default_subject = "Turn on AstroRoshni notifications for timely life signals"
+    default_body = (
+        "Hi,\n\n"
+        "You are currently missing timely in-app signals from AstroRoshni.\n"
+        "Please enable notifications in your device settings so you can receive important alerts "
+        "about life events, timing windows, and planetary shifts right when they matter.\n\n"
+        "Open AstroRoshni > Settings > Notifications and switch alerts ON.\n\n"
+        "Warm regards,\n"
+        "Team AstroRoshni"
+    )
+    subject = (body.subject or default_subject).strip()[:200]
+    msg = (body.body or default_body).strip()[:4000]
+    if not subject or not msg:
+        raise HTTPException(status_code=400, detail="subject and body are required")
+
+    clean_ids = [
+        int(x)
+        for x in (body.user_ids or [])
+        if isinstance(x, int) or (isinstance(x, str) and str(x).isdigit())
+    ]
+    if body.send_all_eligible:
+        if clean_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="Do not pass user_ids when send_all_eligible is true",
+            )
+    elif clean_ids:
+        pass
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide non-empty user_ids or set send_all_eligible to true",
+        )
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+
+            where_extra, params = _eligible_notification_optin_where(
+                body.name if body.send_all_eligible else None
+            )
+            params = list(params)
+            where_sql = f"WHERE {where_extra}"
+            if not body.send_all_eligible:
+                placeholders = ",".join(["?"] * len(clean_ids))
+                where_sql += f" AND u.userid IN ({placeholders})"
+                params.extend(clean_ids)
+
+            cur = execute(
+                conn,
+                f"""
+                SELECT u.userid, COALESCE(TRIM(u.name), ''), TRIM(u.email)
+                {_ELIGIBLE_OPTIN_FROM_SQL}
+                {where_sql}
+                ORDER BY u.userid ASC
+                """,
+                tuple(params),
+            )
+            rows = cur.fetchall() or []
+
+        if not rows:
+            return {
+                "ok": True,
+                "targeted_users": 0,
+                "emails_sent": 0,
+                "message": "No eligible users without notifications and with email found.",
+            }
+
+        emails_sent = 0
+        failures = 0
+        for uid, name, email in rows:
+            greeting = f"Hi {name}," if name else "Hi,"
+            if msg.startswith("Hi,\n\n"):
+                personalized = f"{greeting}\n\n{msg[5:]}"
+            else:
+                personalized = msg
+            ok = send_plain_text_email(email, subject, personalized)
+            if ok:
+                emails_sent += 1
+            else:
+                failures += 1
+                logger.warning("Failed opt-in reminder email to user_id=%s email=%s", uid, email)
+
+        return {
+            "ok": True,
+            "targeted_users": len(rows),
+            "emails_sent": emails_sent,
+            "failures": failures,
+            "message": f"Sent {emails_sent} reminder email(s) out of {len(rows)} targeted users.",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_send_notification_optin_email failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to send reminder emails") from e
+
+
 def _delivery_row_to_item(row: tuple) -> Dict[str, Any]:
     (
         rid,
@@ -552,6 +754,41 @@ async def admin_list_broadcast_templates(current_user: User = Depends(get_curren
         raise HTTPException(status_code=500, detail="Failed to load templates") from e
 
 
+@router.post("/admin/broadcast/templates")
+async def admin_create_broadcast_template(
+    body: BroadcastTemplateCreateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    title = (body.title or "").strip()
+    text = (body.body or "").strip()
+    category = (body.category or "general").strip().lower()[:80] or "general"
+    if not title or not text:
+        raise HTTPException(status_code=400, detail="title and body are required")
+    if len(title) > 200:
+        raise HTTPException(status_code=400, detail="title max length is 200")
+    if len(text) > 600:
+        raise HTTPException(status_code=400, detail="body max length is 600")
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            created_id = db.create_broadcast_template(
+                conn,
+                title=title,
+                body=text,
+                category=category,
+                is_active=bool(body.is_active),
+            )
+            conn.commit()
+        return {"ok": True, "id": created_id}
+    except Exception as e:
+        logger.exception("admin_create_broadcast_template failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create nudge template") from e
+
+
 @router.get("/admin/broadcast/schedule")
 async def admin_list_broadcast_schedule(
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -664,7 +901,8 @@ async def admin_delete_broadcast_schedule(
 
 
 def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
-    now = datetime.now()
+    # Force IST for schedule evaluation even when server timezone differs.
+    now = datetime.now(IST_TZ)
     today_iso = now.date().isoformat()
     now_hhmm = now.strftime("%H:%M")
 
