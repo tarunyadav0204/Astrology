@@ -93,6 +93,32 @@ const escapeHtmlTextContent = (s) =>
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 
+/** Block-level starts we must not wrap in <p> (invalid / breaks layout). */
+const CHAT_BLOCK_START_RE = /^<(h[34]|ul\b|ol\b|div\b|p\b|blockquote|table|hr\b)/i;
+
+/**
+ * HTML ignores raw newlines; split on blank lines into paragraphs and single newlines into <br>.
+ */
+const applyChatProseParagraphs = (html) => {
+    if (!html || !html.trim()) return html;
+    const normalized = String(html).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const segments = normalized.split(/\n{2,}/);
+    const parts = [];
+    for (let seg of segments) {
+        seg = seg.trim();
+        if (!seg) {
+            parts.push('<div class="chat-prose-spacer" aria-hidden="true"></div>');
+            continue;
+        }
+        if (CHAT_BLOCK_START_RE.test(seg)) {
+            parts.push(seg.replace(/\n/g, '<br />'));
+        } else {
+            parts.push(`<p class="chat-prose-block">${seg.replace(/\n/g, '<br />')}</p>`);
+        }
+    }
+    return parts.join('');
+};
+
 /** Ensure glossary is a non-array object; API/history may omit or stringify oddly. */
 const normalizeGlossaryObject = (g) => {
     if (g == null) return {};
@@ -610,7 +636,12 @@ const MessageBubble = ({
         // 6. Process Markdown BEFORE terms
         formatted = formatted.replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>');
         formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
-        
+        // Dense answers often chain "**Point:** … **Next point:**" on one line — add vertical space between labels
+        formatted = formatted.replace(
+            /(<strong class="chat-bold">[^<]{1,120}:<\/strong>)(\s{0,3})(<strong class="chat-bold">)/g,
+            '$1<br class="chat-bold-cluster-gap" /><br class="chat-bold-cluster-gap" />$3'
+        );
+
         // console.log('🔍 After markdown, before terms:', formatted.substring(0, 300));
         
         // 7. PROCESS TERMS — glossary alone is enough (do not require message.terms; history often omits it)
@@ -666,8 +697,11 @@ const MessageBubble = ({
         formatted = formatted.replace(/\n\*\s+(.+)/g, '<li class="chat-bullet">• $1</li>');
         formatted = formatted.replace(/(<li class="chat-bullet">.*?<\/li>)/gs, '<ul class="chat-list">$1</ul>');
 
+        // 9b. Turn blank lines / single newlines into visible spacing (HTML collapses raw \n)
+        formatted = applyChatProseParagraphs(formatted.trim());
+
         // 10. Wrap into a single response container to avoid many "cards"
-        formatted = `<div class="chat-response">${formatted.trim()}</div>`;
+        formatted = `<div class="chat-response">${formatted}</div>`;
         return formatted;
     };
 

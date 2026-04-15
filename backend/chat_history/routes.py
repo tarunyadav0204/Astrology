@@ -5,7 +5,6 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timedelta
 import uuid
 import json
-import asyncio
 from auth import get_current_user
 from db import get_conn, execute
 
@@ -491,111 +490,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             "chart_insights": [],
         }
 
-    # Third-party birth vs own-chart timing (standard chat only; skip Lab & partnership)
-    if not partnership_mode and mode != "lab":
-        try:
-            from ai.subject_native_gate import classify_subject_native_gate
-
-            native_name_hint = (birth_details or {}).get("name") or ""
-            gate = await asyncio.wait_for(
-                classify_subject_native_gate(
-                    sanitize_text(question), native_name_hint, language
-                ),
-                timeout=12.0,
-            )
-            pi = gate.get("primary_intent") or ""
-            conf = float(gate.get("confidence") or 0)
-            cta = bool(gate.get("show_create_native_cta"))
-            clarify_q = (gate.get("clarify_question") or "").strip()
-
-            if cta and pi == "third_party_birth_chart_request":
-                expl = (gate.get("user_facing_explanation") or "").strip()
-                content_out = expl or (
-                    "It looks like you're asking for a reading for someone other than the profile currently selected. "
-                    "To provide an accurate analysis, we need a separate saved birth profile for them in the app. "
-                    "Use **Select native** to choose an existing chart, or **Add new birth profile** to enter their details."
-                )
-                meta_payload = {
-                    "intent_gate": "create_native",
-                    "extracted_birth_hint": gate.get("extracted_birth_hint") or {},
-                }
-                with get_conn() as conn:
-                    execute(
-                        conn,
-                        """
-                            UPDATE chat_messages
-                            SET content = %s, status = %s, message_type = %s, completed_at = %s, gate_metadata = %s
-                            WHERE message_id = %s
-                        """,
-                        (
-                            sanitize_text(content_out),
-                            "completed",
-                            "native_gate",
-                            datetime.now(),
-                            json.dumps(meta_payload),
-                            assistant_message_id,
-                        ),
-                    )
-                    conn.commit()
-                return {
-                    "user_message_id": user_message_id,
-                    "message_id": assistant_message_id,
-                    "status": "completed",
-                    "message_type": "native_gate",
-                    "content": content_out,
-                    "intent_gate": "create_native",
-                    "gate_metadata": meta_payload,
-                    "chart_insights": [],
-                }
-
-            need_clarify = bool(clarify_q) and (
-                pi == "unclear"
-                or (pi == "third_party_birth_chart_request" and not cta and conf >= 0.5)
-            )
-            if need_clarify and conf < 0.88:
-                with get_conn() as conn:
-                    execute(
-                        conn,
-                        """
-                            UPDATE chat_messages
-                            SET content = %s, status = %s, message_type = %s, completed_at = %s
-                            WHERE message_id = %s
-                        """,
-                        (
-                            sanitize_text(clarify_q),
-                            "completed",
-                            "clarification",
-                            datetime.now(),
-                            assistant_message_id,
-                        ),
-                    )
-                    execute(
-                        conn,
-                        """
-                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
-                            VALUES (%s, %s, %s)
-                            ON CONFLICT (session_id) DO UPDATE SET
-                                clarification_count = conversation_state.clarification_count + 1,
-                                extracted_context = EXCLUDED.extracted_context,
-                                last_updated = CURRENT_TIMESTAMP
-                        """,
-                        (session_id, 1, json.dumps({"subject_native_gate": True})),
-                    )
-                    conn.commit()
-                return {
-                    "user_message_id": user_message_id,
-                    "message_id": assistant_message_id,
-                    "status": "completed",
-                    "message_type": "clarification",
-                    "content": clarify_q,
-                    "chart_insights": [],
-                }
-
-        except Exception as e:
-            print(f"⚠️ subject_native_gate skipped: {e}")
-            import traceback
-            traceback.print_exc()
-    
     # Get chart insights from intent router BEFORE starting background task
     chart_insights = []
     try:

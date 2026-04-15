@@ -525,15 +525,37 @@ button.chat-header-credits.credits-display:active {
     border: 1px solid rgba(0,0,0,0.06);
     border-radius: 14px;
     padding: 14px 14px;
+    word-wrap: break-word;
+}
+
+/* Prose blocks from MessageBubble.applyChatProseParagraphs (double newlines in model output) */
+.enhanced-formatting .chat-prose-block {
+    margin: 0 0 0.95em 0;
+    line-height: 1.68;
+    color: #2c3e50;
+}
+
+.enhanced-formatting .chat-response > .chat-prose-block:last-child {
+    margin-bottom: 0;
+}
+
+.enhanced-formatting .chat-prose-spacer {
+    height: 0.55em;
+    min-height: 0.55em;
+    pointer-events: none;
 }
 
 .enhanced-formatting .chat-section-title{
-    margin: 14px 0 8px 0;
+    margin: 18px 0 10px 0;
     font-size: 16px;
     font-weight: 800;
     color: #111827;
     padding-bottom: 6px;
     border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.enhanced-formatting .chat-response > .chat-section-title:first-child {
+    margin-top: 0;
 }
 
 .enhanced-formatting .chat-subheader{
@@ -592,6 +614,11 @@ button.chat-header-credits.credits-display:active {
     .message-text.enhanced-formatting .chat-bullet {
         margin: 6px 0;
         line-height: 1.45;
+    }
+
+    .enhanced-formatting .chat-prose-block {
+        margin-bottom: 0.85em;
+        line-height: 1.66;
     }
 }
 
