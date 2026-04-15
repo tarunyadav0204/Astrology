@@ -4,10 +4,12 @@ in-app inbox for stored nudges.
 """
 import json
 import logging
+import os
+import hmac
 from datetime import date, datetime
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
@@ -23,6 +25,18 @@ from .trigger_def_loader import load_merged_definition
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/nudge", tags=["nudge"])
+
+
+def _verify_cron_secret(x_cron_secret: Optional[str]) -> None:
+    expected = (os.getenv("NUDGE_CRON_SECRET") or "").strip()
+    received = (x_cron_secret or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="NUDGE_CRON_SECRET is not configured on server.",
+        )
+    if not received or not hmac.compare_digest(received, expected):
+        raise HTTPException(status_code=401, detail="Invalid cron secret")
 
 
 class DeviceTokenRequest(BaseModel):
@@ -649,21 +663,7 @@ async def admin_delete_broadcast_schedule(
         raise HTTPException(status_code=500, detail="Failed to delete schedule item") from e
 
 
-@router.post("/admin/broadcast/dispatch-due")
-async def admin_dispatch_due_broadcast(
-    limit: int = Query(100, ge=1, le=500),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Dispatch due broadcast nudge schedule items:
-    - picks active items whose send_date/time <= now and not yet dispatched
-    - sends push to users with device tokens
-    - stores each nudge in in-app inbox (nudge_deliveries) for all users
-    - marks schedule row dispatched
-    """
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-
+def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
     now = datetime.now()
     today_iso = now.date().isoformat()
     now_hhmm = now.strftime("%H:%M")
@@ -747,5 +747,31 @@ async def admin_dispatch_due_broadcast(
             "users_targeted": len(all_user_ids),
         }
     except Exception as e:
-        logger.exception("admin_dispatch_due_broadcast failed: %s", e)
+        logger.exception("_dispatch_due_broadcast failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
+
+
+@router.post("/admin/broadcast/dispatch-due")
+async def admin_dispatch_due_broadcast(
+    limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin-triggered dispatch for due broadcast schedule items.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return _dispatch_due_broadcast(limit)
+
+
+@router.post("/cron/broadcast/dispatch-due")
+async def cron_dispatch_due_broadcast(
+    limit: int = Query(100, ge=1, le=500),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+):
+    """
+    Cron-safe endpoint secured by static secret header:
+      X-Cron-Secret: <NUDGE_CRON_SECRET>
+    """
+    _verify_cron_secret(x_cron_secret)
+    return _dispatch_due_broadcast(limit)
