@@ -1654,10 +1654,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id),
                     )
             else:
-                error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
+                # Prefer user-facing text from analyzer; never persist raw provider errors to clients.
+                error_msg = result.get('response') or result.get(
+                    'error', 'Unable to process your request at this time. Please try again.'
+                )
+                error_msg = sanitize_text(error_msg)
                 try:
                     from utils.error_logger import log_chat_error
-                    err = Exception(error_msg)
+                    err = Exception(result.get('error') or error_msg)
                     username = (birth_details or {}).get('name', 'Unknown')
                     log_chat_error(user_id, username, '', err, question, birth_details, 'backend')
                 except Exception:

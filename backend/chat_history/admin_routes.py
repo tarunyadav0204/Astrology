@@ -344,10 +344,14 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
         from utils.admin_settings import (
             _ensure_admin_settings_table,
             GEMINI_MODEL_OPTIONS,
+            OPENAI_CHAT_MODEL_OPTIONS,
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
             get_podcast_provider,
+            get_chat_llm_provider,
+            get_openai_chat_model,
+            get_openai_premium_model,
         )
         with get_conn() as conn:
             _ensure_admin_settings_table(conn)
@@ -356,9 +360,13 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
         return {
             "settings": settings,
             "gemini_model_options": [{"value": v, "label": l} for v, l in GEMINI_MODEL_OPTIONS],
+            "openai_model_options": [{"value": v, "label": l} for v, l in OPENAI_CHAT_MODEL_OPTIONS],
             "gemini_chat_model": get_gemini_chat_model(),
             "gemini_premium_model": get_gemini_premium_model(),
             "gemini_analysis_model": get_gemini_analysis_model(),
+            "chat_llm_provider": get_chat_llm_provider(),
+            "openai_chat_model": get_openai_chat_model(),
+            "openai_premium_model": get_openai_premium_model(),
             "podcast_provider": get_podcast_provider(),
         }
     except Exception as e:

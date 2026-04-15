@@ -17,6 +17,22 @@ DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite-preview"
 DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
 DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite-preview"
 
+# Chat only: which vendor handles `GeminiChatAnalyzer.generate_chat_response` (analysis stays on Gemini).
+CHAT_LLM_GEMINI = "gemini"
+CHAT_LLM_OPENAI = "openai"
+
+# OpenAI model IDs for Chat Completions API (no `models/` prefix).
+OPENAI_CHAT_MODEL_OPTIONS = [
+    ("gpt-5.4-pro", "OpenAI GPT-5.4 Pro (large context / premium)"),
+    ("gpt-4o-mini", "OpenAI GPT-4o mini (fast, low cost)"),
+    ("gpt-4o", "OpenAI GPT-4o (balanced)"),
+    ("gpt-4-turbo", "OpenAI GPT-4 Turbo"),
+    ("o4-mini", "OpenAI o4-mini (reasoning)"),
+]
+
+DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
+DEFAULT_OPENAI_PREMIUM_MODEL = "gpt-4o"
+
 
 def _ensure_admin_settings_table(conn: Any) -> None:
     """Create admin_settings table if it does not exist (works for sqlite + postgres)."""
@@ -70,6 +86,28 @@ def get_gemini_analysis_model() -> str:
     if value and value.strip():
         return value.strip()
     return DEFAULT_GEMINI_ANALYSIS_MODEL
+
+
+def get_chat_llm_provider() -> str:
+    """Which LLM vendor runs astrological chat: 'gemini' or 'openai'."""
+    value = (get_setting("chat_llm_provider") or "").strip().lower()
+    if value == CHAT_LLM_OPENAI:
+        return CHAT_LLM_OPENAI
+    return CHAT_LLM_GEMINI
+
+
+def get_openai_chat_model() -> str:
+    value = get_setting("openai_chat_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_OPENAI_CHAT_MODEL
+
+
+def get_openai_premium_model() -> str:
+    value = get_setting("openai_premium_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_OPENAI_PREMIUM_MODEL
 
 
 def is_debug_logging_enabled() -> bool:

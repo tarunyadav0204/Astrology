@@ -724,7 +724,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
                     )
             else:
-                error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
+                error_msg = result.get('response') or result.get(
+                    'error', 'Unable to process your request at this time. Please try again.'
+                )
                 cursor.execute(
                     "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
                     ("failed", error_msg, datetime.now(), message_id)

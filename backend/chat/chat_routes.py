@@ -562,13 +562,18 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     ai_error = ai_result.get('error', 'AI analysis failed')
                     print(f"❌ AI ERROR: {ai_error}")
                     
-                    # Show generic user-friendly message
-                    user_error = "I'm having trouble processing your question right now. Please try again in a moment."
-                    
-                    if "timeout" in str(ai_error).lower():
-                        user_error = "Your question is taking longer than expected to process. Please try again."
-                    elif "rate limit" in str(ai_error).lower():
-                        user_error = "I'm processing many requests right now. Please wait a moment and try again."
+                    # Prefer analyzer's user-facing message; never stream raw provider errors to clients.
+                    user_error = ai_result.get('response') or (
+                        "I'm having trouble processing your question right now. Please try again in a moment."
+                    )
+                    if not ai_result.get('response'):
+                        if "timeout" in str(ai_error).lower():
+                            user_error = "Your question is taking longer than expected to process. Please try again."
+                        elif "rate limit" in str(ai_error).lower() or "429" in str(ai_error) or "insufficient_quota" in str(ai_error).lower():
+                            user_error = (
+                                "Our AI assistant is temporarily unavailable due to high demand or usage limits. "
+                                "Please try again in a few minutes."
+                            )
                     
                     # Don't deduct credits if AI fails
                     print(f"⚠️ NOT DEDUCTING CREDITS due to AI failure")

@@ -103,6 +103,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiChatModel, setGeminiChatModel] = useState('');
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
+  const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
+  const [openaiModelOptions, setOpenaiModelOptions] = useState([]);
+  const [openaiChatModel, setOpenaiChatModel] = useState('');
+  const [openaiPremiumModel, setOpenaiPremiumModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
   const [podcastProvider, setPodcastProvider] = useState('tts');
   const [podcastProviderSaving, setPodcastProviderSaving] = useState(false);
@@ -221,6 +225,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
+      setChatLlmProvider(data.chat_llm_provider || 'gemini');
+      setOpenaiModelOptions(data.openai_model_options || []);
+      setOpenaiChatModel(data.openai_chat_model || '');
+      setOpenaiPremiumModel(data.openai_premium_model || '');
       setPodcastProvider(data.podcast_provider || 'tts');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
@@ -251,7 +259,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setGeminiModelsSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [chatRes, premiumRes, analysisRes] = await Promise.all([
+      const [
+        chatRes,
+        premiumRes,
+        analysisRes,
+        providerRes,
+        openaiChatRes,
+        openaiPremiumRes,
+      ] = await Promise.all([
         fetch('/api/admin/settings/gemini_chat_model', {
           method: 'PUT',
           headers,
@@ -279,16 +294,62 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
           }),
         }),
+        fetch('/api/admin/settings/chat_llm_provider', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_llm_provider',
+            value: chatLlmProvider,
+            description: 'Chat LLM vendor: gemini or openai',
+          }),
+        }),
+        fetch('/api/admin/settings/openai_chat_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'openai_chat_model',
+            value: openaiChatModel,
+            description: 'OpenAI model id for standard chat',
+          }),
+        }),
+        fetch('/api/admin/settings/openai_premium_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'openai_premium_model',
+            value: openaiPremiumModel,
+            description: 'OpenAI model id for premium chat',
+          }),
+        }),
       ]);
-      if (!chatRes.ok || !premiumRes.ok || !analysisRes.ok) {
+      if (
+        !chatRes.ok ||
+        !premiumRes.ok ||
+        !analysisRes.ok ||
+        !providerRes.ok ||
+        !openaiChatRes.ok ||
+        !openaiPremiumRes.ok
+      ) {
         const chatErr = await chatRes.json().catch(() => ({}));
         const premiumErr = await premiumRes.json().catch(() => ({}));
         const analysisErr = await analysisRes.json().catch(() => ({}));
-        console.error('Save failed:', chatErr, premiumErr, analysisErr);
-        alert('Failed to save: ' + (chatErr.detail || premiumErr.detail || analysisErr.detail || 'check console'));
+        const providerErr = await providerRes.json().catch(() => ({}));
+        const oaChatErr = await openaiChatRes.json().catch(() => ({}));
+        const oaPremErr = await openaiPremiumRes.json().catch(() => ({}));
+        console.error('Save failed:', chatErr, premiumErr, analysisErr, providerErr, oaChatErr, oaPremErr);
+        alert(
+          'Failed to save: ' +
+            (chatErr.detail ||
+              premiumErr.detail ||
+              analysisErr.detail ||
+              providerErr.detail ||
+              oaChatErr.detail ||
+              oaPremErr.detail ||
+              'check console')
+        );
         return;
       }
-      alert('Gemini models saved. New requests will use the selected models immediately.');
+      alert('Chat and analysis model settings saved. New requests will use them immediately.');
     } catch (error) {
       console.error('Error saving Gemini models:', error);
       alert('Failed to save Gemini models.');
@@ -2675,14 +2736,69 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <h2>System Settings</h2>
 
             <div className="settings-section">
+              <h3>Chat LLM provider</h3>
+              <p className="settings-hint">
+                Conversations use either Google Gemini or OpenAI. Intent routing, subject gate, and all non-chat analysis features still use Gemini. For OpenAI, set <code>OPENAI_API_KEY</code> in the backend environment.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Provider for astrological chat</strong>
+                  <p>Switch to OpenAI when Gemini is slow or unavailable; keep Gemini as default otherwise.</p>
+                </div>
+                <select
+                  value={chatLlmProvider}
+                  onChange={(e) => setChatLlmProvider(e.target.value)}
+                  style={{ minWidth: '240px' }}
+                >
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+              {chatLlmProvider === 'openai' && (
+                <>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>OpenAI — standard chat model</strong>
+                      <p>Used for normal chat questions.</p>
+                    </div>
+                    <select
+                      value={openaiChatModel}
+                      onChange={(e) => setOpenaiChatModel(e.target.value)}
+                      style={{ minWidth: '280px' }}
+                    >
+                      {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o-mini', label: 'GPT-4o mini' }]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>OpenAI — premium chat model</strong>
+                      <p>Used when the user enables premium / deeper chat.</p>
+                    </div>
+                    <select
+                      value={openaiPremiumModel}
+                      onChange={(e) => setOpenaiPremiumModel(e.target.value)}
+                      style={{ minWidth: '280px' }}
+                    >
+                      {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o', label: 'GPT-4o' }]).map((opt) => (
+                        <option key={`p-${opt.value}`} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="settings-section">
               <h3>Gemini Models</h3>
               <p className="settings-hint">
-                Choose which Gemini models to use. Chat (standard/premium) for conversations; Analysis for health, wealth, career, karma, physical, events, etc. Changes apply to new requests immediately.
+                Gemini models for chat (when provider is Gemini above) and for all analysis features (health, wealth, career, karma, physical, events, etc.). Changes apply to new requests immediately.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Chat model (standard)</strong>
-                  <p>Model for standard astrological chat.</p>
+                  <p>Model for standard astrological chat when the chat provider is Gemini.</p>
                 </div>
                 <select
                   value={geminiChatModel}
@@ -2726,7 +2842,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button type="button" className="create-btn" onClick={handleSaveGeminiModels} disabled={geminiModelsSaving}>
-                  {geminiModelsSaving ? 'Saving…' : 'Save Gemini Models'}
+                  {geminiModelsSaving ? 'Saving…' : 'Save chat & analysis models'}
                 </button>
               </div>
             </div>

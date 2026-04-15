@@ -176,7 +176,85 @@ class GeminiChatAnalyzer:
         except Exception as e:
             print(f"⚠️ Model {name} not available ({e}), using fallback")
             return self.premium_model if premium_analysis and self.premium_model else self.model
-    
+
+    @staticmethod
+    def _openai_model_uses_responses_api(model_id: str) -> bool:
+        """GPT-5+ flagship models use /v1/responses, not /v1/chat/completions."""
+        m = (model_id or "").strip().lower()
+        return m.startswith("gpt-5")
+
+    async def _openai_chat_completion(
+        self, prompt: str, model_id: str, premium_analysis: bool = False
+    ) -> str:
+        """OpenAI chat: Chat Completions (GPT-4 family) or Responses API (GPT-5 family)."""
+        try:
+            from openai import AsyncOpenAI
+        except ImportError as e:
+            raise RuntimeError(
+                "The 'openai' package is not installed. Add it to backend requirements and run: "
+                "pip install 'openai>=1.40.0'"
+            ) from e
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+
+        model_clean = (model_id or "").strip()
+        mid = model_clean.lower()
+        client = AsyncOpenAI(api_key=api_key, timeout=600.0)
+
+        if self._openai_model_uses_responses_api(model_clean):
+            # https://platform.openai.com/docs/guides/migrate-to-responses — GPT-5 series
+            # Prefer low effort for speed; gpt-5.4-pro only accepts medium | high | xhigh (not low).
+            if "-pro" in mid:
+                reasoning_effort = "medium"
+            else:
+                reasoning_effort = "low"
+            reasoning = {"effort": reasoning_effort}
+            print(
+                f"🧠 OpenAI Responses API: model={model_clean} "
+                f"reasoning.effort={reasoning_effort}"
+            )
+
+            resp = await client.responses.create(
+                model=model_clean,
+                input=prompt,
+                max_output_tokens=65536,
+                reasoning=reasoning,
+            )
+            if getattr(resp, "error", None) is not None:
+                err = resp.error
+                msg = getattr(err, "message", None) or str(err)
+                raise RuntimeError(msg)
+            content = (resp.output_text or "").strip()
+            if not content and getattr(resp, "output", None):
+                # Fallback: aggregate text from output items if property missed edge cases
+                parts = []
+                for item in resp.output:
+                    if getattr(item, "type", None) == "message":
+                        for block in getattr(item, "content", []) or []:
+                            if getattr(block, "type", None) == "output_text":
+                                parts.append(getattr(block, "text", "") or "")
+                content = "".join(parts).strip()
+            if not content:
+                raise RuntimeError("Blank OpenAI Responses API output")
+            return content
+
+        # Legacy Chat Completions (gpt-4o, gpt-4-turbo, etc.)
+        temperature = 1.0 if mid.startswith("o") else 0.0
+        resp = await client.chat.completions.create(
+            model=model_clean,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=16384,
+        )
+        if not resp.choices:
+            raise RuntimeError("Empty OpenAI choices")
+        content = (resp.choices[0].message.content or "").strip()
+        if not content:
+            raise RuntimeError("Blank OpenAI response content")
+        return content
+
     async def generate_chat_response(
         self,
         user_question: str,
@@ -197,10 +275,17 @@ class GeminiChatAnalyzer:
         Other models or failures fall back to the standard SDK call.
         """
         import time
-        from utils.admin_settings import is_debug_logging_enabled
-        
+        from utils.admin_settings import (
+            is_debug_logging_enabled,
+            get_chat_llm_provider,
+            CHAT_LLM_OPENAI,
+            get_openai_chat_model,
+            get_openai_premium_model,
+        )
+
         debug_logging = is_debug_logging_enabled()
-        
+        llm_provider = get_chat_llm_provider()
+
         total_request_start = time.time()
         if debug_logging:
             print(f"\n🚀 GEMINI CHAT REQUEST STARTED")
@@ -280,109 +365,128 @@ class GeminiChatAnalyzer:
         
         gemini_start_time = time.time()
         try:
-            # Resolve model from admin settings (no server restart needed)
-            selected_model = self._get_model(premium_analysis)
             model_type = "Premium" if premium_analysis else "Standard"
-            model_name = selected_model._model_name if hasattr(selected_model, "_model_name") else "Unknown"
-            
-            # Always log which Gemini model is being used for this request
-            print(f"🧠 Gemini chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
-            
-            if debug_logging:
-                print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-                print(f"Analysis Type: {model_type}")
-                print(f"Model: {model_name}")
-                print(f"Prompt length: {len(prompt)} characters")
-                
-                # Log full prompt
-                print(f"\n{'='*80}")
-                print(f"📤 FULL GEMINI REQUEST PROMPT")
-                print(f"{'='*80}")
-                print(prompt)
-                print(f"\n{'='*80}")
-                print(f"📝 END OF REQUEST PROMPT")
-                print(f"{'='*80}\n")
-            
-
-                # Log request size before sending to Gemini
-                prompt_size = len(prompt)
-                prompt_char_count = len(prompt)
-                print(f"\n📏 GEMINI REQUEST SIZE: {prompt_char_count:,} characters ({prompt_size / 1024:.1f} KB)")
-                
-            api_key = os.getenv("GEMINI_API_KEY") or ""
-            # High-thinking REST path is disabled globally; always use SDK generation path.
-            try_high_thinking = False
             response = None
-            if try_high_thinking:
-                try:
-                    print(
-                        f"🧩 Gemini chat: using REST thinkingLevel=high (model={model_name})"
-                    )
-                    raw = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            _generate_content_rest_v1beta,
-                            model_name,
+            response_text = None
+            model_name = ""
+
+            if llm_provider == CHAT_LLM_OPENAI:
+                model_name = get_openai_premium_model() if premium_analysis else get_openai_chat_model()
+                print(f"🧠 OpenAI chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
+
+                if debug_logging:
+                    print(f"\n=== CALLING OPENAI API (ASYNC) ===")
+                    print(f"Analysis Type: {model_type}")
+                    print(f"Model: {model_name}")
+                    print(f"Prompt length: {len(prompt)} characters")
+                    print(f"\n{'='*80}")
+                    print(f"📤 FULL CHAT REQUEST PROMPT")
+                    print(f"{'='*80}")
+                    print(prompt)
+                    print(f"\n{'='*80}")
+                    print(f"📝 END OF REQUEST PROMPT")
+                    print(f"{'='*80}\n")
+                    prompt_size = len(prompt)
+                    print(f"\n📏 OPENAI REQUEST SIZE: {prompt_size:,} characters ({prompt_size / 1024:.1f} KB)")
+
+                response_text = await asyncio.wait_for(
+                    self._openai_chat_completion(prompt, model_name, premium_analysis),
+                    timeout=600.0,
+                )
+            else:
+                # Resolve Gemini model from admin settings (no server restart needed)
+                selected_model = self._get_model(premium_analysis)
+                model_name = selected_model._model_name if hasattr(selected_model, "_model_name") else "Unknown"
+                print(f"🧠 Gemini chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
+
+                if debug_logging:
+                    print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+                    print(f"Analysis Type: {model_type}")
+                    print(f"Model: {model_name}")
+                    print(f"Prompt length: {len(prompt)} characters")
+                    print(f"\n{'='*80}")
+                    print(f"📤 FULL GEMINI REQUEST PROMPT")
+                    print(f"{'='*80}")
+                    print(prompt)
+                    print(f"\n{'='*80}")
+                    print(f"📝 END OF REQUEST PROMPT")
+                    print(f"{'='*80}\n")
+                    prompt_size = len(prompt)
+                    prompt_char_count = len(prompt)
+                    print(f"\n📏 GEMINI REQUEST SIZE: {prompt_char_count:,} characters ({prompt_size / 1024:.1f} KB)")
+
+                api_key = os.getenv("GEMINI_API_KEY") or ""
+                try_high_thinking = False
+                if try_high_thinking:
+                    try:
+                        print(
+                            f"🧩 Gemini chat: using REST thinkingLevel=high (model={model_name})"
+                        )
+                        raw = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                _generate_content_rest_v1beta,
+                                model_name,
+                                prompt,
+                                api_key,
+                                "high",
+                            ),
+                            timeout=600.0,
+                        )
+                        response = _SimpleTextResponse(raw)
+                    except Exception as rest_err:
+                        print(
+                            f"⚠️ REST thinkingLevel path failed ({type(rest_err).__name__}: {rest_err}); "
+                            f"falling back to google-generativeai SDK"
+                        )
+                if response is None:
+                    response = await asyncio.wait_for(
+                        selected_model.generate_content_async(
                             prompt,
-                            api_key,
-                            "high",
+                            request_options={"timeout": 600},
                         ),
                         timeout=600.0,
                     )
-                    response = _SimpleTextResponse(raw)
-                except Exception as rest_err:
-                    print(
-                        f"⚠️ REST thinkingLevel path failed ({type(rest_err).__name__}: {rest_err}); "
-                        f"falling back to google-generativeai SDK"
-                    )
-            if response is None:
-                # Standard path (clarifications never reach here when caller passes use_thinking_level_high correctly)
-                response = await asyncio.wait_for(
-                    selected_model.generate_content_async(
-                        prompt,
-                        request_options={"timeout": 600},
-                    ),
-                    timeout=600.0,
-                )
-            
+
+                if response and hasattr(response, "text") and response.text:
+                    response_text = response.text.strip()
+
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start
-            
+
             if debug_logging:
+                tag = "OPENAI" if llm_provider == CHAT_LLM_OPENAI else "GEMINI"
                 print(f"\n{'='*80}")
-                print(f"📥 GEMINI RESPONSE #{call_type}")
+                print(f"📥 {tag} RESPONSE #{call_type}")
                 print(f"{'='*80}")
-                if response and hasattr(response, 'text'):
-                    response_text_preview = response.text
-                    print(f"\n📝 COMPLETE GEMINI RESPONSE (ALL {len(response_text_preview)} CHARACTERS):")
-                    print(response_text_preview)
+                preview = (response_text or "") if response_text is not None else (
+                    (response.text or "") if response and hasattr(response, "text") else ""
+                )
+                if preview:
+                    print(f"\n📝 COMPLETE {tag} RESPONSE (ALL {len(preview)} CHARACTERS):")
+                    print(preview)
                     print(f"\n{'='*80}")
-                    print(f"📄 END OF GEMINI RESPONSE")
+                    print(f"📄 END OF {tag} RESPONSE")
                     print(f"{'='*80}")
-                    
-                    # Log divisional chart mentions
                     divisional_mentions = []
                     for d_chart in ['D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60']:
-                        if d_chart in response.text:
+                        if d_chart in preview:
                             divisional_mentions.append(d_chart)
-                    
                     if divisional_mentions:
                         print(f"\n📊 DIVISIONAL CHARTS MENTIONED: {', '.join(divisional_mentions)}")
                     else:
                         print(f"\n📊 NO DIVISIONAL CHARTS MENTIONED in response")
                 else:
-                    print(f"No response or empty response")
+                    print("No response or empty response")
                 print(f"{'='*80}\n")
-                
-                print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
-            
-            if not response or not hasattr(response, 'text') or not response.text:
+                print(f"⏱️ {tag} API call time: {gemini_total_time:.2f}s")
+
+            if not response_text:
                 return {
                     'success': False,
                     'response': "I apologize, but I couldn't generate a response. Please try asking your question again.",
                     'error': 'Empty response from AI'
                 }
-            
-            response_text = response.text.strip()
+
             if len(response_text) == 0:
                 return {
                     'success': False,
@@ -522,12 +626,13 @@ class GeminiChatAnalyzer:
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,
-                    'gemini_processing_time': gemini_total_time
+                    'gemini_processing_time': gemini_total_time,
+                    'chat_llm_provider': llm_provider,
                 }
             }
         except asyncio.TimeoutError:
             total_request_time = time.time() - total_request_start
-            print(f"⏰ Gemini API timeout after {total_request_time:.2f}s")
+            print(f"⏰ Chat LLM API timeout after {total_request_time:.2f}s")
             return {
                 'success': False,
                 'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
@@ -535,7 +640,8 @@ class GeminiChatAnalyzer:
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,
-                    'gemini_processing_time': 600.0
+                    'gemini_processing_time': 600.0,
+                    'chat_llm_provider': llm_provider,
                 }
             }
         except Exception as e:
@@ -558,12 +664,28 @@ class GeminiChatAnalyzer:
             except Exception as log_error:
                 print(f"⚠️ Failed to log error to database: {log_error}")
             
-            # More specific error handling
+            # More specific error handling (never expose raw provider payloads to end users)
+            err_l = str(e).lower()
             error_message = "I'm having trouble processing your question right now. Please try rephrasing it or try again later."
-            
-            if "quota" in str(e).lower() or "rate limit" in str(e).lower():
+
+            if (
+                "429" in str(e)
+                or "insufficient_quota" in err_l
+                or "rate_limit" in err_l
+                or "too many requests" in err_l
+                or err_l.strip().startswith("429")
+            ):
+                error_message = (
+                    "Our AI assistant is temporarily unavailable due to high demand or usage limits. "
+                    "Please try again in a few minutes."
+                )
+            elif "quota" in err_l and "billing" in err_l:
+                error_message = (
+                    "The AI service limit was reached. Please try again later."
+                )
+            elif "quota" in err_l or "rate limit" in err_l:
                 error_message = "I'm receiving too many requests right now. Please wait a moment and try again."
-            elif "api key" in str(e).lower() or "authentication" in str(e).lower():
+            elif "api key" in err_l or "authentication" in err_l:
                 error_message = "There's a temporary service configuration issue. Please try again shortly."
             elif "content" in str(e).lower() or "safety" in str(e).lower():
                 error_message = "I couldn't process this question due to content guidelines. Please try rephrasing your question."
@@ -573,6 +695,14 @@ class GeminiChatAnalyzer:
                 error_message = "The AI service is temporarily unavailable. Please try again in a few minutes."
             elif "cancelled" in str(e).lower() or "499" in str(e):
                 error_message = "The request was interrupted. Please try asking your question again."
+            elif llm_provider == CHAT_LLM_OPENAI and (
+                "openai" in type(e).__module__.lower()
+                or "openai" in err_l
+            ):
+                error_message = (
+                    "The AI assistant could not complete this answer. Please try again in a moment, "
+                    "or rephrase your question."
+                )
             
             return {
                 'success': False,
@@ -582,7 +712,8 @@ class GeminiChatAnalyzer:
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time if 'prompt_time' in locals() else 0,
-                    'gemini_processing_time': gemini_total_time if 'gemini_total_time' in locals() else 0
+                    'gemini_processing_time': gemini_total_time if 'gemini_total_time' in locals() else 0,
+                    'chat_llm_provider': llm_provider,
                 }
             }
     
