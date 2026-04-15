@@ -1,10 +1,11 @@
 """Database helpers for nudge engine: tables and user resolution."""
 import json
 import logging
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db import get_conn as _get_app_conn, execute
+from .default_broadcast_nudges import DEFAULT_BROADCAST_NUDGES, DEFAULT_DAILY_SLOTS
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,90 @@ def _seed_nudge_trigger_definitions(conn) -> None:
             )
         except Exception as e:
             logger.warning("Seed nudge_trigger_definitions %s: %s", spec.trigger_key, e)
+
+
+def _seed_broadcast_templates(conn) -> None:
+    """Seed static nudges used by admin broadcast scheduler (once)."""
+    try:
+        cur = execute(conn, "SELECT COUNT(*) FROM nudge_broadcast_templates")
+        row = cur.fetchone()
+        if row and int(row[0]) > 0:
+            return
+    except Exception:
+        return
+
+    for idx, item in enumerate(DEFAULT_BROADCAST_NUDGES, start=1):
+        try:
+            execute(
+                conn,
+                """
+                INSERT INTO nudge_broadcast_templates(title, body, category, is_active, sort_order)
+                VALUES (%s, %s, %s, TRUE, %s)
+                """,
+                (
+                    str(item.get("title") or "").strip()[:200],
+                    str(item.get("body") or "").strip()[:600],
+                    str(item.get("category") or "general").strip()[:80],
+                    idx,
+                ),
+            )
+        except Exception as e:
+            logger.warning("Seed nudge_broadcast_templates %s failed: %s", item.get("title"), e)
+
+
+def _seed_default_broadcast_schedule(conn, days: int = 30) -> None:
+    """
+    On a fresh system start, pre-create a 30-day schedule with 4 nudges/day
+    at 07:00, 13:00, 17:00, 20:00 in rotating order.
+    """
+    try:
+        cur = execute(conn, "SELECT COUNT(*) FROM nudge_broadcast_schedule")
+        row = cur.fetchone()
+        if row and int(row[0]) > 0:
+            return
+    except Exception:
+        return
+
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT id
+            FROM nudge_broadcast_templates
+            WHERE is_active = TRUE
+            ORDER BY sort_order ASC, id ASC
+            """,
+        )
+        template_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+    except Exception:
+        template_ids = []
+
+    if not template_ids:
+        return
+
+    today = date.today()
+    cursor = 0
+    for d in range(max(1, int(days))):
+        target_day = today + timedelta(days=d)
+        for slot in DEFAULT_DAILY_SLOTS:
+            template_id = template_ids[cursor % len(template_ids)]
+            cursor += 1
+            try:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO nudge_broadcast_schedule(template_id, send_date, send_time, is_active)
+                    VALUES (%s, %s, %s, TRUE)
+                    """,
+                    (template_id, target_day.isoformat(), slot),
+                )
+            except Exception as e:
+                logger.warning(
+                    "Seed nudge_broadcast_schedule %s %s failed: %s",
+                    target_day,
+                    slot,
+                    e,
+                )
 
 
 def init_nudge_tables(conn) -> None:
@@ -142,7 +227,54 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_broadcast_templates (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'general',
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_broadcast_schedule (
+                id SERIAL PRIMARY KEY,
+                template_id INTEGER NOT NULL REFERENCES nudge_broadcast_templates(id) ON DELETE CASCADE,
+                send_date DATE NOT NULL,
+                send_time TIME NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                dispatched_at TIMESTAMPTZ,
+                dispatched_count INTEGER NOT NULL DEFAULT 0,
+                created_by INTEGER,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        execute(
+            conn,
+            "ALTER TABLE nudge_broadcast_schedule ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMPTZ",
+        )
+        execute(
+            conn,
+            "ALTER TABLE nudge_broadcast_schedule ADD COLUMN IF NOT EXISTS dispatched_count INTEGER NOT NULL DEFAULT 0",
+        )
+        execute(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_broadcast_schedule_date_time "
+            "ON nudge_broadcast_schedule(send_date, send_time)",
+        )
         _seed_nudge_trigger_definitions(conn)
+        _seed_broadcast_templates(conn)
+        _seed_default_broadcast_schedule(conn)
     except Exception as e:
         # With autocommit enabled, the exception raised here should be the
         # real failing statement error (not a follow-on InFailedSqlTransaction).
@@ -543,3 +675,110 @@ def upsert_trigger_definition(
             updated_by,
         ),
     )
+
+
+def list_broadcast_templates(conn) -> List[Tuple]:
+    cur = execute(
+        conn,
+        """
+        SELECT id, title, body, category, is_active, sort_order, created_at, updated_at
+        FROM nudge_broadcast_templates
+        ORDER BY sort_order ASC, id ASC
+        """,
+    )
+    return list(cur.fetchall() or [])
+
+
+def list_broadcast_schedule(
+    conn, start_date: Optional[str] = None, end_date: Optional[str] = None
+) -> List[Tuple]:
+    q = [
+        """
+        SELECT s.id, s.template_id, t.title, t.body, t.category,
+               s.send_date::text, s.send_time::text, s.is_active, s.created_by, s.created_at,
+               s.dispatched_at, s.dispatched_count
+        FROM nudge_broadcast_schedule s
+        JOIN nudge_broadcast_templates t ON t.id = s.template_id
+        WHERE 1=1
+        """
+    ]
+    params: List[Any] = []
+    if start_date:
+        q.append(" AND s.send_date >= %s")
+        params.append(start_date)
+    if end_date:
+        q.append(" AND s.send_date <= %s")
+        params.append(end_date)
+    q.append(" ORDER BY s.send_date ASC, s.send_time ASC, s.id ASC")
+    cur = execute(conn, "".join(q), tuple(params))
+    return list(cur.fetchall() or [])
+
+
+def acquire_due_broadcast_schedule(
+    conn, today_iso: str, now_hhmm: str, limit: int = 100
+) -> List[Tuple]:
+    """
+    Return due schedule rows and lock them for this transaction.
+    Rows remain due until caller marks them dispatched.
+    """
+    lim = max(1, min(500, int(limit)))
+    cur = execute(
+        conn,
+        """
+        SELECT s.id, s.template_id, t.title, t.body, t.category,
+               s.send_date::text, s.send_time::text
+        FROM nudge_broadcast_schedule s
+        JOIN nudge_broadcast_templates t ON t.id = s.template_id
+        WHERE s.is_active = TRUE
+          AND s.dispatched_at IS NULL
+          AND (s.send_date < %s OR (s.send_date = %s AND s.send_time <= %s))
+        ORDER BY s.send_date ASC, s.send_time ASC, s.id ASC
+        FOR UPDATE OF s SKIP LOCKED
+        LIMIT %s
+        """,
+        (today_iso, today_iso, now_hhmm, lim),
+    )
+    return list(cur.fetchall() or [])
+
+
+def mark_broadcast_schedule_dispatched(
+    conn, schedule_id: int, dispatched_count: int
+) -> int:
+    cur = execute(
+        conn,
+        """
+        UPDATE nudge_broadcast_schedule
+        SET dispatched_at = CURRENT_TIMESTAMP,
+            dispatched_count = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+        """,
+        (max(0, int(dispatched_count)), int(schedule_id)),
+    )
+    return int(cur.rowcount or 0)
+
+
+def create_broadcast_schedule_item(
+    conn,
+    template_id: int,
+    send_date: str,
+    send_time: str,
+    created_by: Optional[int] = None,
+    is_active: bool = True,
+) -> Optional[int]:
+    cur = execute(
+        conn,
+        """
+        INSERT INTO nudge_broadcast_schedule(template_id, send_date, send_time, is_active, created_by)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (template_id, send_date, send_time, bool(is_active), created_by),
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row else None
+
+
+def delete_broadcast_schedule_item(conn, schedule_id: int) -> int:
+    cur = execute(conn, "DELETE FROM nudge_broadcast_schedule WHERE id = %s", (schedule_id,))
+    return int(cur.rowcount or 0)

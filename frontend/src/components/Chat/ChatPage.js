@@ -71,6 +71,47 @@ function normalizeLegacyChatHistoryItems(items) {
     return out;
 }
 
+function normalizeChatV2SessionMessages(items) {
+    if (!Array.isArray(items)) return [];
+    let seq = 0;
+    const nid = () => `v2-${Date.now()}-${seq++}`;
+
+    return items
+        .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const sender = String(item.sender || '').toLowerCase();
+            const role = sender === 'user' ? 'user' : sender === 'assistant' ? 'assistant' : null;
+            if (!role) return null;
+
+            const content = item.content != null ? String(item.content) : '';
+            // Keep user messages even if blank-ish; skip empty assistant placeholders.
+            if (role === 'assistant' && !content.trim()) return null;
+
+            return {
+                role,
+                content,
+                timestamp: item.timestamp || new Date().toISOString(),
+                messageId: item.message_id ?? item.messageId ?? nid(),
+                message_type: item.message_type || 'answer',
+                terms: Array.isArray(item.terms) ? item.terms : [],
+                glossary: item.glossary && typeof item.glossary === 'object' ? item.glossary : {},
+                images: Array.isArray(item.images) ? item.images : [],
+                gate_metadata: item.gate_metadata || null,
+                intent_gate: item.intent_gate || item.gate_metadata?.intent_gate || undefined,
+                isFromDatabase: true,
+            };
+        })
+        .filter(Boolean);
+}
+
+function getSingleChartSessionStorageKey(birth) {
+    const norm = normalizeBirthDetailsForChat(birth);
+    if (!norm) return null;
+    if (birth?.id != null) return `chatV2Session_single_${birth.id}`;
+    const hash = `${norm.date || ''}_${norm.time || ''}_${norm.latitude ?? ''}_${norm.longitude ?? ''}`;
+    return `chatV2Session_single_${hash}`;
+}
+
 function singleChartProfileDisplay(b) {
     if (!b) return { name: 'Your chart', initials: '?', metaLine: '' };
     const name = (b.name && String(b.name).trim()) || 'Your chart';
@@ -428,6 +469,7 @@ const ChatPage = () => {
 
     // --- chat-v2 async flow (mobile parity) ---
     const [chatV2SessionId, setChatV2SessionId] = useState(null);
+    const singleChartSessionStorageKey = useMemo(() => getSingleChartSessionStorageKey(birthData), [birthData]);
     const [personalChartData, setPersonalChartData] = useState(null);
     const [chatDashaData, setChatDashaData] = useState(null);
     const [chartEssenceLoading, setChartEssenceLoading] = useState(false);
@@ -514,6 +556,9 @@ const ChatPage = () => {
             }
 
             const data = await response.json();
+            if (singleChartSessionStorageKey && data?.session_id) {
+                localStorage.setItem(singleChartSessionStorageKey, data.session_id);
+            }
             return data.session_id;
         } catch (e) {
             console.error('[ChatPage] Error creating chat-v2 session:', e);
@@ -680,27 +725,56 @@ const ChatPage = () => {
 
     const loadChatHistory = async () => {
         try {
-            // console.log('Loading chat history for:', birthData);
             const token = localStorage.getItem('token');
-            const response = await fetch('/api/chat/history', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    ...(token && { 'Authorization': `Bearer ${token}` })
-                },
-                body: JSON.stringify(birthData)
-            });
-            
-            if (!response.ok) {
-                // console.error('History response error:', response.status, response.statusText);
+            if (!token) {
+                addGreetingMessage();
+                return;
             }
-            
-            const data = await response.json();
-            // console.log('Chat history response:', data);
+
+            const storedSessionId = singleChartSessionStorageKey
+                ? localStorage.getItem(singleChartSessionStorageKey)
+                : null;
+            const candidateSessionId = chatV2SessionId || storedSessionId;
+
+            // Preferred path: restore exact chat-v2 session (mobile parity).
+            if (candidateSessionId) {
+                const sessionRes = await fetch(`/api/chat-v2/session/${candidateSessionId}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+
+                if (sessionRes.ok) {
+                    const sessionData = await sessionRes.json();
+                    const sessionMessages = normalizeChatV2SessionMessages(sessionData.messages || []);
+                    setChatV2SessionId(candidateSessionId);
+                    setMessages(sessionMessages);
+                    if (sessionMessages.length === 0) addGreetingMessage();
+                    return;
+                }
+
+                // Session is stale/deleted; clear persisted pointer and continue fallback.
+                if (sessionRes.status === 404 || sessionRes.status === 401) {
+                    if (singleChartSessionStorageKey) {
+                        localStorage.removeItem(singleChartSessionStorageKey);
+                    }
+                    setChatV2SessionId(null);
+                }
+            }
+
+            // Fallback to legacy history endpoint for backward compatibility.
+            const legacyResponse = await fetch('/api/chat/history', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify(birthData),
+            });
+            const data = await legacyResponse.json();
             const existingMessages = normalizeLegacyChatHistoryItems(data.history || data.messages || []);
             setMessages(existingMessages);
-            
-            // Add greeting if no existing messages
             if (existingMessages.length === 0) {
                 addGreetingMessage();
             }

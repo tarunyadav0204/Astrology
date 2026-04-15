@@ -1984,6 +1984,38 @@ input:checked + .toggle-slider:before {
   cursor: pointer;
 }
 
+/* Admin nudge planner */
+.nudge-scheduler-admin {
+  margin-top: 8px;
+}
+
+.nudge-scheduler-form {
+  max-width: 760px;
+}
+
+.nudge-scheduler-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr);
+  gap: 12px;
+}
+
+.nudge-scheduler-filter {
+  margin-top: 18px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.nudge-scheduler-filter .form-field {
+  min-width: 180px;
+}
+
+.nudge-scheduler-list {
+  max-height: 520px;
+}
+
 /* Credits Dashboard */
 .credits-dashboard {
   padding: 24px;

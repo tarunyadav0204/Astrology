@@ -4,7 +4,7 @@ in-app inbox for stored nudges.
 """
 import json
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -58,6 +58,13 @@ class TriggerDefinitionUpdateRequest(BaseModel):
     body_template: str
     question_template: str = ""
     config: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BroadcastScheduleCreateRequest(BaseModel):
+    template_id: int
+    send_date: str  # YYYY-MM-DD
+    send_time: str  # HH:MM
+    is_active: bool = True
 
 
 def _admin_trigger_dto(merged, spec) -> Dict[str, Any]:
@@ -502,3 +509,243 @@ async def admin_put_trigger_definition(
     except Exception as e:
         logger.exception("admin_put_trigger_definition: %s", e)
         raise HTTPException(status_code=500, detail="Failed to save trigger definition") from e
+
+
+@router.get("/admin/broadcast/templates")
+async def admin_list_broadcast_templates(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            rows = db.list_broadcast_templates(conn)
+        items = [
+            {
+                "id": int(r[0]),
+                "title": r[1],
+                "body": r[2],
+                "category": r[3],
+                "is_active": bool(r[4]),
+                "sort_order": int(r[5] or 0),
+                "created_at": r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6]),
+                "updated_at": r[7].isoformat() if hasattr(r[7], "isoformat") else str(r[7]),
+            }
+            for r in rows
+        ]
+        return {"templates": items}
+    except Exception as e:
+        logger.exception("admin_list_broadcast_templates failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load templates") from e
+
+
+@router.get("/admin/broadcast/schedule")
+async def admin_list_broadcast_schedule(
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        if start_date:
+            date.fromisoformat(start_date)
+        if end_date:
+            date.fromisoformat(end_date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date filter: {e}") from e
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            rows = db.list_broadcast_schedule(conn, start_date=start_date, end_date=end_date)
+        items = []
+        for r in rows:
+            created_at = r[9]
+            dispatched_at = r[10]
+            items.append(
+                {
+                    "id": int(r[0]),
+                    "template_id": int(r[1]),
+                    "title": r[2],
+                    "body": r[3],
+                    "category": r[4],
+                    "send_date": r[5],
+                    "send_time": str(r[6])[:5] if r[6] is not None else None,
+                    "is_active": bool(r[7]),
+                    "created_by": r[8],
+                    "created_at": created_at.isoformat()
+                    if hasattr(created_at, "isoformat")
+                    else str(created_at),
+                    "dispatched_at": dispatched_at.isoformat()
+                    if hasattr(dispatched_at, "isoformat")
+                    else (str(dispatched_at) if dispatched_at else None),
+                    "dispatched_count": int(r[11] or 0),
+                }
+            )
+        return {"items": items}
+    except Exception as e:
+        logger.exception("admin_list_broadcast_schedule failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load schedule") from e
+
+
+@router.post("/admin/broadcast/schedule")
+async def admin_create_broadcast_schedule(
+    body: BroadcastScheduleCreateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        date.fromisoformat(body.send_date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid send_date: {e}") from e
+    try:
+        h, m = str(body.send_time).split(":", 1)
+        hh = int(h)
+        mm = int(m)
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            raise ValueError("Hour/minute out of range")
+        send_time_norm = f"{hh:02d}:{mm:02d}"
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid send_time (HH:MM): {e}") from e
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            schedule_id = db.create_broadcast_schedule_item(
+                conn,
+                template_id=int(body.template_id),
+                send_date=body.send_date,
+                send_time=send_time_norm,
+                created_by=current_user.userid,
+                is_active=bool(body.is_active),
+            )
+            conn.commit()
+        return {"ok": True, "id": schedule_id}
+    except Exception as e:
+        logger.exception("admin_create_broadcast_schedule failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create schedule item") from e
+
+
+@router.delete("/admin/broadcast/schedule/{schedule_id}")
+async def admin_delete_broadcast_schedule(
+    schedule_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            deleted = db.delete_broadcast_schedule_item(conn, int(schedule_id))
+            conn.commit()
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Schedule item not found")
+        return {"ok": True, "deleted": deleted}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_delete_broadcast_schedule failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to delete schedule item") from e
+
+
+@router.post("/admin/broadcast/dispatch-due")
+async def admin_dispatch_due_broadcast(
+    limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Dispatch due broadcast nudge schedule items:
+    - picks active items whose send_date/time <= now and not yet dispatched
+    - sends push to users with device tokens
+    - stores each nudge in in-app inbox (nudge_deliveries) for all users
+    - marks schedule row dispatched
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    now = datetime.now()
+    today_iso = now.date().isoformat()
+    now_hhmm = now.strftime("%H:%M")
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            due_rows = db.acquire_due_broadcast_schedule(conn, today_iso=today_iso, now_hhmm=now_hhmm, limit=limit)
+            if not due_rows:
+                conn.commit()
+                return {
+                    "ok": True,
+                    "due_items": 0,
+                    "schedule_items_marked": 0,
+                    "delivery_rows_created": 0,
+                    "push_sent": 0,
+                    "message": "No due scheduled nudges at this time.",
+                }
+
+            token_rows = db.get_all_device_tokens(conn)
+            tokens_by_user: Dict[int, List[tuple]] = {}
+            for uid, token, platform in token_rows:
+                tokens_by_user.setdefault(int(uid), []).append((token, platform))
+            all_user_ids = db.get_all_user_ids(conn)
+
+            total_push_sent = 0
+            total_delivery_rows = 0
+            marked = 0
+
+            for row in due_rows:
+                schedule_id = int(row[0])
+                title = (row[2] or "").strip()[:100]
+                body_text = (row[3] or "").strip()[:200]
+                category = (row[4] or "general").strip()
+
+                if not title or not body_text:
+                    db.mark_broadcast_schedule_dispatched(conn, schedule_id, 0)
+                    marked += 1
+                    continue
+
+                for uid in all_user_ids:
+                    user_sent = 0
+                    payload = {
+                        "trigger_id": "broadcast_schedule",
+                        "cta": "astroroshni://chat",
+                        "schedule_id": str(schedule_id),
+                        "category": category,
+                    }
+                    for token, _platform in tokens_by_user.get(int(uid), []):
+                        if push_module.send_expo_push(token, title, body_text, data=payload):
+                            total_push_sent += 1
+                            user_sent += 1
+
+                    db.insert_delivery(
+                        conn,
+                        userid=int(uid),
+                        trigger_id="broadcast_schedule",
+                        title=title,
+                        body=body_text,
+                        sent_at=now.date(),
+                        event_params=json.dumps(
+                            {"schedule_id": schedule_id, "category": category},
+                            ensure_ascii=False,
+                        ),
+                        channel="push" if user_sent > 0 else "stored",
+                        data_payload=payload,
+                    )
+                    total_delivery_rows += 1
+
+                db.mark_broadcast_schedule_dispatched(conn, schedule_id, len(all_user_ids))
+                marked += 1
+
+            conn.commit()
+
+        return {
+            "ok": True,
+            "due_items": len(due_rows),
+            "schedule_items_marked": marked,
+            "delivery_rows_created": total_delivery_rows,
+            "push_sent": total_push_sent,
+            "users_targeted": len(all_user_ids),
+        }
+    except Exception as e:
+        logger.exception("admin_dispatch_due_broadcast failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
