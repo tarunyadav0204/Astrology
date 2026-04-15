@@ -68,6 +68,14 @@ const AdminChatHistory = () => {
     }) + ' IST';
   };
 
+  const formatLlmLabel = (s) => {
+    const prov = (s.chat_llm_provider || '').trim();
+    const mod = (s.chat_llm_model || '').trim();
+    if (!mod && !prov) return null;
+    if (prov && mod) return `${prov}: ${mod}`;
+    return mod || prov || null;
+  };
+
   const filteredSessions = useMemo(() => {
     const q = sessionQuery.trim().toLowerCase();
     if (!q) return sessions;
@@ -78,6 +86,8 @@ const AdminChatHistory = () => {
         s.native_name,
         s.preview,
         s.session_id,
+        s.chat_llm_provider,
+        s.chat_llm_model,
       ]
         .filter(Boolean)
         .join(' ')
@@ -155,7 +165,7 @@ const AdminChatHistory = () => {
                 id="admin-chat-session-filter"
                 type="search"
                 className="sessions-search-input"
-                placeholder="Name, phone, chart, preview…"
+                placeholder="Name, phone, chart, model, preview…"
                 value={sessionQuery}
                 onChange={(e) => setSessionQuery(e.target.value)}
                 autoComplete="off"
@@ -193,6 +203,11 @@ const AdminChatHistory = () => {
                   {session.native_name && (
                     <div className="session-card-native">Chart: {session.native_name}</div>
                   )}
+                  {formatLlmLabel(session) && (
+                    <div className="session-card-model" title="LLM used for the latest completed answer in this session">
+                      Model: {formatLlmLabel(session)}
+                    </div>
+                  )}
                   <div className="session-date">{formatDate(session.created_at)}</div>
                   <div className="session-preview">{session.preview || 'Chat session'}</div>
                 </div>
@@ -226,6 +241,11 @@ const AdminChatHistory = () => {
                   {msgCount > 0 && (
                     <span className="session-msg-count">
                       {msgCount} message{msgCount === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {formatLlmLabel(selectedSession) && (
+                    <span className="session-header-model" title="Provider and model ID from admin settings at answer time">
+                      {formatLlmLabel(selectedSession)}
                     </span>
                   )}
                 </div>

@@ -108,7 +108,9 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
             cur = execute(
                 conn,
                 """
-                SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, u.name, u.phone,
+                SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id,
+                       cs.chat_llm_provider, cs.chat_llm_model,
+                       u.name, u.phone,
                        bc.name as native_name_raw,
                        (SELECT content FROM chat_messages
                         WHERE session_id = cs.session_id
@@ -127,24 +129,26 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
             )
             for row in cur.fetchall() or []:
                 native_name = None
-                raw = row[6] if row[6] is not None else None
+                raw = row[8] if row[8] is not None else None
                 if raw:
                     try:
                         native_name = enc.decrypt(raw)
                     except Exception:
                         native_name = raw
-                display_time = row[8] if row[8] else row[2]
-                preview = row[7]
+                display_time = row[10] if row[10] else row[2]
+                preview = row[9]
                 preview_str = (preview[:100] + '...') if preview and len(preview) > 100 else preview
                 sessions.append({
                     'session_id': row[0],
                     'user_id': row[1],
-                    'user_name': row[4] or 'Unknown User',
-                    'user_phone': row[5] or 'No phone',
+                    'user_name': row[6] or 'Unknown User',
+                    'user_phone': row[7] or 'No phone',
                     'created_at': _timestamp_to_ist_iso(display_time),
                     'preview': preview_str,
-                    'system_type': row[9],
+                    'system_type': row[11],
                     'native_name': native_name,
+                    'chat_llm_provider': row[4],
+                    'chat_llm_model': row[5],
                 })
 
             cur = execute(
@@ -191,7 +195,9 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
             cur = execute(
                 conn,
                 """
-                SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, bc.name as native_name_raw
+                SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id,
+                       cs.chat_llm_provider, cs.chat_llm_model,
+                       bc.name as native_name_raw
                 FROM chat_sessions cs
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
                 WHERE cs.session_id = %s
@@ -202,7 +208,9 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
 
         if session_row:
             native_name = None
-            raw_name = session_row[4] if session_row[4] is not None else None
+            raw_name = session_row[6] if len(session_row) > 6 and session_row[6] is not None else None
+            chat_llm_provider = session_row[4] if len(session_row) > 4 else None
+            chat_llm_model = session_row[5] if len(session_row) > 5 else None
             if raw_name:
                 try:
                     from encryption_utils import EncryptionManager
@@ -232,6 +240,8 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 "user_id": session_row[1],
                 "created_at": _timestamp_to_ist_iso(session_row[2]),
                 "native_name": native_name,
+                "chat_llm_provider": chat_llm_provider,
+                "chat_llm_model": chat_llm_model,
                 "messages": messages,
             }
 

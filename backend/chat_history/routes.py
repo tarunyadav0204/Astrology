@@ -80,6 +80,8 @@ def init_chat_tables():
 
         # Add columns for older deployments (safe idempotent)
         execute(conn, "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS birth_chart_id INTEGER")
+        execute(conn, "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS chat_llm_provider TEXT")
+        execute(conn, "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS chat_llm_model TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS follow_up_questions TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS category TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS canonical_question TEXT")
@@ -233,7 +235,8 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         cur = execute(
             conn,
             """
-                SELECT cs.user_id, cs.birth_chart_id, bc.name as native_name_raw
+                SELECT cs.user_id, cs.birth_chart_id, cs.chat_llm_provider, cs.chat_llm_model,
+                       bc.name as native_name_raw
                 FROM chat_sessions cs
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
                 WHERE cs.session_id = %s
@@ -245,7 +248,9 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         if not session_row or session_row[0] != current_user.userid:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        raw_name = session_row[2] if len(session_row) > 2 else None
+        raw_name = session_row[4] if len(session_row) > 4 else None
+        sess_llm_provider = session_row[2] if len(session_row) > 2 else None
+        sess_llm_model = session_row[3] if len(session_row) > 3 else None
 
         _ensure_chat_messages_gate_metadata(conn)
         conn.commit()
@@ -316,7 +321,13 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             message_data["gate_metadata"] = None
         conversation.append(message_data)
 
-    return {"session_id": session_id, "native_name": native_name, "messages": conversation}
+    return {
+        "session_id": session_id,
+        "native_name": native_name,
+        "chat_llm_provider": sess_llm_provider,
+        "chat_llm_model": sess_llm_model,
+        "messages": conversation,
+    }
 
 @router.post("/ask")
 async def ask_question_async(request: dict, background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
@@ -1529,6 +1540,21 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             message_id,
                         ),
                     )
+                    timing = result.get("timing") or {}
+                    llm_prov = timing.get("chat_llm_provider")
+                    llm_mod = (result.get("chat_llm_model") or timing.get("chat_llm_model") or "").strip()
+                    if llm_mod:
+                        prov = (str(llm_prov).strip()[:32] if llm_prov else None) or "unknown"
+                        mod = llm_mod[:200]
+                        execute(
+                            conn,
+                            """
+                            UPDATE chat_sessions
+                            SET chat_llm_provider = %s, chat_llm_model = %s
+                            WHERE session_id = %s
+                            """,
+                            (prov, mod, session_id),
+                        )
                 else:
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
                     try:

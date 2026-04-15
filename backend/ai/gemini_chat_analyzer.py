@@ -281,6 +281,8 @@ class GeminiChatAnalyzer:
             CHAT_LLM_OPENAI,
             get_openai_chat_model,
             get_openai_premium_model,
+            get_gemini_chat_model,
+            get_gemini_premium_model,
         )
 
         debug_logging = is_debug_logging_enabled()
@@ -395,8 +397,8 @@ class GeminiChatAnalyzer:
                 )
             else:
                 # Resolve Gemini model from admin settings (no server restart needed)
+                model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
                 selected_model = self._get_model(premium_analysis)
-                model_name = selected_model._model_name if hasattr(selected_model, "_model_name") else "Unknown"
                 print(f"🧠 Gemini chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
 
                 if debug_logging:
@@ -484,14 +486,24 @@ class GeminiChatAnalyzer:
                 return {
                     'success': False,
                     'response': "I apologize, but I couldn't generate a response. Please try asking your question again.",
-                    'error': 'Empty response from AI'
+                    'error': 'Empty response from AI',
+                    'chat_llm_model': model_name or None,
+                    'timing': {
+                        'chat_llm_provider': llm_provider,
+                        'chat_llm_model': model_name or None,
+                    },
                 }
 
             if len(response_text) == 0:
                 return {
                     'success': False,
                     'response': "I received your question but couldn't generate a proper response. Please try rephrasing your question.",
-                    'error': 'Blank response from AI'
+                    'error': 'Blank response from AI',
+                    'chat_llm_model': model_name or None,
+                    'timing': {
+                        'chat_llm_provider': llm_provider,
+                        'chat_llm_model': model_name or None,
+                    },
                 }
             
             # Clean response text to prevent JSON issues
@@ -518,7 +530,12 @@ class GeminiChatAnalyzer:
                 return {
                     'success': False,
                     'response': "I received a partial response. Please try asking your question again.",
-                    'error': 'Response too short or corrupted'
+                    'error': 'Response too short or corrupted',
+                    'chat_llm_model': model_name or None,
+                    'timing': {
+                        'chat_llm_provider': llm_provider,
+                        'chat_llm_model': model_name or None,
+                    },
                 }
             # print(f"✅ Final response ready ({len(cleaned_text)} chars)")
             # print(f"📤 FINAL CLEANED RESPONSE (first 500 chars): {cleaned_text[:500]}...")
@@ -623,26 +640,31 @@ class GeminiChatAnalyzer:
                 'faq_metadata': faq_metadata,
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
+                'chat_llm_model': model_name or None,
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,
                     'gemini_processing_time': gemini_total_time,
                     'chat_llm_provider': llm_provider,
-                }
+                    'chat_llm_model': model_name or None,
+                },
             }
         except asyncio.TimeoutError:
             total_request_time = time.time() - total_request_start
             print(f"⏰ Chat LLM API timeout after {total_request_time:.2f}s")
+            _mn = model_name if "model_name" in locals() else None
             return {
                 'success': False,
                 'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
                 'error': 'AI request timeout (600s)',
+                'chat_llm_model': _mn,
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,
                     'gemini_processing_time': 600.0,
                     'chat_llm_provider': llm_provider,
-                }
+                    'chat_llm_model': _mn,
+                },
             }
         except Exception as e:
             total_request_time = time.time() - total_request_start
@@ -704,17 +726,20 @@ class GeminiChatAnalyzer:
                     "or rephrase your question."
                 )
             
+            _mn = model_name if "model_name" in locals() else None
             return {
                 'success': False,
                 'response': error_message,
                 'error': str(e),
                 'error_type': type(e).__name__,
+                'chat_llm_model': _mn,
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time if 'prompt_time' in locals() else 0,
                     'gemini_processing_time': gemini_total_time if 'gemini_total_time' in locals() else 0,
                     'chat_llm_provider': llm_provider,
-                }
+                    'chat_llm_model': _mn,
+                },
             }
     
     def _fix_response_formatting(self, response_text: str) -> str:
