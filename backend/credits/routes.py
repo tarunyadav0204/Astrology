@@ -704,11 +704,31 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
     return {"plans": plans}
 
 
+class WebNotificationOptInRequest(BaseModel):
+    """Set when the browser reports notification permission granted (honor-system for web free-first-question)."""
+    granted: bool = True
+
+
+@router.post("/web-notification-opt-in")
+async def web_notification_opt_in(
+    body: WebNotificationOptInRequest,
+    current_user: User = Depends(get_current_user),
+):
+    credit_service.set_web_notifications_granted(current_user.userid, bool(body.granted))
+    return {"ok": True}
+
+
 @router.get("/balance")
 async def get_credit_balance(current_user: User = Depends(get_current_user)):
     balance = credit_service.get_user_credits(current_user.userid)
     free_used = credit_service.get_free_chat_question_used(current_user.userid)
-    result = {"credits": balance, "free_question_available": not free_used}
+    free_ok = credit_service.is_free_standard_chat_question_available(current_user.userid)
+    pending_notif = credit_service.free_question_pending_notification_opt_in(current_user.userid)
+    result = {
+        "credits": balance,
+        "free_question_available": free_ok,
+        "free_question_requires_notifications": pending_notif,
+    }
     # Optional: subscription tier for app to show "VIP Silver" etc. (backward compat: new keys)
     try:
         discount = credit_service.get_subscription_discount_percent(current_user.userid)

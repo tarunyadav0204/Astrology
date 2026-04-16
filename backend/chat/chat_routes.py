@@ -126,9 +126,9 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
-    # First question free: standard chat only (not partnership, not premium)
+    # First question free: standard chat only (not partnership, not premium); requires notification opt-in
     is_standard_chat = not request.partnership_mode and not request.premium_analysis
-    free_available = credit_service.get_free_chat_question_used(current_user.userid) is False
+    free_available = credit_service.is_free_standard_chat_question_available(current_user.userid)
     using_free_question = is_standard_chat and free_available
     chat_key = 'premium_chat_cost' if request.premium_analysis else ('chat_question_cost' if not request.partnership_mode else None)
     effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)

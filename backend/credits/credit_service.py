@@ -123,6 +123,16 @@ class CreditService:
                 conn.commit()
             except Exception:
                 pass
+
+            # Web: honor-system flag when browser notification permission is granted (free-first-question gate).
+            try:
+                execute(
+                    conn,
+                    "ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS web_notifications_granted INTEGER DEFAULT 0",
+                )
+                conn.commit()
+            except Exception:
+                pass
         
         # Credit transactions table
             execute(conn, '''
@@ -396,6 +406,70 @@ class CreditService:
         except Exception:
             row = None
         return bool(row and row[0])
+
+    def user_has_registered_push_token(self, userid: int) -> bool:
+        """True if the user has at least one Expo push token (app enabled notifications enough to register)."""
+        from db import get_conn, execute
+        try:
+            from nudge_engine import db as nudge_db
+
+            with get_conn() as conn:
+                nudge_db.init_nudge_tables(conn)
+                cur = execute(conn, "SELECT 1 FROM device_tokens WHERE userid = ? LIMIT 1", (userid,))
+                return cur.fetchone() is not None
+        except Exception:
+            return False
+
+    def get_web_notifications_granted(self, userid: int) -> bool:
+        """Web client: set via POST /credits/web-notification-opt-in when Notification.permission is granted."""
+        from db import get_conn, execute
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT COALESCE(web_notifications_granted, 0) FROM user_credits WHERE userid = ?",
+                    (userid,),
+                )
+                row = cur.fetchone()
+                return bool(row and row[0])
+        except Exception:
+            return False
+
+    def set_web_notifications_granted(self, userid: int, granted: bool = True) -> None:
+        from db import get_conn, execute
+
+        val = 1 if granted else 0
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "UPDATE user_credits SET web_notifications_granted = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
+                (val, userid),
+            )
+            if getattr(cur, "rowcount", 0) == 0:
+                bal = self.get_user_credits(userid)
+                self._upsert_user_credits(conn, userid, bal)
+                execute(
+                    conn,
+                    "UPDATE user_credits SET web_notifications_granted = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
+                    (val, userid),
+                )
+            conn.commit()
+
+    def notification_opt_in_satisfied_for_free_question(self, userid: int) -> bool:
+        """Free first question requires app push registration or (web) explicit browser-notification ack."""
+        return self.user_has_registered_push_token(userid) or self.get_web_notifications_granted(userid)
+
+    def is_free_standard_chat_question_available(self, userid: int) -> bool:
+        """Unused one-time free standard chat AND notifications requirement met."""
+        if self.get_free_chat_question_used(userid):
+            return False
+        return self.notification_opt_in_satisfied_for_free_question(userid)
+
+    def free_question_pending_notification_opt_in(self, userid: int) -> bool:
+        """True when the user still has their free question unused but has not met the notification requirement."""
+        if self.get_free_chat_question_used(userid):
+            return False
+        return not self.notification_opt_in_satisfied_for_free_question(userid)
 
     def mark_free_chat_question_used(self, userid: int) -> None:
         """Mark that the user has used their one free standard chat question. Idempotent."""
