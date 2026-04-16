@@ -3,6 +3,7 @@ Send push notifications via Expo Push API.
 Uses stdlib urllib; no extra dependencies.
 Token format: ExponentPushToken[xxxx] (from expo-notifications in the app).
 """
+import gzip
 import json
 import logging
 import urllib.request
@@ -15,6 +16,38 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 # Expo accepts up to 100 messages per request (https://docs.expo.dev/push-notifications/sending-notifications/).
 _EXPO_BATCH_SIZE = 100
+
+# Do not send Accept-Encoding: gzip — urllib does not always decompress the body before
+# .read(), and json.loads would fail on binary gzip. If we ever get gzip anyway, decode below.
+
+
+def _expo_response_body_text(resp) -> str:
+    """Read HTTP response body as UTF-8 text, decompressing gzip when needed."""
+    raw = resp.read()
+    if not raw:
+        return ""
+    enc = ""
+    try:
+        gh = getattr(resp, "getheader", None)
+        if callable(gh):
+            enc = (gh("Content-Encoding") or "").lower()
+    except Exception:
+        pass
+    if not enc:
+        try:
+            enc = (resp.headers.get("Content-Encoding") or "").lower()
+        except Exception:
+            try:
+                enc = (resp.info().get("Content-Encoding") or "").lower()
+            except Exception:
+                pass
+    if "gzip" in enc or (len(raw) >= 2 and raw[0] == 0x1F and raw[1] == 0x8B):
+        try:
+            raw = gzip.decompress(raw)
+        except Exception as e:
+            logger.warning("Expo push: gzip decompress failed: %s", e)
+            return ""
+    return raw.decode("utf-8", errors="replace")
 
 
 def send_expo_push_messages(messages: List[Dict[str, Any]], timeout: int = 45) -> List[bool]:
@@ -35,20 +68,24 @@ def send_expo_push_messages(messages: List[Dict[str, Any]], timeout: int = 45) -
                 headers={
                     "Content-Type": "application/json",
                     "Accept": "application/json",
-                    "Accept-Encoding": "gzip, deflate",
                 },
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
                 if resp.status != 200:
                     logger.warning("Expo batch push returned status %s", resp.status)
                     out.extend([False] * len(chunk))
                     continue
+                raw = _expo_response_body_text(resp)
                 try:
                     parsed = json.loads(raw)
                 except json.JSONDecodeError:
-                    logger.warning("Expo batch push: invalid JSON response")
+                    preview = (raw[:200] + "…") if len(raw) > 200 else raw
+                    logger.warning(
+                        "Expo batch push: invalid JSON (len=%s preview=%r)",
+                        len(raw),
+                        preview,
+                    )
                     out.extend([False] * len(chunk))
                     continue
                 data = parsed.get("data")
@@ -107,7 +144,6 @@ def send_expo_push(
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "Accept-Encoding": "gzip, deflate",
             },
             method="POST",
         )
@@ -115,6 +151,8 @@ def send_expo_push(
             if resp.status != 200:
                 logger.warning("Expo push returned status %s", resp.status)
                 return False
+            # Drain body (Expo returns JSON receipts); gzip-safe for parity with batch path.
+            _expo_response_body_text(resp)
             return True
     except urllib.error.HTTPError as e:
         logger.warning("Expo push HTTP error %s: %s", e.code, e.read())
