@@ -4009,7 +4009,8 @@ async def get_admin_user_analytics_timeseries(
 ):
     """
     Time series for admin dashboards: new signups (users.created_at) and active users
-    (distinct users who sent at least one chat message). Gender comes from latest self birth_chart.
+    (distinct users who sent at least one chat message). Gender: if the user has exactly one
+    birth chart, use that chart's gender; otherwise use the latest chart with relation self.
     """
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -4053,7 +4054,11 @@ async def get_admin_user_analytics_timeseries(
             LEFT JOIN LATERAL (
                 SELECT bc.gender
                 FROM birth_charts bc
-                WHERE bc.userid = u.userid AND bc.relation = 'self'
+                WHERE bc.userid = u.userid
+                  AND (
+                    (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = u.userid) = 1
+                    OR LOWER(TRIM(COALESCE(bc.relation, ''))) = 'self'
+                  )
                 ORDER BY bc.created_at DESC NULLS LAST
                 LIMIT 1
             ) lat ON true
@@ -4075,7 +4080,11 @@ async def get_admin_user_analytics_timeseries(
             LEFT JOIN LATERAL (
                 SELECT bc.gender
                 FROM birth_charts bc
-                WHERE bc.userid = u.userid AND bc.relation = 'self'
+                WHERE bc.userid = u.userid
+                  AND (
+                    (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = u.userid) = 1
+                    OR LOWER(TRIM(COALESCE(bc.relation, ''))) = 'self'
+                  )
                 ORDER BY bc.created_at DESC NULLS LAST
                 LIMIT 1
             ) lat ON true
@@ -4140,7 +4149,7 @@ async def get_admin_user_analytics_timeseries(
         "date_to": date_to,
         "series": series,
         "definitions": {
-            "new_users": "Count of user accounts created in each period (gender from latest self birth chart).",
+            "new_users": "Count of user accounts created in each period (gender: sole birth chart if count is 1, else latest self chart).",
             "active_users": "Distinct users who sent at least one chat message in the period.",
         },
     }
