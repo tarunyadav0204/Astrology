@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from db import get_conn as _get_app_conn, execute
+from db import get_conn as _get_app_conn, execute, executemany
 from .default_broadcast_nudges import DEFAULT_BROADCAST_NUDGES, DEFAULT_DAILY_SLOTS
 
 logger = logging.getLogger(__name__)
@@ -558,6 +558,31 @@ def insert_delivery(
         )
     except Exception as e:
         logger.exception("Failed to insert nudge delivery for user %s: %s", userid, e)
+        raise
+
+
+def insert_deliveries_batch(
+    conn,
+    rows: List[Tuple[Any, ...]],
+) -> None:
+    """
+    Bulk insert nudge_deliveries. Each row tuple:
+    (userid, trigger_id, title, body, event_params, sent_at_iso, channel, data_json_or_empty)
+    """
+    if not rows:
+        return
+    try:
+        executemany(
+            conn,
+            """
+            INSERT INTO nudge_deliveries
+            (userid, trigger_id, title, body, event_params, sent_at, channel, data_json)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''))
+            """,
+            rows,
+        )
+    except Exception as e:
+        logger.exception("Failed batch insert nudge deliveries (%s rows): %s", len(rows), e)
         raise
 
 

@@ -7,11 +7,71 @@ import json
 import logging
 import urllib.request
 import urllib.error
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+
+# Expo accepts up to 100 messages per request (https://docs.expo.dev/push-notifications/sending-notifications/).
+_EXPO_BATCH_SIZE = 100
+
+
+def send_expo_push_messages(messages: List[Dict[str, Any]], timeout: int = 45) -> List[bool]:
+    """
+    Send many notifications via Expo in batches of up to 100 per HTTP request.
+    `messages` is a list of dicts in Expo's push message shape (to, title, body, sound, data, ...).
+    Returns a list of bool, one per input message (True if Expo reported status ok for that entry).
+    """
+    if not messages:
+        return []
+    out: List[bool] = []
+    for i in range(0, len(messages), _EXPO_BATCH_SIZE):
+        chunk = messages[i : i + _EXPO_BATCH_SIZE]
+        try:
+            req = urllib.request.Request(
+                EXPO_PUSH_URL,
+                data=json.dumps(chunk).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip, deflate",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+                if resp.status != 200:
+                    logger.warning("Expo batch push returned status %s", resp.status)
+                    out.extend([False] * len(chunk))
+                    continue
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.warning("Expo batch push: invalid JSON response")
+                    out.extend([False] * len(chunk))
+                    continue
+                data = parsed.get("data")
+                if not isinstance(data, list) or len(data) != len(chunk):
+                    logger.warning(
+                        "Expo batch push: unexpected data shape (got %s items, expected %s)",
+                        len(data) if isinstance(data, list) else 0,
+                        len(chunk),
+                    )
+                    out.extend([False] * len(chunk))
+                    continue
+                for item in data:
+                    if isinstance(item, dict) and item.get("status") == "ok":
+                        out.append(True)
+                    else:
+                        out.append(False)
+        except urllib.error.HTTPError as e:
+            logger.warning("Expo batch push HTTP error %s: %s", e.code, e.read())
+            out.extend([False] * len(chunk))
+        except Exception as e:
+            logger.exception("Expo batch push failed: %s", e)
+            out.extend([False] * len(chunk))
+    return out
 
 
 def send_expo_push(

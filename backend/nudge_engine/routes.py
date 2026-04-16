@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import hmac
+from collections import defaultdict
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
@@ -926,6 +927,7 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
             for uid, token, platform in token_rows:
                 tokens_by_user.setdefault(int(uid), []).append((token, platform))
             all_user_ids = db.get_all_user_ids(conn)
+            n_users = len(all_user_ids)
 
             total_push_sent = 0
             total_delivery_rows = 0
@@ -942,47 +944,89 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                     marked += 1
                     continue
 
+                payload = {
+                    "trigger_id": "broadcast_schedule",
+                    "cta": "astroroshni://chat",
+                    "schedule_id": str(schedule_id),
+                    "category": category,
+                }
+                event_params = json.dumps(
+                    {"schedule_id": schedule_id, "category": category},
+                    ensure_ascii=False,
+                )
+                data_json = ""
+                try:
+                    data_json = json.dumps(payload, ensure_ascii=False)[:8000]
+                except Exception:
+                    data_json = ""
+
+                # One Expo HTTP request per 100 devices (avoids gateway timeouts on large user bases).
+                expo_messages: List[Dict[str, Any]] = []
+                message_uid: List[int] = []
                 for uid in all_user_ids:
-                    user_sent = 0
-                    payload = {
-                        "trigger_id": "broadcast_schedule",
-                        "cta": "astroroshni://chat",
-                        "schedule_id": str(schedule_id),
-                        "category": category,
-                    }
-                    for token, _platform in tokens_by_user.get(int(uid), []):
-                        if push_module.send_expo_push(token, title, body_text, data=payload):
+                    uid_int = int(uid)
+                    for token, _platform in tokens_by_user.get(uid_int, []):
+                        t = (token or "").strip()
+                        if not t.startswith("ExponentPushToken["):
+                            continue
+                        expo_messages.append(
+                            {
+                                "to": t,
+                                "title": title[:100],
+                                "body": body_text[:200],
+                                "sound": "default",
+                                "data": payload,
+                            }
+                        )
+                        message_uid.append(uid_int)
+
+                push_ok_by_uid: Dict[int, bool] = defaultdict(bool)
+                if expo_messages:
+                    results = push_module.send_expo_push_messages(expo_messages)
+                    for ok, uid_m in zip(results, message_uid):
+                        if ok:
+                            push_ok_by_uid[uid_m] = True
                             total_push_sent += 1
-                            user_sent += 1
 
-                    db.insert_delivery(
-                        conn,
-                        userid=int(uid),
-                        trigger_id="broadcast_schedule",
-                        title=title,
-                        body=body_text,
-                        sent_at=now.date(),
-                        event_params=json.dumps(
-                            {"schedule_id": schedule_id, "category": category},
-                            ensure_ascii=False,
-                        ),
-                        channel="push" if user_sent > 0 else "stored",
-                        data_payload=payload,
+                sent_at_iso = now.date().isoformat()
+                batch_rows: List[tuple] = []
+                for uid in all_user_ids:
+                    uid_int = int(uid)
+                    ch = "push" if push_ok_by_uid.get(uid_int) else "stored"
+                    batch_rows.append(
+                        (
+                            uid_int,
+                            "broadcast_schedule",
+                            title,
+                            body_text,
+                            event_params,
+                            sent_at_iso,
+                            ch,
+                            data_json or "",
+                        )
                     )
-                    total_delivery_rows += 1
+                db.insert_deliveries_batch(conn, batch_rows)
+                total_delivery_rows += len(batch_rows)
 
-                db.mark_broadcast_schedule_dispatched(conn, schedule_id, len(all_user_ids))
+                db.mark_broadcast_schedule_dispatched(conn, schedule_id, n_users)
                 marked += 1
 
             conn.commit()
 
+        logger.info(
+            "broadcast dispatch-due: due_rows=%s users=%s deliveries=%s push_tickets_ok=%s",
+            len(due_rows),
+            n_users,
+            total_delivery_rows,
+            total_push_sent,
+        )
         return {
             "ok": True,
             "due_items": len(due_rows),
             "schedule_items_marked": marked,
             "delivery_rows_created": total_delivery_rows,
             "push_sent": total_push_sent,
-            "users_targeted": len(all_user_ids),
+            "users_targeted": n_users,
         }
     except Exception as e:
         logger.exception("_dispatch_due_broadcast failed: %s", e)

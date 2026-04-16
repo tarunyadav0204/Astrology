@@ -150,6 +150,39 @@ def _is_us_number(phone: str) -> bool:
     return normalized.startswith("+1")
 
 
+def _is_india_number(phone: str) -> bool:
+    """
+    India phone shapes we treat as SMS-first for OTP (no email required).
+    Matches +91 E.164, 91XXXXXXXXXX, and plain 10-digit local (legacy clients; SMS layer assumes +91).
+    """
+    if not phone:
+        return False
+    raw = (
+        str(phone).strip()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+    if raw.startswith("+1"):
+        return False
+    if raw.startswith("+91"):
+        return True
+    digits = "".join(c for c in raw if c.isdigit())
+    if len(digits) == 11 and digits.startswith("1"):
+        return False
+    if len(digits) == 12 and digits.startswith("91"):
+        return True
+    if len(digits) == 10 and not raw.startswith("+"):
+        return True
+    return False
+
+
+def _otp_email_required(phone: str) -> bool:
+    """Password / registration OTP must be sent to email for all countries except India."""
+    return not _is_india_number(phone)
+
+
 def _phone_lookup_variants(phone: Optional[str]) -> List[str]:
     """
     Build possible DB values for users.phone — legacy rows may store 10-digit local,
@@ -1067,7 +1100,7 @@ class UserRegistrationWithBirth(BaseModel):
     name: str
     phone: str
     password: str
-    email: str
+    email: Optional[str] = None
     birth_details: Optional[BirthData] = None
     role: str = "user"
     signup_client: Optional[str] = None
@@ -1107,9 +1140,15 @@ async def register(user_data: UserCreate):
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
         email_clean = (user_data.email or "").strip()
-        if not email_clean:
-            raise HTTPException(status_code=400, detail="Email is required for registration")
-        if "@" not in email_clean or "." not in email_clean.split("@")[-1]:
+        if _otp_email_required(user_data.phone):
+            if not email_clean:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Email is required for registration (non-India numbers).",
+                )
+        if email_clean and (
+            "@" not in email_clean or "." not in email_clean.split("@")[-1]
+        ):
             raise HTTPException(status_code=400, detail="Please provide a valid email address")
 
         hashed_password = hash_password(user_data.password)
@@ -1122,7 +1161,7 @@ async def register(user_data: UserCreate):
                     user_data.phone,
                     hashed_password,
                     user_data.role,
-                    email_clean,
+                    email_clean or None,
                     user_data.signup_client,
                 ),
             )
@@ -1205,6 +1244,18 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
+        email_clean = (user_data.email or "").strip()
+        if _otp_email_required(user_data.phone):
+            if not email_clean:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Email is required for registration (non-India numbers).",
+                )
+        if email_clean and (
+            "@" not in email_clean or "." not in email_clean.split("@")[-1]
+        ):
+            raise HTTPException(status_code=400, detail="Please provide a valid email address")
+
         # Create user
         hashed_password = hash_password(user_data.password)
         try:
@@ -1216,7 +1267,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
                     user_data.phone,
                     hashed_password,
                     user_data.role,
-                    user_data.email,
+                    email_clean or None,
                     user_data.signup_client,
                 ),
             )
@@ -1764,8 +1815,11 @@ async def send_registration_otp(request: SendResetCode):
 
         if existing_user:
             raise HTTPException(status_code=409, detail="Phone number already registered")
-        if _is_us_number(request.phone) and not request.email:
-            raise HTTPException(status_code=400, detail="Email is required for US numbers")
+        if _otp_email_required(request.phone) and not (request.email or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Email is required for registration (non-India numbers).",
+            )
 
         # Generate 6-digit code and secure token
         code = str(random.randint(100000, 999999))
@@ -1792,7 +1846,7 @@ async def send_registration_otp(request: SendResetCode):
             "email_sent": bool(email_sent),
         },
     }
-    if _is_us_number(request.phone) and not sms_sent and not email_sent:
+    if _otp_email_required(request.phone) and not sms_sent and not email_sent:
         raise HTTPException(status_code=503, detail="Failed to deliver OTP to SMS and email")
     
     # Development mode: show code if SMS failed and not in production
@@ -1818,8 +1872,11 @@ async def send_reset_code(request: SendResetCode):
         requested_email = (request.email or "").strip().lower()
         user_email = (user[5] or "").strip().lower() if user[5] else ""
         target_email = user_email or requested_email
-        if _is_us_number(request.phone) and not target_email:
-            raise HTTPException(status_code=400, detail="Email is required for US numbers")
+        if _otp_email_required(request.phone) and not target_email:
+            raise HTTPException(
+                status_code=400,
+                detail="Email is required for password reset (non-India numbers).",
+            )
         if requested_email and user_email and requested_email != user_email:
             raise HTTPException(status_code=400, detail="Provided email does not match account email")
 
