@@ -1775,6 +1775,11 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
         "models/gemini-2.5-flash-lite": {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40},
         "models/gemini-2.0-flash-001": {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40},
         "models/gemini-2.0-flash-lite-001": {"in_le": 0.075, "in_gt": 0.075, "out_le": 0.30, "out_gt": 0.30},
+        # DeepSeek (published cache-miss input + output per 1M; V4 uses same estimate until pricing differs)
+        "deepseek-chat": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
+        "deepseek-reasoner": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
+        "deepseek-v4": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
+        "deepseek-v4-reasoner": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
     }
     row = rates.get(m)
     if not row:
@@ -1785,6 +1790,8 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
             row = {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00}
         elif "pro" in ml:
             row = {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00}
+        elif ml.startswith("deepseek-"):
+            row = {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42}
         else:
             row = {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
     return {

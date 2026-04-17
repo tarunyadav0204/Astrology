@@ -283,14 +283,15 @@ class GeminiChatAnalyzer:
             raise ValueError("DEEPSEEK_API_KEY environment variable not set")
 
         base_url = (os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com").strip().rstrip("/")
-        model_clean = (model_id or "").strip() or "deepseek-chat-3.2"
+        model_clean = (model_id or "").strip() or "deepseek-chat"
         client = AsyncOpenAI(api_key=api_key, base_url=f"{base_url}/v1", timeout=600.0)
 
+        # DeepSeek API allows max_tokens in [1, 8192] only (not Gemini/OpenAI-sized limits).
         resp = await client.chat.completions.create(
             model=model_clean,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=16384,
+            max_tokens=8192,
         )
         if not resp.choices:
             raise RuntimeError("Empty DeepSeek choices")
@@ -392,9 +393,8 @@ class GeminiChatAnalyzer:
         prompt_start = time.time()
         prompt = self._create_chat_prompt(user_question, pruned_context, conversation_history or [], language, response_style, user_context, premium_analysis, mode=mode)
         prompt_time = time.time() - prompt_start
-        
-      
-        
+        prompt_char_count = len(prompt)
+
         # Cache optimization indicator
         has_transit_data = 'transit_activations' in enhanced_context
        
@@ -708,6 +708,7 @@ class GeminiChatAnalyzer:
                 print(f"   Premium analysis: {premium_analysis}")
                 print(f"   Flux service available: {bool(self.flux_service)}")
                 print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
+            response_char_count = len(parsed_response.get("content") or "")
             return {
                 'success': True,
                 'response': parsed_response['content'],
@@ -721,6 +722,8 @@ class GeminiChatAnalyzer:
                 'has_transit_request': has_transit_request,
                 'chat_llm_model': model_name or None,
                 'token_usage': token_usage,
+                'llm_prompt_chars': int(prompt_char_count),
+                'llm_response_chars': int(response_char_count),
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,

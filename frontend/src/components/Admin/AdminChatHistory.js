@@ -321,10 +321,56 @@ const AdminChatHistory = () => {
                           {message.native_name}
                         </span>
                       )}
+                      {Number.isFinite(message.llm_prompt_chars) && message.llm_prompt_chars > 0 && (
+                        <span
+                          className="message-char-badge message-char-badge--prompt"
+                          title={
+                            message.sender === 'user'
+                              ? 'Full prompt character count for the LLM call that answers this question (same as following assistant row)'
+                              : 'Full prompt sent to the LLM (chart JSON + instructions + history + question)'
+                          }
+                        >
+                          Prompt {Number(message.llm_prompt_chars).toLocaleString()} chars
+                        </span>
+                      )}
+                      {message.sender === 'assistant' &&
+                        Number.isFinite(message.llm_response_chars) &&
+                        message.llm_response_chars > 0 && (
+                          <span
+                            className="message-char-badge message-char-badge--reply"
+                            title="Assistant reply text length after parsing (what the user sees)"
+                          >
+                            Reply {Number(message.llm_response_chars).toLocaleString()} chars
+                          </span>
+                        )}
+                      {Number.isFinite(message.llm_input_tokens) && (
+                        <span
+                          className="message-token-badge"
+                          title={
+                            message.sender === 'user'
+                              ? 'API usage: prompt tokens for the assistant reply after this question'
+                              : 'API usage: prompt (input) tokens for this completion'
+                          }
+                        >
+                          In {Number(message.llm_input_tokens).toLocaleString()}
+                        </span>
+                      )}
+                      {Number.isFinite(message.llm_output_tokens) && (
+                        <span
+                          className="message-token-badge"
+                          title={
+                            message.sender === 'user'
+                              ? 'API usage: completion tokens for the assistant reply after this question'
+                              : 'API usage: completion (output) tokens for this reply'
+                          }
+                        >
+                          Out {Number(message.llm_output_tokens).toLocaleString()}
+                        </span>
+                      )}
                       {typeof message?.cost_estimate?.cost_inr_estimate === 'number' && (
                         <span
                           className="message-cost-badge"
-                          title={`~${message.cost_estimate.tokens_estimate || 0} tokens (rough)`}
+                          title={`Rough INR from pricing × ~${Number(message.cost_estimate?.tokens_estimate ?? 0).toLocaleString()} token estimate.${Number.isFinite(message.llm_input_tokens) ? ` API in ${Number(message.llm_input_tokens).toLocaleString()}.` : ''}${Number.isFinite(message.llm_output_tokens) ? ` API out ${Number(message.llm_output_tokens).toLocaleString()}.` : ''}${Number.isFinite(message.llm_prompt_chars) ? ` Prompt ${Number(message.llm_prompt_chars).toLocaleString()} chars.` : ''}`}
                         >
                           INR {message.cost_estimate.cost_inr_estimate.toFixed(4)}
                         </span>

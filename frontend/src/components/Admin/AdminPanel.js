@@ -3241,7 +3241,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       onChange={(e) => setDeepseekChatModel(e.target.value)}
                       style={{ minWidth: '280px' }}
                     >
-                      {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat-3.2', label: 'DeepSeek Chat 3.2' }]).map((opt) => (
+                      {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
                         <option key={`ds-${opt.value}`} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>

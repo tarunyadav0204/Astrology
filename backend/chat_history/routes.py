@@ -76,6 +76,8 @@ def init_chat_tables():
                 intent_router_ms REAL,
                 llm_input_tokens INTEGER,
                 llm_output_tokens INTEGER,
+                llm_prompt_chars INTEGER,
+                llm_response_chars INTEGER,
                 client_request_id TEXT
             )
         """)
@@ -92,6 +94,8 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent_router_ms REAL")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_input_tokens INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_output_tokens INTEGER")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_prompt_chars INTEGER")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_response_chars INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
@@ -1528,7 +1532,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             SET content = %s, terms = %s, glossary = %s, images = %s,
                                 follow_up_questions = %s, status = %s, message_type = %s,
                                 completed_at = %s, language = %s, intent_router_ms = %s,
-                                llm_input_tokens = %s, llm_output_tokens = %s
+                                llm_input_tokens = %s, llm_output_tokens = %s,
+                                llm_prompt_chars = %s, llm_response_chars = %s
                             WHERE message_id = %s
                         """,
                         (
@@ -1544,6 +1549,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             intent_router_ms,
                             int((result.get("token_usage") or {}).get("input_tokens") or 0) or None,
                             int((result.get("token_usage") or {}).get("output_tokens") or 0) or None,
+                            int(result["llm_prompt_chars"]) if result.get("llm_prompt_chars") is not None else None,
+                            int(result["llm_response_chars"]) if result.get("llm_response_chars") is not None else None,
                             message_id,
                         ),
                     )

@@ -34,11 +34,15 @@ OPENAI_CHAT_MODEL_OPTIONS = [
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_OPENAI_PREMIUM_MODEL = "gpt-4o"
 
+# DeepSeek API model IDs (OpenAI-compatible). Confirm current ids with GET https://api.deepseek.com/v1/models when upgrading.
+# V3.2 is the version named on DeepSeek pricing docs for deepseek-chat / deepseek-reasoner; V4 ids appear when the platform exposes them.
 DEEPSEEK_CHAT_MODEL_OPTIONS = [
-    ("deepseek-chat-3.2", "DeepSeek Chat 3.2"),
-    ("deepseek-reasoner", "DeepSeek Reasoner"),
+    ("deepseek-chat", "DeepSeek Chat (V3.2)"),
+    ("deepseek-reasoner", "DeepSeek Reasoner (V3.2 thinking)"),
+    ("deepseek-v4", "DeepSeek V4 (chat)"),
+    ("deepseek-v4-reasoner", "DeepSeek V4 (thinking)"),
 ]
-DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-chat-3.2"
+DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-chat"
 DEFAULT_DEEPSEEK_PREMIUM_MODEL = "deepseek-reasoner"
 
 
@@ -120,17 +124,25 @@ def get_openai_premium_model() -> str:
     return DEFAULT_OPENAI_PREMIUM_MODEL
 
 
+def _normalize_deepseek_model_id(model_id: str) -> str:
+    """Map legacy/wrong ids to DeepSeek API names."""
+    m = (model_id or "").strip()
+    if m == "deepseek-chat-3.2":
+        return "deepseek-chat"
+    return m
+
+
 def get_deepseek_chat_model() -> str:
     value = get_setting("deepseek_chat_model")
     if value and value.strip():
-        return value.strip()
+        return _normalize_deepseek_model_id(value.strip())
     return DEFAULT_DEEPSEEK_CHAT_MODEL
 
 
 def get_deepseek_premium_model() -> str:
     value = get_setting("deepseek_premium_model")
     if value and value.strip():
-        return value.strip()
+        return _normalize_deepseek_model_id(value.strip())
     return DEFAULT_DEEPSEEK_PREMIUM_MODEL
 
 

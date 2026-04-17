@@ -102,6 +102,31 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     "gpt-4-turbo": {"input": 10.00, "output": 30.00},
     "o4-mini": {"input": 1.10, "output": 4.40},
     "gpt-5.4-pro": {"input": 15.00, "output": 60.00},
+    # DeepSeek (api-docs.deepseek.com/quick_start/pricing): cache-miss input + output; no >200k tier in public table.
+    "deepseek-chat": {
+        "input_le_200k": 0.28,
+        "input_gt_200k": 0.28,
+        "output_le_200k": 0.42,
+        "output_gt_200k": 0.42,
+    },
+    "deepseek-reasoner": {
+        "input_le_200k": 0.28,
+        "input_gt_200k": 0.28,
+        "output_le_200k": 0.42,
+        "output_gt_200k": 0.42,
+    },
+    "deepseek-v4": {
+        "input_le_200k": 0.28,
+        "input_gt_200k": 0.28,
+        "output_le_200k": 0.42,
+        "output_gt_200k": 0.42,
+    },
+    "deepseek-v4-reasoner": {
+        "input_le_200k": 0.28,
+        "input_gt_200k": 0.28,
+        "output_le_200k": 0.42,
+        "output_gt_200k": 0.42,
+    },
 }
 
 
@@ -120,6 +145,16 @@ def _usd_to_inr_rate() -> float:
 def _approx_tokens(text: Any) -> int:
     s = str(text or "")
     return max(1, int(round(len(s) / 4.0)))
+
+
+def _row_optional_int(val: Any) -> Optional[int]:
+    """SQL NULL → None; integer token/char counts preserved (including 0)."""
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
 
 
 def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) -> Dict[str, float]:
@@ -144,6 +179,9 @@ def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) ->
         return {"input": 0.15, "output": 0.60, "tier": tier}
     if "gpt-4o" in ml:
         return {"input": 5.00, "output": 15.00, "tier": tier}
+    # Any other deepseek-* (future ids): same ballpark as published chat/reasoner cache-miss pricing.
+    if ml.startswith("deepseek-"):
+        return {"input": 0.28, "output": 0.42, "tier": tier}
     return {"input": 0.10, "output": 0.40, "tier": tier}
 
 
@@ -323,14 +361,28 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
 
                 has_llm_input_tokens = "llm_input_tokens" in msg_cols
                 has_llm_output_tokens = "llm_output_tokens" in msg_cols
+                has_llm_prompt_chars = "llm_prompt_chars" in msg_cols
+                has_llm_response_chars = "llm_response_chars" in msg_cols
                 select_message_type = "COALESCE(message_type, '')" if has_message_type else "''"
-                select_llm_input_tokens = "COALESCE(llm_input_tokens, 0)" if has_llm_input_tokens else "0"
-                select_llm_output_tokens = "COALESCE(llm_output_tokens, 0)" if has_llm_output_tokens else "0"
+                # Preserve SQL NULL so we can tell "not stored" from real API zeros.
+                select_llm_input_tokens = (
+                    "llm_input_tokens" if has_llm_input_tokens else "CAST(NULL AS INTEGER)"
+                )
+                select_llm_output_tokens = (
+                    "llm_output_tokens" if has_llm_output_tokens else "CAST(NULL AS INTEGER)"
+                )
+                select_llm_prompt_chars = (
+                    "llm_prompt_chars" if has_llm_prompt_chars else "CAST(NULL AS INTEGER)"
+                )
+                select_llm_response_chars = (
+                    "llm_response_chars" if has_llm_response_chars else "CAST(NULL AS INTEGER)"
+                )
                 cur = execute(
                     conn,
                     f"""
                     SELECT message_id, sender, content, timestamp, {select_message_type},
-                           {select_llm_input_tokens}, {select_llm_output_tokens}
+                           {select_llm_input_tokens}, {select_llm_output_tokens},
+                           {select_llm_prompt_chars}, {select_llm_response_chars}
                     FROM chat_messages
                     WHERE session_id = %s
                     ORDER BY message_id ASC
@@ -354,30 +406,65 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     next_msg = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
                     next_sender = (next_msg[1] if next_msg else "") or ""
                     next_type = ((next_msg[4] if next_msg else "") or "").strip().lower()
-                    next_input_tokens = int((next_msg[5] if next_msg else 0) or 0)
+                    next_in_m = _row_optional_int(next_msg[5]) if next_msg and len(next_msg) > 5 else None
                     # Clarification/routing turn likely uses much smaller context than full answer turn.
-                    if next_input_tokens > 0:
-                        tokens_est = next_input_tokens
+                    if next_in_m is not None and next_in_m > 0:
+                        tokens_est = next_in_m
                     elif next_sender == "assistant" and next_type == "clarification":
                         tokens_est = _LIGHT_INPUT_TOKENS_PER_QUESTION
                     else:
                         tokens_est = _FIXED_INPUT_TOKENS_PER_QUESTION
                 elif sender == "assistant":
-                    out_tokens = int((r[6] or 0))
-                    if out_tokens > 0:
-                        tokens_est = out_tokens
+                    out_m = _row_optional_int(r[6]) if len(r) > 6 else None
+                    if out_m is not None and out_m > 0:
+                        tokens_est = out_m
                 if sender == "user":
                     usd_per_1m = float(rates["input"])
                 else:
                     usd_per_1m = float(rates["output"])
                 cost_inr = (tokens_est / 1_000_000.0) * usd_per_1m * fx
                 total_inr += cost_inr
+                raw_in = _row_optional_int(r[5]) if len(r) > 5 else None
+                raw_out = _row_optional_int(r[6]) if len(r) > 6 else None
+                raw_pc = _row_optional_int(r[7]) if len(r) > 7 else None
+                raw_rc = _row_optional_int(r[8]) if len(r) > 8 else None
+                llm_in_display: Optional[int] = None
+                llm_out_display: Optional[int] = None
+                llm_prompt_chars_display: Optional[int] = None
+                llm_response_chars_display: Optional[int] = None
+                if str(sender or "").strip().lower() == "assistant":
+                    if has_llm_input_tokens:
+                        llm_in_display = raw_in
+                    if has_llm_output_tokens:
+                        llm_out_display = raw_out
+                    if has_llm_prompt_chars and raw_pc is not None and raw_pc > 0:
+                        llm_prompt_chars_display = raw_pc
+                    if has_llm_response_chars and raw_rc is not None and raw_rc > 0:
+                        llm_response_chars_display = raw_rc
+                else:
+                    # User row: full prompt / usage / reply size come from the assistant message for this turn.
+                    nxt = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
+                    if nxt and str(nxt[1] or "").strip().lower() == "assistant" and len(nxt) > 8:
+                        if has_llm_input_tokens:
+                            llm_in_display = _row_optional_int(nxt[5])
+                        if has_llm_output_tokens:
+                            llm_out_display = _row_optional_int(nxt[6])
+                        npc = _row_optional_int(nxt[7])
+                        nrc = _row_optional_int(nxt[8])
+                        if has_llm_prompt_chars and npc is not None and npc > 0:
+                            llm_prompt_chars_display = npc
+                        if has_llm_response_chars and nrc is not None and nrc > 0:
+                            llm_response_chars_display = nrc
                 messages.append(
                     {
                         "sender": sender,
                         "content": content,
                         "timestamp": _timestamp_to_ist_iso(r[3]),
                         "native_name": native_name,
+                        "llm_input_tokens": llm_in_display,
+                        "llm_output_tokens": llm_out_display,
+                        "llm_prompt_chars": llm_prompt_chars_display,
+                        "llm_response_chars": llm_response_chars_display,
                         "cost_estimate": {
                             "tokens_estimate": tokens_est,
                             "cost_inr_estimate": round(cost_inr, 6),
