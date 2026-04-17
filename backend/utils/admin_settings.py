@@ -20,6 +20,7 @@ DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite-preview"
 # Chat only: which vendor handles `GeminiChatAnalyzer.generate_chat_response` (analysis stays on Gemini).
 CHAT_LLM_GEMINI = "gemini"
 CHAT_LLM_OPENAI = "openai"
+CHAT_LLM_DEEPSEEK = "deepseek"
 
 # OpenAI model IDs for Chat Completions API (no `models/` prefix).
 OPENAI_CHAT_MODEL_OPTIONS = [
@@ -32,6 +33,13 @@ OPENAI_CHAT_MODEL_OPTIONS = [
 
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_OPENAI_PREMIUM_MODEL = "gpt-4o"
+
+DEEPSEEK_CHAT_MODEL_OPTIONS = [
+    ("deepseek-chat-3.2", "DeepSeek Chat 3.2"),
+    ("deepseek-reasoner", "DeepSeek Reasoner"),
+]
+DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-chat-3.2"
+DEFAULT_DEEPSEEK_PREMIUM_MODEL = "deepseek-reasoner"
 
 
 def _ensure_admin_settings_table(conn: Any) -> None:
@@ -89,8 +97,10 @@ def get_gemini_analysis_model() -> str:
 
 
 def get_chat_llm_provider() -> str:
-    """Which LLM vendor runs astrological chat: 'gemini' or 'openai'."""
+    """Which LLM vendor runs astrological chat: 'gemini', 'openai', or 'deepseek'."""
     value = (get_setting("chat_llm_provider") or "").strip().lower()
+    if value == CHAT_LLM_DEEPSEEK:
+        return CHAT_LLM_DEEPSEEK
     if value == CHAT_LLM_OPENAI:
         return CHAT_LLM_OPENAI
     return CHAT_LLM_GEMINI
@@ -108,6 +118,20 @@ def get_openai_premium_model() -> str:
     if value and value.strip():
         return value.strip()
     return DEFAULT_OPENAI_PREMIUM_MODEL
+
+
+def get_deepseek_chat_model() -> str:
+    value = get_setting("deepseek_chat_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_DEEPSEEK_CHAT_MODEL
+
+
+def get_deepseek_premium_model() -> str:
+    value = get_setting("deepseek_premium_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_DEEPSEEK_PREMIUM_MODEL
 
 
 def is_debug_logging_enabled() -> bool:

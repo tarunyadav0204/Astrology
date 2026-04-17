@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import json
 import logging
 import os
@@ -1754,3 +1754,223 @@ async def get_credits_dashboard(
         fd = today.replace(day=1)
         td = today
     return credit_service.get_dashboard_stats(fd.isoformat(), td.isoformat())
+
+
+def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: int) -> Dict[str, Any]:
+    m = (model_name or "").strip()
+    if not m or m.lower() == "unknown":
+        # Prefer configured chat model when historical row lacks model id.
+        try:
+            from utils.admin_settings import get_gemini_chat_model
+            m = (get_gemini_chat_model() or "").strip() or "models/gemini-2.5-flash"
+        except Exception:
+            m = "models/gemini-2.5-flash"
+    tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
+    rates = {
+        "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00},
+        "models/gemini-3-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00},
+        "models/gemini-3-flash-preview": {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00},
+        "models/gemini-2.5-pro": {"in_le": 1.25, "in_gt": 2.50, "out_le": 10.00, "out_gt": 15.00},
+        "models/gemini-2.5-flash": {"in_le": 0.30, "in_gt": 0.30, "out_le": 2.50, "out_gt": 2.50},
+        "models/gemini-2.5-flash-lite": {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40},
+        "models/gemini-2.0-flash-001": {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40},
+        "models/gemini-2.0-flash-lite-001": {"in_le": 0.075, "in_gt": 0.075, "out_le": 0.30, "out_gt": 0.30},
+    }
+    row = rates.get(m)
+    if not row:
+        ml = m.lower()
+        if "flash-lite" in ml:
+            row = {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
+        elif "flash" in ml:
+            row = {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00}
+        elif "pro" in ml:
+            row = {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00}
+        else:
+            row = {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
+    return {
+        "input": float(row["in_gt"] if tier == "gt_200k" else row["in_le"]),
+        "output": float(row["out_gt"] if tier == "gt_200k" else row["out_le"]),
+        "tier": tier,
+        "resolved_model": m,
+    }
+
+
+@router.get("/admin/question-cost-summary")
+async def get_question_cost_summary(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Question unit economics summary: question counts, paid/free split, charged money, and rough AI cost."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from datetime import date as date_type
+    today = date_type.today()
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today.replace(day=1)
+            td = today
+    else:
+        fd = today.replace(day=1)
+        td = today
+
+    # Business rule requested: 1 credit = ₹1
+    inr_per_credit = 1.0
+    usd_to_inr = float(os.getenv("USD_TO_INR_RATE") or 93.0)
+    fixed_input_chars_per_question = 200_000
+    fixed_input_tokens_per_question = max(1, int(round(fixed_input_chars_per_question / 4.0)))
+    light_input_chars_per_question = 5_000
+    light_input_tokens_per_question = max(1, int(round(light_input_chars_per_question / 4.0)))
+    try:
+        chat_question_cost = int(credit_service.get_credit_setting("chat_question_cost") or 1)
+    except Exception:
+        chat_question_cost = 1
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT COUNT(*)
+            FROM chat_messages cm
+            WHERE cm.sender = 'assistant'
+              AND cm.status = 'completed'
+              AND COALESCE(cm.message_type, 'answer') = 'answer'
+              AND cm.completed_at IS NOT NULL
+              AND date(cm.completed_at) >= %s AND date(cm.completed_at) <= %s
+            """,
+            (fd.isoformat(), td.isoformat()),
+        )
+        total_completed_answers = int((cur.fetchone() or [0])[0] or 0)
+
+        cur = execute(
+            conn,
+            """
+            SELECT COUNT(*), COALESCE(SUM(ABS(amount)), 0)
+            FROM credit_transactions
+            WHERE transaction_type = 'spent'
+              AND source = 'feature_usage'
+              AND reference_id = 'chat_question'
+              AND date(created_at) >= %s AND date(created_at) <= %s
+            """,
+            (fd.isoformat(), td.isoformat()),
+        )
+        paid_question_rows, paid_credits_spent = cur.fetchone() or (0, 0)
+        paid_question_rows = int(paid_question_rows or 0)
+        paid_credits_spent = float(paid_credits_spent or 0.0)
+
+        free_question_rows = max(0, total_completed_answers - paid_question_rows)
+        free_credits_equivalent = float(free_question_rows * chat_question_cost)
+        charged_credits = paid_credits_spent
+        total_credits_equivalent = charged_credits + free_credits_equivalent
+
+        # Rough model cost for answered questions in range.
+        cur = execute(
+            conn,
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'chat_messages'
+            """,
+            (),
+        )
+        msg_cols = {r[0] for r in (cur.fetchall() or [])}
+        has_llm_input_tokens = "llm_input_tokens" in msg_cols
+        has_llm_output_tokens = "llm_output_tokens" in msg_cols
+        input_tok_expr = "COALESCE(cm.llm_input_tokens, 0)" if has_llm_input_tokens else "0"
+        output_tok_expr = "COALESCE(cm.llm_output_tokens, 0)" if has_llm_output_tokens else "0"
+
+        cur = execute(
+            conn,
+            f"""
+            SELECT cm.session_id,
+                   cm.message_id,
+                   cm.content AS assistant_answer,
+                   cs.chat_llm_model,
+                   {input_tok_expr} AS llm_input_tokens,
+                   {output_tok_expr} AS llm_output_tokens,
+                   (
+                     SELECT content FROM chat_messages m2
+                     WHERE m2.session_id = cm.session_id
+                       AND m2.sender = 'user'
+                       AND m2.message_id < cm.message_id
+                     ORDER BY m2.message_id DESC
+                     LIMIT 1
+                   ) AS user_question
+            FROM chat_messages cm
+            JOIN chat_sessions cs ON cs.session_id = cm.session_id
+            WHERE cm.sender = 'assistant'
+              AND cm.status = 'completed'
+              AND COALESCE(cm.message_type, 'answer') = 'answer'
+              AND cm.completed_at IS NOT NULL
+              AND date(cm.completed_at) >= %s AND date(cm.completed_at) <= %s
+            """,
+            (fd.isoformat(), td.isoformat()),
+        )
+        rows = cur.fetchall() or []
+
+    model_breakdown: Dict[str, Dict[str, Any]] = {}
+    ai_cost_total_inr = 0.0
+    for r in rows:
+        model = (r[3] or "unknown").strip() or "unknown"
+        a = str(r[2] or "")
+        llm_input_tokens = int(r[4] or 0)
+        llm_output_tokens = int(r[5] or 0)
+        if llm_input_tokens > 0:
+            q_tokens = llm_input_tokens
+        else:
+            # Lightweight turns (intent-routing-like, very short outputs) likely don't carry full context.
+            q_tokens = light_input_tokens_per_question if len(a) < 280 else fixed_input_tokens_per_question
+        a_tokens = llm_output_tokens if llm_output_tokens > 0 else max(1, int(round(len(a) / 4.0)))
+        rate = _question_cost_rate_for_model(model, q_tokens)
+        usd_cost = (q_tokens / 1_000_000.0) * float(rate["input"]) + (a_tokens / 1_000_000.0) * float(rate["output"])
+        inr_cost = usd_cost * usd_to_inr
+        ai_cost_total_inr += inr_cost
+        resolved_model = str(rate.get("resolved_model") or model)
+        if resolved_model not in model_breakdown:
+            model_breakdown[resolved_model] = {
+                "model": resolved_model,
+                "questions": 0,
+                "input_tokens_estimate": 0,
+                "output_tokens_estimate": 0,
+                "ai_cost_inr_estimate": 0.0,
+            }
+        m = model_breakdown[resolved_model]
+        m["questions"] += 1
+        m["input_tokens_estimate"] += q_tokens
+        m["output_tokens_estimate"] += a_tokens
+        m["ai_cost_inr_estimate"] += inr_cost
+
+    for m in model_breakdown.values():
+        m["ai_cost_inr_estimate"] = round(float(m["ai_cost_inr_estimate"]), 4)
+    models_sorted = sorted(model_breakdown.values(), key=lambda x: x["questions"], reverse=True)
+
+    return {
+        "from_date": fd.isoformat(),
+        "to_date": td.isoformat(),
+        "inr_per_credit": inr_per_credit,
+        "chat_question_cost_credits": chat_question_cost,
+        "summary": {
+            "questions_total": total_completed_answers,
+            "questions_paid": paid_question_rows,
+            "questions_free_estimated": free_question_rows,
+            "credits_charged": round(charged_credits, 2),
+            "credits_free_equivalent": round(free_credits_equivalent, 2),
+            "credits_total_equivalent": round(total_credits_equivalent, 2),
+            "money_charged_inr": round(charged_credits * inr_per_credit, 2),
+            "money_free_equivalent_inr": round(free_credits_equivalent * inr_per_credit, 2),
+            "money_total_equivalent_inr": round(total_credits_equivalent * inr_per_credit, 2),
+            "ai_cost_inr_estimate": round(ai_cost_total_inr, 4),
+            "gross_margin_inr_estimate": round((charged_credits * inr_per_credit) - ai_cost_total_inr, 4),
+        },
+        "model_breakdown": models_sorted,
+        "note": (
+            "Free questions are estimated as completed chat answers minus paid chat_question debit rows. "
+            f"Input uses full {fixed_input_chars_per_question} chars/question ({fixed_input_tokens_per_question} tokens est) "
+            f"and light {light_input_chars_per_question} chars/question ({light_input_tokens_per_question} tokens est) for lightweight turns."
+        ),
+    }

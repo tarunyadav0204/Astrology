@@ -185,7 +185,7 @@ class GeminiChatAnalyzer:
 
     async def _openai_chat_completion(
         self, prompt: str, model_id: str, premium_analysis: bool = False
-    ) -> str:
+    ) -> Dict[str, Any]:
         """OpenAI chat: Chat Completions (GPT-4 family) or Responses API (GPT-5 family)."""
         try:
             from openai import AsyncOpenAI
@@ -238,7 +238,13 @@ class GeminiChatAnalyzer:
                 content = "".join(parts).strip()
             if not content:
                 raise RuntimeError("Blank OpenAI Responses API output")
-            return content
+            return {
+                "text": content,
+                "usage": {
+                    "input_tokens": int(getattr(getattr(resp, "usage", None), "input_tokens", 0) or 0),
+                    "output_tokens": int(getattr(getattr(resp, "usage", None), "output_tokens", 0) or 0),
+                },
+            }
 
         # Legacy Chat Completions (gpt-4o, gpt-4-turbo, etc.)
         temperature = 1.0 if mid.startswith("o") else 0.0
@@ -253,7 +259,52 @@ class GeminiChatAnalyzer:
         content = (resp.choices[0].message.content or "").strip()
         if not content:
             raise RuntimeError("Blank OpenAI response content")
-        return content
+        usage_obj = getattr(resp, "usage", None)
+        return {
+            "text": content,
+            "usage": {
+                "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+                "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+            },
+        }
+
+    async def _deepseek_chat_completion(self, prompt: str, model_id: str) -> Dict[str, Any]:
+        """DeepSeek chat via OpenAI-compatible API."""
+        try:
+            from openai import AsyncOpenAI
+        except ImportError as e:
+            raise RuntimeError(
+                "The 'openai' package is not installed. Add it to backend requirements and run: "
+                "pip install 'openai>=1.40.0'"
+            ) from e
+
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise ValueError("DEEPSEEK_API_KEY environment variable not set")
+
+        base_url = (os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com").strip().rstrip("/")
+        model_clean = (model_id or "").strip() or "deepseek-chat-3.2"
+        client = AsyncOpenAI(api_key=api_key, base_url=f"{base_url}/v1", timeout=600.0)
+
+        resp = await client.chat.completions.create(
+            model=model_clean,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=16384,
+        )
+        if not resp.choices:
+            raise RuntimeError("Empty DeepSeek choices")
+        content = (resp.choices[0].message.content or "").strip()
+        if not content:
+            raise RuntimeError("Blank DeepSeek response content")
+        usage_obj = getattr(resp, "usage", None)
+        return {
+            "text": content,
+            "usage": {
+                "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+                "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+            },
+        }
 
     async def generate_chat_response(
         self,
@@ -279,8 +330,11 @@ class GeminiChatAnalyzer:
             is_debug_logging_enabled,
             get_chat_llm_provider,
             CHAT_LLM_OPENAI,
+            CHAT_LLM_DEEPSEEK,
             get_openai_chat_model,
             get_openai_premium_model,
+            get_deepseek_chat_model,
+            get_deepseek_premium_model,
             get_gemini_chat_model,
             get_gemini_premium_model,
         )
@@ -371,6 +425,7 @@ class GeminiChatAnalyzer:
             response = None
             response_text = None
             model_name = ""
+            token_usage = {"input_tokens": 0, "output_tokens": 0}
 
             if llm_provider == CHAT_LLM_OPENAI:
                 model_name = get_openai_premium_model() if premium_analysis else get_openai_chat_model()
@@ -391,10 +446,21 @@ class GeminiChatAnalyzer:
                     prompt_size = len(prompt)
                     print(f"\n📏 OPENAI REQUEST SIZE: {prompt_size:,} characters ({prompt_size / 1024:.1f} KB)")
 
-                response_text = await asyncio.wait_for(
+                oa = await asyncio.wait_for(
                     self._openai_chat_completion(prompt, model_name, premium_analysis),
                     timeout=600.0,
                 )
+                response_text = (oa or {}).get("text")
+                token_usage = (oa or {}).get("usage") or token_usage
+            elif llm_provider == CHAT_LLM_DEEPSEEK:
+                model_name = get_deepseek_premium_model() if premium_analysis else get_deepseek_chat_model()
+                print(f"🧠 DeepSeek chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
+                ds = await asyncio.wait_for(
+                    self._deepseek_chat_completion(prompt, model_name),
+                    timeout=600.0,
+                )
+                response_text = (ds or {}).get("text")
+                token_usage = (ds or {}).get("usage") or token_usage
             else:
                 # Resolve Gemini model from admin settings (no server restart needed)
                 model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
@@ -451,12 +517,25 @@ class GeminiChatAnalyzer:
 
                 if response and hasattr(response, "text") and response.text:
                     response_text = response.text.strip()
+                try:
+                    usage_meta = getattr(response, "usage_metadata", None)
+                    token_usage = {
+                        "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
+                        "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
+                    }
+                except Exception:
+                    token_usage = token_usage
 
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start
 
             if debug_logging:
-                tag = "OPENAI" if llm_provider == CHAT_LLM_OPENAI else "GEMINI"
+                if llm_provider == CHAT_LLM_OPENAI:
+                    tag = "OPENAI"
+                elif llm_provider == CHAT_LLM_DEEPSEEK:
+                    tag = "DEEPSEEK"
+                else:
+                    tag = "GEMINI"
                 print(f"\n{'='*80}")
                 print(f"📥 {tag} RESPONSE #{call_type}")
                 print(f"{'='*80}")
@@ -641,6 +720,7 @@ class GeminiChatAnalyzer:
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
                 'chat_llm_model': model_name or None,
+                'token_usage': token_usage,
                 'timing': {
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,

@@ -1,5 +1,6 @@
 import re
 import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from db import get_conn, execute
 
 # YYYY-MM-DD for date filters (today / this month)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+logger = logging.getLogger(__name__)
 
 
 def _normalize_date_range(
@@ -143,6 +145,12 @@ def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) ->
     if "gpt-4o" in ml:
         return {"input": 5.00, "output": 15.00, "tier": tier}
     return {"input": 0.10, "output": 0.40, "tier": tier}
+
+
+_FIXED_INPUT_CHARS_PER_QUESTION = 200_000
+_FIXED_INPUT_TOKENS_PER_QUESTION = max(1, int(round(_FIXED_INPUT_CHARS_PER_QUESTION / 4.0)))
+_LIGHT_INPUT_CHARS_PER_QUESTION = 5_000
+_LIGHT_INPUT_TOKENS_PER_QUESTION = max(1, int(round(_LIGHT_INPUT_CHARS_PER_QUESTION / 4.0)))
 
 @router.get("/admin/chat/history/{user_id}")
 async def get_user_chat_history(user_id: int, current_user: dict = Depends(require_admin)):
@@ -304,25 +312,60 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 cur = execute(
                     conn,
                     """
-                    SELECT sender, content, timestamp
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'chat_messages'
+                    """,
+                    (),
+                )
+                msg_cols = {r[0] for r in (cur.fetchall() or [])}
+                has_message_type = "message_type" in msg_cols
+
+                has_llm_input_tokens = "llm_input_tokens" in msg_cols
+                has_llm_output_tokens = "llm_output_tokens" in msg_cols
+                select_message_type = "COALESCE(message_type, '')" if has_message_type else "''"
+                select_llm_input_tokens = "COALESCE(llm_input_tokens, 0)" if has_llm_input_tokens else "0"
+                select_llm_output_tokens = "COALESCE(llm_output_tokens, 0)" if has_llm_output_tokens else "0"
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT message_id, sender, content, timestamp, {select_message_type},
+                           {select_llm_input_tokens}, {select_llm_output_tokens}
                     FROM chat_messages
                     WHERE session_id = %s
-                    ORDER BY timestamp ASC
+                    ORDER BY message_id ASC
                     """,
                     (session_id,),
                 )
                 msg_rows = cur.fetchall() or []
             session_input_tokens_est = sum(
-                _approx_tokens(r[1]) for r in msg_rows if (r[0] or "").strip().lower() == "user"
+                _approx_tokens(r[2]) for r in msg_rows if str(r[1] or "").strip().lower() == "user"
             )
             rates = _resolve_model_rate(chat_llm_model, session_input_tokens_est)
             fx = _usd_to_inr_rate()
             total_inr = 0.0
             messages = []
-            for r in msg_rows:
-                sender = r[0]
-                content = r[1]
+            for idx, r in enumerate(msg_rows):
+                sender = r[1]
+                content = r[2]
+                # User question input is charged with fixed assumed context size per request.
                 tokens_est = _approx_tokens(content)
+                if sender == "user":
+                    next_msg = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
+                    next_sender = (next_msg[1] if next_msg else "") or ""
+                    next_type = ((next_msg[4] if next_msg else "") or "").strip().lower()
+                    next_input_tokens = int((next_msg[5] if next_msg else 0) or 0)
+                    # Clarification/routing turn likely uses much smaller context than full answer turn.
+                    if next_input_tokens > 0:
+                        tokens_est = next_input_tokens
+                    elif next_sender == "assistant" and next_type == "clarification":
+                        tokens_est = _LIGHT_INPUT_TOKENS_PER_QUESTION
+                    else:
+                        tokens_est = _FIXED_INPUT_TOKENS_PER_QUESTION
+                elif sender == "assistant":
+                    out_tokens = int((r[6] or 0))
+                    if out_tokens > 0:
+                        tokens_est = out_tokens
                 if sender == "user":
                     usd_per_1m = float(rates["input"])
                 else:
@@ -333,7 +376,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     {
                         "sender": sender,
                         "content": content,
-                        "timestamp": _timestamp_to_ist_iso(r[2]),
+                        "timestamp": _timestamp_to_ist_iso(r[3]),
                         "native_name": native_name,
                         "cost_estimate": {
                             "tokens_estimate": tokens_est,
@@ -356,7 +399,13 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     "output_usd_per_1m": float(rates["output"]),
                     "pricing_tier": rates.get("tier"),
                     "total_cost_inr_estimate": round(total_inr, 6),
-                    "note": "Rough estimate only (message chars to tokens approximation).",
+                    "input_assumption": {
+                        "input_chars_per_question_full": _FIXED_INPUT_CHARS_PER_QUESTION,
+                        "input_tokens_per_question_full_estimate": _FIXED_INPUT_TOKENS_PER_QUESTION,
+                        "input_chars_per_question_light": _LIGHT_INPUT_CHARS_PER_QUESTION,
+                        "input_tokens_per_question_light_estimate": _LIGHT_INPUT_TOKENS_PER_QUESTION,
+                    },
+                    "note": "Rough estimate only. User-question input uses full-context estimate for normal turns and light estimate for clarification/routing turns; assistant output uses answer length.",
                 },
             }
 
@@ -384,7 +433,12 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 for msg in conv_data.get('messages', []):
                     ts = _timestamp_to_ist_iso(msg.get('timestamp') or updated_at)
                     if msg.get('question'):
-                        q_tokens_est = _approx_tokens(msg['question'])
+                        # Legacy rows do not reliably preserve message_type; use conservative light estimate for short questions.
+                        q_tokens_est = (
+                            _LIGHT_INPUT_TOKENS_PER_QUESTION
+                            if len(str(msg.get("question") or "")) < 180
+                            else _FIXED_INPUT_TOKENS_PER_QUESTION
+                        )
                         q_cost_inr = (q_tokens_est / 1_000_000.0) * float(rates["input"]) * fx
                         total_inr += q_cost_inr
                         messages.append({
@@ -424,7 +478,13 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         "output_usd_per_1m": float(rates["output"]),
                         "pricing_tier": rates.get("tier"),
                         "total_cost_inr_estimate": round(total_inr, 6),
-                        "note": "Rough estimate only (legacy session; inferred model rates).",
+                        "input_assumption": {
+                            "input_chars_per_question_full": _FIXED_INPUT_CHARS_PER_QUESTION,
+                            "input_tokens_per_question_full_estimate": _FIXED_INPUT_TOKENS_PER_QUESTION,
+                            "input_chars_per_question_light": _LIGHT_INPUT_CHARS_PER_QUESTION,
+                            "input_tokens_per_question_light_estimate": _LIGHT_INPUT_TOKENS_PER_QUESTION,
+                        },
+                        "note": "Rough estimate only (legacy session). User-question input uses full/light fixed assumption based on prompt length; assistant output uses answer length.",
                     },
                 }
             except Exception:
@@ -434,6 +494,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Error fetching admin chat session details: session_id=%s", session_id)
         raise HTTPException(status_code=500, detail=f"Error fetching session details: {str(e)}")
 
 
@@ -499,6 +560,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             _ensure_admin_settings_table,
             GEMINI_MODEL_OPTIONS,
             OPENAI_CHAT_MODEL_OPTIONS,
+            DEEPSEEK_CHAT_MODEL_OPTIONS,
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
@@ -506,6 +568,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_chat_llm_provider,
             get_openai_chat_model,
             get_openai_premium_model,
+            get_deepseek_chat_model,
+            get_deepseek_premium_model,
         )
         with get_conn() as conn:
             _ensure_admin_settings_table(conn)
@@ -515,12 +579,15 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "settings": settings,
             "gemini_model_options": [{"value": v, "label": l} for v, l in GEMINI_MODEL_OPTIONS],
             "openai_model_options": [{"value": v, "label": l} for v, l in OPENAI_CHAT_MODEL_OPTIONS],
+            "deepseek_model_options": [{"value": v, "label": l} for v, l in DEEPSEEK_CHAT_MODEL_OPTIONS],
             "gemini_chat_model": get_gemini_chat_model(),
             "gemini_premium_model": get_gemini_premium_model(),
             "gemini_analysis_model": get_gemini_analysis_model(),
             "chat_llm_provider": get_chat_llm_provider(),
             "openai_chat_model": get_openai_chat_model(),
             "openai_premium_model": get_openai_premium_model(),
+            "deepseek_chat_model": get_deepseek_chat_model(),
+            "deepseek_premium_model": get_deepseek_premium_model(),
             "podcast_provider": get_podcast_provider(),
         }
     except Exception as e:

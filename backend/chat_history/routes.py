@@ -74,6 +74,8 @@ def init_chat_tables():
                 categorized_at TIMESTAMP,
                 language TEXT,
                 intent_router_ms REAL,
+                llm_input_tokens INTEGER,
+                llm_output_tokens INTEGER,
                 client_request_id TEXT
             )
         """)
@@ -88,6 +90,8 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS categorized_at TIMESTAMP")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS language TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent_router_ms REAL")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_input_tokens INTEGER")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_output_tokens INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
@@ -1523,7 +1527,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             UPDATE chat_messages
                             SET content = %s, terms = %s, glossary = %s, images = %s,
                                 follow_up_questions = %s, status = %s, message_type = %s,
-                                completed_at = %s, language = %s, intent_router_ms = %s
+                                completed_at = %s, language = %s, intent_router_ms = %s,
+                                llm_input_tokens = %s, llm_output_tokens = %s
                             WHERE message_id = %s
                         """,
                         (
@@ -1537,6 +1542,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             datetime.now(),
                             language,
                             intent_router_ms,
+                            int((result.get("token_usage") or {}).get("input_tokens") or 0) or None,
+                            int((result.get("token_usage") or {}).get("output_tokens") or 0) or None,
                             message_id,
                         ),
                     )

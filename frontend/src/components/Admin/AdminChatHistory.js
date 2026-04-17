@@ -243,34 +243,41 @@ const AdminChatHistory = () => {
                       {msgCount} message{msgCount === 1 ? '' : 's'}
                     </span>
                   )}
-                  {formatLlmLabel(selectedSession) && (
-                    <span className="session-header-model" title="Provider and model ID from admin settings at answer time">
-                      {formatLlmLabel(selectedSession)}
-                    </span>
-                  )}
-                  {typeof selectedSession?.cost_summary?.total_cost_inr_estimate === 'number' && (
-                    <span
-                      className="session-header-model"
-                      title={selectedSession?.cost_summary?.note || 'Rough estimate'}
-                    >
-                      Rough cost: INR {selectedSession.cost_summary.total_cost_inr_estimate.toFixed(4)}
-                    </span>
-                  )}
-                  {selectedSession?.cost_summary && (
-                    <span
-                      className="session-header-model"
-                      title="Rough pricing basis used for this estimate"
-                    >
-                      Pricing: in ${Number(selectedSession.cost_summary.input_usd_per_1m || 0).toFixed(2)}/1M, out $
-                      {Number(selectedSession.cost_summary.output_usd_per_1m || 0).toFixed(2)}/1M
-                      {selectedSession.cost_summary.pricing_tier
-                        ? `, ${selectedSession.cost_summary.pricing_tier}`
-                        : ''}
-                      {selectedSession.cost_summary.usd_to_inr_rate
-                        ? `, USD/INR ${Number(selectedSession.cost_summary.usd_to_inr_rate).toFixed(2)}`
-                        : ''}
-                    </span>
-                  )}
+                  <div className="session-meta-chips">
+                    {formatLlmLabel(selectedSession) && (
+                      <span className="session-meta-chip" title="Provider and model ID from admin settings at answer time">
+                        {formatLlmLabel(selectedSession)}
+                      </span>
+                    )}
+                    {typeof selectedSession?.cost_summary?.total_cost_inr_estimate === 'number' && (
+                      <span
+                        className="session-meta-chip session-meta-chip--accent"
+                        title={selectedSession?.cost_summary?.note || 'Rough estimate'}
+                      >
+                        INR {selectedSession.cost_summary.total_cost_inr_estimate.toFixed(4)}
+                      </span>
+                    )}
+                    {selectedSession?.cost_summary?.input_usd_per_1m != null && (
+                      <span className="session-meta-chip" title="Input rate in USD per 1M tokens">
+                        In ${Number(selectedSession.cost_summary.input_usd_per_1m || 0).toFixed(2)}/1M
+                      </span>
+                    )}
+                    {selectedSession?.cost_summary?.output_usd_per_1m != null && (
+                      <span className="session-meta-chip" title="Output rate in USD per 1M tokens">
+                        Out ${Number(selectedSession.cost_summary.output_usd_per_1m || 0).toFixed(2)}/1M
+                      </span>
+                    )}
+                    {selectedSession?.cost_summary?.pricing_tier && (
+                      <span className="session-meta-chip" title="Pricing tier used for estimation">
+                        {selectedSession.cost_summary.pricing_tier}
+                      </span>
+                    )}
+                    {selectedSession?.cost_summary?.usd_to_inr_rate != null && (
+                      <span className="session-meta-chip" title="USD to INR conversion rate">
+                        USD/INR {Number(selectedSession.cost_summary.usd_to_inr_rate).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   type="button"
