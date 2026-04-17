@@ -364,7 +364,12 @@ export default function App() {
           <Stack.Screen 
             name="Login" 
             component={ModernAuthFlow}
-            options={{ headerShown: false }}
+            options={{
+              headerShown: false,
+              // Inner auth (forgot password, OTP, etc.) is not separate stack routes; without this,
+              // iOS edge-swipe pops the whole Login screen (e.g. back to Home after logout bug pattern).
+              gestureEnabled: false,
+            }}
           />
           <Stack.Screen 
             name="Home" 

@@ -33,7 +33,19 @@ import { useCredits } from '../../credits/CreditContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry, onStartNewChat, sessionId }) {
+export default function MessageBubble({
+  message,
+  language,
+  onFollowUpClick,
+  partnership,
+  onDelete,
+  onRestart,
+  onSendRetry,
+  onStartNewChat,
+  sessionId,
+  podcastAutoLaunchMessageId = null,
+  podcastAutoLaunchKey = 0,
+}) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const { podcastCost, credits } = useCredits();
@@ -1103,6 +1115,57 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       : message.content != null
         ? String(message.content)
         : '';
+
+  // Promo CTA on ChatScreen: skip the credits modal; user already consented in PodcastPromoModal.
+  useEffect(() => {
+    if (!podcastAutoLaunchMessageId || !podcastAutoLaunchKey) return;
+    const mid = message.messageId;
+    if (!mid || String(mid) !== String(podcastAutoLaunchMessageId)) return;
+    if (message.role !== 'assistant' || message.isTyping) return;
+    if (isClarification || isNativeGate) return;
+    const body = getCleanMessageText();
+    if (!body || body.length < 80) return;
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          userDismissedGeneratingRef.current = false;
+          const msgId = message.messageId || null;
+          if (msgId) {
+            try {
+              const res = await chatAPI.checkPodcastCache(msgId, language);
+              if (res?.data?.cached === true) {
+                await playPodcast();
+                return;
+              }
+            } catch (_) {
+              // Network failure: still attempt generation (server enforces credits).
+            }
+          }
+          setShowPodcastCreditsModal(false);
+          setPodcastPlayerMode('generating');
+          setShowPodcastPlayerModal(true);
+          setPodcastPositionMillis(0);
+          setPodcastDurationMillis(0);
+          playPodcast();
+        } catch (e) {
+          console.error('[Podcast] auto-launch', e);
+        }
+      })();
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- playPodcast closes over latest message/session; avoid re-firing loops
+  }, [
+    podcastAutoLaunchKey,
+    podcastAutoLaunchMessageId,
+    message.messageId,
+    message.role,
+    message.isTyping,
+    message.content,
+    language,
+    isClarification,
+    isNativeGate,
+  ]);
 
   // Loading rows use LoadingBubble (isTyping), not MessageBubble — skip empty assistant rows safely.
   if (!contentStr.trim()) {

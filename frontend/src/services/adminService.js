@@ -243,4 +243,26 @@ export const adminService = {
     }
     return response.json();
   },
+
+  async generateNudgeFromChat(userId) {
+    const response = await fetch(getEndpoint('/nudge/admin/generate-nudge-from-chat'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ user_id: Number(userId) }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const d = err.detail;
+      const msg =
+        typeof d === 'string'
+          ? d
+          : Array.isArray(d)
+            ? d.map((x) => x?.msg || JSON.stringify(x)).join('; ')
+            : d
+              ? JSON.stringify(d)
+              : 'Failed to generate nudge from chat';
+      throw new Error(msg);
+    }
+    return response.json();
+  },
 };

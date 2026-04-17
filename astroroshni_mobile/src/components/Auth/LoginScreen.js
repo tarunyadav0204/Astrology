@@ -18,6 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';
+import { otpEmailRequiredForPhone } from './countryCodes';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 
@@ -34,7 +35,7 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
+  const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
   const [showOtpVerification, setShowOtpVerification] = useState(false);
@@ -97,7 +98,8 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleAuth = async () => {
-    if (!phone || !password || (!isLogin && (!name || !email))) {
+    const needEmailSignup = !isLogin && otpEmailRequiredForPhone(phone);
+    if (!phone || !password || (!isLogin && (!name || (needEmailSignup && !email.trim())))) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -136,7 +138,12 @@ export default function LoginScreen({ navigation }) {
         }
       } else {
         // For registration, show birth details option first
-        setRegistrationData({ name, phone, password, email });
+        setRegistrationData({
+          name,
+          phone,
+          password,
+          ...(email.trim() ? { email: email.trim() } : {}),
+        });
         setBirthDetails(prev => ({ ...prev, name }));
         setShowBirthDetailsOption(true);
       }
@@ -219,10 +226,18 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
+    if (otpEmailRequiredForPhone(resetData.phone) && !(resetData.email || '').trim()) {
+      Alert.alert('Error', 'Please enter your email for non-India numbers');
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await authAPI.sendResetCode({ phone: resetData.phone });
+      const payload = { phone: resetData.phone };
+      if (otpEmailRequiredForPhone(resetData.phone) && (resetData.email || '').trim()) {
+        payload.email = resetData.email.trim();
+      }
+      const response = await authAPI.sendResetCode(payload);
       Alert.alert('Success', response.data.message);
       setResetStep(2);
     } catch (error) {
@@ -269,7 +284,7 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Success', 'Password reset successfully!');
       setShowForgotPassword(false);
       setResetStep(1);
-      setResetData({ phone: '', code: '', newPassword: '' });
+      setResetData({ phone: '', email: '', code: '', newPassword: '' });
       setResetToken('');
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Password reset failed');
@@ -284,7 +299,11 @@ export default function LoginScreen({ navigation }) {
     
     // Send OTP for registration
     try {
-      await authAPI.sendRegistrationOtp({ phone: registrationData.phone });
+      const regPayload = { phone: registrationData.phone };
+      if (otpEmailRequiredForPhone(registrationData.phone) && registrationData.email) {
+        regPayload.email = registrationData.email;
+      }
+      await authAPI.sendRegistrationOtp(regPayload);
       setShowOtpVerification(true);
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to send OTP');
@@ -561,6 +580,20 @@ export default function LoginScreen({ navigation }) {
                       keyboardType="phone-pad"
                     />
                   </View>
+                  {otpEmailRequiredForPhone(resetData.phone) ? (
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Email (required for non-India)"
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={resetData.email}
+                        onChangeText={(value) => setResetData(prev => ({ ...prev, email: value }))}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  ) : null}
                   <TouchableOpacity
                     style={[styles.modernButton, loading && styles.buttonDisabled]}
                     onPress={handleSendCode}
@@ -640,7 +673,7 @@ export default function LoginScreen({ navigation }) {
                 onPress={() => {
                   setShowForgotPassword(false);
                   setResetStep(1);
-                  setResetData({ phone: '', code: '', newPassword: '' });
+                  setResetData({ phone: '', email: '', code: '', newPassword: '' });
                   setResetToken('');
                 }}
               >
@@ -706,7 +739,11 @@ export default function LoginScreen({ navigation }) {
                       <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
                       <TextInput
                         style={styles.modernInput}
-                        placeholder="Email Address"
+                        placeholder={
+                          otpEmailRequiredForPhone(phone)
+                            ? 'Email Address'
+                            : 'Email (optional for India)'
+                        }
                         placeholderTextColor={COLORS.textSecondary}
                         value={email}
                         onChangeText={setEmail}

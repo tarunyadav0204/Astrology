@@ -29,7 +29,8 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
-  const isUsReset = () => resetCountryCode === '+1';
+  /** Non-India: reset / registration OTP is also sent by email (backend requires it). */
+  const isOtpEmailRequired = () => resetCountryCode !== '+91';
 
   const [biometricSupported, setBiometricSupported] = useState(false);
   
@@ -102,8 +103,8 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      if (isUsReset() && !(resetData.email || '').trim()) {
-        throw new Error('Email is required for US numbers');
+      if (isOtpEmailRequired() && !(resetData.email || '').trim()) {
+        throw new Error('Email is required for non-India numbers');
       }
       const payload = { phone: fullPhone };
       if ((resetData.email || '').trim()) payload.email = resetData.email.trim();
@@ -277,14 +278,14 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 color: '#e91e63',
                 fontWeight: '600'
               }}>
-                Email {isUsReset() ? '(required for US numbers)' : '(optional)'}
+                Email {isOtpEmailRequired() ? '(required for non-India numbers)' : '(optional)'}
               </label>
               <input
                 type="email"
                 value={resetData.email}
                 onChange={(e) => setResetData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="Enter your email"
-                required={isUsReset()}
+                required={isOtpEmailRequired()}
                 style={{
                   width: '100%',
                   padding: '0.75rem',

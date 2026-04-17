@@ -184,7 +184,13 @@ export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
-  const { credits, partnershipCost, freeQuestionAvailable, fetchBalance } = useCredits();
+  const {
+    credits,
+    partnershipCost,
+    freeQuestionAvailable,
+    freeQuestionRequiresNotifications,
+    fetchBalance,
+  } = useCredits();
   const insets = useSafeAreaInsets();
   
   // Mundane mode state
@@ -912,6 +918,19 @@ export default function ChatScreen({ navigation, route }) {
   const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
     ? 0
     : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
+
+  const openNotificationsForFreeQuestion = async () => {
+    try {
+      const { registerPushTokenIfLoggedIn } = require('../../services/pushNotifications');
+      const result = await registerPushTokenIfLoggedIn();
+      await fetchBalance();
+      if (!result.ok) {
+        Alert.alert('Notifications', result.message);
+      }
+    } catch (e) {
+      Alert.alert('Notifications', e?.message || 'Could not enable notifications.');
+    }
+  };
 
   const openPartnershipModal = (cost) => {
     setPartnershipModalCost((cost != null && cost > 0) ? cost : partnershipCost);
@@ -2944,8 +2963,10 @@ export default function ChatScreen({ navigation, route }) {
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder={
-                  loading ? "Analyzing..." : 
-                  credits < effectiveChatCost ? "Insufficient credits" : 
+                  loading ? "Analyzing..." :
+                  freeQuestionRequiresNotifications && !partnershipMode && !isMundane && !isPremiumAnalysis && credits < effectiveChatCost
+                    ? "Turn on notifications to unlock your free question"
+                  : credits < effectiveChatCost ? "Insufficient credits" :
                   partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
                   partnershipMode && partnershipStep === 2 ? "Describe the relationship..." :
                   partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
@@ -3030,7 +3051,19 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             )}
             
-            {credits < effectiveChatCost && (
+            {freeQuestionRequiresNotifications && !partnershipMode && !isMundane && !isPremiumAnalysis && credits < effectiveChatCost && (
+              <TouchableOpacity
+                style={styles.notifGateBanner}
+                onPress={openNotificationsForFreeQuestion}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.notifGateText}>
+                  🔔 Turn on notifications to use your free first question — tap here
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {credits < effectiveChatCost && !freeQuestionRequiresNotifications && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -4607,6 +4640,21 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  notifGateBanner: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.22)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.45)',
+  },
+  notifGateText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
     textAlign: 'center',
   },
   quickActionsBar: {

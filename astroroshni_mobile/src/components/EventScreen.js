@@ -420,7 +420,13 @@ export default function EventScreen({ route }) {
       if (error.response?.status === 401) {
         errorMessage = 'Session expired. Please login again.';
         Alert.alert('Authentication Error', errorMessage, [
-          { text: 'Login', onPress: () => navigation.navigate('Login') },
+          {
+            text: 'Login',
+            onPress: () => {
+              const { replaceWithLogin } = require('../navigation/replaceWithLogin');
+              replaceWithLogin(navigation);
+            },
+          },
           { text: 'Cancel' }
         ]);
       } else if (error.response?.status === 402) {
@@ -661,7 +667,13 @@ export default function EventScreen({ route }) {
       
       if (error.response?.status === 401) {
         Alert.alert('Authentication Error', 'Session expired. Please login again.', [
-          { text: 'Login', onPress: () => navigation.navigate('Login') },
+          {
+            text: 'Login',
+            onPress: () => {
+              const { replaceWithLogin } = require('../navigation/replaceWithLogin');
+              replaceWithLogin(navigation);
+            },
+          },
           { text: 'Cancel' }
         ]);
       } else {

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { setGlobalErrorHandler } from '../services/api';
 import { useError } from '../context/ErrorContext';
+import { replaceWithLogin } from '../navigation/replaceWithLogin';
 
 export default function GlobalErrorHandler() {
   const navigation = useNavigation();
@@ -27,8 +28,8 @@ export default function GlobalErrorHandler() {
           break;
 
         case 'auth':
-          // Auth errors navigate immediately, no overlay
-          navigation.navigate('Login');
+          // Auth errors: clear stack so user cannot swipe back into Home.
+          replaceWithLogin(navigation);
           break;
 
         default:

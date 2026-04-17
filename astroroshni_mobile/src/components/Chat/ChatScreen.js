@@ -34,6 +34,7 @@ import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
 import NotificationEnableReminderModal from '../Notifications/NotificationEnableReminderModal';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
+import PodcastPromoModal from './PodcastPromoModal';
 import { storage } from '../../services/storage';
 import { chatAPI, pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -186,7 +187,14 @@ export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
-  const { credits, partnershipCost, freeQuestionAvailable, fetchBalance } = useCredits();
+  const {
+    credits,
+    partnershipCost,
+    freeQuestionAvailable,
+    freeQuestionRequiresNotifications,
+    fetchBalance,
+    podcastCost,
+  } = useCredits();
   const insets = useSafeAreaInsets();
   
   // Mundane mode state
@@ -336,6 +344,9 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
   const [showMundaneModal, setShowMundaneModal] = useState(false);
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
+  const [podcastPromoVisible, setPodcastPromoVisible] = useState(false);
+  const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
+  const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
 
   useEffect(() => {
     const maxKeyboardInset = Math.min(520, Math.round(Dimensions.get('window').height * 0.58));
@@ -969,6 +980,19 @@ export default function ChatScreen({ navigation, route }) {
   const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
     ? 0
     : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
+
+  const openNotificationsForFreeQuestion = async () => {
+    try {
+      const { registerPushTokenIfLoggedIn } = require('../../services/pushNotifications');
+      const result = await registerPushTokenIfLoggedIn();
+      await fetchBalance();
+      if (!result.ok) {
+        Alert.alert('Notifications', result.message);
+      }
+    } catch (e) {
+      Alert.alert('Notifications', e?.message || 'Could not enable notifications.');
+    }
+  };
 
   const openPartnershipModal = (cost) => {
     setPartnershipModalCost((cost != null && cost > 0) ? cost : partnershipCost);
@@ -1854,6 +1878,12 @@ export default function ChatScreen({ navigation, route }) {
                 [{ text: 'OK' }]
               );
             }
+            const mt = status.message_type || 'answer';
+            const body = (status.content || '').trim();
+            if (!gatedNoCharge && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+              setPodcastPromoMessageId(messageId);
+              setPodcastPromoVisible(true);
+            }
           };
 
           showFinalMessage();
@@ -2530,7 +2560,8 @@ export default function ChatScreen({ navigation, route }) {
           style: 'destructive',
           onPress: async () => {
             await storage.clearAll();
-            navigation.navigate('Login');
+            const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
+            replaceWithLogin(navigation);
           },
         },
       ]
@@ -2596,7 +2627,12 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const renderMessage = ({ item }) => (
-    <MessageBubble message={item} language={language} />
+    <MessageBubble
+      message={item}
+      language={language}
+      podcastAutoLaunchMessageId={podcastPromoMessageId}
+      podcastAutoLaunchKey={podcastAutoLaunchKey}
+    />
   );
 
   const renderSuggestion = ({ item }) => (
@@ -3029,6 +3065,8 @@ export default function ChatScreen({ navigation, route }) {
                       onSendRetry={handleSendRetry}
                       onStartNewChat={confirmStartNewChat}
                       sessionId={sessionId}
+                      podcastAutoLaunchMessageId={podcastPromoMessageId}
+                      podcastAutoLaunchKey={podcastAutoLaunchKey}
                     />
                     
                     {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
@@ -3190,8 +3228,10 @@ export default function ChatScreen({ navigation, route }) {
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder={
-                  loading ? "Analyzing..." : 
-                  credits < effectiveChatCost ? "Insufficient credits" : 
+                  loading ? "Analyzing..." :
+                  freeQuestionRequiresNotifications && !partnershipMode && !isMundane && !isPremiumAnalysis && credits < effectiveChatCost
+                    ? "Turn on notifications to unlock your free question"
+                  : credits < effectiveChatCost ? "Insufficient credits" :
                   partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
                   partnershipMode && partnershipStep === 2 ? "Describe the relationship..." :
                   partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
@@ -3276,7 +3316,19 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             )}
             
-            {credits < effectiveChatCost && !isKeyboardVisible && (
+            {freeQuestionRequiresNotifications && !partnershipMode && !isMundane && !isPremiumAnalysis && credits < effectiveChatCost && !isKeyboardVisible && (
+              <TouchableOpacity
+                style={styles.notifGateBanner}
+                onPress={openNotificationsForFreeQuestion}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.notifGateText}>
+                  🔔 Turn on notifications to use your free first question — tap here
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {credits < effectiveChatCost && !freeQuestionRequiresNotifications && !isKeyboardVisible && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -4519,6 +4571,20 @@ export default function ChatScreen({ navigation, route }) {
       </SafeAreaView>
 
       <NotificationEnableReminderModal homeActive={showGreeting} />
+
+      <PodcastPromoModal
+        visible={podcastPromoVisible}
+        podcastCost={podcastCost}
+        colors={colors}
+        onClose={() => {
+          setPodcastPromoVisible(false);
+          setPodcastPromoMessageId(null);
+        }}
+        onGenerate={() => {
+          setPodcastPromoVisible(false);
+          setPodcastAutoLaunchKey((k) => k + 1);
+        }}
+      />
       
       <PremiumAnalysisModal
         visible={showPremiumModal}
@@ -4991,6 +5057,21 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  notifGateBanner: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.22)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.45)',
+  },
+  notifGateText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
     textAlign: 'center',
   },
   quickActionsBar: {

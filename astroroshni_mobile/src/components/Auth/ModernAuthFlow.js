@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Animated, Dimensions, AppState } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, StyleSheet, Animated, Dimensions, AppState, BackHandler, Platform } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,6 +25,39 @@ import ChooseLanguageScreen from './screens/ChooseLanguageScreen';
 import { COLORS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
+
+/** @returns {string|null} next screen id, or '__root_go_back__' to pop Login off the root stack */
+function resolveAuthHardwareBackTarget(currentScreen, isLogin, formData) {
+  const cc = formData?.countryCode || '';
+  const otpEmailRequired = cc !== '+91';
+  switch (currentScreen) {
+    case 'welcome':
+      return '__root_go_back__';
+    case 'phone':
+      return 'welcome';
+    case 'password':
+      return isLogin ? 'phone' : (cc === '+91' ? 'email' : 'name');
+    case 'forgotPassword':
+      return 'password';
+    case 'email': {
+      if (isLogin) {
+        return 'password';
+      }
+      const nonIndiaPreOtp = cc !== '+91' && !(formData?.otpCode || '').trim();
+      return nonIndiaPreOtp ? 'phone' : 'name';
+    }
+    case 'otp':
+      return otpEmailRequired ? 'email' : 'phone';
+    case 'name':
+      return 'otp';
+    case 'chooseLanguage':
+      return 'password';
+    case 'welcomeAfterRegistration':
+      return 'chooseLanguage';
+    default:
+      return null;
+  }
+}
 
 const INITIAL_FORM_DATA = {
   phone: '',
@@ -89,6 +123,7 @@ export default function ModernAuthFlow({ navigation, route }) {
     return () => storage.clearPendingRegistration();
   }, []);
 
+  const navigateToScreenRef = useRef(null);
   const navigateToScreen = (screenName, direction = 'forward') => {
     const slideValue = direction === 'forward' ? -width : width;
     
@@ -122,6 +157,31 @@ export default function ModernAuthFlow({ navigation, route }) {
       ]).start();
     });
   };
+  navigateToScreenRef.current = navigateToScreen;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') {
+        return undefined;
+      }
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        const target = resolveAuthHardwareBackTarget(currentScreen, isLogin, formData);
+        if (target === '__root_go_back__') {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return true;
+          }
+          return false;
+        }
+        if (target) {
+          navigateToScreenRef.current?.(target, 'back');
+          return true;
+        }
+        return false;
+      });
+      return () => sub.remove();
+    }, [navigation, currentScreen, isLogin, formData])
+  );
 
   const updateFormData = (field, value) => {
     if (field.includes('.')) {

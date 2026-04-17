@@ -482,6 +482,17 @@
   font-weight: 600;
 }
 
+.admin-chat-history .message-cost-badge {
+  font-size: 0.72rem;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .admin-chat-history .message-time {
   font-size: 0.72rem;
   color: #868e96;

@@ -76,7 +76,7 @@ export default function PhoneInputScreen({
       console.log('  → Navigating to password screen');
       navigateToScreen('password');
     } else {
-      if (selectedCountry.code === '+1') {
+      if (selectedCountry.code !== '+91') {
         navigateToScreen('email');
         return;
       }

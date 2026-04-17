@@ -38,7 +38,7 @@ export default function ForgotPasswordScreen({
 
   const nationalDigits = (formData.phone || '').replace(/[^0-9]/g, '');
   const fullPhone = `${selectedCountry.code}${nationalDigits}`;
-  const isUSPhone = selectedCountry.code === '+1';
+  const otpEmailRequired = selectedCountry.code !== '+91';
   const isPhoneValid = isNationalPhoneValid(selectedCountry.code, nationalDigits);
 
   useEffect(() => {
@@ -91,8 +91,8 @@ export default function ForgotPasswordScreen({
       );
       return;
     }
-    if (isUSPhone && !formData.email) {
-      Alert.alert('Error', 'Please enter email for US numbers');
+    if (otpEmailRequired && !formData.email) {
+      Alert.alert('Error', 'Please enter email for non-India numbers');
       return;
     }
 
@@ -100,7 +100,7 @@ export default function ForgotPasswordScreen({
     try {
       const buildPayload = (phoneVal) => {
         const payload = { phone: phoneVal };
-        if (isUSPhone && formData.email) {
+        if (otpEmailRequired && formData.email) {
           payload.email = formData.email;
         }
         return payload;
@@ -183,7 +183,7 @@ export default function ForgotPasswordScreen({
               <Text style={styles.emoji}>📱</Text>
               <Text style={styles.title}>Reset Password</Text>
               <Text style={styles.subtitle}>
-                {isUSPhone
+                {otpEmailRequired
                   ? 'Enter your phone number and email. We will send a reset code to your email.'
                   : 'Enter your phone number to receive a reset code'}
               </Text>
@@ -229,7 +229,7 @@ export default function ForgotPasswordScreen({
               </View>
             </Animated.View>
 
-            {isUSPhone && (
+            {otpEmailRequired && (
               <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
                 <View style={styles.inputWrapper}>
                   <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
@@ -273,7 +273,7 @@ export default function ForgotPasswordScreen({
               <Text style={styles.title}>Enter Code</Text>
               <Text style={styles.subtitle}>
                 We've sent a 6-digit code to{'\n'}
-                {isUSPhone && formData.email ? formData.email : fullPhone}
+                {otpEmailRequired && formData.email ? formData.email : fullPhone}
               </Text>
             </View>
 

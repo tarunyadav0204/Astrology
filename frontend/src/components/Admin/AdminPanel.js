@@ -125,6 +125,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifNativeId, setNotifNativeId] = useState('');
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
+  const [notifChatSuggestMode, setNotifChatSuggestMode] = useState(false);
+  const [notifGenerateFromChatLoading, setNotifGenerateFromChatLoading] = useState(false);
   const [selectedNotifUserIds, setSelectedNotifUserIds] = useState([]); // multi-select
   const [notifSearchName, setNotifSearchName] = useState('');
   const [notifPage, setNotifPage] = useState(1);
@@ -970,6 +972,41 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setNotifResult({ ok: false, message: err.message || 'Request failed' });
     } finally {
       setNotifSending(false);
+    }
+  };
+
+  const handleGenerateNudgeFromChat = async () => {
+    const userId =
+      selectedNotifUserIds.length === 1 ? parseInt(selectedNotifUserIds[0], 10) : 0;
+    if (!userId) {
+      setNotifResult({
+        ok: false,
+        message: 'Select exactly one user, then generate a nudge from their recent chat.',
+      });
+      return;
+    }
+    setNotifGenerateFromChatLoading(true);
+    setNotifResult(null);
+    try {
+      const data = await adminService.generateNudgeFromChat(userId);
+      setNotifTitle(String(data.title || '').slice(0, 100));
+      setNotifBody(String(data.body || '').slice(0, 200));
+      setNotifQuestion(String(data.question || '').slice(0, 500));
+      const n = Number(data.qa_pairs_used) || 1;
+      const est = data.usage_estimate?.total_cost_inr_estimate;
+      const model = data.model_used ? ` model ${data.model_used};` : '';
+      const estMsg =
+        typeof est === 'number'
+          ? ` rough AI cost ~ INR ${est.toFixed(4)}.`
+          : '';
+      setNotifResult({
+        ok: true,
+        message: `Filled title, body, and suggested chat question from ${n} recent completed exchange(s);${model}${estMsg} Review and send.`,
+      });
+    } catch (e) {
+      setNotifResult({ ok: false, message: e.message || 'Failed to generate nudge from chat' });
+    } finally {
+      setNotifGenerateFromChatLoading(false);
     }
   };
 
@@ -2559,8 +2596,47 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <>
                 <p className="notifications-description">
                   Send a custom push notification to selected users. They must have the app installed and have allowed notifications.
+                  You can optionally use Gemini to draft copy from the user&apos;s last completed chat exchanges (one recipient only).
                 </p>
                 <div className="notifications-form">
+                  <div className="form-field notif-chat-suggest-toggle">
+                    <label className="notif-inline-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={notifChatSuggestMode}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          setNotifChatSuggestMode(on);
+                          if (on) {
+                            setSelectedNotifUserIds((prev) =>
+                              prev.length <= 1 ? prev : [prev[0]]
+                            );
+                          }
+                        }}
+                      />
+                      <span>Suggest from recent chat (Gemini) — select only one user</span>
+                    </label>
+                    <div className="form-buttons notif-generate-row">
+                      <button
+                        type="button"
+                        className="notif-search-btn"
+                        onClick={handleGenerateNudgeFromChat}
+                        disabled={
+                          !notifChatSuggestMode ||
+                          notifGenerateFromChatLoading ||
+                          selectedNotifUserIds.length !== 1
+                        }
+                      >
+                        {notifGenerateFromChatLoading
+                          ? 'Generating…'
+                          : 'Generate title, body & question from chat'}
+                      </button>
+                    </div>
+                    <small className="form-hint">
+                      Uses up to the last two completed user questions with assistant replies. Requires{' '}
+                      <code>GEMINI_API_KEY</code> on the server.
+                    </small>
+                  </div>
                   <div className="form-field">
                     <label>Recipients</label>
                     <div className="notif-search-row">
@@ -2584,8 +2660,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                               <input
                                 type="checkbox"
                                 id="notif-select-all"
+                                disabled={notifChatSuggestMode}
                                 checked={users.length > 0 && users.every((u) => selectedNotifUserIds.includes(u.userid))}
                                 onChange={(e) => {
+                                  if (notifChatSuggestMode) return;
                                   if (e.target.checked) {
                                     const pageIds = new Set(users.map((u) => u.userid));
                                     setSelectedNotifUserIds((prev) => [...new Set([...prev, ...pageIds])]);
@@ -2613,6 +2691,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                     type="checkbox"
                                     checked={checked}
                                     onChange={(e) => {
+                                      if (notifChatSuggestMode) {
+                                        if (e.target.checked) {
+                                          setSelectedNotifUserIds([id]);
+                                        } else {
+                                          setSelectedNotifUserIds([]);
+                                        }
+                                        return;
+                                      }
                                       if (e.target.checked) {
                                         setSelectedNotifUserIds((prev) => [...prev, id]);
                                       } else {

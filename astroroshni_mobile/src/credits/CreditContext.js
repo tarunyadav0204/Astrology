@@ -11,6 +11,7 @@ export const CreditProvider = ({ children }) => {
   const [partnershipCost, setPartnershipCost] = useState(2);
   const [podcastCost, setPodcastCost] = useState(2);
   const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
+  const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
   const [subscriptionTierName, setSubscriptionTierName] = useState(null);
   const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
 
@@ -21,6 +22,7 @@ export const CreditProvider = ({ children }) => {
       if (!token) {
         setCredits(0);
         setFreeQuestionAvailable(false);
+        setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
         return;
@@ -32,6 +34,7 @@ export const CreditProvider = ({ children }) => {
       const balance = data?.credits ?? data?.balance ?? 0;
       setCredits(Number(balance) || 0);
       setFreeQuestionAvailable(Boolean(data?.free_question_available));
+      setFreeQuestionRequiresNotifications(Boolean(data?.free_question_requires_notifications));
       setSubscriptionTierName(data?.subscription_tier_name ?? null);
       setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
     } catch (error) {
@@ -47,6 +50,8 @@ export const CreditProvider = ({ children }) => {
       });
       if (error.response?.status === 401) {
         setCredits(0);
+        setFreeQuestionAvailable(false);
+        setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
       }
@@ -119,6 +124,7 @@ export const CreditProvider = ({ children }) => {
       partnershipCost,
       podcastCost,
       freeQuestionAvailable,
+      freeQuestionRequiresNotifications,
       subscriptionTierName,
       subscriptionDiscountPercent,
       fetchBalance,

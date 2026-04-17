@@ -86,7 +86,7 @@ export default function AdminUserGrowthCharts() {
     <div className="admin-user-growth">
       <h2>User charts</h2>
       <p className="admin-user-growth-desc">
-        New users are signups per period (gender from the latest self birth chart on file per user).
+        New users are signups per period (gender: if the user has one birth chart, that chart; otherwise the latest self chart).
         Active users are distinct people who sent at least one chat message in that period.
       </p>
 

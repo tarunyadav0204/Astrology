@@ -10,10 +10,11 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 const { width } = Dimensions.get('window');
 
-export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
+export default function WelcomeScreen({ navigateToScreen, setIsLogin, navigation }) {
   const logoAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const titleAnim = useRef(new Animated.Value(50)).current;
@@ -59,6 +60,8 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
     outputRange: [0, 0.6],
   });
 
+  const canLeaveToRoot = typeof navigation?.canGoBack === 'function' && navigation.canGoBack();
+
   return (
     <ScrollView
       style={styles.container}
@@ -66,6 +69,16 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
       showsVerticalScrollIndicator={false}
       bounces={true}
     >
+      {canLeaveToRoot ? (
+        <TouchableOpacity
+          style={styles.rootBackButton}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
+      ) : null}
       <View style={styles.content}>
         {/* Logo with glow ring */}
         <Animated.View
@@ -164,6 +177,14 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
 }
 
 const styles = StyleSheet.create({
+  rootBackButton: {
+    alignSelf: 'flex-start',
+    marginLeft: 8,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
   container: {
     flex: 1,
   },

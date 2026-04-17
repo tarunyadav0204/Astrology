@@ -248,6 +248,29 @@ const AdminChatHistory = () => {
                       {formatLlmLabel(selectedSession)}
                     </span>
                   )}
+                  {typeof selectedSession?.cost_summary?.total_cost_inr_estimate === 'number' && (
+                    <span
+                      className="session-header-model"
+                      title={selectedSession?.cost_summary?.note || 'Rough estimate'}
+                    >
+                      Rough cost: INR {selectedSession.cost_summary.total_cost_inr_estimate.toFixed(4)}
+                    </span>
+                  )}
+                  {selectedSession?.cost_summary && (
+                    <span
+                      className="session-header-model"
+                      title="Rough pricing basis used for this estimate"
+                    >
+                      Pricing: in ${Number(selectedSession.cost_summary.input_usd_per_1m || 0).toFixed(2)}/1M, out $
+                      {Number(selectedSession.cost_summary.output_usd_per_1m || 0).toFixed(2)}/1M
+                      {selectedSession.cost_summary.pricing_tier
+                        ? `, ${selectedSession.cost_summary.pricing_tier}`
+                        : ''}
+                      {selectedSession.cost_summary.usd_to_inr_rate
+                        ? `, USD/INR ${Number(selectedSession.cost_summary.usd_to_inr_rate).toFixed(2)}`
+                        : ''}
+                    </span>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -289,6 +312,14 @@ const AdminChatHistory = () => {
                           title="Birth chart / Native"
                         >
                           {message.native_name}
+                        </span>
+                      )}
+                      {typeof message?.cost_estimate?.cost_inr_estimate === 'number' && (
+                        <span
+                          className="message-cost-badge"
+                          title={`~${message.cost_estimate.tokens_estimate || 0} tokens (rough)`}
+                        >
+                          INR {message.cost_estimate.cost_inr_estimate.toFixed(4)}
                         </span>
                       )}
                       <span className="message-time">{formatTimeIST(message.timestamp)}</span>

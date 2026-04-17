@@ -56,7 +56,8 @@ const KotaChakraScreen = ({ route, navigation }) => {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         Alert.alert('Error', 'Authentication required');
-        navigation.navigate('Login');
+        const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
+        replaceWithLogin(navigation);
         return;
       }
       

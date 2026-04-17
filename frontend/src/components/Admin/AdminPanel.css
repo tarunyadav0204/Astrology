@@ -2246,6 +2246,33 @@ input:checked + .toggle-slider:before {
   color: #c00;
 }
 
+.notif-chat-suggest-toggle .notif-inline-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+}
+
+.notif-chat-suggest-toggle .notif-inline-checkbox input {
+  margin-top: 3px;
+}
+
+.notif-generate-row {
+  margin-top: 10px;
+}
+
+.notif-generate-row .notif-search-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.notif-generate-row .notif-search-btn:disabled:hover {
+  background: #ccc;
+}
+
 @media (max-width: 900px) {
   .dashboard-charts {
     grid-template-columns: 1fr;

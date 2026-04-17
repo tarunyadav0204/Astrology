@@ -9,6 +9,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
+import PodcastPromoModal from './PodcastPromoModal';
 import ContextModal from './ContextModal';
 import PartnerChartModal from './PartnerChartModal';
 import { authService } from '../../services/authService';
@@ -156,7 +157,7 @@ const ChatPage = () => {
     const navigate = useNavigate();
     const { birthData } = useAstrology();
     const singleChartWizardProfile = useMemo(() => singleChartProfileDisplay(birthData), [birthData]);
-    const { credits, chatCost, partnershipCost, fetchBalance, freeQuestionAvailable } = useCredits();
+    const { credits, chatCost, partnershipCost, fetchBalance, freeQuestionAvailable, podcastCost } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -196,6 +197,9 @@ const ChatPage = () => {
     /** BirthForm tab: 'saved' = Saved Charts, 'new' = New Chart (native gate Add opens create tab). */
     const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
     const [pendingFollowUpQuestion, setPendingFollowUpQuestion] = useState('');
+    const [podcastPromoOpen, setPodcastPromoOpen] = useState(false);
+    const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
+    const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
 
     const openBirthModalEmpty = () => {
         setBirthFormGatePrefill(null);
@@ -876,6 +880,12 @@ const ChatPage = () => {
             const status = await res.json();
 
             if (status.status === 'completed') {
+                const body = String(status.content || '').trim();
+                const mt = status.message_type || 'answer';
+                if (mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+                    setPodcastPromoMessageId(assistantMessageIdToUpdate);
+                    setPodcastPromoOpen(true);
+                }
                 setMessages((prev) =>
                     prev.map((m) =>
                         m.messageId === assistantMessageIdToUpdate
@@ -1044,6 +1054,12 @@ const ChatPage = () => {
                     const content =
                         raw ||
                         "This answer didn't save any text. Please try your question again, or contact support if it keeps happening.";
+                    const mt = status.message_type || 'answer';
+                    const gated = mt === 'native_gate' || mt === 'clarification';
+                    if (!gated && String(content).trim().length >= 80) {
+                        setPodcastPromoMessageId(assistantMessageId);
+                        setPodcastPromoOpen(true);
+                    }
                     setMessages(prev =>
                         prev.map(m =>
                             m.processingClientId === processingClientId
@@ -2454,6 +2470,8 @@ const ChatPage = () => {
                             onDeleteMessage={handleDeleteMessage}
                             onNativeGateOpenSelectNative={openBirthModalEmpty}
                             onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
+                            podcastAutoLaunchMessageId={podcastPromoMessageId}
+                            podcastAutoLaunchKey={podcastAutoLaunchKey}
                         />
                         <div ref={messagesEndRef} />
                     </div>
@@ -2477,6 +2495,19 @@ const ChatPage = () => {
                     isLocked={isWizardLocked}
                 />
             )}
+
+            <PodcastPromoModal
+                open={podcastPromoOpen}
+                podcastCost={podcastCost}
+                onClose={() => {
+                    setPodcastPromoOpen(false);
+                    setPodcastPromoMessageId(null);
+                }}
+                onGenerate={() => {
+                    setPodcastPromoOpen(false);
+                    setPodcastAutoLaunchKey((k) => k + 1);
+                }}
+            />
 
             {/* Credits Modal */}
             <CreditsModal 

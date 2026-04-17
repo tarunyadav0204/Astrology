@@ -21,16 +21,18 @@
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "bitcode": false,
-    "infoPlist": {
-      "ITSAppUsesNonExemptEncryption": false,
-      "NSAppTransportSecurity": {
-        "NSAllowsArbitraryLoads": true
-      },
-      "NSMicrophoneUsageDescription": "This app does not use the microphone.",
-      "NSSpeechRecognitionUsageDescription": "This app uses speech recognition for voice commands.",
-      "UIBackgroundModes": ["audio"],
-      "UILaunchScreen": {}
-    }
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSMicrophoneUsageDescription": "This app does not use the microphone.",
+        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition for voice commands.",
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "UILaunchScreen": {}
+      }
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -39,10 +41,12 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "versionCode": 113,
+      "versionCode": 114,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
-      "permissions": ["com.android.vending.BILLING"]
+      "permissions": [
+        "com.android.vending.BILLING"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

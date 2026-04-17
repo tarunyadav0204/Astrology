@@ -145,11 +145,12 @@ export default function PasswordScreen({
       } else {
         // Registration complete - register user and navigate to birth form
         try {
+          const emailTrim = (formData.email || '').trim();
           const response = await authAPI.registerWithBirth({
             name: formData.name,
             phone: fullPhone,
             password: formData.password,
-            email: formData.email,
+            ...(emailTrim ? { email: emailTrim } : {}),
             role: 'user',
             signup_client: 'mobile',
           });
@@ -193,7 +194,12 @@ export default function PasswordScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen('phone', 'back')}
+          onPress={() =>
+            navigateToScreen(
+              isLogin ? 'phone' : (formData.countryCode === '+91' ? 'email' : 'name'),
+              'back'
+            )
+          }
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>

@@ -154,6 +154,8 @@ const MessageBubble = ({
     onDeleteMessage,
     onNativeGateOpenSelectNative,
     onNativeGateOpenAddProfile,
+    podcastAutoLaunchMessageId = null,
+    podcastAutoLaunchKey = 0,
 }) => {
     const { podcastCost, refreshBalance } = useCredits();
     const [showActions, setShowActions] = useState(false);
@@ -406,6 +408,32 @@ const MessageBubble = ({
 
         await fetchAndPlayPodcast();
     }, [fetchAndPlayPodcast, getCleanMessageText, language, message.messageId, podcastCost, podcastLoading]);
+
+    const lastPodcastPromoKeyRef = useRef(0);
+    useEffect(() => {
+        if (!podcastAutoLaunchKey || podcastAutoLaunchMessageId == null) return;
+        const mid = message.messageId != null ? String(message.messageId) : '';
+        if (!mid || mid !== String(podcastAutoLaunchMessageId)) return;
+        if (message.role !== 'assistant') return;
+        if (message.isTyping || message.isProcessing) return;
+        if (message.message_type === 'clarification' || isNativeGate) return;
+        if (lastPodcastPromoKeyRef.current === podcastAutoLaunchKey) return;
+        lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
+        const timer = setTimeout(() => {
+            fetchAndPlayPodcast();
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [
+        podcastAutoLaunchKey,
+        podcastAutoLaunchMessageId,
+        message.role,
+        message.messageId,
+        message.isTyping,
+        message.isProcessing,
+        message.message_type,
+        isNativeGate,
+        fetchAndPlayPodcast,
+    ]);
 
     const handlePodcastTogglePause = () => {
         const audio = podcastAudioRef.current;

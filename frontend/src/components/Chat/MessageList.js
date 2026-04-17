@@ -25,6 +25,8 @@ const MessageList = ({
     onDeleteMessage,
     onNativeGateOpenSelectNative,
     onNativeGateOpenAddProfile,
+    podcastAutoLaunchMessageId = null,
+    podcastAutoLaunchKey = 0,
 }) => {
     return (
         <div className="message-list">
@@ -57,6 +59,8 @@ const MessageList = ({
                                 onDeleteMessage={onDeleteMessage}
                                 onNativeGateOpenSelectNative={onNativeGateOpenSelectNative}
                                 onNativeGateOpenAddProfile={onNativeGateOpenAddProfile}
+                                podcastAutoLaunchMessageId={podcastAutoLaunchMessageId}
+                                podcastAutoLaunchKey={podcastAutoLaunchKey}
                             />
                         </div>
                         <FeedbackComponent 

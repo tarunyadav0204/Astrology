@@ -14,7 +14,16 @@ const ChatInput = ({
     isMundaneMode = false,
     isLocked = false, // when true, composer is disabled until guided steps are completed
 }) => {
-    const { credits, chatCost, premiumChatCost, partnershipCost, loading: creditsLoading, freeQuestionAvailable } = useCredits();
+    const {
+        credits,
+        chatCost,
+        premiumChatCost,
+        partnershipCost,
+        loading: creditsLoading,
+        freeQuestionAvailable,
+        freeQuestionRequiresNotifications,
+        fetchBalance,
+    } = useCredits();
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
     const [showModeSelector, setShowModeSelector] = useState(false);
@@ -109,7 +118,56 @@ const ChatInput = ({
                     <span style={{ color: '#166534' }}>Your first standard chart question is free. Premium uses credits.</span>
                 </div>
             )}
-            {!creditsLoading && credits < effectiveCost && (
+            {!creditsLoading && showPremiumControls && freeQuestionRequiresNotifications && credits < effectiveCost && (
+                <div
+                    className="credit-warning"
+                    style={{
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgba(59, 130, 246, 0.35)',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: '10px',
+                        justifyContent: 'space-between',
+                    }}
+                >
+                    <span style={{ color: '#1e3a8a' }}>
+                        Allow browser notifications to unlock your free first standard question (one-time).
+                    </span>
+                    <button
+                        type="button"
+                        className="get-credits-btn"
+                        onClick={async () => {
+                            if (typeof window === 'undefined' || !('Notification' in window)) {
+                                window.alert('This browser does not support notifications. Use the mobile app or add credits to continue.');
+                                return;
+                            }
+                            const perm = await Notification.requestPermission();
+                            if (perm !== 'granted') {
+                                window.alert('Notifications were blocked. Allow them for this site in your browser settings, then try again.');
+                                return;
+                            }
+                            try {
+                                const token = localStorage.getItem('token');
+                                await fetch('/api/credits/web-notification-opt-in', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        ...(token && { Authorization: `Bearer ${token}` }),
+                                    },
+                                    body: JSON.stringify({ granted: true }),
+                                });
+                            } catch (_) {
+                                /* ignore */
+                            }
+                            await fetchBalance();
+                        }}
+                    >
+                        Allow notifications
+                    </button>
+                </div>
+            )}
+            {!creditsLoading && credits < effectiveCost && !freeQuestionRequiresNotifications && (
                 <div className="credit-warning">
                     <span>Insufficient credits ({credits}/{effectiveCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : isPartnershipMode ? 'Partnership Analysis' : 'Standard Analysis'})</span>
                     <button onClick={onOpenCreditsModal} className="get-credits-btn">

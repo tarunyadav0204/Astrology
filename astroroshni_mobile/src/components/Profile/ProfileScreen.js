@@ -753,7 +753,8 @@ export default function ProfileScreen({ navigation }) {
               style={[styles.logoutButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.2)' : 'rgba(255, 107, 53, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.5)' : 'rgba(255, 107, 53, 0.4)' }]}
               onPress={async () => {
                 await storage.clearAll();
-                navigation.navigate('Login');
+                const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
+                replaceWithLogin(navigation);
               }}
             >
               <Text style={styles.logoutText}>🚪 Logout</Text>

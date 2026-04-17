@@ -17,6 +17,7 @@ import {
   recordReminderShown,
   recordReminderDeclinedForever,
 } from '../../services/notificationReminder';
+import { useCredits } from '../../credits/CreditContext';
 
 const OPEN_DELAY_MS = 1600;
 
@@ -26,6 +27,7 @@ const OPEN_DELAY_MS = 1600;
  */
 export default function NotificationEnableReminderModal({ homeActive }) {
   const { theme, colors } = useTheme();
+  const { fetchBalance } = useCredits();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const timerRef = useRef(null);
@@ -74,6 +76,7 @@ export default function NotificationEnableReminderModal({ homeActive }) {
       const result = await registerPushTokenIfLoggedIn();
       await recordReminderShown();
       close();
+      await fetchBalance();
       if (!result.ok) {
         Alert.alert('Notifications', result.message);
       }

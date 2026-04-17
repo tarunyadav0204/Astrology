@@ -34,3 +34,33 @@ export function isNationalPhoneValid(countryCode, nationalDigits) {
   const max = getNationalPhoneMaxLength(countryCode);
   return d.length >= min && d.length <= max;
 }
+
+/** True when selected dial code is India (SMS-first; email not required for OTP). */
+export function otpEmailRequiredForCountry(countryCode) {
+  return (countryCode || '') !== '+91';
+}
+
+/**
+ * Mirrors backend `_is_india_number` for legacy single-field phone inputs (no country picker).
+ */
+export function isIndiaPhoneForOtp(phone) {
+  const raw = String(phone || '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/-/g, '')
+    .replace(/\(/g, '')
+    .replace(/\)/g, '');
+  if (!raw) return false;
+  if (raw.startsWith('+1')) return false;
+  if (raw.startsWith('+91')) return true;
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) return false;
+  if (digits.length === 12 && digits.startsWith('91')) return true;
+  if (digits.length === 10 && !raw.startsWith('+')) return true;
+  return false;
+}
+
+/** Registration / reset OTP email required for all numbers except India-shaped ones. */
+export function otpEmailRequiredForPhone(phone) {
+  return !isIndiaPhoneForOtp(phone);
+}

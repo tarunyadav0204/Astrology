@@ -25,6 +25,7 @@ export const CreditProvider = ({ children }) => {
     const [eventsCost, setEventsCost] = useState(100);
     const [loading, setLoading] = useState(true);
     const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
+    const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
 
     const fetchBalance = useCallback(async () => {
         try {
@@ -35,7 +36,24 @@ export const CreditProvider = ({ children }) => {
                 console.log('🔄 No token found, skipping credit balance fetch');
                 setCredits(0);
                 setFreeQuestionAvailable(false);
+                setFreeQuestionRequiresNotifications(false);
                 return;
+            }
+
+            // Web: sync browser notification permission so free-first-question can unlock (server + balance).
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                try {
+                    await fetch('/api/credits/web-notification-opt-in', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({ granted: true }),
+                    });
+                } catch (_) {
+                    /* non-fatal */
+                }
             }
             
             console.log('🔄 Fetching credit balance...', { hasToken: !!token });
@@ -51,20 +69,24 @@ export const CreditProvider = ({ children }) => {
                 console.log('💳 Credit balance data:', data);
                 setCredits(data.credits || 0);
                 setFreeQuestionAvailable(Boolean(data.free_question_available));
+                setFreeQuestionRequiresNotifications(Boolean(data.free_question_requires_notifications));
             } else if (response.status === 403 || response.status === 401) {
                 // User not authenticated or token expired
                 console.log('💳 Authentication failed, setting credits to 0');
                 setCredits(0);
                 setFreeQuestionAvailable(false);
+                setFreeQuestionRequiresNotifications(false);
             } else {
                 console.error('Credit balance fetch failed:', response.status, response.statusText);
                 setCredits(0);
                 setFreeQuestionAvailable(false);
+                setFreeQuestionRequiresNotifications(false);
             }
         } catch (error) {
             console.error('Error fetching credit balance:', error);
             setCredits(0);
             setFreeQuestionAvailable(false);
+            setFreeQuestionRequiresNotifications(false);
         }
     }, []);
 
@@ -180,6 +202,7 @@ export const CreditProvider = ({ children }) => {
             podcastCost,
             eventsCost,
             freeQuestionAvailable,
+            freeQuestionRequiresNotifications,
             loading,
             fetchBalance,
             fetchCosts,
