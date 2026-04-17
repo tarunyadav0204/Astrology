@@ -375,6 +375,7 @@ async def lifespan(app: FastAPI):
     pass
 
 
+# Deploy/restart marker only — no runtime behavior change (2026-04-17).
 app = FastAPI(lifespan=lifespan)
 horoscope_api = HoroscopeAPI()
 
