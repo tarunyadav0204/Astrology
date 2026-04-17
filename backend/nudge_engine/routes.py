@@ -56,6 +56,10 @@ class AdminSendNotificationRequest(BaseModel):
     native_id: Optional[int] = None  # optional; birth_chart id — app will set this native as selected when user taps
 
 
+class AdminGenerateNudgeFromChatRequest(BaseModel):
+    user_id: int
+
+
 class AdminSendBlogNotificationRequest(BaseModel):
     blog_id: int
     audience: str = "all"  # "all" or "eligible"
@@ -283,6 +287,49 @@ async def admin_send_notification(
     except Exception as e:
         logger.exception("Admin send notification failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to send notification") from e
+
+
+@router.post("/admin/generate-nudge-from-chat")
+async def admin_generate_nudge_from_chat(
+    body: AdminGenerateNudgeFromChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin only. Load the user's last 1–2 completed chat Q&A turns and ask Gemini for
+    push title, body, and a suggested chat question; used to pre-fill the custom notification form.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        from .chat_nudge_suggestion import load_last_completed_qa_turns, generate_push_nudge_via_gemini
+
+        with db.get_conn() as conn:
+            turns = load_last_completed_qa_turns(conn, body.user_id, max_turns=2)
+        if not turns:
+            raise HTTPException(
+                status_code=400,
+                detail="No completed chat question-and-answer pairs found for this user.",
+            )
+        out = generate_push_nudge_via_gemini(turns)
+        return {
+            "ok": True,
+            "title": out["title"],
+            "body": out["body"],
+            "question": out["question"],
+            "qa_pairs_used": len(turns),
+            "model_used": out.get("model_used"),
+            "usage_estimate": out.get("usage_estimate"),
+        }
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        msg = str(e)
+        if "GEMINI_API_KEY" in msg:
+            raise HTTPException(status_code=503, detail=msg) from e
+        raise HTTPException(status_code=502, detail=msg) from e
+    except Exception as e:
+        logger.exception("admin_generate_nudge_from_chat failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate nudge from chat") from e
 
 
 @router.post("/admin/send-blog")
@@ -944,11 +991,13 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                     marked += 1
                     continue
 
+                # Include question so tap → chat pre-fills input (same contract as delivery.py / admin send).
                 payload = {
                     "trigger_id": "broadcast_schedule",
                     "cta": "astroroshni://chat",
                     "schedule_id": str(schedule_id),
                     "category": category,
+                    "question": body_text[:500],
                 }
                 event_params = json.dumps(
                     {"schedule_id": schedule_id, "category": category},

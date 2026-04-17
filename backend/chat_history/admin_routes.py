@@ -1,4 +1,5 @@
 import re
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
@@ -62,6 +63,86 @@ def _timestamp_to_ist_iso(val) -> Optional[str]:
     if len(s) >= 19:
         s = s[:19]  # YYYY-MM-DDTHH:MM:SS
     return s + "+05:30"
+
+
+# Rough USD rates per 1M tokens for chat-history cost estimates.
+_CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
+    # Gemini 3 family
+    "models/gemini-3.1-pro-preview": {
+        "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
+    },
+    "models/gemini-3-pro-preview": {
+        "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
+    },
+    "models/gemini-3-flash-preview": {
+        "input_le_200k": 0.50, "input_gt_200k": 0.50, "output_le_200k": 3.00, "output_gt_200k": 3.00
+    },
+    # Gemini 2.5 family
+    "models/gemini-2.5-pro": {
+        "input_le_200k": 1.25, "input_gt_200k": 2.50, "output_le_200k": 10.00, "output_gt_200k": 15.00
+    },
+    "models/gemini-2.5-flash": {
+        "input_le_200k": 0.30, "input_gt_200k": 0.30, "output_le_200k": 2.50, "output_gt_200k": 2.50
+    },
+    "models/gemini-2.5-flash-lite": {
+        "input_le_200k": 0.10, "input_gt_200k": 0.10, "output_le_200k": 0.40, "output_gt_200k": 0.40
+    },
+    # Gemini 2.0 family
+    "models/gemini-2.0-flash-001": {
+        "input_le_200k": 0.10, "input_gt_200k": 0.10, "output_le_200k": 0.40, "output_gt_200k": 0.40
+    },
+    "models/gemini-2.0-flash-lite-001": {
+        "input_le_200k": 0.075, "input_gt_200k": 0.075, "output_le_200k": 0.30, "output_gt_200k": 0.30
+    },
+    # OpenAI (approx)
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "gpt-4o": {"input": 5.00, "output": 15.00},
+    "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+    "o4-mini": {"input": 1.10, "output": 4.40},
+    "gpt-5.4-pro": {"input": 15.00, "output": 60.00},
+}
+
+
+def _usd_to_inr_rate() -> float:
+    raw = (os.getenv("USD_TO_INR_RATE") or "").strip()
+    if raw:
+        try:
+            v = float(raw)
+            if v > 0:
+                return v
+        except Exception:
+            pass
+    return 93.0
+
+
+def _approx_tokens(text: Any) -> int:
+    s = str(text or "")
+    return max(1, int(round(len(s) / 4.0)))
+
+
+def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) -> Dict[str, float]:
+    if not model_name:
+        return {"input": 0.10, "output": 0.40, "tier": "le_200k"}
+    m = str(model_name).strip()
+    tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
+    if m in _CHAT_MODEL_RATE_USD_PER_1M:
+        cfg = _CHAT_MODEL_RATE_USD_PER_1M[m]
+        if tier == "gt_200k":
+            return {"input": float(cfg["input_gt_200k"]), "output": float(cfg["output_gt_200k"]), "tier": tier}
+        return {"input": float(cfg["input_le_200k"]), "output": float(cfg["output_le_200k"]), "tier": tier}
+    ml = m.lower()
+    # Safe fallback by family if exact key not configured.
+    if "flash-lite" in ml:
+        return {"input": 0.10, "output": 0.40, "tier": tier}
+    if "flash" in ml:
+        return {"input": 0.50, "output": 3.00, "tier": tier}
+    if "pro" in ml:
+        return {"input": 2.00, "output": 12.00, "tier": tier}
+    if "gpt-4o-mini" in ml:
+        return {"input": 0.15, "output": 0.60, "tier": tier}
+    if "gpt-4o" in ml:
+        return {"input": 5.00, "output": 15.00, "tier": tier}
+    return {"input": 0.10, "output": 0.40, "tier": tier}
 
 @router.get("/admin/chat/history/{user_id}")
 async def get_user_chat_history(user_id: int, current_user: dict = Depends(require_admin)):
@@ -231,10 +312,35 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     (session_id,),
                 )
                 msg_rows = cur.fetchall() or []
-            messages = [
-                {'sender': r[0], 'content': r[1], 'timestamp': _timestamp_to_ist_iso(r[2]), 'native_name': native_name}
-                for r in msg_rows
-            ]
+            session_input_tokens_est = sum(
+                _approx_tokens(r[1]) for r in msg_rows if (r[0] or "").strip().lower() == "user"
+            )
+            rates = _resolve_model_rate(chat_llm_model, session_input_tokens_est)
+            fx = _usd_to_inr_rate()
+            total_inr = 0.0
+            messages = []
+            for r in msg_rows:
+                sender = r[0]
+                content = r[1]
+                tokens_est = _approx_tokens(content)
+                if sender == "user":
+                    usd_per_1m = float(rates["input"])
+                else:
+                    usd_per_1m = float(rates["output"])
+                cost_inr = (tokens_est / 1_000_000.0) * usd_per_1m * fx
+                total_inr += cost_inr
+                messages.append(
+                    {
+                        "sender": sender,
+                        "content": content,
+                        "timestamp": _timestamp_to_ist_iso(r[2]),
+                        "native_name": native_name,
+                        "cost_estimate": {
+                            "tokens_estimate": tokens_est,
+                            "cost_inr_estimate": round(cost_inr, 6),
+                        },
+                    }
+                )
             return {
                 "session_id": session_row[0],
                 "user_id": session_row[1],
@@ -243,6 +349,15 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 "chat_llm_provider": chat_llm_provider,
                 "chat_llm_model": chat_llm_model,
                 "messages": messages,
+                "cost_summary": {
+                    "currency": "INR",
+                    "usd_to_inr_rate": fx,
+                    "input_usd_per_1m": float(rates["input"]),
+                    "output_usd_per_1m": float(rates["output"]),
+                    "pricing_tier": rates.get("tier"),
+                    "total_cost_inr_estimate": round(total_inr, 6),
+                    "note": "Rough estimate only (message chars to tokens approximation).",
+                },
             }
 
         with get_conn() as conn:
@@ -258,23 +373,43 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 conv_data = json.loads(legacy_conv[1])
                 birth_data = conv_data.get('birth_data', {})
                 legacy_native_name = birth_data.get('name') or None
+                session_input_tokens_est = sum(
+                    _approx_tokens(m.get("question")) for m in conv_data.get("messages", []) if m.get("question")
+                )
+                rates = _resolve_model_rate(None, session_input_tokens_est)
+                fx = _usd_to_inr_rate()
+                total_inr = 0.0
                 messages = []
                 updated_at = legacy_conv[2]
                 for msg in conv_data.get('messages', []):
                     ts = _timestamp_to_ist_iso(msg.get('timestamp') or updated_at)
                     if msg.get('question'):
+                        q_tokens_est = _approx_tokens(msg['question'])
+                        q_cost_inr = (q_tokens_est / 1_000_000.0) * float(rates["input"]) * fx
+                        total_inr += q_cost_inr
                         messages.append({
                             'sender': 'user',
                             'content': msg['question'],
                             'timestamp': ts,
                             'native_name': legacy_native_name,
+                            'cost_estimate': {
+                                'tokens_estimate': q_tokens_est,
+                                'cost_inr_estimate': round(q_cost_inr, 6),
+                            },
                         })
                     if msg.get('response'):
+                        a_tokens_est = _approx_tokens(msg['response'])
+                        a_cost_inr = (a_tokens_est / 1_000_000.0) * float(rates["output"]) * fx
+                        total_inr += a_cost_inr
                         messages.append({
                             'sender': 'assistant',
                             'content': msg['response'],
                             'timestamp': ts,
                             'native_name': legacy_native_name,
+                            'cost_estimate': {
+                                'tokens_estimate': a_tokens_est,
+                                'cost_inr_estimate': round(a_cost_inr, 6),
+                            },
                         })
                 return {
                     "session_id": session_id,
@@ -282,6 +417,15 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     "created_at": _timestamp_to_ist_iso(updated_at),
                     "native_name": legacy_native_name,
                     "messages": messages,
+                    "cost_summary": {
+                        "currency": "INR",
+                        "usd_to_inr_rate": fx,
+                        "input_usd_per_1m": float(rates["input"]),
+                        "output_usd_per_1m": float(rates["output"]),
+                        "pricing_tier": rates.get("tier"),
+                        "total_cost_inr_estimate": round(total_inr, 6),
+                        "note": "Rough estimate only (legacy session; inferred model rates).",
+                    },
                 }
             except Exception:
                 pass
