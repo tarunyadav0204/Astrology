@@ -49,6 +49,31 @@ from .system_instruction_config import (
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
+
+    def augment_current_dashas_with_chart_hints(
+        self,
+        current_dashas: Dict[str, Any],
+        d1_chart: Dict[str, Any],
+        house_lordships: Dict[str, Any],
+    ) -> None:
+        """Inject house, sign, analysis_hint for mahadasha/antardasha/pratyantardasha (mutates current_dashas)."""
+        d1_planets = d1_chart.get("planets", {})
+        for level in ("mahadasha", "antardasha", "pratyantardasha"):
+            dasha_info = current_dashas.get(level, {})
+            if not isinstance(dasha_info, dict):
+                continue
+            lord = dasha_info.get("planet")
+            if lord and lord in d1_planets:
+                planet_data = d1_planets[lord]
+                house = planet_data.get("house")
+                sign_name = planet_data.get("sign_name", "")
+                dasha_info["house"] = house
+                dasha_info["sign"] = sign_name
+                ruled_houses = house_lordships.get(lord, [])
+                dasha_info["analysis_hint"] = (
+                    f"{lord} is in house {house} ({sign_name}). "
+                    f"It rules houses {', '.join(map(str, ruled_houses))}."
+                )
     
     # Class-level constants
     NAKSHATRA_NAMES = [
@@ -149,29 +174,8 @@ class ChatContextBuilder:
         # Enrich current_dashas with house and sign info for easy access
         current_dashas = full_context.get('current_dashas', {})
         d1_chart = full_context.get('d1_chart', {})
-        d1_planets = d1_chart.get('planets', {})
         house_lordships = full_context.get('house_lordships', {})
-        
-        for level in ['mahadasha', 'antardasha', 'pratyantardasha']:
-            dasha_info = current_dashas.get(level, {})
-            lord = dasha_info.get('planet')
-            if lord and lord in d1_planets:
-                planet_data = d1_planets[lord]
-                # Use house from d1_chart for consistency
-                house = planet_data.get('house')
-                sign_name = planet_data.get('sign_name', '')
-                
-                # Inject house and sign directly into dasha info
-                dasha_info['house'] = house
-                dasha_info['sign'] = sign_name
-                
-                # Add analysis hint with lordships
-                ruled_houses = house_lordships.get(lord, [])
-                dasha_info['analysis_hint'] = (
-                    f"{lord} is in house {house} ({sign_name}). "
-                    f"It rules houses {', '.join(map(str, ruled_houses))}."
-                )
-        
+        self.augment_current_dashas_with_chart_hints(current_dashas, d1_chart, house_lordships)
         full_context['current_dashas'] = current_dashas
         
         # Filter divisional charts based on intent router recommendations
@@ -260,8 +264,8 @@ class ChatContextBuilder:
         divisional_calc = DivisionalChartCalculator(chart_data)
         chart_data['divisions'] = divisional_calc.calculate_all_divisional_charts()
         
-        # Initialize analyzers
-        planet_analyzer = PlanetAnalyzer(chart_data, birth_obj)
+        # Initialize analyzers (Shadbala omitted: not used in legacy/new chat JSON; saves heavy classical_shadbala pass)
+        planet_analyzer = PlanetAnalyzer(chart_data, birth_obj, compute_shadbala=False)
         chara_karaka_calc = CharaKarakaCalculator(chart_data)
         yogi_calc = YogiCalculator(chart_data)
         badhaka_calc = BadhakaCalculator(chart_data)
@@ -331,8 +335,6 @@ class ChatContextBuilder:
                 "validation": ascendant_validation_note,
                 "formatted": f"{ascendant_sign_name} {ascendant_degree % 30:.2f}°"
             },
-            
-            "d1_chart": self._add_sign_names_to_chart_copy(chart_data)
         }
         
         # Calculate divisional charts with dignity analysis
@@ -381,22 +383,32 @@ class ChatContextBuilder:
                 # print(f"   ❌ Failed to calculate {chart_code}: {e}")
                 continue
         
-        # Compact divisions map on chart_data (D1 + key divisionals) for internal calculators
-        # Include D1 from chart_data itself, then add other divisional charts
-        divisions_data = {'D1': {p: {'sign': d.get('sign', 0), 'house': d.get('house', 1)} 
-                                 for p, d in chart_data.get('planets', {}).items()}}
+        # Compact divisions map on **D1** (chart_data_original), not the last divisional chart:
+        # after the loop, local `chart_data` points at D60 (or last computed) — using it here was a bug
+        # that mis-built D1 row and attached divisions to the wrong object.
+        divisions_data = {
+            'D1': {
+                p: {'sign': d.get('sign', 0), 'house': d.get('house', 1)}
+                for p, d in chart_data_original.get('planets', {}).items()
+            }
+        }
         divisions_data.update(self._convert_divisional_charts_to_divisions_format(divisional_charts))
-        chart_data['divisions'] = divisions_data
-        
+        chart_data_original['divisions'] = divisions_data
+        context["d1_chart"] = self._add_sign_names_to_chart_copy(chart_data_original)
+
         # Update advanced calculators with divisional charts
-        vargottama_calc = VargottamaCalculator(chart_data, divisional_charts)
-        neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, divisional_charts)
-        
+        vargottama_calc = VargottamaCalculator(chart_data_original, divisional_charts)
+        neecha_bhanga_calc = NeechaBhangaCalculator(chart_data_original, divisional_charts)
+
         # Initialize D9 analyzer for separate analysis (use D9 from divisional_charts)
         d9_chart_for_analysis = divisional_charts.get('d9_navamsa')
         if d9_chart_for_analysis:
             d9_data_structure = d9_chart_for_analysis.get('divisional_chart', d9_chart_for_analysis)
-            d9_planet_analyzer = PlanetAnalyzer(d9_data_structure, birth_obj)
+            d9_planet_analyzer = PlanetAnalyzer(
+                d9_data_structure,
+                birth_obj,
+                compute_shadbala=False,
+            )
         else:
             d9_planet_analyzer = None
         
@@ -416,9 +428,9 @@ class ChatContextBuilder:
         # Extract D9 chart data correctly to prevent structure mismatch
         d9_for_jaimini = divisional_charts['d9_navamsa'].get('divisional_chart', divisional_charts['d9_navamsa'])
         jaimini_calc = JaiminiPointCalculator(
-            chart_data, 
-            d9_for_jaimini, 
-            atmakaraka_planet
+            chart_data_original,
+            d9_for_jaimini,
+            atmakaraka_planet,
         )
         jaimini_points = jaimini_calc.calculate_jaimini_points()
         
@@ -512,7 +524,7 @@ class ChatContextBuilder:
             
             # Special points
             "special_points": {
-                "badhaka_lord": badhaka_calc.get_badhaka_lord(int(chart_data.get('ascendant', 0) / 30))
+                "badhaka_lord": badhaka_calc.get_badhaka_lord(int(chart_data_original.get('ascendant', 0) / 30))
             },
             
             # Relationships

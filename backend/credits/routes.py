@@ -1767,7 +1767,11 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
             m = "models/gemini-2.5-flash"
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
     rates = {
+        "models/gemini-3.1-flash-lite-preview": {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50},
         "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00},
+        "models/gemini-3.1-flash-live-preview": {"in_le": 0.75, "in_gt": 0.75, "out_le": 4.50, "out_gt": 4.50},
+        "models/gemini-3.1-flash-image-preview": {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50},
+        "models/gemini-3.1-flash-tts-preview": {"in_le": 1.00, "in_gt": 1.00, "out_le": 20.00, "out_gt": 20.00},
         "models/gemini-3-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00},
         "models/gemini-3-flash-preview": {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00},
         "models/gemini-2.5-pro": {"in_le": 1.25, "in_gt": 2.50, "out_le": 10.00, "out_gt": 15.00},
@@ -1784,7 +1788,17 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
     row = rates.get(m)
     if not row:
         ml = m.lower()
-        if "flash-lite" in ml:
+        if "gemini-3.1-flash-lite" in ml or ("3.1" in ml and "flash-lite" in ml):
+            row = {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50}
+        elif "gemini-3.1-flash-live" in ml or ("3.1" in ml and "flash-live" in ml):
+            row = {"in_le": 0.75, "in_gt": 0.75, "out_le": 4.50, "out_gt": 4.50}
+        elif "gemini-3.1-flash-image" in ml or ("3.1" in ml and "flash-image" in ml):
+            row = {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50}
+        elif "gemini-3.1-flash-tts" in ml or ("gemini-3.1" in ml and "tts" in ml):
+            row = {"in_le": 1.00, "in_gt": 1.00, "out_le": 20.00, "out_gt": 20.00}
+        elif "gemini-3.1-pro" in ml:
+            row = {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00}
+        elif "flash-lite" in ml:
             row = {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
         elif "flash" in ml:
             row = {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00}

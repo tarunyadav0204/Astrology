@@ -68,6 +68,24 @@ const AdminChatHistory = () => {
     }) + ' IST';
   };
 
+  const formatParallelStageLabel = (stage) => {
+    const s = String(stage || '');
+    return s.replace(/^parallel_/, '').replace(/_/g, ' ') || 'stage';
+  };
+
+  const formatParallelElapsed = (ms) => {
+    if (ms == null || !Number.isFinite(Number(ms))) return null;
+    const n = Number(ms);
+    if (n >= 1000) return `${(n / 1000).toFixed(2)}s`;
+    return `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })}ms`;
+  };
+
+  /** Sum a numeric field across parallel stage rows (orchestrator stores one row per branch + merge). */
+  const sumParallelStageField = (stages, key) => {
+    if (!Array.isArray(stages)) return 0;
+    return stages.reduce((acc, st) => acc + (Number(st?.[key]) || 0), 0);
+  };
+
   const formatLlmLabel = (s) => {
     const prov = (s.chat_llm_provider || '').trim();
     const mod = (s.chat_llm_model || '').trim();
@@ -325,9 +343,11 @@ const AdminChatHistory = () => {
                         <span
                           className="message-char-badge message-char-badge--prompt"
                           title={
-                            message.sender === 'user'
-                              ? 'Full prompt character count for the LLM call that answers this question (same as following assistant row)'
-                              : 'Full prompt sent to the LLM (chart JSON + instructions + history + question)'
+                            message.parallel_llm_usage?.stages?.length
+                              ? 'Total prompt characters for the parallel pipeline: sum of each LLM call’s full prompt (static instructions + VARIABLE_DATA_JSON or merge bundle). Equals Σ Pr on the stage rows and matches orchestrator totals.input_chars.'
+                              : message.sender === 'user'
+                                ? 'Full prompt character count for the LLM call that answers this question (same as following assistant row)'
+                                : 'Full prompt sent to the LLM (chart JSON + instructions + history + question)'
                           }
                         >
                           Prompt {Number(message.llm_prompt_chars).toLocaleString()} chars
@@ -338,7 +358,11 @@ const AdminChatHistory = () => {
                         message.llm_response_chars > 0 && (
                           <span
                             className="message-char-badge message-char-badge--reply"
-                            title="Assistant reply text length after parsing (what the user sees)"
+                            title={
+                              message.parallel_llm_usage?.stages?.length
+                                ? 'Length of the final merged assistant message shown to the user (after parse/clean). This is NOT the sum of per-stage raw LLM outputs (Rp): branches emit JSON; merge emits the user-facing answer.'
+                                : 'Assistant reply text length after parsing (what the user sees)'
+                            }
                           >
                             Reply {Number(message.llm_response_chars).toLocaleString()} chars
                           </span>
@@ -347,9 +371,11 @@ const AdminChatHistory = () => {
                         <span
                           className="message-token-badge"
                           title={
-                            message.sender === 'user'
-                              ? 'API usage: prompt tokens for the assistant reply after this question'
-                              : 'API usage: prompt (input) tokens for this completion'
+                            message.parallel_llm_usage?.stages?.length
+                              ? 'Sum of billed input tokens across all parallel branch calls plus merge (Σ In on stage rows). Same as timing.parallel_llm_usage.totals.input_tokens when stored.'
+                              : message.sender === 'user'
+                                ? 'API usage: prompt tokens for the assistant reply after this question'
+                                : 'API usage: prompt (input) tokens for this completion'
                           }
                         >
                           In {Number(message.llm_input_tokens).toLocaleString()}
@@ -359,9 +385,11 @@ const AdminChatHistory = () => {
                         <span
                           className="message-token-badge"
                           title={
-                            message.sender === 'user'
-                              ? 'API usage: completion tokens for the assistant reply after this question'
-                              : 'API usage: completion (output) tokens for this reply'
+                            message.parallel_llm_usage?.stages?.length
+                              ? 'Sum of billed output tokens across all parallel branch calls plus merge (Σ Out on stage rows). Not the character length of the user-visible reply.'
+                              : message.sender === 'user'
+                                ? 'API usage: completion tokens for the assistant reply after this question'
+                                : 'API usage: completion (output) tokens for this reply'
                           }
                         >
                           Out {Number(message.llm_output_tokens).toLocaleString()}
@@ -377,6 +405,150 @@ const AdminChatHistory = () => {
                       )}
                       <span className="message-time">{formatTimeIST(message.timestamp)}</span>
                     </div>
+                    {Array.isArray(message.parallel_llm_usage?.stages) &&
+                      message.parallel_llm_usage.stages.length > 0 && (
+                      <div
+                        className="message-parallel-stages"
+                        aria-label="Per-branch LLM usage (parallel chat)"
+                      >
+                        {(() => {
+                          const stages = message.parallel_llm_usage.stages;
+                          const blob = message.parallel_llm_usage.totals || {};
+                          const sumPr = sumParallelStageField(stages, 'input_chars');
+                          const sumRp = sumParallelStageField(stages, 'output_chars');
+                          const sumIn = sumParallelStageField(stages, 'input_tokens');
+                          const sumOut = sumParallelStageField(stages, 'output_tokens');
+                          const sumSt = sumParallelStageField(stages, 'static_chars');
+                          const sumDy = sumParallelStageField(stages, 'dynamic_chars');
+                          const blobPr =
+                            blob.input_chars != null ? Number(blob.input_chars) : null;
+                          const blobIn =
+                            blob.input_tokens != null ? Number(blob.input_tokens) : null;
+                          const blobOut =
+                            blob.output_tokens != null ? Number(blob.output_tokens) : null;
+                          const promptBadge = message.llm_prompt_chars;
+                          const inBadge = message.llm_input_tokens;
+                          const outBadge = message.llm_output_tokens;
+                          const stDyMismatch =
+                            stages.length > 0 &&
+                            sumSt > 0 &&
+                            sumDy > 0 &&
+                            sumSt + sumDy !== sumPr;
+                          const warn =
+                            stDyMismatch ||
+                            (blobPr != null && blobPr !== sumPr) ||
+                            (promptBadge != null &&
+                              Number.isFinite(Number(promptBadge)) &&
+                              Number(promptBadge) !== sumPr) ||
+                            (blobIn != null && blobIn !== sumIn) ||
+                            (inBadge != null &&
+                              Number.isFinite(Number(inBadge)) &&
+                              Number(inBadge) !== sumIn) ||
+                            (blobOut != null && blobOut !== sumOut) ||
+                            (outBadge != null &&
+                              Number.isFinite(Number(outBadge)) &&
+                              Number(outBadge) !== sumOut);
+                          const title = [
+                            'Σ = sum of all stage rows (7 branches + merge). Header Prompt/In/Out should match these sums.',
+                            blobPr != null ? `totals.input_chars (stored)=${blobPr}` : null,
+                            sumSt > 0 && sumDy > 0
+                              ? `Σ St+Dy = ${(sumSt + sumDy).toLocaleString()} (should equal Σ Pr)`
+                              : null,
+                            stDyMismatch ? 'Σ St + Σ Dy ≠ Σ Pr — check static/dynamic split' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ');
+                          return (
+                            <div
+                              className={`message-parallel-sum${warn ? ' message-parallel-sum--warn' : ''}`}
+                              title={title}
+                            >
+                              <span className="message-parallel-sum-label">Σ</span>
+                              Pr {sumPr.toLocaleString()}c · Rp {sumRp.toLocaleString()}c · In{' '}
+                              {sumIn.toLocaleString()} · Out {sumOut.toLocaleString()}
+                              {sumSt > 0 && sumDy > 0 && (
+                                <>
+                                  {' '}
+                                  · St {sumSt.toLocaleString()}c · Dy {sumDy.toLocaleString()}c
+                                </>
+                              )}
+                              {warn && (
+                                <span className="message-parallel-sum-warn" title="Mismatch detail">
+                                  {' '}
+                                  ⚠
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {message.parallel_llm_usage.stages.map((st, si) => {
+                          const elapsedLabel = formatParallelElapsed(st.elapsed_ms);
+                          const hasStDy =
+                            st.static_chars != null &&
+                            Number.isFinite(Number(st.static_chars)) &&
+                            st.dynamic_chars != null &&
+                            Number.isFinite(Number(st.dynamic_chars));
+                          const titleParts = [
+                            formatParallelStageLabel(st.stage),
+                            elapsedLabel ? `time ${elapsedLabel}` : null,
+                            hasStDy
+                              ? `static ${Number(st.static_chars).toLocaleString()} chars · dynamic ${Number(
+                                  st.dynamic_chars,
+                                ).toLocaleString()} chars`
+                              : null,
+                            `prompt ${Number(st.input_chars || 0).toLocaleString()} chars · raw out ${Number(
+                              st.output_chars || 0,
+                            ).toLocaleString()} chars`,
+                          ].filter(Boolean);
+                          return (
+                          <span
+                            key={`${st.stage || 'stage'}-${si}`}
+                            className="message-parallel-stage-pill"
+                            title={titleParts.join(' — ')}
+                          >
+                            <span className="message-parallel-stage-name">
+                              {formatParallelStageLabel(st.stage)}
+                            </span>
+                            {elapsedLabel && (
+                              <span
+                                className="message-parallel-chip message-parallel-chip--time"
+                                title="LLM call duration (parallel branches: sum of attempts; merge: single synthesis call)"
+                              >
+                                {elapsedLabel}
+                              </span>
+                            )}
+                            {hasStDy && (
+                              <span
+                                className="message-parallel-chip message-parallel-chip--static"
+                                title="Static portion of the prompt (fixed instructions / role text)"
+                              >
+                                St {Number(st.static_chars).toLocaleString()}c
+                              </span>
+                            )}
+                            {hasStDy && (
+                              <span
+                                className="message-parallel-chip message-parallel-chip--dynamic"
+                                title="Dynamic portion (variable JSON, merge bundle, history slice, etc.)"
+                              >
+                                Dy {Number(st.dynamic_chars).toLocaleString()}c
+                              </span>
+                            )}
+                            <span className="message-parallel-stage-tokens">
+                              {' '}
+                              In {Number(st.input_tokens || 0).toLocaleString()}
+                              {' · '}
+                              Out {Number(st.output_tokens || 0).toLocaleString()}
+                              {' · '}
+                              Pr {Number(st.input_chars || 0).toLocaleString()}c
+                              {' · '}
+                              Rp {Number(st.output_chars || 0).toLocaleString()}c
+                              {st.success === false ? ' ⚠' : ''}
+                            </span>
+                          </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   );
                 })}

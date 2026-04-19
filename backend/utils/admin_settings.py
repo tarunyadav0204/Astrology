@@ -101,13 +101,25 @@ def get_gemini_analysis_model() -> str:
 
 
 def get_chat_llm_provider() -> str:
-    """Which LLM vendor runs astrological chat: 'gemini', 'openai', or 'deepseek'."""
+    """Which LLM vendor runs standard (non-premium) astrological chat: 'gemini', 'openai', or 'deepseek'."""
     value = (get_setting("chat_llm_provider") or "").strip().lower()
     if value == CHAT_LLM_DEEPSEEK:
         return CHAT_LLM_DEEPSEEK
     if value == CHAT_LLM_OPENAI:
         return CHAT_LLM_OPENAI
     return CHAT_LLM_GEMINI
+
+
+def get_chat_llm_provider_premium() -> str:
+    """Vendor for premium chat. When unset or invalid, matches standard chat vendor."""
+    value = (get_setting("chat_llm_provider_premium") or "").strip().lower()
+    if value == CHAT_LLM_DEEPSEEK:
+        return CHAT_LLM_DEEPSEEK
+    if value == CHAT_LLM_OPENAI:
+        return CHAT_LLM_OPENAI
+    if value == CHAT_LLM_GEMINI:
+        return CHAT_LLM_GEMINI
+    return get_chat_llm_provider()
 
 
 def get_openai_chat_model() -> str:

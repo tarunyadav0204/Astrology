@@ -4,10 +4,13 @@ Based on DrikPanchang standards and rigorous BPHS method
 Uses continuous mathematical differentials instead of static if/else logic
 """
 
+import logging
 import swisseph as swe
 import math
 from typing import Dict, Any, List
 from datetime import datetime
+
+_logger = logging.getLogger(__name__)
 
 # Classical point scales from BPHS
 DIGNITY_POINTS = {
@@ -938,13 +941,17 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
         else:
             birth_dict = birth_data
         
-        # DEBUG: Check what's in chart_data
-        print(f"\n=== Chart Data Keys: {list(chart_data.keys())} ===")
-        if 'divisions' in chart_data:
-            print(f"Divisions keys: {list(chart_data['divisions'].keys())}")
+        if not chart_data.get("divisions"):
+            _logger.warning(
+                "Shadbala: chart_data missing non-empty 'divisions'; Saptavargaja Bala will use "
+                "neutral defaults. Keys present: %s",
+                list(chart_data.keys()),
+            )
         else:
-            print("WARNING: No 'divisions' key in chart_data!")
-            print("Shadbala requires divisional chart data for accurate Saptavargaja Bala calculation.")
+            _logger.debug(
+                "Shadbala divisions present: %s",
+                list(chart_data["divisions"].keys()),
+            )
         
         # Get Julian Day with validation
         date_str = birth_dict.get('date', '')

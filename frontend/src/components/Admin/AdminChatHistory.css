@@ -564,6 +564,102 @@
   font-variant-numeric: tabular-nums;
 }
 
+.admin-chat-history .message-parallel-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 8px;
+  padding: 0 4px 2px;
+  align-items: flex-start;
+}
+
+.admin-chat-history .message-parallel-sum {
+  flex: 1 1 100%;
+  font-size: 0.68rem;
+  color: #495057;
+  background: #fff9db;
+  border: 1px solid #ffec99;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.admin-chat-history .message-parallel-sum--warn {
+  border-color: #ffa8a8;
+  background: #fff5f5;
+}
+
+.admin-chat-history .message-parallel-sum-label {
+  font-weight: 800;
+  color: #e67700;
+  margin-right: 6px;
+}
+
+.admin-chat-history .message-parallel-sum-warn {
+  color: #c92a2a;
+  font-weight: 700;
+}
+
+.admin-chat-history .message-parallel-stage-pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 0.65rem;
+  color: #343a40;
+  background: #f1f3f5;
+  border: 1px solid #dee2e6;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  line-height: 1.35;
+  max-width: 100%;
+}
+
+.admin-chat-history .message-parallel-stage-name {
+  font-weight: 700;
+  color: #495057;
+  text-transform: capitalize;
+  margin-right: 2px;
+}
+
+.admin-chat-history .message-parallel-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.admin-chat-history .message-parallel-chip--time {
+  background: #e7f5ff;
+  border-color: #a5d8ff;
+  color: #1864ab;
+}
+
+.admin-chat-history .message-parallel-chip--static {
+  background: #f3f0ff;
+  border-color: #d0bfff;
+  color: #5f3dc4;
+}
+
+.admin-chat-history .message-parallel-chip--dynamic {
+  background: #ebfbee;
+  border-color: #8ce99a;
+  color: #2b8a3e;
+}
+
+.admin-chat-history .message-parallel-stage-tokens {
+  color: #495057;
+}
+
 .loading,
 .no-sessions {
   padding: 20px 16px;

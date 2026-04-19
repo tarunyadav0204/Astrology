@@ -182,7 +182,8 @@ async def process_mundane_response(
             astrological_context=context,
             conversation_history=history,
             language='english',
-            response_style='detailed'
+            response_style='detailed',
+            user_id=user_id,
         )
         
         # Update database with result

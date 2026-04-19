@@ -408,6 +408,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     request.premium_analysis,
                     mode=mode,
                     use_thinking_level_high=False,
+                    user_id=current_user.userid,
                 )
                 
                 # print(f"AI result success: {ai_result.get('success')}")

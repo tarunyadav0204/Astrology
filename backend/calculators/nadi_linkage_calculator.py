@@ -49,7 +49,11 @@ class NadiLinkageCalculator:
                 "trine": set(), "next": set(), "prev": set(), "opposite": set()
             }
             
-            # 3. Calculate Links from ALL Active Signs
+            # 3. Calculate links from ALL active signs (natal sign ± retro "previous sign").
+            # Trine group per base sign = same triplicity: sign_idx, +4, +8 (whole-sign 1/5/9).
+            # Example: Venus in Leo + retro → active signs Leo and Cancer. Cancer's triplicity is
+            # {Cancer, Scorpio, Pisces} — Jupiter in Scorpio then appears under Venus's trine links
+            # (water trine), even though nominal Leo↔Scorpio is square. This is intentional vakra logic.
             for sign_idx in active_signs:
                 # Trine (1, 5, 9)
                 trine_1 = (sign_idx + 4) % 12

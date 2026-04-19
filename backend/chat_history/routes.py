@@ -7,6 +7,7 @@ import uuid
 import json
 from auth import get_current_user
 from db import get_conn, execute
+from ai.question_heuristics import bundled_questions_clarification_reply, looks_like_many_questions
 
 def sanitize_text(text):
     """Remove invalid Unicode characters and surrogates to prevent encoding attacks"""
@@ -41,6 +42,11 @@ router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 def _ensure_chat_messages_gate_metadata(conn):
     """Idempotent DDL — older DBs or skipped startup init may lack this column."""
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS gate_metadata TEXT")
+
+
+def _ensure_chat_messages_parallel_llm_usage(conn):
+    """JSON blob: per-branch + merge LLM metrics (parallel chat)."""
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parallel_llm_usage TEXT")
 
 
 def init_chat_tables():
@@ -99,6 +105,7 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
+        _ensure_chat_messages_parallel_llm_usage(conn)
 
         # Indexes
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)")
@@ -600,6 +607,18 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             force_ready=force_ready_for_limit,
             d1_chart=d1_chart
         )
+        # Several unrelated topics in one message → clarify first (overrides READY from router)
+        if (
+            looks_like_many_questions(question)
+            and clarification_count < 1
+            and not partnership_mode
+            and intent.get("status") == "READY"
+        ):
+            print("📎 MULTI_TOPIC_BUNDLE (/ask): Forcing CLARIFY before full answer")
+            intent["status"] = "CLARIFY"
+            intent["clarification_question"] = bundled_questions_clarification_reply(question, language)
+            intent["chart_insights"] = None
+
         chart_insights = intent.get('chart_insights', [])
         print(f"📊 Got {len(chart_insights)} chart insights from intent router")
         
@@ -692,6 +711,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         db_start = time.time()
         with get_conn() as conn:
             _ensure_chat_messages_gate_metadata(conn)
+            _ensure_chat_messages_parallel_llm_usage(conn)
             conn.commit()
             cur = execute(
                 conn,
@@ -1155,17 +1175,35 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             
             intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready)
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
+            MAX_CLARIFICATIONS = 1
             
             # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap
+            # Do NOT apply when the message bundles several topics (Hindi often uses "." not "?") — user should clarify first.
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
-            if any(kw in question.lower() for kw in timing_keywords) and intent.get('status') == 'CLARIFY':
+            if (
+                any(kw in question.lower() for kw in timing_keywords)
+                and intent.get('status') == 'CLARIFY'
+                and not looks_like_many_questions(combined_question)
+            ):
                 print(f"🛡️ FAIL-SAFE TRIGGERED: Forcing LIFESPAN_EVENT_TIMING for timing question")
                 intent['status'] = 'READY'
                 intent['mode'] = 'LIFESPAN_EVENT_TIMING'
                 intent['needs_transits'] = True
 
-            # Special handling for LIFESPAN_EVENT_TIMING transit range
-            if intent.get('mode') == 'LIFESPAN_EVENT_TIMING':
+            # Several unrelated topics in one message → clarify first (overrides READY)
+            if (
+                looks_like_many_questions(combined_question)
+                and clarification_count < MAX_CLARIFICATIONS
+                and not partnership_mode
+                and intent.get("status") == "READY"
+            ):
+                print("📎 MULTI_TOPIC_BUNDLE: Forcing CLARIFY before full answer")
+                intent["status"] = "CLARIFY"
+                intent["clarification_question"] = bundled_questions_clarification_reply(combined_question, language)
+                intent["chart_insights"] = None
+
+            # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
+            if intent.get('mode') == 'LIFESPAN_EVENT_TIMING' and intent.get('status') == 'READY':
                 print(f"🎯 LIFESPAN_EVENT_TIMING detected - Setting wide transit range")
                 # Calculate age 18 to +25 years
                 birth_year = int(birth_data['date'].split('-')[0])
@@ -1181,9 +1219,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 }
                 print(f"🎯 Range set: {start_year} to {end_year}")
 
-            # CLARIFICATION LIMIT: Set to 1 to allow only one clarification before forcing answer
-            MAX_CLARIFICATIONS = 1
-            
             print(f"🔍 CLARIFICATION CHECK:")
             print(f"   Intent status: {intent.get('status')}")
             print(f"   Clarification count: {clarification_count}")
@@ -1450,10 +1485,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             premium_analysis=premium_analysis,
             mode=intent.get('mode', 'default'),
             use_thinking_level_high=False,
+            user_id=user_id,
         )
         
         # Update database with result
         with get_conn() as conn:
+            _ensure_chat_messages_parallel_llm_usage(conn)
             if result.get('success'):
                 # Use already parsed terms and glossary from GeminiChatAnalyzer
                 terms = result.get('terms', [])
@@ -1525,6 +1562,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         if isinstance(raw_follow_ups, str):
                             follow_up_questions.append(sanitize_text(raw_follow_ups))
                     
+                    timing_save = result.get("timing") or {}
+                    parallel_usage_blob = timing_save.get("parallel_llm_usage")
+                    parallel_usage_json = (
+                        json.dumps(parallel_usage_blob) if parallel_usage_blob else None
+                    )
+
                     execute(
                         conn,
                         """
@@ -1533,7 +1576,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 follow_up_questions = %s, status = %s, message_type = %s,
                                 completed_at = %s, language = %s, intent_router_ms = %s,
                                 llm_input_tokens = %s, llm_output_tokens = %s,
-                                llm_prompt_chars = %s, llm_response_chars = %s
+                                llm_prompt_chars = %s, llm_response_chars = %s,
+                                parallel_llm_usage = %s
                             WHERE message_id = %s
                         """,
                         (
@@ -1551,6 +1595,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             int((result.get("token_usage") or {}).get("output_tokens") or 0) or None,
                             int(result["llm_prompt_chars"]) if result.get("llm_prompt_chars") is not None else None,
                             int(result["llm_response_chars"]) if result.get("llm_response_chars") is not None else None,
+                            parallel_usage_json,
                             message_id,
                         ),
                     )

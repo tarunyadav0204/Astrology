@@ -2,20 +2,35 @@ from .base_calculator import BaseCalculator
 
 class PlanetAnalyzer(BaseCalculator):
     """Comprehensive planet analyzer - reusable for any planet analysis"""
-    
-    def __init__(self, chart_data=None, birth_data=None):
+
+    def __init__(
+        self,
+        chart_data=None,
+        birth_data=None,
+        *,
+        shadbala_chart_data=None,
+        compute_shadbala: bool = True,
+    ):
         super().__init__(chart_data or {})
         self.birth_data = birth_data
-        
+        self._compute_shadbala = bool(compute_shadbala)
+
         # Initialize existing calculators
-        from .classical_shadbala import calculate_classical_shadbala
         from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
         from .yogi_calculator import YogiCalculator
         from .badhaka_calculator import BadhakaCalculator
         from .friendship_calculator import FriendshipCalculator
         from .gandanta_calculator import GandantaCalculator
-        
-        self.shadbala_data = calculate_classical_shadbala(birth_data, chart_data)
+
+        # Shadbala / Saptavargaja requires full D1 `divisions` map. Navamsa-only slices lack it—pass D1 via
+        # `shadbala_chart_data` when analyzing divisional charts so varga dignity is not defaulted to 5.625.
+        if self._compute_shadbala:
+            from .classical_shadbala import calculate_classical_shadbala
+
+            sb_chart = shadbala_chart_data if shadbala_chart_data is not None else chart_data
+            self.shadbala_data = calculate_classical_shadbala(birth_data, sb_chart)
+        else:
+            self.shadbala_data = {}
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
         self.yogi_calc = YogiCalculator(chart_data)
         self.badhaka_calc = BadhakaCalculator(chart_data)
@@ -118,6 +133,14 @@ class PlanetAnalyzer(BaseCalculator):
     
     def _get_strength_analysis(self, planet_name):
         """Shadbala strength analysis"""
+        if not getattr(self, "_compute_shadbala", True):
+            return {
+                "shadbala_rupas": None,
+                "shadbala_points": None,
+                "shadbala_grade": "N/A",
+                "strength_components": {},
+                "strength_interpretation": "Shadbala not computed for this context",
+            }
         if planet_name not in self.shadbala_data:
             # For planets without Shadbala (like Rahu/Ketu)
             return {
@@ -679,21 +702,24 @@ class PlanetAnalyzer(BaseCalculator):
         else:
             calculation_details.append(f"No combustion effects: 0 points")
         
-        # 6. Shadbala strength
-        shadbala_data = self.shadbala_data.get(aspecting_planet, {})
-        shadbala_rupas = shadbala_data.get('total_rupas', 0)
-        
-        if shadbala_rupas >= 6:
-            effect_score += 2
-            calculation_details.append(f"Strong Shadbala ({shadbala_rupas:.2f} rupas): +2 points")
-        elif shadbala_rupas >= 4:
-            effect_score += 1
-            calculation_details.append(f"Good Shadbala ({shadbala_rupas:.2f} rupas): +1 point")
-        elif shadbala_rupas < 3:
-            effect_score -= 1
-            calculation_details.append(f"Weak Shadbala ({shadbala_rupas:.2f} rupas): -1 point")
+        # 6. Shadbala strength (skipped when Shadbala is disabled for this analyzer)
+        if getattr(self, "_compute_shadbala", True):
+            shadbala_data = self.shadbala_data.get(aspecting_planet, {})
+            shadbala_rupas = shadbala_data.get('total_rupas', 0)
+
+            if shadbala_rupas >= 6:
+                effect_score += 2
+                calculation_details.append(f"Strong Shadbala ({shadbala_rupas:.2f} rupas): +2 points")
+            elif shadbala_rupas >= 4:
+                effect_score += 1
+                calculation_details.append(f"Good Shadbala ({shadbala_rupas:.2f} rupas): +1 point")
+            elif shadbala_rupas < 3:
+                effect_score -= 1
+                calculation_details.append(f"Weak Shadbala ({shadbala_rupas:.2f} rupas): -1 point")
+            else:
+                calculation_details.append(f"Average Shadbala ({shadbala_rupas:.2f} rupas): 0 points")
         else:
-            calculation_details.append(f"Average Shadbala ({shadbala_rupas:.2f} rupas): 0 points")
+            calculation_details.append("Shadbala not used in scoring: 0 points")
         
         # 7. Retrograde status (for applicable planets)
         if aspecting_data.get('retrograde', False) and aspecting_planet not in ['Sun', 'Moon', 'Rahu', 'Ketu']:
@@ -810,12 +836,20 @@ class PlanetAnalyzer(BaseCalculator):
     def _assess_shadbala_strength(self, analysis):
         """Assess Shadbala strength using classical thresholds"""
         planet_name = analysis['basic_info']['planet']
-        
+
+        if not getattr(self, "_compute_shadbala", True):
+            return {
+                "value": 50,
+                "reasoning": "Shadbala not computed (neutral weight in composite score)",
+            }
+
         # Rahu/Ketu don't have Shadbala in classical tradition
         if planet_name in ['Rahu', 'Ketu']:
             return {'value': 50, 'reasoning': 'Shadbala not applicable for shadow planets'}
         
         shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
+        if shadbala_rupas is None:
+            return {'value': 50, 'reasoning': 'Shadbala not computed (neutral weight in composite score)'}
         
         if shadbala_rupas >= 6:
             return {'value': 90, 'reasoning': f'Excellent Shadbala ({shadbala_rupas:.2f} rupas) - highly capable'}
@@ -961,7 +995,7 @@ class PlanetAnalyzer(BaseCalculator):
         
         # Shadbala strengths
         shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
-        if shadbala_rupas >= 5:
+        if shadbala_rupas is not None and shadbala_rupas >= 5:
             strengths.append(f"Strong Shadbala ({shadbala_rupas:.1f} rupas)")
         
         # House placement strengths
@@ -997,7 +1031,11 @@ class PlanetAnalyzer(BaseCalculator):
         
         # Shadbala weaknesses
         shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
-        if shadbala_rupas < 3 and analysis['basic_info']['planet'] not in ['Rahu', 'Ketu']:
+        if (
+            shadbala_rupas is not None
+            and shadbala_rupas < 3
+            and analysis['basic_info']['planet'] not in ['Rahu', 'Ketu']
+        ):
             weaknesses.append(f"Weak Shadbala ({shadbala_rupas:.1f} rupas)")
         
         # House placement weaknesses
@@ -1034,7 +1072,12 @@ class PlanetAnalyzer(BaseCalculator):
             recommendations.append(f"Perform {planet_name} strengthening remedies (mantras, gemstones, charity)")
         
         # Shadbala-based recommendations
-        if analysis['strength_analysis']['shadbala_rupas'] < 4 and planet_name not in ['Rahu', 'Ketu']:
+        sr = analysis['strength_analysis']['shadbala_rupas']
+        if (
+            sr is not None
+            and sr < 4
+            and planet_name not in ['Rahu', 'Ketu']
+        ):
             recommendations.append(f"Enhance {planet_name} through appropriate Vedic practices")
         
         # House-based recommendations

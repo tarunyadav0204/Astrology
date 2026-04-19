@@ -5,7 +5,23 @@ from typing import Dict, List, Optional, Tuple
 
 class ResponseParser:
     """Extracts technical terms and glossary from Gemini responses"""
-    
+
+    _FOLLOW_UP_OPEN_CANONICAL = '<div class="follow-up-questions">'
+
+    @staticmethod
+    def _normalize_follow_up_div_opening(text: str) -> str:
+        """
+        Models sometimes copy JSON-escaped quotes from embedded JSON context into HTML, e.g.
+        <div class=\\"follow-up-questions\\"> or <div class="follow-up-questions\\"> — fix for UI regex.
+        """
+        if not text:
+            return text
+        t = text
+        c = ResponseParser._FOLLOW_UP_OPEN_CANONICAL
+        t = t.replace('<div class=\\"follow-up-questions\\">', c)
+        t = t.replace('<div class="follow-up-questions\\">', c)
+        return t
+
     @staticmethod
     def parse_response(text: str) -> Dict:
         """
@@ -146,6 +162,8 @@ class ResponseParser:
         while prev != content:
             prev = content
             content = html.unescape(content)
+
+        content = ResponseParser._normalize_follow_up_div_opening(content)
 
         summary_image_prompt = None
         parsed_glossary = {}

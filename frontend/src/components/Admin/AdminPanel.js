@@ -107,6 +107,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
+  const [chatLlmProviderPremium, setChatLlmProviderPremium] = useState('');
   const [openaiModelOptions, setOpenaiModelOptions] = useState([]);
   const [openaiChatModel, setOpenaiChatModel] = useState('');
   const [openaiPremiumModel, setOpenaiPremiumModel] = useState('');
@@ -242,6 +243,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
+      setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
       setOpenaiChatModel(data.openai_chat_model || '');
       setOpenaiPremiumModel(data.openai_premium_model || '');
@@ -283,6 +285,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         premiumRes,
         analysisRes,
         providerRes,
+        premiumProviderRes,
         openaiChatRes,
         openaiPremiumRes,
         deepseekChatRes,
@@ -321,7 +324,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'chat_llm_provider',
             value: chatLlmProvider,
-            description: 'Chat LLM vendor: gemini or openai',
+            description: 'Chat LLM vendor for standard (non-premium) chat: gemini, openai, or deepseek',
+          }),
+        }),
+        fetch('/api/admin/settings/chat_llm_provider_premium', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_llm_provider_premium',
+            value: chatLlmProviderPremium,
+            description: 'Chat LLM vendor for premium chat; empty = same as standard',
           }),
         }),
         fetch('/api/admin/settings/openai_chat_model', {
@@ -366,6 +378,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         !premiumRes.ok ||
         !analysisRes.ok ||
         !providerRes.ok ||
+        !premiumProviderRes.ok ||
         !openaiChatRes.ok ||
         !openaiPremiumRes.ok ||
         !deepseekChatRes.ok ||
@@ -375,17 +388,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const premiumErr = await premiumRes.json().catch(() => ({}));
         const analysisErr = await analysisRes.json().catch(() => ({}));
         const providerErr = await providerRes.json().catch(() => ({}));
+        const premiumProviderErr = await premiumProviderRes.json().catch(() => ({}));
         const oaChatErr = await openaiChatRes.json().catch(() => ({}));
         const oaPremErr = await openaiPremiumRes.json().catch(() => ({}));
         const dsChatErr = await deepseekChatRes.json().catch(() => ({}));
         const dsPremErr = await deepseekPremiumRes.json().catch(() => ({}));
-        console.error('Save failed:', chatErr, premiumErr, analysisErr, providerErr, oaChatErr, oaPremErr, dsChatErr, dsPremErr);
+        console.error('Save failed:', chatErr, premiumErr, analysisErr, providerErr, premiumProviderErr, oaChatErr, oaPremErr, dsChatErr, dsPremErr);
         alert(
           'Failed to save: ' +
             (chatErr.detail ||
               premiumErr.detail ||
               analysisErr.detail ||
               providerErr.detail ||
+              premiumProviderErr.detail ||
               oaChatErr.detail ||
               oaPremErr.detail ||
               dsChatErr.detail ||
@@ -394,7 +409,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         );
         return;
       }
-      alert('Chat and analysis model settings saved. New requests will use them immediately.');
+      alert('Chat vendors, chat models, and analysis model saved. New requests will use them immediately.');
     } catch (error) {
       console.error('Error saving Gemini models:', error);
       alert('Failed to save Gemini models.');
@@ -415,7 +430,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         body: JSON.stringify({
           key: 'debug_logging_enabled',
           value: newValue ? 'true' : 'false',
-          description: 'Enable complete Gemini request/response logging'
+          description: 'Enable full chat request/response logging (all chat LLM vendors)'
         })
       });
       if (response.ok) {
@@ -1287,6 +1302,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       console.error('Error rejecting request:', error);
     }
   };
+
+  const vendorLabel = (v) => {
+    if (v === 'openai') return 'OpenAI';
+    if (v === 'deepseek') return 'DeepSeek';
+    return 'Google Gemini';
+  };
+  const premiumVendorEffective =
+    chatLlmProviderPremium && String(chatLlmProviderPremium).trim()
+      ? String(chatLlmProviderPremium).trim()
+      : chatLlmProvider;
 
   return (
     <div className="admin-panel">
@@ -3176,14 +3201,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <h2>System Settings</h2>
 
             <div className="settings-section">
-              <h3>Chat LLM provider</h3>
+              <h3>Chat LLM vendors</h3>
               <p className="settings-hint">
-                Conversations use Google Gemini, OpenAI, or DeepSeek. Intent routing, subject gate, and all non-chat analysis features still use Gemini. For OpenAI set <code>OPENAI_API_KEY</code>; for DeepSeek set <code>DEEPSEEK_API_KEY</code>.
+                Pick who runs each tier first. Model choices in the next section follow these vendors. Intent routing and non-chat analysis still use Gemini (analysis model below). Set <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, and <code>DEEPSEEK_API_KEY</code> as needed.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Provider for astrological chat</strong>
-                  <p>Switch to OpenAI when Gemini is slow or unavailable; keep Gemini as default otherwise.</p>
+                  <strong>Vendor — standard chat</strong>
+                  <p>Used for normal (non-premium) astrological chat.</p>
                 </div>
                 <select
                   value={chatLlmProvider}
@@ -3195,115 +3220,118 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <option value="deepseek">DeepSeek</option>
                 </select>
               </div>
-              {chatLlmProvider === 'openai' && (
-                <>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <strong>OpenAI — standard chat model</strong>
-                      <p>Used for normal chat questions.</p>
-                    </div>
-                    <select
-                      value={openaiChatModel}
-                      onChange={(e) => setOpenaiChatModel(e.target.value)}
-                      style={{ minWidth: '280px' }}
-                    >
-                      {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o-mini', label: 'GPT-4o mini' }]).map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <strong>OpenAI — premium chat model</strong>
-                      <p>Used when the user enables premium / deeper chat.</p>
-                    </div>
-                    <select
-                      value={openaiPremiumModel}
-                      onChange={(e) => setOpenaiPremiumModel(e.target.value)}
-                      style={{ minWidth: '280px' }}
-                    >
-                      {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o', label: 'GPT-4o' }]).map((opt) => (
-                        <option key={`p-${opt.value}`} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-              {chatLlmProvider === 'deepseek' && (
-                <>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <strong>DeepSeek - standard chat model</strong>
-                      <p>Used for normal chat questions.</p>
-                    </div>
-                    <select
-                      value={deepseekChatModel}
-                      onChange={(e) => setDeepseekChatModel(e.target.value)}
-                      style={{ minWidth: '280px' }}
-                    >
-                      {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
-                        <option key={`ds-${opt.value}`} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <strong>DeepSeek - premium chat model</strong>
-                      <p>Used when the user enables premium / deeper chat.</p>
-                    </div>
-                    <select
-                      value={deepseekPremiumModel}
-                      onChange={(e) => setDeepseekPremiumModel(e.target.value)}
-                      style={{ minWidth: '280px' }}
-                    >
-                      {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }]).map((opt) => (
-                        <option key={`dsp-${opt.value}`} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Vendor — premium chat</strong>
+                  <p>Used when the user enables premium / deeper chat. Same as standard keeps one vendor for both tiers.</p>
+                </div>
+                <select
+                  value={chatLlmProviderPremium}
+                  onChange={(e) => setChatLlmProviderPremium(e.target.value)}
+                  style={{ minWidth: '240px' }}
+                >
+                  <option value="">Same as standard</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="deepseek">DeepSeek</option>
+                </select>
+              </div>
             </div>
 
             <div className="settings-section">
-              <h3>Gemini Models</h3>
+              <h3>Chat models</h3>
               <p className="settings-hint">
-                Gemini models for chat (when provider is Gemini above) and for all analysis features (health, wealth, career, karma, physical, events, etc.). Changes apply to new requests immediately.
+                Standard uses the standard vendor&apos;s model list; premium uses the premium vendor&apos;s list. If premium vendor is &quot;Same as standard&quot;, the premium model row reuses the standard vendor&apos;s options.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Chat model (standard)</strong>
-                  <p>Model for standard astrological chat when the chat provider is Gemini.</p>
+                  <strong>Model — standard chat</strong>
+                  <p>Maps to {vendorLabel(chatLlmProvider)} for non-premium messages.</p>
                 </div>
-                <select
-                  value={geminiChatModel}
-                  onChange={(e) => setGeminiChatModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                {chatLlmProvider === 'gemini' && (
+                  <select
+                    value={geminiChatModel}
+                    onChange={(e) => setGeminiChatModel(e.target.value)}
+                    style={{ minWidth: '280px' }}
+                  >
+                    {geminiModelOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
+                {chatLlmProvider === 'openai' && (
+                  <select
+                    value={openaiChatModel}
+                    onChange={(e) => setOpenaiChatModel(e.target.value)}
+                    style={{ minWidth: '280px' }}
+                  >
+                    {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o-mini', label: 'GPT-4o mini' }]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
+                {chatLlmProvider === 'deepseek' && (
+                  <select
+                    value={deepseekChatModel}
+                    onChange={(e) => setDeepseekChatModel(e.target.value)}
+                    style={{ minWidth: '280px' }}
+                  >
+                    {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
+                      <option key={`ds-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Chat model (premium)</strong>
-                  <p>Model for premium / deeper chat analysis.</p>
+                  <strong>Model — premium chat</strong>
+                  <p>Maps to {vendorLabel(premiumVendorEffective)} when premium mode is on.</p>
                 </div>
-                <select
-                  value={geminiPremiumModel}
-                  onChange={(e) => setGeminiPremiumModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                {premiumVendorEffective === 'gemini' && (
+                  <select
+                    value={geminiPremiumModel}
+                    onChange={(e) => setGeminiPremiumModel(e.target.value)}
+                    style={{ minWidth: '280px' }}
+                  >
+                    {geminiModelOptions.map((opt) => (
+                      <option key={`gp-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
+                {premiumVendorEffective === 'openai' && (
+                  <select
+                    value={openaiPremiumModel}
+                    onChange={(e) => setOpenaiPremiumModel(e.target.value)}
+                    style={{ minWidth: '280px' }}
+                  >
+                    {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o', label: 'GPT-4o' }]).map((opt) => (
+                      <option key={`op-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
+                {premiumVendorEffective === 'deepseek' && (
+                  <select
+                    value={deepseekPremiumModel}
+                    onChange={(e) => setDeepseekPremiumModel(e.target.value)}
+                    style={{ minWidth: '280px' }}
+                  >
+                    {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }]).map((opt) => (
+                      <option key={`dsp-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Gemini analysis model</h3>
+              <p className="settings-hint">
+                Health, wealth, career, karma, physical, events, fact extraction, and other non-chat features use this Gemini model regardless of chat vendor. Changes apply to new requests immediately.
+              </p>
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Analysis model</strong>
-                  <p>Model for health, wealth, career, karma, physical, event predictor, blank chart, ashtakavarga, fact extraction, etc.</p>
+                  <p>All analysis routes that are not the main chat completion.</p>
                 </div>
                 <select
                   value={geminiAnalysisModel}
@@ -3317,7 +3345,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button type="button" className="create-btn" onClick={handleSaveGeminiModels} disabled={geminiModelsSaving}>
-                  {geminiModelsSaving ? 'Saving…' : 'Save chat & analysis models'}
+                  {geminiModelsSaving ? 'Saving…' : 'Save chat vendors, models & analysis'}
                 </button>
               </div>
             </div>
@@ -3377,8 +3405,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <h3>Debug & Logging</h3>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Gemini Debug Logging</strong>
-                  <p>Enable complete request/response logging for Gemini AI chat</p>
+                  <strong>Chat LLM debug logging</strong>
+                  <p>When enabled, logs the full chat prompt and response for whichever vendor handles that request (Gemini, OpenAI, or DeepSeek).</p>
                 </div>
                 <label className="toggle-switch">
                   <input 

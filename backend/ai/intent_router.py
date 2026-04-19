@@ -5,6 +5,8 @@ import re
 import asyncio
 from typing import Dict
 
+from ai.question_heuristics import looks_like_many_questions
+
 # Roman Hindi / Hinglish cues; app often sends language="english" for UI i18n while user types Hindi in Latin script.
 _HINGLISH_HINT_WORDS = frozenset({
     "mera", "meri", "mere", "main", "mein", "hum", "aap", "tum", "tera", "teri", "tere",
@@ -30,6 +32,166 @@ def _user_question_suggests_hindi(user_question: str) -> bool:
     if words & _HINGLISH_HINT_WORDS:
         return True
     return False
+
+
+def _clarification_has_one_question_nudge(text: str) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    if any(
+        p in low
+        for p in (
+            "one question at a time",
+            "one at a time",
+            "single question",
+            "ask one",
+            "एक समय में एक",
+            "एक ही सवाल",
+            "एक सवाल",
+        )
+    ):
+        return True
+    # Devanagari: एक with सवाल / प्रश्न
+    if "एक" in text and ("सवाल" in text or "प्रश्न" in text):
+        return True
+    return False
+
+
+# Canonical divisional bundles per intent category (keep in sync with IntentRouter._get_default_divisional_charts).
+_DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
+    "marriage": ["D1", "D9", "D7"],
+    "career": ["D1", "D9", "D10", "Karkamsa"],
+    "job": ["D1", "D9", "D10", "Karkamsa"],
+    "promotion": ["D1", "D9", "D10", "Karkamsa"],
+    "business": ["D1", "D9", "D10", "Karkamsa"],
+    "soul": ["D1", "D9", "D20", "Swamsa"],
+    "spirituality": ["D1", "D9", "D20", "Swamsa"],
+    "purpose": ["D1", "D9", "Karkamsa", "Swamsa"],
+    "dharma": ["D1", "D9", "Karkamsa", "Swamsa"],
+    "health": ["D1", "D9", "D30"],
+    "disease": ["D1", "D9", "D30"],
+    "children": ["D1", "D7", "D9"],
+    "child": ["D1", "D7", "D9"],
+    "pregnancy": ["D1", "D7", "D9"],
+    "siblings": ["D1", "D3", "D9"],
+    "property": ["D1", "D4", "D9", "D12"],
+    "home": ["D1", "D4", "D9"],
+    "mother": ["D1", "D4", "D9", "D12"],
+    "father": ["D1", "D9", "D10", "D12"],
+    "education": ["D1", "D9", "D24"],
+    "learning": ["D1", "D9", "D24"],
+    "vehicles": ["D1", "D4", "D16"],
+    "travel": ["D1", "D3", "D9"],
+    "foreign": ["D1", "D9", "D12"],
+    "visa": ["D1", "D9", "D12"],
+    "wealth": ["D1", "D9", "D10"],
+    "money": ["D1", "D9", "D10"],
+    "finance": ["D1", "D9", "D10"],
+    "love": ["D1", "D7", "D9"],
+    "relationship": ["D1", "D7", "D9"],
+    "partner": ["D1", "D7", "D9"],
+    "timing": ["D1", "D9"],
+    "general": ["D1", "D9"],
+    "son": ["D1", "D7", "D9"],
+    "daughter": ["D1", "D7", "D9"],
+    "spouse": ["D1", "D7", "D9"],
+    "family": ["D1", "D9", "D12"],
+}
+
+
+def get_default_divisional_charts_for_category(category: str) -> list[str]:
+    """Return the canonical divisional chart list for a router category (D1 baseline + topic charts)."""
+    return list(_DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY.get((category or "general").strip().lower(), ["D1", "D9"]))
+
+
+def _canonical_divisional_token(c: str) -> str:
+    """Normalize router chart codes: Dx uppercase; Jaimini names match chat_context_builder (`Karkamsa`, `Swamsa`)."""
+    t = (c or "").strip()
+    if not t:
+        return ""
+    low = t.lower()
+    if low == "karkamsa":
+        return "Karkamsa"
+    if low == "swamsa":
+        return "Swamsa"
+    m = re.match(r"^d(\d+)$", low)
+    if m:
+        return "D" + m.group(1)
+    return t
+
+
+def merge_divisional_charts_with_category_defaults(result: Dict) -> None:
+    """
+    After the model returns divisional_charts, ensure the list includes every chart required for
+    `category` (additive merge — extra charts from the model are kept). Fixes omissions like D24 for education.
+    """
+    required = get_default_divisional_charts_for_category(str(result.get("category") or "general"))
+    raw = result.get("divisional_charts")
+    if not isinstance(raw, list):
+        result["divisional_charts"] = list(required)
+        return
+    seen: set[str] = set()
+    out: list[str] = []
+    for c in raw:
+        if isinstance(c, str) and c.strip():
+            u = _canonical_divisional_token(c)
+            if u and u not in seen:
+                seen.add(u)
+                out.append(u)
+    for r in required:
+        cr = _canonical_divisional_token(r)
+        if cr and cr not in seen:
+            out.append(cr)
+            seen.add(cr)
+    result["divisional_charts"] = out
+
+
+def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int) -> None:
+    """
+    Post-process router output: career/education (and related) questions that ask *when* or *whether*
+    (will I / which year / job vs study) must request transits so the backend builds transit windows.
+    """
+    q = (user_question or "").strip().lower()
+    cat = (result.get("category") or "general").strip().lower()
+    careerish = cat in frozenset({"education", "career", "job", "promotion", "business"})
+    if not careerish:
+        return
+    timing_ask = any(
+        phrase in q
+        for phrase in (
+            "when ",
+            " when",
+            "when?",
+            "will i",
+            "which year",
+            "what year",
+            "first job",
+            "after i ",
+            "after graduation",
+            "timing",
+            "which month",
+            "what month",
+            " or job",
+            "job or",
+            "masters or",
+            "degree or",
+            "study or",
+            "kab ",
+        )
+    )
+    if timing_ask:
+        result["needs_transits"] = True
+
+
+def _one_question_nudge_line(is_hindi: bool) -> str:
+    if is_hindi:
+        return (
+            "सुझाव: कृपया एक समय में एक ही सवाल पूछें, ताकि हम आपको "
+            "अधिक गहरा और स्पष्ट उत्तर दे सकें।"
+        )
+    return (
+        "Tip: Ask one question at a time so we can give you a deeper, clearer answer."
+    )
 
 
 class IntentRouter:
@@ -110,6 +272,17 @@ class IntentRouter:
         
         # Add clarification limit enforcement
         clarification_limit_text = ""
+        multi_question_instruction = ""
+        if clarification_count < 1:
+            multi_question_instruction = r"""
+MULTI-QUESTION IN ONE MESSAGE (WHEN status WOULD BE "CLARIFY"):
+If the user's current message clearly packs SEVERAL distinct questions into one (e.g. two or more "?" marks, numbered asks like "1. ... 2. ...", phrases like "another question" / "few questions", or clearly separate topics joined with ";" / "also"), then:
+- Your "clarification_question" MUST still do your normal narrowing (which area, timeframe, etc.).
+- In the SAME language as the clarification (Hindi Devanagari for Hindi/Hinglish users per rules above), add ONE short polite sentence asking them to ask **one question at a time** so the reading can stay focused and detailed. Keep tone warm—not scolding.
+- If you already included that idea, do not repeat it.
+
+"""
+
         if clarification_count >= 1:
             clarification_limit_text = f"""
 
@@ -226,6 +399,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         {history_text}
         {facts_text}
         {clarification_limit_text}
+        {multi_question_instruction}
         
         Current question: "{user_question}"
         
@@ -243,10 +417,42 @@ Set appropriate mode, category, and divisional_charts based on the question cont
            - Combine the original question context with the user's clarification response
         
         DIVISIONAL CHART DETECTION:
-        Based on the question topic, determine which divisional charts are needed. Examples:
-        - "When will I get married?" → ["D1", "D9", "D7"]
-        - "How is my career?" → ["D1", "D9", "D10", "Karkamsa"]
-        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        Set `divisional_charts` to the **exact list** for the chosen `category` below (include **Karkamsa** / **Swamsa** when listed — they are required for those topics). You may **add** extra divisionals if clearly useful, but you must **never omit** any chart from the category's list. **D1** is always the radix; **D9 (Navamsa)** is the standard harmonic companion unless a row below specifies otherwise.
+
+        Quick legend (what each divisional is for): D3 siblings/courage; D4 property/comforts/land; D7 partnerships/marriage; D9 overall strength & spouse nature; D10 career/status; D12 parents & foreign residence; D16 vehicles; D20 devotion/spiritual depth; D24 higher education & scholastic depth; D30 health & disease; **Karkamsa** = soul-purpose / career-spirit line from Chara Karakas; **Swamsa** = Atmakaraka in Navamsa (soul's path).
+
+        CATEGORY → REQUIRED divisional_charts (copy exactly):
+        - marriage, partner, spouse → ["D1", "D9", "D7"]
+        - love, relationship → ["D1", "D7", "D9"]
+        - career, job, promotion, business, wealth, money, finance → ["D1", "D9", "D10", "Karkamsa"]
+        - soul, spirituality → ["D1", "D9", "D20", "Swamsa"]
+        - purpose, dharma → ["D1", "D9", "Karkamsa", "Swamsa"]
+        - health → ["D1", "D9", "D30"]
+        - disease → ["D1", "D9", "D30"]
+        - children, child, pregnancy, son, daughter → ["D1", "D7", "D9"]
+        - siblings → ["D1", "D3", "D9"]
+        - property (land, buildings, ancestral assets) → ["D1", "D4", "D9", "D12"]
+        - home (living space, domestic comfort — not investment land) → ["D1", "D4", "D9"]
+        - mother → ["D1", "D4", "D9", "D12"]
+        - father → ["D1", "D9", "D10", "D12"]
+        - education, learning → ["D1", "D9", "D24"]
+        - vehicles → ["D1", "D4", "D16"]
+        - travel → ["D1", "D3", "D9"]
+        - foreign, visa → ["D1", "D9", "D12"]
+        - family → ["D1", "D9", "D12"]
+        - timing (generic timing without a clearer life-area) → ["D1", "D9"]
+        - general, gain, wish (or unclear topic) → ["D1", "D9"]
+
+        Examples tying question wording to lists:
+        - "When will I get married?" → category marriage → ["D1", "D9", "D7"]
+        - "How is my career / promotion?" → category career or promotion → ["D1", "D9", "D10", "Karkamsa"]
+        - "Tell me about my siblings" → category siblings → ["D1", "D3", "D9"]
+        - "Property / land / home purchase?" → category property → ["D1", "D4", "D9", "D12"]
+        - "Health / illness?" → category health or disease → ["D1", "D9", "D30"]
+
+        🚨 EDUCATION / HIGHER STUDY (category "education" or "learning"):
+        - **D24 (Chaturvimshamsha / Siddhamsha)** = higher education, Masters/PhD, depth of study — **mandatory** in the list above. **D10** = job title / career status — **not** a substitute for D24.
+        - If the user mixes **Masters vs job** in one question, set category to **education** (or **learning**) and **add** "D10" so charts become at least **["D1","D9","D24","D10"]** (education + career angle). Do not drop D24 in favor of only D10.
         
         CONTEXT_TYPE:
         1. "annual": For YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?", "How is my career in 2026?")
@@ -273,8 +479,9 @@ Set appropriate mode, category, and divisional_charts based on the question cont
 
         - "PREDICT_DAILY": For daily predictions (e.g., "How is today?", "What's in store for me today?").
         - "LIFESPAN_EVENT_TIMING": For open-ended "When" questions about major life events (e.g., "When will I get married?", "When did I buy my house?", "When will my daughter get married?", "In which year did I get married?"). 
-          🚨 CRITICAL: Use this mode for ANY question seeking a specific year or date for a major milestone, past or future. 
-          🚨 CRITICAL: For this mode, ALWAYS return status: "READY". Never ask for clarification on "When" questions.
+          🚨 CRITICAL: Use this mode when the user's message is **primarily** a single timing question about one life event.
+          🚨 EXCEPTION — BUNDLED MULTI-TOPIC MESSAGES: If the same message also asks **other unrelated** things (e.g. spouse nature, career, wealth, health) in separate sentences or clauses, you MUST NOT force READY just because one part is a "when" question. Return status: "CLARIFY" and ask which **one** topic to address first (or to send one question at a time), unless the clarification limit already applies.
+          🚨 When the message is **only** a when/year question about one topic: return status: "READY" with this mode. Do not ask clarification for that narrow case.
         - "PREDICT_PERIOD_OUTLOOK": For general questions about a specific timeframe (e.g., "How will the next 6 months be for my career?"). This is for a deep-dive analysis.
         - "PREDICT_EVENT_TIMING": For "when will X happen?" questions (e.g., "When will I get married?").
         - "PREDICT_EVENTS_FOR_PERIOD": For listing numerous potential events over a period (e.g., "Tell me all events for this year."). This is for a timeline-style list.
@@ -323,7 +530,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             }}
         }}
 
-        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, timing
         """
         
         model = self._get_model()
@@ -363,9 +570,25 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             if 'extracted_context' not in result:
                 result['extracted_context'] = {}
             if 'needs_transits' not in result:
-                result['needs_transits'] = result['context_type'] in ['birth', 'annual'] and any(word in user_question.lower() for word in ['when', 'timing', 'period', 'year', '2025', '2026', '2027'])
+                qlow = user_question.lower()
+                result['needs_transits'] = result['context_type'] in ['birth', 'annual'] and any(
+                    word in qlow
+                    for word in [
+                        'when',
+                        'timing',
+                        'period',
+                        'year',
+                        '2025',
+                        '2026',
+                        '2027',
+                        'will i',
+                        'which year',
+                        'first job',
+                    ]
+                )
             if 'divisional_charts' not in result:
                 result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
+            merge_divisional_charts_with_category_defaults(result)
             # Only keep chart_insights when the model returned a valid list of insight objects
             raw_insights = result.get('chart_insights')
             if isinstance(raw_insights, list) and raw_insights:
@@ -374,6 +597,8 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             else:
                 result['chart_insights'] = []
             
+            apply_transit_timing_guards(result, user_question, current_year=current_year)
+
             if result.get('needs_transits') and 'transit_request' not in result:
                 result['transit_request'] = {
                     "startYear": current_year,
@@ -382,6 +607,17 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                         str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)
                     }
                 }
+
+            if (
+                result.get("status") == "CLARIFY"
+                and clarification_count < 1
+                and looks_like_many_questions(user_question)
+            ):
+                cq = (result.get("clarification_question") or "").strip()
+                if cq and not _clarification_has_one_question_nudge(cq):
+                    result["clarification_question"] = (
+                        f"{cq}\n\n{_one_question_nudge_line(is_hindi_question)}"
+                    )
             
             return result
         except Exception as e:
@@ -422,19 +658,5 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                 }
     
     def _get_default_divisional_charts(self, category: str) -> list:
-        """Get default divisional charts based on question category"""
-        chart_mapping = {
-            'marriage': ['D1', 'D9', 'D7'], 'career': ['D1', 'D9', 'D10', 'Karkamsa'], 'job': ['D1', 'D9', 'D10', 'Karkamsa'],
-            'promotion': ['D1', 'D9', 'D10', 'Karkamsa'], 'business': ['D1', 'D9', 'D10', 'Karkamsa'],
-            'soul': ['D1', 'D9', 'D20', 'Swamsa'], 'spirituality': ['D1', 'D9', 'D20', 'Swamsa'], 'purpose': ['D1', 'D9', 'Karkamsa', 'Swamsa'],
-            'dharma': ['D1', 'D9', 'Karkamsa', 'Swamsa'], 'health': ['D1', 'D9', 'D30'], 'disease': ['D1', 'D9', 'D30'],
-            'children': ['D1', 'D7', 'D9'], 'child': ['D1', 'D7', 'D9'], 'pregnancy': ['D1', 'D7', 'D9'],
-            'siblings': ['D1', 'D3', 'D9'], 'property': ['D1', 'D4', 'D9', 'D12'], 'home': ['D1', 'D4', 'D9'],
-            'mother': ['D1', 'D4', 'D9', 'D12'], 'father': ['D1', 'D9', 'D10', 'D12'], 'education': ['D1', 'D9', 'D24'],
-            'learning': ['D1', 'D9', 'D24'], 'vehicles': ['D1', 'D4', 'D16'], 'travel': ['D1', 'D3', 'D9'],
-            'foreign': ['D1', 'D9', 'D12'], 'visa': ['D1', 'D9', 'D12'], 'wealth': ['D1', 'D9', 'D10'], 'money': ['D1', 'D9', 'D10'],
-            'finance': ['D1', 'D9', 'D10'], 'love': ['D1', 'D7', 'D9'], 'relationship': ['D1', 'D7', 'D9'],
-            'partner': ['D1', 'D7', 'D9'], 'timing': ['D1', 'D9'], 'general': ['D1', 'D9'], 'son': ['D1', 'D7', 'D9'],
-            'daughter': ['D1', 'D7', 'D9'], 'spouse': ['D1', 'D7', 'D9'], 'family': ['D1', 'D9', 'D12']
-        }
-        return chart_mapping.get(category.lower(), ['D1', 'D9'])
+        """Get default divisional charts based on question category (see _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY)."""
+        return get_default_divisional_charts_for_category(category)

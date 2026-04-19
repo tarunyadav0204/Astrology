@@ -25,12 +25,36 @@ _CHEAP_NUDGE_GEMINI_MODELS = [
 # Rough USD rates per 1M tokens (input/output) for estimate display only.
 # These are intentionally approximate and can be overridden per env.
 _MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
-    # Gemini 3 family
+    # Gemini 3.1 (USD per 1M tokens; see Google AI pricing)
+    "models/gemini-3.1-flash-lite-preview": {
+        "input_le_200k": 0.25,
+        "input_gt_200k": 0.25,
+        "output_le_200k": 1.50,
+        "output_gt_200k": 1.50,
+    },
     "models/gemini-3.1-pro-preview": {
         "input_le_200k": 2.00,
         "input_gt_200k": 4.00,
         "output_le_200k": 12.00,
         "output_gt_200k": 18.00,
+    },
+    "models/gemini-3.1-flash-live-preview": {
+        "input_le_200k": 0.75,
+        "input_gt_200k": 0.75,
+        "output_le_200k": 4.50,
+        "output_gt_200k": 4.50,
+    },
+    "models/gemini-3.1-flash-image-preview": {
+        "input_le_200k": 0.25,
+        "input_gt_200k": 0.25,
+        "output_le_200k": 1.50,
+        "output_gt_200k": 1.50,
+    },
+    "models/gemini-3.1-flash-tts-preview": {
+        "input_le_200k": 1.00,
+        "input_gt_200k": 1.00,
+        "output_le_200k": 20.00,
+        "output_gt_200k": 20.00,
     },
     "models/gemini-3-pro-preview": {
         "input_le_200k": 2.00,
@@ -95,6 +119,27 @@ def _resolve_rate(used_model: str, input_tokens_est: int) -> Dict[str, float]:
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
     cfg = _MODEL_RATE_USD_PER_1M.get(used_model or "")
     if not cfg:
+        ml = (used_model or "").lower()
+        if "gemini-3.1-flash-lite" in ml or ("3.1" in ml and "flash-lite" in ml):
+            return {"input": 0.25, "output": 1.50, "tier": tier}
+        if "gemini-3.1-flash-live" in ml or ("3.1" in ml and "flash-live" in ml):
+            return {"input": 0.75, "output": 4.50, "tier": tier}
+        if "gemini-3.1-flash-image" in ml or ("3.1" in ml and "flash-image" in ml):
+            return {"input": 0.25, "output": 1.50, "tier": tier}
+        if "gemini-3.1-flash-tts" in ml or ("gemini-3.1" in ml and "tts" in ml):
+            return {"input": 1.00, "output": 20.00, "tier": tier}
+        if "gemini-3.1-pro" in ml:
+            return (
+                {"input": 4.00, "output": 18.00, "tier": tier}
+                if tier == "gt_200k"
+                else {"input": 2.00, "output": 12.00, "tier": tier}
+            )
+        if "flash-lite" in ml:
+            return {"input": 0.10, "output": 0.40, "tier": tier}
+        if "flash" in ml:
+            return {"input": 0.50, "output": 3.00, "tier": tier}
+        if "pro" in ml:
+            return {"input": 2.00, "output": 12.00, "tier": tier}
         return {"input": 0.10, "output": 0.40, "tier": tier}
     if tier == "gt_200k":
         return {

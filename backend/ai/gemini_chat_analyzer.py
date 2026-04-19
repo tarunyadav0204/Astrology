@@ -4,7 +4,7 @@ import os
 import html
 import asyncio
 import re
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 from ai.response_parser import ResponseParser
@@ -238,13 +238,20 @@ class GeminiChatAnalyzer:
                 content = "".join(parts).strip()
             if not content:
                 raise RuntimeError("Blank OpenAI Responses API output")
-            return {
-                "text": content,
-                "usage": {
-                    "input_tokens": int(getattr(getattr(resp, "usage", None), "input_tokens", 0) or 0),
-                    "output_tokens": int(getattr(getattr(resp, "usage", None), "output_tokens", 0) or 0),
-                },
+            u = getattr(resp, "usage", None)
+            usage: Dict[str, Any] = {
+                "input_tokens": int(getattr(u, "input_tokens", 0) or 0),
+                "output_tokens": int(getattr(u, "output_tokens", 0) or 0),
             }
+            itd = getattr(u, "input_tokens_details", None)
+            if itd is not None:
+                c = getattr(itd, "cached_tokens", None)
+                if c is not None:
+                    usage["cached_tokens"] = int(c)
+            tt = getattr(u, "total_tokens", None)
+            if tt is not None:
+                usage["total_tokens"] = int(tt)
+            return {"text": content, "usage": usage}
 
         # Legacy Chat Completions (gpt-4o, gpt-4-turbo, etc.)
         temperature = 1.0 if mid.startswith("o") else 0.0
@@ -260,13 +267,19 @@ class GeminiChatAnalyzer:
         if not content:
             raise RuntimeError("Blank OpenAI response content")
         usage_obj = getattr(resp, "usage", None)
-        return {
-            "text": content,
-            "usage": {
-                "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
-                "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
-            },
+        usage: Dict[str, Any] = {
+            "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+            "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
         }
+        ptd = getattr(usage_obj, "prompt_tokens_details", None)
+        if ptd is not None:
+            c = getattr(ptd, "cached_tokens", None)
+            if c is not None:
+                usage["cached_tokens"] = int(c)
+        tt = getattr(usage_obj, "total_tokens", None)
+        if tt is not None:
+            usage["total_tokens"] = int(tt)
+        return {"text": content, "usage": usage}
 
     async def _deepseek_chat_completion(self, prompt: str, model_id: str) -> Dict[str, Any]:
         """DeepSeek chat via OpenAI-compatible API."""
@@ -299,13 +312,170 @@ class GeminiChatAnalyzer:
         if not content:
             raise RuntimeError("Blank DeepSeek response content")
         usage_obj = getattr(resp, "usage", None)
-        return {
-            "text": content,
-            "usage": {
-                "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
-                "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
-            },
+        usage: Dict[str, Any] = {
+            "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+            "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
         }
+        ptd = getattr(usage_obj, "prompt_tokens_details", None)
+        if ptd is not None:
+            c = getattr(ptd, "cached_tokens", None)
+            if c is not None:
+                usage["cached_tokens"] = int(c)
+        tt = getattr(usage_obj, "total_tokens", None)
+        if tt is not None:
+            usage["total_tokens"] = int(tt)
+        return {"text": content, "usage": usage}
+
+    async def generate_text_from_prompt(
+        self,
+        prompt: str,
+        premium_analysis: bool = False,
+        *,
+        llm_log_tag: Optional[str] = None,
+        request_timeout_s: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Single LLM completion for an arbitrary prompt (parallel chat branches + merge).
+        Uses the same provider routing as `generate_chat_response` (Gemini / OpenAI / DeepSeek).
+
+        When `llm_log_tag` is set, emits one `[LLM_ROUNDTRIP]` line per call (chars + tokens,
+        including cache fields when the provider returns them). Control via `ASTRO_LLM_LOG_ROUNDS`,
+        optional full bodies via `ASTRO_LLM_LOG_BODIES` / `ASTRO_LLM_LOG_BODIES_MAX_CHARS`
+        (see `ai.llm_roundtrip_log`).
+
+        request_timeout_s: When set (e.g. parallel branches), caps wall time so SDK 429 retry
+        storms cannot run for many minutes. Merge/callers omit this to keep the 600s chat default.
+        """
+        import time
+
+        from utils.admin_settings import (
+            CHAT_LLM_DEEPSEEK,
+            CHAT_LLM_OPENAI,
+            get_chat_llm_provider,
+            get_chat_llm_provider_premium,
+            get_deepseek_chat_model,
+            get_deepseek_premium_model,
+            get_gemini_chat_model,
+            get_gemini_premium_model,
+            get_openai_chat_model,
+            get_openai_premium_model,
+        )
+
+        t0 = time.time()
+        timeout_s = (
+            600.0
+            if request_timeout_s is None
+            else max(1.0, min(600.0, float(request_timeout_s)))
+        )
+        llm_provider = (
+            get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
+        )
+        model_name = ""
+        token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}
+        response_text: Optional[str] = None
+
+        def _finish(out: Dict[str, Any]) -> Dict[str, Any]:
+            if llm_log_tag:
+                from ai.llm_roundtrip_log import log_llm_roundtrip
+
+                log_llm_roundtrip(
+                    tag=llm_log_tag,
+                    provider=str(llm_provider),
+                    model=out.get("chat_llm_model"),
+                    prompt=prompt,
+                    response_text=out.get("response"),
+                    success=bool(out.get("success")),
+                    error=out.get("error"),
+                    usage=dict(out.get("token_usage") or {}),
+                    elapsed_s=float(out.get("elapsed_s") or (time.time() - t0)),
+                )
+            return out
+
+        try:
+            if llm_provider == CHAT_LLM_OPENAI:
+                model_name = get_openai_premium_model() if premium_analysis else get_openai_chat_model()
+                oa = await asyncio.wait_for(
+                    self._openai_chat_completion(prompt, model_name, premium_analysis),
+                    timeout=timeout_s,
+                )
+                response_text = (oa or {}).get("text")
+                token_usage = (oa or {}).get("usage") or token_usage
+            elif llm_provider == CHAT_LLM_DEEPSEEK:
+                model_name = get_deepseek_premium_model() if premium_analysis else get_deepseek_chat_model()
+                ds = await asyncio.wait_for(
+                    self._deepseek_chat_completion(prompt, model_name),
+                    timeout=timeout_s,
+                )
+                response_text = (ds or {}).get("text")
+                token_usage = (ds or {}).get("usage") or token_usage
+            else:
+                model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
+                selected_model = self._get_model(premium_analysis)
+                req_to = int(timeout_s) if timeout_s >= 1 else 1
+                response = await asyncio.wait_for(
+                    selected_model.generate_content_async(
+                        prompt,
+                        request_options={"timeout": req_to},
+                    ),
+                    timeout=timeout_s,
+                )
+                if response and hasattr(response, "text") and response.text:
+                    response_text = response.text.strip()
+                try:
+                    usage_meta = getattr(response, "usage_metadata", None)
+                    if usage_meta is not None:
+                        token_usage = {
+                            "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
+                            "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
+                            "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
+                            "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
+                        }
+                except Exception:
+                    pass
+
+            if not response_text:
+                return _finish(
+                    {
+                        "success": False,
+                        "response": None,
+                        "error": "empty_response",
+                        "chat_llm_model": model_name or None,
+                        "token_usage": token_usage,
+                        "elapsed_s": time.time() - t0,
+                    }
+                )
+            return _finish(
+                {
+                    "success": True,
+                    "response": response_text,
+                    "error": None,
+                    "chat_llm_model": model_name or None,
+                    "token_usage": token_usage,
+                    "elapsed_s": time.time() - t0,
+                }
+            )
+        except asyncio.TimeoutError:
+            return _finish(
+                {
+                    "success": False,
+                    "response": None,
+                    "error": "timeout",
+                    "chat_llm_model": model_name or None,
+                    "token_usage": token_usage,
+                    "elapsed_s": time.time() - t0,
+                }
+            )
+        except Exception as e:
+            return _finish(
+                {
+                    "success": False,
+                    "response": None,
+                    "error": str(e),
+                    "chat_llm_model": model_name or None,
+                    "token_usage": token_usage,
+                    "elapsed_s": time.time() - t0,
+                }
+            )
 
     async def generate_chat_response(
         self,
@@ -319,6 +489,7 @@ class GeminiChatAnalyzer:
         mode: str = "default",
         *,
         use_thinking_level_high: bool = False,
+        user_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION.
 
@@ -330,6 +501,7 @@ class GeminiChatAnalyzer:
         from utils.admin_settings import (
             is_debug_logging_enabled,
             get_chat_llm_provider,
+            get_chat_llm_provider_premium,
             CHAT_LLM_OPENAI,
             CHAT_LLM_DEEPSEEK,
             get_openai_chat_model,
@@ -341,7 +513,9 @@ class GeminiChatAnalyzer:
         )
 
         debug_logging = is_debug_logging_enabled()
-        llm_provider = get_chat_llm_provider()
+        llm_provider = (
+            get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
+        )
 
         total_request_start = time.time()
         if debug_logging:
@@ -378,6 +552,26 @@ class GeminiChatAnalyzer:
             'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.',
             'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.'
         }
+
+        # Optional parallel pipeline (ASTRO_PARALLEL_CHAT=1). Standard natal birth mode only.
+        from ai.parallel_chat.config import should_use_parallel_chat
+
+        if should_use_parallel_chat(enhanced_context, user_id=user_id):
+            from ai.parallel_chat.orchestrator import run_parallel_chat_pipeline
+
+            print("🧵 PARALLEL_CHAT_PIPELINE: ASTRO_PARALLEL_CHAT enabled — using multi-branch + merge")
+            return await run_parallel_chat_pipeline(
+                self,
+                user_question=user_question,
+                astrological_context=enhanced_context,
+                conversation_history=conversation_history or [],
+                language=language,
+                response_style=response_style,
+                user_context=user_context,
+                premium_analysis=premium_analysis,
+                mode=mode,
+                total_request_start=total_request_start,
+            )
         
         # Prune context to reduce token load
         # print("✂️ Pruning context to reduce token load...")
@@ -418,7 +612,22 @@ class GeminiChatAnalyzer:
         # print(f"Moon nakshatra available: {bool(moon_nakshatra)}")
         if moon_nakshatra:
             print(f"🌙 MOON NAKSHATRA: {moon_nakshatra.get('name', 'Unknown')} (cached for future requests)")
-        
+
+        if debug_logging:
+            model_type_dbg = "Premium" if premium_analysis else "Standard"
+            print(f"\n=== CHAT LLM REQUEST ({llm_provider}, {call_type}) ===")
+            print(f"Analysis type: {model_type_dbg}")
+            print(f"Prompt length: {len(prompt)} characters")
+            print(f"\n{'='*80}")
+            print(f"📤 FULL CHAT REQUEST PROMPT")
+            print(f"{'='*80}")
+            print(prompt)
+            print(f"\n{'='*80}")
+            print(f"📝 END OF REQUEST PROMPT")
+            print(f"{'='*80}\n")
+            _psz = len(prompt)
+            print(f"\n📏 CHAT REQUEST SIZE: {_psz:,} characters ({_psz / 1024:.1f} KB)")
+
         gemini_start_time = time.time()
         try:
             model_type = "Premium" if premium_analysis else "Standard"
@@ -430,21 +639,6 @@ class GeminiChatAnalyzer:
             if llm_provider == CHAT_LLM_OPENAI:
                 model_name = get_openai_premium_model() if premium_analysis else get_openai_chat_model()
                 print(f"🧠 OpenAI chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
-
-                if debug_logging:
-                    print(f"\n=== CALLING OPENAI API (ASYNC) ===")
-                    print(f"Analysis Type: {model_type}")
-                    print(f"Model: {model_name}")
-                    print(f"Prompt length: {len(prompt)} characters")
-                    print(f"\n{'='*80}")
-                    print(f"📤 FULL CHAT REQUEST PROMPT")
-                    print(f"{'='*80}")
-                    print(prompt)
-                    print(f"\n{'='*80}")
-                    print(f"📝 END OF REQUEST PROMPT")
-                    print(f"{'='*80}\n")
-                    prompt_size = len(prompt)
-                    print(f"\n📏 OPENAI REQUEST SIZE: {prompt_size:,} characters ({prompt_size / 1024:.1f} KB)")
 
                 oa = await asyncio.wait_for(
                     self._openai_chat_completion(prompt, model_name, premium_analysis),
@@ -466,22 +660,6 @@ class GeminiChatAnalyzer:
                 model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
                 selected_model = self._get_model(premium_analysis)
                 print(f"🧠 Gemini chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
-
-                if debug_logging:
-                    print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-                    print(f"Analysis Type: {model_type}")
-                    print(f"Model: {model_name}")
-                    print(f"Prompt length: {len(prompt)} characters")
-                    print(f"\n{'='*80}")
-                    print(f"📤 FULL GEMINI REQUEST PROMPT")
-                    print(f"{'='*80}")
-                    print(prompt)
-                    print(f"\n{'='*80}")
-                    print(f"📝 END OF REQUEST PROMPT")
-                    print(f"{'='*80}\n")
-                    prompt_size = len(prompt)
-                    prompt_char_count = len(prompt)
-                    print(f"\n📏 GEMINI REQUEST SIZE: {prompt_char_count:,} characters ({prompt_size / 1024:.1f} KB)")
 
                 api_key = os.getenv("GEMINI_API_KEY") or ""
                 try_high_thinking = False

@@ -202,7 +202,16 @@ JSON OUTPUT ONLY (Must be valid JSON):
 """
         
         gemini = GeminiChatAnalyzer()
-        ai_result = await gemini.generate_chat_response(prompt, context, [], request.language, "detailed", None, request.premium_analysis)
+        ai_result = await gemini.generate_chat_response(
+            prompt,
+            context,
+            [],
+            request.language,
+            "detailed",
+            None,
+            request.premium_analysis,
+            user_id=current_user.userid,
+        )
         
         if ai_result['success']:
             ai_response_text = ai_result.get('response', '')

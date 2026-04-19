@@ -34,6 +34,31 @@ def _question_looks_like_roman_hindi(text: str) -> bool:
     )
     return any(re.search(p, low) for p in patterns)
 
+
+def build_multi_question_focus_instruction(language: str = "english") -> str:
+    """
+    Tells the answer model: if CURRENT QUESTION still bundles several distinct asks,
+    pick one, answer it deeply, and state scope at the very top of the user-visible reply.
+    (OUTPUT LANGUAGE rules elsewhere still apply — the notice must match the answer language.)
+    """
+    _ = (language or "english").strip()
+    return """
+📌 MULTIPLE QUESTIONS IN "CURRENT QUESTION" (APPLY ONLY WHEN RELEVANT):
+If the user's CURRENT QUESTION (at the end of this prompt) clearly contains **two or more distinct questions**—for example several question marks, numbered asks, or clearly separate topics in one message—do **not** try to answer everything at equal depth in a single reply.
+
+Instead you MUST:
+1) **Choose one focus question** for this reading: the most urgent, chart-central, or emotionally weighty ask (use dasha timing, house emphasis, or what the chart best supports).
+2) **Answer only that question** with full depth and the usual response structure. Do **not** give parallel full analyses for every other bundled question.
+3) **At the very top of your reply**, before any section headers (before "Quick Answer", markdown titles, or the first substantive paragraph), add a **short scope notice** in the **same language as the rest of your answer** (per OUTPUT LANGUAGE rules):
+   - State clearly that this reading is focused on that one question; briefly restate it in your own words (one short clause).
+   - Add one warm line inviting them to send remaining questions **one at a time** in follow-up messages so each can get proper depth.
+   - Tone: helpful and respectful, never scolding.
+
+If CURRENT QUESTION is genuinely **one** integrated question (even if long), **do not** add this disclaimer—answer normally.
+
+"""
+
+
 # --------------------------------------------------------------------------------------
 # I. CENTRALIZED SYSTEM INSTRUCTIONS
 # --------------------------------------------------------------------------------------
@@ -101,7 +126,7 @@ FOLLOW_UP_BLOCK_INSTRUCTION = """
 - [Question 3]
 - [Question 4]
 </div>
-🚨 CRITICAL FORMATTING RULE: You MUST wrap the ENTIRE list of follow-up questions inside a single <div class="follow-up-questions"> block exactly as shown above. Each question MUST start with a hyphen (-). Do not add any other HTML tags inside this block.
+🚨 CRITICAL FORMATTING RULE: You MUST wrap the ENTIRE list of follow-up questions inside a single <div class="follow-up-questions"> block exactly as shown above (literal HTML: double-quote characters only—never a backslash before a quote). Each question MUST start with a hyphen (-). Do not add any other HTML tags inside this block.
 """
 
 # FAQ metadata: LLM must output this exact line at the very end (for categorization + FAQs). Not shown to user.
@@ -511,6 +536,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     prompt_parts.append(system_instruction)
     prompt_parts.append(f"{language_instruction}{elaborate_instruction}{response_format_instruction}{user_context_instruction}{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}")
     
+    prompt_parts.append(build_multi_question_focus_instruction(_lang))
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
     if _lang_lower == "english":
         prompt_parts.append(

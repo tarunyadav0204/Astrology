@@ -50,6 +50,15 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 router = APIRouter()
 
 
+def _parse_parallel_llm_usage(raw: Any) -> Optional[Dict[str, Any]]:
+    if not raw or not isinstance(raw, str):
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
 def _timestamp_to_ist_iso(val) -> Optional[str]:
     """Convert DB timestamp (naive, stored as server local / IST) to ISO string with +05:30 so frontend displays correct IST."""
     if val is None:
@@ -68,11 +77,41 @@ def _timestamp_to_ist_iso(val) -> Optional[str]:
 
 
 # Rough USD rates per 1M tokens for chat-history cost estimates.
+# Gemini 3.1 published pricing (USD per 1M tokens unless noted). INR ≈ USD × rate from _usd_to_inr_rate().
 _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
-    # Gemini 3 family
-    "models/gemini-3.1-pro-preview": {
-        "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
+    # Gemini 3.1 (current product pricing)
+    "models/gemini-3.1-flash-lite-preview": {
+        "input_le_200k": 0.25,
+        "input_gt_200k": 0.25,
+        "output_le_200k": 1.50,
+        "output_gt_200k": 1.50,
     },
+    "models/gemini-3.1-pro-preview": {
+        "input_le_200k": 2.00,
+        "input_gt_200k": 4.00,
+        "output_le_200k": 12.00,
+        "output_gt_200k": 18.00,
+    },
+    "models/gemini-3.1-flash-live-preview": {
+        "input_le_200k": 0.75,
+        "input_gt_200k": 0.75,
+        "output_le_200k": 4.50,
+        "output_gt_200k": 4.50,
+    },
+    # Text output pricing; image generation billed separately (e.g. per image) in provider — not token-parity here.
+    "models/gemini-3.1-flash-image-preview": {
+        "input_le_200k": 0.25,
+        "input_gt_200k": 0.25,
+        "output_le_200k": 1.50,
+        "output_gt_200k": 1.50,
+    },
+    "models/gemini-3.1-flash-tts-preview": {
+        "input_le_200k": 1.00,
+        "input_gt_200k": 1.00,
+        "output_le_200k": 20.00,
+        "output_gt_200k": 20.00,
+    },
+    # Gemini 3 (non-3.1) legacy preview ids
     "models/gemini-3-pro-preview": {
         "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
     },
@@ -169,6 +208,20 @@ def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) ->
         return {"input": float(cfg["input_le_200k"]), "output": float(cfg["output_le_200k"]), "tier": tier}
     ml = m.lower()
     # Safe fallback by family if exact key not configured.
+    if "gemini-3.1-flash-lite" in ml or ("3.1" in ml and "flash-lite" in ml):
+        return {"input": 0.25, "output": 1.50, "tier": tier}
+    if "gemini-3.1-flash-live" in ml or ("3.1" in ml and "flash-live" in ml):
+        return {"input": 0.75, "output": 4.50, "tier": tier}
+    if "gemini-3.1-flash-image" in ml or ("3.1" in ml and "flash-image" in ml):
+        return {"input": 0.25, "output": 1.50, "tier": tier}
+    if "gemini-3.1-flash-tts" in ml or ("3.1" in ml and "flash-tts" in ml) or (
+        "gemini-3.1" in ml and "tts" in ml
+    ):
+        return {"input": 1.00, "output": 20.00, "tier": tier}
+    if "gemini-3.1-pro" in ml:
+        if tier == "gt_200k":
+            return {"input": 4.00, "output": 18.00, "tier": tier}
+        return {"input": 2.00, "output": 12.00, "tier": tier}
     if "flash-lite" in ml:
         return {"input": 0.10, "output": 0.40, "tier": tier}
     if "flash" in ml:
@@ -363,6 +416,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 has_llm_output_tokens = "llm_output_tokens" in msg_cols
                 has_llm_prompt_chars = "llm_prompt_chars" in msg_cols
                 has_llm_response_chars = "llm_response_chars" in msg_cols
+                has_parallel_llm_usage = "parallel_llm_usage" in msg_cols
                 select_message_type = "COALESCE(message_type, '')" if has_message_type else "''"
                 # Preserve SQL NULL so we can tell "not stored" from real API zeros.
                 select_llm_input_tokens = (
@@ -377,12 +431,16 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 select_llm_response_chars = (
                     "llm_response_chars" if has_llm_response_chars else "CAST(NULL AS INTEGER)"
                 )
+                select_parallel_llm_usage = (
+                    "parallel_llm_usage" if has_parallel_llm_usage else "CAST(NULL AS TEXT)"
+                )
                 cur = execute(
                     conn,
                     f"""
                     SELECT message_id, sender, content, timestamp, {select_message_type},
                            {select_llm_input_tokens}, {select_llm_output_tokens},
-                           {select_llm_prompt_chars}, {select_llm_response_chars}
+                           {select_llm_prompt_chars}, {select_llm_response_chars},
+                           {select_parallel_llm_usage}
                     FROM chat_messages
                     WHERE session_id = %s
                     ORDER BY message_id ASC
@@ -428,10 +486,12 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 raw_out = _row_optional_int(r[6]) if len(r) > 6 else None
                 raw_pc = _row_optional_int(r[7]) if len(r) > 7 else None
                 raw_rc = _row_optional_int(r[8]) if len(r) > 8 else None
+                raw_parallel = r[9] if len(r) > 9 else None
                 llm_in_display: Optional[int] = None
                 llm_out_display: Optional[int] = None
                 llm_prompt_chars_display: Optional[int] = None
                 llm_response_chars_display: Optional[int] = None
+                parallel_llm_usage_display: Optional[Dict[str, Any]] = None
                 if str(sender or "").strip().lower() == "assistant":
                     if has_llm_input_tokens:
                         llm_in_display = raw_in
@@ -441,10 +501,12 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         llm_prompt_chars_display = raw_pc
                     if has_llm_response_chars and raw_rc is not None and raw_rc > 0:
                         llm_response_chars_display = raw_rc
+                    if has_parallel_llm_usage:
+                        parallel_llm_usage_display = _parse_parallel_llm_usage(raw_parallel)
                 else:
                     # User row: full prompt / usage / reply size come from the assistant message for this turn.
                     nxt = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
-                    if nxt and str(nxt[1] or "").strip().lower() == "assistant" and len(nxt) > 8:
+                    if nxt and str(nxt[1] or "").strip().lower() == "assistant" and len(nxt) > 9:
                         if has_llm_input_tokens:
                             llm_in_display = _row_optional_int(nxt[5])
                         if has_llm_output_tokens:
@@ -455,6 +517,8 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                             llm_prompt_chars_display = npc
                         if has_llm_response_chars and nrc is not None and nrc > 0:
                             llm_response_chars_display = nrc
+                        if has_parallel_llm_usage:
+                            parallel_llm_usage_display = _parse_parallel_llm_usage(nxt[9])
                 messages.append(
                     {
                         "sender": sender,
@@ -465,6 +529,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         "llm_output_tokens": llm_out_display,
                         "llm_prompt_chars": llm_prompt_chars_display,
                         "llm_response_chars": llm_response_chars_display,
+                        "parallel_llm_usage": parallel_llm_usage_display,
                         "cost_estimate": {
                             "tokens_estimate": tokens_est,
                             "cost_inr_estimate": round(cost_inr, 6),
@@ -648,6 +713,9 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             GEMINI_MODEL_OPTIONS,
             OPENAI_CHAT_MODEL_OPTIONS,
             DEEPSEEK_CHAT_MODEL_OPTIONS,
+            CHAT_LLM_GEMINI,
+            CHAT_LLM_OPENAI,
+            CHAT_LLM_DEEPSEEK,
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
@@ -657,11 +725,18 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_openai_premium_model,
             get_deepseek_chat_model,
             get_deepseek_premium_model,
+            get_setting,
         )
         with get_conn() as conn:
             _ensure_admin_settings_table(conn)
             cur = execute(conn, "SELECT key, value, description FROM admin_settings", ())
             settings = [{"key": row[0], "value": row[1], "description": row[2]} for row in (cur.fetchall() or [])]
+        _raw_premium = (get_setting("chat_llm_provider_premium") or "").strip().lower()
+        _premium_ui = (
+            _raw_premium
+            if _raw_premium in (CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK)
+            else ""
+        )
         return {
             "settings": settings,
             "gemini_model_options": [{"value": v, "label": l} for v, l in GEMINI_MODEL_OPTIONS],
@@ -671,6 +746,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_premium_model": get_gemini_premium_model(),
             "gemini_analysis_model": get_gemini_analysis_model(),
             "chat_llm_provider": get_chat_llm_provider(),
+            "chat_llm_provider_premium": _premium_ui,
             "openai_chat_model": get_openai_chat_model(),
             "openai_premium_model": get_openai_premium_model(),
             "deepseek_chat_model": get_deepseek_chat_model(),
