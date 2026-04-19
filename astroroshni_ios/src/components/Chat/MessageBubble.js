@@ -533,12 +533,72 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     return elements;
   };
   
-  /** One line of text → inline Text nodes (tooltips, bold, italic). */
+  /** Bold + italic for one substring (no tooltips); used inside tooltip parts and sentiment wrappers. */
+  const renderPlainSegmentWithBoldItalic = (segment, keyPrefix, baseTextStyle, textStyle, sentimentColor) => {
+    const tone = sentimentColor ? { color: sentimentColor } : null;
+    const elements = [];
+    const boldRegex = /\*\*(.*?)\*\*/gs;
+    const boldParts = String(segment || '').split(boldRegex);
+
+    boldParts.forEach((boldPart, boldIndex) => {
+      if (boldIndex % 2 === 1) {
+        elements.push(
+          <Text
+            key={`bold-${keyPrefix}-${boldIndex}`}
+            style={[
+              styles.boldText,
+              baseTextStyle,
+              message.role === 'user' && styles.userText,
+              message.role === 'user' && { fontWeight: '700' },
+              tone,
+            ]}
+          >
+            {boldPart}
+          </Text>
+        );
+      } else if (boldPart) {
+        const italicRegex = /\*(.*?)\*/g;
+        const italicParts = boldPart.split(italicRegex);
+
+        italicParts.forEach((italicPart, italicIndex) => {
+          if (italicIndex % 2 === 1) {
+            elements.push(
+              <Text
+                key={`italic-${keyPrefix}-${boldIndex}-${italicIndex}`}
+                style={[
+                  styles.regularText,
+                  baseTextStyle,
+                  { fontStyle: 'italic' },
+                  message.role === 'user' && styles.userText,
+                  tone,
+                ]}
+              >
+                {italicPart}
+              </Text>
+            );
+          } else if (italicPart) {
+            elements.push(
+              <Text
+                key={`text-${keyPrefix}-${boldIndex}-${italicIndex}`}
+                style={[textStyle, tone]}
+              >
+                {italicPart}
+              </Text>
+            );
+          }
+        });
+      }
+    });
+    return elements;
+  };
+
+  /** One line of text → inline Text nodes (tooltips, bold, italic, [PC-9] sentiment). */
   const buildInlineElementsForLine = (line, keyPrefix, baseTextStyle, textStyle) => {
     const elements = [];
     const textLine = (line || '').replace(/^#+\s*/, '').replace(/\s+#+\s+/g, ' ').trim();
     const tooltipRegex = /<tooltip data-term="([^"]+)">([^<]+)<\/tooltip>/g;
     const parts = textLine.split(tooltipRegex);
+    const segmentRegex = /(?:【|\[)POS_START(?:】|\])([\s\S]*?)(?:【|\[)POS_END(?:】|\])|(?:【|\[)NEG_START(?:】|\])([\s\S]*?)(?:【|\[)NEG_END(?:】|\])/g;
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
@@ -555,56 +615,53 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </Text>
         );
       } else if (i % 3 === 0 && part) {
-        const boldRegex = /\*\*(.*?)\*\*/gs;
-        const boldParts = part.split(boldRegex);
-
-        boldParts.forEach((boldPart, boldIndex) => {
-          if (boldIndex % 2 === 1) {
+        segmentRegex.lastIndex = 0;
+        let last = 0;
+        let m;
+        let sub = 0;
+        while ((m = segmentRegex.exec(part)) !== null) {
+          if (m.index > last) {
             elements.push(
-              <Text
-                key={`bold-${keyPrefix}-${i}-${boldIndex}`}
-                style={[
-                  styles.boldText,
-                  baseTextStyle,
-                  message.role === 'user' && styles.userText,
-                  message.role === 'user' && { fontWeight: '700' },
-                ]}
-              >
-                {boldPart}
-              </Text>
+              ...renderPlainSegmentWithBoldItalic(
+                part.slice(last, m.index),
+                `${keyPrefix}-${i}-${sub++}`,
+                baseTextStyle,
+                textStyle,
+                null
+              )
             );
-          } else if (boldPart) {
-            const italicRegex = /\*(.*?)\*/g;
-            const italicParts = boldPart.split(italicRegex);
-
-            italicParts.forEach((italicPart, italicIndex) => {
-              if (italicIndex % 2 === 1) {
-                elements.push(
-                  <Text
-                    key={`italic-${keyPrefix}-${i}-${boldIndex}-${italicIndex}`}
-                    style={[
-                      styles.regularText,
-                      baseTextStyle,
-                      { fontStyle: 'italic' },
-                      message.role === 'user' && styles.userText,
-                    ]}
-                  >
-                    {italicPart}
-                  </Text>
-                );
-              } else if (italicPart) {
-                elements.push(
-                  <Text
-                    key={`text-${keyPrefix}-${i}-${boldIndex}-${italicIndex}`}
-                    style={textStyle}
-                  >
-                    {italicPart}
-                  </Text>
-                );
-              }
-            });
           }
-        });
+          const isPos = m[1] !== undefined;
+          const inner = isPos ? m[1] : m[2];
+          const sentimentColor = isPos ? '#15803d' : '#b91c1c';
+          const innerEls = renderPlainSegmentWithBoldItalic(
+            inner,
+            `${keyPrefix}-${i}-${sub++}`,
+            baseTextStyle,
+            textStyle,
+            sentimentColor
+          );
+          elements.push(
+            <Text
+              key={`sentiment-${keyPrefix}-${i}-${m.index}`}
+              style={[baseTextStyle, isPos ? styles.sentimentPositive : styles.sentimentNegative]}
+            >
+              {innerEls}
+            </Text>
+          );
+          last = segmentRegex.lastIndex;
+        }
+        if (last < part.length) {
+          elements.push(
+            ...renderPlainSegmentWithBoldItalic(
+              part.slice(last),
+              `${keyPrefix}-${i}-${sub}`,
+              baseTextStyle,
+              textStyle,
+              null
+            )
+          );
+        }
       }
     }
     return elements;
@@ -800,6 +857,20 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     out = out.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n\n#### $1\n\n');
     out = out.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**');
     out = out.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*');
+    // [PC-9] Web sentiment spans → markers (parsed in buildInlineElementsForLine)
+    out = out.replace(
+      /<span\s+class=["']chat-sentiment-positive["'][^>]*>([\s\S]*?)<\/span>/gi,
+      '【POS_START】$1【POS_END】'
+    );
+    out = out.replace(
+      /<span\s+class=["']chat-sentiment-negative["'][^>]*>([\s\S]*?)<\/span>/gi,
+      '【NEG_START】$1【NEG_END】'
+    );
+    // Some model outputs emit ASCII marker brackets directly; normalize them.
+    out = out.replace(/\[POS_START\]/g, '【POS_START】');
+    out = out.replace(/\[POS_END\]/g, '【POS_END】');
+    out = out.replace(/\[NEG_START\]/g, '【NEG_START】');
+    out = out.replace(/\[NEG_END\]/g, '【NEG_END】');
     out = out.replace(/<div class="chat-response">\s*/gi, '');
     out = out.replace(/\s*<\/div>\s*$/i, '');
     out = out.replace(/<\/div>/gi, '\n');
@@ -1624,6 +1695,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2c3e50',
     flexShrink: 1,
+  },
+  sentimentPositive: {
+    color: '#15803d',
+  },
+  sentimentNegative: {
+    color: '#b91c1c',
   },
   headerContainer: {
     flexDirection: 'row',

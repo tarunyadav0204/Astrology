@@ -445,6 +445,17 @@ button.chat-header-credits.credits-display:active {
     font-weight: 500;
 }
 
+/* LLM-tagged sentiment (see [PC-9] in system_instruction_config) */
+.enhanced-formatting .chat-sentiment-positive {
+    color: #15803d !important;
+    font-weight: 600;
+}
+
+.enhanced-formatting .chat-sentiment-negative {
+    color: #b91c1c !important;
+    font-weight: 600;
+}
+
 .enhanced-formatting ul.chat-list {
     list-style: none;
     padding-left: 0;
