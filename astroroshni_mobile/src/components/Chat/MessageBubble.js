@@ -775,7 +775,7 @@ export default function MessageBubble({
       .replace(/【(POS|NEG)_(START|END)】/g, '');
 
   const renderPlainSegmentWithBoldItalic = (segment, keyPrefix, baseTextStyle, textStyle, sentimentColor) => {
-    const tone = sentimentColor ? { color: sentimentColor } : null;
+    const tone = sentimentColor ? { color: sentimentColor, fontWeight: '700' } : null;
     const elements = [];
     const boldRegex = /\*\*(.*?)\*\*/gs;
     const cleanSegment = stripAnySentimentMarkers(segment);
@@ -2067,9 +2067,11 @@ const styles = StyleSheet.create({
   },
   sentimentPositive: {
     color: '#15803d',
+    fontWeight: '700',
   },
   sentimentNegative: {
     color: '#b91c1c',
+    fontWeight: '700',
   },
   headerContainer: {
     flexDirection: 'row',

@@ -448,12 +448,12 @@ button.chat-header-credits.credits-display:active {
 /* LLM-tagged sentiment (see [PC-9] in system_instruction_config) */
 .enhanced-formatting .chat-sentiment-positive {
     color: #15803d !important;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .enhanced-formatting .chat-sentiment-negative {
     color: #b91c1c !important;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .enhanced-formatting ul.chat-list {
@@ -537,6 +537,47 @@ button.chat-header-credits.credits-display:active {
     border-radius: 14px;
     padding: 14px 14px;
     word-wrap: break-word;
+}
+
+/* Quick Answer / Final Verdict / Final Thoughts — readable cards (avoid pink gradient + low contrast) */
+.message-text.enhanced-formatting .quick-answer-card,
+.message-text.enhanced-formatting .final-thoughts-card {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #9d174d;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 18px 0 14px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+    color: #334155 !important;
+    font-size: 15px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1.68;
+}
+
+.message-text.enhanced-formatting .quick-answer-card {
+    border-left-color: #ea580c;
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+    border-color: #fde68a;
+    color: #78350f !important;
+}
+
+.message-text.enhanced-formatting .quick-answer-card .chat-bold,
+.message-text.enhanced-formatting .final-thoughts-card .chat-bold {
+    background: rgba(15, 23, 42, 0.06) !important;
+    color: #0f172a !important;
+    font-weight: 700;
+}
+
+.message-text.enhanced-formatting .quick-answer-card .chat-italic,
+.message-text.enhanced-formatting .final-thoughts-card .chat-italic {
+    color: #57534e !important;
+}
+
+.message-text.enhanced-formatting .quick-answer-card strong,
+.message-text.enhanced-formatting .final-thoughts-card strong {
+    text-shadow: none !important;
 }
 
 /* Prose blocks from MessageBubble.applyChatProseParagraphs (double newlines in model output) */

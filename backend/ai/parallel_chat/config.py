@@ -24,7 +24,7 @@ Parallel payload diagnostics (orchestrator):
 
 Rate limits & long tails (429 / TPM / preview models fire many parallel handshakes at once):
 - `ASTRO_PARALLEL_STAGGER_S` — seconds of delay **before** each branch starts after the first (default `0.55`). Spreads 7 LLM calls across ~3.3s instead of one burst (reduces HTTP 429 retry storms).
-- `ASTRO_PARALLEL_BRANCH_TIMEOUT_S` — max wall time per **non-critical** branch LLM call (default `45`). On timeout/error, that branch returns `status=unavailable` and merge continues.
+- `ASTRO_PARALLEL_BRANCH_TIMEOUT_S` — max wall time per **non-critical** branch LLM call (default `90`). On timeout/error, that branch returns `status=unavailable` and merge continues.
 - `ASTRO_PARALLEL_CRITICAL_TIMEOUT_S` — same for the **Parashari** branch (default `120`). Lower than the generic 600s chat timeout so one stuck SDK retry loop cannot block the UI for many minutes.
 
 Agent-built branch payloads (compact JSON, not legacy `ChatContextBuilder` keys):
@@ -113,9 +113,9 @@ def parallel_branch_timeout_s(*, critical: bool) -> float:
     Per-branch asyncio timeout for `generate_text_from_prompt` (caps SDK retry/backoff tails).
     """
     key = "ASTRO_PARALLEL_CRITICAL_TIMEOUT_S" if critical else "ASTRO_PARALLEL_BRANCH_TIMEOUT_S"
-    default = "120" if critical else "45"
+    default = "120" if critical else "90"
     raw = (os.environ.get(key) or default).strip()
     try:
         return max(5.0, min(600.0, float(raw)))
     except ValueError:
-        return 120.0 if critical else 45.0
+        return 120.0 if critical else 90.0

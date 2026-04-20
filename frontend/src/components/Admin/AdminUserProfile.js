@@ -12,6 +12,138 @@ function defaultFromDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function formatDuration(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  const total = Math.round(n / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function formatTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function isLikelyMobileUserAgent(ua) {
+  const s = String(ua || '').toLowerCase();
+  return (
+    s.includes('okhttp') ||
+    s.includes('dalvik') ||
+    s.includes('android') ||
+    s.includes('cfnetwork') ||
+    s.includes('expo') ||
+    s.includes('reactnative')
+  );
+}
+
+function inferScreenFromPath(path) {
+  const p = String(path || '').toLowerCase();
+  if (!p.startsWith('/api/')) return 'Other';
+  if (p.includes('/chat')) return 'Chat';
+  if (p.includes('/birth-chart') || p.includes('/birth-profile')) return 'Birth Profile';
+  if (p.includes('/karma')) return 'Karma Analysis';
+  if (p.includes('/event-timeline')) return 'Event Timeline';
+  if (p.includes('/trading')) return 'Trading';
+  if (p.includes('/credit')) return 'Credits';
+  if (p.includes('/podcast') || p.includes('/tts')) return 'Podcast / Audio';
+  if (p.includes('/muhurat')) return 'Muhurat';
+  if (p.includes('/blog')) return 'Blog';
+  if (p.includes('/support')) return 'Support';
+  if (p.includes('/auth') || p.includes('/login') || p.includes('/signup')) return 'Auth';
+  return 'Other';
+}
+
+function inferCtaLabel(method, path) {
+  const m = String(method || '').toUpperCase();
+  const p = String(path || '').toLowerCase();
+  if (p.includes('/chat') && (m === 'POST' || p.includes('/send'))) return 'Send message';
+  if (p.includes('/chat') && m === 'GET') return 'Open chat/session';
+  if (p.includes('/birth-chart') && m === 'POST') return 'Create/Update chart';
+  if (p.includes('/credit') && p.includes('/purchase')) return 'Buy credits';
+  if (p.includes('/credit') && m === 'GET') return 'Check credits';
+  if (p.includes('/trading') && m === 'GET') return 'View trading insight';
+  if (p.includes('/event-timeline') && m === 'POST') return 'Generate timeline';
+  if (p.includes('/karma') && m === 'POST') return 'Generate karma analysis';
+  if (p.includes('/podcast') || p.includes('/tts')) return 'Podcast action';
+  if (p.includes('/support')) return 'Contact support';
+  return `${m || 'API'} ${p.split('/').filter(Boolean).slice(-1)[0] || 'request'}`;
+}
+
+function buildMobileJourney(activityRows) {
+  const rows = Array.isArray(activityRows) ? activityRows : [];
+  const apiRows = rows
+    .filter((r) => String(r.path || '').startsWith('/api/'))
+    .filter((r) => String(r.action || '') === 'api_request' || String(r.action || '') === 'api_error')
+    .map((r) => ({ ...r, _t: new Date(r.created_at).getTime() }))
+    .filter((r) => Number.isFinite(r._t))
+    .sort((a, b) => a._t - b._t);
+
+  if (!apiRows.length) {
+    return { steps: [], summary: { totalSteps: 0, totalTimeMs: 0, totalApiCalls: 0, mobileRows: 0 } };
+  }
+
+  const mobileRowsCount = apiRows.filter((r) => isLikelyMobileUserAgent(r.user_agent)).length;
+  const sourceRows = mobileRowsCount > 0 ? apiRows.filter((r) => isLikelyMobileUserAgent(r.user_agent)) : apiRows;
+
+  const steps = [];
+  let current = null;
+  sourceRows.forEach((row, idx) => {
+    const screen = inferScreenFromPath(row.path);
+    const cta = inferCtaLabel(row.method, row.path);
+    const startMs = row._t;
+    const nextMs = idx < sourceRows.length - 1 ? sourceRows[idx + 1]._t : null;
+
+    if (!current || current.screen !== screen) {
+      if (current) {
+        current.endMs = startMs;
+        current.timeSpentMs = Math.max(0, current.endMs - current.startMs);
+        current.ctas = Array.from(current.ctas);
+        current.paths = Array.from(current.paths).slice(0, 4);
+        steps.push(current);
+      }
+      current = {
+        screen,
+        startMs,
+        endMs: nextMs || startMs,
+        apiCalls: 0,
+        apiLatencyMs: 0,
+        ctas: new Set(),
+        paths: new Set(),
+      };
+    }
+
+    current.apiCalls += 1;
+    current.apiLatencyMs += Number(row.duration_ms) || 0;
+    current.ctas.add(cta);
+    current.paths.add(row.path || '—');
+  });
+
+  if (current) {
+    current.timeSpentMs = Math.max(0, (current.endMs || current.startMs) - current.startMs);
+    current.ctas = Array.from(current.ctas);
+    current.paths = Array.from(current.paths).slice(0, 4);
+    steps.push(current);
+  }
+
+  const totalTimeMs = steps.reduce((acc, s) => acc + (s.timeSpentMs || 0), 0);
+  return {
+    steps,
+    summary: {
+      totalSteps: steps.length,
+      totalTimeMs,
+      totalApiCalls: sourceRows.length,
+      mobileRows: mobileRowsCount,
+    },
+  };
+}
+
 function Section({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -144,6 +276,7 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
   const summary = data?.summary;
   const user = data?.user;
   const showProfile = data && !data.ambiguous && user;
+  const journey = buildMobileJourney(data?.bigquery_activity || []);
 
   return (
     <div className="users-management admin-user-profile">
@@ -329,6 +462,56 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
                 </tbody>
               </table>
             </div>
+          </Section>
+
+          <Section title={`Mobile journey (${journey.summary.totalSteps || 0} steps)`} defaultOpen>
+            <div className="admin-user-profile-journey-summary">
+              <div><strong>Journey time:</strong> {formatDuration(journey.summary.totalTimeMs)}</div>
+              <div><strong>API calls used:</strong> {journey.summary.totalApiCalls}</div>
+              <div>
+                <strong>Mobile UA rows:</strong>{' '}
+                {journey.summary.mobileRows > 0 ? journey.summary.mobileRows : 'none detected (showing all API rows)'}
+              </div>
+            </div>
+            {journey.steps.length === 0 ? (
+              <div className="admin-user-profile-empty">No API activity found to build journey in selected range.</div>
+            ) : (
+              <div className="admin-user-profile-journey-grid">
+                {journey.steps.map((step, idx) => (
+                  <article className="admin-user-profile-journey-card" key={`${step.screen}-${step.startMs}-${idx}`}>
+                    <div className="admin-user-profile-journey-card-head">
+                      <span className="admin-user-profile-journey-step">Step {idx + 1}</span>
+                      <h4>{step.screen}</h4>
+                    </div>
+                    <div className="admin-user-profile-journey-times">
+                      <span>{formatTime(step.startMs)}</span>
+                      <span>to</span>
+                      <span>{formatTime(step.endMs)}</span>
+                    </div>
+                    <div className="admin-user-profile-journey-metrics">
+                      <div><strong>Time spent:</strong> {formatDuration(step.timeSpentMs)}</div>
+                      <div><strong>Calls:</strong> {step.apiCalls}</div>
+                      <div><strong>Total API latency:</strong> {formatDuration(step.apiLatencyMs)}</div>
+                    </div>
+                    <div className="admin-user-profile-journey-ctas">
+                      {step.ctas.map((cta) => (
+                        <span key={`${step.startMs}-${cta}`} className="admin-user-profile-journey-chip">
+                          {cta}
+                        </span>
+                      ))}
+                    </div>
+                    <details className="admin-user-profile-journey-paths">
+                      <summary>Endpoints</summary>
+                      <ul>
+                        {step.paths.map((p) => (
+                          <li key={`${step.startMs}-${p}`}><code>{p}</code></li>
+                        ))}
+                      </ul>
+                    </details>
+                  </article>
+                ))}
+              </div>
+            )}
           </Section>
 
           {['health', 'wealth', 'marriage', 'education', 'career'].map((key) => {

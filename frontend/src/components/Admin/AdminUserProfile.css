@@ -269,3 +269,114 @@
   max-width: 200px;
   word-break: break-all;
 }
+
+.admin-user-profile-journey-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #444;
+}
+
+.admin-user-profile-empty {
+  background: #fff;
+  border: 1px dashed #e0e0e0;
+  border-radius: 8px;
+  padding: 14px;
+  color: #666;
+  font-size: 13px;
+}
+
+.admin-user-profile-journey-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.admin-user-profile-journey-card {
+  background: #fff;
+  border: 1px solid #f8bbd9;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.admin-user-profile-journey-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.admin-user-profile-journey-card-head h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+}
+
+.admin-user-profile-journey-step {
+  background: #fce4ec;
+  color: #ad1457;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-user-profile-journey-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.admin-user-profile-journey-metrics {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: #444;
+  margin-bottom: 10px;
+}
+
+.admin-user-profile-journey-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.admin-user-profile-journey-chip {
+  background: #f3e5f5;
+  color: #4a148c;
+  border: 1px solid #e1bee7;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.admin-user-profile-journey-paths summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+}
+
+.admin-user-profile-journey-paths ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.admin-user-profile-journey-paths li {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #555;
+}
+
+.admin-user-profile-journey-paths code {
+  background: #f5f5f5;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
