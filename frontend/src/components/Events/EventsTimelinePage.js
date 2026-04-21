@@ -76,6 +76,7 @@ export default function EventsTimelinePage({
   const [loading, setLoading] = useState(false);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [streamProgress, setStreamProgress] = useState({ monthsReady: 0, totalMonths: 12, quarterLabel: '' });
 
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
@@ -87,6 +88,7 @@ export default function EventsTimelinePage({
   const pollIntervalRef = useRef(null);
   const pollTimeoutRef = useRef(null);
   const jobRunningRef = useRef(false);
+  const timelineStreamAbortRef = useRef(null);
 
   const seoData = useMemo(
     () => generatePageSEO('lifeEvents', { path: '/life-events' }),
@@ -146,6 +148,10 @@ export default function EventsTimelinePage({
       clearTimeout(pollTimeoutRef.current);
       pollTimeoutRef.current = null;
     }
+    if (timelineStreamAbortRef.current) {
+      timelineStreamAbortRef.current.abort();
+      timelineStreamAbortRef.current = null;
+    }
   }, []);
 
   /** Normalize status API payload — backend uses `data`; guard if the timeline is ever returned at the top level */
@@ -165,6 +171,7 @@ export default function EventsTimelinePage({
     jobRunningRef.current = true;
     setLoading(true);
     setTimelineData(null);
+    setStreamProgress({ monthsReady: 0, totalMonths: 12, quarterLabel: '' });
     setLoadingMsgIndex(0);
     setLoadingProgress(0);
 
@@ -191,6 +198,7 @@ export default function EventsTimelinePage({
       clearTimers();
       const timelinePayload = extractTimelinePayload(statusResponse);
       setTimelineData(timelinePayload);
+        setStreamProgress({ monthsReady: 12, totalMonths: 12, quarterLabel: 'Done' });
       try {
         await fetchBalance();
       } catch {
@@ -225,6 +233,50 @@ export default function EventsTimelinePage({
       if (!jobId) {
         throw new Error('No job id returned from server.');
       }
+
+      const streamController = new AbortController();
+      timelineStreamAbortRef.current = streamController;
+      let streamDeliveredTerminal = false;
+      apiService
+        .streamEventTimeline(
+          jobId,
+          async (eventName, payload) => {
+            if (!jobRunningRef.current) return;
+            if (payload?.partial_data) {
+              const partial = payload.partial_data;
+              setTimelineData((prev) => ({
+                ...(prev || {}),
+                macro_trends: partial.macro_trends || [],
+                monthly_predictions: partial.monthly_predictions || [],
+              }));
+              const completedQ = Number(payload.completed_quarters || partial.completed_quarters || 0);
+              const totalQ = Number(payload.total_quarters || partial.total_quarters || 4);
+              const monthsReady = Number(payload.months_ready || partial.months_ready || (partial.monthly_predictions || []).length || 0);
+              setStreamProgress({
+                monthsReady,
+                totalMonths: 12,
+                quarterLabel: completedQ > 0 ? `Q${Math.min(completedQ, totalQ)} ready` : '',
+              });
+            }
+            if (eventName === 'completed') {
+              streamDeliveredTerminal = true;
+              await onCompleted(payload);
+            } else if (eventName === 'failed') {
+              streamDeliveredTerminal = true;
+              onFailed(payload?.error || 'Analysis failed');
+            }
+          },
+          streamController.signal
+        )
+        .catch(() => {
+          // Polling remains active as fallback when stream is unavailable.
+        })
+        .finally(() => {
+          timelineStreamAbortRef.current = null;
+          if (!streamDeliveredTerminal && jobRunningRef.current) {
+            // fallback polling will continue
+          }
+        });
 
       const pollOnce = async () => {
         const statusResponse = await apiService.getEventTimelineStatus(jobId);
@@ -398,7 +450,12 @@ export default function EventsTimelinePage({
 
   const yearLabel = String(selectedYear);
   const monthlyPredictions = timelineData?.monthly_predictions || [];
-  const macroTrends = timelineData?.macro_trends || [];
+  const macroTrends = (timelineData?.macro_trends || []).filter((trend) => {
+    const t = String(trend || '').replace(/\s+/g, ' ').trim();
+    if (!t) return false;
+    const wc = t.split(' ').filter(Boolean).length;
+    return wc > 3 && t.length >= 28;
+  });
 
   const diveDeepForMonth = (data) => {
     if (!data?.month_id) return;
@@ -502,12 +559,18 @@ export default function EventsTimelinePage({
               </details>
             )}
 
-            {loading ? (
+            {loading && (
               <section className="events-timeline__loading">
                 <div className="events-timeline__loading-inner">
                   <div className="events-timeline__spinner" aria-hidden />
                   <p className="events-timeline__loading-icon">{LOADING_MESSAGES[loadingMsgIndex].icon}</p>
                   <p className="events-timeline__loading-text">{LOADING_MESSAGES[loadingMsgIndex].text}</p>
+                  {streamProgress.monthsReady > 0 && (
+                    <p className="events-timeline__loading-text">
+                      {streamProgress.monthsReady}/12 months ready
+                      {streamProgress.quarterLabel ? ` · ${streamProgress.quarterLabel}` : ''}
+                    </p>
+                  )}
                   {loadingProgress >= 0 ? (
                     <div className="events-timeline__progress">
                       <div className="events-timeline__progress-track">
@@ -525,7 +588,8 @@ export default function EventsTimelinePage({
                   )}
                 </div>
               </section>
-            ) : (
+            )}
+            {!loading && (
               <>
                 {macroTrends.length > 0 && (
                   <section className="events-timeline__macro">
@@ -580,6 +644,24 @@ export default function EventsTimelinePage({
                   </button>
                 </div>
               </>
+            )}
+            {loading && monthlyPredictions.length > 0 && (
+              <section className="events-timeline__months">
+                <h2 className="events-timeline__section-title">Monthly guide (streaming)</h2>
+                <div className="events-timeline__accordion-list">
+                  {monthlyPredictions.map((month, index) => (
+                    <MonthlyEventAccordion
+                      key={`${month.month_id || index}-${index}`}
+                      data={{
+                        ...month,
+                        month: month.month || monthLabel(month.month_id)
+                      }}
+                      yearLabel={yearLabel}
+                      onDiveDeep={null}
+                    />
+                  ))}
+                </div>
+              </section>
             )}
           </div>
         ) : !birthChartId ? (

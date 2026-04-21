@@ -65,6 +65,7 @@ export default function EventScreen({ route }) {
   const [creditCostOriginal, setCreditCostOriginal] = useState(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [timelineProgress, setTimelineProgress] = useState({ monthsReady: 0, totalMonths: 12, completedQuarters: 0 });
   const progressIntervalRef = useRef(null);
   const [nativeName, setNativeName] = useState('');
   const [birthData, setBirthData] = useState(null);
@@ -220,6 +221,7 @@ export default function EventScreen({ route }) {
     stopEventTimelineJob();
     setLoadingMonthly(true);
     setMonthlyData(null);
+    setTimelineProgress({ monthsReady: 0, totalMonths: 12, completedQuarters: 0 });
     setLoadingMessageIndex(0);
 
     loadingIntervalRef.current = setInterval(() => {
@@ -332,6 +334,22 @@ export default function EventScreen({ route }) {
         try {
           const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
           const status = statusResponse.data.status;
+          const partialData = statusResponse.data?.partial_data;
+
+          if (partialData && Array.isArray(partialData.monthly_predictions)) {
+            setMonthlyData((prev) => ({
+              ...(prev || {}),
+              macro_trends: partialData.macro_trends || prev?.macro_trends || [],
+              monthly_predictions: partialData.monthly_predictions || [],
+            }));
+            setTimelineProgress({
+              monthsReady: Number(statusResponse.data?.months_ready || partialData.monthly_predictions.length || 0),
+              totalMonths: 12,
+              completedQuarters: Number(
+                statusResponse.data?.completed_quarters || partialData.completed_quarters || 0
+              ),
+            });
+          }
 
           if (status === 'completed' && statusResponse.data.data) {
             finishSuccess(statusResponse.data.data);
@@ -687,6 +705,14 @@ export default function EventScreen({ route }) {
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[monthId - 1] || `Month ${monthId}`;
   };
+  const isDescriptiveTrend = (trend) => {
+    const t = String(trend || '').replace(/\s+/g, ' ').trim();
+    if (!t) return false;
+    const wc = t.split(' ').filter(Boolean).length;
+    if (wc <= 3 || t.length < 28) return false;
+    return true;
+  };
+  const displayMacroTrends = (monthlyData?.macro_trends || []).filter(isDescriptiveTrend);
 
   const handleRegenerateConfirm = async () => {
     setShowRegenerateModal(false);
@@ -986,13 +1012,13 @@ export default function EventScreen({ route }) {
         )}
 
         {/* Macro Trends (The "Vibe") */}
-        {monthlyData?.macro_trends && (
+        {displayMacroTrends.length > 0 && (
           <View style={[styles.macroCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
             <View style={styles.macroHeader}>
               <Ionicons name="planet" size={18} color={colors.primary} />
               <Text style={[styles.macroTitle, { color: colors.primary }]}>The Vibe of {selectedYear}</Text>
             </View>
-            {monthlyData.macro_trends.map((trend, index) => (
+            {displayMacroTrends.map((trend, index) => (
               <View key={index} style={styles.trendRow}>
                 <Text style={[styles.bullet, { color: colors.primary }]}>•</Text>
                 <Text style={[styles.trendText, { color: colors.text }]}>{trend}</Text>
@@ -1008,6 +1034,12 @@ export default function EventScreen({ route }) {
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
               <Text style={[styles.loadingText, { color: colors.text }]}>{loadingMessages[loadingMessageIndex].text}</Text>
+              {timelineProgress.monthsReady > 0 ? (
+                <Text style={[styles.takingLongerText, { color: colors.textSecondary }]}>
+                  {timelineProgress.monthsReady}/{timelineProgress.totalMonths} months ready
+                  {timelineProgress.completedQuarters > 0 ? ` • Q${timelineProgress.completedQuarters} done` : ''}
+                </Text>
+              ) : null}
               
               {loadingProgress >= 0 ? (
                 <View style={styles.progressBarContainer}>
@@ -1022,6 +1054,17 @@ export default function EventScreen({ route }) {
                 <Text style={[styles.takingLongerText, { color: colors.textSecondary }]}>Taking longer than usual...</Text>
               )}
             </View>
+            {monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
+              <View style={styles.accordionContainer}>
+                {monthlyData.monthly_predictions.map((month, index) => (
+                  <MonthlyAccordion
+                    key={`stream-${index}`}
+                    data={{ ...month, month: getMonthName(month.month_id) }}
+                    hideDiveDeep
+                  />
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>

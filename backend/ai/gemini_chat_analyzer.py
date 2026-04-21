@@ -331,6 +331,8 @@ class GeminiChatAnalyzer:
         prompt: str,
         premium_analysis: bool = False,
         *,
+        model_override: Optional[Any] = None,
+        model_name_override: Optional[str] = None,
         llm_log_tag: Optional[str] = None,
         request_timeout_s: Optional[float] = None,
     ) -> Dict[str, Any]:
@@ -409,8 +411,11 @@ class GeminiChatAnalyzer:
                 response_text = (ds or {}).get("text")
                 token_usage = (ds or {}).get("usage") or token_usage
             else:
-                model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
-                selected_model = self._get_model(premium_analysis)
+                model_name = (
+                    (str(model_name_override).strip() if model_name_override else "")
+                    or (get_gemini_premium_model() if premium_analysis else get_gemini_chat_model())
+                )
+                selected_model = model_override or self._get_model(premium_analysis)
                 req_to = int(timeout_s) if timeout_s >= 1 else 1
                 response = await asyncio.wait_for(
                     selected_model.generate_content_async(
@@ -430,10 +435,21 @@ class GeminiChatAnalyzer:
                             "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
                             "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
                         }
+                        token_usage["non_cached_input_tokens"] = max(
+                            0,
+                            int(token_usage.get("input_tokens") or 0)
+                            - int(token_usage.get("cached_tokens") or 0),
+                        )
                 except Exception:
                     pass
 
             if not response_text:
+                if "non_cached_input_tokens" not in token_usage:
+                    token_usage["non_cached_input_tokens"] = max(
+                        0,
+                        int(token_usage.get("input_tokens") or 0)
+                        - int(token_usage.get("cached_tokens") or 0),
+                    )
                 return _finish(
                     {
                         "success": False,
@@ -443,6 +459,12 @@ class GeminiChatAnalyzer:
                         "token_usage": token_usage,
                         "elapsed_s": time.time() - t0,
                     }
+                )
+            if "non_cached_input_tokens" not in token_usage:
+                token_usage["non_cached_input_tokens"] = max(
+                    0,
+                    int(token_usage.get("input_tokens") or 0)
+                    - int(token_usage.get("cached_tokens") or 0),
                 )
             return _finish(
                 {
@@ -700,12 +722,25 @@ class GeminiChatAnalyzer:
                     token_usage = {
                         "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
                         "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
+                        "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
+                        "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
                     }
+                    token_usage["non_cached_input_tokens"] = max(
+                        0,
+                        int(token_usage.get("input_tokens") or 0)
+                        - int(token_usage.get("cached_tokens") or 0),
+                    )
                 except Exception:
                     token_usage = token_usage
 
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start
+            if "non_cached_input_tokens" not in token_usage:
+                token_usage["non_cached_input_tokens"] = max(
+                    0,
+                    int(token_usage.get("input_tokens") or 0)
+                    - int(token_usage.get("cached_tokens") or 0),
+                )
 
             if debug_logging:
                 if llm_provider == CHAT_LLM_OPENAI:

@@ -59,6 +59,18 @@ def _parse_parallel_llm_usage(raw: Any) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _parallel_cache_setup_tokens(parallel_usage: Optional[Dict[str, Any]]) -> int:
+    if not isinstance(parallel_usage, dict):
+        return 0
+    totals = parallel_usage.get("totals")
+    if not isinstance(totals, dict):
+        return 0
+    try:
+        return max(0, int(totals.get("cache_setup_input_tokens") or 0))
+    except Exception:
+        return 0
+
+
 def _timestamp_to_ist_iso(val) -> Optional[str]:
     """Convert DB timestamp (naive, stored as server local / IST) to ISO string with +05:30 so frontend displays correct IST."""
     if val is None:
@@ -116,7 +128,12 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
         "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
     },
     "models/gemini-3-flash-preview": {
-        "input_le_200k": 0.50, "input_gt_200k": 0.50, "output_le_200k": 3.00, "output_gt_200k": 3.00
+        "input_le_200k": 0.50,
+        "input_gt_200k": 0.50,
+        "cached_input_le_200k": 0.05,
+        "cached_input_gt_200k": 0.05,
+        "output_le_200k": 3.00,
+        "output_gt_200k": 3.00,
     },
     # Gemini 2.5 family
     "models/gemini-2.5-pro": {
@@ -198,44 +215,48 @@ def _row_optional_int(val: Any) -> Optional[int]:
 
 def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) -> Dict[str, float]:
     if not model_name:
-        return {"input": 0.10, "output": 0.40, "tier": "le_200k"}
+        return {"input": 0.10, "cached_input": 0.10, "output": 0.40, "tier": "le_200k"}
     m = str(model_name).strip()
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
     if m in _CHAT_MODEL_RATE_USD_PER_1M:
         cfg = _CHAT_MODEL_RATE_USD_PER_1M[m]
         if tier == "gt_200k":
-            return {"input": float(cfg["input_gt_200k"]), "output": float(cfg["output_gt_200k"]), "tier": tier}
-        return {"input": float(cfg["input_le_200k"]), "output": float(cfg["output_le_200k"]), "tier": tier}
+            in_rate = float(cfg["input_gt_200k"])
+            cached_rate = float(cfg.get("cached_input_gt_200k", in_rate))
+            return {"input": in_rate, "cached_input": cached_rate, "output": float(cfg["output_gt_200k"]), "tier": tier}
+        in_rate = float(cfg["input_le_200k"])
+        cached_rate = float(cfg.get("cached_input_le_200k", in_rate))
+        return {"input": in_rate, "cached_input": cached_rate, "output": float(cfg["output_le_200k"]), "tier": tier}
     ml = m.lower()
     # Safe fallback by family if exact key not configured.
     if "gemini-3.1-flash-lite" in ml or ("3.1" in ml and "flash-lite" in ml):
-        return {"input": 0.25, "output": 1.50, "tier": tier}
+        return {"input": 0.25, "cached_input": 0.025, "output": 1.50, "tier": tier}
     if "gemini-3.1-flash-live" in ml or ("3.1" in ml and "flash-live" in ml):
-        return {"input": 0.75, "output": 4.50, "tier": tier}
+        return {"input": 0.75, "cached_input": 0.075, "output": 4.50, "tier": tier}
     if "gemini-3.1-flash-image" in ml or ("3.1" in ml and "flash-image" in ml):
-        return {"input": 0.25, "output": 1.50, "tier": tier}
+        return {"input": 0.25, "cached_input": 0.025, "output": 1.50, "tier": tier}
     if "gemini-3.1-flash-tts" in ml or ("3.1" in ml and "flash-tts" in ml) or (
         "gemini-3.1" in ml and "tts" in ml
     ):
-        return {"input": 1.00, "output": 20.00, "tier": tier}
+        return {"input": 1.00, "cached_input": 0.10, "output": 20.00, "tier": tier}
     if "gemini-3.1-pro" in ml:
         if tier == "gt_200k":
-            return {"input": 4.00, "output": 18.00, "tier": tier}
-        return {"input": 2.00, "output": 12.00, "tier": tier}
+            return {"input": 4.00, "cached_input": 0.40, "output": 18.00, "tier": tier}
+        return {"input": 2.00, "cached_input": 0.20, "output": 12.00, "tier": tier}
     if "flash-lite" in ml:
-        return {"input": 0.10, "output": 0.40, "tier": tier}
+        return {"input": 0.10, "cached_input": 0.01, "output": 0.40, "tier": tier}
     if "flash" in ml:
-        return {"input": 0.50, "output": 3.00, "tier": tier}
+        return {"input": 0.50, "cached_input": 0.05, "output": 3.00, "tier": tier}
     if "pro" in ml:
-        return {"input": 2.00, "output": 12.00, "tier": tier}
+        return {"input": 2.00, "cached_input": 0.20, "output": 12.00, "tier": tier}
     if "gpt-4o-mini" in ml:
-        return {"input": 0.15, "output": 0.60, "tier": tier}
+        return {"input": 0.15, "cached_input": 0.15, "output": 0.60, "tier": tier}
     if "gpt-4o" in ml:
-        return {"input": 5.00, "output": 15.00, "tier": tier}
+        return {"input": 5.00, "cached_input": 5.00, "output": 15.00, "tier": tier}
     # Any other deepseek-* (future ids): same ballpark as published chat/reasoner cache-miss pricing.
     if ml.startswith("deepseek-"):
-        return {"input": 0.28, "output": 0.42, "tier": tier}
-    return {"input": 0.10, "output": 0.40, "tier": tier}
+        return {"input": 0.28, "cached_input": 0.28, "output": 0.42, "tier": tier}
+    return {"input": 0.10, "cached_input": 0.10, "output": 0.40, "tier": tier}
 
 
 _FIXED_INPUT_CHARS_PER_QUESTION = 200_000
@@ -248,6 +269,32 @@ async def get_user_chat_history(user_id: int, current_user: dict = Depends(requi
     """Get chat history for a specific user (admin only)"""
     try:
         with get_conn() as conn:
+            execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS event_timeline_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    birth_chart_id INTEGER NOT NULL,
+                    selected_year INTEGER NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    result_data TEXT,
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    started_at TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    selected_month INTEGER,
+                    llm_model TEXT,
+                    llm_input_tokens BIGINT,
+                    llm_output_tokens BIGINT,
+                    llm_cached_input_tokens BIGINT,
+                    llm_non_cached_input_tokens BIGINT,
+                    llm_cache_setup_input_tokens BIGINT,
+                    llm_total_tokens BIGINT
+                )
+                """,
+                (),
+            )
             cur = execute(
                 conn,
                 """
@@ -367,6 +414,188 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching all chat history: {str(e)}")
 
+
+@router.get("/admin/event-timeline/history")
+async def get_event_timeline_history(
+    page: int = 1,
+    limit: int = 50,
+    user_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    timeline_type: Optional[str] = "yearly",
+    current_user: dict = Depends(require_admin),
+):
+    """Admin list of event timeline runs (yearly/monthly) with saved token usage + cost estimate."""
+    try:
+        from encryption_utils import EncryptionManager
+
+        if page < 1:
+            page = 1
+        if limit < 1:
+            limit = 50
+        if limit > 200:
+            limit = 200
+        offset = (page - 1) * limit
+        sdate, edate = _normalize_date_range(start_date, end_date)
+        ttype = (timeline_type or "yearly").strip().lower()
+        if ttype not in ("yearly", "monthly", "all"):
+            ttype = "yearly"
+        where_parts: List[str] = []
+        if ttype == "yearly":
+            where_parts.append("(etj.selected_month IS NULL OR etj.selected_month = 0)")
+        elif ttype == "monthly":
+            where_parts.append("(etj.selected_month IS NOT NULL AND etj.selected_month > 0)")
+        where_params: List[Any] = []
+        if user_name and str(user_name).strip():
+            where_parts.append("COALESCE(u.name, '') ILIKE %s")
+            where_params.append(f"%{str(user_name).strip()}%")
+        if sdate and edate:
+            where_parts.append(
+                "COALESCE(etj.completed_at, etj.created_at)::date >= %s AND COALESCE(etj.completed_at, etj.created_at)::date <= %s"
+            )
+            where_params.extend([sdate, edate])
+        if not where_parts:
+            where_parts.append("1=1")
+        where_sql = " AND ".join(where_parts)
+
+        enc = EncryptionManager()
+        fx = _usd_to_inr_rate()
+
+        with get_conn() as conn:
+            execute(
+                conn,
+                "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_cache_setup_input_tokens BIGINT",
+                (),
+            )
+            cur = execute(
+                conn,
+                f"""
+                SELECT COUNT(*)
+                FROM event_timeline_jobs etj
+                LEFT JOIN users u ON u.userid = etj.user_id
+                WHERE {where_sql}
+                """,
+                tuple(where_params),
+            )
+            total = int((cur.fetchone() or [0])[0] or 0)
+
+            cur = execute(
+                conn,
+                f"""
+                SELECT
+                    etj.job_id,
+                    etj.user_id,
+                    etj.birth_chart_id,
+                    etj.selected_year,
+                    etj.selected_month,
+                    etj.status,
+                    etj.created_at,
+                    etj.completed_at,
+                    etj.llm_model,
+                    etj.llm_input_tokens,
+                    etj.llm_output_tokens,
+                    etj.llm_cached_input_tokens,
+                    etj.llm_non_cached_input_tokens,
+                    etj.llm_cache_setup_input_tokens,
+                    etj.llm_total_tokens,
+                    u.name AS user_name,
+                    u.phone AS user_phone,
+                    bc.name AS native_name_raw
+                FROM event_timeline_jobs etj
+                LEFT JOIN users u ON u.userid = etj.user_id
+                LEFT JOIN birth_charts bc ON bc.id = etj.birth_chart_id
+                WHERE {where_sql}
+                ORDER BY COALESCE(etj.completed_at, etj.created_at) DESC
+                LIMIT %s OFFSET %s
+                """,
+                tuple(where_params) + (limit, offset),
+            )
+            rows = cur.fetchall() or []
+
+        items: List[Dict[str, Any]] = []
+        for r in rows:
+            model = (r[8] or "").strip() if r[8] is not None else None
+            input_tokens = int(r[9] or 0)
+            output_tokens = int(r[10] or 0)
+            cached_input_tokens = int(r[11] or 0)
+            non_cached_input_tokens = int(r[12] or 0)
+            cache_setup_input_tokens = int(r[13] or 0)
+            total_tokens = int(r[14] or 0)
+
+            if non_cached_input_tokens <= 0 and input_tokens > 0:
+                non_cached_input_tokens = max(input_tokens - cached_input_tokens, 0)
+
+            rates = _resolve_model_rate(model, max(input_tokens, non_cached_input_tokens))
+            non_cached_tokens_for_cost = non_cached_input_tokens if non_cached_input_tokens > 0 else input_tokens
+            cached_tokens_for_cost = cached_input_tokens if cached_input_tokens > 0 else 0
+            input_cost_non_cached_inr = (non_cached_tokens_for_cost / 1_000_000.0) * float(rates["input"]) * fx
+            input_cost_cached_inr = (cached_tokens_for_cost / 1_000_000.0) * float(rates.get("cached_input") or rates["input"]) * fx
+            cache_setup_cost_inr = (cache_setup_input_tokens / 1_000_000.0) * float(rates["input"]) * fx
+            input_cost_inr = input_cost_non_cached_inr + input_cost_cached_inr
+            output_cost_inr = (output_tokens / 1_000_000.0) * float(rates["output"]) * fx
+            total_cost_inr = input_cost_inr + cache_setup_cost_inr + output_cost_inr
+
+            native_name = None
+            raw_native = r[17]
+            if raw_native:
+                try:
+                    native_name = enc.decrypt(raw_native)
+                except Exception:
+                    native_name = raw_native
+
+            items.append(
+                {
+                    "job_id": r[0],
+                    "user_id": r[1],
+                    "birth_chart_id": r[2],
+                    "selected_year": r[3],
+                    "selected_month": r[4],
+                    "status": r[5],
+                    "created_at": _timestamp_to_ist_iso(r[6]),
+                    "completed_at": _timestamp_to_ist_iso(r[7]),
+                    "llm_model": model,
+                    "llm_input_tokens": input_tokens,
+                    "llm_output_tokens": output_tokens,
+                    "llm_cached_input_tokens": cached_input_tokens,
+                    "llm_non_cached_input_tokens": non_cached_input_tokens,
+                    "llm_cache_setup_input_tokens": cache_setup_input_tokens,
+                    "llm_total_tokens": total_tokens,
+                    "user_name": r[15] or "Unknown User",
+                    "user_phone": r[16] or "",
+                    "native_name": native_name,
+                    "cost_summary": {
+                        "currency": "INR",
+                        "usd_to_inr_rate": fx,
+                        "input_usd_per_1m": float(rates["input"]),
+                        "cached_input_usd_per_1m": float(rates.get("cached_input") or rates["input"]),
+                        "output_usd_per_1m": float(rates["output"]),
+                        "pricing_tier": rates.get("tier"),
+                        "non_cached_input_tokens_for_cost": int(non_cached_tokens_for_cost),
+                        "cached_input_tokens_for_cost": int(cached_tokens_for_cost),
+                        "input_tokens_for_cost": int(non_cached_tokens_for_cost + cached_tokens_for_cost),
+                        "input_cost_non_cached_inr_estimate": round(input_cost_non_cached_inr, 6),
+                        "input_cost_cached_inr_estimate": round(input_cost_cached_inr, 6),
+                        "cache_setup_input_tokens_for_cost": int(cache_setup_input_tokens),
+                        "cache_setup_cost_inr_estimate": round(cache_setup_cost_inr, 6),
+                        "input_cost_inr_estimate": round(input_cost_inr, 6),
+                        "output_cost_inr_estimate": round(output_cost_inr, 6),
+                        "total_cost_inr_estimate": round(total_cost_inr, 6),
+                        "note": "Estimated from stored model-reported tokens. Input cost includes non-cached, cached, and cache-setup input token pricing when available.",
+                    },
+                }
+            )
+
+        return {
+            "items": items,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "total_pages": (total + limit - 1) // limit if limit else 0,
+            "timeline_type": ttype,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching event timeline history: {str(e)}")
+
 @router.get("/admin/chat/session/{session_id}")
 async def get_session_details(session_id: str, current_user: dict = Depends(require_admin)):
     """Get detailed messages for a specific session (admin only). Includes native_name (birth chart name) for the session."""
@@ -414,6 +643,8 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
 
                 has_llm_input_tokens = "llm_input_tokens" in msg_cols
                 has_llm_output_tokens = "llm_output_tokens" in msg_cols
+                has_llm_cached_input_tokens = "llm_cached_input_tokens" in msg_cols
+                has_llm_non_cached_input_tokens = "llm_non_cached_input_tokens" in msg_cols
                 has_llm_prompt_chars = "llm_prompt_chars" in msg_cols
                 has_llm_response_chars = "llm_response_chars" in msg_cols
                 has_parallel_llm_usage = "parallel_llm_usage" in msg_cols
@@ -424,6 +655,12 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 )
                 select_llm_output_tokens = (
                     "llm_output_tokens" if has_llm_output_tokens else "CAST(NULL AS INTEGER)"
+                )
+                select_llm_cached_input_tokens = (
+                    "llm_cached_input_tokens" if has_llm_cached_input_tokens else "CAST(NULL AS INTEGER)"
+                )
+                select_llm_non_cached_input_tokens = (
+                    "llm_non_cached_input_tokens" if has_llm_non_cached_input_tokens else "CAST(NULL AS INTEGER)"
                 )
                 select_llm_prompt_chars = (
                     "llm_prompt_chars" if has_llm_prompt_chars else "CAST(NULL AS INTEGER)"
@@ -439,6 +676,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     f"""
                     SELECT message_id, sender, content, timestamp, {select_message_type},
                            {select_llm_input_tokens}, {select_llm_output_tokens},
+                           {select_llm_cached_input_tokens}, {select_llm_non_cached_input_tokens},
                            {select_llm_prompt_chars}, {select_llm_response_chars},
                            {select_parallel_llm_usage}
                     FROM chat_messages
@@ -454,6 +692,10 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
             rates = _resolve_model_rate(chat_llm_model, session_input_tokens_est)
             fx = _usd_to_inr_rate()
             total_inr = 0.0
+            total_input_non_cached_inr = 0.0
+            total_input_cached_inr = 0.0
+            total_cache_setup_inr = 0.0
+            total_output_inr = 0.0
             messages = []
             for idx, r in enumerate(msg_rows):
                 sender = r[1]
@@ -478,47 +720,110 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         tokens_est = out_m
                 if sender == "user":
                     usd_per_1m = float(rates["input"])
+                    cost_inr = (tokens_est / 1_000_000.0) * usd_per_1m * fx
+                    input_non_cached_cost_inr = cost_inr
+                    input_cached_cost_inr = 0.0
+                    cache_setup_cost_inr = 0.0
+                    output_cost_inr = 0.0
                 else:
-                    usd_per_1m = float(rates["output"])
-                cost_inr = (tokens_est / 1_000_000.0) * usd_per_1m * fx
+                    raw_in = _row_optional_int(r[5]) if len(r) > 5 else None
+                    raw_out = _row_optional_int(r[6]) if len(r) > 6 else None
+                    raw_cached_in = _row_optional_int(r[7]) if len(r) > 7 else None
+                    raw_non_cached_in = _row_optional_int(r[8]) if len(r) > 8 else None
+                    input_t = int(raw_in or 0)
+                    output_t = int(raw_out or 0)
+                    cached_t = int(raw_cached_in or 0)
+                    non_cached_t = int(raw_non_cached_in or 0)
+                    if non_cached_t <= 0 and input_t > 0:
+                        non_cached_t = max(input_t - cached_t, 0)
+                    input_non_cached_cost_inr = (
+                        ((non_cached_t if input_t > 0 else 0) / 1_000_000.0)
+                        * float(rates["input"])
+                        * fx
+                    )
+                    input_cached_cost_inr = (
+                        ((cached_t if input_t > 0 else 0) / 1_000_000.0)
+                        * float(rates.get("cached_input") or rates["input"])
+                        * fx
+                    )
+                    output_cost_inr = (
+                        ((output_t if output_t > 0 else tokens_est) / 1_000_000.0)
+                        * float(rates["output"])
+                        * fx
+                    )
+                    raw_parallel_for_cost = r[11] if len(r) > 11 else None
+                    parallel_usage_for_cost = _parse_parallel_llm_usage(raw_parallel_for_cost)
+                    cache_setup_tokens = _parallel_cache_setup_tokens(parallel_usage_for_cost)
+                    cache_setup_cost_inr = 0.0
+                    if cache_setup_tokens > 0:
+                        cache_setup_cost_inr = (
+                            (cache_setup_tokens / 1_000_000.0)
+                            * float(rates["input"])
+                            * fx
+                        )
+                    cost_inr = (
+                        input_non_cached_cost_inr
+                        + input_cached_cost_inr
+                        + cache_setup_cost_inr
+                        + output_cost_inr
+                    )
+                total_input_non_cached_inr += input_non_cached_cost_inr
+                total_input_cached_inr += input_cached_cost_inr
+                total_cache_setup_inr += cache_setup_cost_inr
+                total_output_inr += output_cost_inr
                 total_inr += cost_inr
                 raw_in = _row_optional_int(r[5]) if len(r) > 5 else None
                 raw_out = _row_optional_int(r[6]) if len(r) > 6 else None
-                raw_pc = _row_optional_int(r[7]) if len(r) > 7 else None
-                raw_rc = _row_optional_int(r[8]) if len(r) > 8 else None
-                raw_parallel = r[9] if len(r) > 9 else None
+                raw_cached_in = _row_optional_int(r[7]) if len(r) > 7 else None
+                raw_non_cached_in = _row_optional_int(r[8]) if len(r) > 8 else None
+                raw_pc = _row_optional_int(r[9]) if len(r) > 9 else None
+                raw_rc = _row_optional_int(r[10]) if len(r) > 10 else None
+                raw_parallel = r[11] if len(r) > 11 else None
                 llm_in_display: Optional[int] = None
                 llm_out_display: Optional[int] = None
+                llm_cached_in_display: Optional[int] = None
+                llm_non_cached_in_display: Optional[int] = None
                 llm_prompt_chars_display: Optional[int] = None
                 llm_response_chars_display: Optional[int] = None
                 parallel_llm_usage_display: Optional[Dict[str, Any]] = None
+                cache_setup_tokens_display: Optional[int] = None
                 if str(sender or "").strip().lower() == "assistant":
                     if has_llm_input_tokens:
                         llm_in_display = raw_in
                     if has_llm_output_tokens:
                         llm_out_display = raw_out
+                    if has_llm_cached_input_tokens:
+                        llm_cached_in_display = raw_cached_in
+                    if has_llm_non_cached_input_tokens:
+                        llm_non_cached_in_display = raw_non_cached_in
                     if has_llm_prompt_chars and raw_pc is not None and raw_pc > 0:
                         llm_prompt_chars_display = raw_pc
                     if has_llm_response_chars and raw_rc is not None and raw_rc > 0:
                         llm_response_chars_display = raw_rc
                     if has_parallel_llm_usage:
                         parallel_llm_usage_display = _parse_parallel_llm_usage(raw_parallel)
+                        cache_setup_tokens_display = _parallel_cache_setup_tokens(parallel_llm_usage_display) or None
                 else:
                     # User row: full prompt / usage / reply size come from the assistant message for this turn.
                     nxt = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
-                    if nxt and str(nxt[1] or "").strip().lower() == "assistant" and len(nxt) > 9:
+                    if nxt and str(nxt[1] or "").strip().lower() == "assistant" and len(nxt) > 11:
                         if has_llm_input_tokens:
                             llm_in_display = _row_optional_int(nxt[5])
                         if has_llm_output_tokens:
                             llm_out_display = _row_optional_int(nxt[6])
-                        npc = _row_optional_int(nxt[7])
-                        nrc = _row_optional_int(nxt[8])
+                        if has_llm_cached_input_tokens:
+                            llm_cached_in_display = _row_optional_int(nxt[7])
+                        if has_llm_non_cached_input_tokens:
+                            llm_non_cached_in_display = _row_optional_int(nxt[8])
+                        npc = _row_optional_int(nxt[9])
+                        nrc = _row_optional_int(nxt[10])
                         if has_llm_prompt_chars and npc is not None and npc > 0:
                             llm_prompt_chars_display = npc
                         if has_llm_response_chars and nrc is not None and nrc > 0:
                             llm_response_chars_display = nrc
                         if has_parallel_llm_usage:
-                            parallel_llm_usage_display = _parse_parallel_llm_usage(nxt[9])
+                            parallel_llm_usage_display = _parse_parallel_llm_usage(nxt[11])
+                            cache_setup_tokens_display = _parallel_cache_setup_tokens(parallel_llm_usage_display) or None
                 messages.append(
                     {
                         "sender": sender,
@@ -527,11 +832,19 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         "native_name": native_name,
                         "llm_input_tokens": llm_in_display,
                         "llm_output_tokens": llm_out_display,
+                        "llm_cached_input_tokens": llm_cached_in_display,
+                        "llm_non_cached_input_tokens": llm_non_cached_in_display,
                         "llm_prompt_chars": llm_prompt_chars_display,
                         "llm_response_chars": llm_response_chars_display,
                         "parallel_llm_usage": parallel_llm_usage_display,
+                        "llm_cache_setup_input_tokens": cache_setup_tokens_display,
                         "cost_estimate": {
                             "tokens_estimate": tokens_est,
+                            "cache_setup_input_tokens": int(cache_setup_tokens_display or 0),
+                            "input_cost_non_cached_inr_estimate": round(float(input_non_cached_cost_inr), 6),
+                            "input_cost_cached_inr_estimate": round(float(input_cached_cost_inr), 6),
+                            "cache_setup_cost_inr_estimate": round(float(cache_setup_cost_inr), 6),
+                            "output_cost_inr_estimate": round(float(output_cost_inr), 6),
                             "cost_inr_estimate": round(cost_inr, 6),
                         },
                     }
@@ -548,8 +861,13 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     "currency": "INR",
                     "usd_to_inr_rate": fx,
                     "input_usd_per_1m": float(rates["input"]),
+                    "cached_input_usd_per_1m": float(rates.get("cached_input") or rates["input"]),
                     "output_usd_per_1m": float(rates["output"]),
                     "pricing_tier": rates.get("tier"),
+                    "input_cost_non_cached_inr_estimate": round(total_input_non_cached_inr, 6),
+                    "input_cost_cached_inr_estimate": round(total_input_cached_inr, 6),
+                    "cache_setup_cost_inr_estimate": round(total_cache_setup_inr, 6),
+                    "output_cost_inr_estimate": round(total_output_inr, 6),
                     "total_cost_inr_estimate": round(total_inr, 6),
                     "input_assumption": {
                         "input_chars_per_question_full": _FIXED_INPUT_CHARS_PER_QUESTION,
@@ -557,7 +875,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         "input_chars_per_question_light": _LIGHT_INPUT_CHARS_PER_QUESTION,
                         "input_tokens_per_question_light_estimate": _LIGHT_INPUT_TOKENS_PER_QUESTION,
                     },
-                    "note": "Rough estimate only. User-question input uses full-context estimate for normal turns and light estimate for clarification/routing turns; assistant output uses answer length.",
+                    "note": "Rough estimate only. User-question input uses full-context estimate for normal turns and light estimate for clarification/routing turns; assistant output uses answer length. Parallel cache setup input cost is included when available.",
                 },
             }
 
@@ -719,6 +1037,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
+            get_event_timeline_model,
             get_podcast_provider,
             get_chat_llm_provider,
             get_openai_chat_model,
@@ -745,6 +1064,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_chat_model": get_gemini_chat_model(),
             "gemini_premium_model": get_gemini_premium_model(),
             "gemini_analysis_model": get_gemini_analysis_model(),
+            "event_timeline_model": get_event_timeline_model(),
             "chat_llm_provider": get_chat_llm_provider(),
             "chat_llm_provider_premium": _premium_ui,
             "openai_chat_model": get_openai_chat_model(),

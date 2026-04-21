@@ -11,7 +11,7 @@ export default function AboutScreen({ navigation }) {
   const { t } = useTranslation();
 
   const appVersion = Constants.expoConfig?.version || '1.0.0';
-  const androidCode = Constants.expoConfig?.android?.versionCode;
+  const androidCode = Constants.expoConfig?.android?.versionCode ?? 120;
   const iosBuild = Constants.expoConfig?.ios?.buildNumber;
   const platform = Platform.OS;
 

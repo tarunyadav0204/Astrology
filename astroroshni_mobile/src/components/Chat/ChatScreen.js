@@ -18,6 +18,7 @@ import {
   InteractionManager,
   Keyboard,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,12 +36,13 @@ import PremiumAnalysisModal from './PremiumAnalysisModal';
 import NotificationEnableReminderModal from '../Notifications/NotificationEnableReminderModal';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
+import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
 import { chatAPI, pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
-import { trackAstrologyEvent } from '../../utils/analytics';
+import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { useTheme } from '../../context/ThemeContext';
 import { Image } from 'react-native';
 
@@ -57,6 +59,85 @@ const isSmallScreen = screenWidth < 375;
 const cardWidth = screenWidth * 0.3;
 const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
+const CHAT_RATING_PROMPT_STATE_KEY = 'chatRatingPromptState_v1';
+
+/** Dev testing: force rating modal on chat open (no question/scroll). Set to false after testing. */
+const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
+/** Dev testing: if true, never redirect to Play/App Store from Rate now. */
+const DEBUG_IN_APP_REVIEW_ONLY = false;
+
+/** Listing with showAllReviews so users land near ratings when we must fall back to the browser/Play app. */
+const GOOGLE_PLAY_REVIEW_URL =
+  'https://play.google.com/store/apps/details?id=com.astroroshni.mobile&showAllReviews=true&pcampaignid=web_share';
+
+/**
+ * Open store listing when in-app review API cannot run (Expo Go, emulator, sideload, etc.).
+ * Prefer expo’s storeUrl() once app.json has android.playStoreUrl / ios.appStoreUrl.
+ */
+const openRatingStoreListing = async (StoreReview) => {
+  try {
+    let url =
+      StoreReview && typeof StoreReview.storeUrl === 'function' ? StoreReview.storeUrl() : null;
+    if (!url && Platform.OS === 'android') {
+      url = GOOGLE_PLAY_REVIEW_URL;
+    }
+    if (url) {
+      await Linking.openURL(url);
+      return true;
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[StoreReview] open listing failed:', e?.message || e);
+  }
+  if (Platform.OS === 'android') {
+    try {
+      await Linking.openURL(GOOGLE_PLAY_REVIEW_URL);
+      return true;
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return false;
+};
+
+/**
+ * Play In-App Review / SKStoreReviewController when available.
+ * Important: do not use hasAction() as the only gate — it stays false if app.json has no store URLs,
+ * which blocks requestReview() even on real Play installs. Use isAvailableAsync for that.
+ */
+const requestInAppStoreReview = async () => {
+  let StoreReview = null;
+  try {
+    const mod = require('expo-store-review');
+    StoreReview = mod?.default ?? mod;
+  } catch (e) {
+    if (__DEV__) console.warn('[StoreReview] load failed:', e?.message || e);
+    return DEBUG_IN_APP_REVIEW_ONLY ? false : openRatingStoreListing(null);
+  }
+
+  if (!StoreReview || typeof StoreReview.requestReview !== 'function') {
+    return DEBUG_IN_APP_REVIEW_ONLY ? false : openRatingStoreListing(null);
+  }
+
+  try {
+    let available = true;
+    if (typeof StoreReview.isAvailableAsync === 'function') {
+      available = await StoreReview.isAvailableAsync();
+    }
+
+    if (available) {
+      await StoreReview.requestReview();
+      return true;
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[StoreReview] requestReview failed:', e?.message || e);
+  }
+
+  if (DEBUG_IN_APP_REVIEW_ONLY) {
+    return false;
+  }
+
+  return openRatingStoreListing(StoreReview);
+};
 
 const RELATIONSHIP_PRESETS = [
   {
@@ -347,6 +428,97 @@ export default function ChatScreen({ navigation, route }) {
   const [podcastPromoVisible, setPodcastPromoVisible] = useState(false);
   const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
   const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
+  const [ratingPromptVisible, setRatingPromptVisible] = useState(false);
+  const [ratingPromptPending, setRatingPromptPending] = useState(false);
+  const [ratingPromptMessageId, setRatingPromptMessageId] = useState(null);
+  const [ratingEligibleMessageId, setRatingEligibleMessageId] = useState(null);
+  const [ratingPromptStateLoaded, setRatingPromptStateLoaded] = useState(false);
+  const [ratingPromptState, setRatingPromptState] = useState({
+    completed: false,
+    neverAskAgain: false,
+    shownCount: 0,
+    lastShownAt: null,
+    lastAction: null,
+  });
+  const ratingPromptShownMessageIdsRef = useRef(new Set());
+
+  const saveRatingPromptState = async (updater) => {
+    setRatingPromptState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      AsyncStorage.setItem(CHAT_RATING_PROMPT_STATE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  const triggerRatingPrompt = (messageId, source) => {
+    if (!messageId) return;
+    if (!ratingPromptStateLoaded) return;
+    if (ratingPromptState.completed || ratingPromptState.neverAskAgain) return;
+    if (ratingPromptShownMessageIdsRef.current.has(messageId)) return;
+    if (podcastPromoVisible) {
+      setRatingPromptPending(true);
+      setRatingPromptMessageId(messageId);
+      return;
+    }
+    ratingPromptShownMessageIdsRef.current.add(messageId);
+    const shownAt = new Date().toISOString();
+    saveRatingPromptState((prev) => ({
+      ...prev,
+      shownCount: Number(prev.shownCount || 0) + 1,
+      lastShownAt: shownAt,
+      lastAction: 'shown',
+    }));
+    setRatingPromptMessageId(messageId);
+    setRatingPromptVisible(true);
+    trackEvent('rating_prompt_shown', {
+      source,
+      message_id: String(messageId),
+      shown_count: Number(ratingPromptState.shownCount || 0) + 1,
+    });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadRatingPromptState = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CHAT_RATING_PROMPT_STATE_KEY);
+        if (cancelled) return;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            setRatingPromptState((prev) => ({
+              ...prev,
+              ...parsed,
+            }));
+          }
+        }
+      } catch (_) {
+        // ignore corrupted local state
+      } finally {
+        if (!cancelled) {
+          setRatingPromptStateLoaded(true);
+        }
+      }
+    };
+    loadRatingPromptState();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN) return;
+    const t = setTimeout(() => {
+      setRatingPromptMessageId('debug_open_chat');
+      setRatingPromptVisible(true);
+      trackEvent('rating_prompt_shown', {
+        source: 'debug_open_chat',
+        message_id: 'debug_open_chat',
+        shown_count: 0,
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const maxKeyboardInset = Math.min(520, Math.round(Dimensions.get('window').height * 0.58));
@@ -1881,6 +2053,7 @@ export default function ChatScreen({ navigation, route }) {
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
             if (!gatedNoCharge && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+              setRatingEligibleMessageId(messageId);
               setPodcastPromoMessageId(messageId);
               setPodcastPromoVisible(true);
             }
@@ -2204,6 +2377,10 @@ export default function ChatScreen({ navigation, route }) {
     if (!messageText.trim() || !birthData) {
       return;
     }
+    // Gate rating prompt to the next completed answer only.
+    setRatingEligibleMessageId(null);
+    setRatingPromptPending(false);
+    setRatingPromptMessageId(null);
 
     // Partnership Step 2: Relationship description
     if (partnershipMode && partnershipStep === 2) {
@@ -2626,6 +2803,21 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
+  const handleMessagesScroll = (e) => {
+    if (!ratingPromptStateLoaded) return;
+    if (ratingPromptVisible) return;
+    if (ratingPromptState.completed || ratingPromptState.neverAskAgain) return;
+    const y = Number(e?.nativeEvent?.contentOffset?.y || 0);
+    const h = Number(e?.nativeEvent?.layoutMeasurement?.height || 0);
+    const ch = Number(e?.nativeEvent?.contentSize?.height || 0);
+    if (h <= 0 || ch <= 0) return;
+    const nearBottom = y + h >= ch - 120;
+    if (!nearBottom) return;
+    const messageId = ratingEligibleMessageId;
+    if (!messageId) return;
+    triggerRatingPrompt(messageId, 'answer_scroll_bottom');
+  };
+
   const renderMessage = ({ item }) => (
     <MessageBubble
       message={item}
@@ -2907,6 +3099,8 @@ export default function ChatScreen({ navigation, route }) {
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            onScroll={handleMessagesScroll}
+            scrollEventThrottle={120}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="none"
             {...(Platform.OS === 'ios'
@@ -4579,10 +4773,63 @@ export default function ChatScreen({ navigation, route }) {
         onClose={() => {
           setPodcastPromoVisible(false);
           setPodcastPromoMessageId(null);
+          if (ratingPromptPending && ratingPromptMessageId) {
+            setRatingPromptPending(false);
+            triggerRatingPrompt(ratingPromptMessageId, 'after_podcast_close');
+          }
         }}
         onGenerate={() => {
           setPodcastPromoVisible(false);
           setPodcastAutoLaunchKey((k) => k + 1);
+          if (ratingPromptPending && ratingPromptMessageId) {
+            setRatingPromptPending(false);
+            triggerRatingPrompt(ratingPromptMessageId, 'after_podcast_generate');
+          }
+        }}
+      />
+      <ChatRatingPromptModal
+        visible={ratingPromptVisible}
+        colors={colors}
+        onLater={() => {
+          const actionAt = new Date().toISOString();
+          setRatingPromptVisible(false);
+          saveRatingPromptState((prev) => ({
+            ...prev,
+            lastAction: 'later',
+            lastActionAt: actionAt,
+          }));
+          trackEvent('rating_prompt_action', {
+            action: 'later',
+            message_id: String(ratingPromptMessageId || ''),
+          });
+        }}
+        onRateNow={async () => {
+          const actionAt = new Date().toISOString();
+          setRatingPromptVisible(false);
+          trackEvent('rating_prompt_action', {
+            action: 'rate_now',
+            message_id: String(ratingPromptMessageId || ''),
+          });
+          const started = await requestInAppStoreReview();
+          if (started) {
+            saveRatingPromptState((prev) => ({
+              ...prev,
+              completed: true,
+              neverAskAgain: true,
+              lastAction: 'rate_now',
+              lastActionAt: actionAt,
+            }));
+          } else {
+            saveRatingPromptState((prev) => ({
+              ...prev,
+              lastAction: 'later',
+              lastActionAt: actionAt,
+            }));
+            trackEvent('rating_prompt_action', {
+              action: 'rate_now_unavailable',
+              message_id: String(ratingPromptMessageId || ''),
+            });
+          }
         }}
       />
       

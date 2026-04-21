@@ -1767,18 +1767,18 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
             m = "models/gemini-2.5-flash"
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
     rates = {
-        "models/gemini-3.1-flash-lite-preview": {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50},
-        "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00},
-        "models/gemini-3.1-flash-live-preview": {"in_le": 0.75, "in_gt": 0.75, "out_le": 4.50, "out_gt": 4.50},
-        "models/gemini-3.1-flash-image-preview": {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50},
-        "models/gemini-3.1-flash-tts-preview": {"in_le": 1.00, "in_gt": 1.00, "out_le": 20.00, "out_gt": 20.00},
-        "models/gemini-3-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00},
-        "models/gemini-3-flash-preview": {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00},
-        "models/gemini-2.5-pro": {"in_le": 1.25, "in_gt": 2.50, "out_le": 10.00, "out_gt": 15.00},
-        "models/gemini-2.5-flash": {"in_le": 0.30, "in_gt": 0.30, "out_le": 2.50, "out_gt": 2.50},
-        "models/gemini-2.5-flash-lite": {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40},
-        "models/gemini-2.0-flash-001": {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40},
-        "models/gemini-2.0-flash-lite-001": {"in_le": 0.075, "in_gt": 0.075, "out_le": 0.30, "out_gt": 0.30},
+        "models/gemini-3.1-flash-lite-preview": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
+        "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00},
+        "models/gemini-3.1-flash-live-preview": {"in_le": 0.75, "in_gt": 0.75, "cached_in_le": 0.075, "cached_in_gt": 0.075, "out_le": 4.50, "out_gt": 4.50},
+        "models/gemini-3.1-flash-image-preview": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
+        "models/gemini-3.1-flash-tts-preview": {"in_le": 1.00, "in_gt": 1.00, "cached_in_le": 0.10, "cached_in_gt": 0.10, "out_le": 20.00, "out_gt": 20.00},
+        "models/gemini-3-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00},
+        "models/gemini-3-flash-preview": {"in_le": 0.50, "in_gt": 0.50, "cached_in_le": 0.05, "cached_in_gt": 0.05, "out_le": 3.00, "out_gt": 3.00},
+        "models/gemini-2.5-pro": {"in_le": 1.25, "in_gt": 2.50, "cached_in_le": 0.125, "cached_in_gt": 0.25, "out_le": 10.00, "out_gt": 15.00},
+        "models/gemini-2.5-flash": {"in_le": 0.30, "in_gt": 0.30, "cached_in_le": 0.03, "cached_in_gt": 0.03, "out_le": 2.50, "out_gt": 2.50},
+        "models/gemini-2.5-flash-lite": {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.01, "cached_in_gt": 0.01, "out_le": 0.40, "out_gt": 0.40},
+        "models/gemini-2.0-flash-001": {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.01, "cached_in_gt": 0.01, "out_le": 0.40, "out_gt": 0.40},
+        "models/gemini-2.0-flash-lite-001": {"in_le": 0.075, "in_gt": 0.075, "cached_in_le": 0.0075, "cached_in_gt": 0.0075, "out_le": 0.30, "out_gt": 0.30},
         # DeepSeek (published cache-miss input + output per 1M; V4 uses same estimate until pricing differs)
         "deepseek-chat": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
         "deepseek-reasoner": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
@@ -1789,31 +1789,50 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
     if not row:
         ml = m.lower()
         if "gemini-3.1-flash-lite" in ml or ("3.1" in ml and "flash-lite" in ml):
-            row = {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50}
+            row = {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50}
         elif "gemini-3.1-flash-live" in ml or ("3.1" in ml and "flash-live" in ml):
-            row = {"in_le": 0.75, "in_gt": 0.75, "out_le": 4.50, "out_gt": 4.50}
+            row = {"in_le": 0.75, "in_gt": 0.75, "cached_in_le": 0.075, "cached_in_gt": 0.075, "out_le": 4.50, "out_gt": 4.50}
         elif "gemini-3.1-flash-image" in ml or ("3.1" in ml and "flash-image" in ml):
-            row = {"in_le": 0.25, "in_gt": 0.25, "out_le": 1.50, "out_gt": 1.50}
+            row = {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50}
         elif "gemini-3.1-flash-tts" in ml or ("gemini-3.1" in ml and "tts" in ml):
-            row = {"in_le": 1.00, "in_gt": 1.00, "out_le": 20.00, "out_gt": 20.00}
+            row = {"in_le": 1.00, "in_gt": 1.00, "cached_in_le": 0.10, "cached_in_gt": 0.10, "out_le": 20.00, "out_gt": 20.00}
         elif "gemini-3.1-pro" in ml:
-            row = {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00}
+            row = {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00}
         elif "flash-lite" in ml:
-            row = {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
+            row = {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.01, "cached_in_gt": 0.01, "out_le": 0.40, "out_gt": 0.40}
         elif "flash" in ml:
-            row = {"in_le": 0.50, "in_gt": 0.50, "out_le": 3.00, "out_gt": 3.00}
+            row = {"in_le": 0.50, "in_gt": 0.50, "cached_in_le": 0.05, "cached_in_gt": 0.05, "out_le": 3.00, "out_gt": 3.00}
         elif "pro" in ml:
-            row = {"in_le": 2.00, "in_gt": 4.00, "out_le": 12.00, "out_gt": 18.00}
+            row = {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00}
         elif ml.startswith("deepseek-"):
-            row = {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42}
+            row = {"in_le": 0.28, "in_gt": 0.28, "cached_in_le": 0.28, "cached_in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42}
         else:
-            row = {"in_le": 0.10, "in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
+            row = {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.10, "cached_in_gt": 0.10, "out_le": 0.40, "out_gt": 0.40}
     return {
         "input": float(row["in_gt"] if tier == "gt_200k" else row["in_le"]),
+        "cached_input": float(row["cached_in_gt"] if tier == "gt_200k" else row["cached_in_le"]),
         "output": float(row["out_gt"] if tier == "gt_200k" else row["out_le"]),
         "tier": tier,
         "resolved_model": m,
     }
+
+
+def _extract_cache_setup_tokens(raw_parallel_usage: Any) -> int:
+    if not raw_parallel_usage:
+        return 0
+    try:
+        data = json.loads(raw_parallel_usage) if isinstance(raw_parallel_usage, str) else raw_parallel_usage
+    except Exception:
+        return 0
+    if not isinstance(data, dict):
+        return 0
+    totals = data.get("totals")
+    if not isinstance(totals, dict):
+        return 0
+    try:
+        return max(0, int(totals.get("cache_setup_input_tokens") or 0))
+    except Exception:
+        return 0
 
 
 @router.get("/admin/question-cost-summary")
@@ -1902,8 +1921,14 @@ async def get_question_cost_summary(
         msg_cols = {r[0] for r in (cur.fetchall() or [])}
         has_llm_input_tokens = "llm_input_tokens" in msg_cols
         has_llm_output_tokens = "llm_output_tokens" in msg_cols
+        has_llm_cached_input_tokens = "llm_cached_input_tokens" in msg_cols
+        has_llm_non_cached_input_tokens = "llm_non_cached_input_tokens" in msg_cols
+        has_parallel_llm_usage = "parallel_llm_usage" in msg_cols
         input_tok_expr = "COALESCE(cm.llm_input_tokens, 0)" if has_llm_input_tokens else "0"
         output_tok_expr = "COALESCE(cm.llm_output_tokens, 0)" if has_llm_output_tokens else "0"
+        cached_input_tok_expr = "COALESCE(cm.llm_cached_input_tokens, 0)" if has_llm_cached_input_tokens else "0"
+        non_cached_input_tok_expr = "COALESCE(cm.llm_non_cached_input_tokens, 0)" if has_llm_non_cached_input_tokens else "0"
+        parallel_usage_expr = "cm.parallel_llm_usage" if has_parallel_llm_usage else "CAST(NULL AS TEXT)"
 
         cur = execute(
             conn,
@@ -1914,6 +1939,9 @@ async def get_question_cost_summary(
                    cs.chat_llm_model,
                    {input_tok_expr} AS llm_input_tokens,
                    {output_tok_expr} AS llm_output_tokens,
+                   {cached_input_tok_expr} AS llm_cached_input_tokens,
+                   {non_cached_input_tok_expr} AS llm_non_cached_input_tokens,
+                   {parallel_usage_expr} AS parallel_llm_usage,
                    (
                      SELECT content FROM chat_messages m2
                      WHERE m2.session_id = cm.session_id
@@ -1936,21 +1964,50 @@ async def get_question_cost_summary(
 
     model_breakdown: Dict[str, Dict[str, Any]] = {}
     ai_cost_total_inr = 0.0
+    input_non_cached_cost_total_inr = 0.0
+    input_cached_cost_total_inr = 0.0
+    cache_setup_cost_total_inr = 0.0
+    output_cost_total_inr = 0.0
     for r in rows:
         model = (r[3] or "unknown").strip() or "unknown"
         a = str(r[2] or "")
         llm_input_tokens = int(r[4] or 0)
         llm_output_tokens = int(r[5] or 0)
+        llm_cached_input_tokens = int(r[6] or 0)
+        llm_non_cached_input_tokens = int(r[7] or 0)
+        llm_parallel_usage_raw = r[8] if len(r) > 8 else None
+        cache_setup_tokens = _extract_cache_setup_tokens(llm_parallel_usage_raw)
         if llm_input_tokens > 0:
             q_tokens = llm_input_tokens
         else:
             # Lightweight turns (intent-routing-like, very short outputs) likely don't carry full context.
             q_tokens = light_input_tokens_per_question if len(a) < 280 else fixed_input_tokens_per_question
         a_tokens = llm_output_tokens if llm_output_tokens > 0 else max(1, int(round(len(a) / 4.0)))
-        rate = _question_cost_rate_for_model(model, q_tokens)
-        usd_cost = (q_tokens / 1_000_000.0) * float(rate["input"]) + (a_tokens / 1_000_000.0) * float(rate["output"])
+        if llm_non_cached_input_tokens <= 0 and llm_input_tokens > 0:
+            llm_non_cached_input_tokens = max(llm_input_tokens - llm_cached_input_tokens, 0)
+        rate = _question_cost_rate_for_model(model, max(q_tokens, llm_non_cached_input_tokens))
+        non_cached_q_tokens = llm_non_cached_input_tokens if llm_input_tokens > 0 else q_tokens
+        cached_q_tokens = llm_cached_input_tokens if llm_input_tokens > 0 else 0
+        input_non_cached_usd_cost = (non_cached_q_tokens / 1_000_000.0) * float(rate["input"])
+        input_cached_usd_cost = (cached_q_tokens / 1_000_000.0) * float(rate.get("cached_input") or rate["input"])
+        cache_setup_usd_cost = (cache_setup_tokens / 1_000_000.0) * float(rate["input"])
+        output_usd_cost = (a_tokens / 1_000_000.0) * float(rate["output"])
+        usd_cost = (
+            input_non_cached_usd_cost
+            + input_cached_usd_cost
+            + cache_setup_usd_cost
+            + output_usd_cost
+        )
         inr_cost = usd_cost * usd_to_inr
+        input_non_cached_inr_cost = input_non_cached_usd_cost * usd_to_inr
+        input_cached_inr_cost = input_cached_usd_cost * usd_to_inr
+        cache_setup_inr_cost = cache_setup_usd_cost * usd_to_inr
+        output_inr_cost = output_usd_cost * usd_to_inr
         ai_cost_total_inr += inr_cost
+        input_non_cached_cost_total_inr += input_non_cached_inr_cost
+        input_cached_cost_total_inr += input_cached_inr_cost
+        cache_setup_cost_total_inr += cache_setup_inr_cost
+        output_cost_total_inr += output_inr_cost
         resolved_model = str(rate.get("resolved_model") or model)
         if resolved_model not in model_breakdown:
             model_breakdown[resolved_model] = {
@@ -1958,15 +2015,33 @@ async def get_question_cost_summary(
                 "questions": 0,
                 "input_tokens_estimate": 0,
                 "output_tokens_estimate": 0,
+                "cached_input_tokens": 0,
+                "non_cached_input_tokens": 0,
+                "cache_setup_input_tokens": 0,
+                "input_cost_non_cached_inr_estimate": 0.0,
+                "input_cost_cached_inr_estimate": 0.0,
+                "cache_setup_cost_inr_estimate": 0.0,
+                "output_cost_inr_estimate": 0.0,
                 "ai_cost_inr_estimate": 0.0,
             }
         m = model_breakdown[resolved_model]
         m["questions"] += 1
         m["input_tokens_estimate"] += q_tokens
         m["output_tokens_estimate"] += a_tokens
+        m["cached_input_tokens"] += cached_q_tokens
+        m["non_cached_input_tokens"] += non_cached_q_tokens
+        m["cache_setup_input_tokens"] += cache_setup_tokens
+        m["input_cost_non_cached_inr_estimate"] += input_non_cached_inr_cost
+        m["input_cost_cached_inr_estimate"] += input_cached_inr_cost
+        m["cache_setup_cost_inr_estimate"] += cache_setup_inr_cost
+        m["output_cost_inr_estimate"] += output_inr_cost
         m["ai_cost_inr_estimate"] += inr_cost
 
     for m in model_breakdown.values():
+        m["input_cost_non_cached_inr_estimate"] = round(float(m["input_cost_non_cached_inr_estimate"]), 4)
+        m["input_cost_cached_inr_estimate"] = round(float(m["input_cost_cached_inr_estimate"]), 4)
+        m["cache_setup_cost_inr_estimate"] = round(float(m["cache_setup_cost_inr_estimate"]), 4)
+        m["output_cost_inr_estimate"] = round(float(m["output_cost_inr_estimate"]), 4)
         m["ai_cost_inr_estimate"] = round(float(m["ai_cost_inr_estimate"]), 4)
     models_sorted = sorted(model_breakdown.values(), key=lambda x: x["questions"], reverse=True)
 
@@ -1985,6 +2060,10 @@ async def get_question_cost_summary(
             "money_charged_inr": round(charged_credits * inr_per_credit, 2),
             "money_free_equivalent_inr": round(free_credits_equivalent * inr_per_credit, 2),
             "money_total_equivalent_inr": round(total_credits_equivalent * inr_per_credit, 2),
+            "input_cost_non_cached_inr_estimate": round(input_non_cached_cost_total_inr, 4),
+            "input_cost_cached_inr_estimate": round(input_cached_cost_total_inr, 4),
+            "cache_setup_cost_inr_estimate": round(cache_setup_cost_total_inr, 4),
+            "output_cost_inr_estimate": round(output_cost_total_inr, 4),
             "ai_cost_inr_estimate": round(ai_cost_total_inr, 4),
             "gross_margin_inr_estimate": round((charged_credits * inr_per_credit) - ai_cost_total_inr, 4),
         },

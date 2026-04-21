@@ -275,6 +275,26 @@ const AdminChatHistory = () => {
                         INR {selectedSession.cost_summary.total_cost_inr_estimate.toFixed(4)}
                       </span>
                     )}
+                    {typeof selectedSession?.cost_summary?.input_cost_non_cached_inr_estimate === 'number' && (
+                      <span className="session-meta-chip" title="Non-cached input cost estimate">
+                        NC In INR {Number(selectedSession.cost_summary.input_cost_non_cached_inr_estimate).toFixed(4)}
+                      </span>
+                    )}
+                    {typeof selectedSession?.cost_summary?.input_cost_cached_inr_estimate === 'number' && (
+                      <span className="session-meta-chip" title="Cached input cost estimate">
+                        C In INR {Number(selectedSession.cost_summary.input_cost_cached_inr_estimate).toFixed(4)}
+                      </span>
+                    )}
+                    {typeof selectedSession?.cost_summary?.cache_setup_cost_inr_estimate === 'number' && (
+                      <span className="session-meta-chip" title="Context cache setup input cost estimate">
+                        Cache setup INR {Number(selectedSession.cost_summary.cache_setup_cost_inr_estimate).toFixed(4)}
+                      </span>
+                    )}
+                    {typeof selectedSession?.cost_summary?.output_cost_inr_estimate === 'number' && (
+                      <span className="session-meta-chip" title="Output token cost estimate">
+                        Out INR {Number(selectedSession.cost_summary.output_cost_inr_estimate).toFixed(4)}
+                      </span>
+                    )}
                     {selectedSession?.cost_summary?.input_usd_per_1m != null && (
                       <span className="session-meta-chip" title="Input rate in USD per 1M tokens">
                         In ${Number(selectedSession.cost_summary.input_usd_per_1m || 0).toFixed(2)}/1M
@@ -315,6 +335,8 @@ const AdminChatHistory = () => {
                       : message.sender === 'assistant'
                         ? 'assistant'
                         : 'assistant';
+                  const answerModelLabel =
+                    role === 'assistant' ? formatLlmLabel(selectedSession || {}) : null;
                   const label =
                     message.sender === 'user'
                       ? 'User'
@@ -331,6 +353,14 @@ const AdminChatHistory = () => {
                       dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
                     />
                     <div className="message-meta">
+                      {answerModelLabel && (
+                        <span
+                          className="message-token-badge"
+                          title="Provider and model used for this answer"
+                        >
+                          Model {answerModelLabel}
+                        </span>
+                      )}
                       {message.native_name && (
                         <span
                           className="message-native-badge"
@@ -395,6 +425,25 @@ const AdminChatHistory = () => {
                           Out {Number(message.llm_output_tokens).toLocaleString()}
                         </span>
                       )}
+                      {Number.isFinite(message.llm_cached_input_tokens) && (
+                        <span className="message-token-badge" title="Provider-reported cached prompt tokens">
+                          Cached {Number(message.llm_cached_input_tokens).toLocaleString()}
+                        </span>
+                      )}
+                      {Number.isFinite(message.llm_non_cached_input_tokens) && (
+                        <span className="message-token-badge" title="Provider-reported non-cached prompt tokens">
+                          Non-cached {Number(message.llm_non_cached_input_tokens).toLocaleString()}
+                        </span>
+                      )}
+                      {Number.isFinite(message.llm_cache_setup_input_tokens) &&
+                        message.llm_cache_setup_input_tokens > 0 && (
+                          <span
+                            className="message-token-badge"
+                            title="Estimated input tokens spent while creating Gemini context cache"
+                          >
+                            Cache setup {Number(message.llm_cache_setup_input_tokens).toLocaleString()}
+                          </span>
+                        )}
                       {typeof message?.cost_estimate?.cost_inr_estimate === 'number' && (
                         <span
                           className="message-cost-badge"
@@ -418,6 +467,8 @@ const AdminChatHistory = () => {
                           const sumRp = sumParallelStageField(stages, 'output_chars');
                           const sumIn = sumParallelStageField(stages, 'input_tokens');
                           const sumOut = sumParallelStageField(stages, 'output_tokens');
+                          const sumCachedIn = sumParallelStageField(stages, 'cached_tokens');
+                          const sumNonCachedIn = sumParallelStageField(stages, 'non_cached_input_tokens');
                           const sumSt = sumParallelStageField(stages, 'static_chars');
                           const sumDy = sumParallelStageField(stages, 'dynamic_chars');
                           const blobPr =
@@ -466,6 +517,7 @@ const AdminChatHistory = () => {
                               <span className="message-parallel-sum-label">Σ</span>
                               Pr {sumPr.toLocaleString()}c · Rp {sumRp.toLocaleString()}c · In{' '}
                               {sumIn.toLocaleString()} · Out {sumOut.toLocaleString()}
+                              {' · '}CIn {sumCachedIn.toLocaleString()} · NCIn {sumNonCachedIn.toLocaleString()}
                               {sumSt > 0 && sumDy > 0 && (
                                 <>
                                   {' '}
@@ -538,6 +590,10 @@ const AdminChatHistory = () => {
                               In {Number(st.input_tokens || 0).toLocaleString()}
                               {' · '}
                               Out {Number(st.output_tokens || 0).toLocaleString()}
+                              {' · '}
+                              CIn {Number(st.cached_tokens || 0).toLocaleString()}
+                              {' · '}
+                              NCIn {Number(st.non_cached_input_tokens || 0).toLocaleString()}
                               {' · '}
                               Pr {Number(st.input_chars || 0).toLocaleString()}c
                               {' · '}

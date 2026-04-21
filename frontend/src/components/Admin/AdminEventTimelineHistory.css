@@ -1,0 +1,130 @@
+.admin-event-timeline-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-event-timeline-history__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-event-timeline-history__header h2 {
+  color: #0f172a;
+  margin: 0;
+}
+
+.admin-event-timeline-history__filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-event-timeline-history__filters input {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #0f172a;
+}
+
+.admin-event-timeline-history__filters select {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #0f172a;
+}
+
+.admin-event-timeline-history__filters button {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.admin-event-timeline-history__refresh {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.admin-event-timeline-history__error {
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.admin-event-timeline-history__table-wrap {
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-event-timeline-history__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+}
+
+.admin-event-timeline-history__table th,
+.admin-event-timeline-history__table td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.admin-event-timeline-history__table th {
+  background: #f8fafc;
+  font-weight: 700;
+  color: #0f172a !important;
+}
+
+.admin-event-timeline-history__table thead th {
+  color: #0f172a !important;
+}
+
+.admin-event-timeline-history__sub {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-event-timeline-history__model {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+
+.admin-event-timeline-history__empty {
+  text-align: center;
+  color: #64748b;
+}
+
+.admin-event-timeline-history__pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-event-timeline-history__pager button {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.admin-event-timeline-history__pager button:disabled,
+.admin-event-timeline-history__refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

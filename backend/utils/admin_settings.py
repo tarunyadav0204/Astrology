@@ -100,6 +100,14 @@ def get_gemini_analysis_model() -> str:
     return DEFAULT_GEMINI_ANALYSIS_MODEL
 
 
+def get_event_timeline_model() -> str:
+    """Model ID for event timeline generation. Falls back to premium Gemini model when unset."""
+    value = get_setting("event_timeline_model")
+    if value and value.strip():
+        return value.strip()
+    return get_gemini_premium_model()
+
+
 def get_chat_llm_provider() -> str:
     """Which LLM vendor runs standard (non-premium) astrological chat: 'gemini', 'openai', or 'deepseek'."""
     value = (get_setting("chat_llm_provider") or "").strip().lower()

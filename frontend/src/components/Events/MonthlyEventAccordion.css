@@ -127,6 +127,18 @@
   color: #444;
 }
 
+.monthly-event-accordion__why-toggle {
+  margin-top: 8px;
+  border: 1px solid rgba(233, 30, 99, 0.25);
+  background: rgba(233, 30, 99, 0.06);
+  color: #ad1457;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .monthly-event-accordion__manifest {
   margin-top: 10px;
 }

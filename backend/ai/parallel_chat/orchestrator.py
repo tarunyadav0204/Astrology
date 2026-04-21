@@ -128,6 +128,13 @@ from ai.term_matcher import find_terms_in_text
 from chat.system_instruction_config import build_merge_synthesis_instruction
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+
 def _intent_mode(context: Dict[str, Any], mode: str) -> str:
     intent_block = context.get("intent", {}) or {}
     intent_mode = intent_block.get("mode", mode)
@@ -268,6 +275,14 @@ def _llm_call_metrics(
         "output_chars": len(raw_response or ""),
         "input_tokens": int(tu.get("input_tokens") or 0),
         "output_tokens": int(tu.get("output_tokens") or 0),
+        "cached_tokens": int(tu.get("cached_tokens") or 0),
+        "non_cached_input_tokens": int(
+            tu.get("non_cached_input_tokens")
+            or max(
+                0,
+                int(tu.get("input_tokens") or 0) - int(tu.get("cached_tokens") or 0),
+            )
+        ),
         "success": success,
     }
     if elapsed_ms is not None:
@@ -283,13 +298,15 @@ def _log_parallel_llm_summary(rows: List[Dict[str, Any]]) -> None:
     """One log block: per-stage chars/tokens plus totals (parallel branches + merge)."""
     if not rows:
         return
-    tot_ic = tot_oc = tot_it = tot_ot = 0
+    tot_ic = tot_oc = tot_it = tot_ot = tot_ct = tot_ncit = 0
     lines: List[str] = ["PARALLEL_CHAT_LLM_SUMMARY"]
     for row in rows:
         tot_ic += int(row.get("input_chars") or 0)
         tot_oc += int(row.get("output_chars") or 0)
         tot_it += int(row.get("input_tokens") or 0)
         tot_ot += int(row.get("output_tokens") or 0)
+        tot_ct += int(row.get("cached_tokens") or 0)
+        tot_ncit += int(row.get("non_cached_input_tokens") or 0)
         st = row.get("stage", "?")
         em = row.get("elapsed_ms")
         sc = row.get("static_chars")
@@ -302,11 +319,14 @@ def _log_parallel_llm_summary(rows: List[Dict[str, Any]]) -> None:
         lines.append(
             f"  {st}: input_chars={row.get('input_chars')} output_chars={row.get('output_chars')} "
             f"input_tokens={row.get('input_tokens')} output_tokens={row.get('output_tokens')} "
+            f"cached_tokens={row.get('cached_tokens')} "
+            f"non_cached_input_tokens={row.get('non_cached_input_tokens')} "
             f"success={row.get('success')}{extra}"
         )
     lines.append(
         f"  TOTAL: input_chars={tot_ic} output_chars={tot_oc} "
-        f"input_tokens={tot_it} output_tokens={tot_ot}"
+        f"input_tokens={tot_it} output_tokens={tot_ot} "
+        f"cached_tokens={tot_ct} non_cached_input_tokens={tot_ncit}"
     )
     logger.info("\n".join(lines))
 
@@ -317,6 +337,10 @@ def _totals_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "output_chars": sum(int(r.get("output_chars") or 0) for r in rows),
         "input_tokens": sum(int(r.get("input_tokens") or 0) for r in rows),
         "output_tokens": sum(int(r.get("output_tokens") or 0) for r in rows),
+        "cached_tokens": sum(int(r.get("cached_tokens") or 0) for r in rows),
+        "non_cached_input_tokens": sum(
+            int(r.get("non_cached_input_tokens") or 0) for r in rows
+        ),
     }
     if any(r.get("elapsed_ms") is not None for r in rows):
         out["elapsed_ms_sum"] = round(
@@ -338,6 +362,8 @@ async def _run_branch_json(
     *,
     critical: bool,
     start_delay_s: float = 0.0,
+    model_override: Optional[Any] = None,
+    model_name_override: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if start_delay_s > 0:
         await asyncio.sleep(start_delay_s)
@@ -358,6 +384,8 @@ async def _run_branch_json(
             res = await analyzer.generate_text_from_prompt(
                 prompt,
                 premium_analysis=premium_analysis,
+                model_override=model_override,
+                model_name_override=model_name_override,
                 llm_log_tag=f"parallel_{branch_label}",
                 request_timeout_s=branch_timeout_s,
             )
@@ -493,6 +521,59 @@ async def run_parallel_chat_pipeline(
         )
 
     t_parallel = time.time()
+    llm_provider = get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
+    gemini_model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
+    cache_enabled = _env_bool("ASTRO_PARALLEL_CHAT_CONTEXT_CACHE", default=True)
+    cache_ttl_s = max(300, int(os.getenv("ASTRO_PARALLEL_CHAT_CACHE_TTL_S", "3600") or 3600))
+    cache_resource = None
+    cached_model = None
+    cache_setup_input_chars = 0
+    cache_setup_input_tokens = 0
+    try:
+        if llm_provider == "gemini" and cache_enabled:
+            from google.generativeai import caching as genai_caching
+            cache_payload = {
+                "shared_kernel": build_shared_kernel_lite(ctx),
+                "user_facts": ctx.get("user_facts"),
+                "extracted_context": ctx.get("extracted_context"),
+                "history": conversation_history or [],
+                "current_question": user_question,
+            }
+            cache_text = (
+                "PARALLEL_CHAT_SHARED_CONTEXT_JSON:\n"
+                f"{_json_compact(cache_payload)}"
+            )
+            cache_setup_input_chars = len(cache_text)
+            cache_setup_input_tokens = max(
+                1, int(round(cache_setup_input_chars / 4.0))
+            )
+            logger.info(
+                "PARALLEL_CHAT_CACHE create model=%s ttl_s=%s context_chars=%s",
+                gemini_model_name,
+                cache_ttl_s,
+                len(cache_text),
+            )
+            cache_resource = await asyncio.to_thread(
+                genai_caching.CachedContent.create,
+                model=gemini_model_name,
+                display_name=f"parallel-chat-{int(time.time())}",
+                system_instruction="Use cached shared context for all branch and merge reasoning.",
+                contents=[cache_text],
+                ttl=cache_ttl_s,
+            )
+            import google.generativeai as genai
+            cached_model = await asyncio.to_thread(
+                genai.GenerativeModel.from_cached_content,
+                cache_resource,
+            )
+            logger.info(
+                "PARALLEL_CHAT_CACHE created name=%s",
+                getattr(cache_resource, "name", "unknown"),
+            )
+    except Exception as e:
+        logger.warning("PARALLEL_CHAT_CACHE failed; continuing without cache: %s", e)
+        cache_resource = None
+        cached_model = None
     try:
         par_task = asyncio.create_task(
             _run_branch_json(
@@ -503,6 +584,8 @@ async def run_parallel_chat_pipeline(
                 "parashari",
                 critical=True,
                 start_delay_s=0.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         jm_task = asyncio.create_task(
@@ -514,6 +597,8 @@ async def run_parallel_chat_pipeline(
                 "jaimini",
                 critical=False,
                 start_delay_s=1.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         nd_task = asyncio.create_task(
@@ -525,6 +610,8 @@ async def run_parallel_chat_pipeline(
                 "nadi",
                 critical=False,
                 start_delay_s=2.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         nk_task = asyncio.create_task(
@@ -536,6 +623,8 @@ async def run_parallel_chat_pipeline(
                 "nakshatra",
                 critical=False,
                 start_delay_s=3.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         kp_task = asyncio.create_task(
@@ -547,6 +636,8 @@ async def run_parallel_chat_pipeline(
                 "kp",
                 critical=False,
                 start_delay_s=4.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         av_task = asyncio.create_task(
@@ -558,6 +649,8 @@ async def run_parallel_chat_pipeline(
                 "ashtakavarga",
                 critical=False,
                 start_delay_s=5.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         sd_task = asyncio.create_task(
@@ -569,6 +662,8 @@ async def run_parallel_chat_pipeline(
                 "sudarshan",
                 critical=False,
                 start_delay_s=6.0 * stagger_s,
+                model_override=cached_model,
+                model_name_override=gemini_model_name if cached_model else None,
             )
         )
         (
@@ -585,6 +680,12 @@ async def run_parallel_chat_pipeline(
         branch_llm_rows: List[Dict[str, Any]] = [par_m, jm_m, nd_m, nk_m, kp_m, av_m, sd_m]
     except Exception as e:
         logger.exception("parallel gather failed: %s", e)
+        if cache_resource is not None:
+            try:
+                await asyncio.to_thread(cache_resource.delete)
+                logger.info("PARALLEL_CHAT_CACHE deleted")
+            except Exception as del_err:
+                logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", del_err)
         raise
 
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
@@ -663,6 +764,8 @@ async def run_parallel_chat_pipeline(
     syn = await analyzer.generate_text_from_prompt(
         merge_prompt,
         premium_analysis=premium_analysis,
+        model_override=cached_model,
+        model_name_override=gemini_model_name if cached_model else None,
         llm_log_tag="parallel_merge",
     )
     synthesis_ms = round((time.time() - t_syn) * 1000, 1)
@@ -681,9 +784,18 @@ async def run_parallel_chat_pipeline(
     )
     _parallel_usage_rows = branch_llm_rows + [merge_metrics]
     _parallel_totals = _totals_from_rows(_parallel_usage_rows)
+    if cache_setup_input_tokens > 0:
+        _parallel_totals["cache_setup_input_chars"] = int(cache_setup_input_chars)
+        _parallel_totals["cache_setup_input_tokens"] = int(cache_setup_input_tokens)
 
     if not syn.get("success") or not syn.get("response"):
         _log_parallel_llm_summary(_parallel_usage_rows)
+        if cache_resource is not None:
+            try:
+                await asyncio.to_thread(cache_resource.delete)
+                logger.info("PARALLEL_CHAT_CACHE deleted")
+            except Exception as e:
+                logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", e)
         return {
             "success": False,
             "response": "I apologize, but I couldn't generate a merged response. Please try again.",
@@ -720,6 +832,12 @@ async def run_parallel_chat_pipeline(
     cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
     if len(cleaned_text) < 50:
         _log_parallel_llm_summary(_parallel_usage_rows)
+        if cache_resource is not None:
+            try:
+                await asyncio.to_thread(cache_resource.delete)
+                logger.info("PARALLEL_CHAT_CACHE deleted")
+            except Exception as e:
+                logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", e)
         return {
             "success": False,
             "response": "I received a partial merged response. Please try again.",
@@ -754,11 +872,18 @@ async def run_parallel_chat_pipeline(
     token_usage = {
         "input_tokens": int(_parallel_totals["input_tokens"]),
         "output_tokens": int(_parallel_totals["output_tokens"]),
+        "cached_tokens": int(_parallel_totals.get("cached_tokens") or 0),
+        "non_cached_input_tokens": int(_parallel_totals.get("non_cached_input_tokens") or 0),
+        "cache_setup_input_tokens": int(_parallel_totals.get("cache_setup_input_tokens") or 0),
     }
     total_time = time.time() - total_request_start
-    llm_provider = get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
-
     _log_parallel_llm_summary(_parallel_usage_rows)
+    if cache_resource is not None:
+        try:
+            await asyncio.to_thread(cache_resource.delete)
+            logger.info("PARALLEL_CHAT_CACHE deleted")
+        except Exception as e:
+            logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", e)
 
     return {
         "success": True,

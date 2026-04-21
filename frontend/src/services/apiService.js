@@ -544,6 +544,56 @@ export const apiService = {
     return response.data;
   },
 
+  streamEventTimeline: async (jobId, onEvent, signal) => {
+    const token = localStorage.getItem('token');
+    const endpoint = `${API_BASE_URL}${getEndpoint(`/chat/monthly-events/stream/${jobId}`)}`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Timeline stream failed (${response.status})`);
+    }
+    if (!response.body) {
+      throw new Error('Timeline stream body is unavailable');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let sepIndex = buffer.indexOf('\n\n');
+      while (sepIndex !== -1) {
+        const chunk = buffer.slice(0, sepIndex);
+        buffer = buffer.slice(sepIndex + 2);
+        sepIndex = buffer.indexOf('\n\n');
+
+        const lines = chunk.split('\n');
+        let eventName = 'message';
+        const dataLines = [];
+        for (const line of lines) {
+          if (line.startsWith('event:')) eventName = line.slice(6).trim();
+          if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+        }
+        if (dataLines.length > 0) {
+          try {
+            onEvent?.(eventName, JSON.parse(dataLines.join('\n')));
+          } catch {
+            // ignore malformed chunks and continue streaming
+          }
+        }
+      }
+    }
+  },
+
   getCachedEventTimeline: async (payload) => {
     const response = await apiClient.post(getEndpoint('/chat/monthly-events/cached'), payload);
     return response.data;

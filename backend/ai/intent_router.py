@@ -319,9 +319,15 @@ The user's question is Hindi or Hinglish. The client may send language "english"
 Follow the Hindi "Example" block below for chart_insights (not the English shape-only note). JSON keys stay English; only string values must be Devanagari Hindi.
 """
         else:
-            language_instruction = (
-                f"IMPORTANT: If you generate a clarification question, it MUST be in the following language: {_lang}"
-            )
+            language_instruction = f"""IMPORTANT LANGUAGE RULE — MATCH THE USER'S QUESTION LANGUAGE:
+
+The current question is not Hindi/Hinglish. For any user-visible strings, use the same language as the user's current question text.
+
+1) If status is "CLARIFY": "clarification_question" MUST be in the same language as the user's question.
+2) If status is "READY": Every "message" inside "chart_insights" MUST be in the same language as the user's question.
+
+Do not switch languages unexpectedly.
+"""
 
         if is_hindi_question:
             chart_insights_message_spec = (

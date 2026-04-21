@@ -119,8 +119,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     
     # Check credit cost and user balance (subscription tier discount applied via get_effective_cost)
     if request.partnership_mode:
-        base_cost = credit_service.get_credit_setting('chat_question_cost')
-        chat_cost = base_cost * 2  # Partnership mode costs double
+        chat_cost = credit_service.get_credit_setting('partnership_analysis_cost')
     elif request.premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
     else:
@@ -130,7 +129,11 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     is_standard_chat = not request.partnership_mode and not request.premium_analysis
     free_available = credit_service.is_free_standard_chat_question_available(current_user.userid)
     using_free_question = is_standard_chat and free_available
-    chat_key = 'premium_chat_cost' if request.premium_analysis else ('chat_question_cost' if not request.partnership_mode else None)
+    chat_key = (
+        'partnership_analysis_cost'
+        if request.partnership_mode
+        else ('premium_chat_cost' if request.premium_analysis else 'chat_question_cost')
+    )
     effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     
     print(f"💳 CREDIT CHECK DEBUG:")
@@ -887,7 +890,14 @@ def init_event_timeline_table():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     started_at TIMESTAMP,
                     completed_at TIMESTAMP,
-                    selected_month INTEGER
+                    selected_month INTEGER,
+                    llm_model TEXT,
+                    llm_input_tokens BIGINT,
+                    llm_output_tokens BIGINT,
+                    llm_cached_input_tokens BIGINT,
+                    llm_non_cached_input_tokens BIGINT,
+                    llm_cache_setup_input_tokens BIGINT,
+                    llm_total_tokens BIGINT
                 )
             """,
         )
@@ -896,6 +906,13 @@ def init_event_timeline_table():
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_timeline_status ON event_timeline_jobs (status)")
         # Backwards compat: ensure column exists for older DBs
         execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS selected_month INTEGER")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_model TEXT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_input_tokens BIGINT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_output_tokens BIGINT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_cached_input_tokens BIGINT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_non_cached_input_tokens BIGINT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_cache_setup_input_tokens BIGINT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_total_tokens BIGINT")
         conn.commit()
 
 @router.post("/monthly-events")
@@ -1017,6 +1034,15 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
     if status == "completed" and result_data:
         response["data"] = json.loads(result_data)
         response["completed_at"] = completed_at
+    elif status == "processing" and result_data:
+        try:
+            partial = json.loads(result_data)
+            response["partial_data"] = partial
+            response["months_ready"] = len((partial or {}).get("monthly_predictions") or [])
+            response["completed_quarters"] = (partial or {}).get("completed_quarters")
+            response["total_quarters"] = (partial or {}).get("total_quarters")
+        except Exception:
+            pass
     elif status == "failed":
         response["error"] = error_message or "Analysis failed"
     elif status in ["pending", "processing"]:
@@ -1025,6 +1051,79 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
             response["started_at"] = started_at
     
     return response
+
+@router.get("/monthly-events/stream/{job_id}")
+async def stream_event_timeline_status(job_id: str, current_user: User = Depends(get_current_user)):
+    """SSE stream for event timeline progress/completion."""
+    async def event_generator():
+        last_payload = None
+        heartbeat = 0
+        while True:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                        SELECT status, result_data, error_message, started_at, completed_at
+                        FROM event_timeline_jobs
+                        WHERE job_id = %s AND user_id = %s
+                    """,
+                    (job_id, current_user.userid),
+                )
+                result = cur.fetchone()
+
+            if not result:
+                yield "event: error\ndata: " + json.dumps({"error": "Job not found"}) + "\n\n"
+                break
+
+            status, result_data, error_message, started_at, completed_at = result
+            payload = {"status": status}
+            if status == "completed" and result_data:
+                payload["data"] = json.loads(result_data)
+                payload["completed_at"] = str(completed_at) if completed_at else None
+            elif status == "failed":
+                payload["error"] = error_message or "Analysis failed"
+            elif status in ("pending", "processing"):
+                payload["message"] = "Analyzing planetary positions..."
+                if started_at:
+                    payload["started_at"] = str(started_at)
+                if result_data:
+                    try:
+                        partial = json.loads(result_data)
+                        payload["partial_data"] = partial
+                        payload["months_ready"] = len((partial or {}).get("monthly_predictions") or [])
+                        payload["completed_quarters"] = (partial or {}).get("completed_quarters")
+                        payload["total_quarters"] = (partial or {}).get("total_quarters")
+                    except Exception:
+                        pass
+
+            payload_key = json.dumps(payload, sort_keys=True, default=str)
+            if payload_key != last_payload:
+                event_name = "progress"
+                if status == "completed":
+                    event_name = "completed"
+                elif status == "failed":
+                    event_name = "failed"
+                yield f"event: {event_name}\ndata: {payload_key}\n\n"
+                last_payload = payload_key
+            else:
+                heartbeat += 1
+                if heartbeat % 3 == 0:
+                    yield "event: ping\ndata: {}\n\n"
+
+            if status in ("completed", "failed"):
+                break
+
+            await asyncio.sleep(1.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @router.post("/monthly-events/cached")
 async def get_cached_timeline(request: ClearChatRequest, current_user: User = Depends(get_current_user)):
@@ -1178,19 +1277,43 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         dasha_calc = DashaCalculator()
         
         predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
+        timeline_model_name = getattr(predictor, "model_name", None)
         
+        async def _persist_yearly_progress(progress_payload: dict):
+            try:
+                with get_conn() as progress_conn:
+                    execute(
+                        progress_conn,
+                        "UPDATE event_timeline_jobs SET result_data = %s WHERE job_id = %s",
+                        (json.dumps(progress_payload), job_id),
+                    )
+                    progress_conn.commit()
+            except Exception as progress_error:
+                print(f"⚠️ Failed to persist timeline progress for {job_id}: {progress_error}")
+
         if target_month is not None:
             print(f"\n🚀 Calling predict_monthly_deep for year {target_year} month {target_month}...")
             predictions = await predictor.predict_monthly_deep(birth_data_dict, target_year, target_month)
         else:
             print(f"\n🚀 Calling predict_yearly_events for year {target_year}...")
-            predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
+            predictions = await predictor.predict_yearly_events(
+                birth_data_dict,
+                target_year,
+                progress_callback=_persist_yearly_progress,
+            )
         
         print(f"\n📦 Predictions received:")
         print(f"   - Status: {predictions.get('status')}")
         print(f"   - Keys: {list(predictions.keys())}")
         
         if predictions.get('status') == 'success':
+            usage_totals = predictions.pop("_llm_usage_totals", None) or {}
+            llm_input_tokens = int(usage_totals.get("input_tokens") or 0)
+            llm_output_tokens = int(usage_totals.get("output_tokens") or 0)
+            llm_cached_input_tokens = int(usage_totals.get("cached_tokens") or 0)
+            llm_non_cached_input_tokens = int(usage_totals.get("non_cached_input_tokens") or 0)
+            llm_cache_setup_input_tokens = int(usage_totals.get("cache_setup_input_tokens") or 0)
+            llm_total_tokens = int(usage_totals.get("total_tokens") or 0)
             # Deduct credits
             success = credit_service.spend_credits(
                 user_id, 
@@ -1210,8 +1333,33 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
             with get_conn() as conn:
                 execute(
                     conn,
-                    "UPDATE event_timeline_jobs SET status = %s, result_data = %s, completed_at = %s WHERE job_id = %s",
-                    ('completed', json.dumps(predictions), datetime.now(), job_id),
+                    """
+                    UPDATE event_timeline_jobs
+                    SET status = %s,
+                        result_data = %s,
+                        completed_at = %s,
+                        llm_model = %s,
+                        llm_input_tokens = %s,
+                        llm_output_tokens = %s,
+                        llm_cached_input_tokens = %s,
+                        llm_non_cached_input_tokens = %s,
+                        llm_cache_setup_input_tokens = %s,
+                        llm_total_tokens = %s
+                    WHERE job_id = %s
+                    """,
+                    (
+                        'completed',
+                        json.dumps(predictions),
+                        datetime.now(),
+                        timeline_model_name,
+                        llm_input_tokens,
+                        llm_output_tokens,
+                        llm_cached_input_tokens,
+                        llm_non_cached_input_tokens,
+                        llm_cache_setup_input_tokens,
+                        llm_total_tokens,
+                        job_id,
+                    ),
                 )
                 conn.commit()
             print(f"✅ Result saved, task completed")

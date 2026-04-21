@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
+import AdminEventTimelineHistory from './AdminEventTimelineHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
 import AdminActivity from './AdminActivity';
@@ -106,6 +107,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiChatModel, setGeminiChatModel] = useState('');
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
+  const [eventTimelineModel, setEventTimelineModel] = useState('');
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
   const [chatLlmProviderPremium, setChatLlmProviderPremium] = useState('');
   const [openaiModelOptions, setOpenaiModelOptions] = useState([]);
@@ -242,6 +244,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
+      setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
       setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
@@ -284,6 +287,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         chatRes,
         premiumRes,
         analysisRes,
+        timelineRes,
         providerRes,
         premiumProviderRes,
         openaiChatRes,
@@ -316,6 +320,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             key: 'gemini_analysis_model',
             value: geminiAnalysisModel,
             description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
+          }),
+        }),
+        fetch('/api/admin/settings/event_timeline_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'event_timeline_model',
+            value: eventTimelineModel,
+            description: 'Gemini model for yearly/monthly event timeline generation',
           }),
         }),
         fetch('/api/admin/settings/chat_llm_provider', {
@@ -377,6 +390,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         !chatRes.ok ||
         !premiumRes.ok ||
         !analysisRes.ok ||
+        !timelineRes.ok ||
         !providerRes.ok ||
         !premiumProviderRes.ok ||
         !openaiChatRes.ok ||
@@ -387,18 +401,20 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const chatErr = await chatRes.json().catch(() => ({}));
         const premiumErr = await premiumRes.json().catch(() => ({}));
         const analysisErr = await analysisRes.json().catch(() => ({}));
+        const timelineErr = await timelineRes.json().catch(() => ({}));
         const providerErr = await providerRes.json().catch(() => ({}));
         const premiumProviderErr = await premiumProviderRes.json().catch(() => ({}));
         const oaChatErr = await openaiChatRes.json().catch(() => ({}));
         const oaPremErr = await openaiPremiumRes.json().catch(() => ({}));
         const dsChatErr = await deepseekChatRes.json().catch(() => ({}));
         const dsPremErr = await deepseekPremiumRes.json().catch(() => ({}));
-        console.error('Save failed:', chatErr, premiumErr, analysisErr, providerErr, premiumProviderErr, oaChatErr, oaPremErr, dsChatErr, dsPremErr);
+        console.error('Save failed:', chatErr, premiumErr, analysisErr, timelineErr, providerErr, premiumProviderErr, oaChatErr, oaPremErr, dsChatErr, dsPremErr);
         alert(
           'Failed to save: ' +
             (chatErr.detail ||
               premiumErr.detail ||
               analysisErr.detail ||
+              timelineErr.detail ||
               providerErr.detail ||
               premiumProviderErr.detail ||
               oaChatErr.detail ||
@@ -409,7 +425,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         );
         return;
       }
-      alert('Chat vendors, chat models, and analysis model saved. New requests will use them immediately.');
+      alert('Chat vendors, chat models, analysis model, and event timeline model saved. New requests will use them immediately.');
     } catch (error) {
       console.error('Error saving Gemini models:', error);
       alert('Failed to save Gemini models.');
@@ -1393,6 +1409,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Chat History
         </button>
+        <button
+          className={`tab ${activeTab === 'eventTimeline' ? 'active' : ''}`}
+          onClick={() => setActiveTab('eventTimeline')}
+        >
+          Event Timeline Usage
+        </button>
         <button 
           className={`tab ${activeTab === 'support' ? 'active' : ''}`}
           onClick={() => setActiveTab('support')}
@@ -2137,6 +2159,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'chat' && (
           <AdminChatHistory />
+        )}
+
+        {activeTab === 'eventTimeline' && (
+          <AdminEventTimelineHistory />
         )}
 
         {activeTab === 'ledger' && (
@@ -3324,9 +3350,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
 
             <div className="settings-section">
-              <h3>Gemini analysis model</h3>
+              <h3>Gemini analysis & timeline models</h3>
               <p className="settings-hint">
-                Health, wealth, career, karma, physical, events, fact extraction, and other non-chat features use this Gemini model regardless of chat vendor. Changes apply to new requests immediately.
+                Health, wealth, career, karma, physical, and other non-chat features use the analysis model. Event timeline yearly/monthly generation uses the timeline model below, independent from chat vendor selection.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
@@ -3343,9 +3369,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   ))}
                 </select>
               </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Event timeline model</strong>
+                  <p>Used by yearly and monthly event timeline generation.</p>
+                </div>
+                <select
+                  value={eventTimelineModel}
+                  onChange={(e) => setEventTimelineModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={`etl-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button type="button" className="create-btn" onClick={handleSaveGeminiModels} disabled={geminiModelsSaving}>
-                  {geminiModelsSaving ? 'Saving…' : 'Save chat vendors, models & analysis'}
+                  {geminiModelsSaving ? 'Saving…' : 'Save chat vendors, models, analysis & timeline'}
                 </button>
               </div>
             </div>

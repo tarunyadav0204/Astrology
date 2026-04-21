@@ -116,6 +116,14 @@ export default function AdminQuestionCostSummary() {
             <div className="metric-card">
               <h4>AI Cost (rough)</h4>
               <p>INR {(s.ai_cost_inr_estimate ?? 0).toFixed(4)}</p>
+              <small>
+                NC In: INR {(s.input_cost_non_cached_inr_estimate ?? 0).toFixed(4)} | C In: INR{' '}
+                {(s.input_cost_cached_inr_estimate ?? 0).toFixed(4)}
+              </small>
+              <small>
+                Cache setup: INR {(s.cache_setup_cost_inr_estimate ?? 0).toFixed(4)} | Out: INR{' '}
+                {(s.output_cost_inr_estimate ?? 0).toFixed(4)}
+              </small>
               <small>Gross margin est: INR {(s.gross_margin_inr_estimate ?? 0).toFixed(4)}</small>
             </div>
           </div>
@@ -151,15 +159,22 @@ export default function AdminQuestionCostSummary() {
                 <tr>
                   <th>Model</th>
                   <th>Questions</th>
-                  <th>Question tokens (est)</th>
+                  <th>Question tokens (total)</th>
+                  <th>Question tokens (cached)</th>
+                  <th>Question tokens (non-cached)</th>
+                  <th>Cache setup tokens</th>
                   <th>Answer tokens (est)</th>
+                  <th>NC In Cost (INR)</th>
+                  <th>C In Cost (INR)</th>
+                  <th>Cache Setup Cost (INR)</th>
+                  <th>Out Cost (INR)</th>
                   <th>AI Cost (INR, est)</th>
                 </tr>
               </thead>
               <tbody>
                 {models.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>No model data for selected range.</td>
+                    <td colSpan={12}>No model data for selected range.</td>
                   </tr>
                 ) : (
                   models.map((m) => (
@@ -167,7 +182,14 @@ export default function AdminQuestionCostSummary() {
                       <td>{m.model}</td>
                       <td>{m.questions}</td>
                       <td>{m.input_tokens_estimate}</td>
+                      <td>{Number(m.cached_input_tokens || 0)}</td>
+                      <td>{Number(m.non_cached_input_tokens || 0)}</td>
+                      <td>{Number(m.cache_setup_input_tokens || 0)}</td>
                       <td>{m.output_tokens_estimate}</td>
+                      <td>INR {Number(m.input_cost_non_cached_inr_estimate || 0).toFixed(4)}</td>
+                      <td>INR {Number(m.input_cost_cached_inr_estimate || 0).toFixed(4)}</td>
+                      <td>INR {Number(m.cache_setup_cost_inr_estimate || 0).toFixed(4)}</td>
+                      <td>INR {Number(m.output_cost_inr_estimate || 0).toFixed(4)}</td>
                       <td>INR {Number(m.ai_cost_inr_estimate || 0).toFixed(4)}</td>
                     </tr>
                   ))

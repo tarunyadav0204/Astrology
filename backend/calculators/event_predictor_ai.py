@@ -1,17 +1,18 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Callable, Awaitable, Optional
 from types import SimpleNamespace
 import calendar
 import json
 import asyncio
 import os
+import time
+import re
 import google.generativeai as genai  # type: ignore[import-not-found]
+from google.generativeai import caching as genai_caching  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.event_timeline_context_prune import prune_for_event_timeline
-from utils.local_llm_event_timeline import (
-    event_timeline_uses_local_llm,
-    generate_event_timeline_json,
-)
+from ai.llm_roundtrip_log import log_llm_roundtrip
+from utils.admin_settings import is_debug_logging_enabled
 
 # Shared instruction block for Event Timeline (yearly + monthly deep): disambiguate which life channel
 # a house activation targets (any house H), using karaka + afflicter flavour + topic-appropriate vargas.
@@ -81,32 +82,108 @@ class EventPredictor:
         self.transit_calc = real_transit_calculator
         self.dasha_calc = dasha_calculator
         self.ashtakavarga_cls = ashtakavarga_calculator_cls
-
-        # Local Ollama (e.g. Gemma 4 on server) — no Gemini API; see utils/local_llm_event_timeline.py
-        self._use_local_llm = event_timeline_uses_local_llm()
         self.model = None
+        self.model_name = None
+        api_key = os.getenv('GEMINI_API_KEY')
+        if api_key:
+            genai.configure(api_key=api_key)
+            try:
+                from utils.admin_settings import get_event_timeline_model, GEMINI_MODEL_OPTIONS
+                name = get_event_timeline_model()
+                fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
+                for model_name in [name] + fallbacks:
+                    try:
+                        self.model = genai.GenerativeModel(model_name)
+                        self.model_name = model_name
+                        print(f"✅ EventPredictor using {model_name}")
+                        break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
 
-        if self._use_local_llm:
-            print("✅ EventPredictor: EVENT_TIMELINE_USE_LOCAL_LLM enabled — using Ollama (no Gemini API for timeline)")
-        else:
-            api_key = os.getenv('GEMINI_API_KEY')
-            if api_key:
-                genai.configure(api_key=api_key)
-                try:
-                    from utils.admin_settings import get_gemini_premium_model, GEMINI_MODEL_OPTIONS
-                    name = get_gemini_premium_model()
-                    fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
-                    for model_name in [name] + fallbacks:
-                        try:
-                            self.model = genai.GenerativeModel(model_name)
-                            print(f"✅ EventPredictor using {model_name}")
-                            break
-                        except Exception:
-                            continue
-                except Exception:
-                    pass
+    @staticmethod
+    def _env_bool(name: str, default: bool = False) -> bool:
+        raw = (os.getenv(name) or "").strip().lower()
+        if not raw:
+            return default
+        return raw in ("1", "true", "yes", "on")
 
-    async def predict_yearly_events(self, birth_data: Dict, year: int) -> Dict[str, Any]:
+    @staticmethod
+    def _safe_int_env(name: str, default: int) -> int:
+        raw = (os.getenv(name) or "").strip()
+        try:
+            return int(raw) if raw else default
+        except Exception:
+            return default
+
+    @staticmethod
+    def _month_ids_for_quarter(quarter_idx: int) -> List[int]:
+        start = (quarter_idx - 1) * 3 + 1
+        return [start, start + 1, start + 2]
+
+    @staticmethod
+    def _monthly_domain_shards() -> List[Dict[str, Any]]:
+        return [
+            {
+                "id": "career_finance",
+                "label": "Career and Finance",
+                "domains": ["career", "finance", "status", "gains", "business"],
+            },
+            {
+                "id": "relationships_family",
+                "label": "Relationships and Family",
+                "domains": ["relationships", "marriage", "family", "children", "social"],
+            },
+            {
+                "id": "health_inner",
+                "label": "Health and Inner Life",
+                "domains": ["health", "mental", "conflict", "debt", "spiritual"],
+            },
+            {
+                "id": "property_travel_learning",
+                "label": "Property, Travel and Learning",
+                "domains": ["property", "home", "vehicles", "travel", "legal", "education"],
+            },
+        ]
+
+    @staticmethod
+    def _extract_life_stage_context(age: int) -> str:
+        if age < 23:
+            return """
+**USER PROFILE: STUDENT (Education Phase)**
+**INTERPRETATION RULES (Desha Kala Patra):**
+* **5th House:** Primary signification is **EXAMS, GRADES, INTELLIGENCE**. (Secondary: Romance).
+* **4th House:** Signifies **SCHOOLING/COLLEGE STUDY**.
+* **9th House:** Signifies **HIGHER EDUCATION/ADMISSION/COLLEGE**.
+* **11th House:** Signifies **EXAM RESULTS/ADMISSION SUCCESS**. (Not Salary).
+* **6th House:** Signifies **COMPETITIVE EXAMS** (Not Divorce/Job).
+* **10th House:** Signifies **ACADEMIC RANK/ACHIEVEMENT**.
+"""
+        if age > 60:
+            return """
+**USER PROFILE: SENIOR (Retirement/Moksha Phase)**
+**INTERPRETATION RULES (Desha Kala Patra):**
+* **5th House:** Signifies **GRANDCHILDREN/MANTRA/DEVOTION**.
+* **6th House:** Signifies **HEALTH ISSUES/DISEASE**.
+* **1st House:** Signifies **VITALITY/LONGEVITY**.
+* **12th House:** Signifies **HOSPITALS/SPIRITUAL RETREAT**.
+"""
+        return """
+**USER PROFILE: CAREER/ADULT (Artha/Kama Phase)**
+**INTERPRETATION RULES (Desha Kala Patra):**
+* **5th House:** Signifies **CHILDREN/SPECULATION**.
+* **10th House:** Signifies **CAREER/PROMOTION**.
+* **11th House:** Signifies **WEALTH/SALARY/GAINS**.
+* **7th House:** Signifies **MARRIAGE/BUSINESS PARTNERS**.
+"""
+
+    async def predict_yearly_events(
+        self,
+        birth_data: Dict,
+        year: int,
+        progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
+    ) -> Dict[str, Any]:
         try:
             print("\n" + "#"*100)
             print(f"🎯 STARTING YEARLY EVENT PREDICTION FOR {year}")
@@ -120,31 +197,51 @@ class EventPredictor:
             print("\n🔄 Preparing yearly data...")
             raw_data = self._prepare_yearly_data(birth_data, year)
             print(f"✅ Yearly data prepared (length: {len(raw_data)} chars)")
-            
-            # Pass Age to prompt generator for Desha Kala Patra logic
-            print("\n🔄 Creating prediction prompt...")
-            prompt = self._create_prediction_prompt(raw_data, year, current_age)
-            print(f"✅ Prompt created (length: {len(prompt)} chars)")
-            
-            print("\n🔄 Calling timeline LLM...")
-            ai_response = await self._get_ai_prediction_async(prompt)
-            print("✅ Timeline LLM returned response")
+
+            if self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=False):
+                print("\n⚡ Parallel yearly timeline enabled (with context cache)")
+                ai_response = await self._predict_yearly_events_parallel_cached(
+                    raw_data=raw_data,
+                    year=year,
+                    age=current_age,
+                    progress_callback=progress_callback,
+                )
+            else:
+                # Pass Age to prompt generator for Desha Kala Patra logic
+                print("\n🔄 Creating prediction prompt...")
+                prompt = self._create_prediction_prompt(raw_data, year, current_age)
+                print(f"✅ Prompt created (length: {len(prompt)} chars)")
+
+                print("\n🔄 Calling timeline LLM...")
+                ai_response = await self._get_ai_prediction_async(prompt)
+                print("✅ Timeline LLM returned response")
 
             if ai_response.pop("_timeline_invalid", False):
                 return {
                     "year": year,
                     "status": "error",
                     "error": (
-                        "Timeline model returned empty or incomplete JSON (e.g. {}). "
-                        "If using Ollama: set OLLAMA_NUM_PREDICT=65536 (or higher), "
-                        "OLLAMA_NUM_CTX if needed, use a capable model, or disable "
-                        "EVENT_TIMELINE_USE_LOCAL_LLM and use Gemini."
+                        ai_response.get("error")
+                        or "Timeline model returned empty or incomplete JSON (e.g. {})."
                     ),
                     "macro_trends": [],
                     "monthly_predictions": [],
                 }
 
+            run_usage = ai_response.pop("_llm_usage", None)
+            if isinstance(run_usage, dict):
+                print(
+                    "\n📊 YEARLY TOKEN USAGE TOTAL (model-reported): "
+                    f"input_tokens={int(run_usage.get('input_tokens') or 0)} "
+                    f"output_tokens={int(run_usage.get('output_tokens') or 0)} "
+                    f"cached_input_tokens={int(run_usage.get('cached_tokens') or 0)} "
+                    f"non_cached_input_tokens={int(run_usage.get('non_cached_input_tokens') or 0)} "
+                    f"total_tokens={int(run_usage.get('total_tokens') or 0)}"
+                )
+
             final_response = {"year": year, "status": "success", **ai_response}
+            if isinstance(run_usage, dict):
+                final_response["_llm_usage_totals"] = run_usage
             print(f"\n✅ PREDICTION COMPLETE FOR {year}")
             print(f"   - Final response keys: {list(final_response.keys())}")
             print("#"*100 + "\n")
@@ -159,6 +256,320 @@ class EventPredictor:
             traceback.print_exc()
             return {"year": year, "status": "error", "error": str(e), "macro_trends": [], "monthly_predictions": []}
 
+    async def _predict_yearly_events_parallel_cached(
+        self,
+        raw_data: str,
+        year: int,
+        age: int,
+        progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
+    ) -> Dict[str, Any]:
+        if not self.model:
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": "Timeline model not initialized.",
+            }
+
+        require_cache = self._env_bool("EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE", default=True)
+        cache_ttl_s = max(300, self._safe_int_env("EVENT_TIMELINE_CACHE_TTL_S", 3600))
+        cache_resource = None
+        cache_setup_input_tokens = max(1, int(round(len(raw_data or "") / 4.0)))
+        try:
+            print(f"🗂️ Creating Gemini context cache (ttl={cache_ttl_s}s)...")
+            cache_resource = await asyncio.to_thread(
+                genai_caching.CachedContent.create,
+                model=self.model_name or getattr(self.model, "model_name", None),
+                display_name=f"event-timeline-{year}",
+                contents=[raw_data],
+                ttl=cache_ttl_s,
+            )
+            print(f"✅ Cache created: {getattr(cache_resource, 'name', 'unknown')}")
+        except Exception as e:
+            msg = f"Failed to create Gemini context cache: {type(e).__name__}: {e}"
+            print(f"❌ {msg}")
+            if require_cache:
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": msg,
+                }
+            print("⚠️ EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE is disabled; falling back to single-call yearly.")
+            prompt = self._create_prediction_prompt(raw_data, year, age)
+            return await self._get_ai_prediction_async(prompt)
+
+        try:
+            quarter_tasks: List[asyncio.Task] = []
+            for q in (1, 2, 3, 4):
+                month_ids = self._month_ids_for_quarter(q)
+                quarter_prompt = self._create_quarter_prompt(
+                    year=year,
+                    age=age,
+                    quarter_idx=q,
+                    month_ids=month_ids,
+                )
+                cached_model = genai.GenerativeModel.from_cached_content(cache_resource)
+                async def _run_quarter(quarter_index: int, prompt: str, model_obj: Any):
+                    result = await self._get_ai_prediction_async(
+                        prompt,
+                        model_override=model_obj,
+                        llm_log_tag=f"event_timeline_q{quarter_index}",
+                    )
+                    return quarter_index, result
+
+                quarter_tasks.append(asyncio.create_task(_run_quarter(q, quarter_prompt, cached_model)))
+
+            quarter_results_by_index: Dict[int, Dict[str, Any]] = {}
+            usage_totals = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cached_tokens": 0,
+                "non_cached_input_tokens": 0,
+                "total_tokens": 0,
+                "cache_setup_input_tokens": int(cache_setup_input_tokens),
+            }
+            for task in asyncio.as_completed(quarter_tasks):
+                try:
+                    quarter_idx, res = await task
+                except Exception as e:
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Quarter Q{quarter_idx} failed: {type(e).__name__}: {e}",
+                    }
+
+                if isinstance(res, Exception):
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Quarter Q{quarter_idx} failed: {type(res).__name__}: {res}",
+                    }
+                if not isinstance(res, dict) or res.get("_timeline_invalid"):
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Quarter Q{quarter_idx} returned invalid timeline JSON.",
+                    }
+
+                quarter_usage = res.get("_llm_usage") if isinstance(res, dict) else None
+                if isinstance(quarter_usage, dict):
+                    usage_totals["input_tokens"] += int(quarter_usage.get("input_tokens") or 0)
+                    usage_totals["output_tokens"] += int(quarter_usage.get("output_tokens") or 0)
+                    usage_totals["cached_tokens"] += int(quarter_usage.get("cached_tokens") or 0)
+                    usage_totals["non_cached_input_tokens"] += int(
+                        quarter_usage.get("non_cached_input_tokens") or 0
+                    )
+                    usage_totals["total_tokens"] += int(quarter_usage.get("total_tokens") or 0)
+
+                quarter_results_by_index[quarter_idx] = res
+                if progress_callback:
+                    monthly_predictions: List[Dict[str, Any]] = []
+                    macro_trends: List[str] = []
+                    for q in sorted(quarter_results_by_index.keys()):
+                        q_payload = quarter_results_by_index[q] or {}
+                        monthly_predictions.extend(q_payload.get("monthly_predictions") or [])
+                        for trend in q_payload.get("macro_trends") or []:
+                            t = " ".join(str(trend or "").split()).strip()
+                            if not t:
+                                continue
+                            word_count = len([w for w in t.split(" ") if w])
+                            if word_count <= 3 or len(t) < 28:
+                                continue
+                            if t not in macro_trends:
+                                macro_trends.append(t)
+                    monthly_predictions = sorted(
+                        [m for m in monthly_predictions if isinstance(m, dict)],
+                        key=lambda m: int(m.get("month_id") or 99),
+                    )
+                    progress_payload = {
+                        "status": "processing",
+                        "year": year,
+                        "completed_quarters": len(quarter_results_by_index),
+                        "total_quarters": 4,
+                        "months_ready": len(monthly_predictions),
+                        "macro_trends": macro_trends,
+                        "monthly_predictions": monthly_predictions,
+                    }
+                    cb_result = progress_callback(progress_payload)
+                    if asyncio.iscoroutine(cb_result):
+                        await cb_result
+
+            normalized = [quarter_results_by_index[q] for q in sorted(quarter_results_by_index.keys()) if q in quarter_results_by_index]
+            merged = self._merge_quarter_predictions(normalized)
+            merged["_llm_usage"] = usage_totals
+            return merged
+        finally:
+            if cache_resource is not None:
+                try:
+                    await asyncio.to_thread(cache_resource.delete)
+                    print("🧹 Deleted Gemini context cache.")
+                except Exception as e:
+                    print(f"⚠️ Failed to delete cache: {e}")
+
+    def _merge_quarter_predictions(self, quarter_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        monthly_predictions: List[Dict[str, Any]] = []
+        macro_trends: List[str] = []
+
+        def _clean_prediction_text(text: Any) -> str:
+            s = str(text or "")
+            s = s.replace("\n", " ").replace("\r", " ")
+            s = s.replace("\t", " ")
+            s = s.strip()
+            s = s.replace("  ", " ")
+            # Strip known debug tag if leaked.
+            while "[BHAVA-DISAMBIG:" in s and "]" in s:
+                start = s.find("[BHAVA-DISAMBIG:")
+                end = s.find("]", start)
+                if end <= start:
+                    break
+                s = (s[:start] + " " + s[end + 1:]).strip()
+            return " ".join(s.split())
+
+        def _normalize_macro_trends(raw: Any) -> List[str]:
+            """
+            Defensive normalization:
+            - expected shape: list[str]
+            - reject string/dict accidental shapes to avoid char/key bullet spam in UI
+            """
+            if isinstance(raw, list):
+                out: List[str] = []
+                for item in raw:
+                    if isinstance(item, str):
+                        t = item.strip()
+                        if t:
+                            out.append(t)
+                    elif isinstance(item, dict):
+                        # Common LLM drift: {'summary': '...'} / {'key_indicators': [...]} etc.
+                        # Keep values only when they are human-readable strings/lists of strings.
+                        for v in item.values():
+                            if isinstance(v, str):
+                                vv = v.strip()
+                                if vv:
+                                    out.append(vv)
+                            elif isinstance(v, list):
+                                for lv in v:
+                                    if isinstance(lv, str) and lv.strip():
+                                        out.append(lv.strip())
+                return out
+            if isinstance(raw, str):
+                # Treat plain string as single trend (do not iterate chars).
+                t = raw.strip()
+                return [t] if t else []
+            return []
+
+        def _is_descriptive_macro_trend(text: str) -> bool:
+            t = " ".join(str(text or "").split()).strip()
+            if not t:
+                return False
+            words = [w for w in t.split(" ") if w]
+            word_count = len(words)
+            char_count = len(t)
+            # Heading-like fragments we do not want as standalone bullets.
+            if word_count <= 3:
+                return False
+            if char_count < 28:
+                return False
+            # Prefer narrative lines; allow medium-length with punctuation or clear sentence cues.
+            if char_count >= 48:
+                return True
+            if re.search(r"[,:;.!?]", t):
+                return True
+            if re.search(r"\b(with|because|while|after|during|through|indicates|suggests|marks)\b", t, re.I):
+                return True
+            return False
+
+        for result in quarter_results:
+            monthly_predictions.extend(result.get("monthly_predictions") or [])
+            for trend in _normalize_macro_trends(result.get("macro_trends")):
+                t = str(trend).strip()
+                if t and _is_descriptive_macro_trend(t) and t not in macro_trends:
+                    macro_trends.append(t)
+
+        if len(monthly_predictions) != 12:
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Merged quarterly output has {len(monthly_predictions)} months; expected 12.",
+            }
+
+        ids = []
+        for m in monthly_predictions:
+            if not isinstance(m, dict):
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": "Merged quarterly output contains non-object month entries.",
+                }
+            ids.append(m.get("month_id"))
+            events = m.get("events")
+            if not isinstance(events, list) or len(events) == 0:
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": f"Month {m.get('month_id')} has no events in merged quarterly output.",
+                }
+            if len(events) < 6:
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": f"Month {m.get('month_id')} has {len(events)} events; minimum 6 required.",
+                }
+            for ev_idx, ev in enumerate(events, start=1):
+                if not isinstance(ev, dict):
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Month {m.get('month_id')} contains non-object event entry.",
+                    }
+                pred = _clean_prediction_text(ev.get("prediction"))
+                has_technical_noise = bool(
+                    pred
+                    and re.search(
+                        r"(\[BHAVA-DISAMBIG:|\b(BHAVA|Karaka|Varga|Threads=|Afflicter)\b|\b\d{1,2}L\b)",
+                        pred,
+                        re.I,
+                    )
+                )
+                if not pred or has_technical_noise:
+                    event_type = str(ev.get("type") or "").strip() or "unknown"
+                    pred_preview = str(ev.get("prediction") or "").replace("\n", " ").strip()
+                    if len(pred_preview) > 180:
+                        pred_preview = pred_preview[:180] + "..."
+                    reason = "empty prediction" if not pred else "technical/jargon prediction"
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": (
+                            f"Month {m.get('month_id')} event #{ev_idx} ({event_type}) invalid: {reason}. "
+                            f"Raw prediction preview: {pred_preview or '<empty>'}"
+                        ),
+                    }
+                ev["prediction"] = pred
+        try:
+            normalized_ids = sorted(int(x) for x in ids)
+        except Exception:
+            normalized_ids = []
+        if normalized_ids != list(range(1, 13)):
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Merged quarterly output has invalid month_ids: {ids}.",
+            }
+
+        monthly_predictions.sort(key=lambda x: int(x.get("month_id", 0)))
+        return {"macro_trends": macro_trends, "monthly_predictions": monthly_predictions}
+
     async def predict_monthly_deep(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
         """Generate exhaustive predictions for a single month (all triggers, all manifestations)."""
         try:
@@ -170,21 +581,35 @@ class EventPredictor:
             raw_data = self._prepare_yearly_data(birth_data, year)
             transit_facts = self._get_transit_facts_for_month(birth_data, year, month)
             dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
-            prompt = self._create_monthly_deep_prompt(raw_data, year, month, current_age, transit_facts, dasha_facts)
-            ai_response = await self._get_ai_prediction_async(prompt)
+            if self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=False):
+                print("\n⚡ Parallel monthly deep enabled (with context cache + domain shards)")
+                ai_response = await self._predict_monthly_deep_parallel_cached(
+                    raw_data=raw_data,
+                    year=year,
+                    month=month,
+                    age=current_age,
+                    transit_facts=transit_facts,
+                    dasha_facts=dasha_facts,
+                )
+            else:
+                prompt = self._create_monthly_deep_prompt(
+                    raw_data, year, month, current_age, transit_facts, dasha_facts
+                )
+                ai_response = await self._get_ai_prediction_async(prompt)
             if ai_response.pop("_timeline_invalid", False):
                 return {
                     "year": year,
                     "status": "error",
                     "error": (
-                        "Monthly deep model returned empty or incomplete JSON. "
-                        "Try higher OLLAMA_NUM_PREDICT / OLLAMA_NUM_CTX or use Gemini."
+                        ai_response.get("error")
+                        or "Monthly deep model returned empty or incomplete JSON."
                     ),
                     "dasha_facts": dasha_facts,
                     "transit_facts": transit_facts,
                     "macro_trends": [],
                     "monthly_predictions": [],
                 }
+            run_usage = ai_response.pop("_llm_usage", None) if isinstance(ai_response, dict) else None
             final_response = {
                 "year": year,
                 "status": "success",
@@ -192,6 +617,16 @@ class EventPredictor:
                 "transit_facts": transit_facts,
                 **ai_response,
             }
+            if isinstance(run_usage, dict):
+                final_response["_llm_usage_totals"] = run_usage
+                print(
+                    "\n📊 MONTHLY TOKEN USAGE TOTAL (model-reported): "
+                    f"input_tokens={int(run_usage.get('input_tokens') or 0)} "
+                    f"output_tokens={int(run_usage.get('output_tokens') or 0)} "
+                    f"cached_input_tokens={int(run_usage.get('cached_tokens') or 0)} "
+                    f"non_cached_input_tokens={int(run_usage.get('non_cached_input_tokens') or 0)} "
+                    f"total_tokens={int(run_usage.get('total_tokens') or 0)}"
+                )
             print(f"\n✅ MONTHLY DEEP COMPLETE FOR {year}-{month}")
             print("#"*100 + "\n")
             return final_response
@@ -200,6 +635,308 @@ class EventPredictor:
             import traceback
             traceback.print_exc()
             return {"year": year, "status": "error", "error": str(e), "macro_trends": [], "monthly_predictions": []}
+
+    async def _predict_monthly_deep_parallel_cached(
+        self,
+        raw_data: str,
+        year: int,
+        month: int,
+        age: int,
+        transit_facts: Dict[str, Any],
+        dasha_facts: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not self.model:
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": "Timeline model not initialized.",
+            }
+        require_cache = self._env_bool("EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE", default=True)
+        cache_ttl_s = max(300, self._safe_int_env("EVENT_TIMELINE_CACHE_TTL_S", 3600))
+        cache_resource = None
+        cache_setup_input_tokens = max(1, int(round(len(raw_data or "") / 4.0)))
+        try:
+            print(f"🗂️ Creating Gemini context cache for monthly deep (ttl={cache_ttl_s}s)...")
+            cache_resource = await asyncio.to_thread(
+                genai_caching.CachedContent.create,
+                model=self.model_name or getattr(self.model, "model_name", None),
+                display_name=f"event-timeline-monthly-{year}-{month}",
+                contents=[raw_data],
+                ttl=cache_ttl_s,
+            )
+            print(f"✅ Monthly cache created: {getattr(cache_resource, 'name', 'unknown')}")
+        except Exception as e:
+            msg = f"Failed to create Gemini context cache for monthly deep: {type(e).__name__}: {e}"
+            print(f"❌ {msg}")
+            if require_cache:
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": msg,
+                }
+            prompt = self._create_monthly_deep_prompt(raw_data, year, month, age, transit_facts, dasha_facts)
+            return await self._get_ai_prediction_async(prompt)
+
+        try:
+            shards = self._monthly_domain_shards()
+            tasks: List[asyncio.Task] = []
+            for shard in shards:
+                prompt = self._create_monthly_deep_shard_prompt(
+                    year=year,
+                    month=month,
+                    age=age,
+                    transit_facts=transit_facts,
+                    dasha_facts=dasha_facts,
+                    shard=shard,
+                )
+                cached_model = genai.GenerativeModel.from_cached_content(cache_resource)
+
+                async def _run_shard(shard_id: str, shard_prompt: str, model_obj: Any):
+                    result = await self._get_ai_prediction_async(
+                        shard_prompt,
+                        model_override=model_obj,
+                        llm_log_tag=f"event_timeline_monthly_{shard_id}",
+                    )
+                    return shard_id, result
+
+                tasks.append(asyncio.create_task(_run_shard(shard["id"], prompt, cached_model)))
+
+            results_by_shard: Dict[str, Dict[str, Any]] = {}
+            usage_totals = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cached_tokens": 0,
+                "non_cached_input_tokens": 0,
+                "total_tokens": 0,
+                "cache_setup_input_tokens": int(cache_setup_input_tokens),
+            }
+            for task in asyncio.as_completed(tasks):
+                try:
+                    shard_id, res = await task
+                except Exception as e:
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Monthly shard failed: {type(e).__name__}: {e}",
+                    }
+                if not isinstance(res, dict) or res.get("_timeline_invalid"):
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Monthly shard {shard_id} returned invalid JSON.",
+                    }
+                shard_usage = res.get("_llm_usage")
+                if isinstance(shard_usage, dict):
+                    usage_totals["input_tokens"] += int(shard_usage.get("input_tokens") or 0)
+                    usage_totals["output_tokens"] += int(shard_usage.get("output_tokens") or 0)
+                    usage_totals["cached_tokens"] += int(shard_usage.get("cached_tokens") or 0)
+                    usage_totals["non_cached_input_tokens"] += int(
+                        shard_usage.get("non_cached_input_tokens") or 0
+                    )
+                    usage_totals["total_tokens"] += int(shard_usage.get("total_tokens") or 0)
+                results_by_shard[shard_id] = res
+
+            merged = self._merge_monthly_deep_shards(
+                month=month,
+                shard_results_by_id=results_by_shard,
+            )
+            merged["_llm_usage"] = usage_totals
+            return merged
+        finally:
+            if cache_resource is not None:
+                try:
+                    await asyncio.to_thread(cache_resource.delete)
+                    print("🧹 Deleted Gemini monthly context cache.")
+                except Exception as e:
+                    print(f"⚠️ Failed to delete monthly cache: {e}")
+
+    def _create_monthly_deep_shard_prompt(
+        self,
+        year: int,
+        month: int,
+        age: int,
+        transit_facts: Dict[str, Any],
+        dasha_facts: Dict[str, Any],
+        shard: Dict[str, Any],
+    ) -> str:
+        month_names = [
+            "",
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ]
+        month_name = month_names[month] if 1 <= month <= 12 else f"Month {month}"
+        domains = shard.get("domains") or []
+        domains_line = ", ".join(str(d).strip() for d in domains if str(d).strip())
+        return f"""You are an expert Vedic astrologer. Generate ONE SHARD for monthly deep-dive for {month_name} {year}.
+
+You are shard `{shard.get("id")}` focused on domain group: {shard.get("label")}.
+You MUST cover only these domains: [{domains_line}].
+
+DASHA FACTS (copy exactly, do not change):
+```json
+{json.dumps(dasha_facts, indent=2)}
+```
+
+TRANSIT FACTS (copy exactly, do not change):
+```json
+{json.dumps(transit_facts, indent=2)}
+```
+
+Use cached context as ground truth for all chart computations, and apply Desha-Kala-Patra for age {age}.
+
+OUTPUT JSON ONLY with keys:
+{{
+  "macro_trends": [],
+  "monthly_predictions": [
+    {{
+      "month_id": {month},
+      "focus_areas": ["..."],
+      "covered_domains": ["{domains[0] if domains else 'career'}"],
+      "events": [
+        {{
+          "type": "Event Type",
+          "prediction": "Plain-language user-facing prediction",
+          "activation_reasoning": "Astrological why",
+          "possible_manifestations": [{{"scenario":"...","reasoning":"..."}}, {{"scenario":"...","reasoning":"..."}}],
+          "trigger_logic": "dasha + transit logic",
+          "start_date": "YYYY-MM-DD",
+          "end_date": "YYYY-MM-DD",
+          "intensity": "High|Medium|Low"
+        }}
+      ]
+    }}
+  ]
+}}
+
+Constraints:
+1) Return exactly one month object with month_id={month}.
+2) Return 5-8 events for this shard.
+3) Every event MUST map to one of the allowed domains for this shard.
+4) prediction MUST be non-empty plain language. Do not include technical tags in prediction.
+5) covered_domains MUST list only domains from this shard that you actually covered.
+"""
+
+    def _merge_monthly_deep_shards(self, month: int, shard_results_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        expected_shards = self._monthly_domain_shards()
+        covered_domains: set[str] = set()
+        events: List[Dict[str, Any]] = []
+        macro_trends: List[str] = []
+        focus_areas: List[str] = []
+
+        def _clean_text(v: Any) -> str:
+            return " ".join(str(v or "").replace("\n", " ").split()).strip()
+
+        seen_keys: set[str] = set()
+        shard_event_counts: Dict[str, int] = {}
+        for shard in expected_shards:
+            shard_id = str(shard.get("id") or "").strip()
+            if not shard_id or shard_id not in shard_results_by_id:
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": f"Monthly shard {shard_id or '<unknown>'} missing from merge results.",
+                }
+            res = shard_results_by_id.get(shard_id) or {}
+            shard_event_counts[shard_id] = 0
+            for trend in res.get("macro_trends") or []:
+                t = _clean_text(trend)
+                if t and t not in macro_trends:
+                    macro_trends.append(t)
+            months = res.get("monthly_predictions") or []
+            if not months or not isinstance(months[0], dict):
+                continue
+            m = months[0]
+            if int(m.get("month_id") or 0) != int(month):
+                return {
+                    "macro_trends": [],
+                    "monthly_predictions": [],
+                    "_timeline_invalid": True,
+                    "error": f"Monthly shard returned wrong month_id {m.get('month_id')} (expected {month}).",
+                }
+            for fa in m.get("focus_areas") or []:
+                f = _clean_text(fa)
+                if f and f not in focus_areas:
+                    focus_areas.append(f)
+            shard_domains = m.get("covered_domains") or []
+            for d in shard_domains:
+                domain = _clean_text(d).lower()
+                if domain:
+                    covered_domains.add(domain)
+            for ev in m.get("events") or []:
+                if not isinstance(ev, dict):
+                    continue
+                pred = _clean_text(ev.get("prediction"))
+                if not pred:
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": "Monthly shard contains event with empty prediction.",
+                    }
+                if re.search(r"(\[BHAVA-DISAMBIG:|\b(BHAVA|Karaka|Varga|Threads=|Afflicter)\b|\b\d{1,2}L\b)", pred, re.I):
+                    return {
+                        "macro_trends": [],
+                        "monthly_predictions": [],
+                        "_timeline_invalid": True,
+                        "error": f"Monthly shard contains technical prediction text: {pred[:120]}",
+                    }
+                key = f"{_clean_text(ev.get('type')).lower()}|{pred.lower()}"
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                ev["prediction"] = pred
+                events.append(ev)
+                shard_event_counts[shard_id] += 1
+
+        empty_shards = [sid for sid, c in shard_event_counts.items() if c <= 0]
+        if empty_shards:
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Monthly shards returned no usable events: {', '.join(empty_shards)}",
+            }
+        if len(events) < 20:
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Merged monthly deep has {len(events)} events; minimum 20 required.",
+            }
+
+        # Keep strongest and near-term items first if model produced too many.
+        def _intensity_rank(v: Any) -> int:
+            s = str(v or "").strip().lower()
+            if s == "high":
+                return 3
+            if s == "medium":
+                return 2
+            return 1
+
+        events.sort(key=lambda e: (-_intensity_rank(e.get("intensity")), str(e.get("start_date") or "9999-12-31")))
+        events = events[:30]
+        monthly = {
+            "month_id": month,
+            "focus_areas": focus_areas[:10],
+            "covered_domains": sorted(covered_domains),
+            "events": events,
+        }
+        return {"macro_trends": macro_trends[:6], "monthly_predictions": [monthly]}
 
     def _create_monthly_deep_prompt(self, raw_data: str, year: int, month: int, age: int, transit_facts: Dict[str, Any], dasha_facts: Dict[str, Any]) -> str:
         """Prompt for single-month exhaustive analysis (all triggers, all manifestations)."""
@@ -398,36 +1135,7 @@ Now return a single JSON object with this structure:
         Dynamically adjusts prompt based on User Age (Desha Kala Patra).
         """
         
-        # 1. Determine Life Stage Context
-        if age < 23:
-            life_stage_context = """
-**USER PROFILE: STUDENT (Education Phase)**
-**INTERPRETATION RULES (Desha Kala Patra):**
-* **5th House:** Primary signification is **EXAMS, GRADES, INTELLIGENCE**. (Secondary: Romance).
-* **4th House:** Signifies **SCHOOLING/COLLEGE STUDY**.
-* **9th House:** Signifies **HIGHER EDUCATION/ADMISSION/COLLEGE**.
-* **11th House:** Signifies **EXAM RESULTS/ADMISSION SUCCESS**. (Not Salary).
-* **6th House:** Signifies **COMPETITIVE EXAMS** (Not Divorce/Job).
-* **10th House:** Signifies **ACADEMIC RANK/ACHIEVEMENT**.
-"""
-        elif age > 60:
-            life_stage_context = """
-**USER PROFILE: SENIOR (Retirement/Moksha Phase)**
-**INTERPRETATION RULES (Desha Kala Patra):**
-* **5th House:** Signifies **GRANDCHILDREN/MANTRA/DEVOTION**.
-* **6th House:** Signifies **HEALTH ISSUES/DISEASE**.
-* **1st House:** Signifies **VITALITY/LONGEVITY**.
-* **12th House:** Signifies **HOSPITALS/SPIRITUAL RETREAT**.
-"""
-        else:
-            life_stage_context = """
-**USER PROFILE: CAREER/ADULT (Artha/Kama Phase)**
-**INTERPRETATION RULES (Desha Kala Patra):**
-* **5th House:** Signifies **CHILDREN/SPECULATION**.
-* **10th House:** Signifies **CAREER/PROMOTION**.
-* **11th House:** Signifies **WEALTH/SALARY/GAINS**.
-* **7th House:** Signifies **MARRIAGE/BUSINESS PARTNERS**.
-"""
+        life_stage_context = self._extract_life_stage_context(age)
 
         test_month_raw = (os.getenv("EVENT_TIMELINE_TEST_MONTH") or "").strip()
         test_month_suffix = ""
@@ -946,6 +1654,39 @@ Each item in possible_manifestations MUST be an object with TWO fields:
 {test_month_suffix}
 """
 
+    def _create_quarter_prompt(self, year: int, age: int, quarter_idx: int, month_ids: List[int]) -> str:
+        life_stage_context = self._extract_life_stage_context(age)
+        return f"""
+You are an expert Vedic Astrologer predicting life events for Quarter {quarter_idx} of {year}.
+
+IMPORTANT:
+- Full astrological context is already provided via cached content.
+- Do not ask for or expect missing context.
+
+{life_stage_context}
+
+Return ONLY valid JSON with top-level keys: `macro_trends` and `monthly_predictions`.
+
+Output constraints:
+1. `monthly_predictions` MUST contain exactly 3 month objects.
+2. Allowed `month_id` values are exactly: {month_ids[0]}, {month_ids[1]}, {month_ids[2]}.
+3. Do not emit any other month_id.
+4. Each month must include `focus_areas` and `events`.
+5. For EACH month, `events` must contain at least 6 event objects.
+6. For EVERY event, `prediction` is MANDATORY and must be plain-language user-facing text.
+7. Put technical astrology reasoning in `activation_reasoning` and/or `trigger_logic`, NOT inside `prediction`.
+8. NEVER include bracketed debug tags like `[BHAVA-DISAMBIG: ...]` inside `prediction` or scenario text.
+9. Each event must include: `type`, `prediction`, `possible_manifestations`, `start_date`, `end_date`, `intensity`.
+10. Use strict Vedic aspect logic; do not invent aspects.
+
+Plain-language style for `prediction`:
+- 1-3 short sentences.
+- Describe what may happen in real life this month.
+- Avoid jargon like house numbers, karaka/varga labels, and disambiguation tags.
+
+{BHAVA_MANIFESTATION_DISAMBIGUATION_BLOCK}
+"""
+
     def _get_nakshatra_lord(self, longitude: float) -> str:
         """Helper to get Nakshatra Lord from longitude"""
         lords = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury']
@@ -955,48 +1696,51 @@ Each item in possible_manifestations MUST be an object with TWO fields:
     def _format_chart(self, chart):
         return ", ".join([f"{p}:{d['sign_name']}" for p, d in chart['planets'].items() if p in ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn']])
 
-    async def _get_ai_prediction_async(self, prompt: str) -> Dict[str, Any]:
-        """Gemini API or local Ollama (e.g. Gemma on server); see EVENT_TIMELINE_USE_LOCAL_LLM."""
-
-        def run_sync_local_ollama():
-            print("\n" + "="*100)
-            print("🚀 STARTING LOCAL LLM (OLLAMA) FOR EVENT TIMELINE")
-            print("="*100)
-            print(f"Prompt length: {len(prompt)} characters (format=json)")
-            text = generate_event_timeline_json(prompt)
-            print(f"✅ Ollama completed, response length: {len(text)} characters")
-            return text
+    async def _get_ai_prediction_async(
+        self,
+        prompt: str,
+        model_override: Any = None,
+        llm_log_tag: str = "event_timeline_generation",
+    ) -> Dict[str, Any]:
+        """Gemini API call for event timeline generation."""
+        llm_start = time.time()
+        debug_logging = is_debug_logging_enabled()
+        token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}
+        selected_model = model_override or self.model
+        model_name = getattr(selected_model, "model_name", None)
 
         def run_sync_gemini():
             print("\n" + "="*100)
             print("🚀 STARTING GEMINI API CALL")
             print("="*100)
 
-            if not self.model:
+            if not selected_model:
                 print("❌ ERROR: No Gemini model initialized (API Key missing)")
                 raise Exception("No API Key")
 
-            print(f"✅ Model initialized: {self.model}")
+            print(f"✅ Model initialized: {selected_model}")
 
             safety = [{"category": c, "threshold": "BLOCK_NONE"} for c in
                      ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
                       "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]]
 
-            print(f"\n📤 FULL REQUEST TO GEMINI:")
-            print("="*100)
-            print("PROMPT START")
-            print("="*100)
-            print(prompt)
-            print("="*100)
-            print("PROMPT END")
-            print("="*100)
             print(f"Prompt length: {len(prompt)} characters")
             print(f"Safety settings: {len(safety)} categories")
             print(f"Response format: application/json")
             print("="*100)
 
+            if debug_logging:
+                print("\n📤 FULL REQUEST TO GEMINI (debug_logging_enabled=true):")
+                print("="*100)
+                print("PROMPT START")
+                print("="*100)
+                print(prompt)
+                print("="*100)
+                print("PROMPT END")
+                print("="*100)
+
             print("\n⏳ Calling Gemini API...")
-            resp = self.model.generate_content(
+            resp = selected_model.generate_content(
                 prompt,
                 generation_config={"response_mime_type": "application/json"},
                 safety_settings=safety
@@ -1004,27 +1748,38 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             print("✅ Gemini API call completed")
 
             response_text = resp.text
+            usage_meta = getattr(resp, "usage_metadata", None)
+            usage = {
+                "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
+                "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
+                "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
+                "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
+            }
 
-            print("\n📥 FULL RESPONSE FROM GEMINI:")
-            print("="*100)
-            print("RESPONSE START")
-            print("="*100)
-            print(response_text)
-            print("="*100)
-            print("RESPONSE END")
-            print("="*100)
             print(f"Response length: {len(response_text)} characters")
+            print(
+                "Gemini usage: "
+                f"input_tokens={usage['input_tokens']} "
+                f"output_tokens={usage['output_tokens']} "
+                f"cached_tokens={usage['cached_tokens']} "
+                f"total_tokens={usage['total_tokens']}"
+            )
             print("="*100)
+            if debug_logging:
+                print("\n📥 FULL RESPONSE FROM GEMINI (debug_logging_enabled=true):")
+                print("="*100)
+                print("RESPONSE START")
+                print("="*100)
+                print(response_text)
+                print("="*100)
+                print("RESPONSE END")
+                print("="*100)
 
-            return response_text
+            return response_text, usage
 
         try:
-            if self._use_local_llm:
-                print("\n🔄 Starting async local Ollama call...")
-                resp_text = await asyncio.to_thread(run_sync_local_ollama)
-            else:
-                print("\n🔄 Starting async Gemini call...")
-                resp_text = await asyncio.to_thread(run_sync_gemini)
+            print("\n🔄 Starting async Gemini call...")
+            resp_text, token_usage = await asyncio.to_thread(run_sync_gemini)
             
             print("\n🔄 Parsing JSON response...")
             # Gemini sometimes returns valid JSON plus trailing text.
@@ -1089,6 +1844,10 @@ Each item in possible_manifestations MUST be an object with TWO fields:
                     print("\n⚠️ monthly_predictions is not a list; treating as failed parse.")
                     parsed_response["monthly_predictions"] = []
                     parsed_response["_timeline_invalid"] = True
+                elif len(parsed_response.get("monthly_predictions") or []) == 0:
+                    print("\n⚠️ monthly_predictions is empty; treating as failed parse.")
+                    parsed_response["_timeline_invalid"] = True
+                    parsed_response["error"] = "Timeline model returned zero monthly predictions."
 
             print(f"   - Keys in response: {list(parsed_response.keys())}")
 
@@ -1100,20 +1859,89 @@ Each item in possible_manifestations MUST be an object with TWO fields:
                         f"   - monthly_predictions count: {len(parsed_response['monthly_predictions'])}"
                     )
 
-            label = "OLLAMA" if self._use_local_llm else "GEMINI"
-            print(f"\n✅ TIMELINE LLM OK ({label}) - Returning parsed response")
+            llm_ok = not bool(parsed_response.get("_timeline_invalid"))
+            if debug_logging:
+                log_llm_roundtrip(
+                    tag=llm_log_tag,
+                    provider="gemini",
+                    model=model_name,
+                    prompt=prompt,
+                    response_text=resp_text,
+                    success=llm_ok,
+                    error=parsed_response.get("error") if not llm_ok else None,
+                    usage=token_usage,
+                    elapsed_s=time.time() - llm_start,
+                )
+            reported_input_tokens = int(token_usage.get("input_tokens") or 0)
+            reported_output_tokens = int(token_usage.get("output_tokens") or 0)
+            reported_cached_tokens = int(token_usage.get("cached_tokens") or 0)
+            reported_non_cached_input_tokens = max(
+                reported_input_tokens - reported_cached_tokens,
+                0,
+            )
+            reported_total_tokens = int(token_usage.get("total_tokens") or 0)
+            print(
+                "\n📊 TIMELINE TOKEN USAGE (model-reported): "
+                f"input_tokens={reported_input_tokens} "
+                f"output_tokens={reported_output_tokens} "
+                f"cached_input_tokens={reported_cached_tokens} "
+                f"non_cached_input_tokens={reported_non_cached_input_tokens} "
+                f"total_tokens={reported_total_tokens}"
+            )
+            parsed_response["_llm_usage"] = {
+                "input_tokens": reported_input_tokens,
+                "output_tokens": reported_output_tokens,
+                "cached_tokens": reported_cached_tokens,
+                "non_cached_input_tokens": reported_non_cached_input_tokens,
+                "total_tokens": reported_total_tokens,
+            }
+            print("\n✅ TIMELINE LLM call completed - Returning parsed response")
             return parsed_response
 
         except json.JSONDecodeError as je:
+            if debug_logging:
+                log_llm_roundtrip(
+                    tag=llm_log_tag,
+                    provider="gemini",
+                    model=model_name,
+                    prompt=prompt,
+                    response_text=resp_text if "resp_text" in locals() else None,
+                    success=False,
+                    error=f"json_decode_error: {je}",
+                    usage=token_usage,
+                    elapsed_s=time.time() - llm_start,
+                )
             print(f"\n❌ JSON DECODE ERROR:")
             print(f"   - Error: {str(je)}")
             print(f"   - Response text: {resp_text[:500]}...")
-            return {"macro_trends": [], "monthly_predictions": []}
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Timeline JSON parse error: {je}",
+            }
         except Exception as e:
+            if debug_logging:
+                log_llm_roundtrip(
+                    tag=llm_log_tag,
+                    provider="gemini",
+                    model=model_name,
+                    prompt=prompt,
+                    response_text=resp_text if "resp_text" in locals() else None,
+                    success=False,
+                    error=str(e),
+                    usage=token_usage,
+                    elapsed_s=time.time() - llm_start,
+                )
             print(f"\n❌ TIMELINE LLM ERROR:")
             print(f"   - Error type: {type(e).__name__}")
             print(f"   - Error message: {str(e)}")
             import traceback
             print(f"   - Traceback:")
             traceback.print_exc()
-            return {"macro_trends": [], "monthly_predictions": []}
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Timeline LLM request failed: {type(e).__name__}: {e}",
+            }

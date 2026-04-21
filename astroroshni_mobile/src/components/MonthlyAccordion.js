@@ -10,13 +10,46 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const stripBhavaTags = (text) => String(text || '')
+  .replace(/\[BHAVA-DISAMBIG:[^\]]*\]/g, '')
+  .replace(/\s{2,}/g, ' ')
+  .trim();
+
+const getPrimaryScenario = (event) => {
+  const list = event?.possible_manifestations;
+  if (!Array.isArray(list) || list.length === 0) return '';
+  const first = list[0];
+  return typeof first === 'string' ? first : (first?.scenario || '');
+};
+
+const getDisplayPrediction = (event) => {
+  const raw = stripBhavaTags(event?.prediction || '');
+  const scenario = stripBhavaTags(getPrimaryScenario(event));
+  const hasTechnicalNoise = /\b(BHAVA|Karaka|Varga|Threads=|Afflicter|Lord)\b/i.test(raw);
+  if (!raw || hasTechnicalNoise) {
+    if (scenario) return scenario;
+    return '';
+  }
+  return raw;
+};
+
+const getDisplayReason = (event) => {
+  const activation = String(event?.activation_reasoning || '').trim();
+  const trigger = String(event?.trigger_logic || '').trim();
+  return activation || trigger || '';
+};
+
 export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, defaultExpanded = false, hideDiveDeep = false }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
+  const [openReasons, setOpenReasons] = useState({});
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
 
   const toggleExpand = () => {
     setExpanded(!expanded);
+  };
+  const toggleReason = (idx) => {
+    setOpenReasons((prev) => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   // Safety checks
@@ -77,7 +110,31 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
                 <View style={[styles.intensityDot, { backgroundColor: getIntensityColor(event.intensity) }]} />
                 <View style={{flex: 1}}>
                   <Text style={[styles.eventType, { color: colors.text }]}>{event.type}</Text>
-                  <Text style={[styles.eventDesc, { color: colors.textSecondary }]}>{event.prediction}</Text>
+                  <Text style={[styles.eventDesc, { color: colors.textSecondary }]}>{getDisplayPrediction(event)}</Text>
+                  {getDisplayReason(event) ? (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => toggleReason(index)}
+                        style={[styles.whyToggle, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.whyToggleText, { color: colors.accent }]}>
+                          {openReasons[index] ? 'Hide Why' : 'Show Why'}
+                        </Text>
+                        <Ionicons
+                          name={openReasons[index] ? 'chevron-up' : 'chevron-down'}
+                          size={14}
+                          color={colors.accent}
+                        />
+                      </TouchableOpacity>
+                      {openReasons[index] ? (
+                        <View style={styles.reasonBlock}>
+                          <Text style={[styles.reasonTitle, { color: colors.accent }]}>Why:</Text>
+                          <Text style={[styles.reasonBody, { color: colors.textTertiary }]}>{getDisplayReason(event)}</Text>
+                        </View>
+                      ) : null}
+                    </>
+                  ) : null}
                   {event.possible_manifestations && event.possible_manifestations.length > 0 && (
                     <View style={styles.manifestationsContainer}>
                       <View style={styles.manifestationsHeader}>
@@ -117,11 +174,6 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
                       📅 {event.start_date} to {event.end_date}
                     </Text>
                   )}
-                  {event.trigger_logic && (
-                    <Text style={[styles.triggerLogic, { color: colors.textTertiary }]}>
-                      🎯 {event.trigger_logic}
-                    </Text>
-                  )}
                 </View>
               </View>
             ))}
@@ -150,7 +202,8 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
 }
 
 const getIntensityColor = (intensity) => {
-  switch(intensity?.toLowerCase()) {
+  const normalized = String(intensity ?? '').toLowerCase();
+  switch(normalized) {
     case 'high': return '#FF4444';
     case 'medium': return '#FFAA00';
     default: return '#4CAF50';
@@ -202,6 +255,28 @@ const styles = StyleSheet.create({
   intensityDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   eventType: { fontSize: 14, fontWeight: '700', marginBottom: 4, letterSpacing: 0.3 },
   eventDesc: { fontSize: 14, lineHeight: 20, marginBottom: 4 },
+  whyToggle: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  whyToggleText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+  reasonBlock: {
+    marginTop: 4,
+    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(255, 255, 255, 0.18)'
+  },
+  reasonTitle: { fontSize: 11, fontWeight: '700', marginBottom: 2, letterSpacing: 0.4 },
+  reasonBody: { fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
   manifestationsContainer: { marginTop: 12, marginBottom: 8 },
   manifestationsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   manifestationsLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
@@ -232,7 +307,6 @@ const styles = StyleSheet.create({
   reasoningLabel: { fontSize: 11, fontWeight: '700', marginBottom: 4, letterSpacing: 0.5 },
   reasoningText: { fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
   eventDates: { fontSize: 12, fontWeight: '600', marginTop: 6 },
-  triggerLogic: { fontSize: 11, fontStyle: 'italic', marginTop: 4, lineHeight: 16 },
   
   diveDeepButton: { marginTop: 0, marginBottom: 10 },
   chatButton: {

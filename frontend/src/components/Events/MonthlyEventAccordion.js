@@ -16,11 +16,43 @@ function intensityClass(intensity) {
   return 'is-mid';
 }
 
+function stripBhavaTags(text) {
+  return String(text || '')
+    .replace(/\[BHAVA-DISAMBIG:[^\]]*\]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function getPrimaryScenario(event) {
+  const list = event?.possible_manifestations;
+  if (!Array.isArray(list) || list.length === 0) return '';
+  const first = list[0];
+  return typeof first === 'string' ? first : first?.scenario || '';
+}
+
+function getDisplayPrediction(event) {
+  const raw = stripBhavaTags(event?.prediction || '');
+  const scenario = stripBhavaTags(getPrimaryScenario(event));
+  const hasTechnicalNoise = /\b(BHAVA|Karaka|Varga|Threads=|Afflicter|Lord)\b/i.test(raw);
+  if (!raw || hasTechnicalNoise) {
+    if (scenario) return scenario;
+    return '';
+  }
+  return raw;
+}
+
+function getDisplayReason(event) {
+  const activation = String(event?.activation_reasoning || '').trim();
+  const trigger = String(event?.trigger_logic || '').trim();
+  return activation || trigger || '';
+}
+
 /**
  * Single month block — mirrors mobile MonthlyAccordion structure.
  */
 export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
   const [expanded, setExpanded] = useState(false);
+  const [openReasons, setOpenReasons] = useState({});
   const navigate = useNavigate();
 
   if (!data) return null;
@@ -33,7 +65,7 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
     let text = `${monthTitle} ${yearLabel} — predictions:\n\n`;
     if (events.length) {
       events.forEach((event, idx) => {
-        text += `${idx + 1}. ${event.type}\n${event.prediction || ''}\n`;
+        text += `${idx + 1}. ${event.type}\n${getDisplayPrediction(event)}\n`;
         if (event.start_date && event.end_date) text += `Period: ${event.start_date} → ${event.end_date}\n`;
         text += '\n';
       });
@@ -42,6 +74,9 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
     navigate('/chat', {
       state: { openSingleChartChat: true, followUpQuestion: text.trim() }
     });
+  };
+  const toggleReason = (idx) => {
+    setOpenReasons((prev) => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   return (
@@ -89,7 +124,23 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
                 <span className={`monthly-event-accordion__dot ${intensityClass(event.intensity)}`} />
                 <div className="monthly-event-accordion__event-main">
                   <h4 className="monthly-event-accordion__event-type">{event.type}</h4>
-                  <p className="monthly-event-accordion__event-pred">{event.prediction}</p>
+                  <p className="monthly-event-accordion__event-pred">{getDisplayPrediction(event)}</p>
+                  {getDisplayReason(event) && (
+                    <>
+                      <button
+                        type="button"
+                        className="monthly-event-accordion__why-toggle"
+                        onClick={() => toggleReason(index)}
+                      >
+                        {openReasons[index] ? 'Hide Why' : 'Show Why'} {openReasons[index] ? '▴' : '▾'}
+                      </button>
+                      {openReasons[index] && (
+                        <p className="monthly-event-accordion__reasoning">
+                          <strong>Why:</strong> {getDisplayReason(event)}
+                        </p>
+                      )}
+                    </>
+                  )}
                   {event.possible_manifestations?.length > 0 && (
                     <div className="monthly-event-accordion__manifest">
                       <div className="monthly-event-accordion__manifest-title">

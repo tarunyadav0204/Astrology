@@ -49,6 +49,12 @@ def _ensure_chat_messages_parallel_llm_usage(conn):
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parallel_llm_usage TEXT")
 
 
+def _ensure_chat_messages_cache_token_cols(conn):
+    """Token split columns for cache-aware billing visibility."""
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_cached_input_tokens INTEGER")
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_non_cached_input_tokens INTEGER")
+
+
 def init_chat_tables():
     """Initialize chat history tables with polling support"""
     with get_conn() as conn:
@@ -100,6 +106,7 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent_router_ms REAL")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_input_tokens INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_output_tokens INTEGER")
+        _ensure_chat_messages_cache_token_cols(conn)
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_prompt_chars INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_response_chars INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
@@ -385,8 +392,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
     if partnership_mode:
-        base_cost = credit_service.get_credit_setting('chat_question_cost')
-        chat_cost = base_cost * 2  # Partnership mode costs double
+        chat_cost = credit_service.get_credit_setting('partnership_analysis_cost')
     elif premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
     else:
@@ -395,7 +401,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     is_standard_chat = not partnership_mode and not premium_analysis
     free_available = credit_service.is_free_standard_chat_question_available(current_user.userid)
     using_free_question = is_standard_chat and free_available
-    chat_key = 'premium_chat_cost' if premium_analysis else ('chat_question_cost' if not partnership_mode else None)
+    chat_key = (
+        'partnership_analysis_cost'
+        if partnership_mode
+        else ('premium_chat_cost' if premium_analysis else 'chat_question_cost')
+    )
     effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
 
     print(f"💳 CREDIT CHECK (chat-v2):")
@@ -1491,6 +1501,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Update database with result
         with get_conn() as conn:
             _ensure_chat_messages_parallel_llm_usage(conn)
+            _ensure_chat_messages_cache_token_cols(conn)
             if result.get('success'):
                 # Use already parsed terms and glossary from GeminiChatAnalyzer
                 terms = result.get('terms', [])
@@ -1576,6 +1587,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 follow_up_questions = %s, status = %s, message_type = %s,
                                 completed_at = %s, language = %s, intent_router_ms = %s,
                                 llm_input_tokens = %s, llm_output_tokens = %s,
+                                llm_cached_input_tokens = %s, llm_non_cached_input_tokens = %s,
                                 llm_prompt_chars = %s, llm_response_chars = %s,
                                 parallel_llm_usage = %s
                             WHERE message_id = %s
@@ -1593,6 +1605,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             intent_router_ms,
                             int((result.get("token_usage") or {}).get("input_tokens") or 0) or None,
                             int((result.get("token_usage") or {}).get("output_tokens") or 0) or None,
+                            int((result.get("token_usage") or {}).get("cached_tokens") or 0) or None,
+                            int((result.get("token_usage") or {}).get("non_cached_input_tokens") or 0) or None,
                             int(result["llm_prompt_chars"]) if result.get("llm_prompt_chars") is not None else None,
                             int(result["llm_response_chars"]) if result.get("llm_response_chars") is not None else None,
                             parallel_usage_json,
