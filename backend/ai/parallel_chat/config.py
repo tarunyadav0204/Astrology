@@ -1,5 +1,6 @@
 """
 Feature flag for multi-branch parallel chat (opt-in; legacy path unchanged when off).
+Safe deploy note: this file may be edited with comment-only changes to trigger backend rollout checks.
 
 Where to set `ASTRO_PARALLEL_CHAT` (and related logging env vars):
 - **Recommended:** `backend/.env` or repo-root `.env` (same files `load_dotenv` already reads for the API).
