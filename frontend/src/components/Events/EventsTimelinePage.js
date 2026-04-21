@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import NativeSelector from '../Shared/NativeSelector';
+import CreditsModal from '../Credits/CreditsModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
@@ -80,6 +81,7 @@ export default function EventsTimelinePage({
 
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
+  const [showCreditsPurchaseModal, setShowCreditsPurchaseModal] = useState(false);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -335,8 +337,8 @@ export default function EventsTimelinePage({
       if (err?.response?.status === 401) {
         toast.error('Session expired. Please sign in again.');
       } else if (err?.response?.status === 402) {
-        toast.error('Insufficient credits for this analysis.');
-        navigate('/credits');
+        toast.error('Insufficient credits for this analysis. Add credits to continue.');
+        setShowCreditsPurchaseModal(true);
       } else if (err?.response?.status === 404) {
         toast.error('Birth chart not found. Re-select your chart from the dashboard.');
       } else {
@@ -395,7 +397,7 @@ export default function EventsTimelinePage({
       const bal = await fetchFreshCredits();
       if (bal < eventsCost) {
         toast.error(`You need ${eventsCost} credits. You have ${bal}.`);
-        navigate('/credits');
+        setShowCreditsPurchaseModal(true);
         return;
       }
       setPendingAction('generate');
@@ -423,7 +425,7 @@ export default function EventsTimelinePage({
     const bal = await fetchFreshCredits();
     if (bal < eventsCost) {
       toast.error(`You need ${eventsCost} credits to regenerate. You have ${bal}.`);
-      navigate('/credits');
+      setShowCreditsPurchaseModal(true);
       return;
     }
     setPendingAction('regenerate');
@@ -446,7 +448,7 @@ export default function EventsTimelinePage({
     }
   };
 
-  const openCredits = () => navigate('/credits');
+  const openCredits = () => setShowCreditsPurchaseModal(true);
 
   const yearLabel = String(selectedYear);
   const monthlyPredictions = timelineData?.monthly_predictions || [];
@@ -544,19 +546,6 @@ export default function EventsTimelinePage({
               <div className="events-timeline__native-row events-timeline__native-row--compact">
                 <NativeSelector birthData={birthData} onNativeChange={() => setShowBirthModal(true)} />
               </div>
-            )}
-
-            {timelineData?.dasha_facts && readingMode === 'monthly' && (
-              <details className="events-timeline__facts">
-                <summary>Dasha facts (reference)</summary>
-                <pre className="events-timeline__facts-pre">{JSON.stringify(timelineData.dasha_facts, null, 2)}</pre>
-              </details>
-            )}
-            {timelineData?.transit_facts && readingMode === 'monthly' && (
-              <details className="events-timeline__facts">
-                <summary>Transit facts (reference)</summary>
-                <pre className="events-timeline__facts-pre">{JSON.stringify(timelineData.transit_facts, null, 2)}</pre>
-              </details>
             )}
 
             {loading && (
@@ -862,6 +851,12 @@ export default function EventsTimelinePage({
         onSubmit={() => setShowBirthModal(false)}
         title="Birth details"
         description="Select a saved chart or enter details to save a profile."
+      />
+
+      <CreditsModal
+        isOpen={showCreditsPurchaseModal}
+        onClose={() => setShowCreditsPurchaseModal(false)}
+        onLogin={onLogin}
       />
     </div>
   );
