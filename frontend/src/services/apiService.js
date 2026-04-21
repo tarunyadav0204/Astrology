@@ -597,5 +597,12 @@ export const apiService = {
   getCachedEventTimeline: async (payload) => {
     const response = await apiClient.post(getEndpoint('/chat/monthly-events/cached'), payload);
     return response.data;
+  },
+
+  getCachedEventTimelineYears: async (birthChartId) => {
+    const response = await apiClient.get(
+      `${getEndpoint('/chat/monthly-events/cached-years')}?birth_chart_id=${encodeURIComponent(String(birthChartId))}`
+    );
+    return response.data;
   }
 };

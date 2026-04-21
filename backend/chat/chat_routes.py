@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict
@@ -1198,6 +1198,43 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
         import traceback
         traceback.print_exc()
         return {"cached": False}
+
+
+@router.get("/monthly-events/cached-years")
+async def get_cached_timeline_years(
+    birth_chart_id: int = Query(..., description="Birth chart id for current native"),
+    current_user: User = Depends(get_current_user),
+):
+    """Return years that already have completed cached yearly timelines for this user+birth chart."""
+    try:
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT id FROM birth_charts WHERE id = %s AND userid = %s",
+                (birth_chart_id, current_user.userid),
+            )
+            if not cur.fetchone():
+                return {"years": []}
+
+            cur = execute(
+                conn,
+                """
+                    SELECT DISTINCT selected_year
+                    FROM event_timeline_jobs
+                    WHERE user_id = %s
+                      AND birth_chart_id = %s
+                      AND status = 'completed'
+                      AND (selected_month IS NULL OR selected_month = 0)
+                      AND selected_year IS NOT NULL
+                    ORDER BY selected_year ASC
+                """,
+                (current_user.userid, birth_chart_id),
+            )
+            years = [int(r[0]) for r in (cur.fetchall() or []) if r and r[0] is not None]
+        return {"years": years}
+    except Exception as e:
+        print(f"❌ Error fetching cached timeline years: {e}")
+        return {"years": []}
 
 async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: int, user_id: int, cost: int, target_month: int = None):
     """Background task to process event timeline (yearly or monthly dive deep)."""

@@ -193,19 +193,18 @@
 
 .events-timeline__year-strip {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding-bottom: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 }
 
 .events-timeline__year-strip--compact {
-  max-height: none;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 8px;
+  scroll-snap-type: none;
 }
 
 .events-timeline__month-strip {
@@ -226,6 +225,7 @@
   color: #444;
   cursor: pointer;
   transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
+  scroll-snap-align: start;
 }
 
 .events-timeline__chip:hover {
@@ -238,6 +238,13 @@
   color: #fff;
   border-color: transparent;
   box-shadow: 0 4px 14px rgba(233, 30, 99, 0.35);
+}
+
+.events-timeline__chip.is-cached:not(.is-selected) {
+  background: #ecfdf3;
+  color: #166534;
+  border-color: rgba(22, 163, 74, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.18);
 }
 
 .events-timeline__chip--month {

@@ -13,8 +13,8 @@ import { generatePageSEO } from '../../config/seo.config';
 import MonthlyEventAccordion, { monthLabel } from './MonthlyEventAccordion';
 import './EventsTimelinePage.css';
 
-const START_YEAR = 1950;
-const END_YEAR = 2050;
+const START_YEAR_FALLBACK = 1950;
+const END_YEAR = 2100;
 
 const LOADING_MESSAGES = [
   { icon: '🌟', text: 'Analyzing planetary positions...' },
@@ -32,6 +32,29 @@ function resolveBirthChartId(birthData, chartData) {
   if (birthData?.id != null) return Number(birthData.id);
   if (birthData?.chart_id != null) return Number(birthData.chart_id);
   if (chartData?.id != null) return Number(chartData.id);
+  return null;
+}
+
+function extractBirthYear(data) {
+  if (!data || typeof data !== 'object') return null;
+  const candidates = [
+    data.date,
+    data.birth_date,
+    data.dob,
+    data.birthDate,
+    data.birth_date_iso,
+    data.birth_details?.date,
+    data.birthDetails?.date,
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const s = String(raw).trim();
+    let m = s.match(/^(\d{4})[-/.]/);
+    if (!m) m = s.match(/\b(19\d{2}|20\d{2})\b/);
+    if (!m) continue;
+    const y = Number(m[1]);
+    if (Number.isFinite(y) && y >= 1900 && y <= END_YEAR) return y;
+  }
   return null;
 }
 
@@ -84,6 +107,8 @@ export default function EventsTimelinePage({
   const [showCreditsPurchaseModal, setShowCreditsPurchaseModal] = useState(false);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [cachedYears, setCachedYears] = useState([]);
+  const [cachedMonths, setCachedMonths] = useState([]);
 
   const loadingIntervalRef = useRef(null);
   const progressIntervalRef = useRef(null);
@@ -91,6 +116,9 @@ export default function EventsTimelinePage({
   const pollTimeoutRef = useRef(null);
   const jobRunningRef = useRef(false);
   const timelineStreamAbortRef = useRef(null);
+  const yearlyStripRef = useRef(null);
+  const compactStripRef = useRef(null);
+  const autoScrolledYearRef = useRef(false);
 
   const seoData = useMemo(
     () => generatePageSEO('lifeEvents', { path: '/life-events' }),
@@ -106,10 +134,106 @@ export default function EventsTimelinePage({
       birthData?.longitude != null
   );
 
+  const startYear = useMemo(() => extractBirthYear(birthData) ?? START_YEAR_FALLBACK, [birthData]);
+
   const years = useMemo(
-    () => Array.from({ length: END_YEAR - START_YEAR + 1 }, (_, i) => START_YEAR + i),
-    []
+    () => Array.from({ length: Math.max(1, END_YEAR - startYear + 1) }, (_, i) => startYear + i),
+    [startYear]
   );
+  const cachedYearSet = useMemo(() => new Set((cachedYears || []).map((y) => Number(y))), [cachedYears]);
+  const cachedMonthSet = useMemo(() => new Set((cachedMonths || []).map((m) => Number(m))), [cachedMonths]);
+
+  useEffect(() => {
+    if (selectedYear < startYear) {
+      setSelectedYear(startYear);
+    }
+  }, [selectedYear, startYear]);
+
+  useEffect(() => {
+    if (autoScrolledYearRef.current) return;
+
+    const targetYear = years.includes(deviceYear) ? deviceYear : selectedYear;
+    if (!Number.isFinite(targetYear)) return;
+
+    const stripEl =
+      readingMode === 'yearly' ? yearlyStripRef.current : compactStripRef.current;
+    if (!stripEl) return;
+
+    const chipEl = stripEl.querySelector(`[data-year="${targetYear}"]`);
+    if (!chipEl) return;
+
+    chipEl.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+    autoScrolledYearRef.current = true;
+  }, [readingMode, years, deviceYear, selectedYear]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCachedYears = async () => {
+      if (!birthChartId) {
+        if (!cancelled) setCachedYears([]);
+        return;
+      }
+      try {
+        const res = await apiService.getCachedEventTimelineYears(birthChartId);
+        if (!cancelled) {
+          setCachedYears(Array.isArray(res?.years) ? res.years : []);
+        }
+      } catch {
+        if (!cancelled) setCachedYears([]);
+      }
+    };
+    loadCachedYears();
+    return () => {
+      cancelled = true;
+    };
+  }, [birthChartId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCachedMonths = async () => {
+      if (!birthData || !birthChartId || !selectedYear) {
+        if (!cancelled) setCachedMonths([]);
+        return;
+      }
+      try {
+        const dateStr = String(birthData.date).split('T')[0];
+        const timeStr = String(birthData.time).includes('T')
+          ? String(birthData.time).split('T')[1]?.slice(0, 5) || '12:00'
+          : String(birthData.time || '12:00').slice(0, 5);
+        const basePayload = {
+          name: birthData.name,
+          date: dateStr,
+          time: timeStr,
+          place: birthData.place || '',
+          latitude: parseFloat(birthData.latitude),
+          longitude: parseFloat(birthData.longitude),
+          timezone: birthData.timezone || 'UTC+0',
+          gender: birthData.gender || '',
+          birth_chart_id: birthChartId,
+          selectedYear,
+        };
+        const checks = await Promise.all(
+          Array.from({ length: 12 }, (_, i) => i + 1).map(async (m) => {
+            try {
+              const res = await apiService.getCachedEventTimeline({ ...basePayload, selectedMonth: m });
+              return res?.cached ? m : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        if (!cancelled) {
+          setCachedMonths(checks.filter((m) => Number.isFinite(m)));
+        }
+      } catch {
+        if (!cancelled) setCachedMonths([]);
+      }
+    };
+    loadCachedMonths();
+    return () => {
+      cancelled = true;
+    };
+  }, [birthData, birthChartId, selectedYear]);
 
   const buildPayload = useCallback(() => {
     if (!birthData || !birthChartId) return null;
@@ -703,13 +827,14 @@ export default function EventsTimelinePage({
               <>
                 <div className="events-timeline__strip-wrap">
                   <div className="events-timeline__strip-label">Year</div>
-                  <div className="events-timeline__year-strip" role="list">
+                  <div ref={yearlyStripRef} className="events-timeline__year-strip" role="list">
                     {years.map((y) => (
                       <button
                         key={y}
                         type="button"
                         role="listitem"
-                        className={`events-timeline__chip ${selectedYear === y ? 'is-selected' : ''}`}
+                        data-year={y}
+                        className={`events-timeline__chip ${selectedYear === y ? 'is-selected' : ''} ${cachedYearSet.has(Number(y)) ? 'is-cached' : ''}`}
                         onClick={() => handleYearChange(y)}
                       >
                         {y}
@@ -734,12 +859,17 @@ export default function EventsTimelinePage({
               <>
                 <div className="events-timeline__strip-wrap">
                   <div className="events-timeline__strip-label">Year</div>
-                  <div className="events-timeline__year-strip events-timeline__year-strip--compact" role="list">
-                    {[deviceYear - 1, deviceYear, deviceYear + 1].map((y) => (
+                  <div
+                    ref={compactStripRef}
+                    className="events-timeline__year-strip"
+                    role="list"
+                  >
+                    {years.map((y) => (
                       <button
                         key={y}
                         type="button"
-                        className={`events-timeline__chip ${selectedYear === y ? 'is-selected' : ''}`}
+                        data-year={y}
+                        className={`events-timeline__chip ${selectedYear === y ? 'is-selected' : ''} ${cachedYearSet.has(Number(y)) ? 'is-cached' : ''}`}
                         onClick={() => handleYearChange(y)}
                       >
                         {y}
@@ -755,6 +885,8 @@ export default function EventsTimelinePage({
                         key={m}
                         type="button"
                         className={`events-timeline__chip events-timeline__chip--month ${
+                          cachedMonthSet.has(Number(m)) ? 'is-cached' : ''
+                        } ${
                           selectedMonth === m ? 'is-selected' : ''
                         }`}
                         onClick={() => setSelectedMonth(m)}

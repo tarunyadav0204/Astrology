@@ -32,11 +32,45 @@ import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule }
 const { width } = Dimensions.get('window');
 
 // Layout constants for FlatList
-const START_YEAR = 1950;
+const START_YEAR_FALLBACK = 1950;
+const END_YEAR = 2100;
 const ITEM_WIDTH = 80;
 const ITEM_GAP = 12;
 const TOTAL_ITEM_SIZE = ITEM_WIDTH + ITEM_GAP;
 const SIDE_PADDING = (width - ITEM_WIDTH) / 2;
+
+const extractBirthYear = (data) => {
+  if (!data || typeof data !== 'object') return null;
+  const candidates = [
+    data.date,
+    data.birth_date,
+    data.dob,
+    data.birthDate,
+    data.birth_date_iso,
+    data.birth_details?.date,
+    data.birthDetails?.date,
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const s = String(raw).trim();
+    // Prefer leading YYYY forms: 1980-04-02 / 1980/04/02 / 1980.04.02
+    let m = s.match(/^(\d{4})[-/.]/);
+    if (!m) {
+      // Fallback: any 4-digit year in sensible range
+      m = s.match(/\b(19\d{2}|20\d{2})\b/);
+    }
+    if (!m) continue;
+    const y = Number(m[1]);
+    if (Number.isFinite(y) && y >= 1900 && y <= END_YEAR) return y;
+  }
+  return null;
+};
+
+const resolveBirthChartId = (data) => {
+  const raw = data?.id ?? data?.chart_id ?? data?.birth_chart_id ?? null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
 
 export default function EventScreen({ route }) {
   const navigation = useNavigation();
@@ -71,7 +105,10 @@ export default function EventScreen({ route }) {
   const [birthData, setBirthData] = useState(null);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [cachedYears, setCachedYears] = useState([]);
+  const [cachedMonths, setCachedMonths] = useState([]);
   const yearSliderRef = useRef(null);
+  const monthSliderRef = useRef(null);
   const loadingIntervalRef = useRef(null);
   /** Yearly timeline async job: must use refs so timeout/poll always clear (no stale React state). */
   const timelinePollRef = useRef(null);
@@ -138,6 +175,17 @@ export default function EventScreen({ route }) {
   useEffect(() => {
     const loadBirthData = async () => {
       const birthData = await getBirthDetails();
+      if (__DEV__) {
+        console.log('[EventScreen] birthData from storage:', {
+          keys: birthData ? Object.keys(birthData) : null,
+          id: birthData?.id,
+          name: birthData?.name,
+          date: birthData?.date,
+          birth_date: birthData?.birth_date,
+          dob: birthData?.dob,
+          birth_details_date: birthData?.birth_details?.date,
+        });
+      }
       if (!birthData?.name) {
         navigation.replace('BirthProfileIntro', { returnTo: 'EventScreen' });
         return;
@@ -551,7 +599,120 @@ export default function EventScreen({ route }) {
     setRefreshing(false);
   }, []);
 
-  const years = React.useMemo(() => Array.from({length: 101}, (_, i) => START_YEAR + i), []);
+  const startYear = React.useMemo(() => {
+    const parsed = extractBirthYear(birthData);
+    if (__DEV__) {
+      console.log('[EventScreen] startYear resolution:', {
+        parsed,
+        fallback: START_YEAR_FALLBACK,
+        date: birthData?.date,
+        birth_date: birthData?.birth_date,
+        dob: birthData?.dob,
+        birth_details_date: birthData?.birth_details?.date,
+      });
+    }
+    if (parsed != null) return parsed;
+    return START_YEAR_FALLBACK;
+  }, [birthData]);
+
+  const years = React.useMemo(
+    () => Array.from({ length: Math.max(1, END_YEAR - startYear + 1) }, (_, i) => startYear + i),
+    [startYear]
+  );
+  const cachedYearSet = React.useMemo(() => new Set((cachedYears || []).map((y) => Number(y))), [cachedYears]);
+  const cachedMonthSet = React.useMemo(() => new Set((cachedMonths || []).map((m) => Number(m))), [cachedMonths]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCachedYears = async () => {
+      const birthChartId = resolveBirthChartId(birthData);
+      if (!birthChartId) {
+        if (!cancelled) setCachedYears([]);
+        return;
+      }
+      try {
+        const res = await chatAPI.getCachedMonthlyEventYears(birthChartId);
+        const yearsFromApi = Array.isArray(res?.data?.years) ? res.data.years : [];
+        if (yearsFromApi.length > 0) {
+          if (!cancelled) setCachedYears(yearsFromApi);
+          return;
+        }
+      } catch {
+        // Fallback below will probe cache year-by-year in a bounded window.
+      }
+
+      // Fallback for environments where /cached-years is unavailable:
+      // probe a bounded window around current year using existing /cached endpoint.
+      const probeStart = Math.max(startYear, deviceYear - 15);
+      const probeEnd = Math.min(END_YEAR, deviceYear + 15);
+      const probeYears = Array.from({ length: Math.max(0, probeEnd - probeStart + 1) }, (_, i) => probeStart + i);
+
+      if (probeYears.length === 0) {
+        if (!cancelled) setCachedYears([]);
+        return;
+      }
+
+      const checks = await Promise.all(
+        probeYears.map(async (y) => {
+          try {
+            const r = await chatAPI.getCachedMonthlyEvents({
+              ...birthData,
+              selectedYear: y,
+              birth_chart_id: birthChartId,
+            });
+            return r?.data?.cached ? y : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      if (!cancelled) {
+        setCachedYears(checks.filter((y) => Number.isFinite(y)));
+      }
+    };
+    loadCachedYears();
+    return () => {
+      cancelled = true;
+    };
+  }, [birthData, startYear, deviceYear]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCachedMonths = async () => {
+      const birthChartId = resolveBirthChartId(birthData);
+      if (!birthChartId || !selectedYear) {
+        if (!cancelled) setCachedMonths([]);
+        return;
+      }
+      try {
+        const checks = await Promise.all(
+          Array.from({ length: 12 }, (_, i) => i + 1).map(async (m) => {
+            try {
+              const res = await chatAPI.getCachedMonthlyEvents({
+                ...birthData,
+                selectedYear,
+                selectedMonth: m,
+                birth_chart_id: birthChartId,
+              });
+              return res?.data?.cached ? m : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        if (!cancelled) {
+          setCachedMonths(checks.filter((m) => Number.isFinite(m)));
+        }
+      } catch {
+        if (!cancelled) setCachedMonths([]);
+      }
+    };
+    loadCachedMonths();
+    return () => {
+      cancelled = true;
+    };
+  }, [birthData, selectedYear]);
 
   const scrollYearStripToIndex = useCallback((index, animated) => {
     const ref = yearSliderRef.current;
@@ -565,22 +726,47 @@ export default function EventScreen({ route }) {
     ref.scrollTo({ x, animated });
   }, [years.length]);
 
+  const scrollMonthStripToIndex = useCallback((index, animated) => {
+    const ref = monthSliderRef.current;
+    if (!ref) return;
+    const padding = SIDE_PADDING;
+    const itemOffset = padding + index * TOTAL_ITEM_SIZE;
+    const desired = itemOffset - (width - ITEM_WIDTH) / 2;
+    const contentW = padding * 2 + deviceMonths.length * TOTAL_ITEM_SIZE;
+    const maxScroll = Math.max(0, contentW - width);
+    const x = Math.max(0, Math.min(maxScroll, desired));
+    ref.scrollTo({ x, animated });
+  }, [deviceMonths.length]);
+
   useEffect(() => {
-    if (analysisStarted || readingMode !== 'yearly') return;
-    const index = selectedYear - START_YEAR;
+    if (analysisStarted) return;
+    const index = selectedYear - startYear;
     const t = setTimeout(() => scrollYearStripToIndex(index, false), 100);
     return () => clearTimeout(t);
-  }, [analysisStarted, readingMode, selectedYear, scrollYearStripToIndex]);
+  }, [analysisStarted, readingMode, selectedYear, scrollYearStripToIndex, startYear]);
+
+  useEffect(() => {
+    if (analysisStarted || readingMode !== 'monthly') return;
+    const index = Math.max(0, Math.min(deviceMonths.length - 1, selectedMonth - 1));
+    const t = setTimeout(() => scrollMonthStripToIndex(index, false), 100);
+    return () => clearTimeout(t);
+  }, [analysisStarted, readingMode, selectedMonth, deviceMonths.length, scrollMonthStripToIndex]);
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
     setMonthlyData(null); // Clear data when year changes
-    const index = year - START_YEAR;
+    const index = year - startYear;
     scrollYearStripToIndex(index, true);
   };
 
+  const handleMonthChange = (month) => {
+    setSelectedMonth(month);
+    const index = Math.max(0, Math.min(deviceMonths.length - 1, month - 1));
+    scrollMonthStripToIndex(index, true);
+  };
+
   const handleMonthlyContinue = () => {
-    navigation.navigate('MonthlyDeepScreen', { year: deviceYear, month: selectedMonth });
+    navigation.navigate('MonthlyDeepScreen', { year: selectedYear, month: selectedMonth });
   };
 
   const navigateToChat = (context, type) => {
@@ -779,7 +965,7 @@ export default function EventScreen({ route }) {
         </View>
       </Modal>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: colors.cardBorder }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => analysisStarted ? setAnalysisStarted(false) : navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.surface }]}>
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
@@ -878,6 +1064,10 @@ export default function EventScreen({ route }) {
                         style={[
                           styles.yearChip,
                           { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                          cachedYearSet.has(Number(item)) && {
+                            backgroundColor: '#22c55e',
+                            borderColor: '#16a34a',
+                          },
                           selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
                           { width: ITEM_WIDTH }
                         ]}
@@ -885,7 +1075,7 @@ export default function EventScreen({ route }) {
                       >
                         <Text style={[
                           styles.yearChipText,
-                          { color: colors.textSecondary },
+                          { color: cachedYearSet.has(Number(item)) ? '#f0fdf4' : colors.textSecondary },
                           selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
                         ]}>
                           {item}
@@ -911,14 +1101,57 @@ export default function EventScreen({ route }) {
                   <Text style={[styles.quickSelectText, { color: colors.primary }]}>{t('eventScreen.nextYear', 'Next Year')}</Text>
                 </TouchableOpacity>
               </View>
+              <Text style={[styles.cachedYearsHint, { color: colors.textSecondary }]}>
+                {'🟢 Green years/months are already cached. You do not need to pay credits again - just select and view.'}
+              </Text>
             </>
           ) : (
             <>
               <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginTop: 8, marginBottom: 12 }]}>
-                {t('eventScreen.pickMonth', `Pick a month in ${deviceYear}`)}
+                {t('eventScreen.pickMonth', `Pick a month in ${selectedYear}`)}
+              </Text>
+              <View style={styles.yearChipsContainer}>
+                <GHScrollView
+                  ref={yearSliderRef}
+                  horizontal
+                  nestedScrollEnabled
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
+                  contentContainerStyle={styles.yearChipsContent}
+                >
+                  {years.map((item) => (
+                    <View key={item} style={{ width: TOTAL_ITEM_SIZE }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.yearChip,
+                          { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                          cachedYearSet.has(Number(item)) && {
+                            backgroundColor: '#22c55e',
+                            borderColor: '#16a34a',
+                          },
+                          selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
+                          { width: ITEM_WIDTH }
+                        ]}
+                        onPress={() => handleYearChange(item)}
+                      >
+                        <Text style={[
+                          styles.yearChipText,
+                          { color: cachedYearSet.has(Number(item)) ? '#f0fdf4' : colors.textSecondary },
+                          selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
+                        ]}>
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </GHScrollView>
+              </View>
+              <Text style={[styles.cachedYearsHint, { color: colors.textSecondary }]}>
+                {'🟢 Green years/months are already cached. You do not need to pay credits again - just select and view.'}
               </Text>
               <View style={styles.monthChipsContainer}>
                 <GHScrollView
+                  ref={monthSliderRef}
                   horizontal
                   nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
@@ -931,14 +1164,18 @@ export default function EventScreen({ route }) {
                         style={[
                           styles.monthChip,
                           { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                          cachedMonthSet.has(Number(item)) && {
+                            backgroundColor: '#22c55e',
+                            borderColor: '#16a34a',
+                          },
                           selectedMonth === item && { backgroundColor: colors.primary, borderColor: colors.primary },
                           { width: ITEM_WIDTH }
                         ]}
-                        onPress={() => setSelectedMonth(item)}
+                        onPress={() => handleMonthChange(item)}
                       >
                         <Text style={[
                           styles.monthChipText,
-                          { color: colors.textSecondary },
+                          { color: cachedMonthSet.has(Number(item)) ? '#f0fdf4' : colors.textSecondary },
                           selectedMonth === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
                         ]}>
                           {getMonthName(item)}
@@ -987,13 +1224,16 @@ export default function EventScreen({ route }) {
               style={styles.unlockButton}
               onPress={readingMode === 'yearly' ? handleContinue : handleMonthlyContinue}
             >
-              <LinearGradient colors={[colors.primary, '#ff8c5a']} style={styles.unlockGradient}>
-                <Text style={[styles.unlockButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+              <LinearGradient
+                colors={theme === 'dark' ? ['#4a3a7a', '#6a52a3'] : ['#f5efff', '#eadfff']}
+                style={styles.unlockGradient}
+              >
+                <Text style={[styles.unlockButtonText, { color: colors.primary }]}>
                   {readingMode === 'yearly'
                     ? t('eventScreen.continue', 'Continue')
                     : t('eventScreen.generateMonth', 'Generate my month reading')}
                 </Text>
-                <Ionicons name="arrow-forward" size={22} color={theme === 'dark' ? colors.background : '#1a1a1a'} />
+                <Ionicons name="arrow-forward" size={22} color={colors.primary} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1004,16 +1244,9 @@ export default function EventScreen({ route }) {
         contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {/* Native Name */}
-        {nativeName && (
-          <View style={styles.nameContainer}>
-            <Text style={[styles.nameText, { color: colors.primary }]}>{nativeName}</Text>
-          </View>
-        )}
-
         {/* Macro Trends (The "Vibe") */}
         {displayMacroTrends.length > 0 && (
-          <View style={[styles.macroCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+          <View style={styles.macroCard}>
             <View style={styles.macroHeader}>
               <Ionicons name="planet" size={18} color={colors.primary} />
               <Text style={[styles.macroTitle, { color: colors.primary }]}>The Vibe of {selectedYear}</Text>
@@ -1112,18 +1345,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#1a1a2e',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 215, 0, 0.1)',
+    paddingTop: 10,
+    paddingBottom: 14,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 4,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4
+    elevation: 0,
+    shadowOpacity: 0,
   },
   backButton: {
     padding: 8,
@@ -1139,7 +1369,7 @@ const styles = StyleSheet.create({
     fontWeight: '700', 
     color: '#FFD700', 
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 10,
     letterSpacing: 0.5
   },
   headerSpacer: { width: 32 },
@@ -1170,15 +1400,15 @@ const styles = StyleSheet.create({
   macroCard: {
     margin: 20,
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.2)',
-    backgroundColor: '#16162a',
-    elevation: 3,
-    shadowColor: '#FFD700',
+    borderColor: 'rgba(255, 184, 107, 0.38)',
+    backgroundColor: 'rgba(44, 30, 78, 0.72)',
+    elevation: 1,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8
+    shadowOpacity: 0.16,
+    shadowRadius: 6
   },
   macroHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
   macroTitle: { fontSize: 18, fontWeight: '700', color: '#FFD700', letterSpacing: 0.3 },
@@ -1322,6 +1552,13 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 18
   },
+  cachedYearsHint: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginBottom: 16,
+    textAlign: 'center',
+    opacity: 0.95,
+  },
   quickSelectButton: {
     flex: 1,
     paddingVertical: 10,
@@ -1375,11 +1612,13 @@ const styles = StyleSheet.create({
   unlockButton: {
     borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10
+    borderWidth: 0,
+    borderColor: 'transparent',
+    shadowColor: '#140f2b',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 4
   },
   unlockGradient: {
     paddingVertical: 14,
@@ -1391,17 +1630,6 @@ const styles = StyleSheet.create({
   unlockButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.5
-  },
-  nameContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12
-  },
-  nameText: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
     letterSpacing: 0.5
   },
   modalOverlay: {

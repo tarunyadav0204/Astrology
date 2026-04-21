@@ -224,6 +224,10 @@ export const chatAPI = {
   getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData),
   getMonthlyEventsStatus: (jobId) => api.get(getEndpoint(`/chat/monthly-events/status/${jobId}`)),
   getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), birthData),
+  getCachedMonthlyEventYears: (birthChartId) =>
+    api.get(getEndpoint('/chat/monthly-events/cached-years'), {
+      params: { birth_chart_id: Number(birthChartId) },
+    }),
   getYogas: (birthData) => api.post(getEndpoint('/chat/ask'), { ...birthData, question: 'yogas', include_context: true }),
   deductCredits: (amount) => api.post(getEndpoint('/credits/spend'), { 
     amount, 
