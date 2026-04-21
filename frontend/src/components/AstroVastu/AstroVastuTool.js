@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
+import CreditsModal from '../Credits/CreditsModal';
 import { useAstrology } from '../../context/AstrologyContext';
 import './AstroVastuTool.css';
 
@@ -215,6 +216,7 @@ export default function AstroVastuTool({ user, onLogout, onAdminClick, onLogin }
   const [door, setDoor] = useState('E');
   const [zoneTags, setZoneTags] = useState(() => emptyZoneState());
   const [showBirthModal, setShowBirthModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -394,7 +396,7 @@ export default function AstroVastuTool({ user, onLogout, onAdminClick, onLogin }
         onAdminClick={onAdminClick}
         onLogin={onLogin}
         showLoginButton={!user}
-        onCreditsClick={() => navigate('/credits')}
+        onCreditsClick={() => setShowCreditsModal(true)}
         birthData={birthData}
         onChangeNative={() => setShowBirthModal(true)}
         onHomeClick={() => navigate('/')}
@@ -716,6 +718,7 @@ export default function AstroVastuTool({ user, onLogout, onAdminClick, onLogin }
         title="Birth details for AstroVastu"
         description="Accurate date, time, and place give correct sidereal signs for direction mapping."
       />
+      <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );
 }

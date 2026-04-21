@@ -36,7 +36,6 @@ import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPag
 import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
-import CreditsPage from './components/Credits/CreditsPage';
 import PolicyPage from './components/Policy/PolicyPage';
 import DeleteAccountPage from './components/Policy/DeleteAccountPage';
 import ContactPage from './components/Contact/ContactPage';
@@ -729,7 +728,6 @@ function App() {
             />
           } />
           <Route path="/chat" element={<ChatPage />} />
-          <Route path="/credits" element={<CreditsPage />} />
           <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />

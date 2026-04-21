@@ -19,9 +19,9 @@ class InnerErrorBoundary extends React.Component {
     }
   }
   
-  handleReload() {
+  handleReload = () => {
     this.setState({ hasError: false, error: null });
-  }
+  };
 
   render() {
     const { hasError } = this.state;

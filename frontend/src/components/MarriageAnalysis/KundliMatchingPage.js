@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
+import CreditsModal from '../Credits/CreditsModal';
 import CompatibilityAnalysis from './CompatibilityAnalysis';
 import { useAstrology } from '../../context/AstrologyContext';
 import './KundliMatchingPage.css';
@@ -15,6 +16,7 @@ const KundliMatchingPage = ({
 }) => {
   const navigate = useNavigate();
   const { birthData } = useAstrology();
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
 
   const handleAdmin = () => {
     if (onAdminClick) onAdminClick();
@@ -36,7 +38,7 @@ const KundliMatchingPage = ({
         onLogout={onLogout}
         birthData={birthData}
         onChangeNative={() => navigate('/')}
-        onCreditsClick={() => navigate('/credits')}
+        onCreditsClick={() => setShowCreditsModal(true)}
         onLogin={onLogin}
         showLoginButton={showLoginButton}
       />
@@ -54,6 +56,7 @@ const KundliMatchingPage = ({
           <CompatibilityAnalysis user={user} onLogin={onLogin} />
         </div>
       </main>
+      <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );
 };

@@ -329,6 +329,24 @@ const AdminChatHistory = () => {
 
               <div className="messages-container">
                 {selectedSession.messages.map((message, index) => {
+                  const parallelStages = Array.isArray(message.parallel_llm_usage?.stages)
+                    ? message.parallel_llm_usage.stages
+                    : [];
+                  const hasParallelStages = parallelStages.length > 0;
+                  const aggregatePromptChars = hasParallelStages
+                    ? sumParallelStageField(parallelStages, 'input_chars')
+                    : null;
+                  const aggregateReplyChars = hasParallelStages
+                    ? sumParallelStageField(parallelStages, 'output_chars')
+                    : null;
+                  const promptCharsForBadge =
+                    aggregatePromptChars != null && aggregatePromptChars > 0
+                      ? aggregatePromptChars
+                      : Number(message.llm_prompt_chars) || 0;
+                  const replyCharsForBadge =
+                    aggregateReplyChars != null && aggregateReplyChars > 0
+                      ? aggregateReplyChars
+                      : Number(message.llm_response_chars) || 0;
                   const role =
                     message.sender === 'user'
                       ? 'user'
@@ -369,32 +387,32 @@ const AdminChatHistory = () => {
                           {message.native_name}
                         </span>
                       )}
-                      {Number.isFinite(message.llm_prompt_chars) && message.llm_prompt_chars > 0 && (
+                      {Number.isFinite(promptCharsForBadge) && promptCharsForBadge > 0 && (
                         <span
                           className="message-char-badge message-char-badge--prompt"
                           title={
-                            message.parallel_llm_usage?.stages?.length
-                              ? 'Total prompt characters for the parallel pipeline: sum of each LLM call’s full prompt (static instructions + VARIABLE_DATA_JSON or merge bundle). Equals Σ Pr on the stage rows and matches orchestrator totals.input_chars.'
+                            hasParallelStages
+                              ? 'Total prompt characters for the parallel pipeline: sum of each LLM call prompt across all branches + merge (Σ Pr on stage rows).'
                               : message.sender === 'user'
                                 ? 'Full prompt character count for the LLM call that answers this question (same as following assistant row)'
                                 : 'Full prompt sent to the LLM (chart JSON + instructions + history + question)'
                           }
                         >
-                          Prompt {Number(message.llm_prompt_chars).toLocaleString()} chars
+                          Prompt {Number(promptCharsForBadge).toLocaleString()} chars
                         </span>
                       )}
                       {message.sender === 'assistant' &&
-                        Number.isFinite(message.llm_response_chars) &&
-                        message.llm_response_chars > 0 && (
+                        Number.isFinite(replyCharsForBadge) &&
+                        replyCharsForBadge > 0 && (
                           <span
                             className="message-char-badge message-char-badge--reply"
                             title={
-                              message.parallel_llm_usage?.stages?.length
-                                ? 'Length of the final merged assistant message shown to the user (after parse/clean). This is NOT the sum of per-stage raw LLM outputs (Rp): branches emit JSON; merge emits the user-facing answer.'
+                              hasParallelStages
+                                ? 'Total raw output characters across all branch calls + merge (Σ Rp on stage rows).'
                                 : 'Assistant reply text length after parsing (what the user sees)'
                             }
                           >
-                            Reply {Number(message.llm_response_chars).toLocaleString()} chars
+                            Reply {Number(replyCharsForBadge).toLocaleString()} chars
                           </span>
                         )}
                       {Number.isFinite(message.llm_input_tokens) && (

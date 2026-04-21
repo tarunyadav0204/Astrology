@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
+import CreditsModal from '../Credits/CreditsModal';
 import SEOHead from '../SEO/SEOHead';
 import UniversalAIInsights from '../Shared/UniversalAIInsights';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -72,10 +73,11 @@ const PAGE_META = {
   }
 };
 
-const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick }) => {
+const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogin }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('saved');
 
   const meta = PAGE_META[analysisType];
@@ -130,7 +132,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick }) => {
           setBirthModalTab('saved');
           setShowBirthModal(true);
         }}
-        onCreditsClick={() => navigate('/credits')}
+        onCreditsClick={() => setShowCreditsModal(true)}
       />
 
       <main className="analysis-detail-main">
@@ -189,6 +191,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick }) => {
         title={`${meta.headline} — Birth details`}
         description="Please provide your birth information to generate your personalized analysis."
       />
+      <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );
 };

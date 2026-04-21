@@ -56,8 +56,12 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
   if (!data) return null;
   
   // Get all focus tags (no limit)
-  const tags = data.focus_areas || [];
-  const events = data.events || [];
+  // Some months may carry malformed payloads from upstream (object/string instead of array).
+  // Keep rendering resilient so one bad month does not crash the whole yearly screen.
+  const tags = Array.isArray(data.focus_areas)
+    ? data.focus_areas.filter((x) => x != null).map((x) => String(x))
+    : [];
+  const events = Array.isArray(data.events) ? data.events : [];
 
   return (
     <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
@@ -135,7 +139,7 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
                       ) : null}
                     </>
                   ) : null}
-                  {event.possible_manifestations && event.possible_manifestations.length > 0 && (
+                  {Array.isArray(event?.possible_manifestations) && event.possible_manifestations.length > 0 && (
                     <View style={styles.manifestationsContainer}>
                       <View style={styles.manifestationsHeader}>
                         <Ionicons name="git-network-outline" size={14} color={colors.accent} />

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAstrology } from '../../context/AstrologyContext';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
+import CreditsModal from '../Credits/CreditsModal';
 import AshtakavargaModal from './AshtakavargaModal';
 import './AshtakavargaModal.css';
 
@@ -13,6 +14,7 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
   const navigate = useNavigate();
   const { birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const transitDate = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   const handleBack = () => {
@@ -33,7 +35,7 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
         onAdminClick={onAdminClick}
         onLogin={onLogin}
         showLoginButton={!user}
-        onCreditsClick={() => navigate('/credits')}
+        onCreditsClick={() => setShowCreditsModal(true)}
         birthData={birthData}
         onChangeNative={() => setShowBirthModal(true)}
         onHomeClick={() => navigate('/')}
@@ -66,6 +68,7 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
         title="Birth details for Ashtakavarga"
         description="Accurate sidereal chart data is required for bindus and transit comparisons."
       />
+      <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );
 }

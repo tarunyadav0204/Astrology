@@ -170,6 +170,8 @@ export default function EventsTimelinePage({
     const payload = buildPayload();
     if (!payload) return;
 
+    // Keep UI in "analysis" state throughout async streaming/polling retries.
+    setAnalysisStarted(true);
     jobRunningRef.current = true;
     setLoading(true);
     setTimelineData(null);
@@ -301,9 +303,8 @@ export default function EventsTimelinePage({
           return;
         }
       } catch (e) {
-        onFailed(e.message || 'Timeline request failed');
-        setAnalysisStarted(false);
-        return;
+        // Non-fatal: stream may still be alive, and next poll can succeed.
+        console.warn('Initial timeline poll failed (will retry):', e?.message || e);
       }
 
       pollIntervalRef.current = setInterval(async () => {
@@ -314,8 +315,8 @@ export default function EventsTimelinePage({
             pollIntervalRef.current = null;
           }
         } catch (e) {
-          onFailed(e.message || 'Timeline request failed');
-          setAnalysisStarted(false);
+          // Keep trying; transient network/proxy hiccups should not kick user back to setup page.
+          console.warn('Timeline poll tick failed (continuing):', e?.message || e);
         }
       }, 3000);
 
@@ -324,7 +325,6 @@ export default function EventsTimelinePage({
           clearTimers();
           finishLoading();
           toast.error('Analysis is taking longer than expected. Please try again.');
-          setAnalysisStarted(false);
         }
       }, 300000);
     } catch (err) {
