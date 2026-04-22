@@ -105,12 +105,11 @@ class CharaDashaAgent(ContextAgent):
                 "err": "missing_d1_chart",
             }
 
-        dob_dt = datetime.strptime(date_s, "%Y-%m-%d")
-        full = CharaDashaCalculator(chart).calculate_dasha(dob_dt)
-        periods_raw: List[Dict[str, Any]] = list(full.get("periods") or [])
-
         sc = effective_time_scope(ctx)
         focus = focus_datetime(ctx)
+        dob_dt = datetime.strptime(date_s, "%Y-%m-%d")
+        full = CharaDashaCalculator(chart).calculate_dasha(dob_dt, focus_date=focus)
+        periods_raw: List[Dict[str, Any]] = list(full.get("periods") or [])
         ir = ctx.intent_result if isinstance(ctx.intent_result, dict) else None
         filtered, fn_tag = filter_chara_periods(periods_raw, sc, ir, focus)
         use_periods = filtered if filtered else periods_raw

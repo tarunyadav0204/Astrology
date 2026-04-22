@@ -123,6 +123,45 @@ class EventPredictor:
         return [start, start + 1, start + 2]
 
     @staticmethod
+    def _month_label(month_id: int) -> str:
+        names = [
+            "",
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ]
+        return names[month_id] if 1 <= month_id <= 12 else f"Month {month_id}"
+
+    @staticmethod
+    def _intensity_rank(value: Any) -> int:
+        s = str(value or "").strip().lower()
+        if s == "high":
+            return 3
+        if s == "medium":
+            return 2
+        return 1
+
+    @staticmethod
+    def _clean_text(value: Any) -> str:
+        return " ".join(str(value or "").replace("\n", " ").replace("\r", " ").split()).strip()
+
+    @staticmethod
+    def _clip_text(value: Any, limit: int = 140) -> str:
+        text = EventPredictor._clean_text(value)
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    @staticmethod
     def _monthly_domain_shards() -> List[Dict[str, Any]]:
         return [
             {
@@ -240,6 +279,7 @@ class EventPredictor:
                 )
 
             final_response = {"year": year, "status": "success", **ai_response}
+            final_response = self._attach_timeline_summary(year, final_response)
             if isinstance(run_usage, dict):
                 final_response["_llm_usage_totals"] = run_usage
             print(f"\n✅ PREDICTION COMPLETE FOR {year}")
@@ -394,6 +434,7 @@ class EventPredictor:
                         "macro_trends": macro_trends,
                         "monthly_predictions": monthly_predictions,
                     }
+                    progress_payload = self._attach_timeline_summary(year, progress_payload)
                     cb_result = progress_callback(progress_payload)
                     if asyncio.iscoroutine(cb_result):
                         await cb_result
@@ -617,6 +658,7 @@ class EventPredictor:
                 "transit_facts": transit_facts,
                 **ai_response,
             }
+            final_response = self._attach_timeline_summary(year, final_response)
             if isinstance(run_usage, dict):
                 final_response["_llm_usage_totals"] = run_usage
                 print(
@@ -946,14 +988,14 @@ Constraints:
         return f"""You are an expert Vedic Astrologer. For {month_name} {year} ONLY, produce an EXHAUSTIVE deep-dive analysis.
 
 **DASHA FACTS (GROUND TRUTH — DO NOT CHANGE):**
-These are the computed Vimshottari dashas for the native for this month. You MUST copy these exactly into activation_overview.dasha_focus.
+These are the computed Vimshottari dashas for the native for this month. They now include start/mid/end samples and any detected changes inside the month. You MUST copy the top-level MD/AD/PD/Sookshma exactly into activation_overview.dasha_focus and use `samples` / `changes` to narrow the execution window.
 If any level is missing, say "Not provided" — do NOT guess.
 ```json
 {json.dumps(dasha_facts, indent=2)}
 ```
 
 **TRANSIT FACTS (GROUND TRUTH — DO NOT CHANGE):**
-These are the computed whole-sign transit houses for the native for this month. You are STRICTLY FORBIDDEN from stating a different transit house for these planets.
+These are the computed whole-sign transit houses for the native for this month. They now include start/mid/end snapshots and whether a planet changes sign/house/nakshatra inside the month. You are STRICTLY FORBIDDEN from stating a different transit house for these planets.
 If you cannot find a planet here, say "not provided" — do NOT guess.
 ```json
 {json.dumps(transit_facts, indent=2)}
@@ -1011,7 +1053,7 @@ Combine the significations of the activated houses to form specific, real-world 
    - Provide `activation_reasoning` showing your work (e.g., "Because AD lord Rahu is transiting over its natal position in the 8th house, recreating its natal aspect with Saturn...").
    - Fill `prediction` with a clear, real-world scenario (Finance, Health, Career, Family, Real Estate, etc.).
    - Fill `possible_manifestations` as an array of objects with `scenario` and `reasoning`, linking back to houses and planets explicitly.
-   - Use `start_date` and `end_date` when you can infer them from the dasha/transit periods; otherwise leave them as empty strings.
+   - Use `start_date` and `end_date` to define the tightest realistic execution band you can infer from the dasha/transit periods. Prefer a 5-20 day band over the full month when `samples` or `changes` show a clear pivot.
 
 **STRICT ANTI-HALLUCINATION RULES:**
 * When you state a dasha planet, it must come from `current_dashas` or DASHA FACTS.
@@ -1059,44 +1101,307 @@ Now return a single JSON object with this structure:
 
     def _get_transit_facts_for_month(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
         """
-        Compute ground-truth transit houses (whole sign) for key planets for the given month.
-        We anchor to the 1st day of the month at 12:00 UTC to avoid timezone edge cases.
+        Compute interval-based transit facts for a month instead of a single 1st-of-month snapshot.
+        This gives the model a better execution-window picture for month-level timing.
         """
         try:
-            sample_date = datetime(year, month, 1, 12, 0, 0)
             natal_positions = self.transit_calc._calculate_natal_positions(birth_data)  # uses Swiss Ephemeris + Lahiri
             asc_lon = float(natal_positions.get('ascendant_longitude', 0.0)) if natal_positions else 0.0
+            last_day = calendar.monthrange(year, month)[1]
+            sample_points = {
+                "start": datetime(year, month, 1, 12, 0, 0),
+                "mid": datetime(year, month, min(15, last_day), 12, 0, 0),
+                "end": datetime(year, month, last_day, 12, 0, 0),
+            }
 
-            def calc_house(planet: str):
-                lon = self.transit_calc.get_planet_position(sample_date, planet)
+            def calc_snapshot(dt: datetime, planet: str) -> Dict[str, Any]:
+                lon = self.transit_calc.get_planet_position(dt, planet)
                 if lon is None:
-                    return None
-                return int(self.transit_calc.calculate_house_from_longitude(lon, asc_lon))
+                    return {}
+                house = int(self.transit_calc.calculate_house_from_longitude(lon, asc_lon))
+                sign_id = int(lon / 30) + 1
+                nk = self.transit_calc.get_nakshatra_from_longitude(lon)
+                return {
+                    "dt": dt.strftime("%Y-%m-%d"),
+                    "h": house,
+                    "s": sign_id,
+                    "dg": round(lon % 30, 2),
+                    "nk": nk.get("name"),
+                    "pd": nk.get("pada"),
+                }
 
             planets = ['Saturn', 'Rahu', 'Ketu', 'Jupiter', 'Mars', 'Sun', 'Moon', 'Mercury', 'Venus']
+            samples: Dict[str, Dict[str, Any]] = {}
+            changes: Dict[str, Dict[str, Any]] = {}
+            transit_houses: Dict[str, Any] = {}
+            for planet in planets:
+                planet_samples = {label: calc_snapshot(dt, planet) for label, dt in sample_points.items()}
+                samples[planet] = planet_samples
+                start_house = (planet_samples.get("start") or {}).get("h")
+                end_house = (planet_samples.get("end") or {}).get("h")
+                transit_houses[planet] = start_house
+                sign_seq = [((planet_samples.get(label) or {}).get("s")) for label in ("start", "mid", "end")]
+                house_seq = [((planet_samples.get(label) or {}).get("h")) for label in ("start", "mid", "end")]
+                nk_seq = [((planet_samples.get(label) or {}).get("nk")) for label in ("start", "mid", "end")]
+                changes[planet] = {
+                    "house_change": bool(start_house is not None and end_house is not None and start_house != end_house),
+                    "sign_change": len({s for s in sign_seq if s is not None}) > 1,
+                    "nakshatra_change": len({n for n in nk_seq if n}) > 1,
+                    "house_span": [h for h in house_seq if h is not None],
+                }
             facts = {
-                "sample_date_utc": sample_date.strftime('%Y-%m-%d %H:%M'),
+                "sample_window_utc": {
+                    "start": sample_points["start"].strftime('%Y-%m-%d %H:%M'),
+                    "mid": sample_points["mid"].strftime('%Y-%m-%d %H:%M'),
+                    "end": sample_points["end"].strftime('%Y-%m-%d %H:%M'),
+                },
                 "ascendant_longitude": asc_lon,
-                "transit_houses": {p: calc_house(p) for p in planets},
+                "transit_houses": transit_houses,
+                "samples": samples,
+                "changes": changes,
             }
             return facts
         except Exception as e:
             return {"error": str(e), "transit_houses": {}}
 
     def _get_dasha_facts_for_month(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
-        """Compute Vimshottari MD/AD/PD/Sookshma for the selected month (ground truth)."""
+        """Compute interval-based Vimshottari facts for the selected month."""
         try:
-            sample_date = datetime(year, month, 1, 12, 0, 0)
-            dashas = self.dasha_calc.calculate_current_dashas(birth_data, sample_date)
+            last_day = calendar.monthrange(year, month)[1]
+            sample_points = {
+                "start": datetime(year, month, 1, 12, 0, 0),
+                "mid": datetime(year, month, min(15, last_day), 12, 0, 0),
+                "end": datetime(year, month, last_day, 12, 0, 0),
+            }
+
+            def pack_levels(dt: datetime) -> Dict[str, Any]:
+                dashas = self.dasha_calc.calculate_current_dashas(birth_data, dt)
+                return {
+                    "sample_date_local": dt.strftime('%Y-%m-%d %H:%M'),
+                    "mahadasha": (dashas.get('mahadasha') or {}).get('planet'),
+                    "antardasha": (dashas.get('antardasha') or {}).get('planet'),
+                    "pratyantardasha": (dashas.get('pratyantardasha') or {}).get('planet'),
+                    "sookshma": (dashas.get('sookshma') or {}).get('planet'),
+                }
+
+            samples = {label: pack_levels(dt) for label, dt in sample_points.items()}
+            daily_changes: List[Dict[str, Any]] = []
+            prev_stack: Optional[tuple[Any, Any, Any, Any]] = None
+            for day in range(1, last_day + 1):
+                dt = datetime(year, month, day, 12, 0, 0)
+                row = pack_levels(dt)
+                stack = (
+                    row.get("mahadasha"),
+                    row.get("antardasha"),
+                    row.get("pratyantardasha"),
+                    row.get("sookshma"),
+                )
+                if prev_stack is not None and stack != prev_stack:
+                    daily_changes.append(
+                        {
+                            "dt": dt.strftime("%Y-%m-%d"),
+                            "from": {
+                                "mahadasha": prev_stack[0],
+                                "antardasha": prev_stack[1],
+                                "pratyantardasha": prev_stack[2],
+                                "sookshma": prev_stack[3],
+                            },
+                            "to": {
+                                "mahadasha": stack[0],
+                                "antardasha": stack[1],
+                                "pratyantardasha": stack[2],
+                                "sookshma": stack[3],
+                            },
+                        }
+                    )
+                prev_stack = stack
             return {
-                "sample_date_local": sample_date.strftime('%Y-%m-%d %H:%M'),
-                "mahadasha": (dashas.get('mahadasha') or {}).get('planet'),
-                "antardasha": (dashas.get('antardasha') or {}).get('planet'),
-                "pratyantardasha": (dashas.get('pratyantardasha') or {}).get('planet'),
-                "sookshma": (dashas.get('sookshma') or {}).get('planet'),
+                "sample_window_local": {
+                    "start": sample_points["start"].strftime('%Y-%m-%d %H:%M'),
+                    "mid": sample_points["mid"].strftime('%Y-%m-%d %H:%M'),
+                    "end": sample_points["end"].strftime('%Y-%m-%d %H:%M'),
+                },
+                "mahadasha": samples["start"].get("mahadasha"),
+                "antardasha": samples["start"].get("antardasha"),
+                "pratyantardasha": samples["start"].get("pratyantardasha"),
+                "sookshma": samples["start"].get("sookshma"),
+                "samples": samples,
+                "changes": daily_changes,
             }
         except Exception as e:
             return {"error": str(e)}
+
+    def _infer_event_domain(self, event: Dict[str, Any]) -> str:
+        blob = " ".join(
+            [
+                self._clean_text(event.get("type")),
+                self._clean_text(event.get("prediction")),
+                self._clean_text(event.get("trigger_logic")),
+                self._clean_text(event.get("activation_reasoning")),
+            ]
+        ).lower()
+        rules = [
+            ("marriage", ["marriage", "spouse", "partner", "relationship", "engagement", "wedding"]),
+            ("career", ["career", "job", "profession", "promotion", "authority", "role", "business", "work"]),
+            ("children", ["child", "children", "conception", "pregnancy", "ivf", "progeny"]),
+            ("property", ["property", "home", "house", "vehicle", "land", "real estate", "relocation"]),
+            ("wealth", ["money", "wealth", "finance", "salary", "income", "gains", "investment"]),
+            ("health", ["health", "disease", "surgery", "recovery", "hospital", "vitality", "illness"]),
+            ("education", ["education", "exam", "study", "learning", "admission", "degree"]),
+            ("travel", ["travel", "foreign", "visa", "journey", "relocation abroad"]),
+            ("legal", ["legal", "court", "litigation", "dispute", "conflict", "debt"]),
+        ]
+        for domain, keywords in rules:
+            if any(word in blob for word in keywords):
+                return domain
+        return "general"
+
+    def _event_score(self, event: Dict[str, Any], month_id: int) -> float:
+        intensity = self._intensity_rank(event.get("intensity"))
+        score = float(intensity * 3)
+        if event.get("start_date"):
+            score += 1.0
+        if event.get("end_date"):
+            score += 0.5
+        if event.get("possible_manifestations"):
+            try:
+                score += min(len(event.get("possible_manifestations") or []), 5) * 0.2
+            except Exception:
+                pass
+        trigger = self._clean_text(event.get("trigger_logic")).lower()
+        if "nakshatra return" in trigger:
+            score += 2.0
+        if "double transit" in trigger or "triple confirmation" in trigger:
+            score += 1.5
+        score += max(0, 13 - int(month_id)) * 0.01
+        return round(score, 2)
+
+    def _build_timeline_candidate_windows(self, year: int, monthly_predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        candidates: List[Dict[str, Any]] = []
+        for month in monthly_predictions:
+            if not isinstance(month, dict):
+                continue
+            month_id = int(month.get("month_id") or 0)
+            for event in month.get("events") or []:
+                if not isinstance(event, dict):
+                    continue
+                domain = self._infer_event_domain(event)
+                candidates.append(
+                    {
+                        "domain": domain,
+                        "month_id": month_id,
+                        "month": self._month_label(month_id),
+                        "score": self._event_score(event, month_id),
+                        "confidence": {3: "high", 2: "medium", 1: "low"}.get(self._intensity_rank(event.get("intensity")), "low"),
+                        "window_type": "execution",
+                        "prediction": self._clip_text(event.get("prediction"), 180),
+                        "reason": self._clip_text(event.get("trigger_logic") or event.get("activation_reasoning"), 180),
+                        "start_date": event.get("start_date") or "",
+                        "end_date": event.get("end_date") or "",
+                    }
+                )
+        candidates.sort(key=lambda row: (-float(row.get("score") or 0), int(row.get("month_id") or 99), str(row.get("domain") or "")))
+        return candidates
+
+    def _collapse_candidate_windows(self, year: int, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        by_domain: Dict[str, List[Dict[str, Any]]] = {}
+        for row in candidates:
+            by_domain.setdefault(str(row.get("domain") or "general"), []).append(row)
+
+        windows: List[Dict[str, Any]] = []
+        for domain, rows in by_domain.items():
+            rows.sort(key=lambda r: int(r.get("month_id") or 99))
+            cluster: List[Dict[str, Any]] = []
+            for row in rows:
+                if not cluster or int(row.get("month_id") or 0) <= int(cluster[-1].get("month_id") or 0) + 1:
+                    cluster.append(row)
+                else:
+                    windows.append(self._finalize_window(year, domain, cluster))
+                    cluster = [row]
+            if cluster:
+                windows.append(self._finalize_window(year, domain, cluster))
+        windows.sort(key=lambda row: (-float(row.get("score") or 0), int(row.get("peak_month_id") or 99)))
+        return windows[:10]
+
+    def _finalize_window(self, year: int, domain: str, cluster: List[Dict[str, Any]]) -> Dict[str, Any]:
+        peak = max(cluster, key=lambda row: (float(row.get("score") or 0), -int(row.get("month_id") or 99)))
+        start_month = int(cluster[0].get("month_id") or 0)
+        end_month = int(cluster[-1].get("month_id") or 0)
+        label = self._month_label(start_month) if start_month == end_month else f"{self._month_label(start_month)}-{self._month_label(end_month)}"
+        avg_score = round(sum(float(row.get("score") or 0) for row in cluster) / max(len(cluster), 1), 2)
+        return {
+            "domain": domain,
+            "label": f"{label} {year}",
+            "start_month_id": start_month,
+            "end_month_id": end_month,
+            "peak_month_id": int(peak.get("month_id") or start_month),
+            "peak_month": peak.get("month"),
+            "window_type": "execution" if len(cluster) <= 2 else "promise",
+            "score": avg_score,
+            "confidence": peak.get("confidence"),
+            "headline": peak.get("prediction"),
+            "reason": peak.get("reason"),
+            "months": [int(row.get("month_id") or 0) for row in cluster],
+        }
+
+    def _build_user_timeline_summary(self, year: int, monthly_predictions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        candidates = self._build_timeline_candidate_windows(year, monthly_predictions)
+        windows = self._collapse_candidate_windows(year, candidates)
+        best_months = [
+            {
+                "month_id": int(row.get("month_id") or 0),
+                "month": row.get("month"),
+                "domain": row.get("domain"),
+                "confidence": row.get("confidence"),
+                "headline": row.get("prediction"),
+            }
+            for row in candidates[:6]
+        ]
+        turning_points = []
+        for row in windows[:4]:
+            turning_points.append(
+                {
+                    "domain": row.get("domain"),
+                    "window": row.get("label"),
+                    "peak_month": row.get("peak_month"),
+                    "why": row.get("reason"),
+                }
+            )
+        return {
+            "best_months": best_months,
+            "candidate_windows": windows,
+            "turning_points": turning_points,
+        }
+
+    def _attach_timeline_summary(self, year: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            return payload
+        monthly_predictions = payload.get("monthly_predictions")
+        if not isinstance(monthly_predictions, list) or not monthly_predictions:
+            return payload
+        for month in monthly_predictions:
+            if not isinstance(month, dict):
+                continue
+            ranked_events = sorted(
+                [ev for ev in (month.get("events") or []) if isinstance(ev, dict)],
+                key=lambda ev: (-self._event_score(ev, int(month.get("month_id") or 0)), str(ev.get("start_date") or "")),
+            )
+            if ranked_events:
+                top = ranked_events[:3]
+                month["month_summary"] = {
+                    "headline": self._clip_text(top[0].get("prediction"), 180),
+                    "best_domains": [self._infer_event_domain(ev) for ev in top],
+                    "execution_focus": [
+                        {
+                            "domain": self._infer_event_domain(ev),
+                            "prediction": self._clip_text(ev.get("prediction"), 120),
+                            "confidence": {3: "high", 2: "medium", 1: "low"}.get(self._intensity_rank(ev.get("intensity")), "low"),
+                        }
+                        for ev in top
+                    ],
+                }
+        payload["timeline_summary"] = self._build_user_timeline_summary(year, monthly_predictions)
+        return payload
 
     def _prepare_yearly_data(self, birth_data: Dict, year: int) -> str:
         """
@@ -1200,6 +1505,12 @@ You MUST return exactly 12 month objects in the monthly_predictions array, cover
 - DO NOT re-index based on events found
 - If a month has no major triggers, use the current Dasha Lords to predict routine maintenance activities for that month
 - Each month_id must correspond to its calendar month (1=January, 2=February, etc.)
+
+**1b. MONTH-LEVEL EXECUTION WINDOWS (MANDATORY):**
+- Broad year language is not enough. Narrow to the month whenever the data supports it.
+- For every Medium or High intensity event, fill `start_date` and `end_date` with the tightest plausible execution band you can justify.
+- Prefer a 5-20 day execution window over a whole-month range when trigger clustering exists.
+- If you cannot narrow beyond the month, say that clearly in `trigger_logic` instead of pretending exactness.
 
 **2. DASHA INVIOLABILITY (FORBIDDEN TO VIOLATE):**
 You are STRICTLY FORBIDDEN from changing the Dasha dates provided in the current_dashas context.
@@ -1609,6 +1920,19 @@ In trigger_logic field:
 
 **CRITICAL:** The example above shows 8 manifestations for a High-intensity event. You MUST generate AT LEAST this many.
 
+**OPTIONAL USER-FACING SUMMARY LAYER (PREFERRED):**
+You may include a top-level `timeline_highlights` array with 3-6 concise execution windows:
+[
+  {{
+    "window": "July 2026",
+    "domain": "career",
+    "confidence": "high",
+    "headline": "Visible career rise or role elevation becomes much more likely",
+    "why": "PD lord shifts and receives strong transit reinforcement"
+  }}
+]
+If you include this, keep it month-specific and user-friendly.
+
 **CRITICAL MANIFESTATION FORMAT:**
 Each item in possible_manifestations MUST be an object with TWO fields:
 1. **"scenario"**: A DETAILED prediction (3-5 sentences) describing:
@@ -1675,6 +1999,7 @@ Output constraints:
 5. For EACH month, `events` must contain at least 6 event objects.
 6. For EVERY event, `prediction` is MANDATORY and must be plain-language user-facing text.
 7. Put technical astrology reasoning in `activation_reasoning` and/or `trigger_logic`, NOT inside `prediction`.
+8. Narrow to month-level timing. For High/Medium events, `start_date` and `end_date` should usually be tighter than the full month when the data allows.
 8. NEVER include bracketed debug tags like `[BHAVA-DISAMBIG: ...]` inside `prediction` or scenario text.
 9. Each event must include: `type`, `prediction`, `possible_manifestations`, `start_date`, `end_date`, `intensity`.
 10. Use strict Vedic aspect logic; do not invent aspects.

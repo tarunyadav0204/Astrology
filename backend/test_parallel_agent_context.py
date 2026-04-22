@@ -81,8 +81,15 @@ def test_build_all_parallel_agent_payloads_structure(monkeypatch):
     )
     out = pap.build_all_parallel_agent_payloads(ctx, "hello")
     assert "parashari_agents" in out["parashari"]
+    assert "px" in out["parashari"]
     assert out["parashari"]["parashari_agents"]["core_d1"]["a"] == "core_d1"
+    assert out["parashari"]["parashari_agents"]["parashari_day"]["a"] == "parashari_day"
+    assert out["parashari"]["px"]["src"] == "current"
+    assert out["parashari"]["px"]["cat"] == "general"
+    assert out["parashari"]["px"]["hs"] == [1, 5, 7, 10]
     assert out["jaimini"]["jaimini"]["a"] == "jaimini"
+    assert "nx" in out["nadi"]
+    assert out["nadi"]["nadi"]["a"] == "nadi"
     assert "vim_dasha" in out["nakshatra"]
     assert "vim_dasha" in out["kp"]
     assert out["ashtakavarga"]["ashtakavarga"]["a"] == "ashtakavarga"

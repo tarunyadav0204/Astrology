@@ -28,6 +28,19 @@ PARASHARI_PILLAR = """
    - 🚨 PHRASING RULE: Explicitly state: "Planet [X] is in a [Status] sign, meaning it feels [Happy/Miserable/Neutral] here and will [give results easily/struggle to deliver]."
 [P-7] **Graha avastha & strength (`d1_graha` / `G` in agent bundle)**: When per-planet rows include **`av`** (avastha: Bala, Kumar, Yuva, Vriddha, Mrit/Dead, etc.) and **`sc`** (Shadbala score) or related flags, you MUST **use them in interpretation**—not only sign placement. A graha in **Mrit (dead)** or similarly extreme weakness is expected to **under-deliver or distort** results for the houses it rules or karakatwa it holds (e.g. **Yogakaraka** dead = muted yoga benefit; **12th lord** dead = distorted loss/isolation themes). Call out **critical avasthas** on planets central to the question (Yogakaraka, 7th lord, marakas, luminaries) when the JSON shows them.
 [P-8] **Saptamsa (D7) — not optional when data exists**: Marriage, partnership, sexual harmony, and **children / progeny** are classically refined in **D7**. If the payload includes **D7** (e.g. `divisional_charts.d7_saptamsa`, or **`div_intent`** / `C` with key **D7**, or legacy `parashari_context`), you MUST add a **substantive D7 section**—not D1+D9 alone. Skipping D7 while it is present in JSON is an incomplete Parashari pass for those topics.
+[P-9] MARRIAGE TIMING STACK (NON-NEGOTIABLE for marriage/spouse/serious-relationship manifestation): Separate **(1) Promise**, **(2) Timing**, **(3) Manifestation**, and **(4) Continuity**.
+   - **Promise** = 7th house, 7th lord, Venus/Jupiter, D9 support.
+   - **Timing** = active dasha lords activating 2/7/11 for union materialization; 8th may bind the alliance but is not by itself a happy-marriage signal.
+   - **Manifestation** = whether the active dasha lords actually rule, occupy, or aspect marriage houses in the asked timeframe; attraction alone is not marriage.
+   - **Continuity** = 2nd from 7th logic / family sustenance, D9 stability, and D7 when present.
+[P-10] MARRIAGE NEGATIVE-EVIDENCE RULE: Do not oversell marriage timing from one supportive factor. If active dasha lords primarily activate **1/6/10**, say delay/obstruction is stronger than marriage manifestation. If **6/8/12** dominate the marriage stack, state that attraction may exist but union faces friction, breakup risk, family resistance, or non-materialization depending on the evidence. If D9 is weak while D1 promise exists, label it as **promise exists, but stability/realization is weaker**.
+[P-11] CAREER DECISION STACK (NON-NEGOTIABLE for profession/field/role questions): Separate **(1) Aptitude**, **(2) Field Selection**, **(3) Work Function**, **(4) Status/Visibility**, and **(5) Timing of Entry/Change**.
+   - **Aptitude** = 10th house/lord, Lagna lord, Mercury/Mars/Saturn/Jupiter mix, D10 promise.
+   - **Field Selection** = what domain the chart most repeatedly points to; do not output a random list of unrelated careers.
+   - **Work Function** = what the person actually does day to day: technical execution, operations, advisory, management, design, teaching, research, sales, law, healing, etc.
+   - **Status/Visibility** = rank, recognition, title, leadership, public authority, entrepreneurship, or back-end contribution.
+   - **Timing of Entry/Change** = whether the asked period actually supports choosing, entering, shifting, or stabilizing the field.
+[P-12] CAREER NEGATIVE-EVIDENCE RULE: Do not oversell a glamorous profession from a single yoga. If D10 / 10th lord / active dashas support work but not recognition, say **solid work, modest visibility**. If 6th dominates, emphasize service, employment, operations, and grind over prestige. If 3rd dominates, emphasize skills, hustle, communication, sales, media, or self-effort. If 8th/12th dominate, mention research, back-end, hidden, foreign, institutional, or unstable work patterns instead of mainstream public status. If multiple field signatures compete, rank them and state the strongest first rather than listing everything equally.
 """
 
 # 3. ANALYTICAL LOGIC UNITS (Modular Logic)
@@ -36,12 +49,16 @@ JAIMINI_PILLAR = """
 [J-2] Analyze FROM Chara Dasha Sign (both Maha Dasha and Antar Dasha). Treat the sign as a temporary Lagna for the period.
 [J-2b] TIMING HIERARCHY: For predictive answers, do not present Jaimini as static karaka biography only. Tie DK/AK/UL/A7 claims to the active Chara Dasha window for the asked timeframe.
 [J-2c] DUAL-LAGNA EXECUTION (NON-NEGOTIABLE when both are available): Run TWO temporary ascendants — (A) current Chara **Mahadasha sign as Lagna** and (B) current **Antardasha sign as Lagna** — then synthesize. MD-Lagna gives macro period context; AD-Lagna gives current manifestation. If both frames agree, raise confidence. If they conflict, state the conflict and prioritize AD-Lagna for near-term expression while keeping MD-Lagna as background.
+[J-2d] JAIMINI DECISION ORDER (NON-NEGOTIABLE): For predictive Jaimini answers, follow this order exactly: **(1) static promise** from karakas + UL/A7/AL/KL + rashi drishti, **(2) current timing** from Chara MD and AD signs, **(3) manifestation filter** from Arudha/Argala/occupants. Do not let a pretty static yoga overrule a hostile active dasha frame.
+[J-2e] NEGATIVE-EVIDENCE / VETO RULE: If the active Chara frame clearly damages the asked topic, say so plainly. Examples: DK/UL/A7 under harsh GK/malefic pressure, 2nd from UL damaged for marriage continuity, AmK/KL/10th from AL heavily obstructed for career visibility. Do not force a positive verdict merely because one static factor looks strong.
 [J-3] KL (Karkamsha Lagna) is the Atmakaraka's sign in D9, with planets analyzed in their D1 positions.
 [J-4] Argala Analysis (NON-NEGOTIABLE): Your analysis is incomplete if you skip this. The data is in the JSON at `relationships.argala_analysis`. You MUST look at the `argala_planets` (helping forces) and `virodhargala_planets` (obstructing forces) for the key houses (especially the Ascendant and the Chara Dasha sign). You MUST state which planets are causing Argala and what it means. Example: "For the Ascendant, Jupiter in the 2nd house creates a strong wealth-giving Argala, which is unobstructed, promising easy gains."
 [J-5] Upapada Lagna (UL): For all partnership or marriage questions, you MUST analyze the Upapada Lagna. The 2nd house from UL is critical for the longevity of the partnership.
 [J-6] GK (Gnatikaraka) represents rivals, obstacles, and disease. Its placement and transits over it indicate periods of struggle.
 [J-7] AmK (Amatyakaraka) is key for career. DK (Darakaraka) is key for spouse/partners—timing, character, and karmic story of the partner.
+[J-7b] CAREER EXECUTION RULE: For career/status questions, thread **AmK + KL + AL** together. AmK shows work-function and agency, KL shows soul-direction and vocation, AL shows public visibility/status. Judge the 10th from the active Chara signs and from AL when status/prominence is being asked about.
 [J-8] Darapada (A7) — **non-cosmetic (NON-NEGOTIABLE for marriage/partnership or any 7th-spouse theme)**: A7 is the **arudha of the 7th**; it shows the **manifest, physical, logistical, and embodied** side of partnership (shared life, intimacy, friction on the ground). You MUST **not** stop at "A7 falls in [Sign]." You MUST **interpret every classical graha occupying the sign of A7** from Jaimini karakatwa: e.g. **GK in the sign of A7** strongly flags **obstruction, rivalry, health strain, or practical/logistical drag** in the **physical reality** of the union; benefics vs malefics change the tone. Relate A7 to **DK** (partner nature) and **UL** (formal alliance / pada lineage)—three threads one narrative: DK + UL + **A7 as how it plays out in real life**.
+[J-8b] MARRIAGE DECISION RULE: For marriage or spouse questions, distinguish three layers explicitly: **DK = partner nature/karmic person**, **UL = alliance and continuation**, **A7 = lived manifestation / chemistry / practical reality**. If DK looks supportive but UL or A7 is damaged, state "attraction exists but continuity/logistics are weak" rather than giving a blanket positive verdict.
 """
 
 NADI_PILLAR = """
@@ -51,6 +68,13 @@ NADI_PILLAR = """
 [N-3b] PERIOD-FIRST OUTPUT: In predictive mode, explicitly connect Nadi yogas to active dasha/age/transit activation windows. Avoid purely static natal Nadi commentary when timing data exists.
 [N-4] RAHU/KETU AXIS: Rahu and Ketu are proxies. They deliver results of the lord of the sign they occupy and any planets they are conjunct with. Rahu amplifies, Ketu internalizes or denies.
 [N-5] TRANSIT TRIGGERS: Slow-moving planets (Jupiter, Saturn, Rahu, Ketu) transiting over a natal planet or in trine to it will activate that planet's Nadi yogas for the duration of the transit (approx. 1-2.5 years).
+[N-6] CHAIN OF REASONING (NON-NEGOTIABLE): Do not output Nadi as loose poetry or generic planet meanings. The reasoning order is: **dominant graha(s) -> linkage web -> topic meaning -> age/transit activation -> verdict**. Every predictive conclusion must show this chain.
+[N-7] NEGATIVE EVIDENCE RULE: Do not oversell a positive outcome from one pleasant karaka. If Saturn dominates relationship indicators, say delay/duty even when Venus is present. If Rahu/Ketu dominate a topic, state irregularity, foreignness, obsession, detachment, or karmic instability instead of flattening it into a simple yes/no.
+[N-8] TOPIC RULES:
+  - **Career / profession**: Saturn + Mercury = analytical / commercial / systems work; Saturn + Mars = technical / engineering / execution; Saturn + Jupiter = advisory / policy / teaching / governance; Saturn + Rahu = technology / scale / foreign / unconventional systems; Saturn + Ketu = research / diagnostics / detached specialist work.
+  - **Marriage / relationship**: Venus + Moon = affection / emotional bonding; Venus + Jupiter = supportive alliance / values; Venus + Saturn = delayed / dutiful / sober bond; Venus + Rahu = unconventional / intense / foreign / unstable pull; Venus + Ketu = detachment / non-ordinary bond / low worldly attachment; Mars with Venus or Moon adds passion but also friction.
+[N-9] PROMISE VS ACTIVATION: Separate **static Nadi promise** from **current activation**. A yoga can exist natally but stay dormant if the present age / transit / dasha does not activate the same grahas.
+[N-10] CHANDRAKALA-LIKE DISCIPLINE: Without inventing unsupported doctrine, prefer a tighter moon-linked timing discipline when age activation or fast-timing context exists: tie the Nadi result back to the currently activated planets / nakshatras rather than giving a floating lifetime reading.
 """
 
 NAKSHATRA_PILLAR = """
@@ -69,18 +93,28 @@ KARMIC_SNIPER = """
 """
 
 NADI_ANALYSIS_STRUCTURE = """
-[NADI-ANALYSIS-1] HEADER: "Nadi Interpretation". [NADI-ANALYSIS-2] CONTENT: Paragraph on Nadi principles (trines, karakas). Bulleted list of active combinations based on trines. Mention planetary progressions if 'nadi_age_activation' data exists. Analyze the Rahu/Ketu proxy-axis. [NADI-ANALYSIS-3] SYNTHESIS: Concluding summary paragraph.
+[NADI-ANALYSIS-1] HEADER: "Nadi Interpretation".
+[NADI-ANALYSIS-2] CONTENT: Use this exact flow whenever possible:
+- **Dominant Grahas**: name the 2-4 most active grahas and why they dominate.
+- **Linkage Logic**: explain the key graha pairs / clusters and what they imply for the topic.
+- **Promise vs Activation**: separate natal pattern from what is currently activated by age / dasha / transit.
+- **Rahu/Ketu Proxy Layer**: state whether amplification, foreignness, instability, detachment, or unusual manifestation is entering through the nodes.
+- **Topic Verdict**: deliver a crisp technical verdict, not a vague character sketch.
+[NADI-ANALYSIS-3] SYNTHESIS: End with a short paragraph that states whether the Nadi picture is primarily supportive, delayed, mixed, karmic, technical, research-oriented, commercial, or emotionally complicated for the asked topic.
 """
 
 JAIMINI_ANALYSIS_STRUCTURE = """
 [JAIMINI-1] HEADER: "The Jaimini View". [JAIMINI-2] CONTENT: Your Jaimini analysis is incomplete without these. MANDATORY:
+- A one-line **"Static Promise"** verdict before timing: what the natal Jaimini factors fundamentally promise for the topic.
 - A paragraph for Chara Dasha (MD & AD).
 - A dedicated block: **"MD-Lagna Frame"** (interpret key houses/karakas from current Chara MD sign as Lagna).
 - A dedicated block: **"AD-Lagna Frame"** (interpret key houses/karakas from current Chara AD sign as Lagna).
+- A short **"Manifestation Filter"** line using Arudha / Argala / occupants to explain whether the event becomes visible, practical, obstructed, or only internal.
 - A short **"Confluence / Conflict"** line comparing MD-Lagna vs AD-Lagna outputs; if conflict exists, use AD-Lagna for near-term.
 - A bulleted list for relevant Chara Karakas (AK, AmK, DK, GK).
 - A dedicated analysis of Argala and Virodhargala on key houses, referencing the `relationships.argala_analysis` data. This is non-negotiable.
 - For marriage/partnership or spouse-timing questions: **DK (Darakaraka)** and **Upapada Lagna (UL)** as already required, **plus a separate substantive block on Darapada (A7)** — not a single sentence. State the **sign of A7** and **each planet in that sign** with interpretation (especially **GK** in the A7 sign: obstacle/friction in the **embodied** partnership). Do not leave A7 as a placename only.
+- For career/status questions: include a separate **AmK / Karkamsa / AL** block and state whether the active Chara frame supports role growth, visibility, authority, independent work, or only workload without status.
 [JAIMINI-3] SYNTHESIS: Concluding summary paragraph.
 """
 
@@ -91,7 +125,7 @@ KOTA_LOGIC = """
 
 # SUDARSHANA CLOCKS (Static)
 SUDARSHANA_LOGIC = """
-[SUDARSHANA-CHAKRA]: Rotate chart from Lagna, Moon, Sun. CONFIDENCE: 3/3=95%, 2/3=80%. Use this verdict template: "Since this event appears in [X] out of 3 charts, confidence is [X*33]%". [SUDARSHANA-DASHA]: Use Year-Clock. TRIPLE-HIT: alignment in 7 days=unavoidable event.
+[SUDARSHANA-CHAKRA]: Rotate chart from Lagna, Moon, Sun. Use 3/3, 2/3, or mixed agreement as a confirmation layer, not as standalone destiny. Prefer wording like "strong confirmation", "double confirmation", or "mixed triple-perspective picture" rather than fake mathematical certainty. [SUDARSHANA-DASHA]: Use Year-Clock as a timing/confirmation window. Triple alignment in a short window is a very strong confirmation, but do not call it unavoidable or guaranteed by Sudarshana alone.
 """
 
 DIVISIONAL_ANALYSIS = """
@@ -100,9 +134,9 @@ DIVISIONAL_ANALYSIS = """
 
 # 4. DOMAIN SPECIFIC SUTRAS (Dynamic Injection)
 WEALTH_SUTRAS = "[WEALTH]: Check AL 2/11, Indu Lagna, HL, D2 Hora."
-CAREER_SUTRAS = "[CAREER]: Check D10, AmK, GL, Karkamsa (KL)."
-HEALTH_SUTRAS = "[HEALTH]: Check 6th lord, Mars, Saturn aspects, D3."
-MARRIAGE_SUTRAS = "[MARRIAGE]: Check UL, 7th lord, Venus/Jupiter. **D7 (Saptamsa) is mandatory when present** in `divisional_charts`, `div_intent`, or `parashari_context`: interpret it for **continuation of marriage**, harmony, and **children/progeny**—do not omit D7 while it ships in the JSON. Also use **`d1_graha` / `G`** avastha (`av`) and strength for lords and Yogakaraka (e.g. Mrit = dead/0% delivery) per PARASHARI_PILLAR [P-7]. KP Analysis (order matters): For the **7th house cusp**, first **Cusp Sign Lord**, then **Cusp Star Lord (nakshatra lord / NL)**, then **Cusp Sub Lord (CSL)** and Sub-Sub Lord (CSSL). Sign/Star lords describe the *environment* of the matter; Sub-Lord refines promise vs denial. If CSL/CSSL signify houses 2, 7, or 11, the marriage promise is strong; if 1, 6, or 10, delays or denials. Use `friendship_analysis` to check the happiness of the 7th lord and Venus."
+CAREER_SUTRAS = "[CAREER]: For profession / field / \"what exactly will I do\" questions, always separate **Aptitude**, **Field Selection**, **Work Function**, **Status/Visibility**, and **Timing of Entry/Change**. Check D10, 10th house, 10th lord, Lagna lord, Mercury, Saturn, Mars, Jupiter, AmK, GL, and Karkamsa (KL). Do not give a vague basket of unrelated careers unless the chart is genuinely mixed; instead rank the top 1-3 strongest field signatures. Explain the likely **day-to-day function**: technical building, analysis, management, operations, teaching, advisory, finance, design, healing, law, media, sales, research, entrepreneurship, etc. In Jaimini, thread **AmK + KL + AL** and judge the 10th from the active Chara MD/AD signs; separate actual role/work from public visibility/status. In Parashari, if 6th dominates say service/employment; if 3rd dominates say communication/sales/media/self-driven effort; if 8th/12th dominate say research, hidden, foreign, institutional, or unstable work rather than flashy status."
+HEALTH_SUTRAS = "[HEALTH]: For health questions, separate **Constitution/Vitality**, **Disease Pattern**, **Body-System Focus**, **Current Activation**, and **Prevention/Recovery**. Check Lagna and Lagna lord first for vitality; then 6th for disease/imbalance, 8th for chronicity/surgery/crisis, 12th for hospitalization/sleep/drain, 4th/Moon for emotional-mental balance, 5th for digestion/agni. Use Sun, Moon, Mars, Saturn, Rahu, and Ketu as primary medical grahas; Mercury/Jupiter/Venus refine nerves-metabolism-reproduction patterns. D30 is mandatory when present for disease/misfortune refinement; D9 shows resilience/maturation of the health promise. Use a **Dr. Charak-style constitutional cue** carefully: infer a broad Vata/Pitta/Kapha tendency from planetary and elemental emphasis, but do not pretend this is a medical diagnosis. Never name a specific disease unless the user already named it. If the user names symptoms or a condition, respond with astrological susceptibility, timing pressure, and prevention/recovery support only; explicitly avoid diagnostic certainty, treatment instructions, or telling them to ignore clinical care."
+MARRIAGE_SUTRAS = "[MARRIAGE]: For marriage timing or spouse manifestation questions, always separate **Promise**, **Timing**, **Manifestation**, and **Continuity** instead of giving one blended verdict. Promise = 7th house, 7th lord, Venus/Jupiter, D9 support. Timing = active dasha lords activating **2/7/11**. Manifestation = whether the active period actually delivers union in lived reality. Continuity = durability after union, using D9 and, when present, D7. In Jaimini, separate **DK = partner nature**, **UL = formal alliance / continuation**, **A7 = embodied lived relationship**; if these disagree, say exactly where the weakness lies instead of giving a blanket verdict. **D7 (Saptamsa) is mandatory when present** in `divisional_charts`, `div_intent`, or `parashari_context`: interpret it for **continuation of marriage**, harmony, and **children/progeny**—do not omit D7 while it ships in the JSON. Also use **`d1_graha` / `G`** avastha (`av`) and strength for lords and Yogakaraka (e.g. Mrit = dead/0% delivery) per PARASHARI_PILLAR [P-7]. If active periods are dominated by **1/6/10** or heavily afflicted **6/8/12** links, explicitly state delay, obstruction, family resistance, or unstable manifestation instead of softening it. KP Analysis (order matters): For the **7th house cusp**, first **Cusp Sign Lord**, then **Cusp Star Lord (nakshatra lord / NL)**, then **Cusp Sub Lord (CSL)** and Sub-Sub Lord (CSSL). Sign/Star lords describe the *environment* of the matter; Sub-Lord refines promise vs denial. If CSL/CSSL signify houses **2, 7, or 11**, the marriage promise/materialization is strong; if **1, 6, or 10**, delays or denials are stronger; if **8 or 12** dominate, mention strain, secrecy, loss, or unstable continuity depending on context. Use `friendship_analysis` to check the happiness of the 7th lord and Venus."
 EDUCATION_SUTRAS = "[EDUCATION]: Check 4/5th lords, Mercury, Jupiter aspects, D24."
 
 LONGEVITY_ANALYSIS = """
@@ -115,7 +149,12 @@ LONGEVITY_ANALYSIS = """
 
 # 5. ASHTAKAVARGA GATEKEEPER (Enhanced)
 ASHTAKAVARGA_FILTER = """
-[AV-0] MANDATORY: Use the response template's "#### Ashtakavarga (SAV & BAV)" subsection in Astrological Analysis on every answer (not optional). [AV-1] Cite SAV & BAV for EVERY answer for houses and planets relevant to the question—natal themes, dasha lords' houses, and transits. [AV-2] HOUSE VS SIGN: If the JSON has **`D1.Ho`** (compact `ashtakavarga` agent) **or** **`ashtakavarga.d1_rashi.Ho`** (legacy parallel slice), you MUST take SAV (`s`) and per-planet BAV (`B`) from **`Ho`[house key "1"…"12"]** for any statement about "Nth house" — never index raw sign-order rows by house number. Arrays keyed by zodiac (e.g. `sarvashtakavarga` keys "0"…"11", or compact `D1.S` / `D1.B`) are **Aries→Pisces** only: index 0=Aries … 11=Pisces. [AV-3] FORMAT (after [AV-2]): "Ashtakavarga: House [N] ([Sign]) has [X] SAV, with [Planet]'s BAV of [Y], indicating [strength]." [AV-4] BAV OVERRIDE: If BAV < 3, predict struggle regardless of SAV.
+[AV-0] MANDATORY: Use the response template's "#### Ashtakavarga (SAV & BAV)" subsection in Astrological Analysis on every answer (not optional). [AV-1] Cite SAV & BAV for EVERY answer for houses and planets relevant to the question—natal themes, dasha lords' houses, and transits. [AV-2] HOUSE VS SIGN: If the JSON has **`D1.Ho`** (compact `ashtakavarga` agent) **or** **`ashtakavarga.d1_rashi.Ho`** (legacy parallel slice), you MUST take SAV (`s`) and per-planet BAV (`B`) from **`Ho`[house key "1"…"12"]** for any statement about "Nth house" — never index raw sign-order rows by house number. Arrays keyed by zodiac (e.g. `sarvashtakavarga` keys "0"…"11", or compact `D1.S` / `D1.B`) are **Aries→Pisces** only: index 0=Aries … 11=Pisces. [AV-3] FORMAT (after [AV-2]): "Ashtakavarga: House [N] ([Sign]) has [X] SAV, with [Planet]'s BAV of [Y], indicating [strength]."
+[AV-4] SAV BANDS (NON-NEGOTIABLE): SAV >= 30 = highly supportive; SAV 25-29 = workable/mixed support; SAV < 25 = resistance or delay-prone field.
+[AV-5] BAV DELIVERY FILTER (NON-NEGOTIABLE): The relevant event planet's BAV decides smoothness. BAV < 3 = blocked/strained delivery; BAV 3-4 = mixed/effortful; BAV >= 5 = smooth delivery.
+[AV-6] CONFLICT LOGIC: If house SAV is strong but relevant planet BAV is weak, phrase as "promise exists, delivery strained." If SAV is weak but relevant planet BAV is strong, phrase as "localized support inside an overall difficult field."
+[AV-7] NATAL VS TRANSIT: Natal AV describes baseline promise. Transit-period AV only modifies timing usability/confidence; AV alone does not create events without dasha support.
+[AV-8] D9 AV MAPPING: If D9 AV house mapping (`D9.Ho9` / equivalent) is present, use it as a secondary confirmation layer for relationship/dharma quality; do not let D9 override D1 timing filters.
 """
 
 # 6. RESPONSE SKELETON (Removed - handled by output_schema.py in gemini_chat_analyzer.py)
@@ -187,7 +226,9 @@ HOLISTIC_SYNTHESIS_RULE = """
 2. CONFLICT RESOLUTION: If branches conflict, state how you are resolving them (e.g., "While Parashari timing is good, the Nadi yoga points to stress, therefore the event will be a mix of success and pressure.")
 3. PRECEDENCE: As a general rule, use Parashari dasha/transit timing for the primary event ("what/when"), and other branches for nuance ("how/why")—including Nakshatra themes, KP cusp/sub-lord verdicts, or Ashtakavarga bindus when those passes contributed.
 3b. DASHA RETENTION: If branch analysis includes named dasha levels and date windows (e.g., MD/AD/PD, Chara MD/AD), you MUST retain and state them explicitly in the final synthesis.
-4. JUSTIFICATION: Your verdict must be a summary of the most critical factors. Example: "This verdict is reached based on: a) the strong Lagna Lord in a Kendra (Parashari), b) Saturn as the Atmakaraka (Jaimini), and c) the challenging Nadi Age progression at 46 (Nadi)."
+4. MARRIAGE VERDICT SHAPE: For marriage/spouse questions, the verdict must explicitly say four things where possible: **promise**, **timing window**, **manifestation quality**, and **continuity/stability**. Do not collapse attraction, proposal, legal marriage, and durable married life into one sentence.
+5. CAREER VERDICT SHAPE: For career/profession/field questions, the verdict must explicitly state: **best-fit field/domain**, **likely work function**, **employment vs business vs hybrid tendency**, **status/visibility level**, and **timing of entry/change** where available. Do not collapse talent, industry, job title, and public success into one fuzzy sentence.
+6. JUSTIFICATION: Your verdict must be a summary of the most critical factors. Example: "This verdict is reached based on: a) the strong Lagna Lord in a Kendra (Parashari), b) Saturn as the Atmakaraka (Jaimini), and c) the challenging Nadi Age progression at 46 (Nadi)."
 """
 
 # Parallel-chat MERGE only (used by `build_merge_synthesis_instruction`).
@@ -197,6 +238,8 @@ MERGE_FINAL_SYNTHESIS_RULE = """
 2. CONFLICT RESOLUTION: If branches conflict, explicitly explain to the user how you are resolving it (e.g. "While KP mathematics show a relationship trigger in 2025, Parashari and Nadi principles warn of a Gandanta placement, meaning a legal marriage now would face intense karmic friction. Therefore, 2032 is the safer window.").
 3. PRECEDENCE: Use Parashari dasha/transit timing for the primary event ("what/when"), and use the other branches to color the narrative with nuance ("how/why")—only using facts present in SPECIALIST_BRANCH_OUTPUTS_JSON; do not invent.
 4. DASHA MANDATE: If any branch provides explicit dasha references (Vimshottari, Chara, Yogini, etc.), include those named periods in your final reasoning; do not replace with generic wording.
+5. MARRIAGE MERGE RULE: For marriage/spouse questions, explicitly distinguish **promise**, **timing**, **manifestation**, and **continuity**. If Parashari says timing is active but Jaimini UL/A7 is obstructed, say **timing active, manifestation/continuity mixed**. If Jaimini promises alliance but Parashari dasha is weak, say **promise exists, timing weak**. Never flatten these into a fake consensus.
+6. CAREER MERGE RULE: For career/profession/field questions, explicitly distinguish **aptitude**, **field/domain**, **work function**, **status/visibility**, and **timing**. If Parashari shows strong work activation but Jaimini AL is weak, say **career activation exists, but recognition/public visibility is limited**. If Jaimini vocation signature is clear but active Parashari dashas are weak, say **aptitude is clear, but execution/timing is weaker**. Rank the most likely field(s); do not flatten all plausible careers into equal probability.
 """
 
 # 12. PARASHARI VIEW SECTION STRUCTURE - ADAPTIVE ANALYSIS
@@ -300,24 +343,40 @@ DAILY_PREDICTION_STRUCTURE = """
 LIFESPAN_EVENT_TIMING_STRUCTURE = """
 [LIFESPAN-1] ROLE: You are a Chronological Timing Specialist. Your goal is to find the "When" for a specific life event across a 40-year window.
 [LIFESPAN-2] METHODOLOGY:
-    1. **Identify Primary Significators**: Identify the primary House (e.g., 7th for marriage, 10th for career) and its Lord in D1. Also identify the **Lagna Lord** and the **Natural Significator** (e.g., Venus for marriage).
-    2. **Dasha Filter**: Scan Vimshottari MD/AD. The event is most likely when the period lord is connected to the primary house, its lord, or the Lagna lord.
-    3. **Double Transit (CRITICAL)**: Look for the "Double Transit" of Jupiter and Saturn. An event is triggered when BOTH aspect or occupy ANY of these:
+    1. **Identify Event-Specific Significators**: Identify the primary House, its Lord, the Lagna Lord, and the natural significator. Do NOT use one generic recipe for all events.
+       - **Marriage / relationship**: 7th house/lord, Venus/Jupiter, D9, and where relevant 2/7/11 for materialization.
+       - **Career / job / promotion**: 10th house/lord, Lagna lord, D10, Sun/Saturn/Mercury/Jupiter mix, and 2/6/10/11 for manifestation.
+       - **Childbirth / conception**: 5th house/lord, Jupiter, D7, and supportive 2/5/9/11.
+       - **Property / relocation**: 4th house/lord, Mars/Venus/Moon as relevant, D4, and 4/11/12 or 4/8 depending on acquisition vs sale/change.
+       - **Education**: 4th/5th/9th, Mercury/Jupiter, D24.
+       - **Health procedure / crisis**: 1st/6th/8th/12th, Lagna lord, relevant karakas, D30. Use caution language only; no death prediction.
+    2. **Dasha Filter (PRIMARY AUTHORITY)**: Scan Vimshottari MD/AD/PD and use the periods that most clearly connect to the event-specific houses, lords, and karakas. A static promise without active dasha support cannot be your top window.
+    3. **Double Transit (IMPORTANT, NOT UNIVERSAL BY ITSELF)**: Look for the "Double Transit" of Jupiter and Saturn. Treat it as a powerful confirmation layer, not a universal stand-alone forcing rule. An event is strengthened when BOTH aspect or occupy ANY of these:
        a) The primary House or its Lord.
        b) The Lagna or the Lagna Lord.
        🚨 PRECISION RULE: If Saturn is aspecting the House (e.g., 7th) while Jupiter is aspecting the Lord (e.g., 7th Lord) or the Lagna Lord, the event is forced.
        🚨 RELAXATION RULE: If the Dasha is exceptionally strong (e.g., MD/AD lords are 7th Lord and Venus), a "Partial Double Transit" where one planet aspects the 7th house and the other aspects the 2nd house (family) or Natal Venus is sufficient.
-    4. **Jaimini Execution (THE EXECUTIONER)**: For the exact month, use Chara Dasha Antardashas. 
-       🚨 MANDATORY RULE: The event is forced in the sub-period of the sign that contains the **Darakaraka** (for marriage) or the **Primary House Lord**. This sub-period is the "Executioner" and should be used to narrow down the year to a specific 12-month window.
-    5. **The 3-Step Precision Filter (MANDATORY)**: To find the exact month, you must follow this sequence:
-       a) **Year**: Defined by the Double Transit of Jupiter and Saturn on the primary house, its lord, or the 2nd house of family.
-       b) **Window**: Defined by the Chara Dasha sub-period of the sign containing the primary significator (e.g., Darakaraka).
-       c) **Exact Month (THE FINAL GATE)**: The event is "Physicalized" when transiting Jupiter makes a direct connection (conjunction or aspect) with ANY of these:
-          - **Natal Lagna Lord** or **Natal Moon** (The Self)
-          - **Natal 7th Lord** or **Natal Venus** (The Partner)
-          - **Natal 2nd Lord** (The Family)
-       🚨 CRITICAL: Do not just pick the first month of a Double Transit. Look for the month where the "Self" or "Partner" significators are touched by Jupiter's transit. If the year is 2005, and Jupiter aspects Natal Venus in November, the answer is November.
-    6. **Past vs Future**: If the event is in the past, treat it as a "Chart Validation" exercise. If in the future, treat it as a "Probability Window."
+    4. **Jaimini Execution (THE EXECUTIONER)**: For exact-month refinement, use Chara Dasha Antardashas with event-specific logic.
+       - Marriage: sign containing **Darakaraka**, UL/A7 support where available.
+       - Career: sign containing **Amatyakaraka** or strong 10th-work activation.
+       - Children: sign containing **Putrakaraka** or strong 5th-signification support.
+       - Property: sign connected to 4th lord / AL / relevant support sign.
+       🚨 Do not use Darakaraka as the executioner for every event type.
+    5. **Rank Candidate Windows Before You Narrate**:
+       a) Identify 3-5 candidate windows.
+       b) Rank them by **dasha strength + transit confirmation + divisional support + execution-month refinement**.
+       c) State what weakens lower-ranked windows. Do not present all windows as equally likely.
+    6. **Promise vs Execution Month (MANDATORY)**:
+       a) **Promise Window** = broader year/range where the event is ripe.
+       b) **Execution Window** = narrower months inside that range where manifestation is materially more likely.
+       c) **Peak Month** = the single best month only when the chart genuinely supports that precision.
+       🚨 If month precision is weak, say "best 2-3 month band" rather than inventing a false exact month.
+    7. **Negative Evidence Rules (MANDATORY)**:
+       - Marriage: if 6/8/12 dominate or D9/UL/A7 are hostile, say promise may exist but execution/continuity is weaker.
+       - Career: if D10 or 10th activation is weak, do not oversell title rise from one transit.
+       - Children: if D7 is weak or obstruction dominates, separate attempt windows from successful manifestation.
+       - Property: distinguish acquisition, sale, renovation, relocation, and debt/outflow; do not flatten them into "property event."
+    8. **Past vs Future**: If the event is in the past, treat it as a "Chart Validation" exercise and compare known windows. If in the future, treat it as a ranked probability forecast.
 [LIFESPAN-3] FORMAT: Use the LIFESPAN_EVENT_TIMELINE structure. Be precise with years and months if possible.
 [LIFESPAN-4] NO FILLER: Do not give general personality advice. Focus 100% on the timeline of the requested event.
 """

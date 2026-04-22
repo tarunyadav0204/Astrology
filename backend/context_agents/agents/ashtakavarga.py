@@ -91,6 +91,17 @@ def _asc_sign_0_from_static(static: Dict[str, Any]) -> Optional[int]:
     return None
 
 
+def _asc_sign_0_from_divisional(static: Dict[str, Any], key: str) -> Optional[int]:
+    d = static.get(key) or {}
+    if not isinstance(d, dict):
+        return None
+    deg = d.get("ascendant")
+    try:
+        return int(float(deg) // 30) % 12
+    except (TypeError, ValueError):
+        return None
+
+
 def _houses_from_lagna(
     sav12: List[int],
     bav_by_planet: Dict[str, List[int]],
@@ -147,9 +158,15 @@ def _compact_d9(d9: Any) -> Dict[str, Any]:
         r = _sav_row_from_block(sav_big)
         if r:
             out["S9"] = r
+    sav_list = out.get("S9") if isinstance(out.get("S9"), list) else [0] * 12
     bh = d9.get("bhinnashtakavarga")
     if isinstance(bh, dict) and bh:
-        out["B9"] = _bav_rows(bh)
+        b9 = _bav_rows(bh)
+        out["B9"] = b9
+        asc9 = d9.get("La9")
+        if isinstance(asc9, int) and 1 <= asc9 <= 12:
+            out["La9"] = asc9
+            out["Ho9"] = _houses_from_lagna(sav_list, b9, asc9 - 1)
     return out
 
 
@@ -173,6 +190,7 @@ class AshtakavargaAgent(ContextAgent):
         d1 = raw.get("d1_rashi") or {}
         d9 = raw.get("d9_navamsa") or {}
         asc0 = _asc_sign_0_from_static(static)
+        asc9_0 = _asc_sign_0_from_divisional(static, "d9_chart")
 
         out: Dict[str, Any] = {
             "a": self.agent_id,
@@ -180,6 +198,9 @@ class AshtakavargaAgent(ContextAgent):
             "sc": effective_time_scope(ctx).value,
             "D1": _compact_d1_block(d1, asc_sign_0=asc0),
         }
+        if asc9_0 is not None and isinstance(d9, dict):
+            d9 = dict(d9)
+            d9["La9"] = asc9_0 + 1
         d9c = _compact_d9(d9)
         if d9c:
             out["D9"] = d9c

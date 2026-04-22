@@ -50,6 +50,22 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 router = APIRouter()
 
 
+def _get_branch_outputs_bigquery_table() -> Optional[str]:
+    project = (os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID") or "").strip()
+    dataset = (
+        os.getenv("BIGQUERY_BRANCH_OUTPUTS_DATASET_ID")
+        or os.getenv("BIGQUERY_DATASET_ID")
+        or "activity"
+    ).strip()
+    table = (
+        os.getenv("BIGQUERY_BRANCH_OUTPUTS_TABLE_ID")
+        or "chat_branch_outputs"
+    ).strip()
+    if not project:
+        return None
+    return f"`{project}.{dataset}.{table}`"
+
+
 def _parse_parallel_llm_usage(raw: Any) -> Optional[Dict[str, Any]]:
     if not raw or not isinstance(raw, str):
         return None
@@ -826,6 +842,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                             cache_setup_tokens_display = _parallel_cache_setup_tokens(parallel_llm_usage_display) or None
                 messages.append(
                     {
+                        "message_id": r[0],
                         "sender": sender,
                         "content": content,
                         "timestamp": _timestamp_to_ist_iso(r[3]),
@@ -966,6 +983,74 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
     except Exception as e:
         logger.exception("Error fetching admin chat session details: session_id=%s", session_id)
         raise HTTPException(status_code=500, detail=f"Error fetching session details: {str(e)}")
+
+
+@router.get("/admin/chat/branch-analysis/{message_id}")
+async def get_branch_analysis_for_message(
+    message_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    """Fetch specialist branch outputs for a chat message from BigQuery."""
+    table = _get_branch_outputs_bigquery_table()
+    if not table:
+        raise HTTPException(status_code=503, detail="Branch-analysis BigQuery table is not configured")
+    try:
+        from google.cloud import bigquery
+        from google.oauth2 import service_account
+        from utils.env_json import parse_json_from_env
+
+        project = (os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID") or "").strip()
+        key = (
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY")
+            or os.getenv("GOOGLE_TTS_SERVICE_ACCOUNT_JSON")
+            or os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+            or ""
+        )
+        creds = None
+        if key and str(key).strip():
+            raw = str(key).strip()
+            info = parse_json_from_env(raw)
+            if info and isinstance(info, dict):
+                creds = service_account.Credentials.from_service_account_info(info)
+            elif os.path.isfile(raw):
+                creds = service_account.Credentials.from_service_account_file(raw)
+        client = bigquery.Client(project=project, credentials=creds) if creds else bigquery.Client(project=project)
+
+        query = f"""
+            SELECT created_at, specialist_branch_outputs
+            FROM {table}
+            WHERE message_id = @message_id
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        params = [bigquery.ScalarQueryParameter("message_id", "INT64", int(message_id))]
+        job = client.query(query, job_config=bigquery.QueryJobConfig(query_parameters=params))
+        rows = list(job)
+        if not rows:
+            return {"found": False, "message_id": int(message_id), "specialist_branch_outputs": None}
+
+        row = rows[0]
+        raw_payload = row.get("specialist_branch_outputs")
+        parsed = None
+        if isinstance(raw_payload, str) and raw_payload.strip():
+            try:
+                parsed = json.loads(raw_payload)
+            except Exception:
+                parsed = None
+        elif isinstance(raw_payload, dict):
+            parsed = raw_payload
+
+        return {
+            "found": bool(parsed),
+            "message_id": int(message_id),
+            "created_at": str(row.get("created_at")) if row.get("created_at") is not None else None,
+            "specialist_branch_outputs": parsed,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching branch analysis for message_id=%s", message_id)
+        raise HTTPException(status_code=500, detail=f"Error fetching branch analysis: {str(e)}")
 
 
 @router.get("/admin/chat/analysis-stats")

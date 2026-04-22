@@ -19,9 +19,11 @@ _disabled = None
 def _get_topic() -> Optional[str]:
     global _disabled
     if _disabled is True:
+        logger.warning("Activity: publish skipped because PUBSUB_ACTIVITY_TOPIC is disabled/unset")
         return None
     topic = os.getenv("PUBSUB_ACTIVITY_TOPIC", "").strip()
     if not topic:
+        logger.warning("Activity: PUBSUB_ACTIVITY_TOPIC is missing; publish is disabled")
         _disabled = True
         return None
     return topic
@@ -89,9 +91,11 @@ def _publish_sync(payload: dict) -> bool:
     """Publish one message to the activity topic. Runs in thread to avoid blocking."""
     topic_name = _get_topic()
     if not topic_name:
+        logger.warning("Activity: publish skipped (no topic). action=%s", payload.get("action"))
         return False
     client = _get_client()
     if not client:
+        logger.warning("Activity: publish skipped (pubsub client unavailable). action=%s", payload.get("action"))
         return False
     project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID", "").strip()
     if not project:
@@ -115,7 +119,12 @@ def _publish_sync(payload: dict) -> bool:
         future.result(timeout=5)
         return True
     except Exception as e:
-        logger.warning("Activity: Pub/Sub publish failed: %s", e)
+        logger.warning(
+            "Activity: Pub/Sub publish failed: action=%s topic=%s error=%s",
+            payload.get("action"),
+            topic_path,
+            e,
+        )
         return False
 
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import os
+from datetime import datetime
 from typing import Any, Dict, Optional, Set, Tuple
 
 from context_agents.base import AgentContext
@@ -82,6 +83,7 @@ def merged_context_to_agent_context(merged: Dict[str, Any], *, user_question: st
     )
 
     requested_period: Optional[Dict[str, Any]] = None
+    target_date = None
     if isinstance(intent_result, dict):
         tr = intent_result.get("transit_request")
         if isinstance(tr, dict):
@@ -90,6 +92,12 @@ def merged_context_to_agent_context(merged: Dict[str, Any], *, user_question: st
                 "end_year": tr.get("endYear"),
                 "yearMonthMap": tr.get("yearMonthMap", {}),
             }
+        as_of = intent_result.get("dasha_as_of")
+        if isinstance(as_of, str) and len(as_of) >= 10:
+            try:
+                target_date = datetime.strptime(as_of[:10], "%Y-%m-%d")
+            except ValueError:
+                target_date = None
 
     static_part, dynamic_part = _split_static_dynamic(merged)
 
@@ -98,7 +106,7 @@ def merged_context_to_agent_context(merged: Dict[str, Any], *, user_question: st
         user_question=user_question or "",
         intent_result=intent_result,
         requested_period=requested_period,
-        target_date=None,
+        target_date=target_date,
         time_scope=None,
         precomputed_static=static_part if static_part else None,
         precomputed_dynamic=dynamic_part if dynamic_part else None,

@@ -8,6 +8,7 @@ is true. Default production path is unchanged (flag off).
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import os
@@ -16,6 +17,65 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+_ALL_BRANCHES: Tuple[str, ...] = (
+    "parashari",
+    "jaimini",
+    "nadi",
+    "nakshatra",
+    "kp",
+    "ashtakavarga",
+    "sudarshan",
+)
+
+
+def _chart_focus_branch_plan(intent: Dict[str, Any]) -> Tuple[List[str], Optional[str]]:
+    """
+    Narrow specialist fan-out when the user explicitly asks for a specific chart/lens
+    such as Lagna, D9, or D10. This prevents irrelevant schools from muddying a
+    chart-scoped reading.
+    """
+    focus = intent.get("chart_focus")
+    if not isinstance(focus, dict) or focus.get("kind") != "chart_specific":
+        return list(_ALL_BRANCHES), None
+
+    primary = str(focus.get("primary") or "").strip()
+    label = str(focus.get("label") or primary or "chart")
+    enabled = {"parashari", "nakshatra"}
+
+    if primary in {"D9", "D10", "Karkamsa", "Swamsa"}:
+        enabled.add("jaimini")
+    if primary in {"D1"} and str(focus.get("label") or "").strip().lower() == "lagna":
+        enabled.discard("jaimini")
+
+    ordered = [b for b in _ALL_BRANCHES if b in enabled]
+    reason = f"chart_focus:{label}"
+    return ordered, reason
+
+
+def _skipped_branch_output(branch_label: str, reason: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    return (
+        {
+            "branch": branch_label,
+            "status": "skipped",
+            "analysis": "",
+            "bullets": [],
+            "skip_reason": reason,
+        },
+        {
+            "branch": f"parallel_{branch_label}",
+            "success": True,
+            "skipped": True,
+            "elapsed_ms": 0.0,
+            "output_chars": 0,
+            "output_tokens": 0,
+            "input_tokens": 0,
+            "cached_tokens": 0,
+            "non_cached_input_tokens": 0,
+            "static_chars": 0,
+            "dynamic_chars": 0,
+        },
+    )
 
 
 def _parallel_diag_enabled(name: str) -> bool:
@@ -159,6 +219,7 @@ def _merge_instruction_blocks(
 ) -> Tuple[str, str, str, str, str, str]:
     """Mirror `build_final_prompt` tail: language, elaborate, schema, user context, final checks."""
     intent_mode = _intent_mode(context, mode)
+    chart_focus = context.get("intent", {}).get("chart_focus")
     _lang = str(language or "english").strip() or "english"
     _lang_lower = _lang.lower()
 
@@ -200,7 +261,11 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
 - Prioritize depth and clarity. Output sufficient detail to justify the prediction.
 """
 
-    response_format_instruction = get_response_schema_for_mode(intent_mode, premium_analysis=premium_analysis)
+    response_format_instruction = get_response_schema_for_mode(
+        intent_mode,
+        premium_analysis=premium_analysis,
+        chart_focus=chart_focus if isinstance(chart_focus, dict) else None,
+    )
 
     user_context_instruction = ""
     if user_context:
@@ -464,6 +529,8 @@ async def run_parallel_chat_pipeline(
     ctx = astrological_context
     intent = ctx.get("intent") or {}
     category = intent.get("category", "general")
+    enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
+    enabled_branch_set = set(enabled_branches)
     use_agent_ctx = parallel_agent_context_enabled()
 
     hist_text = format_history_for_prompt(conversation_history)
@@ -479,7 +546,7 @@ async def run_parallel_chat_pipeline(
         av_payload = ap["ashtakavarga"]
         par_static = build_parashari_branch_static_agent(category)
         jm_static = build_jaimini_branch_static_agent()
-        nd_static = build_nadi_branch_static_agent()
+        nd_static = build_nadi_branch_static_agent(category)
         nk_static = build_nakshatra_branch_static_agent(category)
         kp_static = build_kp_branch_static_agent(category)
         av_static = build_ashtakavarga_branch_static_agent()
@@ -494,7 +561,7 @@ async def run_parallel_chat_pipeline(
         av_slice = build_ashtakavarga_slice(ctx)
         par_static = build_parashari_branch_static(category)
         jm_static = build_jaimini_branch_static()
-        nd_static = build_nadi_branch_static()
+        nd_static = build_nadi_branch_static(category)
         nk_static = build_nakshatra_branch_static(category)
         kp_static = build_kp_branch_static(category)
         av_static = build_ashtakavarga_branch_static()
@@ -518,6 +585,12 @@ async def run_parallel_chat_pipeline(
             "PARALLEL_CHAT_STAGGER stagger_s=%.3f (~%.1fs spread across 7 branch starts)",
             stagger_s,
             6 * stagger_s,
+        )
+    if branch_scope_reason:
+        logger.info(
+            "PARALLEL_BRANCH_SCOPE reason=%s enabled=%s",
+            branch_scope_reason,
+            ",".join(enabled_branches),
         )
 
     t_parallel = time.time()
@@ -586,7 +659,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=0.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "parashari" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("parashari", branch_scope_reason or "branch_filtered"))
         )
         jm_task = asyncio.create_task(
             _run_branch_json(
@@ -599,7 +672,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=1.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "jaimini" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("jaimini", branch_scope_reason or "branch_filtered"))
         )
         nd_task = asyncio.create_task(
             _run_branch_json(
@@ -612,7 +685,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=2.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "nadi" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("nadi", branch_scope_reason or "branch_filtered"))
         )
         nk_task = asyncio.create_task(
             _run_branch_json(
@@ -625,7 +698,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=3.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "nakshatra" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("nakshatra", branch_scope_reason or "branch_filtered"))
         )
         kp_task = asyncio.create_task(
             _run_branch_json(
@@ -638,7 +711,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=4.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "kp" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("kp", branch_scope_reason or "branch_filtered"))
         )
         av_task = asyncio.create_task(
             _run_branch_json(
@@ -651,7 +724,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=5.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "ashtakavarga" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("ashtakavarga", branch_scope_reason or "branch_filtered"))
         )
         sd_task = asyncio.create_task(
             _run_branch_json(
@@ -664,7 +737,7 @@ async def run_parallel_chat_pipeline(
                 start_delay_s=6.0 * stagger_s,
                 model_override=cached_model,
                 model_name_override=gemini_model_name if cached_model else None,
-            )
+            ) if "sudarshan" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("sudarshan", branch_scope_reason or "branch_filtered"))
         )
         (
             (par_out, par_m),
@@ -723,6 +796,11 @@ async def run_parallel_chat_pipeline(
         "kp": kp_out,
         "ashtakavarga": av_out,
         "sudarshan": sd_out,
+        "scope": {
+            "enabled_branches": enabled_branches,
+            "reason": branch_scope_reason,
+            "chart_focus": copy.deepcopy(intent.get("chart_focus")) if isinstance(intent.get("chart_focus"), dict) else None,
+        },
         "partial": {
             "jaimini": jm_out.get("status") == "unavailable" or bool(jm_out.get("error")),
             "nadi": nd_out.get("status") == "unavailable" or bool(nd_out.get("error")),
@@ -787,6 +865,12 @@ async def run_parallel_chat_pipeline(
     if cache_setup_input_tokens > 0:
         _parallel_totals["cache_setup_input_chars"] = int(cache_setup_input_chars)
         _parallel_totals["cache_setup_input_tokens"] = int(cache_setup_input_tokens)
+    _parallel_usage_payload = {
+        "stages": _parallel_usage_rows,
+        "totals": _parallel_totals,
+        # Persist specialist branch outputs for optional debug UX in clients/admin tools.
+        "specialist_branch_outputs": branch_bundle,
+    }
 
     if not syn.get("success") or not syn.get("response"):
         _log_parallel_llm_summary(_parallel_usage_rows)
@@ -810,10 +894,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 "chat_llm_model": syn.get("chat_llm_model")
                 or (get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()),
-                "parallel_llm_usage": {
-                    "stages": _parallel_usage_rows,
-                    "totals": _parallel_totals,
-                },
+                "parallel_llm_usage": _parallel_usage_payload,
                 "parallel_agent_context": use_agent_ctx,
             },
         }
@@ -847,10 +928,7 @@ async def run_parallel_chat_pipeline(
                 "parallel_chat_ms": parallel_ms,
                 "synthesis_ms": synthesis_ms,
                 "total_request_time": time.time() - total_request_start,
-                "parallel_llm_usage": {
-                    "stages": _parallel_usage_rows,
-                    "totals": _parallel_totals,
-                },
+                "parallel_llm_usage": _parallel_usage_payload,
                 "parallel_agent_context": use_agent_ctx,
             },
         }
@@ -908,9 +986,6 @@ async def run_parallel_chat_pipeline(
             "chat_llm_model": model_name,
             "parallel_pipeline": True,
             "parallel_agent_context": use_agent_ctx,
-            "parallel_llm_usage": {
-                "stages": _parallel_usage_rows,
-                "totals": _parallel_totals,
-            },
+            "parallel_llm_usage": _parallel_usage_payload,
         },
     }

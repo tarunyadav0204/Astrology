@@ -270,6 +270,86 @@ Vimshottari for a **chosen window**, not “now” (see **`vim_dasha`** for curr
 
 ---
 
+## Parallel Parashari derived block `px`
+
+Parallel Parashari branch payloads may also include a small derived block `px` built from
+`core_d1 + d1_graha + vim_dasha/dasha_win + transit_win + div_intent + parashari_day`.
+This is not a standalone context agent. It exists to give the LLM a compact Parashari
+reasoning spine instead of forcing it to recalculate topic houses, active dasha-lord
+house links, and short-term transit pressure from raw rows.
+
+```json
+{
+  "px": {
+    "src": "current",
+    "cat": "career",
+    "hs": [10, 6, 2, 11],
+    "dv": { "D10": true, "D9": true },
+    "D": {
+      "md": { "p": "Jupiter", "rh": [4, 7], "h": 10, "ahs": [2, 4, 6], "sn": "Gemini", "fn": "benefic", "d": "own_sign", "av": "Yuva", "sc": 73.5, "cb": false, "r": false },
+      "ad": { "p": "Saturn", "rh": [5, 6], "h": 8, "ahs": [2, 5, 10] }
+    },
+    "HI": {
+      "10": { "r": [], "o": ["md"], "a": ["ad"] },
+      "6": { "r": ["ad"], "o": [], "a": [] }
+    },
+    "TR": {
+      "n": 12,
+      "th": { "10": 2 },
+      "nh": { "6": 1 },
+      "dp": [{ "tp": "Saturn", "np": "Jupiter", "th": 10, "nh": 6, "at": "conj" }],
+      "pd": [["Saturn", "Jupiter", 2]]
+    }
+  }
+}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `src` | Time authority chosen for the question: `current`, `window`, or `day`. `day` means exact-day logic is active (`parashari_day.x=true`). |
+| `cat` | Router category used to choose the topic frame (`career`, `marriage`, `health`, etc.). |
+| `hs` | Priority whole-sign houses for that topic. Treat these as the main houses to evaluate first. |
+| `dv` | Topic-relevant divisionals and whether they are present in the payload (`true` / `false`). |
+| `D` | Active dasha lord summaries for `md` / `ad` / `pd` / `sk` / `pr` when available: `p` planet, `rh` ruled natal houses, `h` natal house placement, `ahs` aspect-target houses from that placement, `sn` sign name, plus `fn` / `d` / `av` / `sc` / `cb` / `r` copied from `d1_graha` where available. |
+| `HI` | House-impact summary for each topic house: `r` = dasha levels ruling it, `o` = occupying it, `a` = aspecting it. |
+| `TR` | Compact transit filter from `transit_win`: `n` total activation rows considered, `th` = transit-house hits on target houses, `nh` = natal-house hits on target houses, `dp` = up to 10 rows where an active dasha lord is involved, `pd` = slim period-dominance rows when `transit_win.p` exists. |
+| `career` | Dedicated compact career block: `hs` = career houses, `dv` = D10/D9 availability, `dom` = ranked activated houses, `mode` = `service` / `business` / `hybrid` / `unclear`, `work` = house-pattern scores, `vis` = visibility level, `fn` = ranked work-function tags from active dasha lords. |
+| `relationship` | Dedicated compact marriage/relationship block: `hs` = relationship houses, `dv` = D7/D9 availability, `dom` = ranked activated houses, `mat` = materialization score (2/7/11), `fr` = friction score (6/8/12), `ct` = continuity emphasis, `mode` = `supportive` / `mixed` / `obstructed`. |
+
+Interpretation guidance:
+- Use `px.src` before choosing whether to lean on `vim_dasha`, `dasha_win`, or exact-day `parashari_day`.
+- Use `px.hs` + `px.HI` as the first pass for topic questions, then refine with raw agent detail and relevant divisionals.
+- Use `px.career` and `px.relationship` when the question is specifically about career field/role or marriage/relationship manifestation; they are compact topic summaries, not replacements for raw graha evidence.
+- `px` is only a compact summary layer; raw evidence still lives under `parashari_agents`.
+
+---
+
+## `parashari_day` (`a` = `"parashari_day"`)
+
+Exact-day Parashari helper for **daily / specific-date** questions. Emits data only when the agent context carries **`dasha_as_of`** (or an equivalent exact-day focus). Otherwise returns `{ "x": false }`.
+
+| Key | Meaning |
+|-----|---------|
+| `x` | Boolean: exact-day data is present and should be used. |
+| `dt` | Target date `YYYY-MM-DD`. |
+| `P` | Daily Panchanga subset: `vr` = vara (weekday), `ti` = tithi name, `pk` = paksha, `yg` = yoga, `ka` = karana. |
+| `M` | Moon transit row: `{ "p", "s", "sn", "h", "dg", "nk", "pd", "nl" }` = planet, sign 1–12, sign name, house from natal lagna, degree in sign, nakshatra, pada, nakshatra lord. |
+| `F` | Fast-transit rows for `Sun`, `Moon`, `Mercury`, `Venus`, `Mars` using the same row shape as `M`. |
+
+```json
+{
+  "a": "parashari_day",
+  "v": 1,
+  "x": true,
+  "dt": "2026-04-23",
+  "P": { "vr": "Thursday", "ti": "Dwitiya", "pk": "Shukla", "yg": "Saubhagya", "ka": "Bava" },
+  "M": { "p": "Moon", "s": 2, "sn": "Taurus", "h": 11, "dg": 12.4, "nk": "Rohini", "pd": 1, "nl": "Moon" },
+  "F": [{ "p": "Mars", "s": 4, "sn": "Cancer", "h": 1, "dg": 21.1, "nk": "Ashlesha", "pd": 3, "nl": "Mercury" }]
+}
+```
+
+---
+
 ## `panch_maitri` (`a` = `"panch_maitri"`)
 
 **Panchadha maitri** (5-fold planetary friendship): compound of naisargika + tatkalika, same as chat static **`friendship_analysis.friendship_matrix`** from `FriendshipCalculator.calculate_friendship` (`ChatContextBuilder._build_static_context`). **Does not** emit Vedic **drishti** (`aspects_matrix`) or raw longitudes (`planet_positions`).
@@ -335,14 +415,15 @@ Sign integer **`s`** where present is **1–12** (Aries … Pisces), same as oth
 
 ## `jaimini` (`a` = `"jaimini"`)
 
-Static Jaimini bundle from `_build_static_context`: **`jaimini_points`**, **`chara_karakas`**, **`relationships.argala_analysis`**. Does **not** include dynamic **`jaimini_full_analysis`** (that is built in `_build_dynamic_context` with `focus_date`).
+Static Jaimini bundle from `_build_static_context`: **`jaimini_points`**, **`chara_karakas`**, **`relationships.argala_analysis`**. Does **not** include dynamic **`jaimini_full_analysis`** (that is built in `_build_dynamic_context` with `focus_date`). In parallel-agent mode, pair this with the separate **`chara_dasha`** agent for MD/AD timing.
 
 Sign integer **`s`** is **1–12** (Aries … Pisces). **`JP`** uses `sign_id` from the calculator (0–11) → **`s` = sign_id + 1**.
 
 | Key | Chat source | Meaning |
 |-----|-------------|---------|
-| `JP` | `jaimini_points` | Special lagnas: **`AL`** Arudha, **`A7`** Darapada, **`UL`** Upapada, **`KL`** Karkamsa, **`S9`** Swamsa (D9 asc), **`HL`** Hora, **`GL`** Ghatika — each `{ "s": 1–12 }` when present. |
+| `JP` | `jaimini_points` | Special lagnas: **`AL`** Arudha, **`A7`** Darapada, **`UL`** Upapada, **`KL`** Karkamsa, **`S9`** Swamsa (D9 asc), **`HL`** Hora, **`GL`** Ghatika — each `{ "s": 1–12, "pp": [planets occupying that sign] }` when present. |
 | `CK` | `chara_karakas.chara_karakas` | Seven karakas: **`AK`**, **`AmK`**, **`BK`**, **`MK`**, **`PK`**, **`GK`**, **`DK`** — each `{ "p": planet, "dg": degree in sign, "s": sign 1–12, "h": house }`. Omits `title` / `description` / `life_areas`. |
+| `PS` | `d1_chart.planets` + ascendant | Per-planet sign map `{ "Planet": { "s": 1–12 } }` plus `"Asc"`, used for compact Jaimini sign-relative reasoning and derived timing facts. |
 | `AG` | `relationships.argala_analysis` | Houses **`"1"`** … **`"12"`**: `n` = net_argala_strength, `g` = grade code (**1** = Very Strong Support … **7** = Very Strong Obstruction, **4** = Neutral), `ap` = Argala contributors `{ "p", "rs", "k" }` where **`k`** is **2 / 4 / 11** (Argala from 2nd / 4th / 11th from target), `vp` = Virodha `{ "p", "rs", "k" }` with **`k`** **12 / 10 / 3** (house label from calculator). Omits `shadbala_rupas`, `dignity`, long type strings. |
 
 **`g` (Argala grade) codes:** 1 Very Strong Support, 2 Strong Support, 3 Good Support, 4 Neutral, 5 Mild Obstruction, 6 Strong Obstruction, 7 Very Strong Obstruction.
@@ -351,10 +432,89 @@ Sign integer **`s`** is **1–12** (Aries … Pisces). **`JP`** uses `sign_id` f
 {
   "a": "jaimini",
   "v": 1,
-  "JP": { "AL": { "s": 3 }, "UL": { "s": 9 }, "KL": { "s": 5 } },
+  "JP": { "AL": { "s": 3, "pp": ["Jupiter"] }, "UL": { "s": 9, "pp": [] }, "KL": { "s": 5, "pp": ["Venus"] } },
   "CK": { "AK": { "p": "Venus", "dg": 28.5, "s": 6, "h": 2 } },
+  "PS": { "Sun": { "s": 12 }, "Moon": { "s": 7 }, "Asc": { "s": 4 } },
   "AG": {
     "1": { "n": 12.3, "g": 4, "ap": [{ "p": "Jupiter", "rs": 40.0, "k": 4 }], "vp": [] }
+  }
+}
+```
+
+Pair with `chara_dasha` when timing matters:
+
+```json
+{
+  "a": "chara_dasha",
+  "v": 1,
+  "sc": "current",
+  "P": [
+    {
+      "s": 9,
+      "nm": "Sagittarius",
+      "ic": true,
+      "ad": [
+        { "s": 5, "nm": "Leo", "ic": false },
+        { "s": 4, "nm": "Cancer", "ic": true }
+      ]
+    }
+  ]
+}
+```
+
+Parallel Jaimini branch may also include a small derived block `jx` built from `jaimini + chara_dasha`:
+
+| Key | Meaning |
+|-----|---------|
+| `md` / `ad` | Current Chara Mahadasha / Antardasha sign **1–12**. |
+| `rf` | Relative houses of active `md` / `ad` from special lagnas: `UL`, `A7`, `AL`, `KL` → `{ "md": 1–12, "ad": 1–12 }`. |
+| `kr` | Relative houses of active `md` / `ad` from key karaka signs: `AK`, `AmK`, `DK`, `GK` → `{ "md": 1–12, "ad": 1–12 }`. |
+| `dk_asp` | Grahas whose signs aspect the **DK sign** by Jaimini rashi drishti. |
+| `amk_ak` | Compact AK/AmK connection: `"conj"`, `"asp"`, or `"none"`. |
+| `ag7` | Argala grade code on the natal 7th house from lagna (same 1–7 scale as `AG`). |
+| `ul2` | 2nd from UL sign with occupants: `{ "s": 1–12, "pp": [...] }`. |
+| `al10` | 10th from AL sign with occupants: `{ "s": 1–12, "pp": [...] }`. |
+| `kl10` | 10th from KL sign with occupants: `{ "s": 1–12, "pp": [...] }`. |
+| `career` | Dedicated compact Jaimini career block: `amk` / `kl` / `al` signs, `rf` = MD/AD houses from AmK/KL/AL, `md` / `ad` = support band from AmK frame, `img.al10` / `img.kl10` = image/vocation sign occupants, `amk_ak` = compact AK/AmK connection. |
+| `relationship` | Dedicated compact Jaimini relationship block: `dk` / `ul` / `a7` signs, `rf` = MD/AD houses from DK/UL/A7, `md` / `ad` = A7 manifestation support band, `gk_a7` = direct obstruction flag, `mal_a7` / `ben_a7` = occupant tone, `ul_pp` / `ul2_pp` = alliance / continuity occupants, `ct` = continuity tone. |
+
+```json
+{
+  "jx": {
+    "md": 9,
+    "ad": 4,
+    "rf": { "UL": { "md": 1, "ad": 8 }, "A7": { "md": 7, "ad": 2 } },
+    "kr": { "DK": { "md": 10, "ad": 5 }, "AmK": { "md": 4, "ad": 11 } },
+    "dk_asp": ["Jupiter", "Saturn"],
+    "amk_ak": "asp",
+    "ag7": 5,
+    "ul2": { "s": 10, "pp": ["Mercury"] },
+    "al10": { "s": 12, "pp": ["Sun"] },
+    "kl10": { "s": 2, "pp": ["Venus"] },
+    "career": {
+      "amk": 6,
+      "kl": 5,
+      "al": 3,
+      "rf": { "amk": { "md": 10, "ad": 5 }, "kl": { "md": 4, "ad": 11 }, "al": { "md": 7, "ad": 2 } },
+      "md": "supportive",
+      "ad": "mixed",
+      "img": { "al10": ["Sun"], "kl10": ["Venus"] },
+      "amk_ak": "asp"
+    },
+    "relationship": {
+      "dk": 8,
+      "ul": 9,
+      "a7": 3,
+      "rf": { "dk": { "md": 10, "ad": 5 }, "ul": { "md": 1, "ad": 8 }, "a7": { "md": 7, "ad": 2 } },
+      "md": "supportive",
+      "ad": "mixed",
+      "gk_a7": false,
+      "mal_a7": [],
+      "ben_a7": ["Jupiter"],
+      "ul_pp": [],
+      "ul2_pp": ["Mercury"],
+      "ct": "supportive"
+    }
   }
 }
 ```
@@ -424,6 +584,70 @@ Bhrigu Nandi Nadi–style data that appears in **chat context** today (not the s
     "Saturn": { "s": 10, "rv": false, "ex": false, "t": ["Jupiter"], "f": [], "b": [], "o": ["Moon"], "a": ["Jupiter", "Moon"] }
   },
   "AA": { "y": 36, "k": ["Rohini", "Pushya"], "pl": [{ "p": "Mars", "n": "Rohini", "h": 5 }] }
+}
+```
+
+Parallel Nadi branch may also include a small derived block `nx` built from `nadi.LK + nadi.AA`:
+
+| Key | Meaning |
+|-----|---------|
+| `top` | Strongest Nadi grahas overall, ranked by compact linkage score. Each row: `p`, `sc`, `rv`, `ex`, `ln` where `ln` gives counts for `t` / `f` / `b` / `o`. |
+| `sig` | Compact pair-signatures derived from dominant grahas. Each row: `p` = 2-graha pair, `topic`, `tone`, `txt`, `sc`. This is a disciplined hint layer so the model can say what the pair means instead of improvising from raw links alone. |
+| `aa` | Compact age-activation mirror: `y`, `k`, `pl` (same `p` / `n` / `h` rows) when present; empty object if absent. |
+| `career` | Topic-focused Nadi career block: `dom` = dominant career grahas, `tags` = ranked work-style tags, `sig` = compact career signatures, `lead` = leading Nadi work-style, `aa` = age-hit career grahas, `aa_pl` = age-hit rows with nakshatra/house. |
+| `relationship` | Topic-focused Nadi relationship block: `dom` = dominant relationship grahas, `flags` = support/delay/karmic/friction markers, `sig` = relationship signatures, `lead` = primary relationship tone, `aa` = age-hit relationship grahas, `aa_pl` = age-hit rows. |
+| `wealth` | Topic-focused Nadi wealth block: `dom`, `tags`, `sig`, `lead`, `aa`, `aa_pl`. |
+| `health` | Topic-focused Nadi health block: `dom`, `flags`, `sig`, `lead`, `aa`, `aa_pl`. |
+
+```json
+{
+  "nx": {
+    "top": [
+      { "p": "Saturn", "sc": 8, "rv": false, "ex": false, "ln": { "t": 2, "f": 1, "b": 0, "o": 1 } }
+    ],
+    "sig": [
+      {
+        "p": ["Saturn", "Mercury"],
+        "topic": "career",
+        "tone": "analytical-systems",
+        "txt": "analytical, commercial, systems-oriented work",
+        "sc": 14
+      }
+    ],
+    "aa": { "y": 36, "k": ["Rohini", "Pushya"], "pl": [{ "p": "Mars", "n": "Rohini", "h": 5 }] },
+    "career": {
+      "dom": [{ "p": "Saturn", "sc": 8, "rv": false, "ex": false, "ln": { "t": 2, "f": 1, "b": 0, "o": 1 } }],
+      "tags": ["operations", "industry", "analysis"],
+      "sig": [{ "p": ["Saturn", "Mercury"], "topic": "career", "tone": "analytical-systems", "txt": "analytical, commercial, systems-oriented work", "sc": 14 }],
+      "lead": "operations",
+      "aa": ["Mars"],
+      "aa_pl": [{ "p": "Mars", "n": "Rohini", "h": 5 }]
+    },
+    "relationship": {
+      "dom": [{ "p": "Venus", "sc": 7, "rv": false, "ex": false, "ln": { "t": 2, "f": 0, "b": 1, "o": 1 } }],
+      "flags": ["support", "delay"],
+      "sig": [{ "p": ["Venus", "Saturn"], "topic": "relationship", "tone": "delay-duty", "txt": "delay, duty, sobriety, or karmic responsibility in relationships", "sc": 12 }],
+      "lead": "support",
+      "aa": [],
+      "aa_pl": []
+    },
+    "wealth": {
+      "dom": [{ "p": "Jupiter", "sc": 7, "rv": false, "ex": false, "ln": { "t": 2, "f": 0, "b": 1, "o": 1 } }],
+      "tags": ["guidance", "finance", "client-facing"],
+      "sig": [{ "p": ["Jupiter", "Venus"], "topic": "wealth", "tone": "prosperity-support", "txt": "prosperity, support, and value-building capacity", "sc": 13 }],
+      "lead": "guidance",
+      "aa": [],
+      "aa_pl": []
+    },
+    "health": {
+      "dom": [{ "p": "Saturn", "sc": 8, "rv": false, "ex": false, "ln": { "t": 2, "f": 1, "b": 0, "o": 1 } }],
+      "flags": ["chronic", "sensitive"],
+      "sig": [{ "p": ["Saturn", "Moon"], "topic": "health", "tone": "drain-stress", "txt": "stress, depletion, or chronic emotional burden", "sc": 13 }],
+      "lead": "chronic",
+      "aa": [],
+      "aa_pl": []
+    }
+  }
 }
 ```
 

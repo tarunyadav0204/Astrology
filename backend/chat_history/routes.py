@@ -5,9 +5,12 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timedelta
 import uuid
 import json
+import logging
 from auth import get_current_user
 from db import get_conn, execute
 from ai.question_heuristics import bundled_questions_clarification_reply, looks_like_many_questions
+
+logger = logging.getLogger(__name__)
 
 def sanitize_text(text):
     """Remove invalid Unicode characters and surrogates to prevent encoding attacks"""
@@ -280,7 +283,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         cur = execute(
             conn,
             """
-                SELECT message_id, sender, content, timestamp, terms, glossary, images, message_type, gate_metadata
+                SELECT message_id, sender, content, timestamp, terms, glossary, images, message_type, gate_metadata, parallel_llm_usage
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -330,6 +333,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             message_data["images"] = []
         mt = msg[7] if len(msg) > 7 else None
         gm = msg[8] if len(msg) > 8 else None
+        plu = msg[9] if len(msg) > 9 else None
         message_data["message_type"] = mt
         if gm:
             try:
@@ -728,7 +732,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 """
                     SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
                            cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
-                           cm.gate_metadata
+                           cm.gate_metadata, cm.parallel_llm_usage
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
                     WHERE cm.message_id = %s
@@ -743,7 +747,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             print(f"❌ [STATUS] Message {message_id} not found")
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -796,7 +800,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                         response["intent_gate"] = meta["intent_gate"]
                 except Exception:
                     pass
-                
+            
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
         elif status == "processing":
@@ -1575,9 +1579,61 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     
                     timing_save = result.get("timing") or {}
                     parallel_usage_blob = timing_save.get("parallel_llm_usage")
+                    specialist_branch_outputs = None
+                    if isinstance(parallel_usage_blob, dict):
+                        specialist_branch_outputs = parallel_usage_blob.get("specialist_branch_outputs")
+                        if "specialist_branch_outputs" in parallel_usage_blob:
+                            # Keep DB row lean: large specialist blobs are written to BigQuery.
+                            parallel_usage_blob = {
+                                k: v for k, v in parallel_usage_blob.items() if k != "specialist_branch_outputs"
+                            }
                     parallel_usage_json = (
                         json.dumps(parallel_usage_blob) if parallel_usage_blob else None
                     )
+
+                    if isinstance(specialist_branch_outputs, dict) and specialist_branch_outputs:
+                        try:
+                            from activity.publisher import publish_activity
+                            published = publish_activity(
+                                "chat_branch_outputs",
+                                user_id=int(user_id),
+                                resource_type="chat_message",
+                                resource_id=str(message_id),
+                                metadata={
+                                    "message_id": int(message_id),
+                                    "session_id": str(session_id),
+                                    "language": str(language or "english"),
+                                    "chat_llm_model": str(
+                                        result.get("chat_llm_model")
+                                        or (timing_save.get("chat_llm_model") or "")
+                                    ),
+                                    "question_preview": str(question or "")[:1000],
+                                    "specialist_branch_outputs": specialist_branch_outputs,
+                                },
+                            )
+                            if not published:
+                                logger.warning(
+                                    "chat_branch_outputs publish returned False: message_id=%s session_id=%s user_id=%s",
+                                    message_id,
+                                    session_id,
+                                    user_id,
+                                )
+                            else:
+                                logger.info(
+                                    "chat_branch_outputs published to Pub/Sub: message_id=%s session_id=%s user_id=%s",
+                                    message_id,
+                                    session_id,
+                                    user_id,
+                                )
+                        except Exception as e:
+                            # Never fail chat persistence because of debug telemetry sink.
+                            logger.exception(
+                                "chat_branch_outputs publish failed: message_id=%s session_id=%s user_id=%s error=%s",
+                                message_id,
+                                session_id,
+                                user_id,
+                                str(e),
+                            )
 
                     execute(
                         conn,

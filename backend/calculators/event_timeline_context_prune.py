@@ -51,10 +51,6 @@ _EVENT_TIMELINE_DROP_KEYS: FrozenSet[str] = frozenset(
         "prediction_matrix",
         "transit_optimization",
         "comprehensive_transit_analysis",
-        "transit_activations",
-        "unified_dasha_timeline",
-        "requested_dasha_summary",
-        "period_dasha_activations",
         "selected_period_focus",
         "bhavat_bhavam",
         # Large overlap with divisional D9 + D1 planetary_analysis

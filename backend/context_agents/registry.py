@@ -19,6 +19,8 @@ from context_agents.agents.chara_dasha import CharaDashaAgent
 from context_agents.agents.ashtakavarga import AshtakavargaAgent
 from context_agents.agents.nakshatra import NakshatraAgent
 from context_agents.agents.kp import KpAgent
+from context_agents.agents.parashari_day import ParashariDayAgent
+from context_agents.agents.health import HealthAgent
 
 _AGENTS: Dict[str, ContextAgent] = {
     CoreD1Agent.agent_id: CoreD1Agent(),
@@ -36,6 +38,8 @@ _AGENTS: Dict[str, ContextAgent] = {
     AshtakavargaAgent.agent_id: AshtakavargaAgent(),
     NakshatraAgent.agent_id: NakshatraAgent(),
     KpAgent.agent_id: KpAgent(),
+    ParashariDayAgent.agent_id: ParashariDayAgent(),
+    HealthAgent.agent_id: HealthAgent(),
 }
 
 

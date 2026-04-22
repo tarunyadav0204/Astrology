@@ -206,26 +206,58 @@ TEMPLATE_LIFESPAN_TIMELINE = """
 ### 🕰️ LIFESPAN EVENT TIMELINE (MANDATORY)
 Your response must be a chronological analysis of the specific event requested across the native's lifespan.
 
-1. <div class="quick-answer-card">**Executive Summary**: [Direct answer to the "When" question with the most likely window/year]</div>
+1. <div class="quick-answer-card">**Executive Summary**: [Direct answer naming the most likely window AND, when justified, the best month or 2-3 month execution band]</div>
 
-2. ### 🗓️ Chronological Potential Windows
-[List 3-5 specific time windows in chronological order]
+2. ### 🗓️ Ranked Potential Windows
+[List 3-5 specific time windows in ranked order, strongest first]
 - **Window [1/2/3]**: [Year/Period]
+  - **Promise Window**: [Broader year/range]
+  - **Execution Window**: [Best month or narrow month-band]
   - **Astrological Strength**: [High/Medium/Low]
-  - **Key Triggers**: [Briefly mention the Dasha and Transit alignment]
+  - **Key Triggers**: [Briefly mention the Dasha, divisional support, and transit alignment]
+  - **What Helps**: [Why this window is strong]
+  - **What Weakens It**: [Why it is not ranked even higher / what could obstruct]
   - **Manifestation**: [How the event is likely to occur in this period]
 
 3. ### 🔍 Technical Deep Dive
 - **Primary Dasha Promise**: [Analysis of the Mahadasha/Antardasha lords responsible]
+- **Candidate Ranking Logic**: [Why Window 1 outranks Window 2 and Window 3]
 - **Ashtakavarga (SAV & BAV)**: [MANDATORY: Cite SAV for relevant houses and BAV for key planets for the windows discussed; apply BAV override where BAV < 3]
 - **KP Cusp Confirmation**: [Check the relevant Cusp Sub-Lord (CSL) and its significations for the event]
-- **Transit Confirmations**: [Analysis of Jupiter/Saturn/Rahu transits for the key windows]
+- **Transit Confirmations**: [Analysis of Jupiter/Saturn/Rahu transits for the key windows and month-level execution points]
 - **Divisional Confirmation**: [Brief mention of D9/D10/D7 support]
 
 4. ### 💡 Guidance & Preparation
 [Actionable advice for the upcoming windows or reflection for past windows]
 
 <div class="final-thoughts-card">**Final Verdict**: [Summary of the most certain period and why]</div>
+"""
+
+TEMPLATE_CHART_FOCUS = """
+### 🪐 CHART-FOCUSED READING (MANDATORY)
+Use this structure when the user explicitly asks to analyze a specific chart or lens such as Lagna, D9/Navamsha, D10, Karkamsa, or Swamsa.
+
+1. <div class="quick-answer-card">**Quick Answer**: [Give the direct high-level reading of the requested chart. State what this chart/lens says overall about the native, in plain language, without splitting into school-wise sections.]</div>
+
+2. ### What This Chart Governs
+[Briefly explain what the requested chart/lens primarily represents in Jyotish and why it matters for the user's question.]
+
+3. ### Core Strengths
+[3-5 bullets naming the strongest supportive combinations, planets, houses, or signatures inside this chart/lens.]
+
+4. ### Core Challenges
+[3-5 bullets naming the main weaknesses, delays, contradictions, or karmic pressure points in this chart/lens.]
+
+5. ### Focused Interpretation
+[A unified synthesis of the requested chart. Blend Parashari, Jaimini, Nakshatra, and other relevant logic into one chart-centric explanation. Do NOT create separate sections titled "The Jaimini View", "Nadi Interpretation", "KP", or similar unless the user explicitly asked for school-by-school comparison.]
+
+6. ### Current Activation
+[Optional but preferred when dasha/transit/current-period support exists: explain whether the requested chart is presently activated, and through which current periods or triggers.]
+
+7. ### Practical Guidance
+[Actionable advice based on the requested chart's strengths and weaknesses.]
+
+8. <div class="final-thoughts-card">**Final Verdict**: [A concise final judgment centered on the requested chart/lens and its present relevance.]</div>
 """
 
 # Special Template for Mundane Astrology
@@ -294,7 +326,71 @@ SCHEMA_MAPPING = {
     'DEFAULT': TEMPLATE_DEEP_DIVE,
 }
 
-def get_response_schema_for_mode(mode: str, premium_analysis: bool = False) -> str:
+def _normalize_chart_focus_label(chart_focus: dict | None) -> str:
+    if not isinstance(chart_focus, dict):
+        return "requested chart"
+    label = (chart_focus.get("label") or chart_focus.get("primary") or "").strip()
+    return label or "requested chart"
+
+
+def _chart_focus_section_customizations(chart_focus: dict | None) -> tuple[str, str, str, str]:
+    primary = ""
+    if isinstance(chart_focus, dict):
+        primary = (chart_focus.get("primary") or "").strip()
+    if primary == "D1":
+        return (
+            "### Identity, Body, and Life Direction",
+            "[Explain how this chart/lens defines the native's identity, physical embodiment, temperament, and overall life direction.]",
+            "### Life Path Interpretation",
+            "[A unified reading of how the Lagna/D1 shapes the native's personality, vitality, orientation to life, and the broad direction of worldly experience.]",
+        )
+    if primary == "D9":
+        return (
+            "### Marriage, Dharma, and Maturity",
+            "[Explain how this chart/lens reflects marriage quality, dharmic alignment, inner maturity, and how the natal promise ripens over time.]",
+            "### Marriage and Dharma Interpretation",
+            "[A unified reading of relationship karma, spouse/marital quality, dharmic growth, and how the native matures through commitment, values, and inner development.]",
+        )
+    if primary == "D10":
+        return (
+            "### Vocation, Status, and Work Function",
+            "[Explain how this chart/lens reflects profession, public role, status, responsibility, and the kind of work the native is meant to perform.]",
+            "### Career and Work Interpretation",
+            "[A unified reading of vocation, work function, authority, visibility, contribution, and the way professional karma manifests in concrete roles.]",
+        )
+    return (
+        "### What This Chart Governs",
+        "[Briefly explain what the requested chart/lens primarily represents in Jyotish and why it matters for the user's question.]",
+        "### Focused Interpretation",
+        "[A unified synthesis of the requested chart. Blend Parashari, Jaimini, Nakshatra, and other relevant logic into one chart-centric explanation. Do NOT create separate sections titled \"The Jaimini View\", \"Nadi Interpretation\", \"KP\", or similar unless the user explicitly asked for school-by-school comparison.]",
+    )
+
+
+def _get_chart_focus_schema(chart_focus: dict | None) -> str:
+    label = _normalize_chart_focus_label(chart_focus)
+    schema = TEMPLATE_CHART_FOCUS.replace("requested chart/lens", f"{label} chart/lens")
+    schema = schema.replace("requested chart", label)
+    governs_header, governs_body, interp_header, interp_body = _chart_focus_section_customizations(chart_focus)
+    schema = schema.replace(
+        "### What This Chart Governs",
+        governs_header,
+    )
+    schema = schema.replace(
+        "[Briefly explain what the requested chart/lens primarily represents in Jyotish and why it matters for the user's question.]",
+        governs_body,
+    )
+    schema = schema.replace(
+        "### Focused Interpretation",
+        interp_header,
+    )
+    schema = schema.replace(
+        "[A unified synthesis of the requested chart. Blend Parashari, Jaimini, Nakshatra, and other relevant logic into one chart-centric explanation. Do NOT create separate sections titled \"The Jaimini View\", \"Nadi Interpretation\", \"KP\", or similar unless the user explicitly asked for school-by-school comparison.]",
+        interp_body,
+    )
+    return schema
+
+
+def get_response_schema_for_mode(mode: str, premium_analysis: bool = False, chart_focus: dict | None = None) -> str:
     """
     Selects the appropriate response schema based on the analysis mode.
     This function now centralizes the inclusion of common response blocks.
@@ -303,8 +399,13 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False) -> s
     if not mode:
         mode = 'DEFAULT'
     
-    # Select the base schema using the mapping, falling back to DEFAULT
-    base_schema = SCHEMA_MAPPING.get(mode.upper(), SCHEMA_MAPPING['DEFAULT'])
+    # Chart-focused questions should render as a unified chart reading rather than the
+    # normal multi-school deep-dive template.
+    if isinstance(chart_focus, dict) and chart_focus.get("kind") == "chart_specific":
+        base_schema = _get_chart_focus_schema(chart_focus)
+    else:
+        # Select the base schema using the mapping, falling back to DEFAULT
+        base_schema = SCHEMA_MAPPING.get(mode.upper(), SCHEMA_MAPPING['DEFAULT'])
     
     # Programmatically add common blocks to all schemas except special cases
     if mode.upper() not in ['DEV_EVENT_LOG', 'LIFESPAN_EVENT_TIMING']:
@@ -481,7 +582,11 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
 """
     
     # Use the new centralized schema selection function, using the reliable intent_mode
-    response_format_instruction = get_response_schema_for_mode(intent_mode, premium_analysis=premium_analysis)
+    response_format_instruction = get_response_schema_for_mode(
+        intent_mode,
+        premium_analysis=premium_analysis,
+        chart_focus=intent_block.get("chart_focus") if isinstance(intent_block.get("chart_focus"), dict) else None,
+    )
     
     from chat.system_instruction_config import build_system_instruction
     from calculators.mundane.mundane_context_builder import MundaneContextBuilder

@@ -60,20 +60,60 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
         
-        # Analyze current transit strength
-        total_transit_bindus = sum(transit_av['sarvashtakavarga'].values())
-        total_birth_bindus = sum(birth_av['sarvashtakavarga'].values())
-        
-        # Calculate strength based on bindu comparison
-        strength_ratio = total_transit_bindus / total_birth_bindus if total_birth_bindus > 0 else 1.0
-        
-        # Determine overall transit strength
-        if strength_ratio >= 1.1:
+        # Transit AV strength should be computed via local usability (SAV + transit planet BAV),
+        # not total bindu ratios (SAV totals are structurally redistributed).
+        def _sav_band(points):
+            if points >= 30:
+                return 'strong'
+            if points >= 25:
+                return 'workable'
+            return 'weak'
+
+        def _bav_band(points):
+            if points >= 5:
+                return 'supportive'
+            if points >= 3:
+                return 'mixed'
+            return 'blocked'
+
+        planet_usability_rows = []
+        supportive_hits = 0
+        obstructed_hits = 0
+        for planet, data in transit_planets.items():
+            planet_sign = data['sign']
+            sav_points = int(transit_av['sarvashtakavarga'].get(str(planet_sign), 0) or 0)
+            pchart = ((transit_av.get('individual_charts') or {}).get(planet) or {})
+            bindu_map = pchart.get('bindus') or {}
+            bav_points = int(bindu_map.get(planet_sign, bindu_map.get(str(planet_sign), 0)) or 0)
+            sav_band = _sav_band(sav_points)
+            bav_band = _bav_band(bav_points)
+            if sav_band == 'strong' and bav_band == 'supportive':
+                verdict = 'supportive'
+                supportive_hits += 1
+            elif sav_band == 'weak' or bav_band == 'blocked':
+                verdict = 'obstructed'
+                obstructed_hits += 1
+            else:
+                verdict = 'mixed'
+            planet_usability_rows.append(
+                {
+                    'planet': planet,
+                    'sign': planet_sign,
+                    'sign_name': sign_names[planet_sign],
+                    'sav': sav_points,
+                    'sav_band': sav_band,
+                    'bav': bav_points,
+                    'bav_band': bav_band,
+                    'verdict': verdict,
+                }
+            )
+
+        if supportive_hits > obstructed_hits:
             transit_strength = 'strong'
-        elif strength_ratio >= 0.95:
-            transit_strength = 'moderate'
-        else:
+        elif obstructed_hits > supportive_hits:
             transit_strength = 'weak'
+        else:
+            transit_strength = 'moderate'
         
         # Find signs with significant changes
         enhanced_signs = []
@@ -115,7 +155,8 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
             'favorable_activities': [],
             'avoid_activities': [],
             'best_timing': [],
-            'transit_strength': transit_strength
+            'transit_strength': transit_strength,
+            'planet_usability': planet_usability_rows,
         }
         
         # Favorable activities based on analysis
@@ -180,9 +221,9 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
         
-        # Calculate overall statistics
-        total_birth = sum(birth_av['sarvashtakavarga'].values())
-        total_transit = sum(transit_av['sarvashtakavarga'].values())
+        # Total SAV bindus are structurally invariant for a fixed rule matrix,
+        # so the useful comparison is redistribution across signs, not total delta.
+        total_bindus = sum(birth_av['sarvashtakavarga'].values())
         
         # Calculate distribution variance to show how much the energy has shifted
         total_absolute_change = sum(abs(transit_av['sarvashtakavarga'].get(str(i), 0) - birth_av['sarvashtakavarga'].get(str(i), 0)) for i in range(12))
@@ -229,16 +270,13 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         
         # Add summary statistics
         comparison['summary'] = {
-            'total_birth_bindus': total_birth,
-            'total_transit_bindus': total_transit,
-            'overall_change': total_transit - total_birth,
-            'overall_percentage': round((total_transit - total_birth) / total_birth * 100, 1) if total_birth > 0 else 0,
             'distribution_shift': int(distribution_shift),
-            'distribution_percentage': round((distribution_shift / total_birth * 100), 1) if total_birth > 0 else 0,
+            'distribution_percentage': round((distribution_shift / total_bindus * 100), 1) if total_bindus > 0 else 0,
             'significant_changes': significant_changes,
             'enhanced_signs': enhanced_count,
             'reduced_signs': reduced_count,
-            'stability_index': round((12 - significant_changes) / 12 * 100, 1)
+            'stability_index': round((12 - significant_changes) / 12 * 100, 1),
+            'comparison_basis': 'redistribution_only',
         }
         
         return comparison

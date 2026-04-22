@@ -1875,7 +1875,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                 .join(', ')
                             : '—'}
                         </td>
-                        <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                        <td>{new Date(user.created_at).toLocaleString()}</td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"

@@ -118,12 +118,15 @@ class SudarshanaDashaCalculator:
             merged_trigger['perspectives'] = perspectives
             
             if count == 3:
-                merged_trigger['confirmation'] = 'Triple - Guaranteed Event'
-                merged_trigger['intensity'] = 'Maximum'
+                merged_trigger['confirmation'] = 'Triple confirmation'
+                merged_trigger['confidence'] = 'very_high'
+                merged_trigger['intensity'] = 'Very High'
             elif count == 2:
-                merged_trigger['confirmation'] = 'Double - High Probability'
+                merged_trigger['confirmation'] = 'Double confirmation'
+                merged_trigger['confidence'] = 'high'
             else:
-                merged_trigger['confirmation'] = 'Single'
+                merged_trigger['confirmation'] = 'Single indication'
+                merged_trigger['confidence'] = 'moderate'
             
             merged.append(merged_trigger)
             i = j if j > i + 1 else i + 1
@@ -146,7 +149,7 @@ class SudarshanaDashaCalculator:
         return map.get(planet, "Karmic activation point")
 
     def _get_intensity(self, planet: str) -> str:
-        return "Critical" if planet in ["Mars", "Saturn", "Rahu", "Ketu"] else "High"
+        return "Elevated" if planet in ["Mars", "Saturn", "Rahu", "Ketu"] else "Supportive"
     
     def _get_house_signification(self, house: int) -> str:
         significations = {
@@ -181,5 +184,6 @@ class SudarshanaDashaCalculator:
             "significance": f"Year-clock enters {active_house}th house of {self._get_house_signification(active_house)}",
             "intensity": "Moderate",
             "confirmation": "House Activation",
+            "confidence": "moderate",
             "perspectives": ["Lagna"]
         }

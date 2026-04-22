@@ -96,7 +96,7 @@ class LifeEventScanner:
                     unique_events.append(e)
                     seen_years.add(e['year'])
             
-            return unique_events[:1] # Return ONLY the single strongest match for calibration
+            return unique_events[:3]  # Return multiple top windows instead of collapsing to one winner
             
         except Exception as e:
             print(f"❌ Scanner Logic Failed: {e}")

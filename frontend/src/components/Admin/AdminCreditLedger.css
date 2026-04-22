@@ -201,6 +201,35 @@
   font-size: 15px;
 }
 
+.ledger-summary {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ledger-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.ledger-summary-chip--bought {
+  color: #1b5e20;
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+}
+
+.ledger-summary-chip--spent {
+  color: #b71c1c;
+  background: #ffebee;
+  border-color: #ef9a9a;
+}
+
 .no-results-msg {
   margin: 0;
   padding: 24px;

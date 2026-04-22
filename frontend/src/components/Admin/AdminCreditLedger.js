@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminCreditLedger.css';
 
+const isoToday = () => new Date().toISOString().slice(0, 10);
+
 const AdminCreditLedger = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -20,7 +22,10 @@ const AdminCreditLedger = () => {
   }, []);
 
   useEffect(() => {
-    loadTransactions();
+    const today = isoToday();
+    setSearchFromDate(today);
+    setSearchToDate(today);
+    loadTransactions(today, today, '');
   }, []);
 
   const loadTransactions = async (fromDate = '', toDate = '', query = '') => {
@@ -124,6 +129,16 @@ const AdminCreditLedger = () => {
   };
 
   const showUserLedger = selectedUser;
+  const summary = searchResults.reduce(
+    (acc, tx) => {
+      const amt = Number(tx?.amount) || 0;
+      const isCredit = tx?.type === 'earned' || tx?.type === 'refund';
+      if (isCredit) acc.totalBought += Math.abs(amt);
+      else acc.totalSpent += Math.abs(amt);
+      return acc;
+    },
+    { totalBought: 0, totalSpent: 0 }
+  );
 
   return (
     <div className="admin-credit-ledger">
@@ -177,7 +192,7 @@ const AdminCreditLedger = () => {
               {searchLoading ? 'Searching…' : 'Search'}
             </button>
           </div>
-          <p className="search-hint">Default: last 30 days when dates are empty.</p>
+          <p className="search-hint">Default: today's records. Change dates and click Search for a custom range.</p>
           {searchError && <div className="search-error">{searchError}</div>}
         </section>
 
@@ -198,6 +213,14 @@ const AdminCreditLedger = () => {
                   <span className="results-filter"> · matching &quot;{searchQuery.trim()}&quot;</span>
                 )}
               </h2>
+              <div className="ledger-summary">
+                <span className="ledger-summary-chip ledger-summary-chip--bought">
+                  Total Bought: {summary.totalBought}
+                </span>
+                <span className="ledger-summary-chip ledger-summary-chip--spent">
+                  Total Spent: {summary.totalSpent}
+                </span>
+              </div>
               {searchResults.length > 0 ? (
               <div className="transactions-table wrap">
                 <table>

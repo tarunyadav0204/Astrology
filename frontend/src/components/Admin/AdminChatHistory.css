@@ -259,6 +259,137 @@
   opacity: 0.85;
 }
 
+.message-branch-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.message-branch-btn:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.admin-branch-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.55);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.admin-branch-modal {
+  width: min(1000px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-branch-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-branch-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.admin-branch-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.admin-branch-modal-body {
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.admin-branch-modal-error {
+  color: #b91c1c;
+}
+
+.admin-branch-sections {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-branch-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fcfdff;
+}
+
+.admin-branch-section summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #334155;
+  text-transform: capitalize;
+}
+
+.admin-branch-section ul {
+  margin: 8px 0 6px 18px;
+}
+
+.admin-branch-bullets li {
+  margin-bottom: 6px;
+  color: #334155;
+}
+
+.admin-branch-bullets li p {
+  margin: 0;
+}
+
+.admin-branch-analysis {
+  margin-top: 8px;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.admin-branch-analysis p {
+  margin: 0 0 10px;
+}
+
+.admin-branch-analysis h1,
+.admin-branch-analysis h2,
+.admin-branch-analysis h3,
+.admin-branch-analysis h4 {
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+
+.admin-branch-analysis ul,
+.admin-branch-analysis ol {
+  margin: 8px 0 10px 20px;
+}
+
+.admin-branch-analysis code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
 .session-detail-empty-title {
   margin: 0 0 8px 0;
   font-size: 1.15rem;

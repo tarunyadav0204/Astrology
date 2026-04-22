@@ -8,6 +8,13 @@ const AdminChatHistory = () => {
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sessionQuery, setSessionQuery] = useState('');
+  const [branchModal, setBranchModal] = useState({
+    open: false,
+    loading: false,
+    error: '',
+    messageId: null,
+    payload: null,
+  });
 
   useEffect(() => {
     fetchAllChatHistory();
@@ -43,6 +50,73 @@ const AdminChatHistory = () => {
       }
     } catch (error) {
       console.error('Error fetching session details:', error);
+    }
+  };
+
+  const closeBranchModal = () => {
+    setBranchModal({
+      open: false,
+      loading: false,
+      error: '',
+      messageId: null,
+      payload: null,
+    });
+  };
+
+  const stripBranchNoise = (txt) => {
+    if (!txt) return '';
+    return String(txt)
+      .replace(/\[LLM_ROUNDTRIP:[^\]]+\][^\n]*\n?/g, '')
+      .replace(/===== REQUEST part [^\n]*\n?/g, '')
+      .trim();
+  };
+
+  const getBranchTitle = (key) => {
+    const titles = {
+      parashari: 'Parashari',
+      jaimini: 'Jaimini',
+      nadi: 'Nadi',
+      nakshatra: 'Nakshatra',
+      kp: 'KP',
+      ashtakavarga: 'Ashtakavarga',
+      sudarshan: 'Sudarshan Chakra',
+    };
+    return titles[key] || String(key || '').replace(/^\w/, (c) => c.toUpperCase());
+  };
+
+  const openBranchAnalysis = async (messageId) => {
+    if (!messageId) return;
+    setBranchModal({
+      open: true,
+      loading: true,
+      error: '',
+      messageId,
+      payload: null,
+    });
+    try {
+      const response = await fetch(`/api/admin/chat/branch-analysis/${messageId}`, {
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        const t = await response.text().catch(() => '');
+        throw new Error(t || `Failed (${response.status})`);
+      }
+      const data = await response.json();
+      setBranchModal({
+        open: true,
+        loading: false,
+        error: '',
+        messageId,
+        payload: data?.specialist_branch_outputs || null,
+      });
+    } catch (e) {
+      setBranchModal({
+        open: true,
+        loading: false,
+        error: String(e?.message || 'Failed to load branch analysis'),
+        messageId,
+        payload: null,
+      });
     }
   };
 
@@ -149,6 +223,7 @@ const AdminChatHistory = () => {
   const msgCount = selectedSession?.messages?.length ?? 0;
 
   return (
+    <>
     <div
       className={`admin-chat-history${
         selectedSession ? ' admin-chat-history--thread-open' : ''
@@ -371,6 +446,16 @@ const AdminChatHistory = () => {
                       dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
                     />
                     <div className="message-meta">
+                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && (
+                        <button
+                          type="button"
+                          className="message-branch-btn"
+                          onClick={() => openBranchAnalysis(message.message_id)}
+                          title="Open specialist branch outputs"
+                        >
+                          Branch analysis
+                        </button>
+                      )}
                       {answerModelLabel && (
                         <span
                           className="message-token-badge"
@@ -645,6 +730,62 @@ const AdminChatHistory = () => {
         </div>
       </div>
     </div>
+    {branchModal.open && (
+      <div className="admin-branch-modal-overlay" onClick={closeBranchModal}>
+        <div className="admin-branch-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-branch-modal-header">
+            <h3>Branch analysis • Msg #{branchModal.messageId}</h3>
+            <button type="button" className="admin-branch-modal-close" onClick={closeBranchModal}>
+              ×
+            </button>
+          </div>
+          <div className="admin-branch-modal-body">
+            {branchModal.loading && <p>Loading branch analysis…</p>}
+            {!branchModal.loading && branchModal.error && (
+              <p className="admin-branch-modal-error">{branchModal.error}</p>
+            )}
+            {!branchModal.loading && !branchModal.error && !branchModal.payload && (
+              <p>No branch analysis found for this message.</p>
+            )}
+            {!branchModal.loading && !branchModal.error && branchModal.payload && (
+              <div className="admin-branch-sections">
+                {['parashari', 'jaimini', 'nadi', 'nakshatra', 'kp', 'ashtakavarga', 'sudarshan'].map((key) => {
+                  const node = branchModal.payload?.[key];
+                  if (!node || typeof node !== 'object') return null;
+                  const bullets = Array.isArray(node.bullets) ? node.bullets.filter(Boolean) : [];
+                  const analysis = stripBranchNoise(node.analysis || '');
+                  if (!analysis && bullets.length === 0) return null;
+                  return (
+                    <details key={key} className="admin-branch-section">
+                      <summary>{getBranchTitle(key)}</summary>
+                      {bullets.length > 0 && (
+                        <ul className="admin-branch-bullets">
+                          {bullets.slice(0, 12).map((b, i) => (
+                            <li
+                              key={`${key}-b-${i}`}
+                              dangerouslySetInnerHTML={{
+                                __html: formatMessageContent(stripBranchNoise(b)),
+                              }}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                      {analysis && (
+                        <div
+                          className="admin-branch-analysis enhanced-formatting"
+                          dangerouslySetInnerHTML={{ __html: formatMessageContent(analysis) }}
+                        />
+                      )}
+                    </details>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

@@ -18,6 +18,8 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID")
 DATASET_ID = os.getenv("BIGQUERY_DATASET_ID", "activity")
 TABLE_ID = os.getenv("BIGQUERY_TABLE_ID", "user_activity")
 FULL_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}" if PROJECT_ID else None
+BRANCH_TABLE_ID = os.getenv("BIGQUERY_BRANCH_OUTPUTS_TABLE_ID", "chat_branch_outputs")
+BRANCH_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{BRANCH_TABLE_ID}" if PROJECT_ID else None
 
 
 def _parse_iso_ts(s: str):
@@ -68,6 +70,49 @@ def _row_from_payload(msg_id: str, payload: dict) -> dict:
     }
 
 
+def _branch_row_from_payload(payload: dict) -> dict:
+    """Map chat_branch_outputs event payload to dedicated BigQuery row."""
+    created_at = payload.get("created_at")
+    if isinstance(created_at, str):
+        ts = _parse_iso_ts(created_at)
+    else:
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f UTC")
+
+    metadata = payload.get("metadata")
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except Exception:
+            metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    specialist_branch_outputs = metadata.get("specialist_branch_outputs")
+    if isinstance(specialist_branch_outputs, dict):
+        specialist_branch_outputs = json.dumps(specialist_branch_outputs, ensure_ascii=False)
+    elif not isinstance(specialist_branch_outputs, str):
+        specialist_branch_outputs = None
+
+    message_id = metadata.get("message_id")
+    if message_id is None:
+        message_id = payload.get("resource_id")
+    try:
+        message_id = int(message_id) if message_id is not None else None
+    except Exception:
+        message_id = None
+
+    return {
+        "created_at": ts,
+        "message_id": message_id,
+        "session_id": str(metadata.get("session_id") or ""),
+        "user_id": payload.get("user_id"),
+        "language": str(metadata.get("language") or ""),
+        "chat_llm_model": str(metadata.get("chat_llm_model") or ""),
+        "question_preview": str(metadata.get("question_preview") or "")[:1000],
+        "specialist_branch_outputs": specialist_branch_outputs,
+    }
+
+
 @app.route("/", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "activity-subscriber"}), 200
@@ -102,15 +147,31 @@ def push():
         logger.warning("Push: decode/parse failed: %s", e)
         return "", 200
 
-    row = _row_from_payload(msg_id, payload)
+    action = str(payload.get("action") or "").strip().lower()
+    if action == "chat_branch_outputs":
+        if not BRANCH_TABLE:
+            logger.error("BIGQUERY: branch outputs table not configured")
+            return jsonify({"error": "branch table not configured"}), 500
+        table_ref = BRANCH_TABLE
+        row = _branch_row_from_payload(payload)
+    else:
+        table_ref = FULL_TABLE
+        row = _row_from_payload(msg_id, payload)
 
     try:
         from google.cloud import bigquery
         client = bigquery.Client(project=PROJECT_ID)
-        errors = client.insert_rows_json(FULL_TABLE, [row])
+        errors = client.insert_rows_json(table_ref, [row])
         if errors:
             logger.warning("BigQuery insert_rows_json errors: %s", errors)
             return jsonify({"error": "insert failed", "details": str(errors)}), 500
+        if action == "chat_branch_outputs":
+            logger.info(
+                "Inserted chat_branch_outputs row: table=%s message_id=%s session_id=%s",
+                table_ref,
+                row.get("message_id"),
+                row.get("session_id"),
+            )
     except Exception as e:
         logger.exception("BigQuery insert failed: %s", e)
         return jsonify({"error": str(e)}), 500

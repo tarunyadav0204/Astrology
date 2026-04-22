@@ -813,8 +813,6 @@ class ChatContextBuilder:
             dob_dt = datetime.strptime(birth_data['date'], '%Y-%m-%d')
             
             # Calculate full sequence
-            full_chara_data = chara_calc.calculate_dasha(dob_dt)
-            
             # Determine focus date (PRIORITY ORDER)
             focus_date = datetime.now()
             
@@ -834,6 +832,10 @@ class ChatContextBuilder:
                 year = requested_period.get('startYear') or requested_period.get('start_year')
                 if year:
                     focus_date = datetime(int(year), 1, 1)
+
+            # Calculate full sequence aligned to the actual analysis date so both
+            # MD and AD "current" flags are correct for the user's asked timeframe.
+            full_chara_data = chara_calc.calculate_dasha(dob_dt, focus_date=focus_date)
             
             # Filter periods to only relevant ones for the transit period
             filtered_periods = []

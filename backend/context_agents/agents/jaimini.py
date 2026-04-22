@@ -80,15 +80,20 @@ def _grade_code(g: str) -> int:
     return _GRADE_CODE.get(g or "", 4)
 
 
-def _compact_jaimini_points(raw: Any) -> Dict[str, Dict[str, int]]:
-    out: Dict[str, Dict[str, int]] = {}
+def _compact_jaimini_points(raw: Any, sign_map: Dict[int, List[str]]) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
     if not isinstance(raw, dict):
         return out
     for long_k, short_k in _JP_BLOCKS:
         block = raw.get(long_k) or {}
         sid = block.get("sign_id") if isinstance(block, dict) else None
         if isinstance(sid, int):
-            out[short_k] = {"s": (int(sid) % 12) + 1}
+            s0 = int(sid) % 12
+            out[short_k] = {
+                "s": s0 + 1,
+                # Planets occupying the special lagna sign, needed for A7/UL/AL reading.
+                "pp": list(sign_map.get(s0, [])),
+            }
     return out
 
 
@@ -117,6 +122,21 @@ def _compact_chara_karakas(raw: Any) -> Dict[str, Dict[str, Union[str, int, floa
             "s": min(12, max(1, s12)),
             "h": row.get("house", 1),
         }
+    return out
+
+
+def _compact_planet_signs(d1: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
+    out: Dict[str, Dict[str, int]] = {}
+    planets = d1.get("planets") or {}
+    for planet, data in planets.items():
+        try:
+            out[str(planet)] = {"s": (int(data.get("sign")) % 12) + 1}
+        except (TypeError, ValueError, AttributeError):
+            continue
+    try:
+        out["Asc"] = {"s": (int(float(d1.get("ascendant", 0)) / 30) % 12) + 1}
+    except (TypeError, ValueError, AttributeError):
+        pass
     return out
 
 
@@ -204,11 +224,21 @@ class JaiminiAgent(ContextAgent):
             except Exception:
                 ag = {}
 
+        d1 = static.get("d1_chart") or {}
+        planets = d1.get("planets") or {}
+        sign_map: Dict[int, List[str]] = {i: [] for i in range(12)}
+        for planet, data in planets.items():
+            try:
+                sign_map[int(data.get("sign")) % 12].append(planet)
+            except (TypeError, ValueError, AttributeError):
+                continue
+
         return {
             "a": self.agent_id,
             "v": self.schema_version,
             "sc": effective_time_scope(ctx).value,
-            "JP": _compact_jaimini_points(jp),
+            "JP": _compact_jaimini_points(jp, sign_map),
             "CK": _compact_chara_karakas(ck),
+            "PS": _compact_planet_signs(d1),
             "AG": _compact_argala(ag),
         }

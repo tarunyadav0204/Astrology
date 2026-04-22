@@ -3,7 +3,8 @@ import json
 import os
 import re
 import asyncio
-from typing import Dict
+from datetime import datetime, timedelta
+from typing import Any, Dict
 
 from ai.question_heuristics import looks_like_many_questions
 
@@ -19,6 +20,33 @@ _HINGLISH_HINT_WORDS = frozenset({
     "rahega", "hogi", "hoga", "kar", "karo", "karna",
     "merko", "mujhe", "mujhko", "apna", "apni", "apne",
 })
+
+_MONTH_NAME_TO_NUM = {
+    "january": 1,
+    "jan": 1,
+    "february": 2,
+    "feb": 2,
+    "march": 3,
+    "mar": 3,
+    "april": 4,
+    "apr": 4,
+    "may": 5,
+    "june": 6,
+    "jun": 6,
+    "july": 7,
+    "jul": 7,
+    "august": 8,
+    "aug": 8,
+    "september": 9,
+    "sep": 9,
+    "sept": 9,
+    "october": 10,
+    "oct": 10,
+    "november": 11,
+    "nov": 11,
+    "december": 12,
+    "dec": 12,
+}
 
 
 def _contains_devanagari(text: str) -> bool:
@@ -118,9 +146,111 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
 }
 
 
+_CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("D1", ("d1", "rashi chart", "birth chart", "natal chart", "radix chart")),
+    ("LAGNA", ("lagna", "ascendant", "rising sign", "asc")),
+    ("D3", ("d3", "drekkana", "dreshkana", "drekkana")),
+    ("D4", ("d4", "chaturthamsa", "chaturthamsha")),
+    ("D7", ("d7", "saptamsa", "saptamsha")),
+    ("D9", ("d9", "navamsa", "navamsha", "navansh", "navamsh")),
+    ("D10", ("d10", "dashamsa", "dashamsha", "dasamsa", "dasamsha")),
+    ("D12", ("d12", "dwadasamsa", "dwadashamsha")),
+    ("D16", ("d16", "shodasamsa", "shodashamsha")),
+    ("D20", ("d20", "vimsamsa", "vimshamsa")),
+    ("D24", ("d24", "chaturvimsamsa", "siddhamsa", "siddhamsha")),
+    ("D27", ("d27", "nakshatramsa", "bhamsa", "bhamsha")),
+    ("D30", ("d30", "trimsamsa", "trimshamsha")),
+    ("D40", ("d40", "khavedamsa", "khavedamsha")),
+    ("D45", ("d45", "akshavedamsa", "akshavedamsha")),
+    ("D60", ("d60", "shashtiamsa", "shashtiamsha")),
+    ("Karkamsa", ("karkamsa",)),
+    ("Swamsa", ("swamsa",)),
+)
+
+_CHART_FOCUS_CUES = (
+    "analyze",
+    "analyse",
+    "reading",
+    "read",
+    "interpret",
+    "tell me about",
+    "focus on",
+    "deep dive",
+    "explain",
+    "how is my",
+    "what does my",
+    "review",
+)
+
+
 def get_default_divisional_charts_for_category(category: str) -> list[str]:
     """Return the canonical divisional chart list for a router category (D1 baseline + topic charts)."""
     return list(_DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY.get((category or "general").strip().lower(), ["D1", "D9"]))
+
+
+def _normalize_chart_focus_code(code: str) -> str:
+    token = (code or "").strip()
+    if not token:
+        return ""
+    if token == "LAGNA":
+        return "D1"
+    return _canonical_divisional_token(token)
+
+
+def extract_chart_focus_from_question(user_question: str) -> Dict[str, Any] | None:
+    """
+    Detect explicit chart-scoped asks such as "analyze my lagna", "read my D10", or
+    "interpret my navamsha". This is deterministic so branch selection is stable.
+    """
+    q = (user_question or "").strip()
+    if not q:
+        return None
+    low = q.lower()
+
+    matched_code = ""
+    matched_phrase = ""
+    candidates: list[tuple[str, str]] = []
+    for code, phrases in _CHART_FOCUS_SYNONYMS:
+        for phrase in phrases:
+            candidates.append((code, phrase))
+    candidates.sort(key=lambda item: len(item[1]), reverse=True)
+
+    for code, phrase in candidates:
+        if not phrase:
+            continue
+        pattern = rf"(?<![a-z0-9]){re.escape(phrase)}(?![a-z0-9])"
+        if re.search(pattern, low):
+                matched_code = code
+                matched_phrase = phrase
+                break
+    if matched_code:
+        pass
+
+    if not matched_code:
+        return None
+
+    explicit = any(cue in low for cue in _CHART_FOCUS_CUES)
+    if not explicit:
+        short_patterns = (
+            low.startswith(matched_phrase),
+            low.endswith(matched_phrase),
+            low in {matched_phrase, f"my {matched_phrase}", f"{matched_phrase} analysis"},
+            bool(re.search(rf"\b{re.escape(matched_phrase)}\b", low) and len(low.split()) <= 8),
+        )
+        explicit = any(short_patterns)
+    if not explicit:
+        return None
+
+    primary = _normalize_chart_focus_code(matched_code)
+    label = "Lagna" if matched_code == "LAGNA" else primary
+    return {
+        "kind": "chart_specific",
+        "primary": primary,
+        "label": label,
+        "explicit": True,
+        "phrase": matched_phrase,
+        "requested": [primary] if primary else [],
+    }
 
 
 def _canonical_divisional_token(c: str) -> str:
@@ -165,6 +295,76 @@ def merge_divisional_charts_with_category_defaults(result: Dict) -> None:
     result["divisional_charts"] = out
 
 
+def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None:
+    """
+    Attach deterministic chart-focus metadata and ensure explicitly requested divisionals
+    are available downstream even when the router category is broad/general.
+    """
+    focus = extract_chart_focus_from_question(user_question)
+    if not focus:
+        return
+    result["chart_focus"] = focus
+    result.setdefault("extracted_context", {})
+    if isinstance(result["extracted_context"], dict):
+        result["extracted_context"]["chart_focus"] = {
+            "primary": focus.get("primary"),
+            "label": focus.get("label"),
+        }
+    primary = _normalize_chart_focus_code(str(focus.get("primary") or ""))
+    if not primary or primary == "D1":
+        return
+    raw = result.get("divisional_charts")
+    charts = raw if isinstance(raw, list) else []
+    canonical = [_canonical_divisional_token(c) for c in charts if isinstance(c, str) and c.strip()]
+    if primary not in canonical:
+        canonical.append(primary)
+    result["divisional_charts"] = canonical
+
+
+def _extract_specific_date_from_question(user_question: str, *, now: datetime) -> str | None:
+    q = (user_question or "").strip()
+    if not q:
+        return None
+    low = q.lower()
+
+    if "day after tomorrow" in low:
+        return (now + timedelta(days=2)).strftime("%Y-%m-%d")
+    if "tomorrow" in low:
+        return (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    if "today" in low:
+        return now.strftime("%Y-%m-%d")
+
+    m = re.search(r"\b(20\d{2})-(\d{2})-(\d{2})\b", q)
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+
+    month_re = r"(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)"
+    pat1 = re.search(rf"\b{month_re}\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b", low)
+    if pat1:
+        mon = _MONTH_NAME_TO_NUM.get(pat1.group(1))
+        day = int(pat1.group(2))
+        year = int(pat1.group(3)) if pat1.group(3) else now.year
+        try:
+            return datetime(year, mon, day).strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+
+    pat2 = re.search(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+{month_re}(?:,?\s+(20\d{{2}}))?\b", low)
+    if pat2:
+        day = int(pat2.group(1))
+        mon = _MONTH_NAME_TO_NUM.get(pat2.group(2))
+        year = int(pat2.group(3)) if pat2.group(3) else now.year
+        try:
+            return datetime(year, mon, day).strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+
+    return None
+
+
 def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int) -> None:
     """
     Post-process router output: career/education (and related) questions that ask *when* or *whether*
@@ -172,6 +372,23 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     """
     q = (user_question or "").strip().lower()
     cat = (result.get("category") or "general").strip().lower()
+    now = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    exact_date = _extract_specific_date_from_question(user_question, now=now)
+
+    if exact_date:
+        dt = datetime.strptime(exact_date, "%Y-%m-%d")
+        month_name = dt.strftime("%B")
+        result["needs_transits"] = True
+        result["dasha_as_of"] = exact_date
+        result.setdefault("extracted_context", {})
+        if isinstance(result["extracted_context"], dict):
+            result["extracted_context"]["specific_date"] = exact_date
+        result["transit_request"] = {
+            "startYear": dt.year,
+            "endYear": dt.year,
+            "yearMonthMap": {str(dt.year): [month_name]},
+        }
+
     careerish = cat in frozenset({"education", "career", "job", "promotion", "business"})
     if not careerish:
         return
@@ -615,6 +832,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             if 'divisional_charts' not in result:
                 result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
             merge_divisional_charts_with_category_defaults(result)
+            apply_chart_focus_guards(result, user_question)
             # Only keep chart_insights when the model returned a valid list of insight objects
             raw_insights = result.get('chart_insights')
             if isinstance(raw_insights, list) and raw_insights:
@@ -666,7 +884,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             is_daily_question = any(w in user_question.lower() for w in ['today', 'daily'])
 
             if is_daily_question:
-                return {
+                result = {
                     "status": "READY", "extracted_context": {}, "mode": "PREDICT_DAILY", "context_type": "birth", "category": "general", "needs_transits": True,
                     "divisional_charts": ["D1", "D9"],
                     "chart_insights": [],
@@ -675,8 +893,10 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                         "yearMonthMap": {str(current_year): [current_month]}
                     }
                 }
+                apply_chart_focus_guards(result, user_question)
+                return result
             elif is_timing_question:
-                return {
+                result = {
                     "status": "READY", "extracted_context": {}, "mode": "PREDICT_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,
                     "divisional_charts": ["D1", "D9"],
                     "chart_insights": [],
@@ -685,12 +905,16 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                         "yearMonthMap": {str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)}
                     }
                 }
+                apply_chart_focus_guards(result, user_question)
+                return result
             else:
-                return {
+                result = {
                     "status": "READY", "extracted_context": {}, "mode": "ANALYZE_PERSONALITY", "context_type": "birth", "category": "general", "needs_transits": False,
                     "divisional_charts": ["D1", "D9"],
                     "chart_insights": [],
                 }
+                apply_chart_focus_guards(result, user_question)
+                return result
     
     def _get_default_divisional_charts(self, category: str) -> list:
         """Get default divisional charts based on question category (see _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY)."""

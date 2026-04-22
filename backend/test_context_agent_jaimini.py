@@ -34,7 +34,7 @@ def test_jaimini_aligns_with_static(context_agent_cached):
     )
     assert out["a"] == "jaimini"
     assert out["v"] == 1
-    assert set(out.keys()) == {"a", "v", "sc", "JP", "CK", "AG"}
+    assert set(out.keys()) == {"a", "v", "sc", "JP", "CK", "PS", "AG"}
 
     for long_k, short_k in (
         ("arudha_lagna", "AL"),
@@ -52,6 +52,10 @@ def test_jaimini_aligns_with_static(context_agent_cached):
         assert out["CK"]["AK"]["p"] == ak["planet"]
         assert out["CK"]["AK"]["h"] == ak.get("house")
         assert out["CK"]["AK"]["s"] == int(ak.get("sign", 0)) + 1
+
+    moon_sign = (((static.get("d1_chart") or {}).get("planets") or {}).get("Moon") or {}).get("sign")
+    if isinstance(moon_sign, int):
+        assert out["PS"]["Moon"]["s"] == moon_sign + 1
 
     if isinstance(ag_raw, dict) and ag_raw:
         h1 = ag_raw.get(1) or ag_raw.get("1")

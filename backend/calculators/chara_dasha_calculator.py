@@ -16,14 +16,14 @@ class CharaDashaCalculator:
         self.planets = chart_data.get('planets', {})
         self.ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
 
-    def calculate_dasha(self, dob_dt: datetime) -> Dict[str, Any]:
+    def calculate_dasha(self, dob_dt: datetime, focus_date: datetime | None = None) -> Dict[str, Any]:
         """Generates the Chara Dasha sequence and timing with antardashas."""
         dasha_order = self._get_dasha_sequence(self.ascendant_sign, is_mahadasha=True)
         dasha_periods = []
         start_date = dob_dt
         
-        # FIX: Get 'now' in the SAME timezone as dob_dt
-        current_time = self._get_current_datetime(dob_dt)
+        # Use explicit analysis focus date when provided; otherwise fall back to "now"
+        current_time = self._normalize_focus_datetime(focus_date, dob_dt)
         
         for sign_idx in dasha_order:
             years = self._calculate_dasha_length(sign_idx)
@@ -199,15 +199,18 @@ class CharaDashaCalculator:
         """Normalize degree to 0-30 range for sign-based calculations."""
         return degree % 30
     
-    def _get_current_datetime(self, reference_dt: datetime) -> datetime:
-        """Get current datetime matching the timezone of the reference."""
-        now = datetime.now()
+    def _normalize_focus_datetime(self, focus_dt: datetime | None, reference_dt: datetime) -> datetime:
+        """Normalize explicit focus time (or now) to the datetime style of the birth reference."""
+        if focus_dt is None:
+            now = datetime.now(reference_dt.tzinfo) if reference_dt.tzinfo else datetime.now()
+            return now if reference_dt.tzinfo else now.replace(tzinfo=None)
+
         if reference_dt.tzinfo:
-            # If input has timezone, convert 'now' to that timezone
-            return datetime.now(reference_dt.tzinfo)
-        else:
-            # If input is naive, ensure 'now' is naive
-            return now.replace(tzinfo=None)
+            if focus_dt.tzinfo is None:
+                return focus_dt.replace(tzinfo=reference_dt.tzinfo)
+            return focus_dt.astimezone(reference_dt.tzinfo)
+
+        return focus_dt.replace(tzinfo=None) if focus_dt.tzinfo else focus_dt
 
     
     def _calculate_antardashas(self, maha_sign_id: int, total_years: int, start_date: datetime, current_time: datetime) -> List[Dict]:

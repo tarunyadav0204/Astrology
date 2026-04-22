@@ -41,20 +41,79 @@ class SudarshanaChakraCalculator:
             
         return rotated_houses
 
-    def _synthesize_perspectives(self) -> Dict[str, str]:
-        """Identifies patterns visible in all 3 charts."""
-        insights = []
-        
+    def _synthesize_perspectives(self) -> Dict[str, Any]:
+        """Identify tri-perspective house patterns in a reusable compact form."""
+        insights: List[str] = []
+
         lagna = self._rotate_chart(self.ascendant)
         moon = self._rotate_chart(self.moon_long)
         sun = self._rotate_chart(self.sun_long)
-        
+
+        perspective_maps = {
+            "lagna": lagna,
+            "moon": moon,
+            "sun": sun,
+        }
+        benefics = {"Jupiter", "Venus", "Mercury", "Moon"}
+        malefics = {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}
+        supportive_houses = {1, 2, 4, 5, 7, 9, 10, 11}
+        obstructive_houses = {6, 8, 12}
+
+        house_rows = []
+        for house in range(1, 13):
+            present_in = []
+            benefic_hits = 0
+            malefic_hits = 0
+            occupants: Dict[str, List[str]] = {}
+            for label, pmap in perspective_maps.items():
+                occ = sorted([planet for planet, h in pmap.items() if h == house])
+                if occ:
+                    present_in.append(label)
+                    occupants[label] = occ
+                benefic_hits += len([planet for planet in occ if planet in benefics])
+                malefic_hits += len([planet for planet in occ if planet in malefics])
+
+            agreement = len(present_in)
+            if house in supportive_houses and agreement >= 2 and benefic_hits >= malefic_hits:
+                band = "supportive"
+            elif house in obstructive_houses and agreement >= 2 and malefic_hits >= benefic_hits:
+                band = "challenging"
+            elif agreement >= 2:
+                band = "mixed"
+            else:
+                band = "weak"
+
+            house_rows.append(
+                {
+                    "h": house,
+                    "agree": agreement,
+                    "in": present_in,
+                    "ben": benefic_hits,
+                    "mal": malefic_hits,
+                    "band": band,
+                    "occ": occupants,
+                }
+            )
+
+        house_rows.sort(key=lambda row: (-int(row["agree"]), -int(row["ben"]), int(row["mal"]), int(row["h"])))
+
         bad_houses = [6, 8, 12]
         sat_l = lagna.get('Saturn')
         sat_m = moon.get('Saturn')
         sat_s = sun.get('Saturn')
-        
+
         if sat_l in bad_houses and sat_m in bad_houses and sat_s in bad_houses:
             insights.append("Saturn is consistently difficult (in 6/8/12) from Body, Mind, and Soul.")
-        
-        return {"patterns": insights}
+
+        strong_333 = [row["h"] for row in house_rows if row["agree"] == 3 and row["band"] == "supportive"][:4]
+        hard_333 = [row["h"] for row in house_rows if row["agree"] == 3 and row["band"] == "challenging"][:4]
+        if strong_333:
+            insights.append(f"Strong 3/3 alignment on houses {strong_333}.")
+        if hard_333:
+            insights.append(f"Challenging 3/3 alignment on houses {hard_333}.")
+
+        return {
+            "patterns": insights,
+            "house_agreement": house_rows,
+            "dominant_houses": [row["h"] for row in house_rows[:5]],
+        }
