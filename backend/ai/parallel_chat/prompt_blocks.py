@@ -48,6 +48,8 @@ Return a single JSON object only (no markdown fences, no prose before or after).
   "bullets": ["<optional short fact bullets>"]
 }
 Keep "analysis" under 12000 characters. Use ONLY the variable JSON in the same message.
+ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or soften conclusions for politeness. Do not use motivational filler.
+DASHA MANDATE: If dasha/chara/yogini period labels or windows are present in the payload, explicitly cite them in "analysis" (do not replace with generic timing language).
 """
 
 _PARASHARI_JSON_FOOTER = """
@@ -60,6 +62,8 @@ Return a single JSON object only (no markdown fences, no prose before or after).
 }
 Keep "analysis" under 12000 characters. Use ONLY the variable JSON in the same message.
 If `special_points.yogi_points` is present in VARIABLE_DATA_JSON (non-empty / populated), the markdown inside "analysis" MUST include a distinct subsection titled exactly #### Yogi & Avayogi Karma in which you explicitly list and interpret all four: **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** (lords and signs as given), each in relation to the user's question and relevant houses. Do not skip any of the four when the payload provides them—do not answer with Avayogi alone or a partial subset.
+ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or soften conclusions for politeness. Do not use motivational filler.
+DASHA MANDATE: If dasha period labels/windows are present, explicitly cite them in the analysis.
 """
 
 MERGE_ROLE_PREAMBLE = """
@@ -75,7 +79,9 @@ You receive:
 You must:
 - Produce ONE answer following the RESPONSE FORMAT template below (same section headers as legacy single-pass).
 - Synthesize branch findings into those sections: Parashari drives primary "what/when"; weave in Jaimini/Nadi/Nakshatra/KP/Ashtakavarga/Sudarshana when present. If a branch is missing or status=unavailable, note briefly under that #### subsection and continue.
-- Obey [MERGE-VOICE], [MERGE-HONESTY], [MERGE-TIME], and [SYNTH-FINAL] in the merge doctrine block below: you are the only voice the user sees—fluid expert prose, not raw dumps or robotic step lists; end with **Final Verdict** (confluence, conflict resolution, precedence).
+- Obey [MERGE-VOICE], [MERGE-HONESTY], [MERGE-TIME], [MERGE-DASHA-SOVEREIGNTY], and [SYNTH-FINAL] in the merge doctrine block below.
+- If any branch provides explicit dasha/chara/yogini period names or date windows, you MUST retain them in final output (do not collapse into generic timing prose).
+- Prioritize strict technical accuracy over conversational softness.
 
 You must not:
 - Copy-paste or concatenate specialist JSON as the user-facing answer.
@@ -216,6 +222,8 @@ def build_jaimini_branch_static() -> str:
         DATA_SOVEREIGNTY,
         "\n# TASK (JAIMINI BRANCH ONLY)\n",
         "Use ONLY Jaimini-related JSON (Chara Karakas, Jaimini points, Argala, Chara Dasha, UL/DK/A7 fields, etc.).",
+        "When current Chara MD and AD signs are available, you MUST produce dual-frame analysis: (1) **MD-Lagna Frame** and (2) **AD-Lagna Frame**. "
+        "Treat each sign as temporary Lagna, then add a short **Confluence/Conflict** conclusion; near-term priority goes to AD-Lagna when they differ.",
         "For marriage/partnership or 7th-house themes: thread **DK + UL + Darapada (A7)**. **A7 must be analyzed in depth** (sign + planets in that sign; GK or other grahas in A7’s sign = concrete friction or support in the physical/logistical reality of the union)—see JAIMINI_PILLAR [J-8]. Never stop at naming A7’s sign alone.",
         _BRANCH_JSON_FOOTER.replace("<branch_id>", "jaimini"),
     ]
@@ -284,6 +292,7 @@ def build_jaimini_branch_static_agent() -> str:
         DATA_SOVEREIGNTY,
         "\n# TASK (JAIMINI BRANCH ONLY — CONTEXT AGENT)\n",
         "Use ONLY the `jaimini` object in VARIABLE_DATA_JSON (compact keys: JP, CK, AG, `a`=`jaimini`). See `context_agents/SCHEMA.md`.",
+        "If current Chara MD and AD signs are present in `JP`, run both temporary ascendants explicitly: **MD-Lagna Frame** and **AD-Lagna Frame**, then a short **Confluence/Conflict** line (AD-Lagna prioritized for near-term manifestation when conflict appears).",
         "Marriage/partnership questions: full **DK → UL → A7** thread in `analysis`; **A7** requires interpretation of **grahas in the A7 sign** (e.g. GK = obstacle in embodied partnership), not sign-only—[J-8].",
         _BRANCH_JSON_FOOTER.replace("<branch_id>", "jaimini"),
     ]

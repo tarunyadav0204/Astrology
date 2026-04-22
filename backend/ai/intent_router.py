@@ -8,28 +8,47 @@ from typing import Dict
 from ai.question_heuristics import looks_like_many_questions
 
 # Roman Hindi / Hinglish cues; app often sends language="english" for UI i18n while user types Hindi in Latin script.
+# Keep this strict: avoid astrology words (e.g., dasha) as they appear in normal English queries too.
 _HINGLISH_HINT_WORDS = frozenset({
     "mera", "meri", "mere", "main", "mein", "hum", "aap", "tum", "tera", "teri", "tere",
     "hai", "hain", "ho", "tha", "thi", "the", "hun", "hoon",
     "kab", "kya", "kyun", "kyaa", "kaun", "kahan", "kaise", "kaisa", "kaisi",
     "ko", "ka", "ki", "ke", "se", "par",
     "batao", "bata", "btao", "sab", "saari", "saara", "kuch", "sba",  # sba: typo for sab
-    "dasha", "dasa", "mahadasha", "antar", "vishleshan", "vichar", "shaadi", "shadi",
+    "vishleshan", "vichar", "shaadi", "shadi",
     "rahega", "hogi", "hoga", "kar", "karo", "karna",
     "merko", "mujhe", "mujhko", "apna", "apni", "apne",
 })
+
+
+def _contains_devanagari(text: str) -> bool:
+    for ch in (text or ""):
+        if "\u0900" <= ch <= "\u097f":
+            return True
+    return False
+
+
+def _looks_like_hindi_or_hinglish_output(text: str) -> bool:
+    s = (text or "").strip()
+    if not s:
+        return False
+    if _contains_devanagari(s):
+        return True
+    words = set(re.findall(r"[a-z]+", s.lower()))
+    # Strong roman-Hindi signal: at least two functional Hindi cues.
+    return len(words & _HINGLISH_HINT_WORDS) >= 2
 
 
 def _user_question_suggests_hindi(user_question: str) -> bool:
     text = (user_question or "").strip()
     if not text:
         return False
-    for ch in text:
-        if "\u0900" <= ch <= "\u097f":
-            return True
+    if _contains_devanagari(text):
+        return True
     low = text.lower()
     words = set(re.findall(r"[a-z]+", low))
-    if words & _HINGLISH_HINT_WORDS:
+    # Be conservative to avoid false positives on English astrology questions.
+    if len(words & _HINGLISH_HINT_WORDS) >= 2:
         return True
     return False
 
@@ -324,6 +343,7 @@ Follow the Hindi "Example" block below for chart_insights (not the English shape
 The current question is not Hindi/Hinglish. For any user-visible strings, use the same language as the user's current question text.
 
 1) If status is "CLARIFY": "clarification_question" MUST be in the same language as the user's question.
+   - If the user's question is English, clarification_question MUST be English-only (no Devanagari Hindi and no Hinglish switches).
 2) If status is "READY": Every "message" inside "chart_insights" MUST be in the same language as the user's question.
 
 Do not switch languages unexpectedly.
@@ -623,6 +643,15 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                 if cq and not _clarification_has_one_question_nudge(cq):
                     result["clarification_question"] = (
                         f"{cq}\n\n{_one_question_nudge_line(is_hindi_question)}"
+                    )
+
+            # Hard guard: English question must never emit Hindi/Hinglish clarification.
+            if result.get("status") == "CLARIFY" and not is_hindi_question:
+                cq = (result.get("clarification_question") or "").strip()
+                if _looks_like_hindi_or_hinglish_output(cq):
+                    result["clarification_question"] = (
+                        "Could you clarify which one area you want to focus on first "
+                        "(career, relationships, health, finances, or education)?"
                     )
             
             return result

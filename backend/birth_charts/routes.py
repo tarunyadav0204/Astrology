@@ -351,6 +351,19 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
             enc_name, enc_date, enc_time = birth_data['name'], birth_data['date'], birth_data['time']
             enc_lat, enc_lon, enc_place = str(birth_data['latitude']), str(birth_data['longitude']), birth_data.get('place', '')
 
+        # Keep timezone behavior consistent with chart creation:
+        # if client doesn't send timezone, derive it from coordinates.
+        timezone_value = birth_data.get("timezone")
+        if not timezone_value:
+            try:
+                from utils.timezone_service import get_timezone_from_coordinates
+                timezone_value = get_timezone_from_coordinates(
+                    float(birth_data["latitude"]),
+                    float(birth_data["longitude"]),
+                )
+            except Exception:
+                timezone_value = "UTC+0"
+
         cursor.execute(
             """
             UPDATE birth_charts
@@ -363,7 +376,7 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
                 enc_time,
                 enc_lat,
                 enc_lon,
-                birth_data.get("timezone", "UTC+0"),
+                timezone_value,
                 enc_place,
                 birth_data.get("gender", ""),
                 chart_id,
