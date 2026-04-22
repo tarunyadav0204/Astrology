@@ -36,7 +36,8 @@ class AshtakavargaCalculator:
         self.chart_data = chart_data
         self.planets = chart_data['planets']
         
-        # Authentic Vedic Ashtakavarga rules - houses where each planet gives bindus to target planet
+        # Classical Bhinnashtakavarga rules from Brihat Jataka, Chapter IX
+        # (same fixed totals also summarized by B.V. Raman's Ashtakavarga tables).
         self.contribution_rules = {
             'Sun': {
                 'Sun': [1, 2, 4, 7, 8, 9, 10, 11],
@@ -51,16 +52,16 @@ class AshtakavargaCalculator:
             'Moon': {
                 'Sun': [3, 6, 7, 8, 10, 11],
                 'Moon': [1, 3, 6, 7, 10, 11],
-                'Mars': [2, 3, 5, 6, 10, 11],
+                'Mars': [2, 3, 5, 6, 9, 10, 11],
                 'Mercury': [1, 3, 4, 5, 7, 8, 10, 11],
                 'Jupiter': [1, 4, 7, 8, 10, 11, 12],
                 'Venus': [3, 4, 5, 7, 9, 10, 11],
                 'Saturn': [3, 5, 6, 11],
-                'Ascendant': [3, 6, 10, 11, 12]
+                'Ascendant': [3, 6, 10, 11]
             },
             'Mars': {
                 'Sun': [3, 5, 6, 10, 11],
-                'Moon': [3, 6, 8, 10, 11],
+                'Moon': [3, 6, 11],
                 'Mars': [1, 2, 4, 7, 8, 10, 11],
                 'Mercury': [3, 5, 6, 11],
                 'Jupiter': [6, 10, 11, 12],
@@ -74,7 +75,7 @@ class AshtakavargaCalculator:
                 'Mars': [1, 2, 4, 7, 8, 9, 10, 11],
                 'Mercury': [1, 3, 5, 6, 9, 10, 11, 12],
                 'Jupiter': [6, 8, 11, 12],
-                'Venus': [1, 3, 5, 6, 9, 11, 12],
+                'Venus': [1, 2, 3, 4, 5, 8, 9, 11],
                 'Saturn': [1, 2, 4, 7, 8, 9, 10, 11],
                 'Ascendant': [1, 2, 4, 6, 8, 10, 11]
             },
@@ -91,7 +92,7 @@ class AshtakavargaCalculator:
             'Venus': {
                 'Sun': [8, 11, 12],
                 'Moon': [1, 2, 3, 4, 5, 8, 9, 11, 12],
-                'Mars': [3, 4, 6, 9, 11, 12],
+                'Mars': [3, 5, 6, 9, 11, 12],
                 'Mercury': [3, 5, 6, 9, 11],
                 'Jupiter': [5, 8, 9, 10, 11],
                 'Venus': [1, 2, 3, 4, 5, 8, 9, 10, 11],
@@ -100,7 +101,7 @@ class AshtakavargaCalculator:
             },
             'Saturn': {
                 'Sun': [1, 2, 4, 7, 8, 10, 11],
-                'Moon': [3, 5, 6, 11],
+                'Moon': [3, 6, 11],
                 'Mars': [3, 5, 6, 10, 11, 12],
                 'Mercury': [6, 8, 9, 10, 11, 12],
                 'Jupiter': [5, 6, 11, 12],
@@ -108,6 +109,21 @@ class AshtakavargaCalculator:
                 'Saturn': [3, 5, 6, 11],
                 'Ascendant': [1, 3, 4, 6, 10, 11]
             }
+        }
+
+        # Classical Lagna Bhinnashtakavarga target (49 total bindus).
+        # Source used for this helper: Parasara tradition as summarized in
+        # "Secrets of Ashtakavarga" (and explicitly noted there as a Lagna-only
+        # addition outside the standard 337-point 7-planet SAV scheme).
+        self.lagna_contribution_rules = {
+            'Sun': [3, 4, 6, 10, 11, 12],
+            'Moon': [3, 6, 10, 11, 12],
+            'Mars': [1, 3, 6, 10, 11],
+            'Mercury': [1, 2, 4, 6, 8, 10, 11],
+            'Jupiter': [1, 2, 4, 5, 6, 7, 9, 10, 11],
+            'Venus': [1, 2, 3, 4, 5, 8, 9],
+            'Saturn': [1, 3, 4, 6, 10, 11],
+            'Ascendant': [3, 6, 10, 11]
         }
     
     def calculate_individual_ashtakavarga(self, target_planet):
@@ -140,6 +156,51 @@ class AshtakavargaCalculator:
             'bindus': {i: bindus[i] for i in range(12)},
             'total': sum(bindus)
         }
+
+    def calculate_individual_ashtakavarga_trace(self, target_planet):
+        """
+        Contributor-level trace for a target planet's Bhinnashtakavarga.
+        Useful for validating sign-wise differences against external references.
+        """
+        if target_planet not in self.contribution_rules:
+            return {}
+
+        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+
+        bindus = [0] * 12
+        contributions = {i: [] for i in range(12)}
+        rules = self.contribution_rules[target_planet]
+
+        for contributor, beneficial_houses in rules.items():
+            if contributor == 'Ascendant':
+                contributor_sign = int(self.chart_data['ascendant'] / 30)
+            else:
+                contributor_sign = self.planets[contributor]['sign']
+
+            for house_num in beneficial_houses:
+                target_sign = (contributor_sign + house_num - 1) % 12
+                bindus[target_sign] += 1
+                contributions[target_sign].append({
+                    'contributor': contributor,
+                    'house_from_contributor': house_num,
+                    'contributor_sign': contributor_sign,
+                    'contributor_sign_name': sign_names[contributor_sign],
+                })
+
+        return {
+            'planet': target_planet,
+            'bindus': {i: bindus[i] for i in range(12)},
+            'total': sum(bindus),
+            'contributions_by_sign': {
+                str(i): {
+                    'sign_name': sign_names[i],
+                    'count': bindus[i],
+                    'contributions': contributions[i],
+                }
+                for i in range(12)
+            },
+        }
     
     def calculate_sarvashtakavarga(self):
         """Calculate Sarvashtakavarga (combined chart)"""
@@ -163,7 +224,25 @@ class AshtakavargaCalculator:
         return {
             'sarvashtakavarga': sarva_str_keys,
             'total_bindus': sum(sarva.values()),
-            'individual_charts': individual_charts
+            'individual_charts': individual_charts,
+            'lagna_chart': self.calculate_lagna_ashtakavarga()
+        }
+
+    def calculate_lagna_ashtakavarga(self):
+        """Calculate classical Lagna Bhinnashtakavarga (target total = 49)."""
+        bindus = [0] * 12
+        for contributor, beneficial_houses in self.lagna_contribution_rules.items():
+            if contributor == 'Ascendant':
+                contributor_sign = int(self.chart_data['ascendant'] / 30)
+            else:
+                contributor_sign = self.planets[contributor]['sign']
+            for house_num in beneficial_houses:
+                target_sign = (contributor_sign + house_num - 1) % 12
+                bindus[target_sign] += 1
+        return {
+            'planet': 'Lagna',
+            'bindus': {i: bindus[i] for i in range(12)},
+            'total': sum(bindus)
         }
     
     def get_ashtakavarga_analysis(self, chart_type='lagna'):

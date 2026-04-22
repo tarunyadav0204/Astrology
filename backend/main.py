@@ -3175,6 +3175,8 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
 
         birth_data = BirthData(**request['birth_data'])
         chart_type = request.get('chart_type', 'lagna')
+        debug_trace = bool(request.get('debug_trace', False))
+        debug_trace_planet = str(request.get('debug_trace_planet') or 'Moon')
 
         if chart_type == 'transit':
             # For transit charts, use current transit positions
@@ -3216,13 +3218,16 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
                 'strength': 'Strong' if bindus >= 30 else 'Weak' if bindus <= 25 else 'Moderate'
             }
 
-        return {
+        response_payload = {
             "ashtakavarga": sarva,
             "analysis": analysis,
             "chart_type": chart_type,
             "chart_data": chart_data,  # Include chart_data for oracle calculations
             "chart_ashtakavarga": chart_ashtakavarga  # Formatted for chart widget
         }
+        if debug_trace:
+            response_payload["debug_trace"] = calculator.calculate_individual_ashtakavarga_trace(debug_trace_planet)
+        return response_payload
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Ashtakavarga calculation failed: {type(e).__name__}: {str(e)}")
@@ -5970,5 +5975,3 @@ if __name__ == "__main__":
     except Exception as e:
         log_shutdown(f"Exception: {str(e)}")
         raise
-
-
