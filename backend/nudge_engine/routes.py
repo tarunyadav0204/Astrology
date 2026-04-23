@@ -1402,3 +1402,48 @@ async def admin_chat_followup_cron_status(
     except Exception as e:
         logger.exception("admin_chat_followup_cron_status failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to fetch cron status") from e
+
+
+@router.get("/admin/deliveries/today")
+async def admin_list_today_deliveries(
+    target_date: Optional[str] = Query(None, description="YYYY-MM-DD; defaults to today in IST"),
+    limit: int = Query(500, ge=1, le=2000),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin list of notifications sent for a date (today by default), with delivery status."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        if target_date:
+            day = date.fromisoformat(target_date)
+        else:
+            day = datetime.now(IST_TZ).date()
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            rows = db.list_deliveries_for_date_admin(conn, day.isoformat(), limit=int(limit))
+        items: List[Dict[str, Any]] = []
+        for r in rows:
+            channel = (r[8] or "stored").strip()
+            status = "sent_push" if channel == "push" else "stored_only"
+            items.append(
+                {
+                    "id": int(r[0]),
+                    "user_id": int(r[1]),
+                    "user_name": r[2] or "",
+                    "user_phone": r[3] or "",
+                    "trigger_id": r[4] or "",
+                    "title": r[5] or "",
+                    "body": r[6] or "",
+                    "sent_at": r[7] or None,
+                    "channel": channel,
+                    "status": status,
+                    "created_at": r[9].isoformat() if hasattr(r[9], "isoformat") else str(r[9]),
+                    "read_at": r[10].isoformat() if hasattr(r[10], "isoformat") else (str(r[10]) if r[10] else None),
+                }
+            )
+        return {"ok": True, "target_date": day.isoformat(), "count": len(items), "items": items}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid target_date: {e}") from e
+    except Exception as e:
+        logger.exception("admin_list_today_deliveries failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch deliveries") from e

@@ -156,7 +156,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifTotal, setNotifTotal] = useState(0);
   const [notifTotalPages, setNotifTotalPages] = useState(0);
   const [notifUserIdsWithTokens, setNotifUserIdsWithTokens] = useState([]); // userids who have accepted notifications
-  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog' | 'email_reminder' | 'nudge_triggers' | 'nudge_schedule'
+  const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog' | 'email_reminder' | 'nudge_triggers' | 'nudge_schedule' | 'sent_today'
+  const [notifTodayRows, setNotifTodayRows] = useState([]);
+  const [notifTodayLoading, setNotifTodayLoading] = useState(false);
+  const [notifTodayError, setNotifTodayError] = useState(null);
+  const [notifHistoryDate, setNotifHistoryDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
   const [selectedEmailReminderUserIds, setSelectedEmailReminderUserIds] = useState([]);
   const [emailReminderSubject, setEmailReminderSubject] = useState('Turn on AstroRoshni notifications for timely life signals');
   const [emailReminderBody, setEmailReminderBody] = useState(
@@ -225,8 +231,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       fetchUsersForNotifications();
       fetchNotifUserIdsWithTokens();
       fetchBlogPosts();
+      if (notifSubTab === 'sent_today') {
+        fetchTodayDeliveries();
+      }
     }
-  }, [activeTab, activeSubTab]);
+  }, [activeTab, activeSubTab, notifSubTab]);
 
   const fetchAllowedDevices = async () => {
     setAllowedDevicesLoading(true);
@@ -608,6 +617,47 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } catch (e) {
       setNotifUserIdsWithTokens([]);
     }
+  };
+
+  const fetchTodayDeliveries = async (targetDate = null) => {
+    setNotifTodayLoading(true);
+    setNotifTodayError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '1000');
+      const d = targetDate || notifHistoryDate;
+      if (d) params.set('target_date', d);
+      const response = await fetch(`/api/nudge/admin/deliveries/today?${params.toString()}`, {
+        headers: getAdminAuthHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const msg = data.detail || data.message || 'Failed to load deliveries';
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      }
+      setNotifTodayRows(Array.isArray(data.items) ? data.items : []);
+    } catch (e) {
+      setNotifTodayRows([]);
+      setNotifTodayError(e.message || 'Failed to load deliveries');
+    } finally {
+      setNotifTodayLoading(false);
+    }
+  };
+
+  const formatNotifDateIST = (dateStr) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
   };
 
   const fetchUserFacts = async (overrides = {}) => {
@@ -2700,6 +2750,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               >
                 Nudge planner
               </button>
+              <button
+                type="button"
+                className={`sub-tab ${notifSubTab === 'sent_today' ? 'active' : ''}`}
+                onClick={() => {
+                  setNotifSubTab('sent_today');
+                  fetchTodayDeliveries();
+                }}
+              >
+                Sent today
+              </button>
             </div>
 
             {notifSubTab === 'custom' && (
@@ -3233,6 +3293,65 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
             {notifSubTab === 'nudge_triggers' && <AdminNudgeTriggerDefinitions />}
             {notifSubTab === 'nudge_schedule' && <AdminNudgeScheduler />}
+            {notifSubTab === 'sent_today' && (
+              <div className="notifications-form">
+                <div className="form-buttons notif-generate-row">
+                  <label className="form-field" style={{ margin: 0 }}>
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      value={notifHistoryDate}
+                      onChange={(e) => setNotifHistoryDate(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="notif-search-btn"
+                    onClick={() => fetchTodayDeliveries()}
+                    disabled={notifTodayLoading}
+                  >
+                    {notifTodayLoading ? 'Refreshing…' : 'Refresh'}
+                  </button>
+                </div>
+                {notifTodayError && <div className="search-error">{notifTodayError}</div>}
+                <div className="notif-user-list">
+                  <table className="notif-user-table">
+                    <thead>
+                      <tr>
+                        <th>Time (IST)</th>
+                        <th>User</th>
+                        <th>Phone</th>
+                        <th>Trigger</th>
+                        <th>Title</th>
+                        <th>Body</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {notifTodayRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="users-table-empty">
+                            {notifTodayLoading ? 'Loading…' : 'No notifications sent today.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        notifTodayRows.map((row) => (
+                          <tr key={row.id}>
+                            <td>{formatNotifDateIST(row.created_at)}</td>
+                            <td>{row.user_name || `User ${row.user_id}`}</td>
+                            <td>{row.user_phone || '—'}</td>
+                            <td>{row.trigger_id || '—'}</td>
+                            <td>{row.title || '—'}</td>
+                            <td>{row.body || '—'}</td>
+                            <td>{row.status === 'sent_push' ? 'Sent (push)' : 'Stored only'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

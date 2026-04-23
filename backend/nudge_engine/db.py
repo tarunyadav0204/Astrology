@@ -623,6 +623,39 @@ def list_deliveries_for_user(
     return list(cur.fetchall() or [])
 
 
+def list_deliveries_for_date_admin(
+    conn, target_date: str, limit: int = 500
+) -> List[Tuple]:
+    """
+    Admin list for a specific sent_at date.
+    Rows: id, userid, user_name, user_phone, trigger_id, title, body, sent_at, channel, created_at, read_at
+    """
+    lim = max(1, min(2000, int(limit)))
+    cur = execute(
+        conn,
+        """
+        SELECT d.id,
+               d.userid,
+               COALESCE(u.name, '') AS user_name,
+               COALESCE(u.phone, '') AS user_phone,
+               d.trigger_id,
+               d.title,
+               d.body,
+               d.sent_at::text,
+               d.channel,
+               d.created_at,
+               d.read_at
+        FROM nudge_deliveries d
+        LEFT JOIN users u ON u.userid = d.userid
+        WHERE d.sent_at = %s
+        ORDER BY d.created_at DESC, d.id DESC
+        LIMIT %s
+        """,
+        (target_date, lim),
+    )
+    return list(cur.fetchall() or [])
+
+
 def count_unread_deliveries(conn, userid: int) -> int:
     cur = execute(
         conn,
