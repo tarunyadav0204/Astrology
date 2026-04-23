@@ -10,6 +10,17 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from calculators.karma_context_builder import KarmaContextBuilder
 
+
+def _json_for_prompt(value: Any) -> str:
+    """Serialize chart payloads for prompts, including datetime/date values."""
+    return json.dumps(value, default=str)
+
+
+def json_dumps_karma_safe(value: Any) -> str:
+    """Serialize karma context for persistence, including datetime/date values."""
+    return json.dumps(value, default=str)
+
+
 class KarmaGeminiAnalyzer:
     """Integrates Karma Context with Gemini AI for personalized readings"""
     
@@ -21,9 +32,17 @@ class KarmaGeminiAnalyzer:
     def analyze_karma(self, chart_data: Dict[str, Any], divisional_charts: Dict[str, Any] = None, native_name: str = None, log_request: bool = False) -> Dict[str, Any]:
         """Generate complete karma analysis with AI interpretation"""
         
-        # Build karma context
+        # Build karma context. The underlying calculators are verbose, so keep
+        # production logs clean unless karma debugging is explicitly enabled.
         karma_builder = KarmaContextBuilder(chart_data, divisional_charts)
-        karma_context = karma_builder.get_complete_karma_context()
+        if os.getenv("ASTRO_DEBUG_KARMA") == "1":
+            karma_context = karma_builder.get_complete_karma_context()
+        else:
+            import contextlib
+            import io
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                karma_context = karma_builder.get_complete_karma_context()
         
         # Generate AI interpretation
         prompt = self._build_karma_prompt(karma_context, native_name)
@@ -33,19 +52,23 @@ class KarmaGeminiAnalyzer:
             print(f"📤 GEMINI REQUEST - Karma Analysis")
             print(f"{'='*80}")
             print(f"Prompt length: {len(prompt)} characters")
-            print(f"\nFull Prompt:\n{prompt}")
+            print("Full prompt logging is disabled for privacy. Set ASTRO_DEBUG_AI_PAYLOADS=1 to print sensitive payloads.")
+            if os.getenv("ASTRO_DEBUG_AI_PAYLOADS") == "1":
+                print(f"\nFull Prompt:\n{prompt}")
             print(f"{'='*80}\n")
         
         try:
             response = self.model.generate_content(prompt)
             interpretation = response.text
             
-            print(f"\n{'='*80}")
-            print(f"📥 GEMINI RESPONSE - Karma Analysis")
-            print(f"{'='*80}")
-            print(f"Response length: {len(interpretation)} characters")
-            print(f"\nFull Response:\n{interpretation}")
-            print(f"{'='*80}\n")
+            if log_request or os.getenv("ASTRO_DEBUG_AI_PAYLOADS") == "1":
+                print(f"\n{'='*80}")
+                print(f"📥 GEMINI RESPONSE - Karma Analysis")
+                print(f"{'='*80}")
+                print(f"Response length: {len(interpretation)} characters")
+                if os.getenv("ASTRO_DEBUG_AI_PAYLOADS") == "1":
+                    print(f"\nFull Response:\n{interpretation}")
+                print(f"{'='*80}\n")
             
             return {
                 "success": True,
@@ -86,36 +109,39 @@ class KarmaGeminiAnalyzer:
         bhagya = karma_context.get('bhagya_karma', {})
         house_12 = karma_context.get('moksha_indicators', {})
         timing = karma_context.get('karmic_timing', {})
+        karma_evidence = karma_context.get('karma_evidence', {})
         
         # Extract raw charts
         d1_chart = karma_context.get('d1_chart', {})
         d9_chart = karma_context.get('d9_navamsa', {})
         d60_chart = karma_context.get('d60_shashtiamsa', {})
         
-        prompt = f"""You are an expert Vedic astrologer specializing in past life karma analysis using classical texts (Brihat Parashara Hora Shastra, Jaimini Sutras, Phaladeepika, Saravali). Provide a comprehensive, personalized reading based on the following karmic indicators.{name_instruction}
+        prompt = f"""You are an expert Vedic astrologer specializing in karma analysis using classical Jyotish principles. Provide a compassionate, evidence-backed reading based on the following karmic indicators.{name_instruction}
 
 ## CRITICAL ANALYSIS INSTRUCTIONS
 
+### Trust, Safety, and Certainty Rules
+- Treat "past life" language as a symbolic karmic pattern, not a literal factual biography.
+- Do NOT use fatalistic, frightening, curse-heavy, or death-predictive language.
+- D60 is highly birth-time sensitive. If `karma_evidence.d60_confidence.boundary_risk` is medium/high or birth time is not clearly reliable, downgrade D60 certainty and rely more on D1, D9, Atmakaraka, Karkamsa, Rahu-Ketu, and current dasha.
+- Do not invent exact classical citations or verse references. You may say "the classical Parashari/Jaimini principle is..." only when the provided evidence supports it.
+- If evidence conflicts, explicitly say which evidence is stronger and which is supportive/weak.
+- Remedies must be practical, ethical, and tied to the exact chart evidence. Do not promise guaranteed outcomes.
+
+### Karma Evidence Spine
+Use this compact evidence block as the priority spine before raw chart inference:
+{_json_for_prompt(karma_evidence)}
+
 ### Raw Chart Analysis Protocol
 You have access to THREE raw charts for direct analysis:
-1. **D1 Chart (Rashi)**: Birth chart showing current life setup - {json.dumps(d1_chart)}
-2. **D9 Chart (Navamsa)**: Dharma/marriage/inner strength chart - {json.dumps(d9_chart)}
-3. **D60 Chart (Shashtiamsa)**: Past life karma essence chart - {json.dumps(d60_chart)}
+1. **D1 Chart (Rashi)**: Birth chart showing current life setup - {_json_for_prompt(d1_chart)}
+2. **D9 Chart (Navamsa)**: Dharma/marriage/inner strength chart - {_json_for_prompt(d9_chart)}
+3. **D60 Chart (Shashtiamsa)**: Past life karma essence chart - {_json_for_prompt(d60_chart)}
 
 **MANDATORY**: Cross-reference calculated insights with raw planetary positions. If you find contradictions or additional patterns in the raw charts, MENTION THEM.
 
-### Classical Text References (MANDATORY)
-For EVERY major karmic interpretation, cite the classical source:
-- **BPHS (Brihat Parashara Hora Shastra)**: D60 interpretations, retrograde planets, house significations
-- **Jaimini Sutras**: Atmakaraka, Chara Karakas, Karkamsa analysis
-- **Phaladeepika**: Nakshatra karma, planetary yogas
-- **Saravali**: Rahu-Ketu axis, karmic patterns
-- **Traditional Texts**: Gandanta, Badhaka, Pitru/Matru Dosha
-
-Format: "According to [Text Name], [interpretation]..."
-
-### D60 Supremacy Rule
-**IMPORTANT INTERPRETIVE RULE:** If a planet has high D9 (Navamsa) dignity but a malefic D60 deity (Ghora, Rakshasa, Pishacha, Preta, etc.), prioritize the D60 deity as the 'hidden' karmic reality that will eventually manifest. D60 is the final arbiter of past life karma per BPHS.
+### D60 Handling Rule
+D60 refines hidden karmic residue, but it is not a standalone verdict. If D9/D1 show strength and D60 is challenging, describe it as "outer capacity with inner karmic work." If D60 is strong but D1/D9 are weak, describe it as "inner merit requiring current-life discipline." Never say a D60 result must inevitably manifest.
 
 ## SOUL IDENTITY (D60 Shashtiamsa)
 **Lagna Deity:** {soul_identity.get('lagna_deity', 'Unknown')}
@@ -223,6 +249,7 @@ Format: "According to [Text Name], [interpretation]..."
 **Karmic Indication:** {house_12.get('karmic_indication', '')}
 
 ## KARMIC TIMING
+**Current Vimshottari:** {_json_for_prompt(timing.get('current_vimshottari', {}))}
 **Saturn Dasha:** {timing.get('saturn_dasha', '')}
 **Rahu Dasha:** {timing.get('rahu_dasha', '')}
 **Ketu Dasha:** {timing.get('ketu_dasha', '')}
@@ -232,31 +259,37 @@ Format: "According to [Text Name], [interpretation]..."
 
 ## ANALYSIS REQUIREMENTS
 
-Based on this comprehensive karmic analysis AND the raw charts provided, provide a detailed reading covering:
+Return the reading using exactly these markdown section headings so the app can render it cleanly:
 
-1. **Past Life Overview**: What karma did this soul bring from previous incarnations? What was their primary role or identity?
+### 1. Karma Snapshot
+Summarize the top 3 karmic themes and state confidence level, especially D60 confidence.
 
-2. **Soul's Mission**: What is the primary purpose of this incarnation? What lessons must be learned?
+### 2. Static Karma Promise
+Use D1 5th/8th/9th/12th houses, Rahu-Ketu axis, Atmakaraka, Karkamsa, D9, and D60 confidence-aware evidence.
 
-3. **Nakshatra Karma Analysis**: Deep dive into the subconscious karmic patterns revealed by Atmakaraka, Ketu, and Moon nakshatras. What specific past life occupations and skills? How does Ganda-Moola affect the soul's journey?
+### 3. Soul Direction and Lessons
+Explain AK, Karkamsa, Rahu mission, and the current-life growth path.
 
-4. **Karmic Debts**: What specific debts or obligations need resolution? How can they be addressed?
+### 4. Gifts and Carried Talents
+Describe talents as natural tendencies, not guaranteed success. Include Ketu/nakshatra/Nadi only when supported.
 
-5. **Soul Talents**: What skills, abilities, or wisdom carried forward from past lives? How to leverage them?
+### 5. Karmic Friction and Repeating Patterns
+Discuss retrograde planets, Badhaka, Gandanta, ancestral/maternal patterns, and obstacles without fear language.
 
-6. **Karmic Obstacles**: What challenges or tests will arise? Why are they appearing? How to overcome them?
+### 6. Current Activation
+Use current Vimshottari MD/AD/PD and active Saturn/Rahu/Ketu themes. Distinguish active now from latent potential.
 
-7. **Ancestral Patterns**: What family karma affects this soul? What ancestral blessings or burdens exist?
+### 7. Life Domains Affected
+Explain how karma may show through career, relationship, family, wealth, health discipline, spirituality, and foreign/inner life, but only as tendencies.
 
-8. **Transformation Path**: What major transformations are destined? When and how will they occur?
+### 8. Transformation Path
+State likely transformation themes and broad timing anchors without overclaiming exact events.
 
-9. **Spiritual Evolution**: What is the path to moksha/liberation? What spiritual practices are recommended?
+### 9. Remedies and Integration Plan
+Give specific mantra/charity/seva/behavioral practices tied to chart evidence. Keep remedies realistic and ethical.
 
-10. **Timing of Events**: When will major karmic events manifest? What periods require special attention?
-
-11. **Remedial Measures**: What specific remedies (mantras, charity, practices) can help resolve karma?
-
-Provide a compassionate, insightful, and actionable reading that helps the person understand their karmic journey and soul's evolution.
+### 10. Final Guidance
+End with grounded, non-fatalistic advice on how to work with karma consciously.
 """
         
         return prompt

@@ -18,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai.gemini_errors import transient_gemini_error, user_facing_gemini_error
 from ai.health_ai_context_generator import HealthAIContextGenerator
 from ai.structured_analyzer import StructuredAnalysisAnalyzer
+from context_agents.base import AgentContext
+from context_agents.registry import build_agent
 
 HEALTH_STRUCTURED_QUESTION = """
 You are an expert Vedic astrologer. Analyze the birth chart for Health and Wellness.
@@ -25,54 +27,89 @@ You are an expert Vedic astrologer. Analyze the birth chart for Health and Welln
 IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra fields or change field names.
 
 {
-  "quick_answer": "Brief health summary based on chart analysis",
+  "quick_answer": "Brief, useful health summary based on chart analysis. Mention this is astrological wellness guidance, not medical diagnosis.",
   "detailed_analysis": [
     {
-      "question": "What are my primary health vulnerabilities?",
-      "answer": "Detailed analysis of 6th/8th house, lords, and afflictions",
+      "question": "What is my core constitution and vitality pattern?",
+      "answer": "Analyze Lagna, Lagna lord, Sun, Moon, elemental/dosha balance, and health_agent.ct / health_agent.eb if available",
       "key_points": ["Point 1", "Point 2"],
       "astrological_basis": "Planetary positions and aspects"
     },
     {
-      "question": "When should I be extra cautious about health?",
-      "answer": "Timing analysis based on dashas and transits",
+      "question": "What are my primary health vulnerabilities?",
+      "answer": "Analyze 1st/6th/8th/12th houses, their lords, afflicting grahas, D30 confirmation, and health_agent.ph / health_agent.hh if available",
       "key_points": ["Period 1", "Period 2"],
       "astrological_basis": "Dasha periods and planetary transits"
     },
     {
       "question": "What body parts need special attention?",
-      "answer": "Body parts analysis based on houses and signs",
+      "answer": "Use signs, houses, afflicted planets, body_parts, mrityu_bhaga_analysis, and health_agent.ph.dhatu/body-system cues",
       "key_points": ["Body part 1", "Body part 2"],
       "astrological_basis": "House and sign correlations"
     },
     {
       "question": "How is my mental and emotional health?",
-      "answer": "Moon, Mercury, and 4th house analysis",
+      "answer": "Analyze Moon, Mercury, 4th house, 12th house/sleep, Rahu/Saturn influence, and current activation",
       "key_points": ["Mental aspect 1", "Mental aspect 2"],
       "astrological_basis": "Moon and Mercury positions"
     },
     {
-      "question": "What remedies can improve my health?",
-      "answer": "Practical remedies and suggestions",
+      "question": "How are digestion, metabolism, and recovery capacity shown?",
+      "answer": "Analyze 5th house/agni, Sun/Mars/Jupiter, 6th-house immunity, D9 resilience, and any supportive yogas",
+      "key_points": ["Agni point 1", "Recovery point 2"],
+      "astrological_basis": "5th house, vitality, and recovery indicators"
+    },
+    {
+      "question": "Is the pattern more acute, chronic, sensitivity-based, or preventive?",
+      "answer": "Classify the pattern from health_agent.ph, health_agent.hh, health_agent.yg, 6th/8th/12th, Saturn, Mars, Rahu, and Ketu. Acute = Mars/6th flare; chronic = Saturn/8th; sensitivity/irregularity = Rahu/Ketu/Moon/Mercury; preventive = stronger vitality with manageable triggers.",
+      "key_points": ["Pattern point 1", "Pattern point 2"],
+      "astrological_basis": "Disease pattern indicators"
+    },
+    {
+      "question": "When should I be extra cautious about health?",
+      "answer": "Use current dashas first, then transits and health_agent.rw ranked risk windows if present. Give time windows, preferably months or date ranges when available; do not overclaim certainty.",
+      "key_points": ["Period 1", "Period 2"],
+      "astrological_basis": "Dasha periods, transit triggers, and health windows"
+    },
+    {
+      "question": "What does D30/Trimsamsa add to the health reading?",
+      "answer": "Explain D30 disease/misfortune refinement if available. Compare D1 visible vulnerability with D9 resilience and D30 confirmation. If missing, say so.",
+      "key_points": ["D30 point 1", "D9/D1 point 2"],
+      "astrological_basis": "D1-D9-D30 synthesis"
+    },
+    {
+      "question": "What lifestyle and preventive guidance fits my chart?",
+      "answer": "Give non-medical, practical wellness suggestions tied to dosha, planets, sleep, stress, digestion, movement, and routine. Avoid treatment instructions.",
       "key_points": ["Remedy 1", "Remedy 2"],
       "astrological_basis": "Planetary strengthening methods"
+    },
+    {
+      "question": "What should I not ignore?",
+      "answer": "State safety boundaries: astrology cannot diagnose; if symptoms, pain, mental distress, or medical concerns exist, consult qualified professionals. Frame chart indicators as areas for proactive monitoring.",
+      "key_points": ["Safety point 1", "Safety point 2"],
+      "astrological_basis": "Health houses and current activation"
     }
   ],
-  "final_thoughts": "Positive health outlook and guidance",
+  "final_thoughts": "Balanced health outlook and path forward",
   "follow_up_questions": [
     "🏥 How to improve my immunity?",
     "🧘 Best yoga/exercise for my body type?",
-    "💊 Specific dietary precautions?",
-    "🌿 Natural remedies for my weak planets?"
+    "🌿 What diet and routine suits my constitution?",
+    "📅 Which months require extra caution?",
+    "🧠 How is my stress and sleep pattern?",
+    "🪬 Which remedies support my weak health planets?"
   ]
 }
 
 CRITICAL RULES:
 1. Response must be ONLY valid JSON - no extra text
 2. Use EXACTLY the field names shown above
-3. Include exactly 5 questions in detailed_analysis array
+3. Include exactly 10 questions in detailed_analysis array
 4. Always mention this is astrological guidance, not medical advice
 5. Use ** for bold text in JSON strings
+6. Do NOT diagnose disease, prescribe treatment, or tell the user to avoid medical care
+7. If a specific disease/symptom is not named in the user input/context, speak in body-system and vulnerability language only
+8. Use the `health_agent` block as the evidence spine when available, especially health_agent.hs, health_agent.ct, health_agent.ph, health_agent.hh, health_agent.rw, and health_agent.d30
 """
 
 
@@ -137,6 +174,24 @@ def store_health_cache(userid: int, birth_hash: str, health_insights: Dict, get_
         conn.commit()
 
 
+def attach_health_agent_context(context: Dict[str, Any], birth_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach the compact health context-agent block used by agentic chat."""
+    try:
+        context["health_agent"] = build_agent(
+            "health",
+            AgentContext(
+                birth_data=birth_data,
+                user_question="Health & Wellness Analysis",
+                intent_result={"category": "health", "divisional_charts": ["D1", "D9", "D30"]},
+                precomputed_static=context,
+                precomputed_dynamic=context,
+            ),
+        )
+    except Exception as exc:
+        context["health_agent"] = {"a": "health", "error": str(exc)[:300]}
+    return context
+
+
 async def execute_health_analysis(
     userid: int,
     request: Any,
@@ -181,6 +236,7 @@ async def execute_health_analysis(
         health_context_generator.build_health_context,
         birth_data,
     )
+    context = attach_health_agent_context(context, birth_data)
 
     analyzer = StructuredAnalysisAnalyzer()
     max_retries = 3
@@ -230,6 +286,8 @@ async def execute_health_analysis(
                 detailed_analysis.append({
                     "question": item.get("question", ""),
                     "answer": item.get("answer", ""),
+                    "key_points": item.get("key_points", []),
+                    "astrological_basis": item.get("astrological_basis", ""),
                 })
             parsed_response = {
                 "quick_answer": raw_data.get("quick_answer", "Analysis completed successfully."),
@@ -245,6 +303,8 @@ async def execute_health_analysis(
             detailed_analysis.append({
                 "question": item.get("question", ""),
                 "answer": item.get("answer", ""),
+                "key_points": item.get("key_points", []),
+                "astrological_basis": item.get("astrological_basis", ""),
             })
 
         formatted_response = {

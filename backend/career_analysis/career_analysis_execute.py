@@ -14,7 +14,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai.career_ai_context_generator import CareerAIContextGenerator
 from ai.gemini_errors import transient_gemini_error, user_facing_gemini_error
+from ai.parallel_chat.parallel_agent_payloads import (
+    build_jaimini_agent_payload,
+    build_nadi_agent_payload,
+    build_parashari_agent_payload,
+)
 from ai.structured_analyzer import StructuredAnalysisAnalyzer
+from context_agents.base import AgentContext
 
 CAREER_STRUCTURED_QUESTION = """
 You are an expert Vedic astrologer specializing in Career and Professional direction (Karma). Analyze the birth chart for Professional Success.
@@ -27,20 +33,76 @@ CRITICAL INPUT DATA TO ANALYZE (Priority Order):
 2. **Modern Career Indicators (Rahu/Ketu in D10):**
    - **CRITICAL:** If Rahu is in D10 Kendra (1,4,7,10) or Upachaya (3,6,11), predict TECHNOLOGY, AI, CODING, AVIATION, or FOREIGN MNC careers.
    - Ketu in D10 Kendra/Upachaya = Coding, Research, Mathematics, Precision work.
+3. **Agentic Career Evidence Spine:**
+   - Use `career_evidence.parashari.px.career` first for mode, work-function scores, ranked function tags, visibility, dominant houses, and active dasha/house links.
+   - Use `career_evidence.parashari.px.dx.career` for D10/Karkamsa/AL divisional confirmation and current dasha support.
+   - Use `career_evidence.jaimini.jx.career` for AmK, Karkamsa/KL, AL, image/status, and Chara dasha support.
+   - Use `career_evidence.nadi.nx.career` for dominant Nadi grahas, career signatures, work-style tags, and age activation.
 
 IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra fields.
 {
-  "quick_answer": "A sharp, 3-sentence summary.",
+  "quick_answer": "A sharp 3-4 sentence summary naming the top 1-2 career directions, likely work function, employment/business tendency, visibility level, and next timing focus.",
   "detailed_analysis": [
-    {"question": "What is my true professional purpose (Dharma)?", "answer": "Analyze AmK in D10."},
-    {"question": "Status vs. Reality: Will I be famous or just work hard?", "answer": "Compare AL vs A10."},
-    {"question": "What specific industry or niche is best for me?", "answer": "Use 10th lord nakshatra + D10."},
-    {"question": "Should I choose Job, Business, or Freelancing?", "answer": "Use 6th/7th houses and D10."},
-    {"question": "Will I have success in Government, Corporate, or Startups?", "answer": "Use Sun/Mars vs Rahu/Mercury."},
-    {"question": "Will I face career instability or breaks?", "answer": "Use 8th house and 10th lord dignity."},
-    {"question": "What are my Sniper skills (Unique Talents)?", "answer": "Identify strongest career-signifying factors."},
-    {"question": "When is my next big career breakthrough?", "answer": "Use current dasha timing."},
-    {"question": "Action Plan: What should I do right now?", "answer": "Practical next steps from chart synthesis."}
+    {
+      "question": "What is my true professional purpose and work function?",
+      "answer": "Analyze Amatyakaraka, 10th house/lord, D10, Karkamsa, and career_evidence.parashari.px.career.fn. State the concrete work function: builder, analyst, advisor, communicator, manager, creator, healer/service provider, researcher, trader, operator, or technical specialist.",
+      "key_points": ["Purpose point 1", "Work-function point 2"],
+      "astrological_basis": "AmK, 10th house/lord, D10, Karkamsa, career function tags"
+    },
+    {
+      "question": "What specific industry, niche, or role cluster suits me best?",
+      "answer": "Rank the top 3 fields only. Use 10th lord nakshatra, D10, AmK, dominant planets, career_evidence.nadi.nx.career.tags/sig, and career_evidence.parashari.px.career.fn. Avoid vague baskets; explain why each field fits.",
+      "key_points": ["Field 1", "Field 2"],
+      "astrological_basis": "Nakshatra, D10, Nadi signatures, dominant career grahas"
+    },
+    {
+      "question": "What exactly will I do day-to-day?",
+      "answer": "Translate chart evidence into practical day-to-day tasks: coding/building, analysis, selling, teaching, managing people, operations, design, strategy, healing/service, research, finance, consulting, public-facing work, or backend/private work. Use career_evidence.parashari.px.career.work and mode.",
+      "key_points": ["Task pattern 1", "Task pattern 2"],
+      "astrological_basis": "6th/10th/2nd/11th patterns, Mercury/Saturn/Mars/Venus/Jupiter/Rahu emphasis"
+    },
+    {
+      "question": "Should I choose job, business, freelancing, or leadership?",
+      "answer": "Use 6th for employment/service, 7th for business/public dealing, 10th for authority, 11th for networks/gains, and career_evidence.parashari.px.career.mode/work. Give a ranked recommendation, not a generic yes to everything.",
+      "key_points": ["Income model point 1", "Work setup point 2"],
+      "astrological_basis": "6th/7th/10th/11th houses and D10"
+    },
+    {
+      "question": "Status vs. reality: will I gain visibility, authority, or mostly work hard behind the scenes?",
+      "answer": "Compare AL, A10/Rajya Pada, 10th house, Sun/Saturn, D10, and career_evidence.jaimini.jx.career.img plus career_evidence.parashari.px.career.vis. Separate real capability from public recognition.",
+      "key_points": ["Visibility point 1", "Authority point 2"],
+      "astrological_basis": "AL, A10/Rajya Pada, Sun, Saturn, D10"
+    },
+    {
+      "question": "Government, corporate, startup, foreign/MNC, or independent path?",
+      "answer": "Use Sun/Mars/Saturn for government/authority, Mercury/Venus for commerce/design, Rahu for tech/foreign/startups, Jupiter for advisory/education, and D10 confirmation. Rank likely ecosystems and state what to avoid.",
+      "key_points": ["Ecosystem point 1", "Avoidance point 2"],
+      "astrological_basis": "Planetary significators, Rahu/Ketu in D10, house patterns"
+    },
+    {
+      "question": "What are my strongest professional skills and unfair advantages?",
+      "answer": "Identify 3-5 unique talents using strongest career grahas, nakshatra_career_analysis, d10_detailed, career_yogas, and career_evidence.nadi.nx.career.sig. Make these actionable as skills to build or monetize.",
+      "key_points": ["Skill 1", "Skill 2"],
+      "astrological_basis": "Strong grahas, nakshatras, yogas, D10"
+    },
+    {
+      "question": "Where can career instability, blocks, or wrong choices come from?",
+      "answer": "Analyze 8th/12th/6th pressure, weak 10th lord, afflicted AmK/Saturn, D10 dusthana placements, and negative evidence in career_evidence.parashari.px.career.dom/work. State concrete risks: wrong industry, burnout, politics, frequent switches, hidden work, foreign displacement, or delayed recognition.",
+      "key_points": ["Risk point 1", "Correction point 2"],
+      "astrological_basis": "Dusthana pressure, 10th lord dignity, Saturn/AmK, D10"
+    },
+    {
+      "question": "When is my next big career breakthrough or change window?",
+      "answer": "Use current Vimshottari dasha first, then career_timing, career_evidence.parashari.px.D/HI/TR, divisional current support in px.dx.career, and career_evidence.jaimini.jx.career.md/ad. Give windows as supportive/mixed/weak; do not promise guaranteed events.",
+      "key_points": ["Timing window 1", "Timing window 2"],
+      "astrological_basis": "Dasha, transits, D10/Karkamsa activation"
+    },
+    {
+      "question": "What action plan should I follow now?",
+      "answer": "Give a 90-day and 12-month action plan aligned with the top field, work function, skill gaps, timing, and risk factors. The advice must be practical and chart-specific.",
+      "key_points": ["90-day action", "12-month action"],
+      "astrological_basis": "Full career synthesis"
+    }
   ],
   "final_thoughts": "One empowering concluding paragraph summarizing the career trajectory.",
   "follow_up_questions": [
@@ -54,9 +116,12 @@ IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra f
 CRITICAL RULES:
 1. Response must be ONLY valid JSON.
 2. Use EXACTLY the field names shown above.
-3. Include exactly 9 questions in detailed_analysis array.
+3. Include exactly 10 questions in detailed_analysis array.
 4. Use ** for bold text in JSON strings where needed.
 5. Be realistic and specific.
+6. Rank likely fields; do not list more than 3 top fields as equal recommendations.
+7. Every answer must separate at least one of: aptitude, field selection, work function, ecosystem, visibility/status, income model, risk, or timing.
+8. Use `career_evidence` when available; it is the compact evidence spine from the agentic chat system.
 """
 
 
@@ -104,6 +169,36 @@ def get_cached_career(userid: int, birth_hash: str, get_conn: Any, execute_fn: A
     return json.loads(row[0]) if row else None
 
 
+def attach_career_agentic_context(context: Dict[str, Any], birth_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach compact branch evidence used by the agentic chat career flow."""
+    agent_ctx = AgentContext(
+        birth_data=birth_data,
+        user_question="Career Analysis",
+        intent_result={"category": "career", "divisional_charts": ["D1", "D9", "D10", "Karkamsa"]},
+        precomputed_static=context,
+        precomputed_dynamic=context,
+    )
+    evidence: Dict[str, Any] = {}
+    builders = {
+        "parashari": build_parashari_agent_payload,
+        "jaimini": build_jaimini_agent_payload,
+        "nadi": build_nadi_agent_payload,
+    }
+    for name, builder in builders.items():
+        try:
+            payload = builder(agent_ctx, "Career Analysis")
+            if name == "parashari":
+                evidence[name] = {"px": payload.get("px")}
+            elif name == "jaimini":
+                evidence[name] = {"jx": payload.get("jx")}
+            elif name == "nadi":
+                evidence[name] = {"nx": payload.get("nx")}
+        except Exception as exc:
+            evidence[name] = {"error": str(exc)[:300]}
+    context["career_evidence"] = evidence
+    return context
+
+
 async def execute_career_analysis(
     userid: int,
     request: Any,
@@ -142,6 +237,7 @@ async def execute_career_analysis(
         context_generator.build_career_context,
         birth_data,
     )
+    context = attach_career_agentic_context(context, birth_data)
 
     analyzer = StructuredAnalysisAnalyzer()
     max_retries = 3
@@ -188,6 +284,8 @@ async def execute_career_analysis(
                     {
                         "question": item.get("question", ""),
                         "answer": item.get("answer", ""),
+                        "key_points": item.get("key_points", []),
+                        "astrological_basis": item.get("astrological_basis", ""),
                     }
                 )
             parsed_response = {

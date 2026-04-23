@@ -118,6 +118,23 @@ class KarmaContextBuilder:
         
         print(f"Result: {deity[0]} ({deity[1]}) - {deity[2]}")
         return deity
+
+    @staticmethod
+    def get_shashtiamsa_deity_info(degree_in_sign: float, sign_number: int) -> Dict[str, Any]:
+        """Return D60 deity plus the applied odd/even index for auditability."""
+        raw_index = int(degree_in_sign * 2)
+        raw_index = max(0, min(raw_index, len(KarmaContextBuilder.SHASHTIAMSA_DEITIES) - 1))
+        applied_index = raw_index if sign_number % 2 == 1 else 59 - raw_index
+        deity_name, nature, theme = KarmaContextBuilder.SHASHTIAMSA_DEITIES[applied_index]
+        return {
+            "deity": deity_name,
+            "nature": nature,
+            "theme": theme,
+            "raw_index": raw_index,
+            "applied_index": applied_index,
+            "sign_number": sign_number,
+            "direction": "direct" if sign_number % 2 == 1 else "reverse",
+        }
     
     # Nakshatra Past Life Occupations
     NAKSHATRA_KARMA = {
@@ -223,7 +240,8 @@ class KarmaContextBuilder:
             "eighth_house_secrets": self._analyze_8th_house(),
             "bhagya_karma": self._analyze_9th_house(),
             "moksha_indicators": self._analyze_12th_house(),
-            "karmic_timing": self._get_karmic_timing_summary()
+            "karmic_timing": self._get_karmic_timing_summary(),
+            "karma_evidence": self._build_karma_evidence_spine()
         }
     
     def _analyze_d60_essence(self) -> Dict:
@@ -251,20 +269,18 @@ class KarmaContextBuilder:
         d60_asc_full = d60_data.get('ascendant', 0)
         print(f"\n[Reference] D60 Ascendant: {d60_asc_full:.4f}° ({(d60_asc_full % 30):.4f}° in sign)")
         
-        deity_idx = int(d1_asc_degree / 0.5)  # 0.5° per deity, 60 divisions in 30°
-        print(f"\nDeity index calculation: int({d1_asc_degree:.4f} / 0.5) = {deity_idx}")
-        
-        if deity_idx >= len(self.SHASHTIAMSA_DEITIES):
-            print(f"⚠️ Deity index {deity_idx} out of range, capping to {len(self.SHASHTIAMSA_DEITIES)-1}")
-            deity_idx = len(self.SHASHTIAMSA_DEITIES) - 1
-        
-        deity_name, nature, theme = self.SHASHTIAMSA_DEITIES[deity_idx]
+        deity_info = self.get_shashtiamsa_deity_info(d1_asc_degree, d1_asc_sign + 1)
+        deity_idx = deity_info["applied_index"]
+        deity_name = deity_info["deity"]
+        nature = deity_info["nature"]
+        theme = deity_info["theme"]
+        print(f"\nDeity index calculation: raw={deity_info['raw_index']}, applied={deity_idx} ({deity_info['direction']})")
         print(f"\n✅ LAGNA DEITY: {deity_name}")
         print(f"   Nature: {nature}")
         print(f"   Theme: {theme}")
         
         # Get deity benefic/malefic classification
-        deity_classification = getattr(self, 'DEITY_NATURE', {}).get(deity_idx, nature)
+        deity_classification = nature
         print(f"   Classification: {deity_classification}")
         
         result = {
@@ -275,6 +291,8 @@ class KarmaContextBuilder:
             "d1_ascendant_degree": round(d1_asc_degree, 2),
             "d60_ascendant_degree": round(d60_asc_full % 30, 2),
             "deity_index": deity_idx,
+            "raw_deity_index": deity_info["raw_index"],
+            "deity_direction": deity_info["direction"],
             "significance": "Deity determined from D1 degree per BPHS - D60 Lagna shows the vessel, Atmakaraka shows the soul within"
         }
         
@@ -305,19 +323,17 @@ class KarmaContextBuilder:
                     print(f"AK D1 degree in sign: {ak_d1_degree:.4f}°")
                     print(f"\n[Reference] AK D60 longitude: {ak_longitude:.4f}° ({(ak_longitude % 30):.4f}° in sign)")
                     
-                    ak_deity_idx = int(ak_d1_degree / 0.5)
-                    print(f"\nAK Deity index: int({ak_d1_degree:.4f} / 0.5) = {ak_deity_idx}")
-                    
-                    if ak_deity_idx >= len(self.SHASHTIAMSA_DEITIES):
-                        print(f"⚠️ AK Deity index {ak_deity_idx} out of range, capping to {len(self.SHASHTIAMSA_DEITIES)-1}")
-                        ak_deity_idx = len(self.SHASHTIAMSA_DEITIES) - 1
-                    
-                    ak_deity_name, ak_nature, ak_theme = self.SHASHTIAMSA_DEITIES[ak_deity_idx]
+                    ak_deity_info = self.get_shashtiamsa_deity_info(ak_d1_degree, ak_d1_sign + 1)
+                    ak_deity_idx = ak_deity_info["applied_index"]
+                    ak_deity_name = ak_deity_info["deity"]
+                    ak_nature = ak_deity_info["nature"]
+                    ak_theme = ak_deity_info["theme"]
+                    print(f"\nAK Deity index: raw={ak_deity_info['raw_index']}, applied={ak_deity_idx} ({ak_deity_info['direction']})")
                     print(f"\n✅ ATMAKARAKA DEITY: {ak_deity_name}")
                     print(f"   Nature: {ak_nature}")
                     print(f"   Theme: {ak_theme}")
                     
-                    ak_classification = getattr(self, 'DEITY_NATURE', {}).get(ak_deity_idx, ak_nature)
+                    ak_classification = ak_nature
                     print(f"   Classification: {ak_classification}")
                     
                     # Calculate nakshatra from longitude
@@ -337,6 +353,9 @@ class KarmaContextBuilder:
                     result["atmakaraka_classification"] = ak_classification
                     result["atmakaraka_planet"] = ak_planet
                     result["atmakaraka_d60_nakshatra"] = ak_d60_nakshatra
+                    result["atmakaraka_raw_deity_index"] = ak_deity_info["raw_index"]
+                    result["atmakaraka_deity_index"] = ak_deity_idx
+                    result["atmakaraka_deity_direction"] = ak_deity_info["direction"]
                     
                     karmic_balance = self._calculate_karmic_balance(deity_classification, ak_classification)
                     result["karmic_balance"] = karmic_balance
@@ -914,15 +933,67 @@ class KarmaContextBuilder:
         planets = self.chart_data.get('planets', {})
         saturn_house = planets.get('Saturn', {}).get('house', 0)
         rahu_house = planets.get('Rahu', {}).get('house', 0)
+        current_dasha = self.chart_data.get('current_dasha') or self.chart_data.get('current_dashas') or {}
+        md = (current_dasha.get('mahadasha') or {}).get('planet')
+        ad = (current_dasha.get('antardasha') or {}).get('planet')
+        pd = (current_dasha.get('pratyantardasha') or {}).get('planet')
         
         return {
+            "current_vimshottari": {
+                "mahadasha": md,
+                "antardasha": ad,
+                "pratyantardasha": pd,
+            },
             "saturn_dasha": "Major karmic testing period - discipline, delays, maturity",
             "rahu_dasha": "Obsessive desires, foreign connections, unconventional experiences",
             "ketu_dasha": "Spiritual detachment, past life memories, moksha pull",
             "sade_sati": "Saturn transit over Moon sign ±1 - 7.5 year karmic test",
             "saturn_return": "Age 29-30, 58-60 - Major life restructuring",
             "rahu_return": "Age 18-19, 37-38, 56-57 - Destiny activation",
-            "current_focus": f"Saturn in house {saturn_house}, Rahu in house {rahu_house}"
+            "current_focus": f"Current Vimshottari {md or 'Unknown'}-{ad or 'Unknown'}-{pd or 'Unknown'} with Saturn in house {saturn_house}, Rahu in house {rahu_house}"
+        }
+
+    def _build_karma_evidence_spine(self) -> Dict:
+        """Compact evidence spine to keep karma interpretation disciplined."""
+        ak_data = self.chara_karaka_calc.get_atmakaraka() or {}
+        soul_identity = self._analyze_d60_essence()
+        soul_talents = self._analyze_karkamsa_skills()
+        timing = self._get_karmic_timing_summary()
+        asc_degree = self.chart_data.get('ascendant', 0) % 30
+        distance_to_d60_boundary = min(asc_degree % 0.5, 0.5 - (asc_degree % 0.5))
+        boundary_risk = "high" if distance_to_d60_boundary <= 0.03 else "medium" if distance_to_d60_boundary <= 0.08 else "normal"
+        d60_available = bool(self.divisional_charts.get('d60_shashtiamsa'))
+
+        return {
+            "primary": {
+                "atmakaraka": ak_data.get("planet"),
+                "atmakaraka_house": ak_data.get("house"),
+                "d60_lagna_deity": soul_identity.get("lagna_deity"),
+                "d60_lagna_nature": soul_identity.get("lagna_nature"),
+                "d60_atmakaraka_deity": soul_identity.get("atmakaraka_deity"),
+                "karkamsa_sign": soul_talents.get("karkamsa_sign"),
+                "karkamsa_house": soul_talents.get("karkamsa_house"),
+            },
+            "d60_confidence": {
+                "available": d60_available,
+                "birth_time_sensitivity": "D60 changes about every 30 minutes by sign and every 0.5 degree by deity; use as high-confidence only when birth time is reliable/rectified.",
+                "boundary_risk": boundary_risk,
+                "ascendant_degree_in_sign": round(asc_degree, 4),
+                "distance_to_half_degree_boundary": round(distance_to_d60_boundary, 4),
+            },
+            "current_activation": timing.get("current_vimshottari", {}),
+            "interpretive_priority": [
+                "D1 5th/8th/9th/12th and Rahu-Ketu axis define visible karmic themes",
+                "Jaimini AK/Karkamsa defines soul orientation",
+                "D9 confirms dharmic maturity",
+                "D60 refines hidden karmic residue only when birth time confidence is adequate",
+                "Current Vimshottari decides what is active now"
+            ],
+            "safety_rules": [
+                "Frame past-life statements as symbolic karmic patterns, not factual certainty",
+                "Do not use death/fatalistic language from Mrityu Bhaga",
+                "If D60 confidence is weak, downgrade certainty and rely more on D1/D9/AK/Rahu-Ketu"
+            ]
         }
     
     def _calculate_karmic_balance(self, lagna_class: str, ak_class: str) -> Dict:

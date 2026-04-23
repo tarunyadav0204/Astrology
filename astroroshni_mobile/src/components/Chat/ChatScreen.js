@@ -67,8 +67,9 @@ const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
 const DEBUG_IN_APP_REVIEW_ONLY = false;
 
 /** Listing with showAllReviews so users land near ratings when we must fall back to the browser/Play app. */
+const ANDROID_PACKAGE_NAME = 'com.astroroshni.mobile';
 const GOOGLE_PLAY_REVIEW_URL =
-  'https://play.google.com/store/apps/details?id=com.astroroshni.mobile&showAllReviews=true&pcampaignid=web_share';
+  `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE_NAME}&showAllReviews=true&pcampaignid=web_share`;
 
 /**
  * Open store listing when in-app review API cannot run (Expo Go, emulator, sideload, etc.).
@@ -82,6 +83,14 @@ const openRatingStoreListing = async (StoreReview) => {
       url = GOOGLE_PLAY_REVIEW_URL;
     }
     if (url) {
+      if (Platform.OS === 'android') {
+        try {
+          await Linking.openURL(`market://details?id=${ANDROID_PACKAGE_NAME}`);
+          return true;
+        } catch (_) {
+          // Fall through to the Expo/web store URL.
+        }
+      }
       await Linking.openURL(url);
       return true;
     }
@@ -89,6 +98,12 @@ const openRatingStoreListing = async (StoreReview) => {
     if (__DEV__) console.warn('[StoreReview] open listing failed:', e?.message || e);
   }
   if (Platform.OS === 'android') {
+    try {
+      await Linking.openURL(`market://details?id=${ANDROID_PACKAGE_NAME}`);
+      return true;
+    } catch (_) {
+      /* fallback below */
+    }
     try {
       await Linking.openURL(GOOGLE_PLAY_REVIEW_URL);
       return true;

@@ -487,6 +487,26 @@ class CreditService:
                 conn.commit()
         except Exception:
             return
+
+    def record_zero_cost_feature_usage(self, userid: int, feature: str, description: str = None) -> bool:
+        """Record a feature usage transaction with 0 credit impact (for free/waived usages)."""
+        from db import get_conn, execute
+        try:
+            with get_conn() as conn:
+                current_balance = self.get_user_credits(userid)
+                execute(
+                    conn,
+                    """
+                    INSERT INTO credit_transactions
+                    (userid, transaction_type, amount, balance_after, source, reference_id, description)
+                    VALUES (?, 'spent', 0, ?, 'feature_usage', ?, ?)
+                    """,
+                    (userid, current_balance, feature, description),
+                )
+                conn.commit()
+            return True
+        except Exception:
+            return False
     
     def has_transaction_with_reference(self, userid: int, source: str, reference_id: str) -> bool:
         """Return True if a transaction already exists with this source and reference_id (for idempotency)."""

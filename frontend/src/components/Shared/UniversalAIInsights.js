@@ -20,17 +20,17 @@ const ANALYSIS_CONFIG = {
     steps: [
       '💰 Analyzing wealth houses',
       '🪐 Examining planetary positions',
-      '🏛️ Calculating Dhana yogas',
-      '💎 Determining prosperity indicators',
-      '📈 Generating investment guidance'
+      '🏛️ Calculating Dhana yogas and asset patterns',
+      '💎 Mapping income source and risk profile',
+      '📈 Generating wealth timing and strategy'
     ],
     preview: [
-      '✨ 9 Essential wealth questions with detailed answers',
-      '🪐 Complete planetary analysis from your birth chart',
-      '🏛️ Dhana yogas and prosperity indicators',
-      '📊 Investment guidance and timing predictions',
-      '💼 Business vs job recommendations',
-      '📈 Stock trading and speculation analysis'
+      '✨ 10-part wealth and finance report',
+      '🪐 Income source: salary, business, advisory, assets, or investing',
+      '🏛️ Dhana yogas, savings capacity, and asset-building pattern',
+      '📊 Investment/trading suitability with risk-control warnings',
+      '💼 Career-to-money and business/job wealth pathway',
+      '📈 Wealth growth windows plus 90-day and 12-month strategy'
     ],
     disclaimer: 'Wealth insights are for educational purposes only. Consult financial advisors for investment decisions.'
   },
@@ -45,18 +45,18 @@ const ANALYSIS_CONFIG = {
     description: 'Discover your ideal career path and professional growth opportunities',
     steps: [
       '💼 Analyzing career houses',
-      '🌟 Examining professional indicators',
-      '🎯 Calculating success yogas',
-      '📈 Determining growth potential',
-      '🚀 Generating career guidance'
+      '🌟 Checking D10, AmK, AL, and Karkamsa',
+      '🎯 Ranking fields, roles, and work functions',
+      '📈 Mapping job/business and visibility potential',
+      '🚀 Generating timing and action plan'
     ],
     preview: [
-      '✨ Career path recommendations',
-      '🎯 Professional strengths analysis',
-      '📈 Growth timing predictions',
-      '💼 Leadership potential assessment',
-      '🌟 Success indicators',
-      '🚀 Career change guidance'
+      '✨ 10-part career and vocation report',
+      '🎯 Top 3 field/role clusters with chart evidence',
+      '🛠️ Day-to-day work function and strongest skills',
+      '💼 Job vs business vs freelancing vs leadership fit',
+      '🌟 Visibility, authority, and recognition potential',
+      '🚀 Breakthrough/change windows plus 90-day action plan'
     ],
     disclaimer: 'Career insights are for guidance purposes only. Consider professional counseling for major decisions.'
   },
@@ -71,18 +71,18 @@ const ANALYSIS_CONFIG = {
     description: 'Understand your health patterns and wellness recommendations',
     steps: [
       '🏥 Analyzing health houses',
-      '🌿 Examining body constitution',
-      '⚕️ Calculating health indicators',
-      '💊 Determining wellness factors',
-      '🧘 Generating health guidance'
+      '🌿 Mapping constitution and dosha patterns',
+      '⚕️ Checking D30 and sensitive body systems',
+      '📅 Ranking health timing windows',
+      '🧘 Generating preventive wellness guidance'
     ],
     preview: [
-      '✨ Health vulnerability analysis',
-      '🌿 Constitutional assessment',
-      '⚕️ Disease susceptibility patterns',
-      '💊 Preventive care recommendations',
-      '🧘 Wellness and lifestyle guidance',
-      '📅 Health timing predictions'
+      '✨ 10-part health and wellness report',
+      '🌿 Constitution, dosha, vitality, and recovery pattern',
+      '⚕️ Sensitive body systems from D1/D9/D30 evidence',
+      '🧠 Mental, emotional, sleep, and stress indicators',
+      '📅 Health caution windows with dasha/transit support',
+      '🧘 Preventive lifestyle guidance with medical safety boundaries'
     ],
     disclaimer: 'Health insights are for educational purposes only. Always consult qualified medical professionals.'
   },
@@ -96,19 +96,19 @@ const ANALYSIS_CONFIG = {
     cacheEndpoint: '/api/marriage/check-cache',
     description: 'Explore your relationship patterns and marriage compatibility',
     steps: [
-      '💕 Analyzing relationship houses',
-      '💖 Examining love indicators',
-      '👫 Calculating compatibility factors',
-      '💍 Determining marriage timing',
-      '🌹 Generating relationship guidance'
+      '💕 Analyzing marriage promise and 7th house',
+      '💖 Checking D9, DK, UL, and A7 indicators',
+      '👫 Separating relationship phase, commitment, and continuity',
+      '💍 Ranking dasha and transit lifecycle windows',
+      '🌹 Generating relationship guidance and remedies'
     ],
     preview: [
-      '✨ Marriage timing predictions',
-      '💖 Relationship compatibility analysis',
-      '👫 Partner characteristics',
-      '💍 Wedding timing recommendations',
-      '🌹 Love life insights',
-      '🏠 Marital harmony factors'
+      '✨ 10-part marriage and relationship report',
+      '💖 Promise vs current phase vs manifestation vs continuity',
+      '👫 Partner nature from 7th house, D9, and Darakaraka',
+      '💍 Relationship and marriage lifecycle windows from dasha/transit evidence',
+      '🪷 Navamsa, Upapada Lagna, and A7 relationship manifestation',
+      '🏠 Harmony, friction, family support, and practical remedies'
     ],
     disclaimer: 'Marriage insights are for guidance purposes only. Relationships require mutual understanding and effort.'
   },
@@ -120,18 +120,18 @@ const ANALYSIS_CONFIG = {
     startEndpoint: '/api/progeny/ai-insights/start',
     statusEndpointBase: '/api/progeny/ai-insights/status',
     cacheEndpoint: '/api/progeny/check-cache',
-    description: 'Understand progeny promise, timing windows, and family expansion guidance',
+    description: 'Understand progeny promise, current activation, and family expansion guidance',
     steps: [
-      '👶 Analyzing 5th house and Jupiter factors',
-      '🧿 Examining D7 (Saptamsa) indicators',
-      '⏳ Mapping dasha and transit windows',
-      '🪔 Identifying obstacles and remedies',
-      '🌸 Generating supportive guidance'
+      '👶 Reading D1 5th house promise',
+      '🧿 Examining D7 (Saptamsa) support',
+      '⏳ Mapping current dasha activation',
+      '🪔 Separating promise, timing, and parenting guidance',
+      '🌸 Generating supportive next steps'
     ],
     preview: [
-      '✨ Progeny promise and timing insights',
+      '✨ Progeny promise vs current activation',
       '🧿 D7-based family expansion indicators',
-      '⏳ Favorable periods and caution windows',
+      '⏳ Favorable windows and caution periods',
       '🪔 Remedies and practical guidance',
       '💞 Parenting and family harmony themes'
     ],
@@ -399,6 +399,7 @@ const UniversalAIInsights = ({
         latitude: birthDetails?.latitude || 0,
         longitude: birthDetails?.longitude || 0,
         gender: birthDetails?.gender || '',
+        marital_status: birthDetails?.marital_status || birthDetails?.maritalStatus || '',
         language: 'english',
         response_style: 'detailed',
         force_regenerate: forceRegenerate
@@ -626,6 +627,7 @@ const UniversalAIInsights = ({
           latitude: birthDetails?.latitude || 0,
           longitude: birthDetails?.longitude || 0,
           gender: birthDetails?.gender || '',
+          marital_status: birthDetails?.marital_status || birthDetails?.maritalStatus || '',
           language: 'english',
           response_style: 'detailed'
         };

@@ -15,36 +15,65 @@ from typing import Any, Dict, Optional
 import os
 
 from ai.gemini_errors import transient_gemini_error, user_facing_gemini_error
+from ai.parallel_chat.parallel_agent_payloads import build_nadi_agent_payload, build_parashari_agent_payload
+from context_agents.base import AgentContext
 
 # wealth_routes helpers are imported lazily inside functions to avoid circular imports at module load
 
 
 WEALTH_STRUCTURED_QUESTION = """
 {
-  "summary": "Brief wealth overview with key insights",
+  "summary": "A sharp wealth summary naming income source, accumulation strength, gains/network support, investment/speculation suitability, risk level, and next timing focus.",
   "detailed_analysis": [
     {
-      "title": "Wealth Houses Analysis",
-      "content": "Analysis of 2nd, 11th, and 9th houses for wealth indicators"
+      "title": "Core Wealth Promise",
+      "content": "Analyze 2nd house accumulation, 11th gains, 9th fortune, 5th speculation, and wealth_evidence.parashari.px.wealth.acc/gain/fort/spec. Separate wealth promise from current timing."
     },
     {
-      "title": "Planetary Wealth Indicators",
-      "content": "Jupiter, Venus, and other wealth-giving planets analysis"
+      "title": "Primary Income Source",
+      "content": "Identify whether money comes mainly through salary/service, business/network, investment/speculation, advisory/knowledge, creative/client-facing work, foreign/technology, property/assets, or family/support. Use wealth_evidence.parashari.px.wealth.mode/income and Nadi tags."
     },
     {
-      "title": "Dhana Yogas",
-      "content": "Wealth combinations and yogas in the chart"
+      "title": "Cashflow, Savings, and Asset-Building Pattern",
+      "content": "Explain earning consistency, saving capacity, liquidity, asset accumulation, and whether wealth grows steadily or in bursts. Use 2nd/4th/8th/11th houses, Jupiter/Venus/Mercury/Saturn, and dasha support."
     },
     {
-      "title": "Dasha Periods for Wealth",
-      "content": "Current and upcoming periods for financial gains"
+      "title": "Dhana Yogas and Prosperity Combinations",
+      "content": "Identify Dhana, Lakshmi, Raja, Viparita, or other wealth combinations only when supported by the supplied context. State what each yoga can realistically produce: salary rise, asset gain, business profit, network gains, inheritance/joint resources, or prestige-to-income conversion."
     },
     {
-      "title": "Investment & Business Guidance",
-      "content": "Recommendations for investments and business ventures"
+      "title": "Business, Job, Trading, or Investment Suitability",
+      "content": "Rank suitability for job income, business, freelancing, trading/speculation, long-term investing, real estate/assets, and partnership income. Do not recommend risky speculation if 5th/8th/12th risk pressure is high."
+    },
+    {
+      "title": "Financial Risk and Loss Patterns",
+      "content": "Analyze debt, impulsive spending, sudden losses, unstable gains, partner/shared-money risks, litigation/loans, and hidden expenses using 6th/8th/12th and wealth_evidence.parashari.px.wealth.risk. Give caution without fear."
+    },
+    {
+      "title": "Career-to-Money Connection",
+      "content": "Explain how profession converts into income using 10th/2nd/11th, D10 if available, Mercury/Jupiter/Venus/Saturn, and whether authority, expertise, communication, management, technical skill, or client trust creates wealth."
+    },
+    {
+      "title": "Current and Upcoming Wealth Timing",
+      "content": "Use current Vimshottari dasha first, then transits, wealth_evidence.parashari.px.D/HI/TR, and wealth_evidence.nadi.nx.wealth. Give supportive/mixed/weak windows; do not claim guaranteed windfalls."
+    },
+    {
+      "title": "Practical Wealth Strategy",
+      "content": "Give a practical 90-day and 12-month wealth plan based on income mode, risk band, skill/asset leverage, and timing. Keep it educational, not financial advice."
+    },
+    {
+      "title": "What to Avoid",
+      "content": "Name the top 3 money mistakes for this chart: wrong income model, over-risking, debt, relying on luck, poor savings discipline, partnership mistakes, delayed monetization, or hidden expenses."
     }
   ],
   "final_thoughts": "Concluding summary with key takeaways and overall wealth outlook",
+  "follow_up_questions": [
+    "💰 What is my best income source?",
+    "📈 Is trading or investing suitable for me?",
+    "🏠 Will I build property or assets?",
+    "💼 How does career affect my wealth?",
+    "📅 When is my next wealth growth window?"
+  ],
   "glossary": {
     "term_id": "Simple explanation of the term"
   }
@@ -59,9 +88,42 @@ Analyze the wealth potential focusing on:
 - Current and upcoming dasha periods
 - Investment recommendations
 - Business vs job suitability
+- Risk control: debt, losses, speculation, over-spending
+- Career-to-money conversion
+- Asset-building and savings pattern
+- wealth_evidence.parashari.px.wealth and wealth_evidence.nadi.nx.wealth when available
 
 IMPORTANT: Include meaningful final_thoughts with overall assessment and key advice.
+IMPORTANT: This is educational astrology guidance, not financial advice. Do not prescribe specific stocks, trades, or investments.
+IMPORTANT: Include exactly 10 detailed_analysis sections.
 """
+
+
+def attach_wealth_agentic_context(context: Dict[str, Any], birth_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach compact branch evidence used by the agentic chat wealth flow."""
+    agent_ctx = AgentContext(
+        birth_data=birth_data,
+        user_question="Wealth Analysis",
+        intent_result={"category": "wealth", "divisional_charts": ["D1", "D9", "D10"]},
+        precomputed_static=context,
+        precomputed_dynamic=context,
+    )
+    evidence: Dict[str, Any] = {}
+    builders = {
+        "parashari": build_parashari_agent_payload,
+        "nadi": build_nadi_agent_payload,
+    }
+    for name, builder in builders.items():
+        try:
+            payload = builder(agent_ctx, "Wealth Analysis")
+            if name == "parashari":
+                evidence[name] = {"px": payload.get("px")}
+            elif name == "nadi":
+                evidence[name] = {"nx": payload.get("nx")}
+        except Exception as exc:
+            evidence[name] = {"error": str(exc)[:300]}
+    context["wealth_evidence"] = evidence
+    return context
 
 
 async def execute_wealth_enhanced(
@@ -149,6 +211,8 @@ async def execute_wealth_enhanced(
                 "place": birth_data["place"],
             },
         }
+    if isinstance(context_dict, dict):
+        context_dict = attach_wealth_agentic_context(context_dict, birth_data)
 
     max_retries = 3
     retry_delay = 10
@@ -193,6 +257,8 @@ async def execute_wealth_enhanced(
                     detailed_analysis.append({
                         "question": item.get("title", ""),
                         "answer": item.get("content", ""),
+                        "key_points": item.get("key_points", []),
+                        "astrological_basis": item.get("astrological_basis", ""),
                     })
                 parsed_response = {
                     "quick_answer": raw_data.get("summary", "Analysis completed successfully."),

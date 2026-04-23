@@ -38,6 +38,21 @@ async def submit_feedback(request: FeedbackRequest, current_user: User = Depends
             _ensure_feedback_table(conn)
             cur = execute(
                 conn,
+                """
+                SELECT cm.message_id
+                FROM chat_messages cm
+                JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                WHERE cm.message_id = %s
+                  AND cs.user_id = %s
+                  AND cm.sender = 'assistant'
+                """,
+                (request.message_id, current_user.userid),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Feedback message not found")
+
+            cur = execute(
+                conn,
                 "SELECT id FROM message_feedback WHERE message_id = %s",
                 (request.message_id,),
             )
@@ -70,6 +85,8 @@ async def submit_feedback(request: FeedbackRequest, current_user: User = Depends
             "message": "Feedback submitted successfully"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Feedback submission error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")

@@ -261,6 +261,12 @@ export const chatAPI = {
     const path = getEndpoint('/tts/podcast/stream').replace(/^\//, '');
     return `${base}/${path}?message_id=${encodeURIComponent(String(messageId))}&lang=${encodeURIComponent(langCode)}`;
   },
+  submitFeedback: ({ message_id, rating, comment = null }) =>
+    api.post(getEndpoint('/chat/feedback/submit'), {
+      message_id,
+      rating,
+      comment,
+    }),
 };
 
 export const wealthAPI = {

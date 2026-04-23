@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from auth import get_current_user, User
-from ai.karma_gemini_analyzer import KarmaGeminiAnalyzer
+from ai.karma_gemini_analyzer import KarmaGeminiAnalyzer, json_dumps_karma_safe
 from credits.credit_service import CreditService
 from db import get_conn, execute
 
@@ -25,6 +25,15 @@ credit_service = CreditService()
 class KarmaAnalysisRequest(BaseModel):
     chart_id: str
     force_regenerate: bool = False
+
+
+def _safe_json_loads(raw, fallback):
+    if not raw:
+        return fallback
+    try:
+        return json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return fallback
 
 
 def _load_chart_data(chart_id: str, user_id: int) -> dict:
@@ -148,6 +157,7 @@ def init_karma_analysis_jobs_table():
 
 def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, birth_data: dict, karma_cost: int):
     """Background task to process karma analysis and persist to job + cache tables."""
+    credits_spent = False
     try:
         with get_conn() as conn:
             execute(
@@ -174,6 +184,14 @@ def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, 
 
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
+        try:
+            from shared.dasha_calculator import DashaCalculator
+
+            current_dashas = DashaCalculator().calculate_current_dashas(birth_data)
+            chart_data["current_dasha"] = current_dashas
+            chart_data["current_dashas"] = current_dashas
+        except Exception as dasha_error:
+            print(f"⚠️ Karma analysis: current dasha calculation unavailable: {dasha_error}")
 
         from calculators.divisional_chart_calculator import DivisionalChartCalculator
 
@@ -191,10 +209,19 @@ def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, 
             chart_data,
             divisional_charts,
             native_name=birth_data.get("name", "the native"),
-            log_request=True,
+            log_request=os.getenv("ASTRO_DEBUG_AI_PAYLOADS") == "1",
         )
 
         if analysis.get("success"):
+            credits_spent = credit_service.spend_credits(
+                user_id,
+                karma_cost,
+                "karma_analysis",
+                f"Karma analysis for chart {chart_id}",
+            )
+            if not credits_spent:
+                raise RuntimeError("Unable to spend credits for karma analysis. Please check your balance and try again.")
+
             payload = {
                 "karma_context": analysis["karma_context"],
                 "ai_interpretation": analysis["ai_interpretation"],
@@ -215,9 +242,9 @@ def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, 
                     WHERE chart_id = %s AND user_id = %s
                     """,
                     (
-                        json.dumps(analysis["karma_context"]),
+                        json_dumps_karma_safe(analysis["karma_context"]),
                         analysis["ai_interpretation"],
-                        json.dumps(analysis["sections"]),
+                        json_dumps_karma_safe(analysis["sections"]),
                         chart_id,
                         user_id,
                     ),
@@ -229,16 +256,9 @@ def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, 
                     SET status = 'completed', result_data = %s, completed_at = CURRENT_TIMESTAMP
                     WHERE job_id = %s
                     """,
-                    (json.dumps(payload), job_id),
+                    (json_dumps_karma_safe(payload), job_id),
                 )
                 conn.commit()
-
-            credit_service.spend_credits(
-                user_id,
-                karma_cost,
-                "karma_analysis",
-                f"Karma analysis for chart {chart_id}",
-            )
         else:
             err = analysis.get("error", "Unknown error")
             with get_conn() as conn:
@@ -265,6 +285,13 @@ def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, 
         import traceback
 
         traceback.print_exc()
+        if credits_spent:
+            credit_service.refund_credits(
+                user_id,
+                karma_cost,
+                "karma_analysis",
+                f"Refund for failed karma analysis cache write/job {job_id}",
+            )
         with get_conn() as conn:
             execute(
                 conn,
@@ -305,6 +332,7 @@ async def start_karma_analysis(
 
     chart_data = _load_chart_data(request.chart_id, current_user.userid)
 
+    init_karma_analysis_jobs_table()
     with get_conn() as conn:
         cur = execute(
             conn,
@@ -321,14 +349,13 @@ async def start_karma_analysis(
             return {
                 "status": "completed",
                 "data": {
-                    "karma_context": json.loads(existing[1]),
+                    "karma_context": _safe_json_loads(existing[1], {}),
                     "ai_interpretation": existing[2],
-                    "sections": json.loads(existing[3]),
+                    "sections": _safe_json_loads(existing[3], {}),
                 },
                 "cached": True,
             }
 
-    init_karma_analysis_jobs_table()
     job_id = str(uuid.uuid4())
     with get_conn() as conn:
         execute(
@@ -402,6 +429,7 @@ async def analyze_karma(
 async def get_karma_status(chart_id: str, current_user: User = Depends(get_current_user)):
     """Backward-compatible status lookup by chart_id."""
     try:
+        init_karma_analysis_jobs_table()
         with get_conn() as conn:
             cur = execute(
                 conn,
@@ -422,9 +450,9 @@ async def get_karma_status(chart_id: str, current_user: User = Depends(get_curre
             return {
                 "status": "completed",
                 "data": {
-                    "karma_context": json.loads(result[1]),
+                    "karma_context": _safe_json_loads(result[1], {}),
                     "ai_interpretation": result[2],
-                    "sections": json.loads(result[3]),
+                    "sections": _safe_json_loads(result[3], {}),
                 },
             }
         if status == "error":

@@ -69,18 +69,31 @@ def get_cached_progeny(userid: int, birth_hash: str, get_conn: Any, execute_fn: 
 
 
 def _build_progeny_question(request: Any, context: Dict[str, Any]) -> str:
-    if request.analysis_focus == "parenting":
-        focus_instruction = f"The user already has {request.children_count} children. Do NOT predict conception timing. Focus on parenting and child relationship guidance."
-    elif request.analysis_focus == "next_child":
-        focus_instruction = f"The user has {request.children_count} children and wants guidance for the next child timing and potential."
+    analysis_focus = request.analysis_focus or "first_child"
+    if analysis_focus == "parenting":
+        focus_instruction = (
+            f"The user already has {request.children_count} children. Do NOT predict conception timing. "
+            "Focus on parenting style, child relationship, support periods, and family harmony."
+        )
+    elif analysis_focus == "next_child":
+        focus_instruction = (
+            f"The user currently has {request.children_count} children. Focus only on timing and promise for the next child. "
+            "Do not reframe the question as first-child analysis."
+        )
     else:
-        focus_instruction = "Focus on first child promise, fertility support, and favorable timing windows."
+        focus_instruction = (
+            "Focus on first-child promise, supportive timing windows, and any obstacles or remedies. "
+            "Keep the language compassionate and non-fatalistic."
+        )
 
     progeny = context.get("progeny_analysis", {})
     sphuta = progeny.get("fertility_sphuta", {})
     d7 = progeny.get("d7_analysis", {})
     timing_indicators = progeny.get("timing_indicators", [])
     dasha = context.get("current_dashas", {})
+    evidence = context.get("progeny_evidence", {})
+    timing_summary = context.get("current_timing_summary", {})
+    guardrails = evidence.get("safety_rules", []) or context.get("interpretative_guidelines", {}).get("safety_rule", "")
 
     return f"""
 As an expert Vedic astrologer, analyze the birth chart for Progeny and Family Expansion.
@@ -91,44 +104,180 @@ USER SITUATION:
 - Current Children: {request.children_count}
 - Fertility Sphuta Type: {sphuta.get('type', 'unknown')}
 - Fertility Sphuta Strength: {sphuta.get('strength', 'unknown')}
+- Current Dasha Summary: {timing_summary.get('summary', 'Not available')}
+- Progeny Promise Rating: {evidence.get('promise', {}).get('rating', 'Unknown')}
+- Progeny Promise Notes: {', '.join(evidence.get('promise', {}).get('notes', [])) or 'Not available'}
 
 CHART ANALYSIS POINTS:
-1. D7 Saptamsa:
+1. D1 Promise:
+   - 5th House Sign: {progeny.get('d1_fifth_house', {}).get('sign', 'unknown')}
+   - 5th House Lord: {progeny.get('d1_fifth_house', {}).get('lord', 'unknown')}
+   - 5th House Planets: {', '.join(progeny.get('d1_fifth_house', {}).get('planets', []) or []) or 'Empty'}
+   - Malefic Pressure: {progeny.get('d1_fifth_house', {}).get('has_malefics', False)}
+2. D7 Saptamsa:
    - Lagna Lord: {d7.get('d7_lagna_lord', 'unknown')}
    - 5th House Planets: {', '.join(d7.get('planets_in_d7_5th', []) or []) or 'Empty'}
+   - 9th House Planets: {', '.join(d7.get('planets_in_d7_9th', []) or []) or 'Empty'}
+   - 2nd House Planets: {', '.join(d7.get('planets_in_d7_2nd', []) or []) or 'Empty'}
    - Summary: {d7.get('summary', 'Not available')}
-2. Timing Indicators: {', '.join(timing_indicators or []) or 'Not available'}
-3. Current Dasha: {dasha.get('mahadasha', {}).get('planet', 'Unknown')} MD / {dasha.get('antardasha', {}).get('planet', 'Unknown')} AD
+   - Support Level: {d7.get('support_level', 'Unknown')}
+3. Jupiter Status:
+   - Sign: {progeny.get('jupiter_status', {}).get('sign', 'unknown')}
+   - House: {progeny.get('jupiter_status', {}).get('house', 'unknown')}
+   - Status: {progeny.get('jupiter_status', {}).get('status', 'unknown')}
+4. Timing Indicators: {', '.join(timing_indicators or []) or 'Not available'}
+5. Current Dasha: {dasha.get('mahadasha', {}).get('planet', 'Unknown')} MD / {dasha.get('antardasha', {}).get('planet', 'Unknown')} AD
+6. Focus Guardrail: {focus_instruction}
+7. Safety Rules: {guardrails if isinstance(guardrails, str) else '; '.join(guardrails)}
 
 CRITICAL: You MUST respond with ONLY a JSON object.
 {{
-  "quick_answer": "Summary of progeny prospects and timing based on chart analysis.",
+  "analysis_mode": "{analysis_focus}",
+  "promise_strength": "Strong, Moderate, or Sensitive",
+  "quick_answer": "A 3-4 sentence summary of the progeny promise, timing, and focus-specific takeaway.",
   "detailed_analysis": [
     {{
-      "question": "What does my chart indicate about progeny and family expansion?",
-      "answer": "Core progeny promise from D1 + D7 with chart-specific detail."
+      "question": "What is the core progeny promise in the chart?",
+      "answer": "Explain the D1 5th house, D7 support, Jupiter, and fertility sphuta together."
     }},
     {{
-      "question": "Are there delays or obstacles and what are the likely reasons?",
-      "answer": "Explain likely astrological reasons and whether they are temporary."
+      "question": "What does the D1 5th house say about children?",
+      "answer": "Explain the 5th house sign, lord, occupants, and whether it is protected or pressured."
     }},
     {{
-      "question": "When are the favorable periods for conception / family milestones?",
-      "answer": "Use dasha and transit windows with practical timing guidance."
+      "question": "What does D7 say about progeny strength?",
+      "answer": "Use the D7 lagna lord, 5th house, 9th house, and 2nd house together."
+    }},
+    {{
+      "question": "What is Jupiter and fertility sphuta showing?",
+      "answer": "Explain Jupiter's role, fertility sphuta polarity, and whether the body/seed-field symbolism is supportive."
+    }},
+    {{
+      "question": "What current timing or activation is present?",
+      "answer": "Use the active Mahadasha, Antardasha, and any matching timing indicators."
+    }},
+    {{
+      "question": "Which timing windows look most supportive?",
+      "answer": "Give the best near-term windows and explain why they are better than other periods."
+    }},
+    {{
+      "question": "What are the main support factors?",
+      "answer": "List the strongest supportive factors first, in priority order."
+    }},
+    {{
+      "question": "What are the main obstacles or delays?",
+      "answer": "List the main cautions, delays, or mixed indications without being fatalistic."
+    }},
+    {{
+      "question": "How should this be read for the selected focus?",
+      "answer": "If first_child, talk about first-child promise. If next_child, talk only about next-child timing. If parenting, focus on existing children and do not predict conception timing."
     }},
     {{
       "question": "What practical remedies and actions are supportive?",
-      "answer": "Give realistic, compassionate, non-fatalistic remedies and guidance."
+      "answer": "Give realistic, compassionate, non-fatalistic remedies and family-supportive actions."
     }}
   ],
+  "timing_windows": [],
+  "obstacles_and_support": [],
+  "parenting_guidance": "",
   "final_thoughts": "Supportive summary with practical next steps."
 }}
 
 ETHICAL RULES:
 - Use supportive language.
 - Avoid deterministic or harmful wording.
+- Fertility and parenting are guidance topics, not medical diagnosis.
+- If the focus is parenting, do not mention conception timing.
 - No text outside JSON.
 """
+
+
+def _merge_or_pad_progeny_questions(
+    detailed_analysis: Any,
+    context: Dict[str, Any],
+    request: Any,
+) -> list:
+    canonical_questions = [
+        "What is the core progeny promise in the chart?",
+        "What does the D1 5th house say about children?",
+        "What does D7 say about progeny strength?",
+        "What is Jupiter and fertility sphuta showing?",
+        "What current timing or activation is present?",
+        "Which timing windows look most supportive?",
+        "What are the main support factors?",
+        "What are the main obstacles or delays?",
+        "How should this be read for the selected focus?",
+        "What practical remedies and actions are supportive?",
+    ]
+
+    merged = []
+    existing = {}
+    for item in detailed_analysis or []:
+        if isinstance(item, dict):
+            q = (item.get("question") or "").strip()
+            if q:
+                existing[q] = item.get("answer", "")
+
+    timing_summary = context.get("current_timing_summary", {})
+    progeny = context.get("progeny_analysis", {})
+    evidence = context.get("progeny_evidence", {})
+    d1 = progeny.get("d1_fifth_house", {})
+    d7 = progeny.get("d7_analysis", {})
+    jupiter = progeny.get("jupiter_status", {})
+    sphuta = progeny.get("fertility_sphuta", {})
+
+    fallback_answers = {
+        "What is the core progeny promise in the chart?": (
+            f"Promise rating: {evidence.get('promise', {}).get('rating', 'Moderate')}. "
+            f"D1 5th house is in {d1.get('sign', 'unknown')} with lord {d1.get('lord', 'unknown')}. "
+            f"D7 support level is {d7.get('support_level', 'Unknown')}. "
+            f"Jupiter is {jupiter.get('status', 'unknown')}. "
+            f"Fertility sphuta is {sphuta.get('strength', 'unknown')}."
+        ),
+        "What does the D1 5th house say about children?": (
+            f"The D1 5th house sits in {d1.get('sign', 'unknown')} and is ruled by {d1.get('lord', 'unknown')}. "
+            f"Planets present: {', '.join(d1.get('planets', []) or []) or 'none'}. "
+            f"Malefic pressure: {d1.get('has_malefics', False)}."
+        ),
+        "What does D7 say about progeny strength?": (
+            f"D7 lagna lord is {d7.get('d7_lagna_lord', 'unknown')}. "
+            f"D7 5th house planets: {', '.join(d7.get('planets_in_d7_5th', []) or []) or 'none'}. "
+            f"D7 9th house planets: {', '.join(d7.get('planets_in_d7_9th', []) or []) or 'none'}. "
+            f"D7 2nd house planets: {', '.join(d7.get('planets_in_d7_2nd', []) or []) or 'none'}. "
+            f"Support level: {d7.get('support_level', 'Unknown')}."
+        ),
+        "What is Jupiter and fertility sphuta showing?": (
+            f"Jupiter is in {jupiter.get('sign', 'unknown')} / house {jupiter.get('house', 'unknown')} "
+            f"and is {jupiter.get('status', 'unknown')}. "
+            f"Fertility sphuta is {sphuta.get('type', 'unknown')} with strength {sphuta.get('strength', 'unknown')}."
+        ),
+        "What current timing or activation is present?": (
+            timing_summary.get("summary")
+            or "Current dasha timing is available but no compact summary was generated."
+        ),
+        "Which timing windows look most supportive?": (
+            "Use the current Mahadasha/Antardasha plus any listed timing indicators to rank the most supportive near-term windows."
+        ),
+        "What are the main support factors?": (
+            f"Supportive factors include: {', '.join(evidence.get('promise', {}).get('notes', [])[:3]) or 'No compact support notes available.'}"
+        ),
+        "What are the main obstacles or delays?": (
+            "Identify only the strongest delay indicators, and keep the language mixed or sensitive rather than fatalistic."
+        ),
+        "How should this be read for the selected focus?": (
+            f"Focus is {getattr(request, 'analysis_focus', 'first_child')}. "
+            "If parenting, do not predict conception timing; if next_child, keep the answer limited to the next child; if first_child, stay on first-child promise and timing."
+        ),
+        "What practical remedies and actions are supportive?": (
+            "Offer realistic remedies, family-supportive actions, and health-conscious but non-medical suggestions."
+        ),
+    }
+
+    for question in canonical_questions:
+        answer = existing.get(question) or fallback_answers.get(question, "")
+        merged.append({"question": question, "answer": answer})
+
+    return merged
 
 
 async def execute_progeny_analysis(
@@ -234,27 +383,34 @@ async def execute_progeny_analysis(
         if ai_result.get("is_raw"):
             parsed_response = {
                 "quick_answer": "Analysis completed successfully.",
-                "detailed_analysis": [
-                    {
-                        "question": "What does my chart indicate about family expansion?",
-                        "answer": ai_result.get("response", "Analysis completed successfully."),
-                    }
-                ],
+                "analysis_mode": request.analysis_focus,
+                "promise_strength": "Moderate",
+                "detailed_analysis": _merge_or_pad_progeny_questions(
+                    [
+                        {
+                            "question": "What is the core progeny promise in the chart?",
+                            "answer": ai_result.get("response", "Analysis completed successfully."),
+                        }
+                    ],
+                    context,
+                    request,
+                ),
                 "final_thoughts": "Your chart has been analyzed for progeny prospects.",
             }
         else:
             raw_data = ai_result.get("data", {})
-            detailed_analysis = []
-            for item in raw_data.get("detailed_analysis", []):
-                detailed_analysis.append(
-                    {
-                        "question": item.get("question", ""),
-                        "answer": item.get("answer", ""),
-                    }
-                )
             parsed_response = {
                 "quick_answer": raw_data.get("quick_answer", "Analysis completed successfully."),
-                "detailed_analysis": detailed_analysis,
+                "analysis_mode": raw_data.get("analysis_mode", request.analysis_focus),
+                "promise_strength": raw_data.get("promise_strength", "Moderate"),
+                "detailed_analysis": _merge_or_pad_progeny_questions(
+                    raw_data.get("detailed_analysis", []),
+                    context,
+                    request,
+                ),
+                "timing_windows": raw_data.get("timing_windows", []),
+                "obstacles_and_support": raw_data.get("obstacles_and_support", []),
+                "parenting_guidance": raw_data.get("parenting_guidance", ""),
                 "final_thoughts": raw_data.get("final_thoughts", ""),
             }
 

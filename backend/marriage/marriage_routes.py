@@ -32,6 +32,7 @@ class MarriageAnalysisRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
+    marital_status: Optional[str] = None
     language: Optional[str] = "english"
     response_style: Optional[str] = "detailed"
     force_regenerate: Optional[bool] = False

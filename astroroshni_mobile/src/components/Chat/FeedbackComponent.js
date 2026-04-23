@@ -8,18 +8,31 @@ import {
   Alert,
   StyleSheet,
   Linking,
+  Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { chatAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 
 /** Same listing as web chat + AstroRoshni homepage CTA. */
+const ANDROID_PACKAGE_NAME = 'com.astroroshni.mobile';
 const GOOGLE_PLAY_LISTING_URL =
-  'https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share';
+  `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE_NAME}&showAllReviews=true&pcampaignid=web_share`;
 
 function FeedbackPlayStoreRow({ colors, theme }) {
-  const openPlay = () => {
-    Linking.openURL(GOOGLE_PLAY_LISTING_URL).catch(() => {});
+  const openPlay = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        await Linking.openURL(`market://details?id=${ANDROID_PACKAGE_NAME}`);
+        return;
+      } catch (_) {
+        // Fall back to web listing below.
+      }
+    }
+    try {
+      await Linking.openURL(GOOGLE_PLAY_LISTING_URL);
+    } catch (_) {
+      Alert.alert('Could not open Play Store', 'Please search for AstroRoshni in the Play Store.');
+    }
   };
   return (
     <>
@@ -77,39 +90,29 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
 
   const submitFeedback = async () => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/feedback/submit')}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          message_id: String(message.messageId),
-          rating: feedback.rating,
-          comment: feedback.comment.trim() || null
-        })
+      await chatAPI.submitFeedback({
+        message_id: Number(message.messageId),
+        rating: feedback.rating,
+        comment: feedback.comment.trim() || null,
       });
 
-      if (response.ok) {
-        setFeedback(prev => ({ ...prev, submitted: true }));
-        if (onFeedbackSubmitted) {
-          onFeedbackSubmitted(message.messageId, feedback.rating);
-        }
-        setTimeout(() => {
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-          }).start(() => {
-            setVisible(false);
-          });
-        }, 2000);
-      } else {
-        Alert.alert('Error', 'Failed to submit feedback');
+      setFeedback(prev => ({ ...prev, submitted: true }));
+      if (onFeedbackSubmitted) {
+        onFeedbackSubmitted(message.messageId, feedback.rating);
       }
+      setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start(() => {
+          setVisible(false);
+        });
+      }, feedback.rating >= 4 ? 12000 : 2200);
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit feedback');
+      const detail = error?.response?.data?.detail || error?.message || 'Failed to submit feedback';
+      if (__DEV__) console.warn('[Feedback] submit failed:', detail);
+      Alert.alert('Error', detail);
     }
   };
 
@@ -136,7 +139,12 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
       borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.3)'
     }]}>
       {feedback.submitted ? (
-        <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>
+        <>
+          <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>
+          {feedback.rating >= 4 && (
+            <FeedbackPlayStoreRow colors={colors} theme={theme} />
+          )}
+        </>
       ) : (
         <>
           <Text style={[styles.title, { color: colors.text }]}>How was this answer?</Text>

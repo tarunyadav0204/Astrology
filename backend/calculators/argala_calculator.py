@@ -3,19 +3,31 @@ from .base_calculator import BaseCalculator
 class ArgalaCalculator(BaseCalculator):
     """Calculate Argala (planetary interventions) using real Vedic calculations"""
     
-    def __init__(self, chart_data, birth_data):
+    def __init__(self, chart_data, birth_data=None):
         super().__init__(chart_data)
         self.birth_data = birth_data
         
         # Initialize Shadbala calculator for real strength calculations
-        from .classical_shadbala import calculate_classical_shadbala
         from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
         
-        self.shadbala_data = calculate_classical_shadbala(self.birth_data, chart_data)
+        self.shadbala_data = self._calculate_shadbala_data(chart_data, birth_data)
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
         
         # Get real planetary strengths
         self.dignities_data = self.dignities_calc.calculate_planetary_dignities()
+
+    def _calculate_shadbala_data(self, chart_data, birth_data):
+        if birth_data:
+            try:
+                from .classical_shadbala import calculate_classical_shadbala
+                return calculate_classical_shadbala(birth_data, chart_data)
+            except Exception:
+                pass
+        try:
+            from .shadbala_calculator import ShadbalaCalculator
+            return ShadbalaCalculator(chart_data).calculate_shadbala()
+        except Exception:
+            return {}
     
     def calculate_argala_analysis(self):
         """Calculate complete Argala analysis using real planetary strengths"""

@@ -38,6 +38,22 @@ function promoCodeIsActive(value) {
   return Boolean(value);
 }
 
+function formatDateTimeIST(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
 const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
   const navigate = useNavigate();
   
@@ -1875,7 +1891,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                 .join(', ')
                             : '—'}
                         </td>
-                        <td>{new Date(user.created_at).toLocaleString()}</td>
+                        <td>{formatDateTimeIST(user.created_at)}</td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"

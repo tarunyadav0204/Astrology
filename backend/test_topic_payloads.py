@@ -3,6 +3,7 @@ from ai.parallel_chat.parallel_agent_payloads import (
     build_jaimini_agent_payload,
     build_parashari_agent_payload,
 )
+from ai.parallel_chat.prompt_blocks import build_parashari_branch_static_agent
 from chat.chat_context_builder import ChatContextBuilder
 from context_agents.base import AgentContext
 
@@ -73,6 +74,36 @@ def test_parashari_payload_exposes_health_topic_block():
     assert px["health"]["charak"]["charak"] in {"vata", "pitta", "kapha", "mixed"}
     assert "rw" in px["health"]
     assert "score" in px["health"]
+
+
+def test_parashari_payload_exposes_wealth_topic_block():
+    birth = _birth_data()
+    static = ChatContextBuilder()._build_static_context(birth)
+    payload = build_parashari_agent_payload(
+        AgentContext(
+            birth_data=birth,
+            user_question="How will I build wealth?",
+            intent_result={"category": "wealth", "divisional_charts": ["D1", "D9", "D10"]},
+            precomputed_static=static,
+        ),
+        "How will I build wealth?",
+    )
+
+    wealth = payload["px"]["wealth"]
+    assert wealth["hs"] == [2, 11, 5, 9]
+    assert wealth["mode"] in {"salary_service", "business_network", "investment_speculation", "mixed"}
+    assert wealth["risk"]["band"] in {"managed", "medium", "high"}
+    assert "income" in wealth
+
+
+def test_parashari_health_prompt_is_category_gated():
+    career_prompt = build_parashari_branch_static_agent("career")
+    health_prompt = build_parashari_branch_static_agent("health")
+
+    assert "px.health" not in career_prompt
+    assert "Constitution/Vitality -> Disease Pattern" not in career_prompt
+    assert "px.health" in health_prompt
+    assert "Constitution/Vitality -> Disease Pattern" in health_prompt
 
 
 def test_parashari_payload_exposes_divisional_reasoning_spine_for_career():

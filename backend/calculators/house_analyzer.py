@@ -194,10 +194,7 @@ class HouseAnalyzer(BaseCalculator):
         from .argala_calculator import ArgalaCalculator
         
         shadbala_calc = ShadbalaCalculator(self.chart_data)
-        argala_calc = ArgalaCalculator(self.chart_data)
-        # Set birth_data separately if needed
-        if hasattr(argala_calc, 'birth_data'):
-            argala_calc.birth_data = self.birth_data
+        argala_calc = ArgalaCalculator(self.chart_data, self.birth_data)
         
         # Get real Shadbala data
         shadbala_data = shadbala_calc.calculate_shadbala()

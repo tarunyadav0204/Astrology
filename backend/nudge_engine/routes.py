@@ -7,11 +7,11 @@ import logging
 import os
 import hmac
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
@@ -1082,6 +1082,232 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
 
 
+def _recent_chat_user_candidates(
+    conn,
+    *,
+    lookback_minutes: int,
+    limit_users: int,
+) -> List[Dict[str, int]]:
+    """Users with at least one user question in lookback window; includes latest user message_id."""
+    since_dt = datetime.utcnow() - timedelta(minutes=max(1, int(lookback_minutes)))
+    cur = execute(
+        conn,
+        """
+        SELECT cs.user_id,
+               MAX(cm.message_id) AS last_user_message_id
+        FROM chat_messages cm
+        JOIN chat_sessions cs ON cs.session_id = cm.session_id
+        WHERE cm.sender = 'user'
+          AND cm.timestamp >= %s
+        GROUP BY cs.user_id
+        ORDER BY MAX(cm.timestamp) DESC
+        LIMIT %s
+        """,
+        (since_dt, int(limit_users)),
+    )
+    out: List[Dict[str, int]] = []
+    for row in cur.fetchall() or []:
+        try:
+            uid = int(row[0])
+            mid = int(row[1]) if row[1] is not None else 0
+            if uid > 0 and mid > 0:
+                out.append({"user_id": uid, "message_id": mid})
+        except Exception:
+            continue
+    return out
+
+
+def _recent_chat_followup_dedupe_keys(conn, *, since_dt: datetime) -> set[tuple[int, int]]:
+    """
+    Already-sent (user_id, message_id) keys for trigger_id=chat_hourly_followup since since_dt.
+    Prevents duplicate sends across frequent cron runs.
+    """
+    cur = execute(
+        conn,
+        """
+        SELECT userid, event_params
+        FROM nudge_deliveries
+        WHERE trigger_id = %s
+          AND created_at >= %s
+        """,
+        ("chat_hourly_followup", since_dt),
+    )
+    keys: set[tuple[int, int]] = set()
+    for row in cur.fetchall() or []:
+        try:
+            uid = int(row[0])
+            raw = row[1]
+            if not raw:
+                continue
+            obj = json.loads(raw)
+            mid = int(obj.get("message_id") or 0)
+            if uid > 0 and mid > 0:
+                keys.add((uid, mid))
+        except Exception:
+            continue
+    return keys
+
+
+def _dispatch_recent_chat_followups(
+    *,
+    limit_users: int = 200,
+    lookback_minutes: int = 60,
+    max_turns: int = 2,
+) -> Dict[str, Any]:
+    """
+    Generate + send nudges for users active in chat in the last `lookback_minutes`.
+    Intended for cron/background use.
+    """
+    from .chat_nudge_suggestion import (
+        load_last_completed_qa_turns,
+        generate_push_nudge_via_gemini,
+    )
+
+    lookback_minutes = max(1, min(int(lookback_minutes), 24 * 60))
+    limit_users = max(1, min(int(limit_users), 500))
+    max_turns = max(1, min(int(max_turns), 2))
+    dedupe_since = datetime.utcnow() - timedelta(hours=6)
+
+    targeted = 0
+    generated = 0
+    deliveries_created = 0
+    push_sent = 0
+    skipped_dedupe = 0
+    skipped_no_turns = 0
+    failed = 0
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            candidates = _recent_chat_user_candidates(
+                conn,
+                lookback_minutes=lookback_minutes,
+                limit_users=limit_users,
+            )
+            sent_keys = _recent_chat_followup_dedupe_keys(conn, since_dt=dedupe_since)
+            today = date.today()
+
+            for item in candidates:
+                uid = int(item["user_id"])
+                message_id = int(item["message_id"])
+                targeted += 1
+
+                if (uid, message_id) in sent_keys:
+                    skipped_dedupe += 1
+                    continue
+
+                try:
+                    turns = load_last_completed_qa_turns(conn, uid, max_turns=max_turns)
+                    if not turns:
+                        skipped_no_turns += 1
+                        continue
+
+                    out = generate_push_nudge_via_gemini(turns)
+                    title = str(out.get("title") or "").strip()[:100]
+                    body_text = str(out.get("body") or "").strip()[:200]
+                    question = str(out.get("question") or "").strip()[:500]
+                    if not title or not body_text:
+                        failed += 1
+                        continue
+                    generated += 1
+
+                    push_data: Dict[str, Any] = {
+                        "trigger_id": "chat_hourly_followup",
+                        "cta": "astroroshni://chat",
+                        "question": question,
+                        "source_message_id": str(message_id),
+                    }
+
+                    tokens = db.get_device_tokens_for_user(conn, uid)
+                    sent = 0
+                    for token, _platform in tokens or []:
+                        if push_module.send_expo_push(token, title, body_text, data=push_data):
+                            sent += 1
+                    push_sent += sent
+
+                    event_params = json.dumps(
+                        {
+                            "source": "recent_chat_hourly",
+                            "message_id": message_id,
+                            "lookback_minutes": lookback_minutes,
+                        },
+                        ensure_ascii=False,
+                    )
+                    channel = "push" if sent > 0 else "stored"
+                    db.insert_delivery(
+                        conn,
+                        userid=uid,
+                        trigger_id="chat_hourly_followup",
+                        title=title,
+                        body=body_text,
+                        sent_at=today,
+                        event_params=event_params,
+                        channel=channel,
+                        data_payload=push_data,
+                    )
+                    deliveries_created += 1
+                except Exception as e:
+                    failed += 1
+                    logger.warning(
+                        "chat_hourly_followup failed for user_id=%s message_id=%s: %s",
+                        uid,
+                        message_id,
+                        e,
+                    )
+                    continue
+
+            summary = {
+                "ok": True,
+                "targeted_users": targeted,
+                "generated": generated,
+                "deliveries_created": deliveries_created,
+                "push_sent": push_sent,
+                "skipped_dedupe": skipped_dedupe,
+                "skipped_no_turns": skipped_no_turns,
+                "failed": failed,
+                "lookback_minutes": lookback_minutes,
+                "limit_users": limit_users,
+            }
+            db.insert_cron_run(
+                conn,
+                job_key="chat_followup_dispatch_recent",
+                status="success",
+                summary_json=json.dumps(summary, ensure_ascii=False),
+            )
+            conn.commit()
+    except Exception as e:
+        summary = {
+            "ok": False,
+            "error": str(e),
+            "targeted_users": targeted,
+            "generated": generated,
+            "deliveries_created": deliveries_created,
+            "push_sent": push_sent,
+            "skipped_dedupe": skipped_dedupe,
+            "skipped_no_turns": skipped_no_turns,
+            "failed": failed + 1,
+            "lookback_minutes": lookback_minutes,
+            "limit_users": limit_users,
+        }
+        try:
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                db.insert_cron_run(
+                    conn,
+                    job_key="chat_followup_dispatch_recent",
+                    status="failed",
+                    summary_json=json.dumps(summary, ensure_ascii=False),
+                )
+                conn.commit()
+        except Exception:
+            pass
+        logger.exception("chat_hourly_followup fatal error: %s", e)
+        return summary
+
+    logger.info("chat_hourly_followup summary: %s", summary)
+    return summary
+
+
 @router.post("/admin/broadcast/dispatch-due")
 async def admin_dispatch_due_broadcast(
     limit: int = Query(100, ge=1, le=500),
@@ -1106,3 +1332,73 @@ async def cron_dispatch_due_broadcast(
     """
     _verify_cron_secret(x_cron_secret)
     return _dispatch_due_broadcast(limit)
+
+
+@router.post("/cron/chat-followup/dispatch-recent")
+async def cron_dispatch_recent_chat_followups(
+    background_tasks: BackgroundTasks,
+    limit_users: int = Query(200, ge=1, le=500),
+    lookback_minutes: int = Query(60, ge=1, le=1440),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+):
+    """
+    Cron-safe, non-blocking endpoint:
+    - Finds users who asked >=1 question in the last lookback window.
+    - Generates title/body/question from their recent completed chat exchanges.
+    - Sends push (and stores delivery row) with dedupe by latest user message id.
+    """
+    _verify_cron_secret(x_cron_secret)
+    background_tasks.add_task(
+        _dispatch_recent_chat_followups,
+        limit_users=int(limit_users),
+        lookback_minutes=int(lookback_minutes),
+        max_turns=2,
+    )
+    return {
+        "ok": True,
+        "queued": True,
+        "message": "Recent chat follow-up dispatch queued in background",
+        "limit_users": int(limit_users),
+        "lookback_minutes": int(lookback_minutes),
+    }
+
+
+@router.get("/admin/cron/chat-followup/status")
+async def admin_chat_followup_cron_status(
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin status endpoint: recent run summaries for chat follow-up cron job."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            rows = db.list_cron_runs(
+                conn,
+                job_key="chat_followup_dispatch_recent",
+                limit=int(limit),
+            )
+        items = []
+        for r in rows:
+            summary = {}
+            try:
+                summary = json.loads(r[3] or "{}")
+                if not isinstance(summary, dict):
+                    summary = {}
+            except Exception:
+                summary = {}
+            items.append(
+                {
+                    "id": int(r[0]),
+                    "job_key": r[1],
+                    "status": r[2],
+                    "summary": summary,
+                    "created_at": r[4].isoformat() if hasattr(r[4], "isoformat") else str(r[4]),
+                }
+            )
+        latest = items[0] if items else None
+        return {"ok": True, "latest": latest, "items": items}
+    except Exception as e:
+        logger.exception("admin_chat_followup_cron_status failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch cron status") from e

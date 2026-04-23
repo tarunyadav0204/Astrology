@@ -169,6 +169,13 @@ def _risk_windows(dynamic: Dict[str, Any]) -> List[Dict[str, Any]]:
     return rows[:8]
 
 
+def _safe_call(default: Any, fn: Any, *args: Any) -> Any:
+    try:
+        return fn(*args)
+    except Exception:
+        return default
+
+
 class HealthAgent(ContextAgent):
     agent_id = "health"
     schema_version = 1
@@ -181,22 +188,22 @@ class HealthAgent(ContextAgent):
         try:
             raw = calc.calculate_overall_health()
         except Exception:
-            planet_analysis = calc._analyze_health_planets()
-            house_analysis = calc._analyze_health_houses()
+            planet_analysis = _safe_call({}, calc._analyze_health_planets)
+            house_analysis = _safe_call({}, calc._analyze_health_houses)
             yoga_analysis = {
                 "beneficial_yogas": [],
                 "affliction_yogas": [],
                 "total_beneficial": 0,
                 "total_afflictions": 0,
             }
-            score = calc._calculate_health_score(planet_analysis, house_analysis, yoga_analysis)
+            score = _safe_call({"score": 0}, calc._calculate_health_score, planet_analysis, house_analysis, yoga_analysis)
             raw = {
                 "planet_analysis": planet_analysis,
                 "house_analysis": house_analysis,
                 "yoga_analysis": yoga_analysis,
                 "health_score": score.get("score", 0),
-                "constitution_type": calc._determine_constitution(),
-                "element_balance": calc._calculate_element_balance(),
+                "constitution_type": _safe_call("Unknown", calc._determine_constitution),
+                "element_balance": _safe_call({}, calc._calculate_element_balance),
             }
         ph = _compact_planet_impacts(raw.get("planet_analysis") or {})
         hh = _compact_house_impacts(raw.get("house_analysis") or {})

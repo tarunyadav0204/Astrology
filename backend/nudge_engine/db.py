@@ -281,6 +281,22 @@ def init_nudge_tables(conn) -> None:
             "CREATE INDEX IF NOT EXISTS idx_nudge_broadcast_schedule_date_time "
             "ON nudge_broadcast_schedule(send_date, send_time)",
         )
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_cron_runs (
+                id SERIAL PRIMARY KEY,
+                job_key TEXT NOT NULL,
+                status TEXT NOT NULL,
+                summary_json TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        execute(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_cron_runs_job_created ON nudge_cron_runs(job_key, created_at DESC)",
+        )
         _seed_nudge_trigger_definitions(conn)
         _seed_broadcast_templates(conn)
         _seed_default_broadcast_schedule(conn)
@@ -841,3 +857,33 @@ def create_broadcast_schedule_item(
 def delete_broadcast_schedule_item(conn, schedule_id: int) -> int:
     cur = execute(conn, "DELETE FROM nudge_broadcast_schedule WHERE id = %s", (schedule_id,))
     return int(cur.rowcount or 0)
+
+
+def insert_cron_run(conn, job_key: str, status: str, summary_json: str) -> Optional[int]:
+    cur = execute(
+        conn,
+        """
+        INSERT INTO nudge_cron_runs(job_key, status, summary_json)
+        VALUES (%s, %s, %s)
+        RETURNING id
+        """,
+        (str(job_key or "").strip(), str(status or "").strip(), str(summary_json or "{}")),
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row else None
+
+
+def list_cron_runs(conn, job_key: str, limit: int = 20) -> List[Tuple]:
+    lim = max(1, min(int(limit), 200))
+    cur = execute(
+        conn,
+        """
+        SELECT id, job_key, status, summary_json, created_at
+        FROM nudge_cron_runs
+        WHERE job_key = %s
+        ORDER BY created_at DESC, id DESC
+        LIMIT %s
+        """,
+        (str(job_key or "").strip(), lim),
+    )
+    return list(cur.fetchall() or [])

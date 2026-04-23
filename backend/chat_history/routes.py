@@ -1515,6 +1515,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 credit_service = CreditService()
                 if using_free_question:
                     credit_service.mark_free_chat_question_used(user_id)
+                    analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
+                    credit_service.record_zero_cost_feature_usage(
+                        user_id,
+                        "chat_question",
+                        f"{analysis_type} (Free): {question[:50]}...",
+                    )
                     print(f"🆓 FREE QUESTION USED for user {user_id} (no credits deducted)")
                     success = True
                 else:

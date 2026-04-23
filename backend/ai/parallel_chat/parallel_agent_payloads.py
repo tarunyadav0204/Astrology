@@ -714,6 +714,7 @@ def _build_parashari_derived_payload(agent_ctx: AgentContext, agents: Dict[str, 
         "TR": _transit_summary(topic["hs"], levels, agents.get("transit_win") or {}),
         "career": _build_parashari_career_payload(levels, divs),
         "relationship": _build_parashari_relationship_payload(levels, divs),
+        "wealth": _build_parashari_wealth_payload(levels, divs),
     }
     if _is_health_category(topic["cat"]):
         out["health"] = _build_parashari_health_payload(levels, divs, core, agents.get("health") or {})
@@ -824,6 +825,48 @@ def _build_parashari_relationship_payload(levels: Dict[str, Dict[str, Any]], div
         "fr": friction,
         "ct": continuity,
         "mode": verdict,
+    }
+
+
+def _build_parashari_wealth_payload(levels: Dict[str, Dict[str, Any]], divs: Dict[str, bool]) -> Dict[str, Any]:
+    hi = _house_impact_summary([2, 11, 5, 9, 8, 12, 6, 10], levels)
+    ranked = _rank_houses(hi)
+    accumulation = _house_level_weight(levels, 2)
+    gains = _house_level_weight(levels, 11)
+    speculation = _house_level_weight(levels, 5)
+    fortune = _house_level_weight(levels, 9)
+    debt_service = _house_level_weight(levels, 6)
+    sudden = _house_level_weight(levels, 8)
+    expense = _house_level_weight(levels, 12)
+    career_income = _house_level_weight(levels, 10) + debt_service
+    business_income = _house_level_weight(levels, 7) + gains
+    investment_income = speculation + fortune
+    risk = sudden + expense + debt_service
+    if business_income >= max(career_income, investment_income, 1) + 2:
+        mode = "business_network"
+    elif investment_income >= max(career_income, business_income, 1) + 2:
+        mode = "investment_speculation"
+    elif career_income >= max(business_income, investment_income, 1):
+        mode = "salary_service"
+    else:
+        mode = "mixed"
+    if risk > accumulation + gains + fortune:
+        risk_band = "high"
+    elif risk >= max(accumulation, gains, fortune, 1):
+        risk_band = "medium"
+    else:
+        risk_band = "managed"
+    return {
+        "hs": [2, 11, 5, 9],
+        "dv": {"D9": bool(divs.get("D9")), "D10": bool(divs.get("D10"))},
+        "dom": ranked[:6],
+        "acc": accumulation,
+        "gain": gains,
+        "spec": speculation,
+        "fort": fortune,
+        "risk": {"debt": debt_service, "sudden": sudden, "expense": expense, "band": risk_band},
+        "mode": mode,
+        "income": {"career": career_income, "business": business_income, "investment": investment_income},
     }
 
 

@@ -57,7 +57,7 @@ const PAGE_META = {
     headline: 'Progeny Analysis',
     kicker: 'AI-powered Vedic insights',
     blurb:
-      'Explore progeny promise, timing windows, and family expansion guidance from your chart—supportive guidance only, not medical advice.',
+      'Explore progeny promise, current activation, and family expansion guidance from your chart—supportive guidance only, not medical advice.',
     icon: '👶',
     pdf: null
   },
