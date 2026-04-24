@@ -43,6 +43,45 @@ def test_apply_chart_focus_guards_adds_requested_chart_and_metadata():
     assert result["extracted_context"]["chart_focus"]["label"] == "D9"
 
 
+def test_apply_chart_focus_guards_skips_generic_birth_chart_for_career_topic():
+    from ai.intent_router import apply_chart_focus_guards
+
+    result = {
+        "category": "career",
+        "divisional_charts": ["D1", "D10", "D9"],
+        "extracted_context": {},
+    }
+
+    apply_chart_focus_guards(result, "Tell me about my career from my birth chart")
+
+    assert "chart_focus" not in result
+    assert result["extracted_context"] == {}
+
+
+def test_apply_chart_focus_guards_prefers_llm_chart_focus_payload():
+    from ai.intent_router import apply_chart_focus_guards
+
+    result = {
+        "category": "career",
+        "divisional_charts": ["D1", "D9"],
+        "extracted_context": {},
+        "chart_focus": {
+            "kind": "chart_specific",
+            "primary": "d10",
+            "label": "Career chart",
+            "explicit": True,
+            "phrase": "career in d10 tell",
+            "requested": ["d10"],
+        },
+    }
+
+    apply_chart_focus_guards(result, "career in d10 tell")
+
+    assert result["chart_focus"]["primary"] == "D10"
+    assert "D10" in result["divisional_charts"]
+    assert result["extracted_context"]["chart_focus"]["primary"] == "D10"
+
+
 def test_chart_focus_branch_plan_narrows_d10_run():
     from ai.parallel_chat.orchestrator import _chart_focus_branch_plan
 

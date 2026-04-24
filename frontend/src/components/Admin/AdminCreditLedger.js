@@ -16,6 +16,7 @@ const AdminCreditLedger = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchRange, setSearchRange] = useState({ from_date: null, to_date: null });
+  const [buyOnly, setBuyOnly] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -129,6 +130,10 @@ const AdminCreditLedger = () => {
   };
 
   const showUserLedger = selectedUser;
+  const isBuyTransaction = (tx) => tx?.type === 'earned' || tx?.type === 'refund';
+  const visibleSearchResults = buyOnly
+    ? searchResults.filter(isBuyTransaction)
+    : searchResults;
   const summary = searchResults.reduce(
     (acc, tx) => {
       const amt = Number(tx?.amount) || 0;
@@ -203,7 +208,7 @@ const AdminCreditLedger = () => {
           {!searchLoading && (
             <div className="results-block">
               <h2 className="results-title">
-                Transactions ({searchResults.length})
+                Transactions ({visibleSearchResults.length}{buyOnly ? ` of ${searchResults.length}` : ''})
                 {searchRange.from_date && searchRange.to_date && (
                   <span className="results-range">
                     {' '}· {formatDate(searchRange.from_date)} – {formatDate(searchRange.to_date)}
@@ -220,8 +225,16 @@ const AdminCreditLedger = () => {
                 <span className="ledger-summary-chip ledger-summary-chip--spent">
                   Total Spent: {summary.totalSpent}
                 </span>
+                <label className="ledger-buy-only-toggle">
+                  <input
+                    type="checkbox"
+                    checked={buyOnly}
+                    onChange={(e) => setBuyOnly(e.target.checked)}
+                  />
+                  <span>Buy only transactions</span>
+                </label>
               </div>
-              {searchResults.length > 0 ? (
+              {visibleSearchResults.length > 0 ? (
               <div className="transactions-table wrap">
                 <table>
                   <thead>
@@ -236,7 +249,7 @@ const AdminCreditLedger = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {searchResults.map((tx) => (
+                    {visibleSearchResults.map((tx) => (
                       <tr key={tx.id} className={tx.type}>
                         <td className="date-cell">{formatDate(tx.created_at)}</td>
                         <td>{tx.user_name}</td>
@@ -259,7 +272,11 @@ const AdminCreditLedger = () => {
                 </table>
               </div>
               ) : (
-                <p className="no-results-msg">No transactions for this period. Adjust dates or name/phone and click Search.</p>
+                <p className="no-results-msg">
+                  {buyOnly
+                    ? 'No buy transactions for this period. Turn off Buy only or adjust filters.'
+                    : 'No transactions for this period. Adjust dates or name/phone and click Search.'}
+                </p>
               )}
             </div>
           )}

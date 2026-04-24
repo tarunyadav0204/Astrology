@@ -73,3 +73,30 @@ def test_relational_response_contract_requires_faq_meta():
 
     assert ok is False
     assert "missing_faq_meta" in errors
+
+
+def test_relational_response_contract_blocks_generic_sections_for_behavior_question():
+    profile = {
+        "relation_family": "spouse_romantic",
+        "event_topic": "general_relationship",
+    }
+    text = """
+### Overall Compatibility
+The relationship is moderate.
+
+### Emotional Bond
+There is affection.
+
+FAQ_META: {"category":"marriage","canonical_question":"Marriage behavior dynamics"}
+""".strip()
+
+    ok, errors = RelationalResponseContract.validate(
+        text,
+        profile,
+        question="Tell me in detail what is Tarun's behaviour towards Deepika and Deepika's behaviour about Tarun",
+    )
+
+    assert ok is False
+    assert any(err.startswith("forbidden_generic_section:overall compatibility") for err in errors)
+    assert "missing_behavior_texture_nakshatra" in errors
+    assert "missing_behavior_texture_sign" in errors

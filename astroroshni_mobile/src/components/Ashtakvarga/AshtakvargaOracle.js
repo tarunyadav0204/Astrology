@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -49,6 +50,20 @@ const LIFE_PREDICTION_DOMAIN_LABELS = {
 
 const LIFE_PREDICTIONS_POLL_MS = 3000;
 const LIFE_PREDICTIONS_MAX_POLLS = 120;
+const ASHTAKVARGA_TABS = [
+  { key: 'matrix', label: 'Matrix', icon: 'table-outline' },
+  { key: 'sav', label: 'SAV', icon: 'grid-outline' },
+  { key: 'bav', label: 'BAV', icon: 'planet-outline' },
+  { key: 'ai', label: 'Analysis', icon: 'analytics-outline' },
+];
+const SIGN_SHORT_NAMES = ['Ari', 'Tau', 'Gem', 'Can', 'Leo', 'Vir', 'Lib', 'Sco', 'Sag', 'Cap', 'Aqu', 'Pis'];
+const ASHTAKVARGA_QUESTION_SUGGESTIONS = [
+  'How is career support right now?',
+  'Which houses are weakest at the moment?',
+  'Is money support improving or weakening?',
+  'How is marriage support in Ashtakavarga?',
+  'Which planet is not delivering results well?',
+];
 
 function lifePredictionsJobStatusUrl(jobId) {
   return `${API_BASE_URL}${getEndpoint(`/ashtakavarga/life-predictions/status/${jobId}`)}`;
@@ -151,6 +166,8 @@ export default function AshtakvargaOracle({ navigation }) {
   const [completeOracleData, setCompleteOracleData] = useState(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [analysisQuestion, setAnalysisQuestion] = useState('');
+  const [lastAskedQuestion, setLastAskedQuestion] = useState('');
   
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -163,6 +180,8 @@ export default function AshtakvargaOracle({ navigation }) {
   /** null | 'open' (main CTA) | 'regenerate' (modal toolbar) */
   const [lifePredictionsCreditModalMode, setLifePredictionsCreditModalMode] = useState(null);
   const [lifePredictionsCacheChecking, setLifePredictionsCacheChecking] = useState(false);
+  const [analysisCreditModalVisible, setAnalysisCreditModalVisible] = useState(false);
+  const [pendingAnalysisQuestion, setPendingAnalysisQuestion] = useState(null);
 
   useEffect(() => {
     loadBirthData();
@@ -352,6 +371,8 @@ export default function AshtakvargaOracle({ navigation }) {
       if (response.ok) {
         const data = await response.json();
         setOracleData(data);
+        setCompleteOracleData(null);
+        setLastAskedQuestion('');
 
         // Store birth chart data for comparison if this is birth chart
         if (isSameDate) {
@@ -373,12 +394,13 @@ export default function AshtakvargaOracle({ navigation }) {
     }
   };
 
-  const fetchDailyInsight = async () => {
+  const fetchDailyInsight = async (questionOverride = null) => {
     if (!oracleData || !birthData) {
       console.error('Missing ashtakvarga or birth data');
       return;
     }
 
+    const questionText = (questionOverride ?? analysisQuestion).trim();
     setLoadingInsight(true);
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -392,7 +414,10 @@ export default function AshtakvargaOracle({ navigation }) {
         body: JSON.stringify({
           birth_data: birthData,
           ashtakvarga_data: oracleData,
-          date: new Date().toISOString().split('T')[0]
+          birth_ashtakavarga_data: birthOracleData,
+          date: (selectedDate || new Date()).toISOString().split('T')[0],
+          query_type: questionText ? 'question' : 'overview',
+          ...(questionText ? { question_text: questionText } : {}),
         })
       });
 
@@ -400,15 +425,106 @@ export default function AshtakvargaOracle({ navigation }) {
         const completeData = await dailyResponse.json();
         console.log('Complete oracle data received:', completeData);
         setCompleteOracleData(completeData);
+        setLastAskedQuestion(questionText);
+        if (Number(completeData?.credits_charged) > 0) {
+          fetchBalance();
+        }
       } else {
-        console.error('Failed to fetch oracle insight:', dailyResponse.status, dailyResponse.statusText);
+        let message = `Request failed (${dailyResponse.status})`;
+        const errBody = await dailyResponse.json().catch(() => ({}));
+        if (typeof errBody?.detail === 'string') {
+          message = errBody.detail;
+        } else if (Array.isArray(errBody?.detail) && errBody.detail.length) {
+          message = errBody.detail.map((d) => d.msg || JSON.stringify(d)).join('\n');
+        } else if (errBody?.error) {
+          message = String(errBody.error);
+        }
+        console.error('Failed to fetch oracle insight:', dailyResponse.status, message);
+        Alert.alert('Ashtakavarga Analysis', message);
+        if (dailyResponse.status === 402) {
+          fetchBalance();
+        }
       }
     } catch (error) {
       console.error('Error fetching oracle insight:', error);
+      Alert.alert('Ashtakavarga Analysis', 'Could not generate the analysis right now. Please try again.');
     } finally {
       setLoadingInsight(false);
     }
   };
+
+  const probeAshtakavargaAnalysis = async (questionOverride = null) => {
+    if (loadingInsight || !oracleData || !birthData) return;
+    const questionText = (questionOverride ?? analysisQuestion).trim();
+    setLoadingInsight(true);
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/ashtakavarga/oracle-insight`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          birth_data: birthData,
+          ashtakvarga_data: oracleData,
+          birth_ashtakavarga_data: birthOracleData,
+          date: (selectedDate || new Date()).toISOString().split('T')[0],
+          query_type: questionText ? 'question' : 'overview',
+          ...(questionText ? { question_text: questionText } : {}),
+          cache_probe: true,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        if (typeof data?.detail === 'string') message = data.detail;
+        else if (data?.error) message = String(data.error);
+        Alert.alert('Ashtakavarga Analysis', message);
+        if (response.status === 402) fetchBalance();
+        return;
+      }
+      if (data.cached === true && !data.error) {
+        setCompleteOracleData(data);
+        setLastAskedQuestion(questionText);
+        return;
+      }
+      if (data.credit_cost_next != null && !Number.isNaN(Number(data.credit_cost_next))) {
+        setLifePredictionsCreditCost(Math.max(1, Number(data.credit_cost_next)));
+      }
+      setPendingAnalysisQuestion(questionText || null);
+      setAnalysisCreditModalVisible(true);
+    } catch (error) {
+      console.error('Error probing Ashtakavarga analysis:', error);
+      Alert.alert('Ashtakavarga Analysis', 'Could not check saved analyses right now. Please try again.');
+    } finally {
+      setLoadingInsight(false);
+    }
+  };
+
+  const requestAshtakavargaAnalysis = () => {
+    probeAshtakavargaAnalysis();
+  };
+
+  const onConfirmAnalysisCreditModal = () => {
+    setAnalysisCreditModalVisible(false);
+    const nextQuestion = pendingAnalysisQuestion;
+    setPendingAnalysisQuestion(null);
+    fetchDailyInsight(nextQuestion);
+  };
+
+  const closeAnalysisCreditModal = () => {
+    setAnalysisCreditModalVisible(false);
+    setPendingAnalysisQuestion(null);
+  };
+
+  const analysisCreditModalTitle = analysisQuestion.trim()
+    ? 'Ask Ashtakavarga?'
+    : 'Generate Ashtakavarga overview?';
+
+  const analysisCreditModalDescription = analysisQuestion.trim()
+    ? `This will run a focused Ashtakavarga analysis for your question and use ${lifePredictionsCreditCost} credits if generation succeeds. Your balance: ${credits} credits.`
+    : `This will generate a fresh Ashtakavarga overview and use ${lifePredictionsCreditCost} credits if generation succeeds. Your balance: ${credits} credits.`;
 
   const getCosmicWeatherTheme = () => {
     if (!oracleData?.ashtakavarga?.total_bindus) {
@@ -443,68 +559,159 @@ export default function AshtakvargaOracle({ navigation }) {
   };
 
   const renderOraclesPulse = () => {
-    const weather = getCosmicWeatherTheme();
     const hasBindus = oracleData?.ashtakavarga?.total_bindus != null;
+    const totalBindus = hasBindus ? oracleData.ashtakavarga.total_bindus : 0;
+    const ashtakvargaHouses = oracleData?.chart_ashtakavarga || {};
+    const topHouses = Object.entries(ashtakvargaHouses)
+      .map(([house, row]) => ({
+        house: Number(house),
+        bindus: row?.bindus || 0,
+        sign: SIGN_SHORT_NAMES[row?.sign || 0] || '',
+      }))
+      .sort((a, b) => b.bindus - a.bindus)
+      .slice(0, 3);
+    const weakestHouses = Object.entries(ashtakvargaHouses)
+      .map(([house, row]) => ({
+        house: Number(house),
+        bindus: row?.bindus || 0,
+        sign: SIGN_SHORT_NAMES[row?.sign || 0] || '',
+      }))
+      .sort((a, b) => a.bindus - b.bindus)
+      .slice(0, 2);
+    const selectedLabel = selectedDate?.toLocaleDateString?.('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }) || 'Selected date';
+    const snapshot = completeOracleData?.snapshot || {};
+    const analysisTitle = completeOracleData?.analysis_title || 'Ashtakavarga Analysis';
+    const headline = completeOracleData?.headline || completeOracleData?.oracle_message || '';
+    const sections = Array.isArray(completeOracleData?.sections) ? completeOracleData.sections : [];
     return (
       <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.cosmicWeatherHeader, { height: height * 0.35 }]}>
-          <LinearGradient
-            colors={weather.colors}
-            style={styles.weatherGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Animated.View style={[styles.weatherContent, { transform: [{ scale: pulseAnim }] }]}>
-              <Text style={[styles.cosmicTheme, { color: colors.text }]}>{weather.theme}</Text>
-              <Text style={[styles.cosmicSubtext, { color: colors.textSecondary }]}>Today's Cosmic Pulse</Text>
-              <View style={styles.strengthIndicator}>
-                <Text style={styles.strengthValue}>{hasBindus ? `${Math.round((oracleData.ashtakavarga.total_bindus / 337) * 100)}%` : '—'}</Text>
-                <Text style={styles.strengthLabel}>Cosmic Alignment</Text>
-              </View>
-            </Animated.View>
-          </LinearGradient>
+        <View style={[styles.analysisSummaryCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.2)' }]}>
+          <Text style={[styles.analysisSummaryTitle, { color: colors.text }]}>{analysisTitle}</Text>
+          <Text style={[styles.analysisSummaryDate, { color: colors.textSecondary }]}>
+            {snapshot.chart_type === 'transit' ? 'Transit overlay' : 'Natal baseline'} • {selectedLabel}
+          </Text>
+          <View style={styles.analysisMetricRow}>
+            <View style={[styles.analysisMetricCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[styles.analysisMetricValue, { color: colors.text }]}>{snapshot.total_bindus || totalBindus}</Text>
+              <Text style={[styles.analysisMetricLabel, { color: colors.textSecondary }]}>Total bindus</Text>
+            </View>
+            <View style={[styles.analysisMetricCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[styles.analysisMetricValue, { color: colors.text }]}>
+                {snapshot.strongest_house?.house || topHouses[0]?.house || '—'}
+              </Text>
+              <Text style={[styles.analysisMetricLabel, { color: colors.textSecondary }]}>Strongest house</Text>
+            </View>
+            <View style={[styles.analysisMetricCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[styles.analysisMetricValue, { color: colors.text }]}>
+                {snapshot.weakest_house?.house || weakestHouses[0]?.house || '—'}
+              </Text>
+              <Text style={[styles.analysisMetricLabel, { color: colors.textSecondary }]}>Weakest house</Text>
+            </View>
+          </View>
+          {headline ? (
+            <Text style={[styles.analysisHeadline, { color: colors.textSecondary }]}>{headline}</Text>
+          ) : null}
         </View>
 
-        <Animated.View style={[styles.narrativeCard, { opacity: fadeAnim }]}>
-          <LinearGradient
-            colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
-            style={styles.narrativeGradient}
-          >
-            <Text style={[styles.narrativeTitle, { color: colors.text }]}>Today's Oracle</Text>
-            {completeOracleData ? (
-              <Text style={[styles.narrativeText, { color: colors.textSecondary }]}>
-                {completeOracleData.oracle_message}
-              </Text>
-            ) : (
-              <TouchableOpacity 
-                style={styles.generateInsightButton}
-                onPress={fetchDailyInsight}
-                disabled={loadingInsight}
+        <View style={[styles.analysisQuestionCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.7)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+          <Text style={[styles.analysisQuestionTitle, { color: colors.text }]}>Ask Ashtakavarga</Text>
+          <Text style={[styles.analysisQuestionSubtitle, { color: colors.textSecondary }]}>
+            Ask about career, money, marriage, weak houses, graha delivery, or present timing from SAV and BAV.
+          </Text>
+          <TextInput
+            value={analysisQuestion}
+            onChangeText={setAnalysisQuestion}
+            placeholder="Example: How is career support right now from Ashtakavarga?"
+            placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(107,114,128,0.9)'}
+            multiline
+            textAlignVertical="top"
+            style={[
+              styles.analysisQuestionInput,
+              {
+                color: colors.text,
+                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : '#fff',
+                borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)',
+              },
+            ]}
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.analysisSuggestionRow}>
+            {ASHTAKVARGA_QUESTION_SUGGESTIONS.map((suggestion) => (
+              <TouchableOpacity
+                key={suggestion}
+                style={[styles.analysisSuggestionChip, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(249,115,22,0.12)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(249,115,22,0.18)' }]}
+                onPress={() => {
+                  setAnalysisQuestion(suggestion);
+                  probeAshtakavargaAnalysis(suggestion);
+                }}
               >
-                <LinearGradient
-                  colors={['#ff6b35', '#ffd700']}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.buttonText}>
-                    {loadingInsight ? '🔮 Consulting Oracle...' : '🔮 Generate Daily Insight'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
-          </LinearGradient>
-        </Animated.View>
-
-        <View style={styles.powerActionsContainer}>
-          <Text style={[styles.powerActionsTitle, { color: colors.text }]}>Power Actions</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsContainer}>
-            {(completeOracleData?.power_actions || []).map((action, index) => (
-              <TouchableOpacity key={index} style={[styles.actionPill, action.type === 'avoid' ? styles.avoidPill : styles.doPill]}>
-                <Text style={styles.pillIcon}>{action.type === 'avoid' ? '🔴' : '🟢'}</Text>
-                <Text style={[styles.pillText, { color: colors.text }]}>{action.text}</Text>
+                <Text style={[styles.analysisSuggestionText, { color: colors.textSecondary }]}>{suggestion}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
+          <View style={styles.analysisQuestionActions}>
+            <TouchableOpacity
+              style={[styles.analysisAskButton, { backgroundColor: colors.primary, opacity: loadingInsight ? 0.7 : 1 }]}
+              onPress={requestAshtakavargaAnalysis}
+              disabled={loadingInsight}
+            >
+              {loadingInsight ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="search-outline" size={16} color="#fff" />
+                  <Text style={styles.analysisAskButtonText}>
+                    {analysisQuestion.trim() ? 'Ask Ashtakavarga' : 'Get Overview'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {analysisQuestion.trim() ? (
+              <TouchableOpacity
+                style={[styles.analysisClearButton, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
+                onPress={() => setAnalysisQuestion('')}
+              >
+                <Text style={[styles.analysisClearButtonText, { color: colors.textSecondary }]}>Clear</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.analysisHistoryButton, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
+              onPress={() => navigation.navigate('AshtakvargaHistory')}
+            >
+              <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
+              <Text style={[styles.analysisHistoryButtonText, { color: colors.textSecondary }]}>History</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {completeOracleData ? (
+          <View style={[styles.analysisAnswerCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.78)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+            <Text style={[styles.analysisAnswerTitle, { color: colors.text }]}>
+              {lastAskedQuestion ? 'Answer' : 'Overview'}
+            </Text>
+            {lastAskedQuestion ? (
+              <Text style={[styles.analysisAnswerQuestion, { color: colors.primary }]}>Q: {lastAskedQuestion}</Text>
+            ) : null}
+            {headline ? (
+              <Text style={[styles.analysisAnswerHeadline, { color: colors.textSecondary }]}>{headline}</Text>
+            ) : null}
+            {sections.map((section, index) => (
+              <View key={`${section.title}-${index}`} style={styles.analysisAnswerSection}>
+                <Text style={[styles.analysisAnswerSectionTitle, { color: colors.text }]}>{section.title}</Text>
+                {(section.bullets || []).map((bullet, bulletIndex) => (
+                  <Text key={`${section.title}-${bulletIndex}`} style={[styles.bulletPoint, { color: colors.textSecondary }]}>
+                    • {String(bullet)}
+                  </Text>
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {renderLifePredictionsCta()}
       </ScrollView>
     );
   };
@@ -556,21 +763,17 @@ export default function AshtakvargaOracle({ navigation }) {
             cosmicTheme={true}
           />
         </View>
+      </ScrollView>
+    );
+  };
 
-        {/* CTA right after SAV: users see value before the BAV strip (which is exploratory / advanced) */}
+  const renderLifePredictionsCta = () => {
+    if (loadingLifePredictions || lifePredictionsCacheChecking) {
+      return (
         <View style={styles.lifePredictionsContainer}>
-          <TouchableOpacity 
-            style={[styles.lifePredictionsButton, (loadingLifePredictions || lifePredictionsCacheChecking) && styles.loadingButton]}
-            onPress={onLifePredictionsMainCta}
-            disabled={loadingLifePredictions || lifePredictionsCacheChecking}
-            activeOpacity={0.9}
-          >
+          <View style={[styles.lifePredictionsButton, styles.loadingButton]}>
             <LinearGradient
-              colors={
-                loadingLifePredictions || lifePredictionsCacheChecking
-                  ? ['#2c3e50', '#34495e', '#5d6d7e']
-                  : ['#5b2c83', '#8e44ad', '#c39bd3']
-              }
+              colors={['#2c3e50', '#34495e', '#5d6d7e']}
               style={styles.lifePredictionsGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -602,62 +805,157 @@ export default function AshtakvargaOracle({ navigation }) {
                     <Text style={styles.progressText}>{Math.round(loadingProgress)}%</Text>
                   </View>
                 </View>
-              ) : lifePredictionsCacheChecking ? (
+              ) : (
                 <View style={styles.loadingContent}>
                   <ActivityIndicator size="small" color="#fff" style={{ marginBottom: 8 }} />
                   <Text style={styles.lifePredictionsText}>Checking saved reading…</Text>
                 </View>
-              ) : (
-                <>
-                  <Text style={styles.lifePredictionsIconLarge}>🌟</Text>
-                  <Text style={styles.lifePredictionsHeadline}>Dots of Destiny</Text>
-                  <Text style={styles.lifePredictionsTeaser}>
-                    Full reading from your bindus — career, relationships, timing windows, dasha & remedies.
-                  </Text>
-                  <View style={styles.lifePredictionsChips}>
-                    <Text style={styles.lifePredictionsChip}>12 houses</Text>
-                    <Text style={styles.lifePredictionsChip}>Transits</Text>
-                    <Text style={styles.lifePredictionsChip}>Dasha</Text>
-                  </View>
-                  <View style={styles.lifePredictionsCtaRow}>
-                    <Text style={styles.lifePredictionsCtaText}>Open life predictions</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#fff" style={{ opacity: 0.95, marginLeft: 4 }} />
-                  </View>
-                  <Text style={styles.lifePredictionsCreditHint}>
-                    {lifePredictionsCreditCost} credits first run · saved reading replays free
-                  </Text>
-                  <Text style={styles.lifePredictionsSubtext}>Vinay Aditya · Ashtakavarga methodology</Text>
-                </>
               )}
             </LinearGradient>
-          </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.lifePredictionsContainer}>
+        <TouchableOpacity 
+          style={styles.lifePredictionsButton}
+          onPress={onLifePredictionsMainCta}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={['#5b2c83', '#8e44ad', '#c39bd3']}
+            style={styles.lifePredictionsGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <>
+              <Text style={styles.lifePredictionsIconLarge}>🌟</Text>
+              <Text style={styles.lifePredictionsHeadline}>Dots of Destiny</Text>
+              <Text style={styles.lifePredictionsTeaser}>
+                Full reading from your bindus — career, relationships, timing windows, dasha & remedies.
+              </Text>
+              <View style={styles.lifePredictionsChips}>
+                <Text style={styles.lifePredictionsChip}>12 houses</Text>
+                <Text style={styles.lifePredictionsChip}>Transits</Text>
+                <Text style={styles.lifePredictionsChip}>Dasha</Text>
+              </View>
+              <View style={styles.lifePredictionsCtaRow}>
+                <Text style={styles.lifePredictionsCtaText}>Open life predictions</Text>
+                <Ionicons name="chevron-forward" size={20} color="#fff" style={{ opacity: 0.95, marginLeft: 4 }} />
+              </View>
+              <Text style={styles.lifePredictionsCreditHint}>
+                {lifePredictionsCreditCost} credits first run · saved reading replays free
+              </Text>
+              <Text style={styles.lifePredictionsSubtext}>Vinay Aditya · Ashtakavarga methodology</Text>
+            </>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderBavTab = () => (
+    <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+      <View style={styles.titleContainer}>
+        <Text style={[styles.mapTitle, { color: colors.text }]}>Bhinnashtakvarga</Text>
+        <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>Planet-wise bindu maps. Tap any graha to open its full sign spread.</Text>
+      </View>
+
+      <View style={styles.planetaryToggle}>
+        <Text style={[styles.toggleTitle, { color: colors.text }]}>Bhinnashtakvarga Charts</Text>
+        <Text style={[styles.bavHint, { color: colors.textSecondary }]}>
+          Each graha shows where it receives support across the zodiac.
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].map(planet => {
+            const planetChart = oracleData?.ashtakavarga?.individual_charts?.[planet];
+            const totalBindus = planetChart?.total || 0;
+            return (
+              <TouchableOpacity 
+                key={planet} 
+                style={[styles.planetButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.15)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
+                onPress={() => openPlanetChart(planet, planetChart)}
+              >
+                <Text style={[styles.planetIcon, { color: '#FFFFFF' }]}>{getPlanetIcon(planet)}</Text>
+                <Text style={[styles.planetName, { color: colors.text }]}>{planet}</Text>
+                <Text style={[styles.planetBindus, { color: '#FFFFFF' }]}>{totalBindus}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </ScrollView>
+  );
+
+  const renderCombinedMatrixTab = () => {
+    const individualCharts = oracleData?.ashtakavarga?.individual_charts || {};
+    const savHouses = oracleData?.chart_ashtakavarga || {};
+    const planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
+    const rows = SIGN_SHORT_NAMES.map((sign, index) => ({
+      sign: `${sign} (${index + 1})`,
+      values: planets.map((planet) => individualCharts?.[planet]?.bindus?.[index] ?? 0),
+      sav: savHouses?.[(index + 1).toString()]?.bindus ?? 0,
+    }));
+
+    return (
+      <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.mapTitle, { color: colors.text }]}>SAV + BAV Matrix</Text>
+          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>See every sign’s Bhinnashtakvarga values together with the Sarvashtakvarga total.</Text>
         </View>
 
-        <View style={styles.planetaryToggle}>
-          <Text style={[styles.toggleTitle, { color: colors.text }]}>Bhinnashtakvarga Charts</Text>
-          <Text style={[styles.bavHint, { color: colors.textSecondary }]}>
-            Per-planet bindu breakdowns — tap after you’ve seen your full chart reading above.
-          </Text>
+        <View style={[styles.matrixCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.2)' }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].map(planet => {
-              const planetChart = oracleData?.ashtakavarga?.individual_charts?.[planet];
-              const totalBindus = planetChart?.total || 0;
-              return (
-                <TouchableOpacity 
-                  key={planet} 
-                  style={[styles.planetButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.15)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
-                  onPress={() => openPlanetChart(planet, planetChart)}
+            <View>
+              <View style={[styles.matrixRow, styles.matrixHeaderRow, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+                <Text style={[styles.matrixHeaderCell, styles.matrixSignCell, { color: colors.text }]}>Sign</Text>
+                {planets.map((planet) => (
+                  <Text key={planet} style={[styles.matrixHeaderCell, { color: colors.text }]}>{planet.slice(0, 2)}</Text>
+                ))}
+                <Text style={[styles.matrixHeaderCell, styles.matrixSavCell, { color: colors.primary }]}>SAV</Text>
+              </View>
+
+              {rows.map((row, rowIndex) => (
+                <View
+                  key={row.sign}
+                  style={[
+                    styles.matrixRow,
+                    rowIndex % 2 === 0
+                      ? { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.5)' }
+                      : null,
+                    { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(249,115,22,0.12)' },
+                  ]}
                 >
-                  <Text style={[styles.planetIcon, { color: '#FFFFFF' }]}>{getPlanetIcon(planet)}</Text>
-                  <Text style={[styles.planetName, { color: colors.text }]}>{planet}</Text>
-                  <Text style={[styles.planetBindus, { color: '#FFFFFF' }]}>{totalBindus}</Text>
-                </TouchableOpacity>
-              );
-            })}
+                  <Text style={[styles.matrixCell, styles.matrixSignCell, { color: colors.text }]}>{row.sign}</Text>
+                  {row.values.map((value, idx) => (
+                    <Text key={`${row.sign}-${planets[idx]}`} style={[styles.matrixCell, { color: colors.textSecondary }]}>
+                      {value}
+                    </Text>
+                  ))}
+                  <Text style={[styles.matrixCell, styles.matrixSavCell, { color: colors.primary }]}>
+                    {row.sav}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </ScrollView>
         </View>
+
+        <Text style={[styles.matrixHint, { color: colors.textSecondary }]}>
+          Read across a sign to compare each graha’s BAV support. The last column shows the SAV total for that same sign/house position in your chart view.
+        </Text>
       </ScrollView>
     );
+  };
+
+  const renderActiveTab = () => {
+    const tabKey = ASHTAKVARGA_TABS[activeTab]?.key;
+    if (tabKey === 'ai') return renderOraclesPulse();
+    if (tabKey === 'bav') return renderBavTab();
+    if (tabKey === 'matrix') return renderCombinedMatrixTab();
+    return renderDestinyMap();
   };
 
 
@@ -1010,7 +1308,43 @@ export default function AshtakvargaOracle({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {renderDestinyMap()}
+          <View style={styles.tabNavigation}>
+            {ASHTAKVARGA_TABS.map((tab, index) => {
+              const isActive = activeTab === index;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[
+                    styles.tab,
+                    isActive && styles.activeTab,
+                    {
+                      backgroundColor: isActive
+                        ? (theme === 'dark' ? 'rgba(255, 215, 0, 0.18)' : 'rgba(249,115,22,0.15)')
+                        : (theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(249,115,22,0.06)'),
+                    },
+                  ]}
+                  onPress={() => setActiveTab(index)}
+                >
+                  <Ionicons
+                    name={tab.icon}
+                    size={18}
+                    color={isActive ? colors.primary : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: isActive ? colors.primary : colors.textSecondary },
+                      isActive && styles.activeTabText,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {renderActiveTab()}
 
           <CreditModal
             visible={lifePredictionsCreditModalMode !== null}
@@ -1019,6 +1353,15 @@ export default function AshtakvargaOracle({ navigation }) {
             cost={lifePredictionsCreditCost}
             title={lifePredictionsCreditModalTitle}
             description={lifePredictionsCreditModalDescription}
+          />
+
+          <CreditModal
+            visible={analysisCreditModalVisible}
+            onConfirm={onConfirmAnalysisCreditModal}
+            onCancel={closeAnalysisCreditModal}
+            cost={lifePredictionsCreditCost}
+            title={analysisCreditModalTitle}
+            description={analysisCreditModalDescription}
           />
 
           <Modal
@@ -1514,7 +1857,7 @@ const styles = {
     alignItems: 'center',
     paddingVertical: 12,
     borderRadius: 20,
-    marginHorizontal: 4,
+    marginHorizontal: 3,
   },
   activeTab: {
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
@@ -1525,13 +1868,218 @@ const styles = {
     marginTop: 4,
   },
   activeTabText: {
-    color: '#ffd700',
     fontWeight: '600',
   },
   
   tabContent: { 
     flex: 1, 
     paddingHorizontal: 20,
+  },
+  analysisSummaryCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 18,
+  },
+  analysisSummaryTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  analysisSummaryDate: {
+    fontSize: 14,
+    marginBottom: 14,
+  },
+  analysisMetricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  analysisMetricCard: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginHorizontal: 4,
+  },
+  analysisMetricValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  analysisMetricLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  analysisHeadline: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  analysisQuestionCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 18,
+  },
+  analysisQuestionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  analysisQuestionSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  analysisQuestionInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    minHeight: 96,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  analysisSuggestionRow: {
+    paddingRight: 4,
+    marginBottom: 14,
+  },
+  analysisSuggestionChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  analysisSuggestionText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  analysisQuestionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  analysisAskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 48,
+  },
+  analysisAskButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+  analysisClearButton: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginLeft: 10,
+  },
+  analysisClearButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  analysisHistoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginLeft: 10,
+  },
+  analysisHistoryButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  analysisAnswerCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 18,
+  },
+  analysisAnswerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  analysisAnswerQuestion: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  analysisAnswerHeadline: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  analysisAnswerSection: {
+    marginTop: 10,
+  },
+  analysisAnswerSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  matrixCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+  },
+  matrixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    minHeight: 38,
+  },
+  matrixHeaderRow: {
+    minHeight: 42,
+  },
+  matrixHeaderCell: {
+    width: 38,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingVertical: 8,
+  },
+  matrixCell: {
+    width: 38,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    paddingVertical: 8,
+  },
+  matrixSignCell: {
+    width: 64,
+    textAlign: 'left',
+    paddingLeft: 4,
+  },
+  matrixSavCell: {
+    width: 42,
+    fontWeight: '800',
+  },
+  matrixHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginHorizontal: 2,
+  },
+  aiInsightSection: {
+    marginTop: 12,
+  },
+  aiInsightSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   
   titleContainer: {

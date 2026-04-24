@@ -147,7 +147,7 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
 
 
 _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("D1", ("d1", "rashi chart", "birth chart", "natal chart", "radix chart")),
+    ("D1", ("d1",)),
     ("LAGNA", ("lagna", "ascendant", "rising sign", "asc")),
     ("D3", ("d3", "drekkana", "dreshkana", "drekkana")),
     ("D4", ("d4", "chaturthamsa", "chaturthamsha")),
@@ -182,7 +182,6 @@ _CHART_FOCUS_CUES = (
     "review",
 )
 
-
 def get_default_divisional_charts_for_category(category: str) -> list[str]:
     """Return the canonical divisional chart list for a router category (D1 baseline + topic charts)."""
     return list(_DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY.get((category or "general").strip().lower(), ["D1", "D9"]))
@@ -199,8 +198,11 @@ def _normalize_chart_focus_code(code: str) -> str:
 
 def extract_chart_focus_from_question(user_question: str) -> Dict[str, Any] | None:
     """
-    Detect explicit chart-scoped asks such as "analyze my lagna", "read my D10", or
-    "interpret my navamsha". This is deterministic so branch selection is stable.
+    Detect only highly explicit chart-scoped asks such as "analyze my lagna",
+    "read my D10", or "interpret my navamsha".
+
+    Broad natural-language inference should come from the LLM intent router, not this
+    deterministic fallback.
     """
     q = (user_question or "").strip()
     if not q:
@@ -269,6 +271,38 @@ def _canonical_divisional_token(c: str) -> str:
     return t
 
 
+def _normalize_chart_focus_payload(focus: Dict[str, Any] | None) -> Dict[str, Any] | None:
+    if not isinstance(focus, dict):
+        return None
+    primary = _normalize_chart_focus_code(str(focus.get("primary") or ""))
+    if not primary:
+        return None
+    label_raw = str(focus.get("label") or "").strip()
+    label = label_raw or ("Lagna" if primary == "D1" else primary)
+    kind = str(focus.get("kind") or "").strip() or "chart_specific"
+    if kind != "chart_specific":
+        return None
+    requested = focus.get("requested")
+    if isinstance(requested, list) and requested:
+        normalized_requested = []
+        seen: set[str] = set()
+        for item in requested:
+            token = _normalize_chart_focus_code(str(item or ""))
+            if token and token not in seen:
+                seen.add(token)
+                normalized_requested.append(token)
+    else:
+        normalized_requested = [primary]
+    return {
+        "kind": "chart_specific",
+        "primary": primary,
+        "label": label,
+        "explicit": bool(focus.get("explicit", True)),
+        "phrase": str(focus.get("phrase") or "").strip(),
+        "requested": normalized_requested,
+    }
+
+
 def merge_divisional_charts_with_category_defaults(result: Dict) -> None:
     """
     After the model returns divisional_charts, ensure the list includes every chart required for
@@ -300,9 +334,12 @@ def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None
     Attach deterministic chart-focus metadata and ensure explicitly requested divisionals
     are available downstream even when the router category is broad/general.
     """
-    focus = extract_chart_focus_from_question(user_question)
+    focus = _normalize_chart_focus_payload(result.get("chart_focus"))
+    if not focus:
+        focus = extract_chart_focus_from_question(user_question)
     if not focus:
         return
+    primary = _normalize_chart_focus_code(str(focus.get("primary") or ""))
     result["chart_focus"] = focus
     result.setdefault("extracted_context", {})
     if isinstance(result["extracted_context"], dict):
@@ -310,7 +347,6 @@ def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None
             "primary": focus.get("primary"),
             "label": focus.get("label"),
         }
-    primary = _normalize_chart_focus_code(str(focus.get("primary") or ""))
     if not primary or primary == "D1":
         return
     raw = result.get("divisional_charts")
@@ -733,6 +769,20 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         - "ANALYZE_ROOT_CAUSE": For deep-seated "why" questions (e.g., "Why do I always struggle with self-confidence?").
         - "RECOMMEND_REMEDY_FOR_PROBLEM": Suggests remedies for a specific issue (e.g., "I have a lot of anxiety. What can I do?").
 
+        CHART-FOCUS DETECTION:
+        Decide whether the user is asking for a specific chart/lens reading rather than a normal life-topic reading.
+        - If the user explicitly or implicitly wants a chart-lens reading, set `chart_focus`.
+        - Examples that SHOULD set `chart_focus`:
+          - "Analyze my D10"
+          - "Read my navamsha"
+          - "Analyze my lagna"
+          - broken but clear variants like "career in d10 tell"
+        - Examples that should NOT set `chart_focus`:
+          - "Tell me about my career"
+          - "What career suits me from my chart"
+          - "Marriage prospects in my birth chart"
+        - Mentioning "chart" alone is NOT enough. Only set `chart_focus` when a specific lens/chart is actually the requested object.
+
         CHART INSIGHTS:
         🚨 MANDATORY REQUIREMENT 🚨
         When status is "READY", you MUST generate chart_insights using the D1 chart data provided.
@@ -758,6 +808,14 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             "clarification_question": "Your clarifying question here (only if status=CLARIFY; if user wrote Hindi/Hinglish, this string must be Devanagari Hindi)",
             "chart_insights": [{{"house_number": 1, "message": "Devanagari Hindi prose for Hinglish users; English for English-only questions", "highlight_type": "ascendant"}}],
             "mode": "PREDICT_DAILY" or "PREDICT_EVENT_TIMING" or "ANALYZE_PERSONALITY",
+            "chart_focus": {{
+                "kind": "chart_specific",
+                "primary": "D1 or D9 or D10 or D7 or Karkamsa or Swamsa",
+                "label": "Lagna or D10 or Navamsha",
+                "explicit": true,
+                "phrase": "the phrase or implied lens you detected",
+                "requested": ["D10"]
+            }} or null,
             "extracted_context": {{ "timeframe": "2025", "aspect": "promotion" }},
             "context_type": "annual" or "birth",
             "category": "category_name",

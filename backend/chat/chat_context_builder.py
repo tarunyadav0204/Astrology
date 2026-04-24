@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import time
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 
@@ -87,6 +88,42 @@ class ChatContextBuilder:
     def __init__(self):
         self.static_cache = {}  # Cache static chart data
         self.dynamic_cache = {}  # Cache dynamic context data
+        self._static_cache_ts = {}
+        self._dynamic_cache_ts = {}
+        self._static_cache_ttl_s = max(300, int(os.getenv("ASTRO_CONTEXT_STATIC_CACHE_TTL_S", "43200") or 43200))
+        self._dynamic_cache_ttl_s = max(60, int(os.getenv("ASTRO_CONTEXT_DYNAMIC_CACHE_TTL_S", "1800") or 1800))
+        self._static_cache_max_entries = max(8, int(os.getenv("ASTRO_CONTEXT_STATIC_CACHE_MAX_ENTRIES", "128") or 128))
+        self._dynamic_cache_max_entries = max(16, int(os.getenv("ASTRO_CONTEXT_DYNAMIC_CACHE_MAX_ENTRIES", "256") or 256))
+
+    def _cache_get(self, cache: Dict[str, Any], timestamps: Dict[str, float], key: str, ttl_s: int) -> Optional[Any]:
+        now = time.time()
+        ts = timestamps.get(key)
+        if ts is None:
+            return None
+        if now - ts > ttl_s:
+            cache.pop(key, None)
+            timestamps.pop(key, None)
+            return None
+        timestamps[key] = now
+        return cache.get(key)
+
+    def _cache_set(
+        self,
+        cache: Dict[str, Any],
+        timestamps: Dict[str, float],
+        key: str,
+        value: Any,
+        max_entries: int,
+    ) -> Any:
+        now = time.time()
+        cache[key] = value
+        timestamps[key] = now
+        if len(cache) > max_entries:
+            overflow = len(cache) - max_entries
+            for old_key, _ts in sorted(timestamps.items(), key=lambda item: item[1])[:overflow]:
+                cache.pop(old_key, None)
+                timestamps.pop(old_key, None)
+        return value
     
     def build_synastry_context(self, native_birth_data: Dict, partner_birth_data: Dict, user_question: str = "", intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Build dual-chart context for partnership/compatibility analysis"""
@@ -144,12 +181,23 @@ class ChatContextBuilder:
         
         # Get static data (cached)
         static_start_time = time.time()
-        if birth_hash not in self.static_cache:
+        static_context = self._cache_get(
+            self.static_cache,
+            self._static_cache_ts,
+            birth_hash,
+            self._static_cache_ttl_s,
+        )
+        if static_context is None:
             # print(f"   📊 Building static context (not cached)...")
-            self.static_cache[birth_hash] = self._build_static_context(birth_data)
+            static_context = self._cache_set(
+                self.static_cache,
+                self._static_cache_ts,
+                birth_hash,
+                self._build_static_context(birth_data),
+                self._static_cache_max_entries,
+            )
         else:
             print(f"   ✅ Using cached static context")
-        static_context = self.static_cache[birth_hash]
         static_time = time.time() - static_start_time
         # print(f"   Static context time: {static_time:.2f}s")
         
@@ -161,13 +209,23 @@ class ChatContextBuilder:
         
         # Check Dynamic Cache
         dynamic_start_time = time.time()
-        if dynamic_cache_key not in self.dynamic_cache:
+        dynamic_context = self._cache_get(
+            self.dynamic_cache,
+            self._dynamic_cache_ts,
+            dynamic_cache_key,
+            self._dynamic_cache_ttl_s,
+        )
+        if dynamic_context is None:
             # print(f"   🔄 Calculating fresh dynamic context...")
-            self.dynamic_cache[dynamic_cache_key] = self._build_dynamic_context(birth_data, user_question, target_date, requested_period, intent_result)
+            dynamic_context = self._cache_set(
+                self.dynamic_cache,
+                self._dynamic_cache_ts,
+                dynamic_cache_key,
+                self._build_dynamic_context(birth_data, user_question, target_date, requested_period, intent_result),
+                self._dynamic_cache_max_entries,
+            )
         else:
             print(f"   ✅ Using cached dynamic context")
-        
-        dynamic_context = self.dynamic_cache[dynamic_cache_key]
         dynamic_time = time.time() - dynamic_start_time
         # print(f"   Dynamic context time: {dynamic_time:.2f}s")
         

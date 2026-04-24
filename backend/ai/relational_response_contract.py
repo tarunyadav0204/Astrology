@@ -47,7 +47,7 @@ class RelationalResponseContract:
     )
 
     @classmethod
-    def validate(cls, text: str, profile: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    def validate(cls, text: str, profile: Dict[str, Any], question: str | None = None) -> Tuple[bool, List[str]]:
         errors: List[str] = []
         if not text or len(text.strip()) < 40:
             return False, ["response_too_short"]
@@ -56,14 +56,36 @@ class RelationalResponseContract:
         lower = content.lower()
         event_topic = str(profile.get("event_topic") or "")
         relation_family = str(profile.get("relation_family") or "")
+        q = str(question or "").lower()
+        behavior_question = any(
+            cue in q for cue in (
+                "behave",
+                "behavior",
+                "behaviour",
+                "nature",
+                "personality",
+                "why does she fight",
+                "why does he fight",
+                "married life",
+            )
+        )
 
         if faq is None:
             errors.append("missing_faq_meta")
 
-        if event_topic not in {"general_relationship", "support_guidance"}:
+        if event_topic not in {"general_relationship", "support_guidance"} or behavior_question:
             for heading in cls.GENERIC_EVENT_SECTIONS:
                 if heading in lower:
                     errors.append(f"forbidden_generic_section:{heading}")
+
+        if event_topic == "general_relationship" and behavior_question:
+            if "nakshatra" not in lower:
+                errors.append("missing_behavior_texture_nakshatra")
+            if not any(sign in lower for sign in (
+                "aries", "taurus", "gemini", "cancer", "leo", "virgo",
+                "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces",
+            )):
+                errors.append("missing_behavior_texture_sign")
 
         if event_topic in cls.ACCUSATION_TOPICS:
             if any(re.search(pat, lower) for pat in cls.OVERCLAIM_PATTERNS):

@@ -202,6 +202,15 @@ def test_relationship_profile_handles_event_specific_spouse_question():
     }
 
 
+def test_relationship_profile_infers_day_level_timing_request():
+    profile = build_relationship_profile(
+        {"relationship": {"raw_label": "Husband & Wife"}},
+        "Will she come back tomorrow?",
+    )
+
+    assert profile["timing_request"]["requested_granularity"] == "day"
+
+
 def test_relationship_profile_handles_messy_infidelity_language():
     context = {
         "relationship": {"raw_label": "Husband & Wife"},
@@ -271,6 +280,8 @@ def test_relational_evidence_spine_computes_role_event_and_cross_contacts():
         for row in spine["mutual_overlays"]["navamsa_d9"]["partner_d9_planets_in_native_d9_focus"]
     )
     assert spine["timing_alignment"]["one_active"] is True
+    assert spine["timing_alignment"]["native"]["current_stack"][0]["level"] == "MD"
+    assert spine["timing_alignment"]["native"]["current_stack"][1]["level"] == "AD"
     assert spine["branch_activation"]["kp_relational"]["priority"] == "primary"
     assert spine["branch_activation"]["kp_relational"]["data_available"] is True
     assert spine["kp_relational_cusps"]["available"] is True
@@ -326,6 +337,36 @@ def test_relational_evidence_spine_computes_role_event_and_cross_contacts():
     assert moon_moon["strength_band"] == "very_supportive"
 
 
+def test_relational_timing_strategy_degrades_precision_to_available_level():
+    context = _full_synastry_context()
+    context["native"]["period_dasha_activations"] = {
+        "period_type": "monthly",
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
+        "sampled_activations": [
+            {"date": "2026-05-03", "activations": [{"planet": "Venus"}, {"planet": "Saturn"}]},
+        ],
+        "analysis_depth": "medium",
+    }
+    context["native"]["transit_activations"] = [
+        {
+            "transit_planet": "Venus",
+            "natal_planet": "Moon",
+            "transit_house": 7,
+            "start_date": "2026-05-02",
+            "end_date": "2026-05-18",
+            "dasha_significance": "supportive",
+        }
+    ]
+    spine = build_relational_evidence_spine(context, "Will she come back tomorrow?")
+
+    assert spine["timing_strategy"]["requested_granularity"] == "day"
+    assert spine["timing_strategy"]["delivery_granularity"] == "month"
+    assert spine["timing_strategy"]["native"]["period_dasha"]["available"] is True
+    assert spine["timing_strategy"]["native"]["transit_windows"]["available"] is True
+    assert spine["timing_strategy"]["native"]["transit_windows"]["rows"][0]["transit_house"] == 7
+
+
 def test_relational_branch_payloads_include_evidence_spine_for_every_method():
     payloads = build_relational_branch_payloads(_full_synastry_context(), "Will my wife go to jail?")
 
@@ -361,6 +402,10 @@ def test_relational_merge_prompt_blocks_irrelevant_sections_for_events():
     assert "If Jaimini or Nadi materially contributed, name them explicitly" in prompt
     assert "sign_flavor_*" in prompt
     assert "nakshatra_flavor_*" in prompt
+    assert "timing_strategy" in prompt
+    assert "deliverable granularity" in prompt
+    assert "do not stop at Mahadasha" in prompt
+    assert "MD + AD" in prompt
 
 
 def test_relational_branch_prompts_require_explicit_method_reasoning():
@@ -383,6 +428,16 @@ def test_enabled_relational_branches_include_optional_methods_when_data_exists()
 
     assert "ashtakavarga_relational" in enabled
     assert "sudarshan_relational" in enabled
+
+
+def test_enabled_relational_branches_skip_low_relevance_core_branches():
+    spine = build_relational_evidence_spine(_full_synastry_context(), "Tell me in detail what is Taruns behaviour towards Deepika and Deepika's behaviour about Tarun")
+    enabled = _enabled_relational_branches(spine)
+
+    assert "parashari_relational" in enabled
+    assert "nakshatra_relational" in enabled
+    assert "jaimini_relational" in enabled
+    assert "timing_relational" not in enabled
 
 
 def test_enabled_relational_branches_skip_optional_methods_without_data():

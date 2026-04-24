@@ -230,6 +230,26 @@
   border-color: #ef9a9a;
 }
 
+.ledger-buy-only-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ledger-buy-only-toggle input {
+  margin: 0;
+  cursor: pointer;
+}
+
 .no-results-msg {
   margin: 0;
   padding: 24px;

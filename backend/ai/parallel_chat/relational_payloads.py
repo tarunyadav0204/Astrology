@@ -359,6 +359,7 @@ def build_relationship_profile(context: Dict[str, Any], user_question: str) -> D
     karakas = list(dict.fromkeys([*relation_rule.get("karakas", []), *event_rule.get("karakas", [])]))
 
     role_house = _infer_role_house(relation_rule["family"], raw_label, user_question)
+    timing_request = _infer_timing_request(user_question, event_rule["mode"])
 
     return {
         "raw_label": raw_label,
@@ -371,6 +372,7 @@ def build_relationship_profile(context: Dict[str, Any], user_question: str) -> D
         "primary_houses": houses,
         "primary_karakas": karakas,
         "required_divisionals": relation_rule.get("divisionals", []),
+        "timing_request": timing_request,
         "answer_policy": {
             "shape_answer_from_question": True,
             "do_not_force_compatibility_sections": True,
@@ -383,6 +385,30 @@ def build_relationship_profile(context: Dict[str, Any], user_question: str) -> D
             "safety_class": event_rule.get("safety") or "general",
         },
     }
+
+
+def _infer_timing_request(user_question: str, question_mode: str) -> Dict[str, Any]:
+    q = str(user_question or "").lower()
+    if question_mode not in {"predictive_timing", "predictive_yes_no"}:
+        return {"requested_granularity": "none", "reason": "Question is not primarily timing-oriented."}
+
+    day_cues = [
+        "today", "tomorrow", "day after", "day-after", "tonight", "this evening",
+        "this week", "next week", "on monday", "on tuesday", "on wednesday",
+        "on thursday", "on friday", "on saturday", "on sunday",
+    ]
+    month_cues = [
+        "this month", "next month", "coming months", "within", "in the next",
+        "by month", "which month", "month",
+    ]
+    year_cues = ["this year", "next year", "in 20", "year", "years"]
+    if any(cue in q for cue in day_cues) or re.search(r"\b\d{4}-\d{2}-\d{2}\b", q):
+        return {"requested_granularity": "day", "reason": "Question asks for immediate or specific-date timing."}
+    if any(cue in q for cue in month_cues) and "year" not in q:
+        return {"requested_granularity": "month", "reason": "Question asks for near-term timing by month/window."}
+    if any(cue in q for cue in year_cues):
+        return {"requested_granularity": "year", "reason": "Question asks for broad year-level timing."}
+    return {"requested_granularity": "month", "reason": "Predictive timing question without a narrower explicit timescale."}
 
 
 def _refine_event_rule(relation_rule: Dict[str, Any], event_rule: Dict[str, Any], text: str) -> Dict[str, Any]:
@@ -432,6 +458,7 @@ def build_relational_evidence_spine(context: Dict[str, Any], user_question: str)
 
     native_timing = _timing_alignment(native, profile)
     partner_timing = _timing_alignment(partner, profile)
+    timing_strategy = _relational_timing_strategy(profile, native, partner)
     branch_activation = _branch_activation(profile, contacts, overlays, kuta, kp_map, native, partner)
 
     return {
@@ -458,6 +485,7 @@ def build_relational_evidence_spine(context: Dict[str, Any], user_question: str)
             "both_active": bool(native_timing.get("active") and partner_timing.get("active")),
             "one_active": bool(native_timing.get("active") or partner_timing.get("active")),
         },
+        "timing_strategy": timing_strategy,
         "branch_activation": branch_activation,
         "quality_flags": _quality_flags(profile, native_role, native_derived, partner_events),
     }
@@ -1917,6 +1945,51 @@ def _current_dasha_lords(person_context: Dict[str, Any]) -> List[str]:
     return lords
 
 
+def _current_dasha_stack(person_context: Dict[str, Any], profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+    current = person_context.get("current_dashas") or {}
+    rows: List[Dict[str, Any]] = []
+    relevant = set(profile.get("primary_karakas") or [])
+    for h in profile.get("primary_houses") or []:
+        snap = _house_snapshot(person_context, h)
+        if snap.get("lord") and snap["lord"] != "unknown":
+            relevant.add(snap["lord"])
+    for key, short in (
+        ("mahadasha", "MD"),
+        ("antardasha", "AD"),
+        ("pratyantardasha", "PD"),
+        ("sookshma", "SD"),
+        ("prana", "PrD"),
+    ):
+        node = current.get(key)
+        if isinstance(node, dict):
+            planet = node.get("planet") or node.get("lord") or node.get("name")
+            start = node.get("start_date") or node.get("start")
+            end = node.get("end_date") or node.get("end")
+        else:
+            planet = node
+            start = None
+            end = None
+        if not isinstance(planet, str) or not planet or planet == "Unknown":
+            continue
+        sign = _planet_sign(person_context, planet)
+        house = None
+        pdata = _planets(person_context).get(planet)
+        if isinstance(pdata, dict):
+            house = pdata.get("house")
+        rows.append(
+            {
+                "level": short,
+                "planet": planet,
+                "is_relevant": planet in relevant,
+                "house": house,
+                "sign": _SIGN_NAMES[sign] if isinstance(sign, int) and 0 <= sign <= 11 else None,
+                "start_date": start,
+                "end_date": end,
+            }
+        )
+    return rows
+
+
 def _timing_alignment(person_context: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
     lords = _current_dasha_lords(person_context)
     relevant = set(profile.get("primary_karakas") or [])
@@ -1930,8 +2003,135 @@ def _timing_alignment(person_context: Dict[str, Any], profile: Dict[str, Any]) -
     return {
         "active": bool(matched),
         "current_lords": lords,
+        "current_stack": _current_dasha_stack(person_context, profile),
         "matched_lords": matched,
         "relevant_house_lords": sorted(set(house_lords)),
+    }
+
+
+def _timing_rank(granularity: str) -> int:
+    return {"none": 0, "year": 1, "month": 2, "day": 3}.get(str(granularity or "none"), 0)
+
+
+def _best_supported_granularity(person_context: Dict[str, Any]) -> str:
+    pda = person_context.get("period_dasha_activations") or {}
+    if isinstance(pda, dict):
+        ptype = str(pda.get("period_type") or "").lower()
+        if ptype == "daily":
+            return "day"
+        if ptype in {"weekly", "monthly"}:
+            return "month"
+        if ptype == "extended":
+            return "year"
+    ta = person_context.get("transit_activations") or []
+    if isinstance(ta, list) and ta:
+        return "month"
+    if isinstance(person_context.get("requested_dasha_summary"), dict) and person_context.get("requested_dasha_summary"):
+        return "year"
+    if isinstance(person_context.get("current_dashas"), dict) and person_context.get("current_dashas"):
+        return "year"
+    return "none"
+
+
+def _compact_period_dasha_window(person_context: Dict[str, Any]) -> Dict[str, Any]:
+    pda = person_context.get("period_dasha_activations") or {}
+    if not isinstance(pda, dict) or not pda:
+        return {"available": False}
+    out: Dict[str, Any] = {
+        "available": True,
+        "period_type": pda.get("period_type"),
+        "analysis_depth": pda.get("analysis_depth"),
+    }
+    for key in ("target_date", "start_date", "end_date"):
+        if pda.get(key):
+            out[key] = pda.get(key)
+    if isinstance(pda.get("exact_dashas"), dict):
+        exact = pda["exact_dashas"]
+        out["exact_dashas"] = {
+            k: (v.get("planet") if isinstance(v, dict) else v)
+            for k, v in exact.items()
+            if k in {"mahadasha", "antardasha", "pratyantardasha", "sookshma", "prana"}
+        }
+    if isinstance(pda.get("dasha_activations"), list):
+        out["top_activations"] = [
+            {
+                "planet": row.get("planet"),
+                "dasha_level": row.get("dasha_level"),
+                "probability": row.get("probability"),
+                "transit_house": row.get("transit_house"),
+            }
+            for row in pda.get("dasha_activations", [])[:5]
+            if isinstance(row, dict)
+        ]
+    elif isinstance(pda.get("sampled_activations"), list):
+        out["sampled_activations"] = [
+            {
+                "date": row.get("date"),
+                "planets": [a.get("planet") for a in row.get("activations", []) if isinstance(a, dict) and a.get("planet")],
+            }
+            for row in pda.get("sampled_activations", [])[:5]
+            if isinstance(row, dict)
+        ]
+    return out
+
+
+def _compact_transit_windows(person_context: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
+    transits = person_context.get("transit_activations") or []
+    if not isinstance(transits, list) or not transits:
+        return {"available": False}
+    houses = set(h for h in profile.get("primary_houses") or [] if isinstance(h, int))
+    karakas = set(str(p) for p in profile.get("primary_karakas") or [] if isinstance(p, str))
+    rows = []
+    for row in transits:
+        if not isinstance(row, dict):
+            continue
+        if houses and row.get("transit_house") not in houses and row.get("natal_planet") not in karakas and row.get("transit_planet") not in karakas:
+            continue
+        rows.append(
+            {
+                "transit_planet": row.get("transit_planet"),
+                "natal_planet": row.get("natal_planet"),
+                "transit_house": row.get("transit_house"),
+                "start_date": row.get("start_date"),
+                "end_date": row.get("end_date"),
+                "dasha_significance": row.get("dasha_significance"),
+            }
+        )
+    return {"available": bool(rows), "rows": rows[:6]}
+
+
+def _timing_window_block(person_context: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
+    supported = _best_supported_granularity(person_context)
+    return {
+        "supported_granularity": supported,
+        "current_stack": _current_dasha_stack(person_context, profile),
+        "period_dasha": _compact_period_dasha_window(person_context),
+        "transit_windows": _compact_transit_windows(person_context, profile),
+        "current_dashas": _current_dasha_lords(person_context),
+    }
+
+
+def _relational_timing_strategy(profile: Dict[str, Any], native: Dict[str, Any], partner: Dict[str, Any]) -> Dict[str, Any]:
+    requested = ((profile.get("timing_request") or {}).get("requested_granularity")) or "none"
+    native_supported = _best_supported_granularity(native)
+    partner_supported = _best_supported_granularity(partner)
+    delivered = "none"
+    if requested != "none":
+        max_supported = max(_timing_rank(native_supported), _timing_rank(partner_supported))
+        delivered = next((g for g in ("day", "month", "year", "none") if _timing_rank(g) == min(_timing_rank(requested), max_supported)), "none")
+    return {
+        "requested_granularity": requested,
+        "delivery_granularity": delivered,
+        "reason": (profile.get("timing_request") or {}).get("reason"),
+        "native": _timing_window_block(native, profile),
+        "partner": _timing_window_block(partner, profile),
+        "guidance": (
+            "Use day-level timing only when period_dasha_activations are daily and exact-date evidence exists."
+            if requested == "day"
+            else "Prefer month-level windows when short-term sampled activations or transit windows exist."
+            if requested == "month"
+            else "Prefer year-level windows when only broad dasha/transit support is available."
+        ),
     }
 
 

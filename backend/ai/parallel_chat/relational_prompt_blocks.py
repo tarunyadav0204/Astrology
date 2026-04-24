@@ -47,6 +47,7 @@ Use VARIABLE_DATA_JSON.relational_evidence as the computed spine:
 - sudarshana_relational_evidence = comparative Lagna/Moon/Sun tri-perspective support and trigger quality across both charts
 - cross_chart_contacts = concrete planet-to-planet sign contacts
 - timing_alignment = whether current dasha lords activate the topic in one or both charts
+- timing_strategy = requested timing granularity, supported/deliverable timing granularity, compact period-dasha windows, and compact transit windows for both charts
 - branch_activation = whether this method is primary/supporting for this question
 
 Stay inside the {method} method. Do not write the final user answer. Produce evidence for the merge model.
@@ -89,7 +90,9 @@ def build_relational_branch_static(branch_id: str) -> str:
         ),
         "timing_relational": (
             "Timing synthesis. Use current dashas, requested dasha summaries, period activations, and current-date context for both people. "
-            "State whether the event/relationship theme is active in one chart, both charts, or neither."
+            "State whether the event/relationship theme is active in one chart, both charts, or neither. "
+            "Respect relational_evidence.timing_strategy: if requested granularity is day but deliverable granularity is only month or year, explicitly downgrade precision instead of pretending exact-day timing. "
+            "Use current_stack / current_lords to describe MD, AD, and PD when available instead of collapsing everything into Mahadasha-only language."
         ),
         "ashtakavarga_relational": (
             "Ashtakavarga. Compare relevant houses and relationship/event houses between both charts using SAV/BAV support or weakness. "
@@ -173,9 +176,12 @@ Output rules:
   - Behavioral Texture = Moon nakshatra, 7th-lord nakshatra, and key relationship planets, plus D9 resonance when available
   - Interaction Pattern = overlays, cross-chart contacts, Jaimini/Nadi/KP confirmations
   - Current Activation = only after baseline nature is explained; do not let current dasha replace baseline nature
+  - Current Activation should use the dasha stack, not just Mahadasha: mention MD + AD, and PD too when available and relevant
 - For serious predictive, conflict, or trust questions, include a compact section or paragraph equivalent to "Method Cross-Checks" that names the strongest 3-5 method confirmations instead of flattening everything into one anonymous paragraph.
 - Include method details naturally: e.g. "Parashari...", "KP...", "Nadi...", "Jaimini..." only when that branch provided useful evidence.
 - If branch_activation marks a method as skipped or data_available=false, do not pretend that method gave a concrete finding.
+- Respect RELATIONAL_EVIDENCE_SPINE_JSON.timing_strategy. If the user implicitly or explicitly asks for day-level timing but the deliverable granularity is only month or year, say so and answer at that lower granularity instead of inventing precision.
+- In any Current Activation section, do not stop at Mahadasha if Antardasha / Pratyantardasha are present in timing_strategy or timing_alignment. Use the full stack that is actually available.
 - Use methods in a hierarchy:
   1. direct event/timing verdict from Parashari, KP, Jaimini, Timing
   2. hidden-dynamics texture from Nadi/Nakshatra
@@ -193,6 +199,12 @@ Output rules:
 - When relation_specific_evidence.sign_flavor_* is present, include at least one concrete sign-based behavioral reading for each relevant person instead of speaking only in house abstractions.
 - When relation_specific_evidence.nakshatra_flavor_* is present, include at least one explicit nakshatra-based behavioral reading for each relevant person instead of reducing Nakshatra to compatibility score only.
 - Do not answer behavior/nature questions using only timing pressure, overlays, or compatibility scores; baseline sign and nakshatra texture must appear when present.
+- For timing questions, prefer this order:
+  1. promise/activity from dasha and role houses
+  2. current MD/AD/PD stack and which relationship houses or karakas those lords activate
+  3. short-term confirmation from period_dasha_activations when available
+  4. compact transit windows as confirmation, not standalone proof
+  5. final window at the actually deliverable granularity: day, month, or year
 - Do not state exact cusp lord, star lord, or sub lord details for one partner unless that partner-specific KP evidence is actually present in the branch evidence.
 - Use Ashtakoota/Guna Milan only for spouse/romantic compatibility as primary evidence; for family/guru/business bonds, mention it only as Moon-temperament support if useful.
 - If branches conflict, explain the conflict and how you resolve it.

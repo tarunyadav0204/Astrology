@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -107,6 +108,32 @@ For every user query, structure your response exactly as follows:
     
     def __init__(self):
         self.static_cache = {}  # Cache static chart data
+        self._static_cache_ts = {}
+        self._static_cache_ttl_s = max(300, int(os.getenv("ASTRO_CONTEXT_STATIC_CACHE_TTL_S", "43200") or 43200))
+        self._static_cache_max_entries = max(8, int(os.getenv("ASTRO_CONTEXT_STATIC_CACHE_MAX_ENTRIES", "128") or 128))
+
+    def _cache_get(self, key: str) -> Optional[Dict[str, Any]]:
+        now = time.time()
+        ts = self._static_cache_ts.get(key)
+        if ts is None:
+            return None
+        if now - ts > self._static_cache_ttl_s:
+            self.static_cache.pop(key, None)
+            self._static_cache_ts.pop(key, None)
+            return None
+        self._static_cache_ts[key] = now
+        return self.static_cache.get(key)
+
+    def _cache_set(self, key: str, value: Dict[str, Any]) -> Dict[str, Any]:
+        now = time.time()
+        self.static_cache[key] = value
+        self._static_cache_ts[key] = now
+        if len(self.static_cache) > self._static_cache_max_entries:
+            overflow = len(self.static_cache) - self._static_cache_max_entries
+            for old_key, _ts in sorted(self._static_cache_ts.items(), key=lambda item: item[1])[:overflow]:
+                self.static_cache.pop(old_key, None)
+                self._static_cache_ts.pop(old_key, None)
+        return value
     
     def build_base_context(self, birth_data: Dict) -> Dict[str, Any]:
         """Build base astrological context needed for all analysis types"""
@@ -115,10 +142,12 @@ For every user query, structure your response exactly as follows:
         birth_hash = self._create_birth_hash(birth_data)
         
         # Get static data (cached)
-        if birth_hash not in self.static_cache:
-            self.static_cache[birth_hash] = self._build_static_base_context(birth_data)
-        
-        static_context = self.static_cache[birth_hash]
+        static_context = self._cache_get(birth_hash)
+        if static_context is None:
+            static_context = self._cache_set(
+                birth_hash,
+                self._build_static_base_context(birth_data),
+            )
         
         # Add dynamic data (always fresh)
         dynamic_context = self._build_dynamic_base_context(birth_data)

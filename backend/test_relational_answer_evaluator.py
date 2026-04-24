@@ -120,3 +120,44 @@ def test_relational_answer_evaluator_rejects_unsupported_ashtakavarga_numbers():
 
     assert result["passed"] is False
     assert "no_unsupported_av_numbers" in result["failed_checks"]
+
+
+def test_relational_answer_evaluator_requires_behavior_texture_when_expected():
+    result = RelationalAnswerEvaluator.evaluate(
+        text=(
+            "**Direct Answer**: He is intense and she reacts strongly.\n\n"
+            "**Main Astrological Evidence**: Their relationship has pressure and karmic tension.\n\n"
+            "FAQ_META: {\"category\":\"marriage\",\"canonical_question\":\"Marriage behavior dynamics\"}"
+        ),
+        profile={"relation_family": "spouse_romantic", "event_topic": "general_relationship"},
+        question="Tell me in detail what is Tarun's behaviour towards Deepika and Deepika's behaviour about Tarun",
+        evidence_spine={
+            "relation_specific_evidence": {
+                "sign_flavor_native": [{"sign": "Libra", "sign_flavor": "balancing, diplomatic"}],
+                "sign_flavor_partner": [{"sign": "Virgo", "sign_flavor": "critical, analytical"}],
+                "nakshatra_flavor_native": {"moon": {"nakshatra": "Swati", "flavor": "independent, peace-seeking"}},
+                "nakshatra_flavor_partner": {"moon": {"nakshatra": "Chitra", "flavor": "crafted, exacting"}},
+            }
+        },
+    )
+
+    assert result["passed"] is False
+    assert "behavior_sign_texture_present" in result["failed_checks"]
+    assert "behavior_nakshatra_texture_present" in result["failed_checks"]
+
+
+def test_relational_answer_evaluator_rejects_overprecise_timing_when_only_year_supported():
+    result = RelationalAnswerEvaluator.evaluate(
+        text=(
+            "**Direct Answer**: Reconciliation is possible on 2026-05-04.\n\n"
+            "**Main Astrological Evidence**: The dasha supports return.\n\n"
+            "**Timing Windows**: May 2026 is the key month.\n\n"
+            "FAQ_META: {\"category\":\"marriage\",\"canonical_question\":\"Reconciliation timing\"}"
+        ),
+        profile={"relation_family": "spouse_romantic", "event_topic": "reconciliation_return"},
+        question="When will she come back?",
+        evidence_spine={"timing_strategy": {"delivery_granularity": "year"}},
+    )
+
+    assert result["passed"] is False
+    assert "timing_granularity_respected" in result["failed_checks"]

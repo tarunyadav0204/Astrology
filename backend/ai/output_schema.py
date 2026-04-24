@@ -138,6 +138,19 @@ FAQ_META: {"category": "<one of: career, marriage, health, education, progeny, w
 - canonical_question: a concise FAQ-style phrase; similar questions should get the same or very similar phrase so they group together.
 """
 
+
+def _single_native_format_guard(analysis_type: str) -> str:
+    if analysis_type in ("synastry", "relational"):
+        return ""
+    return """
+FORMAT GUARD FOR SINGLE-NATIVE READINGS:
+- This is NOT a two-person synastry/relational reading unless the data explicitly contains two full charts.
+- Do NOT use the relational two-person answer template or its fixed section labels such as:
+  "Core Nature", "Behavioral Texture", "Interaction Pattern", or a spouse-vs-partner comparison layout.
+- Do NOT speak as if you are comparing native and partner charts unless two-chart data is actually present.
+- If the topic is marriage/relationship but the input is still one native chart, answer it as a single-chart relationship reading, not a dual-chart compatibility reading.
+"""
+
 # Template A: The Deep Dive (Default)
 # Used for: ANALYZE_TOPIC_POTENTIAL, ANALYZE_ROOT_CAUSE, PREDICT_PERIOD_OUTLOOK
 TEMPLATE_DEEP_DIVE = """
@@ -639,7 +652,14 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     prompt_parts.append(time_context)
     
     prompt_parts.append(system_instruction)
-    prompt_parts.append(f"{language_instruction}{elaborate_instruction}{response_format_instruction}{user_context_instruction}{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}")
+    prompt_parts.append(
+        f"{language_instruction}"
+        f"{elaborate_instruction}"
+        f"{response_format_instruction}"
+        f"{user_context_instruction}"
+        f"{_single_native_format_guard(analysis_type)}"
+        f"{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}"
+    )
     
     prompt_parts.append(build_multi_question_focus_instruction(_lang))
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")

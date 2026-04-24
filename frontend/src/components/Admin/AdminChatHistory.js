@@ -122,8 +122,22 @@ const AdminChatHistory = () => {
 
   const IST = 'Asia/Kolkata';
 
+  const parseUtcTimestamp = (dateStr) => {
+    if (!dateStr) return null;
+    const raw = String(dateStr).trim();
+    if (!raw) return null;
+    // Backend DB timestamps are UTC but often arrive without a timezone suffix.
+    // Add Z so JS does not interpret them as browser-local time before IST formatting.
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+    const normalized = hasTimezone ? raw : `${raw.replace(' ', 'T')}Z`;
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
   const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    const d = parseUtcTimestamp(dateStr);
+    if (!d) return '—';
+    return d.toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -134,7 +148,9 @@ const AdminChatHistory = () => {
   };
 
   const formatTimeIST = (dateStr) => {
-    return new Date(dateStr).toLocaleTimeString('en-IN', {
+    const d = parseUtcTimestamp(dateStr);
+    if (!d) return '—';
+    return d.toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',

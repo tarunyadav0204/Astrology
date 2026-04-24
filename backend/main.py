@@ -3400,32 +3400,196 @@ async def get_ashtakavarga_oracle_insight(request: dict, current_user: User = De
     """Generate Gemini-powered Ashtakvarga Oracle insights"""
     try:
         from calculators.ashtakvarga_oracle import get_oracle_instance
+        from calculators.ashtakavarga_life_predictions_cache import birth_fingerprint
+        from calculators.ashtakvarga_oracle_cache import (
+            ensure_oracle_history_table,
+            fetch_cached_oracle_payload,
+            oracle_cache_key,
+            store_oracle_payload,
+        )
+        from credits.credit_service import CreditService
         
         birth_data = request['birth_data']
         ashtakvarga_data = request['ashtakvarga_data']
+        birth_ashtakavarga_data = request.get('birth_ashtakavarga_data')
         date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
         query_type = request.get('query_type', 'general')
+        question_text = request.get('question_text')
+        cache_probe = bool(request.get('cache_probe', False))
+        chart_type = str((ashtakvarga_data or {}).get('chart_type') or 'lagna')
+        normalized_birth = BirthData(**birth_data)
+        birth_hash = birth_fingerprint(
+            {
+                "date": normalized_birth.date,
+                "time": normalized_birth.time,
+                "latitude": normalized_birth.latitude,
+                "longitude": normalized_birth.longitude,
+            }
+        )
+        question_mode = 'question' if question_text else (query_type or 'overview')
+        cache_key = oracle_cache_key(birth_hash, date, chart_type, question_mode, question_text)
+        credit_service = CreditService()
+        base_cost = max(1, int(credit_service.get_credit_setting("ashtakavarga_life_predictions_cost")))
+        analysis_cost = credit_service.get_effective_cost(
+            current_user.userid, base_cost, "ashtakavarga_life_predictions_cost"
+        )
+
+        with get_conn() as conn:
+            ensure_oracle_history_table(conn)
+            cached = fetch_cached_oracle_payload(conn, current_user.userid, cache_key)
+            conn.commit()
+
+        if cache_probe:
+            if cached:
+                return {
+                    **cached,
+                    "cached": True,
+                    "credits_charged": 0,
+                    "credit_cost_next": analysis_cost,
+                }
+            return {"cached": False, "credit_cost_next": analysis_cost}
+
+        if cached:
+            return {
+                **cached,
+                "cached": True,
+                "credits_charged": 0,
+                "credit_cost_next": analysis_cost,
+            }
+
+        user_balance = credit_service.get_user_credits(current_user.userid)
+        if user_balance < analysis_cost:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Insufficient credits. You need {analysis_cost} credits but have {user_balance}.",
+            )
+
+        if birth_ashtakavarga_data or question_text:
+            ashtakvarga_data = {
+                **ashtakvarga_data,
+                **({'birth_ashtakavarga_data': birth_ashtakavarga_data} if birth_ashtakavarga_data else {}),
+                **({'question_text': question_text} if question_text else {}),
+            }
         
         oracle = get_oracle_instance()
         complete_oracle = oracle.generate_complete_oracle(birth_data, ashtakvarga_data, date, query_type)
+
+        spent = credit_service.spend_credits(
+            current_user.userid,
+            analysis_cost,
+            "ashtakavarga_oracle_insight",
+            f"Ashtakavarga analysis for {(birth_data or {}).get('name') or 'user'}",
+        )
+        if not spent:
+            raise HTTPException(status_code=500, detail="Credit deduction failed after analysis generation.")
+        complete_oracle["credits_charged"] = analysis_cost
+        complete_oracle["credits_remaining"] = credit_service.get_user_credits(current_user.userid)
+        complete_oracle["credit_cost_next"] = analysis_cost
+        complete_oracle["cached"] = False
+
+        with get_conn() as conn:
+            ensure_oracle_history_table(conn)
+            store_oracle_payload(
+                conn=conn,
+                userid=current_user.userid,
+                birth_hash=birth_hash,
+                oracle_key=cache_key,
+                date_key=date,
+                chart_type=chart_type,
+                query_type=question_mode,
+                question_text=question_text,
+                payload=complete_oracle,
+            )
+            conn.commit()
         
-        # Return complete oracle data including timeline_events
         return complete_oracle
         
     except Exception as e:
         print(f"Oracle insight error: {str(e)}")
         return {
-            "oracle_message": "The cosmic energies are aligning. Your Ashtakvarga reveals hidden patterns of strength and opportunity.",
-            "power_actions": [
-                {"type": "do", "text": "Focus on morning activities"},
-                {"type": "do", "text": "Wear bright colors today"},
-                {"type": "avoid", "text": "Avoid major decisions after sunset"}
+            "analysis_title": "Ashtakavarga Analysis",
+            "headline": "Ashtakavarga analysis is temporarily unavailable. Please try again in a moment.",
+            "snapshot": {
+                "date": request.get('date', datetime.now().strftime('%Y-%m-%d')),
+                "chart_type": (request.get('ashtakvarga_data') or {}).get("chart_type", "lagna"),
+                "total_bindus": ((request.get('ashtakvarga_data') or {}).get("ashtakavarga") or {}).get("total_bindus", 0),
+            },
+            "key_takeaways": [
+                "The analysis service is temporarily unavailable.",
+                "Use the Matrix, SAV, and BAV tabs for raw bindu values for now.",
             ],
-            "cosmic_strength": 65,
-            "pillar_insights": [f"Sign {i+1} holds cosmic significance in your chart." for i in range(12)]
+            "sections": [
+                {
+                    "title": "Practical focus",
+                    "bullets": [
+                        "Review the strongest and weakest houses in the Matrix tab while the analysis service recovers.",
+                    ],
+                }
+            ],
+            "oracle_message": "Ashtakavarga analysis is temporarily unavailable. Please try again in a moment.",
+            "pillar_insights": [f"House {i+1} is available for review in the Matrix tab." for i in range(12)]
         }
 
 # Timeline endpoint removed - frontend handles timeline data from oracle-insight response
+
+@app.post("/api/ashtakavarga/oracle-history")
+async def get_ashtakavarga_oracle_history(request: dict, current_user: User = Depends(get_current_user)):
+    """Get saved Ashtakavarga oracle analyses for a birth profile."""
+    from calculators.ashtakavarga_life_predictions_cache import birth_fingerprint
+    from calculators.ashtakvarga_oracle_cache import ensure_oracle_history_table, list_oracle_history
+
+    raw_birth = request.get("birth_data")
+    if not raw_birth:
+        raise HTTPException(status_code=400, detail="birth_data is required")
+
+    limit = max(1, min(int(request.get("limit", 25)), 100))
+    normalized_birth = BirthData(**raw_birth)
+    birth_hash = birth_fingerprint(
+        {
+            "date": normalized_birth.date,
+            "time": normalized_birth.time,
+            "latitude": normalized_birth.latitude,
+            "longitude": normalized_birth.longitude,
+        }
+    )
+    with get_conn() as conn:
+        ensure_oracle_history_table(conn)
+        items = list_oracle_history(conn, current_user.userid, birth_hash, limit=limit)
+        conn.commit()
+    return {"items": items}
+
+
+@app.get("/api/ashtakavarga/oracle-history")
+async def get_ashtakavarga_oracle_history_all(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """Get saved Ashtakavarga oracle analyses for the current user."""
+    from calculators.ashtakvarga_oracle_cache import ensure_oracle_history_table, list_user_oracle_history
+
+    safe_limit = max(1, min(int(limit), 100))
+    with get_conn() as conn:
+        ensure_oracle_history_table(conn)
+        items = list_user_oracle_history(conn, current_user.userid, limit=safe_limit)
+        conn.commit()
+    return {"items": items}
+
+
+@app.get("/api/ashtakavarga/oracle-history/{analysis_id}")
+async def get_ashtakavarga_oracle_history_detail(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Get one saved Ashtakavarga oracle analysis by id for the current user."""
+    from calculators.ashtakvarga_oracle_cache import ensure_oracle_history_table, fetch_oracle_history_item
+
+    with get_conn() as conn:
+        ensure_oracle_history_table(conn)
+        item = fetch_oracle_history_item(conn, current_user.userid, analysis_id)
+        conn.commit()
+    if not item:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return item
 
 @app.get("/api/interpretations/planet-nakshatra")
 async def get_planet_nakshatra_interpretation(
@@ -5798,7 +5962,14 @@ async def get_complete_ashtakavarga_oracle(request: dict, current_user: User = D
         ashtakvarga_data = request['ashtakvarga_data']
         date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
         query_type = request.get('query_type', 'general')
+        question_text = request.get('question_text')
         timeline_years = request.get('timeline_years', 3)
+
+        if question_text:
+            ashtakvarga_data = {
+                **ashtakvarga_data,
+                'question_text': question_text,
+            }
         
         oracle = get_oracle_instance()
         complete_response = oracle.generate_complete_oracle(birth_data, ashtakvarga_data, date, query_type, timeline_years)

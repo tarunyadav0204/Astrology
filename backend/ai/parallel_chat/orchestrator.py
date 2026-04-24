@@ -418,6 +418,74 @@ def _totals_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     return out
 
 
+def _parallel_cache_ttl_s() -> int:
+    # This cache is explicitly deleted after each request; TTL is only a fallback.
+    return max(300, int(os.getenv("ASTRO_PARALLEL_CHAT_CACHE_TTL_S", "300") or 300))
+
+
+async def _create_gemini_parallel_cache(
+    *,
+    llm_provider: str,
+    model_name: str,
+    cache_payload: Dict[str, Any],
+    cache_label: str,
+    cache_enabled_env: str = "ASTRO_PARALLEL_CHAT_CONTEXT_CACHE",
+) -> Tuple[Optional[Any], Optional[Any], int, int]:
+    """
+    Create a short-lived Gemini CachedContent resource for intra-request branch fan-out.
+
+    Returns: (cache_resource, cached_model, setup_chars, setup_tokens)
+    """
+    if llm_provider != "gemini" or not _env_bool(cache_enabled_env, default=True):
+        return None, None, 0, 0
+    try:
+        from google.generativeai import caching as genai_caching
+        import google.generativeai as genai
+
+        cache_text = f"{cache_label.upper()}_SHARED_CONTEXT_JSON:\n{_json_compact(cache_payload)}"
+        cache_setup_input_chars = len(cache_text)
+        cache_setup_input_tokens = max(1, int(round(cache_setup_input_chars / 4.0)))
+        ttl_s = _parallel_cache_ttl_s()
+        logger.info(
+            "%s_CACHE create model=%s ttl_s=%s context_chars=%s",
+            cache_label.upper(),
+            model_name,
+            ttl_s,
+            cache_setup_input_chars,
+        )
+        cache_resource = await asyncio.to_thread(
+            genai_caching.CachedContent.create,
+            model=model_name,
+            display_name=f"{cache_label}-{int(time.time())}",
+            system_instruction="Use cached shared context for all branch and merge reasoning.",
+            contents=[cache_text],
+            ttl=ttl_s,
+        )
+        cached_model = await asyncio.to_thread(
+            genai.GenerativeModel.from_cached_content,
+            cache_resource,
+        )
+        logger.info(
+            "%s_CACHE created name=%s",
+            cache_label.upper(),
+            getattr(cache_resource, "name", "unknown"),
+        )
+        return cache_resource, cached_model, cache_setup_input_chars, cache_setup_input_tokens
+    except Exception as e:
+        logger.warning("%s_CACHE failed; continuing without cache: %s", cache_label.upper(), e)
+        return None, None, 0, 0
+
+
+async def _delete_parallel_cache(cache_resource: Optional[Any], *, cache_label: str) -> None:
+    if cache_resource is None:
+        return
+    try:
+        await asyncio.to_thread(cache_resource.delete)
+        logger.info("%s_CACHE deleted", cache_label.upper())
+    except Exception as e:
+        logger.warning("%s_CACHE delete failed: %s", cache_label.upper(), e)
+
+
 async def _run_branch_json(
     analyzer: Any,
     static_instruction: str,
@@ -596,57 +664,23 @@ async def run_parallel_chat_pipeline(
     t_parallel = time.time()
     llm_provider = get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
     gemini_model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
-    cache_enabled = _env_bool("ASTRO_PARALLEL_CHAT_CONTEXT_CACHE", default=True)
-    cache_ttl_s = max(300, int(os.getenv("ASTRO_PARALLEL_CHAT_CACHE_TTL_S", "3600") or 3600))
     cache_resource = None
     cached_model = None
     cache_setup_input_chars = 0
     cache_setup_input_tokens = 0
-    try:
-        if llm_provider == "gemini" and cache_enabled:
-            from google.generativeai import caching as genai_caching
-            cache_payload = {
-                "shared_kernel": build_shared_kernel_lite(ctx),
-                "user_facts": ctx.get("user_facts"),
-                "extracted_context": ctx.get("extracted_context"),
-                "history": conversation_history or [],
-                "current_question": user_question,
-            }
-            cache_text = (
-                "PARALLEL_CHAT_SHARED_CONTEXT_JSON:\n"
-                f"{_json_compact(cache_payload)}"
-            )
-            cache_setup_input_chars = len(cache_text)
-            cache_setup_input_tokens = max(
-                1, int(round(cache_setup_input_chars / 4.0))
-            )
-            logger.info(
-                "PARALLEL_CHAT_CACHE create model=%s ttl_s=%s context_chars=%s",
-                gemini_model_name,
-                cache_ttl_s,
-                len(cache_text),
-            )
-            cache_resource = await asyncio.to_thread(
-                genai_caching.CachedContent.create,
-                model=gemini_model_name,
-                display_name=f"parallel-chat-{int(time.time())}",
-                system_instruction="Use cached shared context for all branch and merge reasoning.",
-                contents=[cache_text],
-                ttl=cache_ttl_s,
-            )
-            import google.generativeai as genai
-            cached_model = await asyncio.to_thread(
-                genai.GenerativeModel.from_cached_content,
-                cache_resource,
-            )
-            logger.info(
-                "PARALLEL_CHAT_CACHE created name=%s",
-                getattr(cache_resource, "name", "unknown"),
-            )
-    except Exception as e:
-        logger.warning("PARALLEL_CHAT_CACHE failed; continuing without cache: %s", e)
-        cache_resource = None
-        cached_model = None
+    cache_payload = {
+        "shared_kernel": build_shared_kernel_lite(ctx),
+        "user_facts": ctx.get("user_facts"),
+        "extracted_context": ctx.get("extracted_context"),
+        "history": conversation_history or [],
+        "current_question": user_question,
+    }
+    cache_resource, cached_model, cache_setup_input_chars, cache_setup_input_tokens = await _create_gemini_parallel_cache(
+        llm_provider=llm_provider,
+        model_name=gemini_model_name,
+        cache_payload=cache_payload,
+        cache_label="parallel_chat",
+    )
     try:
         par_task = asyncio.create_task(
             _run_branch_json(
@@ -753,18 +787,20 @@ async def run_parallel_chat_pipeline(
         branch_llm_rows: List[Dict[str, Any]] = [par_m, jm_m, nd_m, nk_m, kp_m, av_m, sd_m]
     except Exception as e:
         logger.exception("parallel gather failed: %s", e)
-        if cache_resource is not None:
-            try:
-                await asyncio.to_thread(cache_resource.delete)
-                logger.info("PARALLEL_CHAT_CACHE deleted")
-            except Exception as del_err:
-                logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", del_err)
+        await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
         raise
 
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
 
     intent_mode = _intent_mode(ctx, mode)
     merge_system_instruction = build_merge_synthesis_instruction(mode=intent_mode)
+    single_native_format_guard = """
+FORMAT GUARD FOR SINGLE-NATIVE READINGS:
+- This is NOT a two-person synastry/relational reading.
+- Do NOT use fixed two-person relational section labels such as "Core Nature", "Behavioral Texture", or "Interaction Pattern".
+- Do NOT frame the answer as native-vs-partner comparison, spouse-vs-spouse behavior, or compatibility scoring unless the request actually contains two charts.
+- If the topic is marriage/relationship, still answer from the single native chart unless a second chart is explicitly present.
+"""
     (
         language_instruction,
         elaborate_instruction,
@@ -825,6 +861,7 @@ async def run_parallel_chat_pipeline(
             elaborate_instruction,
             response_format_instruction,
             user_context_instruction,
+            single_native_format_guard,
             VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION.strip(),
         ]
     )
@@ -874,12 +911,7 @@ async def run_parallel_chat_pipeline(
 
     if not syn.get("success") or not syn.get("response"):
         _log_parallel_llm_summary(_parallel_usage_rows)
-        if cache_resource is not None:
-            try:
-                await asyncio.to_thread(cache_resource.delete)
-                logger.info("PARALLEL_CHAT_CACHE deleted")
-            except Exception as e:
-                logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", e)
+        await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
         return {
             "success": False,
             "response": "I apologize, but I couldn't generate a merged response. Please try again.",
@@ -913,12 +945,7 @@ async def run_parallel_chat_pipeline(
     cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
     if len(cleaned_text) < 50:
         _log_parallel_llm_summary(_parallel_usage_rows)
-        if cache_resource is not None:
-            try:
-                await asyncio.to_thread(cache_resource.delete)
-                logger.info("PARALLEL_CHAT_CACHE deleted")
-            except Exception as e:
-                logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", e)
+        await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
         return {
             "success": False,
             "response": "I received a partial merged response. Please try again.",
@@ -956,12 +983,7 @@ async def run_parallel_chat_pipeline(
     }
     total_time = time.time() - total_request_start
     _log_parallel_llm_summary(_parallel_usage_rows)
-    if cache_resource is not None:
-        try:
-            await asyncio.to_thread(cache_resource.delete)
-            logger.info("PARALLEL_CHAT_CACHE deleted")
-        except Exception as e:
-            logger.warning("PARALLEL_CHAT_CACHE delete failed: %s", e)
+    await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
 
     return {
         "success": True,

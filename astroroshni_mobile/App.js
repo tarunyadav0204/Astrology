@@ -34,6 +34,8 @@ import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import MonthlyDeepScreen from './src/components/MonthlyDeepScreen';
 import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
+import AshtakvargaHistoryScreen from './src/components/Ashtakvarga/AshtakvargaHistoryScreen';
+import AshtakvargaHistoryDetailScreen from './src/components/Ashtakvarga/AshtakvargaHistoryDetailScreen';
 import NumerologyScreen from './src/components/Numerology/NumerologyScreen';
 import FinancialDashboard from './src/components/Financial/FinancialDashboard';
 import SectorDetailScreen from './src/components/Financial/SectorDetailScreen';
@@ -484,6 +486,16 @@ export default function App() {
           <Stack.Screen 
             name="AshtakvargaOracle" 
             component={AshtakvargaOracle}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AshtakvargaHistory"
+            component={AshtakvargaHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AshtakvargaHistoryDetail"
+            component={AshtakvargaHistoryDetailScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 
