@@ -334,6 +334,16 @@ def ensure_users_signup_client_column() -> None:
         logger.warning("Could not ensure users.signup_client column: %s", e)
 
 
+def ensure_users_gender_column() -> None:
+    """Add users.gender for registration-time capture; safe to run repeatedly."""
+    try:
+        with get_conn() as conn:
+            execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT")
+            conn.commit()
+    except Exception as e:
+        logger.warning("Could not ensure users.gender column: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
@@ -342,6 +352,10 @@ async def lifespan(app: FastAPI):
         ensure_users_signup_client_column()
     except Exception as e:
         print(f"Warning: signup_client schema check failed: {e}")
+    try:
+        ensure_users_gender_column()
+    except Exception as e:
+        print(f"Warning: users.gender schema check failed: {e}")
     try:
         prediction_engine = DailyPredictionEngine()
         prediction_engine.reset_prediction_rules()
@@ -785,6 +799,7 @@ class UserCreate(BaseModel):
     otp_token: Optional[str] = None
     role: str = "user"
     signup_client: Optional[str] = None
+    gender: Optional[str] = None
 
     @field_validator("signup_client", mode="before")
     @classmethod
@@ -795,6 +810,20 @@ class UserCreate(BaseModel):
             return None
         s = str(v).strip().lower()
         return s if s in ("web", "mobile") else None
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def _normalize_gender(cls, v):
+        if v is None:
+            return None
+        s = str(v).strip().lower()
+        if not s:
+            return None
+        if s in ("m", "man", "male"):
+            return "male"
+        if s in ("f", "woman", "female"):
+            return "female"
+        return None
 
 class UserLogin(BaseModel):
     phone: str
@@ -1105,6 +1134,7 @@ class UserRegistrationWithBirth(BaseModel):
     birth_details: Optional[BirthData] = None
     role: str = "user"
     signup_client: Optional[str] = None
+    gender: Optional[str] = None
 
     @field_validator("signup_client", mode="before")
     @classmethod
@@ -1115,6 +1145,20 @@ class UserRegistrationWithBirth(BaseModel):
             return None
         s = str(v).strip().lower()
         return s if s in ("web", "mobile") else None
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def _normalize_gender_registration(cls, v):
+        if v is None:
+            return None
+        s = str(v).strip().lower()
+        if not s:
+            return None
+        if s in ("m", "man", "male"):
+            return "male"
+        if s in ("f", "woman", "female"):
+            return "female"
+        return None
 
 @app.post("/api/register")
 async def register(user_data: UserCreate):
@@ -1156,7 +1200,7 @@ async def register(user_data: UserCreate):
         try:
             execute(
                 conn,
-                "INSERT INTO users (name, phone, password, role, email, signup_client) VALUES (%s, %s, %s, %s, %s, %s)",
+                "INSERT INTO users (name, phone, password, role, email, signup_client, gender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 (
                     user_data.name,
                     user_data.phone,
@@ -1164,6 +1208,7 @@ async def register(user_data: UserCreate):
                     user_data.role,
                     email_clean or None,
                     user_data.signup_client,
+                    user_data.gender,
                 ),
             )
         except pg_errors.UniqueViolation:
@@ -1175,7 +1220,7 @@ async def register(user_data: UserCreate):
 
         cur = execute(
             conn,
-            "SELECT userid, name, phone, role, email, signup_client FROM users WHERE phone = %s",
+            "SELECT userid, name, phone, role, email, signup_client, gender FROM users WHERE phone = %s",
             (user_data.phone,),
         )
         user = cur.fetchone()
@@ -1233,6 +1278,7 @@ async def register(user_data: UserCreate):
             "role": user[3],
             "email": user[4] if len(user) > 4 else None,
             "signup_client": user[5] if len(user) > 5 else None,
+            "gender": user[6] if len(user) > 6 else None,
         },
         "self_birth_chart": None  # No birth chart in regular registration
     }
@@ -1262,7 +1308,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
         try:
             execute(
                 conn,
-                "INSERT INTO users (name, phone, password, role, email, signup_client) VALUES (%s, %s, %s, %s, %s, %s)",
+                "INSERT INTO users (name, phone, password, role, email, signup_client, gender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 (
                     user_data.name,
                     user_data.phone,
@@ -1270,6 +1316,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
                     user_data.role,
                     email_clean or None,
                     user_data.signup_client,
+                    user_data.gender,
                 ),
             )
         except pg_errors.UniqueViolation:
@@ -1282,7 +1329,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
 
         cur = execute(
             conn,
-            "SELECT userid, name, phone, role, email, signup_client FROM users WHERE phone = %s",
+            "SELECT userid, name, phone, role, email, signup_client, gender FROM users WHERE phone = %s",
             (user_data.phone,),
         )
         user = cur.fetchone()
@@ -1366,6 +1413,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             "role": user[3],
             "email": user[4] if len(user) > 4 else None,
             "signup_client": user[5] if len(user) > 5 else None,
+            "gender": user[6] if len(user) > 6 else None,
         },
         "self_birth_chart": birth_chart_data
     }
@@ -3961,7 +4009,7 @@ async def get_admin_users(
         offset = (page - 1) * limit
         cur = execute(
             conn,
-            f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.signup_client, u.created_at {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
+            f"SELECT u.userid, u.name, u.phone, u.role, u.email, u.signup_client, u.created_at, u.gender {base_sql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
             params + [limit, offset],
         )
         rows = cur.fetchall() or []
@@ -3990,6 +4038,38 @@ async def get_admin_users(
 
         users = []
         for row in rows:
+            user_gender = (row[7] or "").strip() if len(row) > 7 else ""
+            if not user_gender:
+                cur = execute(
+                    conn,
+                    """
+                        SELECT bc.gender
+                        FROM birth_charts bc
+                        WHERE bc.userid = %s
+                          AND (
+                            (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = %s) = 1
+                            OR LOWER(COALESCE(bc.relation, '')) = 'self'
+                          )
+                        ORDER BY
+                          CASE WHEN LOWER(COALESCE(bc.relation, '')) = 'self' THEN 0 ELSE 1 END,
+                          bc.created_at DESC
+                        LIMIT 1
+                    """,
+                    (row[0], row[0]),
+                )
+                chart_gender_row = cur.fetchone()
+                if chart_gender_row and chart_gender_row[0]:
+                    user_gender = str(chart_gender_row[0]).strip()
+
+            normalized_gender = ""
+            gender_l = user_gender.lower()
+            if gender_l in ("male", "m", "man"):
+                normalized_gender = "male"
+            elif gender_l in ("female", "f", "woman"):
+                normalized_gender = "female"
+            elif user_gender:
+                normalized_gender = user_gender
+
             cur = execute(
                 conn,
                 """
@@ -4015,6 +4095,7 @@ async def get_admin_users(
                 'email': row[4],
                 'signup_client': row[5],
                 'created_at': row[6],
+                'gender': normalized_gender,
                 'subscriptions': subscriptions,
                 # From device_tokens (Expo push). Not set on users table; empty ≠ "web-only"
                 # (mobile user may not have registered push).
@@ -4029,6 +4110,84 @@ async def get_admin_users(
         'limit': limit,
         'total_pages': total_pages
     }
+
+
+@app.get("/api/admin/users/summary")
+async def get_admin_users_summary(
+    current_user: User = Depends(get_current_user),
+    phone: Optional[str] = Query(None, description="Filter by phone (partial match)"),
+    name: Optional[str] = Query(None, description="Filter by name/email (partial match)"),
+    role: Optional[str] = Query(None, description="Filter by role (user/admin)"),
+    subscription: Optional[str] = Query(None, description="Filter by plan name, or 'none' for no subscription"),
+):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with get_conn() as conn:
+        conditions = []
+        params = []
+        if phone and phone.strip():
+            conditions.append("u.phone ILIKE ?")
+            params.append(f"%{phone.strip()}%")
+        if name and name.strip():
+            pat = f"%{name.strip()}%"
+            conditions.append("(u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)")
+            params.append(pat)
+            params.append(pat)
+        if role and role.strip():
+            conditions.append("u.role = ?")
+            params.append(role.strip())
+
+        if subscription is not None and subscription.strip():
+            sub_val = subscription.strip()
+            if sub_val.lower() == 'none':
+                conditions.append("""u.userid NOT IN (
+                    SELECT userid FROM user_subscriptions us
+                    WHERE us.status = 'active' AND us.end_date >= CURRENT_DATE
+                )""")
+            else:
+                conditions.append("""u.userid IN (
+                    SELECT us.userid FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE (sp.plan_name = ? OR sp.tier_name = ?)
+                    AND us.status = 'active' AND us.end_date >= CURRENT_DATE
+                )""")
+                params.append(sub_val)
+                params.append(sub_val)
+
+        where_sql = " AND ".join(conditions) if conditions else "1=1"
+
+        summary_sql = f"""
+            SELECT
+                COUNT(*) AS users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END) AS mobile_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END) AS web_users_count,
+                SUM(CASE WHEN dt.userid IS NOT NULL THEN 1 ELSE 0 END) AS push_enabled_count
+            FROM users u
+            LEFT JOIN (
+                SELECT DISTINCT userid FROM device_tokens
+            ) dt ON dt.userid = u.userid
+            WHERE {where_sql}
+        """
+
+        cur = execute(conn, summary_sql, params)
+        total_row = cur.fetchone() or [0, 0, 0, 0]
+
+        cur = execute(conn, summary_sql + " AND DATE(u.created_at) = CURRENT_DATE", params)
+        today_row = cur.fetchone() or [0, 0, 0, 0]
+
+        def _to_block(row):
+            return {
+                "users_count": int(row[0] or 0),
+                "mobile_users_count": int(row[1] or 0),
+                "web_users_count": int(row[2] or 0),
+                "push_enabled_count": int(row[3] or 0),
+            }
+
+        return {
+            "today": _to_block(today_row),
+            "total": _to_block(total_row),
+        }
 
 
 def _normalize_ts_to_date(val) -> date_type:

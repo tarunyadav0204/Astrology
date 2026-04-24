@@ -53,6 +53,7 @@ class ChatRequest(BaseModel):
     partner_longitude: Optional[float] = Field(None, alias="partnerLongitude")
     partner_timezone: Optional[str] = Field(None, alias="partnerTimezone")
     partner_gender: Optional[str] = Field(None, alias="partnerGender")
+    partnership_relationship: Optional[str] = Field(None, alias="partnershipRelationship")
     
     class Config:
         populate_by_name = True  # Allows both snake_case and camelCase
@@ -253,7 +254,8 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         'latitude': request.partner_latitude or 28.6139,
                         'longitude': request.partner_longitude or 77.2090,
                         'timezone': request.partner_timezone,
-                        'gender': request.partner_gender
+                        'gender': request.partner_gender,
+                        'partnership_relationship': request.partnership_relationship
                     }
                     
                     print(f"   ✅ Building synastry context for both charts...")

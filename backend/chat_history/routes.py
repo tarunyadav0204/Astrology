@@ -387,11 +387,24 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         'latitude': request.get('partner_latitude') or request.get('partnerLatitude'),
         'longitude': request.get('partner_longitude') or request.get('partnerLongitude'),
         'timezone': request.get('partner_timezone') or request.get('partnerTimezone'),
-        'gender': request.get('partner_gender') or request.get('partnerGender')
+        'gender': request.get('partner_gender') or request.get('partnerGender'),
+        'partnership_relationship': (
+            request.get('partnership_relationship')
+            or request.get('partnershipRelationship')
+            or request.get('relationship')
+            or request.get('relationshipType')
+        )
     } if partnership_mode else None
 
     if partnership_mode and partner_birth_details:
         partner_birth_details = coerce_chat_birth_details(partner_birth_details)
+        partner_birth_details['partnership_relationship'] = (
+            request.get('partnership_relationship')
+            or request.get('partnershipRelationship')
+            or partner_birth_details.get('partnership_relationship')
+            or partner_birth_details.get('relationship')
+            or partner_birth_details.get('relationshipType')
+        )
     
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()

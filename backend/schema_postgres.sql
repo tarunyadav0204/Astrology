@@ -10,6 +10,7 @@ CREATE TABLE "users" (
     "name" TEXT DEFAULT '',
     "email" TEXT,
     "signup_client" TEXT,
+    "gender" TEXT,
     PRIMARY KEY ("userid")
 );
 

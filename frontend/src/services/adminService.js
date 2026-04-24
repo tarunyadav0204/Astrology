@@ -66,6 +66,23 @@ export const adminService = {
     return response.json();
   },
 
+  async getUsersSummary(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.phone != null && params.phone !== '') sp.set('phone', params.phone);
+    if (params.name != null && params.name !== '') sp.set('name', params.name);
+    if (params.role != null && params.role !== '' && params.role !== 'all') sp.set('role', params.role);
+    if (params.subscription != null && params.subscription !== '' && params.subscription !== 'all') sp.set('subscription', params.subscription);
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/users/summary') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch users summary');
+    }
+    return response.json();
+  },
+
   async updateUser(phone, updates) {
     const response = await fetch(getEndpoint(`/admin/users/${phone}`), {
       method: 'PUT',

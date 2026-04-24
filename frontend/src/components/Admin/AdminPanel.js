@@ -73,10 +73,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [usersSearchSubscription, setUsersSearchSubscription] = useState('all');
   const [usersSearchCreatedStart, setUsersSearchCreatedStart] = useState('');
   const [usersSearchCreatedEnd, setUsersSearchCreatedEnd] = useState('');
+  const [usersFiltersCollapsed, setUsersFiltersCollapsed] = useState(true);
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersTotalPages, setUsersTotalPages] = useState(0);
   const [usersLimit] = useState(25);
+  const [usersSummaryLoading, setUsersSummaryLoading] = useState(false);
+  const [usersSummary, setUsersSummary] = useState({
+    today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+    total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+  });
   const [userFacts, setUserFacts] = useState([]);
   const [factsSearch, setFactsSearch] = useState('');
   const [factsPage, setFactsPage] = useState(1);
@@ -95,7 +101,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [pendingSubscription, setPendingSubscription] = useState(null);
-  const [seedVipLoading, setSeedVipLoading] = useState(false);
   /** Set when opening User profile from User Management (today’s date range + auto-load). Cleared when opening the tab manually. */
   const [profileJumpContext, setProfileJumpContext] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
@@ -554,28 +559,44 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setLoading(true);
     const page = pageOverride !== undefined ? pageOverride : usersPage;
     if (pageOverride !== undefined) setUsersPage(page);
+    const summaryParams = {
+      phone: usersSearchPhone.trim() || undefined,
+      name: usersSearchName.trim() || undefined,
+      role: usersSearchRole === 'all' ? undefined : usersSearchRole,
+      subscription: usersSearchSubscription === 'all' ? undefined : usersSearchSubscription,
+    };
+    setUsersSummaryLoading(true);
     try {
       const params = {
-        phone: usersSearchPhone.trim() || undefined,
-        name: usersSearchName.trim() || undefined,
-        role: usersSearchRole === 'all' ? undefined : usersSearchRole,
-        subscription: usersSearchSubscription === 'all' ? undefined : usersSearchSubscription,
+        ...summaryParams,
         created_from: usersSearchCreatedStart.trim() || undefined,
         created_to: usersSearchCreatedEnd.trim() || undefined,
         page,
         limit: usersLimit,
       };
-      const data = await adminService.getAllUsers(params);
+      const [data, summary] = await Promise.all([
+        adminService.getAllUsers(params),
+        adminService.getUsersSummary(summaryParams),
+      ]);
       setUsers(data.users || []);
       setUsersTotal(data.total ?? 0);
       setUsersTotalPages(data.total_pages ?? 0);
+      setUsersSummary({
+        today: summary?.today || { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+        total: summary?.total || { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+      });
     } catch (error) {
       console.error('Error fetching users:', error);
       setUsers([]);
       setUsersTotal(0);
       setUsersTotalPages(0);
+      setUsersSummary({
+        today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+        total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+      });
     } finally {
       setLoading(false);
+      setUsersSummaryLoading(false);
     }
   };
 
@@ -1690,95 +1711,101 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       >
         {activeTab === 'users' && activeSubTab === 'management' && (
           <div className="users-management">
-            <h2>User Management</h2>
             {loading ? (
               <div className="loading">Loading users...</div>
             ) : (
               <>
-                <div className="users-management-filters">
-                  <label>
-                    <span>Phone</span>
-                    <input
-                      type="text"
-                      placeholder="Search by phone"
-                      value={usersSearchPhone}
-                      onChange={(e) => setUsersSearchPhone(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>Name or email</span>
-                    <input
-                      type="text"
-                      placeholder="Search by name or email"
-                      value={usersSearchName}
-                      onChange={(e) => setUsersSearchName(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>Role</span>
-                    <select
-                      value={usersSearchRole}
-                      onChange={(e) => setUsersSearchRole(e.target.value)}
-                    >
-                      <option value="all">All</option>
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Subscription</span>
-                    <select
-                      value={usersSearchSubscription}
-                      onChange={(e) => setUsersSearchSubscription(e.target.value)}
-                    >
-                      <option value="all">All</option>
-                      <option value="none">None</option>
-                      {subscriptionPlans && [...new Set(subscriptionPlans.map((p) => p.plan_name || p.tier_name).filter(Boolean))].map((planName) => (
-                        <option key={planName} value={planName}>{planName}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Created from</span>
-                    <input
-                      type="date"
-                      value={usersSearchCreatedStart}
-                      onChange={(e) => setUsersSearchCreatedStart(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>Created to</span>
-                    <input
-                      type="date"
-                      value={usersSearchCreatedEnd}
-                      onChange={(e) => setUsersSearchCreatedEnd(e.target.value)}
-                    />
-                  </label>
-                  <button type="button" className="users-search-btn" onClick={() => fetchUsers(1)}>
-                    Search
-                  </button>
-                </div>
-                <div className="users-seed-vip">
-                  <span>Don&apos;t see VIP Silver / Gold / Platinum in the subscription dropdown? </span>
+                <div className="users-filters-panel">
                   <button
                     type="button"
-                    className="users-seed-vip-btn"
-                    disabled={seedVipLoading}
-                    onClick={async () => {
-                      setSeedVipLoading(true);
-                      try {
-                        await adminService.seedVipSubscriptionPlans();
-                        await fetchSubscriptionPlans();
-                        await fetchUsers(usersPage);
-                      } catch (e) {
-                        alert(e.message || 'Failed to seed VIP plans');
-                      } finally {
-                        setSeedVipLoading(false);
-                      }
-                    }}
+                    className="users-filters-toggle"
+                    onClick={() => setUsersFiltersCollapsed((prev) => !prev)}
+                    aria-expanded={!usersFiltersCollapsed}
                   >
-                    {seedVipLoading ? 'Seeding…' : 'Seed VIP plans (Silver, Gold, Platinum)'}
+                    <span>Filters</span>
+                    <span>{usersFiltersCollapsed ? 'Show' : 'Hide'}</span>
                   </button>
+                  {!usersFiltersCollapsed && (
+                    <div className="users-management-filters">
+                      <label>
+                        <span>Phone</span>
+                        <input
+                          type="text"
+                          placeholder="Search by phone"
+                          value={usersSearchPhone}
+                          onChange={(e) => setUsersSearchPhone(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Name or email</span>
+                        <input
+                          type="text"
+                          placeholder="Search by name or email"
+                          value={usersSearchName}
+                          onChange={(e) => setUsersSearchName(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Role</span>
+                        <select
+                          value={usersSearchRole}
+                          onChange={(e) => setUsersSearchRole(e.target.value)}
+                        >
+                          <option value="all">All</option>
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Subscription</span>
+                        <select
+                          value={usersSearchSubscription}
+                          onChange={(e) => setUsersSearchSubscription(e.target.value)}
+                        >
+                          <option value="all">All</option>
+                          <option value="none">None</option>
+                          {subscriptionPlans && [...new Set(subscriptionPlans.map((p) => p.plan_name || p.tier_name).filter(Boolean))].map((planName) => (
+                            <option key={planName} value={planName}>{planName}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Created from</span>
+                        <input
+                          type="date"
+                          value={usersSearchCreatedStart}
+                          onChange={(e) => setUsersSearchCreatedStart(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Created to</span>
+                        <input
+                          type="date"
+                          value={usersSearchCreatedEnd}
+                          onChange={(e) => setUsersSearchCreatedEnd(e.target.value)}
+                        />
+                      </label>
+                      <button type="button" className="users-search-btn" onClick={() => fetchUsers(1)}>
+                        Search
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="users-summary-grid">
+                  <div className="users-summary-card">
+                    <h4>Today</h4>
+                    <p># Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.users_count ?? 0)}</strong></p>
+                    <p>Mobile Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.mobile_users_count ?? 0)}</strong></p>
+                    <p>Web Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.web_users_count ?? 0)}</strong></p>
+                    <p>Push Enabled: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.push_enabled_count ?? 0)}</strong></p>
+                  </div>
+                  <div className="users-summary-card">
+                    <h4>Total</h4>
+                    <p># Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.users_count ?? 0)}</strong></p>
+                    <p>Mobile Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.mobile_users_count ?? 0)}</strong></p>
+                    <p>Web Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.web_users_count ?? 0)}</strong></p>
+                    <p>Push Enabled: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.push_enabled_count ?? 0)}</strong></p>
+                  </div>
                 </div>
                 <div className="users-table">
                 <table>
@@ -1790,6 +1817,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <th title="Recorded at account creation from the registering app (web vs mobile).">
                         Signup
                       </th>
+                      <th>Gender</th>
                       <th>Role</th>
                       <th>Subscriptions</th>
                       <th
@@ -1803,7 +1831,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </thead>
                   <tbody>
                     {users.length === 0 ? (
-                      <tr><td colSpan={9} className="users-table-empty">No users match the search.</td></tr>
+                      <tr><td colSpan={10} className="users-table-empty">No users match the search.</td></tr>
                     ) : (
                       users.map(user => (
                       <tr
@@ -1829,6 +1857,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             : user.signup_client === 'mobile'
                               ? 'Mobile app'
                               : '—'}
+                        </td>
+                        <td>
+                          {user.gender
+                            ? String(user.gender).charAt(0).toUpperCase() + String(user.gender).slice(1)
+                            : '—'}
                         </td>
                         <td onClick={(e) => editingUser === user.phone && e.stopPropagation()}>
                           {editingUser === user.phone ? (
@@ -3294,7 +3327,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             {notifSubTab === 'nudge_triggers' && <AdminNudgeTriggerDefinitions />}
             {notifSubTab === 'nudge_schedule' && <AdminNudgeScheduler />}
             {notifSubTab === 'sent_today' && (
-              <div className="notifications-form">
+              <div className="notifications-form notifications-form--wide">
                 <div className="form-buttons notif-generate-row">
                   <label className="form-field" style={{ margin: 0 }}>
                     <span>Date</span>
@@ -3314,8 +3347,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </button>
                 </div>
                 {notifTodayError && <div className="search-error">{notifTodayError}</div>}
-                <div className="notif-user-list">
-                  <table className="notif-user-table">
+                <div className="notif-user-list notif-user-list--full">
+                  <table className="notif-user-table notif-user-table--history">
                     <thead>
                       <tr>
                         <th>Time (IST)</th>
@@ -3324,13 +3357,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         <th>Trigger</th>
                         <th>Title</th>
                         <th>Body</th>
+                        <th>Question</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {notifTodayRows.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="users-table-empty">
+                          <td colSpan={8} className="users-table-empty">
                             {notifTodayLoading ? 'Loading…' : 'No notifications sent today.'}
                           </td>
                         </tr>
@@ -3343,6 +3377,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             <td>{row.trigger_id || '—'}</td>
                             <td>{row.title || '—'}</td>
                             <td>{row.body || '—'}</td>
+                            <td>{row.question || '—'}</td>
                             <td>{row.status === 'sent_push' ? 'Sent (push)' : 'Stored only'}</td>
                           </tr>
                         ))

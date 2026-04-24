@@ -575,8 +575,25 @@ class GeminiChatAnalyzer:
             'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.'
         }
 
-        # Optional parallel pipeline (ASTRO_PARALLEL_CHAT=1). Standard natal birth mode only.
-        from ai.parallel_chat.config import should_use_parallel_chat
+        # Optional parallel pipelines. Relational/partnership is gated separately so legacy stays default.
+        from ai.parallel_chat.config import should_use_parallel_chat, should_use_parallel_relational_chat
+
+        if should_use_parallel_relational_chat(enhanced_context, user_id=user_id):
+            from ai.parallel_chat.relational_orchestrator import run_parallel_relational_chat_pipeline
+
+            print("🧵 RELATIONAL_PARALLEL_CHAT: enabled — using two-person method branches + merge")
+            return await run_parallel_relational_chat_pipeline(
+                self,
+                user_question=user_question,
+                astrological_context=enhanced_context,
+                conversation_history=conversation_history or [],
+                language=language,
+                response_style=response_style,
+                user_context=user_context,
+                premium_analysis=premium_analysis,
+                mode=mode,
+                total_request_start=total_request_start,
+            )
 
         if should_use_parallel_chat(enhanced_context, user_id=user_id):
             from ai.parallel_chat.orchestrator import run_parallel_chat_pipeline

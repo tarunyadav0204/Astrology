@@ -1425,6 +1425,15 @@ async def admin_list_today_deliveries(
         for r in rows:
             channel = (r[8] or "stored").strip()
             status = "sent_push" if channel == "push" else "stored_only"
+            question = ""
+            try:
+                payload_raw = r[11]
+                if payload_raw:
+                    payload_obj = json.loads(payload_raw)
+                    if isinstance(payload_obj, dict):
+                        question = str(payload_obj.get("question") or "").strip()
+            except Exception:
+                question = ""
             items.append(
                 {
                     "id": int(r[0]),
@@ -1439,6 +1448,7 @@ async def admin_list_today_deliveries(
                     "status": status,
                     "created_at": r[9].isoformat() if hasattr(r[9], "isoformat") else str(r[9]),
                     "read_at": r[10].isoformat() if hasattr(r[10], "isoformat") else (str(r[10]) if r[10] else None),
+                    "question": question,
                 }
             )
         return {"ok": True, "target_date": day.isoformat(), "count": len(items), "items": items}

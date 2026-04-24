@@ -90,8 +90,18 @@ class ChatContextBuilder:
     
     def build_synastry_context(self, native_birth_data: Dict, partner_birth_data: Dict, user_question: str = "", intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Build dual-chart context for partnership/compatibility analysis"""
+        relationship_raw = (
+            partner_birth_data.get("partnership_relationship")
+            or partner_birth_data.get("relationship")
+            or partner_birth_data.get("relationship_type")
+            or ""
+        )
         return {
             'analysis_type': 'synastry',
+            'relationship': {
+                'raw_label': relationship_raw,
+                'source': 'partnership_mode',
+            },
             'native': self.build_complete_context(native_birth_data, user_question, None, None, intent_result),
             'partner': self.build_complete_context(partner_birth_data, user_question, None, None, intent_result)
         }
@@ -485,7 +495,9 @@ class ChatContextBuilder:
             kp_analysis = {
                 "planet_lords": kp_data.get('planet_lords', {}),
                 "cusp_lords": kp_data.get('cusp_lords', {}),
-                "significators": kp_data.get('significators', {})
+                "significators": kp_data.get('significators', {}),
+                "planet_significators": kp_data.get('planet_significators', {}),
+                "four_step_theory": kp_data.get('four_step_theory', {}),
             }
         except Exception as e:
             print(f"❌ KP calculation failed for chat context: {e}")

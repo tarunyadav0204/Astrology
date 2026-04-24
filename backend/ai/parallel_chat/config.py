@@ -28,6 +28,11 @@ Rate limits & long tails (429 / TPM / preview models fire many parallel handshak
 - `ASTRO_PARALLEL_BRANCH_TIMEOUT_S` — max wall time per **non-critical** branch LLM call (default `90`). On timeout/error, that branch returns `status=unavailable` and merge continues.
 - `ASTRO_PARALLEL_CRITICAL_TIMEOUT_S` — same for the **Parashari** branch (default `120`). Lower than the generic 600s chat timeout so one stuck SDK retry loop cannot block the UI for many minutes.
 
+Relational / partnership parallel rollout:
+- Set ``ASTRO_PARALLEL_RELATIONAL_CHAT=1`` to route partnership mode through the relational multi-branch pipeline.
+- It uses the same allowlist variable, ``ASTRO_PARALLEL_CHAT_USER_IDS``, so A/B testing can share one rollout control.
+- Legacy partnership chat remains the default when this flag is off.
+
 Agent-built branch payloads (compact JSON, not legacy `ChatContextBuilder` keys):
 - `ASTRO_PARALLEL_AGENT_CONTEXT=1` — parallel branches send **context agent** output (`build_agent` / `context_agents/SCHEMA.md` short keys) instead of `context_slices` legacy blobs. Default off; requires same merged chart dict from the chat route (agents reuse `precomputed_static` / `precomputed_dynamic` when possible).
 """
@@ -42,6 +47,11 @@ from typing import Dict, Optional
 def parallel_chat_enabled() -> bool:
     """When true, `GeminiChatAnalyzer.generate_chat_response` may use the parallel pipeline (subject to allowlist)."""
     return os.environ.get("ASTRO_PARALLEL_CHAT", "").strip().lower() in ("1", "true", "yes")
+
+
+def parallel_relational_chat_enabled() -> bool:
+    """When true, partnership/two-person chat may use the relational parallel pipeline."""
+    return os.environ.get("ASTRO_PARALLEL_RELATIONAL_CHAT", "").strip().lower() in ("1", "true", "yes")
 
 
 def parallel_chat_user_allowlist() -> Optional[frozenset[int]]:
@@ -98,6 +108,31 @@ def should_use_parallel_chat(context: dict, *, user_id: Optional[int] = None) ->
     if mode in ("prashna", "annual"):
         return False
     return True
+
+
+def should_use_parallel_relational_chat(context: dict, *, user_id: Optional[int] = None) -> bool:
+    """
+    Opt-in two-person relationship/partnership pipeline.
+
+    Uses the same user allowlist as natal parallel chat so production A/B testing has one control surface.
+    """
+    if not parallel_relational_chat_enabled():
+        return False
+    allow = parallel_chat_user_allowlist()
+    if allow is not None:
+        if not allow:
+            return False
+        if user_id is None or user_id not in allow:
+            return False
+    if not isinstance(context, dict):
+        return False
+    if context.get("analysis_type") not in ("synastry", "relational"):
+        return False
+    native = context.get("native")
+    partner = context.get("partner")
+    if not isinstance(native, dict) or not isinstance(partner, dict):
+        return False
+    return bool(native.get("birth_details") and partner.get("birth_details"))
 
 
 def parallel_branch_stagger_s() -> float:

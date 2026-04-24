@@ -628,7 +628,8 @@ def list_deliveries_for_date_admin(
 ) -> List[Tuple]:
     """
     Admin list for a specific sent_at date.
-    Rows: id, userid, user_name, user_phone, trigger_id, title, body, sent_at, channel, created_at, read_at
+    Rows: id, userid, user_name, user_phone, trigger_id, title, body, sent_at,
+    channel, created_at, read_at, data_json
     """
     lim = max(1, min(2000, int(limit)))
     cur = execute(
@@ -644,7 +645,8 @@ def list_deliveries_for_date_admin(
                d.sent_at::text,
                d.channel,
                d.created_at,
-               d.read_at
+               d.read_at,
+               d.data_json
         FROM nudge_deliveries d
         LEFT JOIN users u ON u.userid = d.userid
         WHERE d.sent_at = %s

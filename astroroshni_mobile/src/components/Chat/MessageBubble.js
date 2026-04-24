@@ -540,6 +540,25 @@ export default function MessageBubble({
       const cleanContent = finalThoughts.replace(/### Final Thoughts\n?/, '').trim();
       return `<finalthoughts>${cleanContent}</finalthoughts>`;
     });
+
+    // Partnership/relational merges often use "Direct Answer" style headings instead of quick-answer-card HTML.
+    // Normalize these to the same yellow quick-answer card UX used in single-chart responses.
+    formatted = formatted.replace(
+      /(###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*[\s\S]*?)(?=###|$)/gi,
+      (match) => {
+        const cleanContent = match.replace(/^###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*\n?/i, '').trim();
+        return `<quickanswer>${cleanContent}</quickanswer>`;
+      }
+    );
+
+    // Normalize common closing section names from partnership branches to Final Thoughts card.
+    formatted = formatted.replace(
+      /(###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*[\s\S]*?)(?=###|$)/gi,
+      (match) => {
+        const cleanContent = match.replace(/^###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*\n?/i, '').trim();
+        return `<finalthoughts>${cleanContent}</finalthoughts>`;
+      }
+    );
     
     // Handle Quick Answer sections
     formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');

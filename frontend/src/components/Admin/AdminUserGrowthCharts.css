@@ -23,6 +23,33 @@
   margin-bottom: 28px;
 }
 
+.admin-user-growth-today-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: -8px 0 20px;
+}
+
+.admin-user-growth-summary-card {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-user-growth-summary-card span {
+  color: #6b7280;
+  font-size: 0.84rem;
+}
+
+.admin-user-growth-summary-card strong {
+  font-size: 1.05rem;
+  color: #111827;
+}
+
 .admin-user-growth-filters label {
   display: flex;
   flex-direction: column;
@@ -92,4 +119,86 @@
   padding: 40px;
   text-align: center;
   color: #666;
+}
+
+.admin-user-growth-bar-label {
+  fill: #374151;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-user-growth-no-data {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 0.9rem;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+  .admin-user-growth-desc--mobile-hide {
+    display: none;
+  }
+
+  .admin-user-growth-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    margin-bottom: 14px;
+    align-items: end;
+  }
+
+  .admin-user-growth-filters label {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-user-growth-filters input[type='date'],
+  .admin-user-growth-filters select {
+    min-width: 0;
+    width: 100%;
+    padding: 7px 9px;
+    font-size: 16px; /* Prevent iOS Safari auto-zoom + mispositioned native dropdown */
+  }
+
+  .admin-user-growth-filters label span {
+    font-size: 0.78rem;
+  }
+
+  .admin-user-growth-filters button {
+    width: 100%;
+    grid-column: 1 / -1;
+    margin-top: 2px;
+    padding: 9px 12px;
+  }
+
+  .admin-user-growth-today-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-user-growth-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .admin-user-growth-chart-card {
+    padding: 12px 8px 6px;
+  }
+
+  .admin-user-growth-chart-card h3 {
+    margin: 0 0 8px 8px;
+    font-size: 0.98rem;
+  }
+
+  .admin-user-growth-chart-wrap {
+    height: 260px;
+  }
+
+  .admin-user-growth-bar-label {
+    font-size: 10px;
+  }
 }

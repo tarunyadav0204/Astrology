@@ -153,6 +153,7 @@ export default function PasswordScreen({
             ...(emailTrim ? { email: emailTrim } : {}),
             role: 'user',
             signup_client: 'mobile',
+            ...(formData?.birthDetails?.gender ? { gender: formData.birthDetails.gender } : {}),
           });
           
           await storage.setAuthToken(response.data.access_token);

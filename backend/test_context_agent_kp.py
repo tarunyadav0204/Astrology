@@ -47,7 +47,13 @@ def test_kp_slice_builds():
         "intent": {"category": "career"},
         "current_date_info": {"d": 1},
         "response_format": {"x": 1},
-        "kp_analysis": {"planet_lords": {"Sun": {}}, "cusp_lords": {}, "significators": {}},
+        "kp_analysis": {
+            "planet_lords": {"Sun": {}},
+            "cusp_lords": {},
+            "significators": {},
+            "planet_significators": {"Sun": [10]},
+            "four_step_theory": {"Sun": {"planet": {"name": "Sun", "houses": [10]}}},
+        },
         "ascendant_info": {"sign_name": "Aries"},
         "birth_details": {"name": "T"},
         "d1_chart": {},
@@ -55,4 +61,6 @@ def test_kp_slice_builds():
     }
     sl = build_kp_slice(ctx)
     assert sl["kp_analysis"]["planet_lords"] == {"Sun": {}}
+    assert sl["kp_analysis"]["planet_significators"] == {"Sun": [10]}
+    assert "four_step_theory" in sl["kp_analysis"]
     assert "ascendant_info" in sl

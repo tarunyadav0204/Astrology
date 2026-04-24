@@ -1221,7 +1221,7 @@ const ChatPage = () => {
         const partnershipBirth = isPartnershipMode && wizardPrimaryChart ? wizardPrimaryChart : birthData;
         const partnershipSecond = isPartnershipMode && wizardSecondaryChart ? wizardSecondaryChart : selectedPartnerChart;
         const relationshipLabel = (wizardRelationshipText || '').trim();
-        // Backend chat-v2 does not read partnership_relationship; mobile prepends this for model/context (see ChatScreen.js).
+        // Prefix keeps legacy prompts relationship-aware; partnership_relationship feeds the new relational backend path.
         const questionForApi =
             isPartnershipMode && relationshipLabel
                 ? `[Relationship: ${relationshipLabel}] ${message}`
