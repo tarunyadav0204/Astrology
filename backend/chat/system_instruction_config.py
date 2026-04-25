@@ -330,12 +330,16 @@ DAILY_PREDICTION_STRUCTURE = """
     *   **Fast Transits ONLY**: Focus on the transits of fast-moving planets (Moon, Mercury, Venus, Mars) and their aspects for today.
     *   **Contextual Slow Transits**: The transits of Saturn, Jupiter, Rahu, and Ketu are for long-term background context ONLY. Do NOT use them to predict specific events for today. Mention them only as a backdrop influence, not a primary driver.
 [DAILY-4] Jaimini & Nadi Application:
+*   **Daily School Spine**: If `daily_prediction_spine.school_judgments` is present, use it as the compact cross-school evidence layer. Do not produce separate lifetime-style Parashari/Jaimini/Nadi/KP/Ashtakavarga essays.
+*   **Parashari Daily**: Use `school_judgments.parashari.top_triggers` and `daily_judgment` first. PR/SK/PD decide the day; AD/MD permit or constrain.
 *   **Nadi Focus**: Your Nadi analysis for today MUST follow this strict algorithm:
         1. **Identify Transiting Moon's Sign:** Note the sign the Moon is transiting today.
         2. **Check for Natal Yoga Activation:** Does this sign contain any natal planets? If so, are those natal planets part of a major, pre-existing Nadi yoga (a trine of planets in signs of the same element)? Announce that the transit is activating this powerful existing yoga.
         3. **Identify Valid New Transit Yogas:** Independently, does the transiting Moon's sign form a valid Nadi link (a trine [1/5/9 relationship to a natal planet's sign] or a conjunction [in the same sign as a natal planet])?
         4. **Synthesize and Report:** Based ONLY on the valid yogas identified in steps 2 and 3, explain what they mean for the day. You are strictly forbidden from claiming a Nadi link exists for any other relationship (e.g., 4/10, 2/12, or other non-trine aspects).
     *   **Jaimini Focus**: For Jaimini analysis, your entire focus for today MUST be the transit of the Moon in relation to the natal Chara Karakas (AK, AmK, DK etc.). For example: "Today's Moon transits the 3rd house from your Darakaraka, indicating..."
+    *   **KP Focus**: Use `school_judgments.kp.active_dasha_significator_hits` to decide whether the day can materially deliver the requested event through relevant cusps. If absent, say KP confirmation is weak rather than forcing certainty.
+    *   **Ashtakavarga Focus**: Use `school_judgments.ashtakavarga.dasha_transit_usability` and conflicts. Judge local usability by transit house SAV plus the active dasha planet's BAV; never use total SAV as the daily trigger.
 [DAILY-5] AVOID: Do not discuss Mahadasha or Antardasha level results as if they are today's events. Do not analyze divisional charts other than D1 and D9 unless directly relevant to a specific micro-period.
 [DAILY-6] SUMMARY_PHRASING: When writing the opening summary (Quick Answer or Daily Outlook per template), refer to the requested date explicitly. For example, use phrases like "February 15th will be a day of..." or "That day is one for...". AVOID using the word "Today" unless the requested date is, in fact, the current date. That opening must fully answer what the user asked about that day—not only a one-line teaser before the rest.
 """

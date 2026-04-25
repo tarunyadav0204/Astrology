@@ -9,19 +9,6 @@ from typing import Any, Dict
 from ai.question_heuristics import looks_like_many_questions
 from ai.output_schema import resolve_output_language_policy
 
-# Roman Hindi / Hinglish cues; app often sends language="english" for UI i18n while user types Hindi in Latin script.
-# Keep this strict: avoid astrology words (e.g., dasha) as they appear in normal English queries too.
-_HINGLISH_HINT_WORDS = frozenset({
-    "mera", "meri", "mere", "main", "mein", "hum", "aap", "tum", "tera", "teri", "tere",
-    "hai", "hain", "ho", "tha", "thi", "the", "hun", "hoon",
-    "kab", "kya", "kyun", "kyaa", "kaun", "kahan", "kaise", "kaisa", "kaisi",
-    "ko", "ka", "ki", "ke", "se", "par",
-    "batao", "bata", "btao", "sab", "saari", "saara", "kuch", "sba",  # sba: typo for sab
-    "vishleshan", "vichar", "shaadi", "shadi",
-    "rahega", "hogi", "hoga", "kar", "karo", "karna",
-    "merko", "mujhe", "mujhko", "apna", "apni", "apne",
-})
-
 _MONTH_NAME_TO_NUM = {
     "january": 1,
     "jan": 1,
@@ -48,61 +35,6 @@ _MONTH_NAME_TO_NUM = {
     "december": 12,
     "dec": 12,
 }
-
-
-def _contains_devanagari(text: str) -> bool:
-    for ch in (text or ""):
-        if "\u0900" <= ch <= "\u097f":
-            return True
-    return False
-
-
-def _looks_like_hindi_or_hinglish_output(text: str) -> bool:
-    s = (text or "").strip()
-    if not s:
-        return False
-    if _contains_devanagari(s):
-        return True
-    words = set(re.findall(r"[a-z]+", s.lower()))
-    # Strong roman-Hindi signal: at least two functional Hindi cues.
-    return len(words & _HINGLISH_HINT_WORDS) >= 2
-
-
-def _user_question_suggests_hindi(user_question: str) -> bool:
-    text = (user_question or "").strip()
-    if not text:
-        return False
-    if _contains_devanagari(text):
-        return True
-    low = text.lower()
-    words = set(re.findall(r"[a-z]+", low))
-    # Be conservative to avoid false positives on English astrology questions.
-    if len(words & _HINGLISH_HINT_WORDS) >= 2:
-        return True
-    return False
-
-
-def _clarification_has_one_question_nudge(text: str) -> bool:
-    if not text:
-        return False
-    low = text.lower()
-    if any(
-        p in low
-        for p in (
-            "one question at a time",
-            "one at a time",
-            "single question",
-            "ask one",
-            "एक समय में एक",
-            "एक ही सवाल",
-            "एक सवाल",
-        )
-    ):
-        return True
-    # Devanagari: एक with सवाल / प्रश्न
-    if "एक" in text and ("सवाल" in text or "प्रश्न" in text):
-        return True
-    return False
 
 
 # Canonical divisional bundles per intent category (keep in sync with IntentRouter._get_default_divisional_charts).
@@ -402,19 +334,22 @@ def _extract_specific_date_from_question(user_question: str, *, now: datetime) -
     return None
 
 
-def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int) -> None:
+def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int, now: datetime | None = None) -> None:
     """
     Post-process router output: career/education (and related) questions that ask *when* or *whether*
     (will I / which year / job vs study) must request transits so the backend builds transit windows.
     """
     q = (user_question or "").strip().lower()
     cat = (result.get("category") or "general").strip().lower()
-    now = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    exact_date = _extract_specific_date_from_question(user_question, now=now)
+    now_dt = (now or datetime.now()).replace(hour=12, minute=0, second=0, microsecond=0)
+    exact_date = _extract_specific_date_from_question(user_question, now=now_dt)
 
     if exact_date:
         dt = datetime.strptime(exact_date, "%Y-%m-%d")
         month_name = dt.strftime("%B")
+        result["mode"] = "PREDICT_DAILY"
+        result["context_type"] = "birth"
+        result["analysis_type"] = "DAILY_PREDICTION"
         result["needs_transits"] = True
         result["dasha_as_of"] = exact_date
         result.setdefault("extracted_context", {})
@@ -454,19 +389,6 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     )
     if timing_ask:
         result["needs_transits"] = True
-
-
-def _one_question_nudge_line(language_policy: dict) -> str | None:
-    if (language_policy or {}).get("kind") == "question_hindi_devanagari":
-        return (
-            "सुझाव: कृपया एक समय में एक ही सवाल पूछें, ताकि हम आपको "
-            "अधिक गहरा और स्पष्ट उत्तर दे सकें।"
-        )
-    if (language_policy or {}).get("kind") == "english_default":
-        return (
-            "Tip: Ask one question at a time so we can give you a deeper, clearer answer."
-        )
-    return None
 
 
 class IntentRouter:
@@ -582,89 +504,36 @@ PROCEED WITH ANALYSIS NOW.
         
         _lang = str(language or "english").strip() or "english"
         language_policy = resolve_output_language_policy(_lang, user_question)
-        is_hindi_question = bool(language_policy.get("question_is_hindi"))
-        language_policy_kind = language_policy.get("kind")
+        app_language = language_policy.get("app_language", _lang)
+        language_instruction = f"""🚨 CRITICAL LANGUAGE RULE — THE LLM MUST INFER CURRENT QUESTION LANGUAGE:
 
-        if language_policy_kind == "question_hindi_devanagari":
-            language_instruction = """🚨 CURRENT QUESTION OVERRIDES ENGLISH — USE HINDI (Devanagari) FOR ALL USER-VISIBLE JSON STRINGS:
+The app-selected language is "{app_language}", but this is only UI context. Do not blindly follow it.
 
-The app may send language "english" for UI, but the CURRENT QUESTION is Hindi or Hinglish.
+You must infer the language of CURRENT QUESTION yourself and use that same language and natural script for every user-visible JSON string:
+1) If status is "CLARIFY": "clarification_question" MUST be in the language of CURRENT QUESTION.
+2) If status is "READY": every "message" inside "chart_insights" MUST be in the language of CURRENT QUESTION.
 
-1) If status is "CLARIFY": "clarification_question" MUST be Hindi (Devanagari).
+Examples:
+- English question -> English strings.
+- Hindi Devanagari question -> Hindi strings in Devanagari.
+- Hinglish / Roman Hindi question -> Hindi strings in Devanagari, not Roman Hindi.
+- Tamil question -> Tamil strings.
+- Telugu/Gujarati/Marathi/Bengali/French/German/Russian/Chinese/etc. question -> same language and script.
 
-2) If status is "READY": Every "message" inside "chart_insights" MUST be Hindi (Devanagari).
-
-CRITICAL:
-- Decide the language from the CURRENT QUESTION only, not from earlier turns.
-- Do NOT keep using English just because the conversation started in English.
-- JSON keys stay English; only end-user string values must be Devanagari Hindi.
-"""
-        elif language_policy_kind == "question_language_override":
-            language_instruction = """🚨 CURRENT QUESTION OVERRIDES ENGLISH — USE THE CURRENT QUESTION'S LANGUAGE FOR ALL USER-VISIBLE JSON STRINGS:
-
-The app language is "english", but the CURRENT QUESTION is clearly written in another non-English language.
-
-1) If status is "CLARIFY": "clarification_question" MUST be in the same language and script as CURRENT QUESTION.
-2) If status is "READY": Every "message" inside "chart_insights" MUST be in the same language and script as CURRENT QUESTION.
-
-CRITICAL:
-- Decide the language from the CURRENT QUESTION only, not from earlier turns.
-- Do NOT fall back to English just because the previous conversation was in English.
-"""
-        elif language_policy_kind == "app_language":
-            language_instruction = f"""IMPORTANT LANGUAGE RULE — USE THE APP-SELECTED LANGUAGE "{_lang}" FOR ALL USER-VISIBLE JSON STRINGS:
-
-The user has selected "{_lang}" in the app. Use that language for all end-user-visible strings.
-
-1) If status is "CLARIFY": "clarification_question" MUST be in "{_lang}".
-2) If status is "READY": Every "message" inside "chart_insights" MUST be in "{_lang}".
-
-CRITICAL:
-- Do NOT drift into a previous turn's language.
-- Use CURRENT QUESTION for meaning, but keep the output language as "{_lang}".
-"""
-        else:
-            language_instruction = """IMPORTANT LANGUAGE RULE — USE THE CURRENT QUESTION'S LANGUAGE:
-
-The app language is english, and the CURRENT QUESTION does not clearly override that.
-
-1) If status is "CLARIFY": "clarification_question" MUST match the CURRENT QUESTION's language.
-   - If CURRENT QUESTION is ordinary English, clarification_question MUST be English-only.
-2) If status is "READY": Every "message" inside "chart_insights" MUST match the CURRENT QUESTION's language.
-
-CRITICAL:
-- Decide the language from the CURRENT QUESTION only, not from earlier turns.
-- Do not switch languages unexpectedly.
+Only if CURRENT QUESTION is too short or language-ambiguous, use app-selected language "{app_language}" as fallback.
+JSON keys stay English; only end-user string values change language.
 """
 
-        if language_policy_kind == "question_hindi_devanagari":
-            chart_insights_message_spec = (
-                '- message: इस जातक की वास्तविक कुंडली के आधार पर विशिष्ट अंतर्दृष्टि; पूरा वाक्य हिंदी देवनागरी में। '
-                "Roman/Latin script में हिंदी न लिखें। ग्रह/भाव नाम हिंदी में लिखें (जैसे मंगल, द्वितीय भाव)।"
-            )
-            chart_insights_example_block = """
-        Example (chart_insights — सभी message हिंदी देवनागरी में; यही शैली अपनाएँ):
+        chart_insights_message_spec = (
+            '- message: SPECIFIC insight about THIS native\'s chart, written in the language and natural script '
+            'you infer from CURRENT QUESTION. For Hinglish/Roman Hindi, write the message in Hindi Devanagari.'
+        )
+        chart_insights_example_block = """
+        Example structure only. Replace bracketed text with real chart-specific prose in the inferred CURRENT QUESTION language:
         "chart_insights": [
-            {"house_number": 1, "message": "कन्या लग्न विश्लेषणात्मक प्रवृत्ति और स्वास्थ्य के प्रति सजगता दर्शाता है।", "highlight_type": "ascendant"},
-            {"house_number": 2, "message": "द्वितीय भाव में सिंह राशि में मंगल, गुरु, शनि और राहु धन तथा वाणी के मामलों में गहन और जटिल प्रभाव बनाते हैं।", "highlight_type": "planets"},
-            {"house_number": 5, "message": "पंचम भाव में गुरु बुद्धिमान संतान और रचनात्मक ज्ञान का आशीर्वाद देता है।", "highlight_type": "planets"},
-            {"house_number": 7, "message": "सप्तम भाव में शनि परिपक्व और जिम्मेदार साझेदारी का संकेत देता है।", "highlight_type": "planets"},
-            {"house_number": 10, "message": "दशम भाव में चंद्र सार्वजनिक मान्यता और करियर में भावनात्मक संतोष से जुड़ा है।", "highlight_type": "planets"}
-        ]
-        """
-        else:
-            chart_insights_message_spec = (
-                '- message: SPECIFIC insight about THIS native\'s chart (e.g., "Sun in 10th house in Capricorn indicates strong career '
-                'ambitions and leadership in professional life")'
-            )
-            chart_insights_example_block = """
-        Example:
-        "chart_insights": [
-            {"house_number": 1, "message": "Virgo Ascendant reflects analytical nature and health consciousness", "highlight_type": "ascendant"},
-            {"house_number": 2, "message": "Leo in 2nd house with Sun, Mercury, Venus, Mars - strong wealth potential through leadership", "highlight_type": "planets"},
-            {"house_number": 5, "message": "Jupiter in 5th house blesses with intelligent children and creative wisdom", "highlight_type": "planets"},
-            {"house_number": 7, "message": "Saturn in 7th house indicates mature, responsible partnerships", "highlight_type": "planets"},
-            {"house_number": 10, "message": "Moon in 10th house creates public recognition and emotional career fulfillment", "highlight_type": "planets"}
+            {"house_number": 1, "message": "[real insight in inferred CURRENT QUESTION language]", "highlight_type": "ascendant"},
+            {"house_number": 2, "message": "[real insight in inferred CURRENT QUESTION language]", "highlight_type": "planets"},
+            {"house_number": 5, "message": "[real insight in inferred CURRENT QUESTION language]", "highlight_type": "planets"}
         ]
         """
 
@@ -945,27 +814,6 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                     }
                 }
 
-            if (
-                result.get("status") == "CLARIFY"
-                and clarification_count < 1
-                and looks_like_many_questions(user_question)
-            ):
-                cq = (result.get("clarification_question") or "").strip()
-                nudge_line = _one_question_nudge_line(language_policy)
-                if cq and nudge_line and not _clarification_has_one_question_nudge(cq):
-                    result["clarification_question"] = (
-                        f"{cq}\n\n{nudge_line}"
-                    )
-
-            # Hard guard: ordinary English current question must never emit Hindi/Hinglish clarification.
-            if result.get("status") == "CLARIFY" and language_policy_kind == "english_default":
-                cq = (result.get("clarification_question") or "").strip()
-                if _looks_like_hindi_or_hinglish_output(cq):
-                    result["clarification_question"] = (
-                        "Could you clarify which one area you want to focus on first "
-                        "(career, relationships, health, finances, or education)?"
-                    )
-            
             return result
         except Exception as e:
             total_time = time.time() - intent_start
@@ -975,7 +823,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             
             # Fallback logic
             is_timing_question = any(w in user_question.lower() for w in ['when', 'time', 'date', 'year', 'month', 'will i', 'should i'])
-            is_daily_question = any(w in user_question.lower() for w in ['today', 'daily'])
+            is_daily_question = any(w in user_question.lower() for w in ['today', 'tomorrow', 'day after tomorrow', 'daily'])
 
             if is_daily_question:
                 result = {
@@ -987,6 +835,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                         "yearMonthMap": {str(current_year): [current_month]}
                     }
                 }
+                apply_transit_timing_guards(result, user_question, current_year=current_year)
                 apply_chart_focus_guards(result, user_question)
                 return result
             elif is_timing_question:

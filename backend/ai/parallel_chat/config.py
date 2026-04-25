@@ -107,6 +107,8 @@ def should_use_parallel_chat(context: dict, *, user_id: Optional[int] = None) ->
     mode = (intent.get("mode") or "").lower()
     if mode in ("prashna", "annual"):
         return False
+    if mode.startswith("predict_daily"):
+        return False
     return True
 
 

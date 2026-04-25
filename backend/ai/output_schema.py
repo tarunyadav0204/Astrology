@@ -1,192 +1,45 @@
 # Unified Output Schema - Single Source of Truth for Response Formatting
 import json
-import re
 from datetime import datetime
-
-
-def _question_has_devanagari(text: str) -> bool:
-    if not text:
-        return False
-    for ch in text:
-        if "\u0900" <= ch <= "\u097f":
-            return True
-    return False
-
-
-def _question_looks_like_roman_hindi(text: str) -> bool:
-    """
-    Conservative Roman-Hindi cues (whole words). Avoid false positives on normal English
-    (e.g. 'main' as in 'main idea').
-    """
-    if not text or not text.strip():
-        return False
-    low = text.lower()
-    # Strong cues unlikely in ordinary English astrology questions
-    patterns = (
-        r"\b(mera|meri|mere|merko|mujhe|mujhko|hum|aap|tum|tera|teri|tere)\b",
-        r"\b(batao|bata|btao|bataiye)\b",
-        r"\b(kya|kyun|kab|kaise|kaisa|kaisi|kahan)\b",
-        r"\b(shaadi|shadi|vivah|dasha|dasa|mahadasha|antar)\b",
-        r"\b(hai|hain|hoga|hogi|tha|thi|the)\b",
-        r"\b(mein|meri)\b",  # 'mein' as Hindi 'in' / I
-        r"\b(sab|saari|saara|kuch)\b",
-        r"\b(vishleshan|jyotish)\b",
-    )
-    return any(re.search(p, low) for p in patterns)
-
-
-_NON_LATIN_SCRIPT_RANGES = (
-    ("bengali", 0x0980, 0x09FF),
-    ("gurmukhi", 0x0A00, 0x0A7F),
-    ("gujarati", 0x0A80, 0x0AFF),
-    ("oriya", 0x0B00, 0x0B7F),
-    ("tamil", 0x0B80, 0x0BFF),
-    ("telugu", 0x0C00, 0x0C7F),
-    ("kannada", 0x0C80, 0x0CFF),
-    ("malayalam", 0x0D00, 0x0D7F),
-    ("thai", 0x0E00, 0x0E7F),
-    ("tibetan", 0x0F00, 0x0FFF),
-    ("georgian", 0x10A0, 0x10FF),
-    ("hangul", 0xAC00, 0xD7AF),
-    ("hiragana", 0x3040, 0x309F),
-    ("katakana", 0x30A0, 0x30FF),
-    ("cjk", 0x4E00, 0x9FFF),
-    ("arabic", 0x0600, 0x06FF),
-    ("hebrew", 0x0590, 0x05FF),
-    ("cyrillic", 0x0400, 0x04FF),
-)
-
-
-def _question_has_other_non_english_script(text: str) -> bool:
-    if not text:
-        return False
-    if _question_has_devanagari(text):
-        return False
-    for ch in text:
-        cp = ord(ch)
-        for _, start, end in _NON_LATIN_SCRIPT_RANGES:
-            if start <= cp <= end:
-                return True
-    return False
-
-
-def _question_has_extended_latin_non_english_cues(text: str) -> bool:
-    if not text or not text.strip():
-        return False
-    # Covers many Latin-script languages with diacritics while avoiding ordinary ASCII English.
-    return bool(re.search(r"[À-ÖØ-öø-ÿĀ-ž]", text))
 
 
 def resolve_output_language_policy(language: str, user_question: str) -> dict:
     app_language = str(language or "english").strip() or "english"
     app_language_lower = app_language.lower()
-    question = (user_question or "").strip()
-
-    if app_language_lower != "english":
-        return {
-            "kind": "app_language",
-            "app_language": app_language,
-            "app_language_lower": app_language_lower,
-            "question_is_hindi": _question_has_devanagari(question)
-            or _question_looks_like_roman_hindi(question),
-        }
-
-    if _question_has_devanagari(question) or _question_looks_like_roman_hindi(question):
-        return {
-            "kind": "question_hindi_devanagari",
-            "app_language": app_language,
-            "app_language_lower": app_language_lower,
-            "question_is_hindi": True,
-        }
-
-    if _question_has_other_non_english_script(question) or _question_has_extended_latin_non_english_cues(question):
-        return {
-            "kind": "question_language_override",
-            "app_language": app_language,
-            "app_language_lower": app_language_lower,
-            "question_is_hindi": False,
-        }
-
     return {
-        "kind": "english_default",
+        "kind": "llm_current_question",
         "app_language": app_language,
         "app_language_lower": app_language_lower,
-        "question_is_hindi": False,
+        "question_is_hindi": None,
     }
 
 
 def build_output_language_blocks(language: str, user_question: str) -> tuple[dict, str, str]:
     policy = resolve_output_language_policy(language, user_question)
     app_language = policy["app_language"]
-    kind = policy["kind"]
+    language_instruction = f"""OUTPUT LANGUAGE — LLM MUST INFER FROM CURRENT QUESTION:
 
-    if kind == "app_language":
-        language_instruction = f"""OUTPUT LANGUAGE (read CURRENT QUESTION at the end of this prompt, but follow the app-selected language first):
+The app-selected language is **{app_language}**, but for chat answers it is only UI context. Do **not** blindly follow it.
 
-The app-selected language is **{app_language}**. Write the entire substantive answer in **{app_language}**.
+You must infer the language of the **CURRENT QUESTION** yourself and write the entire user-visible answer in that same language and natural script.
 
-CRITICAL:
-- Use the app-selected language for prose and section headers.
-- Do NOT keep speaking in a previous turn's language just because the conversation started that way.
-- Use CURRENT QUESTION to understand the user's meaning, but do not switch away from **{app_language}** unless a stricter system rule explicitly tells you to.
-"""
-        final_check = (
-            f"FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION, but keep the user-visible answer in the "
-            f'app-selected language "{app_language}". Do not drift into an earlier turn\'s language.'
-        )
-        return policy, language_instruction, final_check
-
-    if kind == "question_hindi_devanagari":
-        language_instruction = """OUTPUT LANGUAGE (CURRENT QUESTION OVERRIDES ENGLISH):
-
-The app-selected language is **english**, but the CURRENT QUESTION is clearly Hindi or Hinglish.
-
-You MUST write the entire substantive answer in **Hindi using Devanagari script (हिंदी)**.
+NON-NEGOTIABLE EXAMPLES:
+- If CURRENT QUESTION is English, answer in English.
+- If CURRENT QUESTION is Hindi in Devanagari, answer in Hindi using Devanagari.
+- If CURRENT QUESTION is Hinglish / Roman Hindi, answer in Hindi using Devanagari, not Roman Hindi.
+- If CURRENT QUESTION is Tamil, answer in Tamil.
+- If CURRENT QUESTION is Telugu, Gujarati, Marathi, Bengali, Kannada, Malayalam, French, German, Russian, Chinese, Arabic, or any other language, answer in that same language and script.
 
 CRITICAL:
-- Ignore earlier English turns when deciding the answer language.
-- Do NOT answer in English just because the app language is english.
-- Do NOT write the main answer in Roman Hindi; use Devanagari Hindi.
-"""
-        final_check = (
-            "FINAL CHECK BEFORE YOU WRITE: CURRENT QUESTION is Hindi/Hinglish, so the answer must be in "
-            "Devanagari Hindi—not English—even if earlier conversation turns were English."
-        )
-        return policy, language_instruction, final_check
-
-    if kind == "question_language_override":
-        language_instruction = """OUTPUT LANGUAGE (CURRENT QUESTION OVERRIDES ENGLISH):
-
-The app-selected language is **english**, but the CURRENT QUESTION is clearly written in another non-English language.
-
-You MUST answer in the **same language and script as CURRENT QUESTION**.
-
-CRITICAL:
-- Ignore earlier English turns when deciding the answer language.
-- Do NOT default back to English just because the app language is english.
-- Mirror the user's current-question language for prose and section headers.
-"""
-        final_check = (
-            "FINAL CHECK BEFORE YOU WRITE: CURRENT QUESTION is clearly not English, so answer in that same "
-            "language—not in English—even if previous turns were in English."
-        )
-        return policy, language_instruction, final_check
-
-    language_instruction = """OUTPUT LANGUAGE (read CURRENT QUESTION at the end of this prompt):
-
-DEFAULT — ENGLISH: The app-selected language is **english**. Write the entire answer in clear English unless the CURRENT QUESTION itself clearly overrides that.
-
-OVERRIDES BASED ONLY ON CURRENT QUESTION:
-- If CURRENT QUESTION is Hindi or Hinglish, switch to Devanagari Hindi.
-- If CURRENT QUESTION is clearly in some other non-English language, answer in that same language.
-
-CRITICAL:
-- Decide the language from the CURRENT QUESTION, not from earlier turns.
-- If CURRENT QUESTION is ordinary English, do not switch languages because of chart labels, names, or prior messages.
+- Decide from the CURRENT QUESTION, not from app-selected language, previous messages, chart labels, names, glossary terms, or stored preferences.
+- Do not translate an English question into Hindi.
+- Do not answer a Tamil/Telugu/etc. question in Hindi.
+- Only if the CURRENT QUESTION is too short or language-ambiguous, use the app-selected language "{app_language}" as a fallback.
 """
     final_check = (
-        "FINAL CHECK BEFORE YOU WRITE: Use the CURRENT QUESTION—not prior turns—to decide the answer language. "
-        "If CURRENT QUESTION is ordinary English, answer in English."
+        "FINAL CHECK BEFORE YOU WRITE: Infer the language of CURRENT QUESTION yourself. "
+        "English question -> English. Hinglish/Roman Hindi -> Devanagari Hindi. "
+        "Tamil/Telugu/etc. -> same language and script. App language is fallback only for ambiguous questions."
     )
     return policy, language_instruction, final_check
 
@@ -357,13 +210,21 @@ TEMPLATE_EVENT_PREDICTION = """
 # Template C: Daily Summary
 # Used for: PREDICT_DAILY_* modes
 TEMPLATE_DAILY_SUMMARY = """
-<div class="quick-answer-card">**Daily Outlook**: [Brief summary]</div>
+### Astrological Blueprint for [Requested Date]
 
-### Key Opportunities
-[Bulleted list of positive influences and how to use them]
+<div class="quick-answer-card">**Daily Outlook**: [Answer exactly what is likely for the requested day in 2-4 practical paragraphs. Name the requested date explicitly. Keep natal/dasha factors as background only.]</div>
 
-### Potential Challenges
-[Bulleted list of obstacles and how to navigate them]
+### Main Day Triggers
+[3-5 bullets focused on the transiting Moon, nakshatra/tara, tithi/karana/yoga if available, and fast transits. Mention slow planets only as background.]
+
+### What To Use
+[Bulleted list of concrete opportunities and how to use them during this day.]
+
+### What To Watch
+[Bulleted list of practical cautions for this day. Avoid life-wide claims.]
+
+### Timing Through The Day
+[Morning / afternoon / evening guidance. If exact time data is not available, keep it approximate and say so.]
 
 ### Guidance for the Day
 [A final piece of actionable advice]
@@ -488,7 +349,7 @@ SCHEMA_MAPPING = {
     'ANALYZE_ROOT_CAUSE': TEMPLATE_DEEP_DIVE,
     'PREDICT_PERIOD_OUTLOOK': TEMPLATE_DEEP_DIVE,
     'PREDICT_EVENTS_FOR_PERIOD': TEMPLATE_DEV_EVENT_LOG,
-    'PREDICT_DAILY': TEMPLATE_DEEP_DIVE,
+    'PREDICT_DAILY': TEMPLATE_DAILY_SUMMARY,
     'MUNDANE': TEMPLATE_MUNDANE,
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
     'LIFESPAN_EVENT_TIMING': TEMPLATE_LIFESPAN_TIMELINE,
@@ -710,7 +571,22 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     _lang = str(language or "english").strip() or "english"
     _, language_instruction, final_check = build_output_language_blocks(_lang, user_question)
     
-    elaborate_instruction = """
+    if str(intent_mode or "").upper() == "PREDICT_DAILY":
+        elaborate_instruction = """
+CRITICAL - DAILY ANSWER SCOPE (NON-NEGOTIABLE):
+The user asked about one specific day. Keep the answer day-specific and practical.
+- Aim for 2,500-4,000 characters, not a lifetime report.
+- Do not expand into full natal, Jaimini, KP, Nadi, divisional, or long dasha methodology blocks.
+- Use natal chart and major dashas only as background filters; do not present Mahadasha/Antardasha as the day's event.
+- If `daily_prediction_spine` is present in BIRTH CHART DATA, it is the authoritative daily evidence. Use it before all broad natal context.
+- Lead from `daily_prediction_spine.dasha_stack`: Prana and Sookshma are the sharpest event triggers, Pratyantardasha frames the day, Antardasha/Mahadasha are background permission.
+- For each active dasha planet, use its `natal`, `transit`, and `trigger` fields. If it returns to natal sign/nakshatra/degree or aspects/conjoins natal planets, explicitly translate those activated houses/lordships into concrete day-level possibilities.
+- Use `daily_prediction_spine.daily_judgment.top_activated_houses`, `top_event_domains`, and `massive_result_factors` to rank what is most likely to happen. Do not treat all houses or all dasha levels equally.
+- Use `daily_prediction_spine.school_judgments` as the daily cross-check: Parashari = main event trigger, KP = materialization through event cusps, Nadi = exact conjunction/trine linkage, Jaimini = Chara Karaka manifestation, Ashtakavarga = ease/resistance/confidence. Keep these as compact evidence, not separate lifetime reports.
+- Lead with the requested date, the transiting Moon/nakshatra, panchanga/day quality if available, fast transits, and practical morning/afternoon/evening guidance.
+"""
+    else:
+        elaborate_instruction = """
 CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):
 Your full response MUST be comprehensive. Short or summary-style answers are FORBIDDEN.
 - For Birth Chart queries: Aim for 12,000 characters. Expand every section with planetary reasoning, classical references, and technical detail.

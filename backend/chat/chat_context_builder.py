@@ -757,6 +757,19 @@ class ChatContextBuilder:
         birth_hash = self._create_birth_hash(birth_data)
         chart_data = self.static_cache[birth_hash]['d1_chart']
         asc_sign = int(chart_data['ascendant'] / 30)
+
+        if intent_result and str(intent_result.get('mode') or '').upper() == 'PREDICT_DAILY':
+            try:
+                from daily_prediction_spine import build_daily_prediction_spine
+                daily_spine = build_daily_prediction_spine(
+                    birth_data=birth_data,
+                    static_context=self.static_cache[birth_hash],
+                    intent_result=intent_result,
+                )
+                if daily_spine:
+                    context['daily_prediction_spine'] = daily_spine
+            except Exception as e:
+                print(f"❌ Daily prediction spine failed: {e}")
         
         relatives = {
             "Mother": (asc_sign + 3) % 12,        # 4th

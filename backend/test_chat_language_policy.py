@@ -13,25 +13,32 @@ from ai.output_schema import build_final_prompt, resolve_output_language_policy
 from ai.parallel_chat.orchestrator import _merge_instruction_blocks
 
 
-def test_output_language_policy_switches_english_app_to_devanagari_hindi():
+def test_output_language_policy_does_not_programmatically_classify_hinglish():
     policy = resolve_output_language_policy("english", "mera career kab chalega?")
 
-    assert policy["kind"] == "question_hindi_devanagari"
-    assert policy["question_is_hindi"] is True
+    assert policy["kind"] == "llm_current_question"
+    assert policy["question_is_hindi"] is None
 
 
-def test_output_language_policy_switches_english_app_to_current_question_language():
+def test_output_language_policy_does_not_programmatically_classify_tamil():
     policy = resolve_output_language_policy("english", "என் தொழில் எப்படி இருக்கும்?")
 
-    assert policy["kind"] == "question_language_override"
-    assert policy["question_is_hindi"] is False
+    assert policy["kind"] == "llm_current_question"
+    assert policy["question_is_hindi"] is None
 
 
-def test_output_language_policy_respects_non_english_selected_language():
+def test_output_language_policy_does_not_programmatically_classify_english():
     policy = resolve_output_language_policy("spanish", "Tell me about my career")
 
-    assert policy["kind"] == "app_language"
+    assert policy["kind"] == "llm_current_question"
     assert policy["app_language_lower"] == "spanish"
+
+
+def test_output_language_policy_keeps_app_language_only_as_context():
+    policy = resolve_output_language_policy("tamil", "mera career kab chalega?")
+
+    assert policy["kind"] == "llm_current_question"
+    assert policy["app_language_lower"] == "tamil"
 
 
 def test_final_prompt_uses_current_question_language_not_previous_turn_language():
@@ -51,9 +58,9 @@ def test_final_prompt_uses_current_question_language_not_previous_turn_language(
         mode="ANALYZE_TOPIC_POTENTIAL",
     )
 
-    assert "CURRENT QUESTION OVERRIDES ENGLISH" in prompt
-    assert "Devanagari Hindi" in prompt
-    assert "earlier conversation turns were English" in prompt
+    assert "LLM MUST INFER FROM CURRENT QUESTION" in prompt
+    assert "Hinglish / Roman Hindi" in prompt
+    assert "Hindi using Devanagari" in prompt
 
 
 def test_parallel_merge_blocks_follow_current_question_language():
@@ -67,9 +74,9 @@ def test_parallel_merge_blocks_follow_current_question_language():
         mode="ANALYZE_TOPIC_POTENTIAL",
     )
 
-    assert "CURRENT QUESTION OVERRIDES ENGLISH" in language_instruction
-    assert "same language and script as CURRENT QUESTION" in language_instruction
-    assert "CURRENT QUESTION is clearly not English" in final_check
+    assert "LLM MUST INFER FROM CURRENT QUESTION" in language_instruction
+    assert "Tamil" in language_instruction
+    assert "same language and script" in final_check
 
 
 def test_intent_router_prompt_uses_current_question_language_override():
@@ -97,5 +104,5 @@ def test_intent_router_prompt_uses_current_question_language_override():
     result = asyncio.run(_run())
 
     assert result["status"] == "READY"
-    assert "CURRENT QUESTION OVERRIDES ENGLISH" in captured["prompt"]
-    assert '"clarification_question" MUST be Hindi (Devanagari)' in captured["prompt"]
+    assert "THE LLM MUST INFER CURRENT QUESTION LANGUAGE" in captured["prompt"]
+    assert 'Hinglish / Roman Hindi question -> Hindi strings in Devanagari' in captured["prompt"]

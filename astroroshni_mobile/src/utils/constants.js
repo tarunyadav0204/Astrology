@@ -54,13 +54,12 @@ const getApiUrl = () => {
 
   // Uncomment exactly one of these for non-dev builds / manual switching:
   // return TEST_API_URL;
-  return PROD_API_URL;
+  // return PROD_API_URL;
 
-  // if (Platform.OS === 'ios') {
-  //   return 'http://localhost:8001';
-  // } else {
-  //   return 'http://10.0.2.2:8001';
-  // }
+  if (Platform.OS === 'ios') {
+    return 'http://localhost:8001';
+  } else {
+    return 'http://10.0.2.2:8001';
 };
 
 export const API_BASE_URL = getApiUrl();
