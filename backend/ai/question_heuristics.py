@@ -99,9 +99,18 @@ def bundled_questions_clarification_reply(user_question: str, language: str = "e
     User-visible clarification when we block a multi-topic bundle before the main model.
     Match Hindi/Hinglish vs English from the question text.
     """
-    from ai.output_schema import _question_has_devanagari, _question_looks_like_roman_hindi
+    text = str(user_question or "").strip()
+    lang = str(language or "").strip().lower()
 
-    if _question_has_devanagari(user_question) or _question_looks_like_roman_hindi(user_question):
+    has_devanagari = bool(re.search(r"[\u0900-\u097F]", text))
+    looks_roman_hindi = bool(re.search(
+        r"\b(kya|kyu|kyon|kab|kaise|mujhe|mera|meri|meri|aap|shaadi|shadi|naukri|paisa|swasthya|bhavishya)\b",
+        text,
+        re.I,
+    ))
+    should_reply_hindi = has_devanagari or looks_roman_hindi or lang in {"hindi", "hinglish"}
+
+    if should_reply_hindi:
         return (
             "आपने एक ही संदेश में कई अलग-अलग सवाल पूछे हैं। "
             "कृपया अभी **एक** सवाल चुनकर भेजें जिस पर आप सबसे पहले ध्यान देना चाहते हैं, "
