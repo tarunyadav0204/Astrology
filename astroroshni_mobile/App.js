@@ -241,7 +241,7 @@ export default function App() {
         const token = await storage.getAuthToken();
         if (!token) return;
         const pushNotifications = require('./src/services/pushNotifications');
-        await pushNotifications.registerPushTokenIfLoggedIn();
+        await pushNotifications.syncPushTokenIfPermissionGranted();
       } catch (e) {
         if (__DEV__) console.warn('[App] registerPushToken failed:', e?.message || e);
       }

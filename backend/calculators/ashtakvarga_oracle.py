@@ -18,12 +18,11 @@ class AshtakvargaOracle:
     def __init__(self):
         # Configure Gemini
         api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is required")
-        
-        genai.configure(api_key=api_key)
-        from utils.admin_settings import get_gemini_analysis_model
-        self.model = genai.GenerativeModel(get_gemini_analysis_model())
+        self.model = None
+        if api_key:
+            genai.configure(api_key=api_key)
+            from utils.admin_settings import get_gemini_analysis_model
+            self.model = genai.GenerativeModel(get_gemini_analysis_model())
         
         # Sign names for reference
         self.sign_names = [
@@ -563,6 +562,17 @@ REQUIRED JSON FORMAT:
 
 Return ONLY valid JSON. No markdown formatting. No explanatory text.
 """
+            if self.model is None:
+                return self._build_fallback_response(
+                    birth_data=birth_data,
+                    current_rows=current_house_rows,
+                    birth_rows=birth_house_rows,
+                    current_bav=current_bav_rows,
+                    date=date,
+                    chart_type=chart_type,
+                    question_context=question_context,
+                )
+
             response = self.model.generate_content(prompt)
             
             text = response.text.strip()

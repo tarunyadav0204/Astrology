@@ -19,6 +19,14 @@ const EAS_PROJECT_ID_FALLBACK = '8e33070b-ac6c-42e0-a089-bd830019bb1a';
 
 let notificationHandlerSet = false;
 
+function getExpoProjectId() {
+  return (
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    Constants.easConfig?.projectId ??
+    EAS_PROJECT_ID_FALLBACK
+  );
+}
+
 /**
  * Call once after app has mounted (e.g. from App.js useEffect). Required on iOS to avoid
  * crash from touching Notifications before native bridge is ready.
@@ -77,10 +85,7 @@ export async function registerForPushNotificationsAsync() {
     if (final !== 'granted') {
       return { token: null, reason: 'denied' };
     }
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId ??
-      EAS_PROJECT_ID_FALLBACK;
+    const projectId = getExpoProjectId();
     const tokenResult = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
@@ -108,6 +113,33 @@ export async function registerDeviceTokenWithBackend(pushToken) {
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   await nudgeAPI.registerDeviceToken(pushToken.trim(), platform);
   if (__DEV__) console.log('[Push] Device token registered with backend');
+}
+
+/**
+ * Sync an existing push token only when notification permission is already granted.
+ * This is safe for app startup/foreground/login paths because it never shows the
+ * system permission prompt.
+ */
+export async function syncPushTokenIfPermissionGranted() {
+  try {
+    const status = await getPushPermissionStatusAsync();
+    if (status !== 'granted') {
+      return { ok: false, message: 'Notifications are not enabled.' };
+    }
+    const tokenResult = await Notifications.getExpoPushTokenAsync({
+      projectId: getExpoProjectId(),
+    });
+    const token = tokenResult?.data ?? null;
+    if (!token) {
+      return { ok: false, message: 'Could not get notification token.' };
+    }
+    await registerDeviceTokenWithBackend(token);
+    return { ok: true, message: 'Notifications registered.' };
+  } catch (e) {
+    const msg = e?.response?.status === 401 ? 'Session expired. Please log in again.' : (e?.message || 'Failed to register.');
+    if (__DEV__) console.warn('[Push] syncPushTokenIfPermissionGranted error:', e?.message);
+    return { ok: false, message: msg };
+  }
 }
 
 /**

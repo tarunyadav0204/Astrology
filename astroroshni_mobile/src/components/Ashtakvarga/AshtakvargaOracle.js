@@ -423,7 +423,7 @@ export default function AshtakvargaOracle({ navigation }) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          birth_data: birthData,
+          birth_data: normalizeBirthForApi(birthData),
           ashtakvarga_data: oracleData,
           birth_ashtakavarga_data: birthOracleData,
           date: (selectedDate || new Date()).toISOString().split('T')[0],
@@ -491,7 +491,7 @@ export default function AshtakvargaOracle({ navigation }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          birth_data: birthData,
+          birth_data: normalizeBirthForApi(birthData),
           ashtakvarga_data: oracleData,
           birth_ashtakavarga_data: birthOracleData,
           date: (selectedDate || new Date()).toISOString().split('T')[0],

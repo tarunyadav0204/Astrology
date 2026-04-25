@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -33,7 +33,7 @@ import { useCredits } from '../../credits/CreditContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
-function MessageBubble({
+export default function MessageBubble({
   message,
   language,
   onFollowUpClick,
@@ -1247,19 +1247,8 @@ function MessageBubble({
     return null;
   }
 
-  const formattedContent = useMemo(
-    () => formatContent(contentStr),
-    [
-      contentStr,
-      message.terms,
-      message.glossary,
-      message.role,
-    ]
-  );
-  const renderedElements = useMemo(
-    () => renderFormattedText(formattedContent),
-    [formattedContent]
-  );
+  const formattedContent = formatContent(contentStr);
+  const renderedElements = renderFormattedText(formattedContent);
 
   const chartName = message.native_name || null;
 
@@ -2685,20 +2674,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-});
-
-export default React.memo(MessageBubble, (prevProps, nextProps) => {
-  return (
-    prevProps.message === nextProps.message &&
-    prevProps.language === nextProps.language &&
-    prevProps.partnership === nextProps.partnership &&
-    prevProps.sessionId === nextProps.sessionId &&
-    prevProps.podcastAutoLaunchMessageId === nextProps.podcastAutoLaunchMessageId &&
-    prevProps.podcastAutoLaunchKey === nextProps.podcastAutoLaunchKey &&
-    prevProps.onFollowUpClick === nextProps.onFollowUpClick &&
-    prevProps.onDelete === nextProps.onDelete &&
-    prevProps.onRestart === nextProps.onRestart &&
-    prevProps.onSendRetry === nextProps.onSendRetry &&
-    prevProps.onStartNewChat === nextProps.onStartNewChat
-  );
 });

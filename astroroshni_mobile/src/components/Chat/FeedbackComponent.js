@@ -64,7 +64,7 @@ function FeedbackPlayStoreRow({ colors, theme }) {
   );
 }
 
-function FeedbackComponent({ message, onFeedbackSubmitted }) {
+export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   const { theme, colors } = useTheme();
   const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
   const [visible, setVisible] = useState(false);
@@ -191,13 +191,6 @@ function FeedbackComponent({ message, onFeedbackSubmitted }) {
     </Animated.View>
   );
 }
-
-export default React.memo(FeedbackComponent, (prevProps, nextProps) => {
-  return (
-    prevProps.message === nextProps.message &&
-    prevProps.onFeedbackSubmitted === nextProps.onFeedbackSubmitted
-  );
-});
 
 const styles = StyleSheet.create({
   container: {

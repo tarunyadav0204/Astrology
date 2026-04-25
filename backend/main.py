@@ -3504,6 +3504,8 @@ async def get_ashtakavarga_oracle_insight(request: dict, current_user: User = De
         
         return complete_oracle
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Oracle insight error: {str(e)}")
         return {

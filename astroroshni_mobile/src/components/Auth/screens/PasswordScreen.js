@@ -123,8 +123,8 @@ export default function PasswordScreen({
         await refreshCredits();
         if (Platform.OS !== 'ios') {
           try {
-            const { registerPushTokenIfLoggedIn } = require('../../../services/pushNotifications');
-            registerPushTokenIfLoggedIn();
+            const { syncPushTokenIfPermissionGranted } = require('../../../services/pushNotifications');
+            syncPushTokenIfPermissionGranted();
           } catch (_) {}
         }
 
