@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -545,6 +545,9 @@ export default function ChatScreen({ navigation, route }) {
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
       setIsKeyboardVisible(true);
+      if (Platform.OS === 'android') {
+        return;
+      }
       const h = e?.endCoordinates?.height;
       if (typeof h === 'number' && h > 0) {
         setKeyboardBottomInset(Math.min(h, maxKeyboardInset));
@@ -561,6 +564,15 @@ export default function ChatScreen({ navigation, route }) {
       hideDidSub?.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (showGreeting && podcastPromoVisible) {
+      setPodcastPromoVisible(false);
+      setPodcastPromoMessageId(null);
+      setPodcastAutoLaunchKey(0);
+    }
+  }, [showGreeting, podcastPromoVisible]);
+
   // Stop any ongoing TTS playback when leaving the chat screen
   useFocusEffect(
     React.useCallback(() => {
@@ -2188,7 +2200,7 @@ export default function ChatScreen({ navigation, route }) {
     poll();
   };
   
-  const restartPolling = (messageId) => {
+  const restartPolling = useCallback((messageId) => {
     // Update message to show restarting
     setMessagesWithStorage(prev => prev.map(msg => 
       msg.messageId === messageId 
@@ -2201,7 +2213,7 @@ export default function ChatScreen({ navigation, route }) {
     const processingMessage = messages.find(msg => msg.messageId === messageId);
     const userMessage = messages.find(msg => msg.id === processingMessage?.userMessageId);
     pollForResponse(messageId, null, sessionId, userMessage?.content || '', true);
-  };
+  }, [messages, sessionId]);
 
   const sendChatRequestWithRetry = async ({
     messageText,
@@ -2598,7 +2610,7 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
-  const handleSendRetry = async (failedMessage) => {
+  const handleSendRetry = useCallback(async (failedMessage) => {
     const { clientRequestId, userMessageId, failedQuestion } = failedMessage || {};
     if (!clientRequestId || !failedQuestion) {
       return;
@@ -2673,7 +2685,7 @@ export default function ChatScreen({ navigation, route }) {
       setLoading(false);
       setIsTyping(false);
     }
-  };
+  }, [sessionId, t]);
 
   const handleLanguageChange = async (newLanguage) => {
     i18n.changeLanguage(newLanguage);
@@ -2697,7 +2709,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   /** Clears local thread, resets server session id (next send creates a new session). Server Chat History entries stay as-is. */
-  const performStartNewChat = () => {
+  const performStartNewChat = useCallback(() => {
     setSessionId(null);
     setLoading(false);
     setIsTyping(false);
@@ -2722,9 +2734,9 @@ export default function ChatScreen({ navigation, route }) {
     }
     setMessagesWithStorage([welcomeMessage]);
     setShowGreeting(false);
-  };
+  }, [birthData?.name, isMundaneRef, mundaneContextRef, t]);
 
-  const confirmStartNewChat = () => {
+  const confirmStartNewChat = useCallback(() => {
     Alert.alert(
       t('chat.newConversationTitle', 'New conversation'),
       t('chat.newConversationMessage', 'This clears the chat on this screen and starts a fresh session on your next message. Your past threads remain in Chat History.'),
@@ -2737,7 +2749,7 @@ export default function ChatScreen({ navigation, route }) {
         },
       ]
     );
-  };
+  }, [performStartNewChat, t]);
 
   const clearChat = confirmStartNewChat;
 
@@ -2760,7 +2772,7 @@ export default function ChatScreen({ navigation, route }) {
     );
   };
 
-  const handleDeleteMessage = async (messageIdOrLocalId) => {
+  const handleDeleteMessage = useCallback(async (messageIdOrLocalId) => {
     const message = messages.find(
       msg =>
         msg.messageId === messageIdOrLocalId ||
@@ -2816,7 +2828,7 @@ export default function ChatScreen({ navigation, route }) {
       console.error('Error deleting message:', error);
       Alert.alert('❌ Error', 'Failed to delete message');
     }
-  };
+  }, [messages]);
 
   const handleMessagesScroll = (e) => {
     if (!ratingPromptStateLoaded) return;
@@ -2856,6 +2868,94 @@ export default function ChatScreen({ navigation, route }) {
     inputScopeNativeTrimmed.length > 7
       ? `${inputScopeNativeTrimmed.slice(0, 7)}...`
       : inputScopeNativeTrimmed;
+
+  const handleFeedbackSubmitted = useCallback((messageId, rating) => {
+    console.log('Feedback submitted:', messageId, rating);
+  }, []);
+
+  const transcriptContent = useMemo(() => {
+    return messages.map((item, index) => {
+      const isLastMessage = index === messages.length - 1;
+
+      if (item.isTyping) {
+        return (
+          <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+            <LoadingBubble
+              chartInsights={item.chartInsights}
+              chartData={chartData}
+              scrollViewRef={scrollViewRef}
+            />
+          </View>
+        );
+      }
+
+      if (item.setupType === 'partnership' && partnershipMode) {
+        return (
+          <View key={item.id} style={{ marginBottom: 16 }}>
+            <LinearGradient
+              colors={['rgba(255, 107, 53, 0.1)', 'rgba(249, 115, 22, 0.05)']}
+              style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.2)' }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <View style={{ backgroundColor: '#ff6b3520', padding: 8, borderRadius: 12 }}>
+                  <Text style={{ fontSize: 18 }}>🤝</Text>
+                </View>
+                <View>
+                  <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Partnership Analysis</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Setup complete</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: '#ff6b3520', paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 8 }}
+                onPress={() => setShowPartnershipSetupModal(true)}
+              >
+                <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>Edit Setup ✏️</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        );
+      }
+
+      return (
+        <View key={item.id}>
+          <View ref={isLastMessage ? lastMessageRef : null}>
+            <MessageBubble
+              message={item}
+              language={language}
+              onFollowUpClick={setInputText}
+              partnership={partnershipMode}
+              onDelete={handleDeleteMessage}
+              onRestart={restartPolling}
+              onSendRetry={handleSendRetry}
+              onStartNewChat={confirmStartNewChat}
+              sessionId={sessionId}
+              podcastAutoLaunchMessageId={podcastPromoMessageId}
+              podcastAutoLaunchKey={podcastAutoLaunchKey}
+            />
+          </View>
+          <FeedbackComponent
+            message={item}
+            onFeedbackSubmitted={handleFeedbackSubmitted}
+          />
+        </View>
+      );
+    });
+  }, [
+    messages,
+    chartData,
+    partnershipMode,
+    language,
+    handleDeleteMessage,
+    restartPolling,
+    handleSendRetry,
+    confirmStartNewChat,
+    sessionId,
+    podcastPromoMessageId,
+    podcastAutoLaunchKey,
+    colors.text,
+    colors.textSecondary,
+    handleFeedbackSubmitted,
+  ]);
 
   return (
     <View style={styles.container}>
@@ -3218,77 +3318,7 @@ export default function ChatScreen({ navigation, route }) {
             
 
             
-            {messages.map((item, index) => {
-              const isLastMessage = index === messages.length - 1;
-
-              if (item.isTyping) {
-                return (
-                  <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
-                    <LoadingBubble 
-                      chartInsights={item.chartInsights}
-                      chartData={chartData}
-                      scrollViewRef={scrollViewRef}
-                    />
-                  </View>
-                );
-              }
-
-              // Render Partnership Setup Card
-              if (item.setupType === 'partnership' && partnershipMode) {
-                return (
-                  <View key={item.id} style={{ marginBottom: 16 }}>
-                    <LinearGradient
-                      colors={['rgba(255, 107, 53, 0.1)', 'rgba(249, 115, 22, 0.05)']}
-                      style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.2)' }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                        <View style={{ backgroundColor: '#ff6b3520', padding: 8, borderRadius: 12 }}>
-                          <Text style={{ fontSize: 18 }}>🤝</Text>
-                        </View>
-                        <View>
-                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Partnership Analysis</Text>
-                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Setup complete</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity 
-                        style={{ backgroundColor: '#ff6b3520', paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 8 }}
-                        onPress={() => setShowPartnershipSetupModal(true)}
-                      >
-                        <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>Edit Setup ✏️</Text>
-                      </TouchableOpacity>
-                    </LinearGradient>
-                  </View>
-                );
-              }
-
-              return (
-                <View key={item.id}>
-                  <View ref={isLastMessage ? lastMessageRef : null}>
-                    <MessageBubble
-                      message={item}
-                      language={language}
-                      onFollowUpClick={setInputText}
-                      partnership={partnershipMode}
-                      onDelete={handleDeleteMessage}
-                      onRestart={restartPolling}
-                      onSendRetry={handleSendRetry}
-                      onStartNewChat={confirmStartNewChat}
-                      sessionId={sessionId}
-                      podcastAutoLaunchMessageId={podcastPromoMessageId}
-                      podcastAutoLaunchKey={podcastAutoLaunchKey}
-                    />
-                    
-                    {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
-                  </View>
-                  <FeedbackComponent 
-                    message={item} 
-                    onFeedbackSubmitted={(messageId, rating) => {
-                      console.log('Feedback submitted:', messageId, rating);
-                    }}
-                  />
-                </View>
-              );
-            })}
+            {transcriptContent}
           </GHScrollView>
 
         {/* Suggestions + Input: lift by keyboard frame when open (Android needs this with edge-to-edge). */}
@@ -3298,7 +3328,7 @@ export default function ChatScreen({ navigation, route }) {
           paddingTop: 12,
           marginHorizontal: -12,
           paddingHorizontal: 12,
-          paddingBottom: keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
+          paddingBottom: Platform.OS === 'ios' && keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
         }}
         >
         {/* Suggestions (only show when not loading and not showing greeting) */}
@@ -4782,7 +4812,7 @@ export default function ChatScreen({ navigation, route }) {
       <NotificationEnableReminderModal homeActive={showGreeting} />
 
       <PodcastPromoModal
-        visible={podcastPromoVisible}
+        visible={!showGreeting && podcastPromoVisible}
         podcastCost={podcastCost}
         colors={colors}
         onClose={() => {

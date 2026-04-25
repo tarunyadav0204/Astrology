@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from ai.question_heuristics import looks_like_many_questions
+from ai.output_schema import resolve_output_language_policy
 
 # Roman Hindi / Hinglish cues; app often sends language="english" for UI i18n while user types Hindi in Latin script.
 # Keep this strict: avoid astrology words (e.g., dasha) as they appear in normal English queries too.
@@ -455,15 +456,17 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
         result["needs_transits"] = True
 
 
-def _one_question_nudge_line(is_hindi: bool) -> str:
-    if is_hindi:
+def _one_question_nudge_line(language_policy: dict) -> str | None:
+    if (language_policy or {}).get("kind") == "question_hindi_devanagari":
         return (
             "सुझाव: कृपया एक समय में एक ही सवाल पूछें, ताकि हम आपको "
             "अधिक गहरा और स्पष्ट उत्तर दे सकें।"
         )
-    return (
-        "Tip: Ask one question at a time so we can give you a deeper, clearer answer."
-    )
+    if (language_policy or {}).get("kind") == "english_default":
+        return (
+            "Tip: Ask one question at a time so we can give you a deeper, clearer answer."
+        )
+    return None
 
 
 class IntentRouter:
@@ -578,31 +581,63 @@ PROCEED WITH ANALYSIS NOW.
 """
         
         _lang = str(language or "english").strip() or "english"
-        is_hindi_question = _user_question_suggests_hindi(user_question)
-        if is_hindi_question:
-            language_instruction = """🚨 HINDI / HINGLISH USER — ALL USER-VISIBLE TEXT IN JSON MUST BE HINDI (Devanagari):
+        language_policy = resolve_output_language_policy(_lang, user_question)
+        is_hindi_question = bool(language_policy.get("question_is_hindi"))
+        language_policy_kind = language_policy.get("kind")
 
-The user's question is Hindi or Hinglish. The client may send language "english" for app UI only—ignore that for any strings the end user reads.
+        if language_policy_kind == "question_hindi_devanagari":
+            language_instruction = """🚨 CURRENT QUESTION OVERRIDES ENGLISH — USE HINDI (Devanagari) FOR ALL USER-VISIBLE JSON STRINGS:
+
+The app may send language "english" for UI, but the CURRENT QUESTION is Hindi or Hinglish.
 
 1) If status is "CLARIFY": "clarification_question" MUST be Hindi (Devanagari).
 
-2) If status is "READY": Every "message" inside "chart_insights" MUST be Hindi (Devanagari). These lines rotate under the birth chart while the full answer loads—do NOT write them in English. Keep insights specific to the chart; use natural Hindi for Jyotish terms where appropriate.
+2) If status is "READY": Every "message" inside "chart_insights" MUST be Hindi (Devanagari).
 
-Follow the Hindi "Example" block below for chart_insights (not the English shape-only note). JSON keys stay English; only string values must be Devanagari Hindi.
+CRITICAL:
+- Decide the language from the CURRENT QUESTION only, not from earlier turns.
+- Do NOT keep using English just because the conversation started in English.
+- JSON keys stay English; only end-user string values must be Devanagari Hindi.
+"""
+        elif language_policy_kind == "question_language_override":
+            language_instruction = """🚨 CURRENT QUESTION OVERRIDES ENGLISH — USE THE CURRENT QUESTION'S LANGUAGE FOR ALL USER-VISIBLE JSON STRINGS:
+
+The app language is "english", but the CURRENT QUESTION is clearly written in another non-English language.
+
+1) If status is "CLARIFY": "clarification_question" MUST be in the same language and script as CURRENT QUESTION.
+2) If status is "READY": Every "message" inside "chart_insights" MUST be in the same language and script as CURRENT QUESTION.
+
+CRITICAL:
+- Decide the language from the CURRENT QUESTION only, not from earlier turns.
+- Do NOT fall back to English just because the previous conversation was in English.
+"""
+        elif language_policy_kind == "app_language":
+            language_instruction = f"""IMPORTANT LANGUAGE RULE — USE THE APP-SELECTED LANGUAGE "{_lang}" FOR ALL USER-VISIBLE JSON STRINGS:
+
+The user has selected "{_lang}" in the app. Use that language for all end-user-visible strings.
+
+1) If status is "CLARIFY": "clarification_question" MUST be in "{_lang}".
+2) If status is "READY": Every "message" inside "chart_insights" MUST be in "{_lang}".
+
+CRITICAL:
+- Do NOT drift into a previous turn's language.
+- Use CURRENT QUESTION for meaning, but keep the output language as "{_lang}".
 """
         else:
-            language_instruction = f"""IMPORTANT LANGUAGE RULE — MATCH THE USER'S QUESTION LANGUAGE:
+            language_instruction = """IMPORTANT LANGUAGE RULE — USE THE CURRENT QUESTION'S LANGUAGE:
 
-The current question is not Hindi/Hinglish. For any user-visible strings, use the same language as the user's current question text.
+The app language is english, and the CURRENT QUESTION does not clearly override that.
 
-1) If status is "CLARIFY": "clarification_question" MUST be in the same language as the user's question.
-   - If the user's question is English, clarification_question MUST be English-only (no Devanagari Hindi and no Hinglish switches).
-2) If status is "READY": Every "message" inside "chart_insights" MUST be in the same language as the user's question.
+1) If status is "CLARIFY": "clarification_question" MUST match the CURRENT QUESTION's language.
+   - If CURRENT QUESTION is ordinary English, clarification_question MUST be English-only.
+2) If status is "READY": Every "message" inside "chart_insights" MUST match the CURRENT QUESTION's language.
 
-Do not switch languages unexpectedly.
+CRITICAL:
+- Decide the language from the CURRENT QUESTION only, not from earlier turns.
+- Do not switch languages unexpectedly.
 """
 
-        if is_hindi_question:
+        if language_policy_kind == "question_hindi_devanagari":
             chart_insights_message_spec = (
                 '- message: इस जातक की वास्तविक कुंडली के आधार पर विशिष्ट अंतर्दृष्टि; पूरा वाक्य हिंदी देवनागरी में। '
                 "Roman/Latin script में हिंदी न लिखें। ग्रह/भाव नाम हिंदी में लिखें (जैसे मंगल, द्वितीय भाव)।"
@@ -916,13 +951,14 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                 and looks_like_many_questions(user_question)
             ):
                 cq = (result.get("clarification_question") or "").strip()
-                if cq and not _clarification_has_one_question_nudge(cq):
+                nudge_line = _one_question_nudge_line(language_policy)
+                if cq and nudge_line and not _clarification_has_one_question_nudge(cq):
                     result["clarification_question"] = (
-                        f"{cq}\n\n{_one_question_nudge_line(is_hindi_question)}"
+                        f"{cq}\n\n{nudge_line}"
                     )
 
-            # Hard guard: English question must never emit Hindi/Hinglish clarification.
-            if result.get("status") == "CLARIFY" and not is_hindi_question:
+            # Hard guard: ordinary English current question must never emit Hindi/Hinglish clarification.
+            if result.get("status") == "CLARIFY" and language_policy_kind == "english_default":
                 cq = (result.get("clarification_question") or "").strip()
                 if _looks_like_hindi_or_hinglish_output(cq):
                     result["clarification_question"] = (

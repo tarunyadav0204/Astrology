@@ -221,37 +221,10 @@ def _merge_instruction_blocks(
     intent_mode = _intent_mode(context, mode)
     chart_focus = context.get("intent", {}).get("chart_focus")
     _lang = str(language or "english").strip() or "english"
-    _lang_lower = _lang.lower()
 
-    from ai.output_schema import _question_has_devanagari, _question_looks_like_roman_hindi
+    from ai.output_schema import build_output_language_blocks
 
-    if _lang_lower == "english":
-        language_instruction = f"""OUTPUT LANGUAGE (read CURRENT QUESTION at the end of this prompt):
-
-DEFAULT — ENGLISH: The app language is **english**. Write the **entire** answer in **clear English** (prose and section headers), including when birth data or chart JSON contains Indian place names or Hindi labels. Indian names or locations in the context do **not** mean you should switch the answer to Hindi.
-
-SWITCH TO HINDI (Devanagari) **only if** CURRENT QUESTION is clearly Hindi or Roman-Hindi:
-- The question contains **Devanagari** script, **or**
-- The question contains **obvious conversational Roman-Hindi** (e.g. mera/meri, batao/btao, kya/kab in a Hindi-style question — not normal English words like "what", "when", "career").
-
-If the question is ordinary English, you **must not** answer primarily in Hindi. Do not use Devanagari for the main answer in that case.
-
-"""
-        if not _question_has_devanagari(user_question) and not _question_looks_like_roman_hindi(user_question):
-            language_instruction += (
-                "\nAUTO-CHECK: CURRENT QUESTION has no Devanagari and no Roman-Hindi cues → "
-                "**English answer required**.\n"
-            )
-    else:
-        language_instruction = f"""OUTPUT LANGUAGE (you will see CURRENT QUESTION at the end of this prompt—infer language from that text and app language "{_lang}"):
-
-1) If CURRENT QUESTION is Hindi OR Roman Hindi (Hinglish), write the ENTIRE substantive answer in Hindi using Devanagari script (हिंदी) when appropriate for {_lang}. Jyotish terms may use natural Hindi or common transliteration.
-
-   Signals for Hinglish: words like mera/meri/mere, batao/btao, sab/sba kuch, dasha/dasa, shaadi/shadi, kab, kya, kaisa/kaisi, vishleshan, hai/hain, or any Devanagari.
-
-2) Otherwise: use app language "{_lang}" for the answer.
-
-"""
+    _, language_instruction, final_check = build_output_language_blocks(_lang, user_question)
 
     elaborate_instruction = """
 CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):
@@ -285,21 +258,6 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
                 f"about {native_name}'s chart. You MUST use '{native_name}' or 'they/their' in your response. "
                 f"NEVER use 'you/your'."
             )
-
-    if _lang_lower == "english":
-        final_check = (
-            "FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION and OUTPUT LANGUAGE above. "
-            "If CURRENT QUESTION is ordinary English (no Devanagari, not clear Roman-Hindi), "
-            "the full answer must be in English—do not switch to Hindi because of chart labels or names. "
-            "Only if CURRENT QUESTION is clearly Hindi or Roman-Hindi (per OUTPUT LANGUAGE), "
-            "write the substantive answer in Devanagari Hindi; you may use Hindi section titles then."
-        )
-    else:
-        final_check = (
-            "FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION. If it is Hindi or Hinglish, "
-            "your answer must be in Devanagari Hindi—not English—regardless of any English examples "
-            "or English section headers elsewhere in this prompt; you may use Hindi section titles."
-        )
 
     return (
         language_instruction,

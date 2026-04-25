@@ -15,6 +15,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -63,6 +64,11 @@ const ASHTAKVARGA_QUESTION_SUGGESTIONS = [
   'Is money support improving or weakening?',
   'How is marriage support in Ashtakavarga?',
   'Which planet is not delivering results well?',
+];
+const ASHTAKVARGA_ANALYSIS_MODES = [
+  { key: 'birth', label: 'Birth', icon: 'person-circle-outline' },
+  { key: 'transit', label: 'Transit', icon: 'today-outline' },
+  { key: 'ask', label: 'Ask', icon: 'chatbubble-ellipses-outline' },
 ];
 
 function lifePredictionsJobStatusUrl(jobId) {
@@ -167,6 +173,9 @@ export default function AshtakvargaOracle({ navigation }) {
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [analysisQuestion, setAnalysisQuestion] = useState('');
+  const [analysisMode, setAnalysisMode] = useState('birth');
+  const [analysisResultMode, setAnalysisResultMode] = useState(null);
+  const [askMessages, setAskMessages] = useState([]);
   const [lastAskedQuestion, setLastAskedQuestion] = useState('');
   
   // Animations
@@ -372,6 +381,8 @@ export default function AshtakvargaOracle({ navigation }) {
         const data = await response.json();
         setOracleData(data);
         setCompleteOracleData(null);
+        setAnalysisResultMode(null);
+        setAskMessages([]);
         setLastAskedQuestion('');
 
         // Store birth chart data for comparison if this is birth chart
@@ -425,7 +436,12 @@ export default function AshtakvargaOracle({ navigation }) {
         const completeData = await dailyResponse.json();
         console.log('Complete oracle data received:', completeData);
         setCompleteOracleData(completeData);
+        setAnalysisResultMode(questionText ? 'ask' : 'transit');
         setLastAskedQuestion(questionText);
+        if (questionText) {
+          appendAskExchange(questionText, completeData);
+          setAnalysisQuestion('');
+        }
         if (Number(completeData?.credits_charged) > 0) {
           fetchBalance();
         }
@@ -451,6 +467,15 @@ export default function AshtakvargaOracle({ navigation }) {
     } finally {
       setLoadingInsight(false);
     }
+  };
+
+  const appendAskExchange = (questionText, answerData) => {
+    const baseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setAskMessages((prev) => [
+      ...prev,
+      { id: `${baseId}-user`, role: 'user', text: questionText },
+      { id: `${baseId}-assistant`, role: 'assistant', data: answerData },
+    ]);
   };
 
   const probeAshtakavargaAnalysis = async (questionOverride = null) => {
@@ -486,13 +511,18 @@ export default function AshtakvargaOracle({ navigation }) {
       }
       if (data.cached === true && !data.error) {
         setCompleteOracleData(data);
+        setAnalysisResultMode(questionText ? 'ask' : 'transit');
         setLastAskedQuestion(questionText);
+        if (questionText) {
+          appendAskExchange(questionText, data);
+          setAnalysisQuestion('');
+        }
         return;
       }
       if (data.credit_cost_next != null && !Number.isNaN(Number(data.credit_cost_next))) {
         setLifePredictionsCreditCost(Math.max(1, Number(data.credit_cost_next)));
       }
-      setPendingAnalysisQuestion(questionText || null);
+      setPendingAnalysisQuestion(questionText);
       setAnalysisCreditModalVisible(true);
     } catch (error) {
       console.error('Error probing Ashtakavarga analysis:', error);
@@ -506,9 +536,14 @@ export default function AshtakvargaOracle({ navigation }) {
     probeAshtakavargaAnalysis();
   };
 
+  const requestAshtakavargaOverview = () => {
+    setAnalysisQuestion('');
+    probeAshtakavargaAnalysis('');
+  };
+
   const onConfirmAnalysisCreditModal = () => {
     setAnalysisCreditModalVisible(false);
-    const nextQuestion = pendingAnalysisQuestion;
+    const nextQuestion = pendingAnalysisQuestion ?? '';
     setPendingAnalysisQuestion(null);
     fetchDailyInsight(nextQuestion);
   };
@@ -518,11 +553,15 @@ export default function AshtakvargaOracle({ navigation }) {
     setPendingAnalysisQuestion(null);
   };
 
-  const analysisCreditModalTitle = analysisQuestion.trim()
+  const modalAnalysisQuestion = analysisCreditModalVisible
+    ? (pendingAnalysisQuestion ?? '')
+    : analysisQuestion.trim();
+
+  const analysisCreditModalTitle = modalAnalysisQuestion
     ? 'Ask Ashtakavarga?'
     : 'Generate Ashtakavarga overview?';
 
-  const analysisCreditModalDescription = analysisQuestion.trim()
+  const analysisCreditModalDescription = modalAnalysisQuestion
     ? `This will run a focused Ashtakavarga analysis for your question and use ${lifePredictionsCreditCost} credits if generation succeeds. Your balance: ${credits} credits.`
     : `This will generate a fresh Ashtakavarga overview and use ${lifePredictionsCreditCost} credits if generation succeeds. Your balance: ${credits} credits.`;
 
@@ -558,125 +597,142 @@ export default function AshtakvargaOracle({ navigation }) {
     }
   };
 
-  const renderOraclesPulse = () => {
-    const hasBindus = oracleData?.ashtakavarga?.total_bindus != null;
-    const totalBindus = hasBindus ? oracleData.ashtakavarga.total_bindus : 0;
-    const ashtakvargaHouses = oracleData?.chart_ashtakavarga || {};
-    const topHouses = Object.entries(ashtakvargaHouses)
-      .map(([house, row]) => ({
-        house: Number(house),
-        bindus: row?.bindus || 0,
-        sign: SIGN_SHORT_NAMES[row?.sign || 0] || '',
-      }))
-      .sort((a, b) => b.bindus - a.bindus)
-      .slice(0, 3);
-    const weakestHouses = Object.entries(ashtakvargaHouses)
-      .map(([house, row]) => ({
-        house: Number(house),
-        bindus: row?.bindus || 0,
-        sign: SIGN_SHORT_NAMES[row?.sign || 0] || '',
-      }))
-      .sort((a, b) => a.bindus - b.bindus)
-      .slice(0, 2);
+  const renderAnalysisModeTabs = () => (
+    <View style={[styles.analysisModeTabs, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(249,115,22,0.08)' }]}>
+      {ASHTAKVARGA_ANALYSIS_MODES.map((mode) => {
+        const isActive = analysisMode === mode.key;
+        return (
+          <TouchableOpacity
+            key={mode.key}
+            style={[
+              styles.analysisModeTab,
+              isActive && {
+                backgroundColor: theme === 'dark' ? 'rgba(255,215,0,0.18)' : 'rgba(249,115,22,0.16)',
+              },
+            ]}
+            onPress={() => setAnalysisMode(mode.key)}
+          >
+            <Ionicons
+              name={mode.icon}
+              size={17}
+              color={isActive ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.analysisModeTabText, { color: isActive ? colors.primary : colors.textSecondary }]}>
+              {mode.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const renderAnalysisBenefit = (iconName, text) => (
+    <View style={styles.analysisBenefitRow} key={text}>
+      <Ionicons name={iconName} size={16} color={colors.primary} />
+      <Text style={[styles.analysisBenefitText, { color: colors.textSecondary }]}>{text}</Text>
+    </View>
+  );
+
+  const renderAnalysisAnswer = (expectedMode) => {
+    const headline = completeOracleData?.headline || completeOracleData?.oracle_message || '';
+    const sections = Array.isArray(completeOracleData?.sections) ? completeOracleData.sections : [];
+    if (!completeOracleData) return null;
+    if (expectedMode && analysisResultMode && analysisResultMode !== expectedMode) return null;
+
+    return (
+      <View style={[styles.analysisAnswerCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.78)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+        <Text style={[styles.analysisAnswerTitle, { color: colors.text }]}>
+          {lastAskedQuestion ? 'Answer' : 'Transit Overview'}
+        </Text>
+        {lastAskedQuestion ? (
+          <Text style={[styles.analysisAnswerQuestion, { color: colors.primary }]}>Q: {lastAskedQuestion}</Text>
+        ) : null}
+        {headline ? (
+          <Text style={[styles.analysisAnswerHeadline, { color: colors.textSecondary }]}>{headline}</Text>
+        ) : null}
+        {sections.map((section, index) => (
+          <View key={`${section.title}-${index}`} style={styles.analysisAnswerSection}>
+            <Text style={[styles.analysisAnswerSectionTitle, { color: colors.text }]}>{section.title}</Text>
+            {(section.bullets || []).map((bullet, bulletIndex) => (
+              <Text key={`${section.title}-${bulletIndex}`} style={[styles.bulletPoint, { color: colors.textSecondary }]}>
+                • {String(bullet)}
+              </Text>
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderBirthAnalysisPanel = () => (
+    <View style={[styles.analysisPanelCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+      <View style={styles.analysisPanelHeader}>
+        <View style={[styles.analysisPanelIcon, { backgroundColor: theme === 'dark' ? 'rgba(255,215,0,0.15)' : 'rgba(249,115,22,0.12)' }]}>
+          <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
+        </View>
+        <View style={styles.analysisPanelTitleBlock}>
+          <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Birth Chart Ashtakvarga Predictions</Text>
+          <Text style={[styles.analysisPanelSubtitle, { color: colors.textSecondary }]}>
+            A full natal reading from your bindus, houses, dasha context, and life-area strengths.
+          </Text>
+        </View>
+      </View>
+      <View style={styles.analysisBenefits}>
+        {renderAnalysisBenefit('home-outline', 'Lifelong strengths and weaker houses')}
+        {renderAnalysisBenefit('briefcase-outline', 'Career, relationship, money, and health themes')}
+        {renderAnalysisBenefit('refresh-circle-outline', 'Saved readings reopen without using credits')}
+      </View>
+      {renderLifePredictionsCta()}
+    </View>
+  );
+
+  const renderTransitAnalysisPanel = () => {
     const selectedLabel = selectedDate?.toLocaleDateString?.('en-IN', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
-    }) || 'Selected date';
-    const snapshot = completeOracleData?.snapshot || {};
-    const analysisTitle = completeOracleData?.analysis_title || 'Ashtakavarga Analysis';
-    const headline = completeOracleData?.headline || completeOracleData?.oracle_message || '';
-    const sections = Array.isArray(completeOracleData?.sections) ? completeOracleData.sections : [];
+    }) || 'selected date';
+
     return (
-      <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.analysisSummaryCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.2)' }]}>
-          <Text style={[styles.analysisSummaryTitle, { color: colors.text }]}>{analysisTitle}</Text>
-          <Text style={[styles.analysisSummaryDate, { color: colors.textSecondary }]}>
-            {snapshot.chart_type === 'transit' ? 'Transit overlay' : 'Natal baseline'} • {selectedLabel}
-          </Text>
-          <View style={styles.analysisMetricRow}>
-            <View style={[styles.analysisMetricCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)' }]}>
-              <Text style={[styles.analysisMetricValue, { color: colors.text }]}>{snapshot.total_bindus || totalBindus}</Text>
-              <Text style={[styles.analysisMetricLabel, { color: colors.textSecondary }]}>Total bindus</Text>
+      <>
+        <View style={[styles.analysisPanelCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+          <View style={styles.analysisPanelHeader}>
+            <View style={[styles.analysisPanelIcon, { backgroundColor: theme === 'dark' ? 'rgba(255,215,0,0.15)' : 'rgba(249,115,22,0.12)' }]}>
+              <Ionicons name="today-outline" size={24} color={colors.primary} />
             </View>
-            <View style={[styles.analysisMetricCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)' }]}>
-              <Text style={[styles.analysisMetricValue, { color: colors.text }]}>
-                {snapshot.strongest_house?.house || topHouses[0]?.house || '—'}
+            <View style={styles.analysisPanelTitleBlock}>
+              <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Transit Ashtakvarga Predictions</Text>
+              <Text style={[styles.analysisPanelSubtitle, { color: colors.textSecondary }]}>
+                See how the selected date activates your birth chart strengths and pressure points.
               </Text>
-              <Text style={[styles.analysisMetricLabel, { color: colors.textSecondary }]}>Strongest house</Text>
-            </View>
-            <View style={[styles.analysisMetricCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)' }]}>
-              <Text style={[styles.analysisMetricValue, { color: colors.text }]}>
-                {snapshot.weakest_house?.house || weakestHouses[0]?.house || '—'}
-              </Text>
-              <Text style={[styles.analysisMetricLabel, { color: colors.textSecondary }]}>Weakest house</Text>
             </View>
           </View>
-          {headline ? (
-            <Text style={[styles.analysisHeadline, { color: colors.textSecondary }]}>{headline}</Text>
-          ) : null}
-        </View>
-
-        <View style={[styles.analysisQuestionCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.7)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
-          <Text style={[styles.analysisQuestionTitle, { color: colors.text }]}>Ask Ashtakavarga</Text>
-          <Text style={[styles.analysisQuestionSubtitle, { color: colors.textSecondary }]}>
-            Ask about career, money, marriage, weak houses, graha delivery, or present timing from SAV and BAV.
-          </Text>
-          <TextInput
-            value={analysisQuestion}
-            onChangeText={setAnalysisQuestion}
-            placeholder="Example: How is career support right now from Ashtakavarga?"
-            placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(107,114,128,0.9)'}
-            multiline
-            textAlignVertical="top"
-            style={[
-              styles.analysisQuestionInput,
-              {
-                color: colors.text,
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : '#fff',
-                borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)',
-              },
-            ]}
+          <DateNavigator
+            date={selectedDate}
+            onDateChange={setSelectedDate}
+            cosmicTheme={true}
+            resetDate={birthData ? (parseCalendarDateInput(birthData.date) || new Date()) : new Date()}
           />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.analysisSuggestionRow}>
-            {ASHTAKVARGA_QUESTION_SUGGESTIONS.map((suggestion) => (
-              <TouchableOpacity
-                key={suggestion}
-                style={[styles.analysisSuggestionChip, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(249,115,22,0.12)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(249,115,22,0.18)' }]}
-                onPress={() => {
-                  setAnalysisQuestion(suggestion);
-                  probeAshtakavargaAnalysis(suggestion);
-                }}
-              >
-                <Text style={[styles.analysisSuggestionText, { color: colors.textSecondary }]}>{suggestion}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={styles.analysisBenefits}>
+            {renderAnalysisBenefit('calendar-outline', `Reading date: ${selectedLabel}`)}
+            {renderAnalysisBenefit('trending-up-outline', 'Supportive and sensitive houses right now')}
+            {renderAnalysisBenefit('compass-outline', 'Timing guidance from SAV and BAV')}
+          </View>
           <View style={styles.analysisQuestionActions}>
             <TouchableOpacity
               style={[styles.analysisAskButton, { backgroundColor: colors.primary, opacity: loadingInsight ? 0.7 : 1 }]}
-              onPress={requestAshtakavargaAnalysis}
+              onPress={requestAshtakavargaOverview}
               disabled={loadingInsight}
             >
               {loadingInsight ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="search-outline" size={16} color="#fff" />
-                  <Text style={styles.analysisAskButtonText}>
-                    {analysisQuestion.trim() ? 'Ask Ashtakavarga' : 'Get Overview'}
-                  </Text>
+                  <Ionicons name="analytics-outline" size={16} color="#fff" />
+                  <Text style={styles.analysisAskButtonText}>Generate Transit Reading</Text>
                 </>
               )}
             </TouchableOpacity>
-            {analysisQuestion.trim() ? (
-              <TouchableOpacity
-                style={[styles.analysisClearButton, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
-                onPress={() => setAnalysisQuestion('')}
-              >
-                <Text style={[styles.analysisClearButtonText, { color: colors.textSecondary }]}>Clear</Text>
-              </TouchableOpacity>
-            ) : null}
             <TouchableOpacity
               style={[styles.analysisHistoryButton, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
               onPress={() => navigation.navigate('AshtakvargaHistory')}
@@ -686,32 +742,180 @@ export default function AshtakvargaOracle({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+        {renderAnalysisAnswer('transit')}
+      </>
+    );
+  };
 
-        {completeOracleData ? (
-          <View style={[styles.analysisAnswerCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.78)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
-            <Text style={[styles.analysisAnswerTitle, { color: colors.text }]}>
-              {lastAskedQuestion ? 'Answer' : 'Overview'}
-            </Text>
-            {lastAskedQuestion ? (
-              <Text style={[styles.analysisAnswerQuestion, { color: colors.primary }]}>Q: {lastAskedQuestion}</Text>
-            ) : null}
-            {headline ? (
-              <Text style={[styles.analysisAnswerHeadline, { color: colors.textSecondary }]}>{headline}</Text>
-            ) : null}
-            {sections.map((section, index) => (
-              <View key={`${section.title}-${index}`} style={styles.analysisAnswerSection}>
-                <Text style={[styles.analysisAnswerSectionTitle, { color: colors.text }]}>{section.title}</Text>
-                {(section.bullets || []).map((bullet, bulletIndex) => (
-                  <Text key={`${section.title}-${bulletIndex}`} style={[styles.bulletPoint, { color: colors.textSecondary }]}>
-                    • {String(bullet)}
-                  </Text>
-                ))}
-              </View>
-            ))}
+  const renderAskMessage = (message) => {
+    if (message.role === 'user') {
+      return (
+        <View key={message.id} style={styles.askUserBubbleRow}>
+          <View style={[styles.askUserBubble, { backgroundColor: colors.primary }]}>
+            <Text style={styles.askUserText}>{message.text}</Text>
           </View>
-        ) : null}
+        </View>
+      );
+    }
 
-        {renderLifePredictionsCta()}
+    const answer = message.data || {};
+    const headline = answer.headline || answer.oracle_message || '';
+    const sections = Array.isArray(answer.sections) ? answer.sections : [];
+
+    return (
+      <View key={message.id} style={styles.askAssistantBubbleRow}>
+        <View style={[styles.askAssistantAvatar, { backgroundColor: theme === 'dark' ? 'rgba(255,215,0,0.16)' : 'rgba(249,115,22,0.12)' }]}>
+          <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+        </View>
+        <View style={[styles.askAssistantBubble, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.8)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+          {headline ? (
+            <Text style={[styles.askAssistantHeadline, { color: colors.text }]}>{headline}</Text>
+          ) : null}
+          {sections.map((section, sectionIndex) => (
+            <View key={`${message.id}-${section.title}-${sectionIndex}`} style={styles.askAssistantSection}>
+              {section.title ? (
+                <Text style={[styles.askAssistantSectionTitle, { color: colors.text }]}>{section.title}</Text>
+              ) : null}
+              {(section.bullets || []).map((bullet, bulletIndex) => (
+                <Text key={`${message.id}-${sectionIndex}-${bulletIndex}`} style={[styles.askAssistantBullet, { color: colors.textSecondary }]}>
+                  • {String(bullet)}
+                </Text>
+              ))}
+            </View>
+          ))}
+          {!headline && sections.length === 0 ? (
+            <Text style={[styles.askAssistantBullet, { color: colors.textSecondary }]}>
+              I found your Ashtakvarga answer, but it came back without readable details. Try asking again with a more specific life area.
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    );
+  };
+
+  const renderAskAnalysisPanel = () => (
+    <View style={[styles.askChatCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.7)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+      <View style={styles.askChatHeader}>
+        <View style={styles.askChatTitleBlock}>
+          <Text style={[styles.analysisQuestionTitle, { color: colors.text }]}>Ask Ashtakvarga</Text>
+          <Text style={[styles.analysisQuestionSubtitle, { color: colors.textSecondary }]}>
+            Keep asking follow-ups about career, money, marriage, weak houses, planets, or timing.
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.analysisHistoryButton, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
+          onPress={() => navigation.navigate('AshtakvargaHistory')}
+        >
+          <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
+          <Text style={[styles.analysisHistoryButtonText, { color: colors.textSecondary }]}>History</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.askMessages}>
+        {askMessages.length === 0 ? (
+          <View style={styles.askAssistantBubbleRow}>
+            <View style={[styles.askAssistantAvatar, { backgroundColor: theme === 'dark' ? 'rgba(255,215,0,0.16)' : 'rgba(249,115,22,0.12)' }]}>
+              <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+            </View>
+            <View style={[styles.askAssistantBubble, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.8)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+              <Text style={[styles.askAssistantHeadline, { color: colors.text }]}>
+                What would you like to understand from your Ashtakvarga?
+              </Text>
+              <Text style={[styles.askAssistantBullet, { color: colors.textSecondary }]}>
+                Start with one life area, then ask follow-ups as the reading unfolds.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          askMessages.map(renderAskMessage)
+        )}
+      </View>
+
+      <GHScrollView
+        horizontal
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+        style={styles.analysisSuggestionScroller}
+        contentContainerStyle={styles.analysisSuggestionRow}
+        scrollEventThrottle={16}
+      >
+        {ASHTAKVARGA_QUESTION_SUGGESTIONS.map((suggestion) => (
+          <TouchableOpacity
+            key={suggestion}
+            style={[styles.analysisSuggestionChip, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(249,115,22,0.12)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(249,115,22,0.18)' }]}
+            onPress={() => {
+              setAnalysisQuestion(suggestion);
+              probeAshtakavargaAnalysis(suggestion);
+            }}
+            disabled={loadingInsight}
+          >
+            <Text style={[styles.analysisSuggestionText, { color: colors.textSecondary }]}>{suggestion}</Text>
+          </TouchableOpacity>
+        ))}
+      </GHScrollView>
+
+      <View style={styles.askComposerToolbar}>
+        <TouchableOpacity
+          style={[styles.askComposerHistoryLink, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)', backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)' }]}
+          onPress={() => navigation.navigate('AshtakvargaHistory')}
+        >
+          <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
+          <Text style={[styles.analysisHistoryButtonText, { color: colors.textSecondary }]}>History</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.askComposer, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : '#fff', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
+        <TextInput
+          value={analysisQuestion}
+          onChangeText={setAnalysisQuestion}
+          placeholder="Ask a follow-up..."
+          placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(107,114,128,0.9)'}
+          multiline
+          textAlignVertical="center"
+          style={[styles.askComposerInput, { color: colors.text }]}
+        />
+        <TouchableOpacity
+          style={[styles.askSendButton, { backgroundColor: colors.primary, opacity: loadingInsight || !analysisQuestion.trim() ? 0.7 : 1 }]}
+          onPress={requestAshtakavargaAnalysis}
+          disabled={loadingInsight || !analysisQuestion.trim()}
+        >
+          {loadingInsight ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="send" size={18} color="#fff" />
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderOraclesPulse = () => {
+    const activePanel =
+      analysisMode === 'transit'
+        ? renderTransitAnalysisPanel()
+        : analysisMode === 'ask'
+          ? renderAskAnalysisPanel()
+          : renderBirthAnalysisPanel();
+
+    return (
+      <ScrollView
+        style={styles.tabContent}
+        contentContainerStyle={styles.analysisTabContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+      >
+        <View style={styles.titleContainer}>
+          <Text style={[styles.mapTitle, { color: colors.text }]}>Ashtakvarga Predictions</Text>
+          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>
+            Choose the kind of reading you want before using credits.
+          </Text>
+        </View>
+
+        {renderAnalysisModeTabs()}
+
+        {activePanel}
       </ScrollView>
     );
   };
@@ -1875,52 +2079,158 @@ const styles = {
     flex: 1, 
     paddingHorizontal: 20,
   },
-  analysisSummaryCard: {
+  analysisTabContent: {
+    paddingBottom: 20,
+  },
+  analysisModeTabs: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 14,
+  },
+  analysisModeTab: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 6,
+  },
+  analysisModeTabText: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 5,
+  },
+  analysisPanelCard: {
     borderWidth: 1,
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
     marginBottom: 18,
   },
-  analysisSummaryTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  analysisSummaryDate: {
-    fontSize: 14,
-    marginBottom: 14,
-  },
-  analysisMetricRow: {
+  analysisPanelHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 14,
   },
-  analysisMetricCard: {
-    flex: 1,
+  analysisPanelIcon: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  analysisMetricValue: {
-    fontSize: 24,
+  analysisPanelTitleBlock: {
+    flex: 1,
+  },
+  analysisPanelTitle: {
+    fontSize: 19,
+    lineHeight: 24,
     fontWeight: '800',
-    marginBottom: 4,
-    textAlign: 'center',
+    marginBottom: 5,
   },
-  analysisMetricLabel: {
-    fontSize: 12,
-    textAlign: 'center',
+  analysisPanelSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
   },
-  analysisHeadline: {
-    fontSize: 15,
-    lineHeight: 22,
+  analysisBenefits: {
+    marginBottom: 14,
+  },
+  analysisBenefitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 9,
+  },
+  analysisBenefitText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    marginLeft: 8,
   },
   analysisQuestionCard: {
     borderWidth: 1,
     borderRadius: 18,
     padding: 16,
     marginBottom: 18,
+  },
+  askChatCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 18,
+  },
+  askChatHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+  },
+  askChatTitleBlock: {
+    flex: 1,
+  },
+  askMessages: {
+    marginBottom: 12,
+  },
+  askUserBubbleRow: {
+    alignItems: 'flex-end',
+    marginBottom: 10,
+  },
+  askUserBubble: {
+    maxWidth: '86%',
+    borderRadius: 16,
+    borderBottomRightRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  askUserText: {
+    color: '#fff',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  askAssistantBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  askAssistantAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 2,
+  },
+  askAssistantBubble: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 16,
+    borderTopLeftRadius: 5,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  askAssistantHeadline: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  askAssistantSection: {
+    marginTop: 8,
+  },
+  askAssistantSectionTitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  askAssistantBullet: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 4,
   },
   analysisQuestionTitle: {
     fontSize: 20,
@@ -1943,8 +2253,12 @@ const styles = {
     marginBottom: 12,
   },
   analysisSuggestionRow: {
-    paddingRight: 4,
-    marginBottom: 14,
+    paddingHorizontal: 4,
+    paddingBottom: 14,
+  },
+  analysisSuggestionScroller: {
+    marginHorizontal: -4,
+    flexGrow: 0,
   },
   analysisSuggestionChip: {
     borderWidth: 1,
@@ -1960,6 +2274,7 @@ const styles = {
   analysisQuestionActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   analysisAskButton: {
     flexDirection: 'row',
@@ -1969,12 +2284,15 @@ const styles = {
     paddingVertical: 12,
     paddingHorizontal: 16,
     minHeight: 48,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   analysisAskButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '800',
     marginLeft: 8,
+    flexShrink: 1,
   },
   analysisClearButton: {
     borderWidth: 1,
@@ -1999,6 +2317,46 @@ const styles = {
   analysisHistoryButtonText: {
     fontSize: 13,
     fontWeight: '700',
+    marginLeft: 6,
+  },
+  askComposer: {
+    borderWidth: 1,
+    borderRadius: 18,
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 6,
+  },
+  askComposerToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
+  askComposerHistoryLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  askComposerInput: {
+    flex: 1,
+    maxHeight: 96,
+    minHeight: 38,
+    fontSize: 15,
+    lineHeight: 21,
+    paddingVertical: 8,
+    paddingRight: 8,
+  },
+  askSendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 6,
   },
   analysisAnswerCard: {

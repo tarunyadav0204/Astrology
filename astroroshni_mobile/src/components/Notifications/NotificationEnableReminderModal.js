@@ -89,8 +89,9 @@ export default function NotificationEnableReminderModal({ homeActive }) {
     }
   };
 
-  const cardBg = theme === 'dark' ? colors.cardBackground || '#1e293b' : '#ffffff';
-  const borderColor = colors.cardBorder || 'rgba(0,0,0,0.08)';
+  const overlayBg = theme === 'dark' ? '#020617' : '#fff7ed';
+  const cardBg = theme === 'dark' ? '#1e293b' : '#ffffff';
+  const borderColor = theme === 'dark' ? '#334155' : '#e5e7eb';
 
   return (
     <Modal
@@ -100,7 +101,7 @@ export default function NotificationEnableReminderModal({ homeActive }) {
       statusBarTranslucent
       onRequestClose={onNotNow}
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: overlayBg }]}>
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
           <View style={styles.iconWrap}>
             <Ionicons name="notifications" size={36} color="#ff6b35" />
@@ -137,7 +138,6 @@ export default function NotificationEnableReminderModal({ homeActive }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,

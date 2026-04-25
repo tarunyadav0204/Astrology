@@ -35,6 +35,162 @@ def _question_looks_like_roman_hindi(text: str) -> bool:
     return any(re.search(p, low) for p in patterns)
 
 
+_NON_LATIN_SCRIPT_RANGES = (
+    ("bengali", 0x0980, 0x09FF),
+    ("gurmukhi", 0x0A00, 0x0A7F),
+    ("gujarati", 0x0A80, 0x0AFF),
+    ("oriya", 0x0B00, 0x0B7F),
+    ("tamil", 0x0B80, 0x0BFF),
+    ("telugu", 0x0C00, 0x0C7F),
+    ("kannada", 0x0C80, 0x0CFF),
+    ("malayalam", 0x0D00, 0x0D7F),
+    ("thai", 0x0E00, 0x0E7F),
+    ("tibetan", 0x0F00, 0x0FFF),
+    ("georgian", 0x10A0, 0x10FF),
+    ("hangul", 0xAC00, 0xD7AF),
+    ("hiragana", 0x3040, 0x309F),
+    ("katakana", 0x30A0, 0x30FF),
+    ("cjk", 0x4E00, 0x9FFF),
+    ("arabic", 0x0600, 0x06FF),
+    ("hebrew", 0x0590, 0x05FF),
+    ("cyrillic", 0x0400, 0x04FF),
+)
+
+
+def _question_has_other_non_english_script(text: str) -> bool:
+    if not text:
+        return False
+    if _question_has_devanagari(text):
+        return False
+    for ch in text:
+        cp = ord(ch)
+        for _, start, end in _NON_LATIN_SCRIPT_RANGES:
+            if start <= cp <= end:
+                return True
+    return False
+
+
+def _question_has_extended_latin_non_english_cues(text: str) -> bool:
+    if not text or not text.strip():
+        return False
+    # Covers many Latin-script languages with diacritics while avoiding ordinary ASCII English.
+    return bool(re.search(r"[À-ÖØ-öø-ÿĀ-ž]", text))
+
+
+def resolve_output_language_policy(language: str, user_question: str) -> dict:
+    app_language = str(language or "english").strip() or "english"
+    app_language_lower = app_language.lower()
+    question = (user_question or "").strip()
+
+    if app_language_lower != "english":
+        return {
+            "kind": "app_language",
+            "app_language": app_language,
+            "app_language_lower": app_language_lower,
+            "question_is_hindi": _question_has_devanagari(question)
+            or _question_looks_like_roman_hindi(question),
+        }
+
+    if _question_has_devanagari(question) or _question_looks_like_roman_hindi(question):
+        return {
+            "kind": "question_hindi_devanagari",
+            "app_language": app_language,
+            "app_language_lower": app_language_lower,
+            "question_is_hindi": True,
+        }
+
+    if _question_has_other_non_english_script(question) or _question_has_extended_latin_non_english_cues(question):
+        return {
+            "kind": "question_language_override",
+            "app_language": app_language,
+            "app_language_lower": app_language_lower,
+            "question_is_hindi": False,
+        }
+
+    return {
+        "kind": "english_default",
+        "app_language": app_language,
+        "app_language_lower": app_language_lower,
+        "question_is_hindi": False,
+    }
+
+
+def build_output_language_blocks(language: str, user_question: str) -> tuple[dict, str, str]:
+    policy = resolve_output_language_policy(language, user_question)
+    app_language = policy["app_language"]
+    kind = policy["kind"]
+
+    if kind == "app_language":
+        language_instruction = f"""OUTPUT LANGUAGE (read CURRENT QUESTION at the end of this prompt, but follow the app-selected language first):
+
+The app-selected language is **{app_language}**. Write the entire substantive answer in **{app_language}**.
+
+CRITICAL:
+- Use the app-selected language for prose and section headers.
+- Do NOT keep speaking in a previous turn's language just because the conversation started that way.
+- Use CURRENT QUESTION to understand the user's meaning, but do not switch away from **{app_language}** unless a stricter system rule explicitly tells you to.
+"""
+        final_check = (
+            f"FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION, but keep the user-visible answer in the "
+            f'app-selected language "{app_language}". Do not drift into an earlier turn\'s language.'
+        )
+        return policy, language_instruction, final_check
+
+    if kind == "question_hindi_devanagari":
+        language_instruction = """OUTPUT LANGUAGE (CURRENT QUESTION OVERRIDES ENGLISH):
+
+The app-selected language is **english**, but the CURRENT QUESTION is clearly Hindi or Hinglish.
+
+You MUST write the entire substantive answer in **Hindi using Devanagari script (हिंदी)**.
+
+CRITICAL:
+- Ignore earlier English turns when deciding the answer language.
+- Do NOT answer in English just because the app language is english.
+- Do NOT write the main answer in Roman Hindi; use Devanagari Hindi.
+"""
+        final_check = (
+            "FINAL CHECK BEFORE YOU WRITE: CURRENT QUESTION is Hindi/Hinglish, so the answer must be in "
+            "Devanagari Hindi—not English—even if earlier conversation turns were English."
+        )
+        return policy, language_instruction, final_check
+
+    if kind == "question_language_override":
+        language_instruction = """OUTPUT LANGUAGE (CURRENT QUESTION OVERRIDES ENGLISH):
+
+The app-selected language is **english**, but the CURRENT QUESTION is clearly written in another non-English language.
+
+You MUST answer in the **same language and script as CURRENT QUESTION**.
+
+CRITICAL:
+- Ignore earlier English turns when deciding the answer language.
+- Do NOT default back to English just because the app language is english.
+- Mirror the user's current-question language for prose and section headers.
+"""
+        final_check = (
+            "FINAL CHECK BEFORE YOU WRITE: CURRENT QUESTION is clearly not English, so answer in that same "
+            "language—not in English—even if previous turns were in English."
+        )
+        return policy, language_instruction, final_check
+
+    language_instruction = """OUTPUT LANGUAGE (read CURRENT QUESTION at the end of this prompt):
+
+DEFAULT — ENGLISH: The app-selected language is **english**. Write the entire answer in clear English unless the CURRENT QUESTION itself clearly overrides that.
+
+OVERRIDES BASED ONLY ON CURRENT QUESTION:
+- If CURRENT QUESTION is Hindi or Hinglish, switch to Devanagari Hindi.
+- If CURRENT QUESTION is clearly in some other non-English language, answer in that same language.
+
+CRITICAL:
+- Decide the language from the CURRENT QUESTION, not from earlier turns.
+- If CURRENT QUESTION is ordinary English, do not switch languages because of chart labels, names, or prior messages.
+"""
+    final_check = (
+        "FINAL CHECK BEFORE YOU WRITE: Use the CURRENT QUESTION—not prior turns—to decide the answer language. "
+        "If CURRENT QUESTION is ordinary English, answer in English."
+    )
+    return policy, language_instruction, final_check
+
+
 def build_multi_question_focus_instruction(language: str = "english") -> str:
     """
     Tells the answer model: if CURRENT QUESTION still bundles several distinct asks,
@@ -552,39 +708,7 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
         raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
     _lang = str(language or "english").strip() or "english"
-    _lang_lower = _lang.lower()
-
-    # When the client requests English, default to English unless the *question* is clearly Hindi/Hinglish.
-    if _lang_lower == "english":
-        language_instruction = f"""OUTPUT LANGUAGE (read CURRENT QUESTION at the end of this prompt):
-
-DEFAULT — ENGLISH: The app language is **english**. Write the **entire** answer in **clear English** (prose and section headers), including when birth data or chart JSON contains Indian place names or Hindi labels. Indian names or locations in the context do **not** mean you should switch the answer to Hindi.
-
-SWITCH TO HINDI (Devanagari) **only if** CURRENT QUESTION is clearly Hindi or Roman-Hindi:
-- The question contains **Devanagari** script, **or**
-- The question contains **obvious conversational Roman-Hindi** (e.g. mera/meri, batao/btao, kya/kab in a Hindi-style question — not normal English words like "what", "when", "career").
-
-If the question is ordinary English, you **must not** answer primarily in Hindi. Do not use Devanagari for the main answer in that case.
-
-"""
-        if (
-            not _question_has_devanagari(user_question)
-            and not _question_looks_like_roman_hindi(user_question)
-        ):
-            language_instruction += (
-                "\nAUTO-CHECK: CURRENT QUESTION has no Devanagari and no Roman-Hindi cues → "
-                "**English answer required**.\n"
-            )
-    else:
-        language_instruction = f"""OUTPUT LANGUAGE (you will see CURRENT QUESTION at the end of this prompt—infer language from that text and app language "{_lang}"):
-
-1) If CURRENT QUESTION is Hindi OR Roman Hindi (Hinglish), write the ENTIRE substantive answer in Hindi using Devanagari script (हिंदी) when appropriate for {_lang}. Jyotish terms may use natural Hindi or common transliteration.
-
-   Signals for Hinglish: words like mera/meri/mere, batao/btao, sab/sba kuch, dasha/dasa, shaadi/shadi, kab, kya, kaisa/kaisi, vishleshan, hai/hain, or any Devanagari.
-
-2) Otherwise: use app language "{_lang}" for the answer.
-
-"""
+    _, language_instruction, final_check = build_output_language_blocks(_lang, user_question)
     
     elaborate_instruction = """
 CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):
@@ -663,20 +787,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     
     prompt_parts.append(build_multi_question_focus_instruction(_lang))
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
-    if _lang_lower == "english":
-        prompt_parts.append(
-            "FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION and OUTPUT LANGUAGE above. "
-            "If CURRENT QUESTION is ordinary English (no Devanagari, not clear Roman-Hindi), "
-            "the full answer must be in English—do not switch to Hindi because of chart labels or names. "
-            "Only if CURRENT QUESTION is clearly Hindi or Roman-Hindi (per OUTPUT LANGUAGE), "
-            "write the substantive answer in Devanagari Hindi; you may use Hindi section titles then."
-        )
-    else:
-        prompt_parts.append(
-            "FINAL CHECK BEFORE YOU WRITE: Re-read CURRENT QUESTION. If it is Hindi or Hinglish, "
-            "your answer must be in Devanagari Hindi—not English—regardless of any English examples "
-            "or English section headers elsewhere in this prompt; you may use Hindi section titles."
-        )
+    prompt_parts.append(final_check)
     prompt_parts.append(FAQ_META_INSTRUCTION.strip())
     
     return "\n\n".join(prompt_parts)
