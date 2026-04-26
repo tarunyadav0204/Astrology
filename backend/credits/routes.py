@@ -19,6 +19,9 @@ promo_manager = PromoCodeManager()
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110
+DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210
+
 # Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback
 def _get_play_credentials_path():
     return os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON") or os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
@@ -1271,11 +1274,37 @@ def _get_pricing_with_originals():
     return pricing, pricing_original
 
 
+def _safe_countdown_seconds(value, fallback: int) -> int:
+    try:
+        parsed = int(str(value).strip())
+        return parsed if parsed > 0 else fallback
+    except Exception:
+        return fallback
+
+
+def _get_chat_countdown_settings() -> Dict[str, int]:
+    """Timer settings for chat loading countdown (mobile/web)."""
+    try:
+        from utils.admin_settings import get_setting
+        standard_raw = get_setting("chat_countdown_standard_seconds")
+        premium_raw = get_setting("chat_countdown_premium_seconds")
+    except Exception:
+        standard_raw = None
+        premium_raw = None
+    return {
+        "standard": _safe_countdown_seconds(standard_raw, DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS),
+        "premium": _safe_countdown_seconds(premium_raw, DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS),
+    }
+
+
 @router.get("/settings/analysis-pricing")
 async def get_analysis_pricing():
     """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough). Unauthenticated; base/admin pricing."""
     pricing, pricing_original = _get_pricing_with_originals()
-    result = {"pricing": pricing}
+    result = {
+        "pricing": pricing,
+        "chat_countdown_seconds": _get_chat_countdown_settings(),
+    }
     if pricing_original:
         result["pricing_original"] = pricing_original
     return result
@@ -1398,7 +1427,11 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
     except (TypeError, ValueError):
         pass
 
-    result = {"pricing": pricing, "subscription_discount_percent": discount_percent}
+    result = {
+        "pricing": pricing,
+        "subscription_discount_percent": discount_percent,
+        "chat_countdown_seconds": _get_chat_countdown_settings(),
+    }
     if tier_name:
         result["subscription_tier_name"] = tier_name
     if pricing_original:
@@ -1844,7 +1877,7 @@ async def get_question_cost_summary(
     """Question unit economics summary: question counts, paid/free split, charged money, and rough AI cost."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    from datetime import date as date_type
+    from datetime import date as date_type, timedelta
     today = date_type.today()
     if from_date and to_date:
         try:
@@ -1853,11 +1886,13 @@ async def get_question_cost_summary(
             if fd > td:
                 fd, td = td, fd
         except ValueError:
-            fd = today.replace(day=1)
+            fd = today
             td = today
     else:
-        fd = today.replace(day=1)
+        fd = today
         td = today
+    start_dt = datetime.combine(fd, datetime.min.time())
+    end_exclusive_dt = datetime.combine(td + timedelta(days=1), datetime.min.time())
 
     # Business rule requested: 1 credit = ₹1
     inr_per_credit = 1.0
@@ -1881,9 +1916,9 @@ async def get_question_cost_summary(
               AND cm.status = 'completed'
               AND COALESCE(cm.message_type, 'answer') = 'answer'
               AND cm.completed_at IS NOT NULL
-              AND date(cm.completed_at) >= %s AND date(cm.completed_at) <= %s
+              AND cm.completed_at >= %s AND cm.completed_at < %s
             """,
-            (fd.isoformat(), td.isoformat()),
+            (start_dt, end_exclusive_dt),
         )
         total_completed_answers = int((cur.fetchone() or [0])[0] or 0)
 
@@ -1895,9 +1930,9 @@ async def get_question_cost_summary(
             WHERE transaction_type = 'spent'
               AND source = 'feature_usage'
               AND reference_id = 'chat_question'
-              AND date(created_at) >= %s AND date(created_at) <= %s
+              AND created_at >= %s AND created_at < %s
             """,
-            (fd.isoformat(), td.isoformat()),
+            (start_dt, end_exclusive_dt),
         )
         paid_question_rows, paid_credits_spent = cur.fetchone() or (0, 0)
         paid_question_rows = int(paid_question_rows or 0)
@@ -1933,32 +1968,22 @@ async def get_question_cost_summary(
         cur = execute(
             conn,
             f"""
-            SELECT cm.session_id,
-                   cm.message_id,
-                   cm.content AS assistant_answer,
+            SELECT cm.content AS assistant_answer,
                    cs.chat_llm_model,
                    {input_tok_expr} AS llm_input_tokens,
                    {output_tok_expr} AS llm_output_tokens,
                    {cached_input_tok_expr} AS llm_cached_input_tokens,
                    {non_cached_input_tok_expr} AS llm_non_cached_input_tokens,
-                   {parallel_usage_expr} AS parallel_llm_usage,
-                   (
-                     SELECT content FROM chat_messages m2
-                     WHERE m2.session_id = cm.session_id
-                       AND m2.sender = 'user'
-                       AND m2.message_id < cm.message_id
-                     ORDER BY m2.message_id DESC
-                     LIMIT 1
-                   ) AS user_question
+                   {parallel_usage_expr} AS parallel_llm_usage
             FROM chat_messages cm
             JOIN chat_sessions cs ON cs.session_id = cm.session_id
             WHERE cm.sender = 'assistant'
               AND cm.status = 'completed'
               AND COALESCE(cm.message_type, 'answer') = 'answer'
               AND cm.completed_at IS NOT NULL
-              AND date(cm.completed_at) >= %s AND date(cm.completed_at) <= %s
+              AND cm.completed_at >= %s AND cm.completed_at < %s
             """,
-            (fd.isoformat(), td.isoformat()),
+            (start_dt, end_exclusive_dt),
         )
         rows = cur.fetchall() or []
 
@@ -1969,13 +1994,13 @@ async def get_question_cost_summary(
     cache_setup_cost_total_inr = 0.0
     output_cost_total_inr = 0.0
     for r in rows:
-        model = (r[3] or "unknown").strip() or "unknown"
-        a = str(r[2] or "")
-        llm_input_tokens = int(r[4] or 0)
-        llm_output_tokens = int(r[5] or 0)
-        llm_cached_input_tokens = int(r[6] or 0)
-        llm_non_cached_input_tokens = int(r[7] or 0)
-        llm_parallel_usage_raw = r[8] if len(r) > 8 else None
+        model = (r[1] or "unknown").strip() or "unknown"
+        a = str(r[0] or "")
+        llm_input_tokens = int(r[2] or 0)
+        llm_output_tokens = int(r[3] or 0)
+        llm_cached_input_tokens = int(r[4] or 0)
+        llm_non_cached_input_tokens = int(r[5] or 0)
+        llm_parallel_usage_raw = r[6] if len(r) > 6 else None
         cache_setup_tokens = _extract_cache_setup_tokens(llm_parallel_usage_raw)
         if llm_input_tokens > 0:
             q_tokens = llm_input_tokens
