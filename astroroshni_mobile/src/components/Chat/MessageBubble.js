@@ -33,7 +33,7 @@ import { useCredits } from '../../credits/CreditContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
-export default function MessageBubble({
+function MessageBubble({
   message,
   language,
   onFollowUpClick,
@@ -1881,7 +1881,21 @@ export default function MessageBubble({
     </Animated.View>
     </>
   );
+}
+
+const areMessageBubblePropsEqual = (prevProps, nextProps) => {
+  // Skip heavy bubble rerenders when unrelated parent state changes (e.g., input typing).
+  // Message object identity changes whenever that row actually updates.
+  if (prevProps.message !== nextProps.message) return false;
+  if (prevProps.language !== nextProps.language) return false;
+  if (prevProps.partnership !== nextProps.partnership) return false;
+  if (prevProps.sessionId !== nextProps.sessionId) return false;
+  if (prevProps.podcastAutoLaunchMessageId !== nextProps.podcastAutoLaunchMessageId) return false;
+  if (prevProps.podcastAutoLaunchKey !== nextProps.podcastAutoLaunchKey) return false;
+  return true;
 };
+
+export default React.memo(MessageBubble, areMessageBubblePropsEqual);
 
 const styles = StyleSheet.create({
   container: {

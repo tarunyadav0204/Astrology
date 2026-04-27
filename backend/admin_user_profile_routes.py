@@ -164,6 +164,7 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
         "karma_insights": [],
         "event_timeline_jobs": [],
         "credit_transactions": [],
+        "subscriptions": [],
         "trading": {"daily": [], "monthly": []},
     }
 
@@ -273,6 +274,60 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
             )
             profile["credit_transactions"] = [_row_dict(r) for r in (cur.fetchall() or [])]
 
+            try:
+                cur.execute(
+                    """
+                    SELECT us.subscription_id, us.userid, us.plan_id,
+                           sp.platform, sp.plan_name, sp.tier_name, sp.discount_percent,
+                           sp.google_play_product_id, sp.price, sp.duration_months,
+                           us.status, us.start_date, us.end_date, us.created_at AS recorded_at,
+                           CASE
+                               WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN TRUE
+                               ELSE FALSE
+                           END AS is_current,
+                           CASE
+                               WHEN us.status <> 'active' OR us.end_date < CURRENT_DATE THEN us.end_date
+                               ELSE NULL
+                           END AS ended_at
+                    FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE us.userid = %s
+                    ORDER BY
+                        CASE WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN 0 ELSE 1 END,
+                        us.end_date DESC NULLS LAST,
+                        us.start_date DESC NULLS LAST
+                    LIMIT 50
+                    """,
+                    (user_id,),
+                )
+            except Exception:
+                cur.execute(
+                    """
+                    SELECT us.subscription_id, us.userid, us.plan_id,
+                           sp.platform, sp.plan_name, NULL AS tier_name, NULL AS discount_percent,
+                           NULL AS google_play_product_id, sp.price, sp.duration_months,
+                           us.status, us.start_date, us.end_date, NULL AS recorded_at,
+                           CASE
+                               WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN TRUE
+                               ELSE FALSE
+                           END AS is_current,
+                           CASE
+                               WHEN us.status <> 'active' OR us.end_date < CURRENT_DATE THEN us.end_date
+                               ELSE NULL
+                           END AS ended_at
+                    FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE us.userid = %s
+                    ORDER BY
+                        CASE WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN 0 ELSE 1 END,
+                        us.end_date DESC NULLS LAST,
+                        us.start_date DESC NULLS LAST
+                    LIMIT 50
+                    """,
+                    (user_id,),
+                )
+            profile["subscriptions"] = [_row_dict(r) for r in (cur.fetchall() or [])]
+
             cur.execute(
                 """
                 SELECT id, cache_key, user_id, target_date,
@@ -336,6 +391,14 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
         "karma_insights_count": len(profile["karma_insights"]),
         "event_timeline_jobs_count": len(profile["event_timeline_jobs"]),
         "credit_transactions_count": len(profile["credit_transactions"]),
+        "subscriptions_count": len(profile["subscriptions"]),
+        "active_subscriptions_count": len(
+            [
+                s
+                for s in profile["subscriptions"]
+                if bool(s.get("is_current"))
+            ]
+        ),
         "credits_purchased": credit_r["credits_purchased"],
         "credits_refunds": credit_r["credits_refunds"],
         "credits_promo": credit_r["credits_promo"],

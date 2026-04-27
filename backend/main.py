@@ -4836,10 +4836,18 @@ async def update_admin_subscription_plan(plan_id: int, body: dict, current_user:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     discount_percent = body.get('discount_percent')
+    features = body.get('features')
     if discount_percent is not None:
         discount_percent = int(discount_percent)
         if discount_percent < 0 or discount_percent > 100:
             raise HTTPException(status_code=400, detail="discount_percent must be 0-100")
+    if features is not None:
+        if isinstance(features, list):
+            features = json.dumps(features, ensure_ascii=False)
+        elif isinstance(features, dict):
+            features = json.dumps(features, ensure_ascii=False)
+        else:
+            features = str(features)
     
     with get_conn() as conn:
         cur = execute(conn, "SELECT plan_id FROM subscription_plans WHERE plan_id = %s", (plan_id,))
@@ -4854,6 +4862,12 @@ async def update_admin_subscription_plan(plan_id: int, body: dict, current_user:
                 )
             except Exception:
                 raise HTTPException(status_code=400, detail="discount_percent column not available")
+        if features is not None:
+            execute(
+                conn,
+                "UPDATE subscription_plans SET features = %s WHERE plan_id = %s",
+                (features, plan_id),
+            )
         conn.commit()
     
     return {"message": "Subscription plan updated", "plan_id": plan_id}

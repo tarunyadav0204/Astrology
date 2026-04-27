@@ -245,6 +245,13 @@ class ChatContextBuilder:
         house_lordships = full_context.get('house_lordships', {})
         self.augment_current_dashas_with_chart_hints(current_dashas, d1_chart, house_lordships)
         full_context['current_dashas'] = current_dashas
+
+        if intent_result:
+            try:
+                from ai.classical_sutra_rules import build_classical_rule_matches
+                full_context['classical_rule_matches'] = build_classical_rule_matches(full_context, intent_result)
+            except Exception as e:
+                print(f"⚠️ Classical rule matcher failed: {e}")
         
         # Filter divisional charts based on intent router recommendations
         if intent_result and intent_result.get('divisional_charts'):

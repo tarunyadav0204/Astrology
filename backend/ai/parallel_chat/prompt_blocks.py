@@ -52,6 +52,11 @@ ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or sof
 DASHA MANDATE: If dasha/chara/yogini period labels or windows are present in the payload, explicitly cite them in "analysis" (do not replace with generic timing language).
 """
 
+_BRANCH_JSON_FOOTER_6000 = _BRANCH_JSON_FOOTER.replace(
+    'Keep "analysis" under 12000 characters.',
+    'Keep "analysis" under 6000 characters.',
+)
+
 _PARASHARI_JSON_FOOTER = """
 OUTPUT FORMAT (NON-NEGOTIABLE):
 Return a single JSON object only (no markdown fences, no prose before or after). Schema:
@@ -91,6 +96,16 @@ You must not:
 - Hallucinate chart facts, dasha names, or date ranges not supported by the branch outputs.
 
 The following blocks are the merge-only doctrine (consultant voice, honesty, Final Verdict), not the full single-pass encyclopedia.
+"""
+
+
+CLASSICAL_RULE_MATCH_INSTRUCTION = """
+# CLASSICAL RULE MATCHES
+If VARIABLE_DATA_JSON contains `classical_rule_matches`, treat it as pre-filtered supporting evidence, not a mandate.
+- For now only `derived_12th_from_topic_house` is enabled: the 12th counted from the topic house shows expense, sacrifice, loss, release, or investment for that topic.
+- Use it only when its `evidence.activation_tags`, occupants, lords, or dasha hits make it relevant to the user's question.
+- Interpret constructively as investment/service when supported; interpret as leakage/conflict/fatigue/loss when afflicted or unsupported.
+- Do not force this rule into the branch output if stronger branch-specific evidence points elsewhere.
 """
 
 
@@ -134,6 +149,7 @@ def build_parashari_branch_static(intent_category: str) -> str:
         DASHA_DATES_SOVEREIGNTY,
         HOUSE_SIGNIFICATIONS,
         BHAVAM_BHAVESH_RULES,
+        CLASSICAL_RULE_MATCH_INSTRUCTION,
         DATA_SOVEREIGNTY,
         PERSONAL_CONSULTATION_RULES,
         "\n# TASK (PARASHARI BRANCH ONLY)\n",
@@ -165,7 +181,7 @@ def build_kp_branch_static(intent_category: str) -> str:
         "For every primary house cusp you analyze, follow KP_PILLAR order: **Cusp Sign Lord → Cusp Star Lord (NL) → Cusp Sub Lord (CSL)** before the 4-step chain; do not open with CSL alone.",
         "Apply 4-step sub-lord theory and dasha trigger after that cusp hierarchy. "
         "Do NOT repeat full Parashari divisional exposition, Jaimini, Nadi tables, Nakshatra mansion doctrine, or Ashtakavarga — other passes cover them.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "kp"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "kp"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -185,7 +201,7 @@ def build_nakshatra_branch_static(intent_category: str) -> str:
         "Navatara / Tara and D9 own-sign claims MUST follow [NK-7] (math + sign lords)—never contradict `navatara_warnings` or classical sign ownership.",
         "Tie lunar-mansion (nakshatra) themes, pada, Navatara quality, and Pushkara hints to the question. "
         "Do NOT repeat full Parashari divisional doctrine, Jaimini, Nadi linkage tables, or Ashtakavarga bindus — other passes cover them.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "nakshatra"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "nakshatra"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -223,7 +239,7 @@ def build_sudarshan_branch_static(intent_category: str) -> str:
         "Use ONLY `sudarshana_context` for raw chart mechanics when needed: `sudarshana_chakra` (lagna_chart, chandra_lagna, surya_lagna rotated houses + synthesis) and `sudarshana_dasha` when present. "
         "Apply Sudarshana rules with disciplined wording: compare event/house themes across Body (Lagna), Mind (Moon), Soul (Sun); state whether support is 3/3, 2/3, or mixed from `sx.topic.rows`, and for predictive/current questions also cite `sx.current.topic` or the relevant `sx.current.<topic>` block so the branch says whether the active periods are presently energizing that Sudarshana theme. Treat Sudarshana triggers as confirmation windows, not standalone guarantees. "
         "Do NOT repeat full Parashari divisional doctrine, Jaimini, Nadi tables, Nakshatra mansion analysis, KP cusp steps, or Ashtakavarga bindus — other branches cover them.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "sudarshan"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "sudarshan"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -265,7 +281,7 @@ def build_nadi_branch_static(intent_category: str = "") -> str:
         "For health questions, do not name diseases or overstate outcomes; keep the Nadi read at the level of astrological pattern, sensitivity, irregularity, chronicity, or acute flare tendency."
         if _is_health_category(intent_category)
         else "",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "nadi"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "nadi"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -298,6 +314,7 @@ def build_parashari_branch_static_agent(intent_category: str) -> str:
         DASHA_DATES_SOVEREIGNTY,
         HOUSE_SIGNIFICATIONS,
         BHAVAM_BHAVESH_RULES,
+        CLASSICAL_RULE_MATCH_INSTRUCTION,
         DATA_SOVEREIGNTY,
         PERSONAL_CONSULTATION_RULES,
         "\n# TASK (PARASHARI BRANCH ONLY — CONTEXT AGENTS)\n",
@@ -391,7 +408,7 @@ def build_nakshatra_branch_static_agent(intent_category: str) -> str:
         "For any house-specific topic (e.g. marriage → 7th lord, career → 10th lord): the **house lord(s)** must appear in `analysis` with nakshatra+pada and **navamsa (D9) dignity** (debilitation/exaltation/own per pada mapping)—not only karaka or occupants—[NK-6]. "
         "Navatara/Tara and **own sign in D9** follow [NK-7]: verify against JSON; never claim Scorpio (e.g.) as Jupiter’s own sign.",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, KP, or Ashtakavarga — other passes cover them.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "nakshatra"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "nakshatra"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -410,7 +427,7 @@ def build_kp_branch_static_agent(intent_category: str) -> str:
         "Use ONLY `kp` and `vim_dasha` in VARIABLE_DATA_JSON. `kp` has `KP` (cusp/significators); `vim_dasha` has current MD/AD for the trigger step.",
         "For each relevant house cusp, state **Sign Lord → Star Lord (NL) → Sub Lord (CSL)** from the JSON before CSL-only or 4-step detail; never skip Sign/Star lords when the payload lists them.",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, Nakshatra, or Ashtakavarga — other passes cover them.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "kp"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "kp"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -447,6 +464,6 @@ def build_sudarshan_branch_static_agent(intent_category: str) -> str:
         "Use `sx` as the Sudarshana reasoning spine and `sudarshana_context` only for raw backup: `sx.topic.rows` = relevant houses with 3-view agreement and support band, `sx.career` / `sx.relationship` / `sx.education` / `sx.health` = topic-specific Sudarshana blocks, `sx.current.topic` and `sx.current.<topic>` = current MD/AD/PD Sudarshana activation, `sx.dom` = dominant houses, `sx.patterns` = synthesis notes, `sx.triggers` = year-clock windows, `sx.D` = current dasha anchor. "
         "Rotate Lagna / Moon / Sun perspectives, but do not infer everything from scratch; prefer `sx` for disciplined reasoning, and for prediction/current questions explicitly say whether the active dasha planets are supporting or not supporting the Sudarshana topic. Treat triggers as confirmation windows rather than guaranteed events. "
         "Do NOT duplicate Parashari agent bundle, Jaimini, Nadi, Nakshatra, KP, or Ashtakavarga specialist passes — other branches cover them.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "sudarshan"),
+        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "sudarshan"),
     ]
     return "\n\n".join(p for p in parts if p)

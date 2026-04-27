@@ -69,7 +69,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [users, setUsers] = useState([]);
   const [usersSearchPhone, setUsersSearchPhone] = useState('');
   const [usersSearchName, setUsersSearchName] = useState('');
-  const [usersSearchRole, setUsersSearchRole] = useState('all');
   const [usersSearchSubscription, setUsersSearchSubscription] = useState('all');
   const [usersSearchCreatedStart, setUsersSearchCreatedStart] = useState('');
   const [usersSearchCreatedEnd, setUsersSearchCreatedEnd] = useState('');
@@ -106,6 +105,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editingPlanDiscount, setEditingPlanDiscount] = useState('');
   const [savingPlanDiscount, setSavingPlanDiscount] = useState(false);
+  const [planBenefitsDraft, setPlanBenefitsDraft] = useState({});
+  const [savingPlanBenefitsId, setSavingPlanBenefitsId] = useState(null);
   const [promoCodes, setPromoCodes] = useState([]);
   const [creditStats, setCreditStats] = useState({});
   const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1, max_uses_per_user: 1 });
@@ -138,6 +139,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deepseekChatModel, setDeepseekChatModel] = useState('');
   const [deepseekPremiumModel, setDeepseekPremiumModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
+  const [chatCountdownStandardSeconds, setChatCountdownStandardSeconds] = useState('110');
+  const [chatCountdownPremiumSeconds, setChatCountdownPremiumSeconds] = useState('210');
+  const [chatCountdownSaving, setChatCountdownSaving] = useState(false);
   const [podcastProvider, setPodcastProvider] = useState('tts');
   const [podcastProviderSaving, setPodcastProviderSaving] = useState(false);
   const [allowedDevices, setAllowedDevices] = useState([]);
@@ -222,6 +226,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         fetchCreditStats();
         fetchCreditSettings();
         fetchSubscriptionPlans();
+      } else if (activeSubTab === 'subscriptionPlans') {
+        fetchSubscriptionPlans();
       } else if (activeSubTab === 'requests') {
         fetchCreditRequests();
       }
@@ -267,9 +273,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       const androidMin = data.settings.find(s => s.key === 'min_android_version_code');
       const iosMin = data.settings.find(s => s.key === 'min_ios_build_number');
       const releaseNotes = data.settings.find(s => s.key === 'app_update_release_notes');
+      const timerStandard = data.settings.find((s) => s.key === 'chat_countdown_standard_seconds');
+      const timerPremium = data.settings.find((s) => s.key === 'chat_countdown_premium_seconds');
       setAndroidMinVersion(androidMin?.value ?? '');
       setIosMinVersion(iosMin?.value ?? '');
       setAppUpdateReleaseNotes(releaseNotes?.value ?? '');
+      setChatCountdownStandardSeconds((timerStandard?.value ?? '110').toString());
+      setChatCountdownPremiumSeconds((timerPremium?.value ?? '210').toString());
       setGeminiModelOptions(data.gemini_model_options || []);
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
@@ -488,6 +498,52 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
+  const handleSaveChatCountdownSettings = async () => {
+    const standard = Number(chatCountdownStandardSeconds);
+    const premium = Number(chatCountdownPremiumSeconds);
+    if (!Number.isFinite(standard) || standard <= 0 || !Number.isFinite(premium) || premium <= 0) {
+      alert('Enter valid positive countdown values (in seconds) for both standard and premium.');
+      return;
+    }
+    setChatCountdownSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [standardRes, premiumRes] = await Promise.all([
+        fetch('/api/admin/settings/chat_countdown_standard_seconds', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_countdown_standard_seconds',
+            value: String(Math.round(standard)),
+            description: 'Chat loading countdown (seconds) for standard chat',
+          }),
+        }),
+        fetch('/api/admin/settings/chat_countdown_premium_seconds', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_countdown_premium_seconds',
+            value: String(Math.round(premium)),
+            description: 'Chat loading countdown (seconds) for premium chat',
+          }),
+        }),
+      ]);
+      if (!standardRes.ok || !premiumRes.ok) {
+        const se = await standardRes.json().catch(() => ({}));
+        const pe = await premiumRes.json().catch(() => ({}));
+        alert('Failed to save countdown settings: ' + (se.detail || pe.detail || 'unknown error'));
+        return;
+      }
+      alert('Chat countdown settings saved. New chats will use updated timer values.');
+      fetchAdminSettings();
+    } catch (e) {
+      console.error('Error saving chat countdown settings:', e);
+      alert('Failed to save chat countdown settings.');
+    } finally {
+      setChatCountdownSaving(false);
+    }
+  };
+
   const handleSaveAppVersionConfig = async () => {
     const androidValue = androidMinVersion?.toString().trim();
     const iosValue = iosMinVersion?.toString().trim();
@@ -549,7 +605,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const fetchSubscriptionPlans = async () => {
     try {
       const data = await adminService.getSubscriptionPlans();
-      setSubscriptionPlans(data.plans || []);
+      const plans = data.plans || [];
+      setSubscriptionPlans(plans);
+      const nextDraft = {};
+      plans.forEach((p) => {
+        const id = p.plan_id ?? p.id;
+        if (id != null) nextDraft[id] = p.features != null ? String(p.features) : '';
+      });
+      setPlanBenefitsDraft(nextDraft);
     } catch (error) {
       console.error('Error fetching subscription plans:', error);
     }
@@ -562,7 +625,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     const summaryParams = {
       phone: usersSearchPhone.trim() || undefined,
       name: usersSearchName.trim() || undefined,
-      role: usersSearchRole === 'all' ? undefined : usersSearchRole,
       subscription: usersSearchSubscription === 'all' ? undefined : usersSearchSubscription,
     };
     setUsersSummaryLoading(true);
@@ -798,6 +860,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert(error.message || 'Failed to update discount');
     } finally {
       setSavingPlanDiscount(false);
+    }
+  };
+
+  const handleSavePlanBenefits = async (planId) => {
+    if (planId == null) {
+      alert('Invalid plan ID');
+      return;
+    }
+    const value = String(planBenefitsDraft?.[planId] ?? '').trim();
+    setSavingPlanBenefitsId(planId);
+    try {
+      await adminService.updateSubscriptionPlan(planId, { features: value });
+      await fetchSubscriptionPlans();
+      alert('Plan benefits updated');
+    } catch (error) {
+      console.error('Error updating plan benefits:', error);
+      alert(error.message || 'Failed to update plan benefits');
+    } finally {
+      setSavingPlanBenefitsId(null);
     }
   };
 
@@ -1601,6 +1682,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             Daily
           </button>
           <button
+            className={`subtab ${activeSubTab === 'subscriptionPlans' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('subscriptionPlans')}
+          >
+            Subscription Plans
+          </button>
+          <button
             className={`subtab ${activeSubTab === 'questionCost' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('questionCost')}
           >
@@ -1744,17 +1831,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           value={usersSearchName}
                           onChange={(e) => setUsersSearchName(e.target.value)}
                         />
-                      </label>
-                      <label>
-                        <span>Role</span>
-                        <select
-                          value={usersSearchRole}
-                          onChange={(e) => setUsersSearchRole(e.target.value)}
-                        >
-                          <option value="all">All</option>
-                          <option value="user">User</option>
-                          <option value="admin">Admin</option>
-                        </select>
                       </label>
                       <label>
                         <span>Subscription</span>
@@ -2616,6 +2692,54 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <AdminDailyActivity />
         )}
 
+        {activeTab === 'credits' && activeSubTab === 'subscriptionPlans' && (
+          <div className="credits-management">
+            <h2>Subscription Plans</h2>
+            <p className="credit-settings-hint">
+              Define plan benefits shown on mobile plan cards. You can store plain text (one benefit per line) or JSON like <code>{`{"benefits":["10% off all questions","Priority response"]}`}</code>.
+            </p>
+            <div className="settings-form settings-form-table subscription-plan-table">
+              {(subscriptionPlans || []).map((plan, index) => {
+                const planId = plan.plan_id ?? plan.id;
+                const rowKey = planId != null ? String(planId) : `plan-${index}`;
+                const isSaving = savingPlanBenefitsId != null && String(savingPlanBenefitsId) === String(planId);
+                const name = plan.tier_name || plan.plan_name || `Plan ${rowKey}`;
+                return (
+                  <div key={rowKey} className="setting-row subscription-plan-row" style={{ alignItems: 'flex-start' }}>
+                    <label className="setting-row-label" title={plan.google_play_product_id || ''} style={{ paddingTop: 8 }}>
+                      {name}
+                    </label>
+                    <div style={{ flex: 1, minWidth: 280 }}>
+                      <textarea
+                        value={planBenefitsDraft?.[planId] ?? ''}
+                        onChange={(e) =>
+                          setPlanBenefitsDraft((prev) => ({ ...prev, [planId]: e.target.value }))
+                        }
+                        rows={4}
+                        style={{ width: '100%', minHeight: 90, padding: 8, fontFamily: 'inherit', fontSize: 13 }}
+                        placeholder='e.g. {"benefits":["10% off all questions","Priority response"]}'
+                      />
+                    </div>
+                    <div className="plan-discount-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleSavePlanBenefits(planId)}
+                        className="save-btn plan-discount-btn"
+                        disabled={isSaving}
+                      >
+                        {isSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {(!subscriptionPlans || subscriptionPlans.length === 0) && (
+                <p className="credit-settings-hint">No subscription plans found.</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'credits' && activeSubTab === 'questionCost' && (
           <AdminQuestionCostSummary />
         )}
@@ -2746,7 +2870,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'notifications' && (
           <div className="notifications-admin">
-            <h2>Notifications</h2>
             <div className="notifications-tabs">
               <button
                 type="button"
@@ -3330,7 +3453,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <div className="notifications-form notifications-form--wide">
                 <div className="form-buttons notif-generate-row">
                   <label className="form-field" style={{ margin: 0 }}>
-                    <span>Date</span>
                     <input
                       type="date"
                       value={notifHistoryDate}
@@ -3516,6 +3638,49 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     ))}
                   </select>
                 )}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Chat loading countdown</h3>
+              <p className="settings-hint">
+                Controls how long the chat loading timer runs before it switches to the high-traffic waiting state.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Standard chat timer (seconds)</strong>
+                  <p>Used for normal chat mode.</p>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  value={chatCountdownStandardSeconds}
+                  onChange={(e) => setChatCountdownStandardSeconds(e.target.value)}
+                  style={{ width: '140px' }}
+                />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Premium chat timer (seconds)</strong>
+                  <p>Used when premium chat mode is selected.</p>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  value={chatCountdownPremiumSeconds}
+                  onChange={(e) => setChatCountdownPremiumSeconds(e.target.value)}
+                  style={{ width: '140px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveChatCountdownSettings}
+                  disabled={chatCountdownSaving}
+                >
+                  {chatCountdownSaving ? 'Saving…' : 'Save countdown timers'}
+                </button>
               </div>
             </div>
 

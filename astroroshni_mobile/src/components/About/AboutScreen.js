@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusB
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
@@ -10,9 +11,9 @@ export default function AboutScreen({ navigation }) {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
 
-  const appVersion = Constants.expoConfig?.version || '1.0.0';
-  const androidCode = Constants.expoConfig?.android?.versionCode ?? 122;
-  const iosBuild = Constants.expoConfig?.ios?.buildNumber;
+  const appVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
+  const androidCode = Number(Application.nativeBuildVersion || Constants.expoConfig?.android?.versionCode || 0) || undefined;
+  const iosBuild = Application.nativeBuildVersion || Constants.expoConfig?.ios?.buildNumber;
   const platform = Platform.OS;
 
   const versionLine =

@@ -1734,6 +1734,8 @@ input:checked + .toggle-slider:before {
 .notif-user-list--full {
   max-height: calc(100vh - 320px);
   min-height: 520px;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .notif-search-row {
@@ -1873,12 +1875,35 @@ input:checked + .toggle-slider:before {
 
 .notif-user-table--history {
   table-layout: auto;
+  min-width: 1380px;
 }
 
 .notif-user-table--history th,
 .notif-user-table--history td {
   white-space: normal;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.notif-user-table--history th:nth-child(1),
+.notif-user-table--history td:nth-child(1) {
+  min-width: 140px;
+}
+
+.notif-user-table--history th:nth-child(2),
+.notif-user-table--history td:nth-child(2) {
+  min-width: 150px;
+}
+
+.notif-user-table--history th:nth-child(3),
+.notif-user-table--history td:nth-child(3) {
+  min-width: 130px;
+}
+
+.notif-user-table--history th:nth-child(4),
+.notif-user-table--history td:nth-child(4) {
+  min-width: 160px;
 }
 
 .notif-user-table--history th:nth-child(5),
@@ -1887,7 +1912,13 @@ input:checked + .toggle-slider:before {
 .notif-user-table--history td:nth-child(6),
 .notif-user-table--history th:nth-child(7),
 .notif-user-table--history td:nth-child(7) {
-  min-width: 280px;
+  min-width: 320px;
+}
+
+.notif-user-table--history th:nth-child(8),
+.notif-user-table--history td:nth-child(8) {
+  min-width: 130px;
+  white-space: nowrap;
 }
 
 .notif-td-checkbox {
@@ -2413,6 +2444,17 @@ input:checked + .toggle-slider:before {
 
 .notif-generate-row {
   margin-top: 10px;
+  align-items: center;
+}
+
+.notif-generate-row .notif-search-btn {
+  padding: 0 14px;
+  height: 38px;
+  min-height: 38px;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 6px;
+  margin-top: 0;
 }
 
 .notif-generate-row .notif-search-btn:disabled {

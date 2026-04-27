@@ -87,6 +87,67 @@ def _parallel_cache_setup_tokens(parallel_usage: Optional[Dict[str, Any]]) -> in
         return 0
 
 
+def _parallel_stage_cost_breakdown_inr(
+    parallel_usage: Optional[Dict[str, Any]],
+    fallback_model_name: Optional[str],
+    fx: float,
+) -> Optional[Dict[str, float]]:
+    if not isinstance(parallel_usage, dict):
+        return None
+    stages = parallel_usage.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return None
+
+    input_non_cached_cost_inr = 0.0
+    input_cached_cost_inr = 0.0
+    output_cost_inr = 0.0
+
+    for st in stages:
+        if not isinstance(st, dict):
+            continue
+        model_name = (st.get("llm_model") or fallback_model_name or "").strip() or None
+        input_t = max(0, int(st.get("input_tokens") or 0))
+        cached_t = max(0, int(st.get("cached_tokens") or 0))
+        non_cached_t = max(0, int(st.get("non_cached_input_tokens") or 0))
+        output_t = max(0, int(st.get("output_tokens") or 0))
+        if non_cached_t <= 0 and input_t > 0:
+            non_cached_t = max(input_t - cached_t, 0)
+        rates = _resolve_model_rate(model_name, max(input_t, non_cached_t))
+        input_non_cached_cost_inr += (non_cached_t / 1_000_000.0) * float(rates["input"]) * fx
+        input_cached_cost_inr += (
+            (cached_t / 1_000_000.0)
+            * float(rates.get("cached_input") or rates["input"])
+            * fx
+        )
+        output_cost_inr += (output_t / 1_000_000.0) * float(rates["output"]) * fx
+
+    totals = parallel_usage.get("totals") if isinstance(parallel_usage.get("totals"), dict) else {}
+    standard_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_standard") or 0))
+    premium_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_premium") or 0))
+    cache_setup_cost_inr = 0.0
+    if standard_setup_tokens > 0:
+        standard_model = (totals.get("cache_setup_llm_model_standard") or fallback_model_name or "").strip() or None
+        rates_standard = _resolve_model_rate(standard_model, standard_setup_tokens)
+        cache_setup_cost_inr += (standard_setup_tokens / 1_000_000.0) * float(rates_standard["input"]) * fx
+    if premium_setup_tokens > 0:
+        premium_model = (totals.get("cache_setup_llm_model_premium") or fallback_model_name or "").strip() or None
+        rates_premium = _resolve_model_rate(premium_model, premium_setup_tokens)
+        cache_setup_cost_inr += (premium_setup_tokens / 1_000_000.0) * float(rates_premium["input"]) * fx
+
+    if standard_setup_tokens <= 0 and premium_setup_tokens <= 0:
+        legacy_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens") or 0))
+        if legacy_setup_tokens > 0:
+            rates_legacy = _resolve_model_rate(fallback_model_name, legacy_setup_tokens)
+            cache_setup_cost_inr += (legacy_setup_tokens / 1_000_000.0) * float(rates_legacy["input"]) * fx
+
+    return {
+        "input_non_cached_cost_inr": float(input_non_cached_cost_inr),
+        "input_cached_cost_inr": float(input_cached_cost_inr),
+        "cache_setup_cost_inr": float(cache_setup_cost_inr),
+        "output_cost_inr": float(output_cost_inr),
+    }
+
+
 def _timestamp_to_ist_iso(val) -> Optional[str]:
     """Convert DB timestamp (naive, stored as server local / IST) to ISO string with +05:30 so frontend displays correct IST."""
     if val is None:
@@ -715,33 +776,20 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
             messages = []
             for idx, r in enumerate(msg_rows):
                 sender = r[1]
+                sender_key = str(sender or "").strip().lower()
                 content = r[2]
-                # User question input is charged with fixed assumed context size per request.
                 tokens_est = _approx_tokens(content)
-                if sender == "user":
-                    next_msg = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
-                    next_sender = (next_msg[1] if next_msg else "") or ""
-                    next_type = ((next_msg[4] if next_msg else "") or "").strip().lower()
-                    next_in_m = _row_optional_int(next_msg[5]) if next_msg and len(next_msg) > 5 else None
-                    # Clarification/routing turn likely uses much smaller context than full answer turn.
-                    if next_in_m is not None and next_in_m > 0:
-                        tokens_est = next_in_m
-                    elif next_sender == "assistant" and next_type == "clarification":
-                        tokens_est = _LIGHT_INPUT_TOKENS_PER_QUESTION
-                    else:
-                        tokens_est = _FIXED_INPUT_TOKENS_PER_QUESTION
-                elif sender == "assistant":
+                input_non_cached_cost_inr = 0.0
+                input_cached_cost_inr = 0.0
+                cache_setup_cost_inr = 0.0
+                output_cost_inr = 0.0
+                cost_inr = 0.0
+
+                if sender_key == "assistant":
                     out_m = _row_optional_int(r[6]) if len(r) > 6 else None
                     if out_m is not None and out_m > 0:
                         tokens_est = out_m
-                if sender == "user":
-                    usd_per_1m = float(rates["input"])
-                    cost_inr = (tokens_est / 1_000_000.0) * usd_per_1m * fx
-                    input_non_cached_cost_inr = cost_inr
-                    input_cached_cost_inr = 0.0
-                    cache_setup_cost_inr = 0.0
-                    output_cost_inr = 0.0
-                else:
+
                     raw_in = _row_optional_int(r[5]) if len(r) > 5 else None
                     raw_out = _row_optional_int(r[6]) if len(r) > 6 else None
                     raw_cached_in = _row_optional_int(r[7]) if len(r) > 7 else None
@@ -769,25 +817,36 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     )
                     raw_parallel_for_cost = r[11] if len(r) > 11 else None
                     parallel_usage_for_cost = _parse_parallel_llm_usage(raw_parallel_for_cost)
+                    stage_costs = _parallel_stage_cost_breakdown_inr(
+                        parallel_usage_for_cost,
+                        chat_llm_model,
+                        fx,
+                    )
                     cache_setup_tokens = _parallel_cache_setup_tokens(parallel_usage_for_cost)
-                    cache_setup_cost_inr = 0.0
-                    if cache_setup_tokens > 0:
-                        cache_setup_cost_inr = (
-                            (cache_setup_tokens / 1_000_000.0)
-                            * float(rates["input"])
-                            * fx
-                        )
+                    if stage_costs is not None:
+                        input_non_cached_cost_inr = float(stage_costs["input_non_cached_cost_inr"])
+                        input_cached_cost_inr = float(stage_costs["input_cached_cost_inr"])
+                        cache_setup_cost_inr = float(stage_costs["cache_setup_cost_inr"])
+                        output_cost_inr = float(stage_costs["output_cost_inr"])
+                    else:
+                        cache_setup_cost_inr = 0.0
+                        if cache_setup_tokens > 0:
+                            cache_setup_cost_inr = (
+                                (cache_setup_tokens / 1_000_000.0)
+                                * float(rates["input"])
+                                * fx
+                            )
                     cost_inr = (
                         input_non_cached_cost_inr
                         + input_cached_cost_inr
                         + cache_setup_cost_inr
                         + output_cost_inr
                     )
-                total_input_non_cached_inr += input_non_cached_cost_inr
-                total_input_cached_inr += input_cached_cost_inr
-                total_cache_setup_inr += cache_setup_cost_inr
-                total_output_inr += output_cost_inr
-                total_inr += cost_inr
+                    total_input_non_cached_inr += input_non_cached_cost_inr
+                    total_input_cached_inr += input_cached_cost_inr
+                    total_cache_setup_inr += cache_setup_cost_inr
+                    total_output_inr += output_cost_inr
+                    total_inr += cost_inr
                 raw_in = _row_optional_int(r[5]) if len(r) > 5 else None
                 raw_out = _row_optional_int(r[6]) if len(r) > 6 else None
                 raw_cached_in = _row_optional_int(r[7]) if len(r) > 7 else None
@@ -803,7 +862,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 llm_response_chars_display: Optional[int] = None
                 parallel_llm_usage_display: Optional[Dict[str, Any]] = None
                 cache_setup_tokens_display: Optional[int] = None
-                if str(sender or "").strip().lower() == "assistant":
+                if sender_key == "assistant":
                     if has_llm_input_tokens:
                         llm_in_display = raw_in
                     if has_llm_output_tokens:
@@ -819,27 +878,6 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     if has_parallel_llm_usage:
                         parallel_llm_usage_display = _parse_parallel_llm_usage(raw_parallel)
                         cache_setup_tokens_display = _parallel_cache_setup_tokens(parallel_llm_usage_display) or None
-                else:
-                    # User row: full prompt / usage / reply size come from the assistant message for this turn.
-                    nxt = msg_rows[idx + 1] if idx + 1 < len(msg_rows) else None
-                    if nxt and str(nxt[1] or "").strip().lower() == "assistant" and len(nxt) > 11:
-                        if has_llm_input_tokens:
-                            llm_in_display = _row_optional_int(nxt[5])
-                        if has_llm_output_tokens:
-                            llm_out_display = _row_optional_int(nxt[6])
-                        if has_llm_cached_input_tokens:
-                            llm_cached_in_display = _row_optional_int(nxt[7])
-                        if has_llm_non_cached_input_tokens:
-                            llm_non_cached_in_display = _row_optional_int(nxt[8])
-                        npc = _row_optional_int(nxt[9])
-                        nrc = _row_optional_int(nxt[10])
-                        if has_llm_prompt_chars and npc is not None and npc > 0:
-                            llm_prompt_chars_display = npc
-                        if has_llm_response_chars and nrc is not None and nrc > 0:
-                            llm_response_chars_display = nrc
-                        if has_parallel_llm_usage:
-                            parallel_llm_usage_display = _parse_parallel_llm_usage(nxt[11])
-                            cache_setup_tokens_display = _parallel_cache_setup_tokens(parallel_llm_usage_display) or None
                 messages.append(
                     {
                         "message_id": r[0],
@@ -863,7 +901,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                             "cache_setup_cost_inr_estimate": round(float(cache_setup_cost_inr), 6),
                             "output_cost_inr_estimate": round(float(output_cost_inr), 6),
                             "cost_inr_estimate": round(cost_inr, 6),
-                        },
+                        } if sender_key == "assistant" else None,
                     }
                 )
             return {
@@ -886,13 +924,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     "cache_setup_cost_inr_estimate": round(total_cache_setup_inr, 6),
                     "output_cost_inr_estimate": round(total_output_inr, 6),
                     "total_cost_inr_estimate": round(total_inr, 6),
-                    "input_assumption": {
-                        "input_chars_per_question_full": _FIXED_INPUT_CHARS_PER_QUESTION,
-                        "input_tokens_per_question_full_estimate": _FIXED_INPUT_TOKENS_PER_QUESTION,
-                        "input_chars_per_question_light": _LIGHT_INPUT_CHARS_PER_QUESTION,
-                        "input_tokens_per_question_light_estimate": _LIGHT_INPUT_TOKENS_PER_QUESTION,
-                    },
-                    "note": "Rough estimate only. User-question input uses full-context estimate for normal turns and light estimate for clarification/routing turns; assistant output uses answer length. Parallel cache setup input cost is included when available.",
+                    "note": "Estimated from assistant answer rows only. For parallel responses, each stage is priced using its own model rates when stage metadata is present.",
                 },
             }
 

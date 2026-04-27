@@ -430,7 +430,7 @@ class IntentRouter:
             print(f"⚠️ Intent router model {name} not available ({e}), using fallback")
             return self.model
         
-    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None) -> Dict[str, str]:
+    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False) -> Dict[str, str]:
         """
         Returns: {'status': 'CLARIFY' | 'READY', 'mode': 'PREDICT_DAILY' | 'ANALYZE_PERSONALITY' | ..., 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}, 'extracted_context': {...}, 'context_type': 'birth' | 'annual'}
         """
@@ -553,6 +553,19 @@ If the question seems vague, make reasonable assumptions and proceed.
 Set appropriate mode, category, and divisional_charts based on the question context.
 """
 
+        force_clarify_instruction = ""
+        if force_clarify:
+            force_clarify_instruction = """
+🚨🚨🚨 ABSOLUTE OVERRIDE - RETURN CLARIFICATION 🚨🚨🚨
+
+You are ABSOLUTELY REQUIRED to return status: "CLARIFY".
+You are ABSOLUTELY FORBIDDEN from returning status: "READY".
+
+You MUST generate exactly ONE concise "clarification_question" that asks the user to pick one topic/question first.
+Keep it warm and polite. Do not ask for birth details.
+The clarification_question MUST follow the language rule and use the inferred CURRENT QUESTION language/script.
+"""
+
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification, and to classify the user's intent.
         
@@ -570,6 +583,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         - Only ask clarification about WHICH ASPECT of their life they want to focus on (career, health, relationships, etc.)
         
         {force_ready_instruction}
+        {force_clarify_instruction}
         {language_instruction}
 
         CURRENT DATE CONTEXT:

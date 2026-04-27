@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 import i18n from './src/locales/i18n';
 
@@ -114,7 +115,10 @@ export default function App() {
         typeof data?.app_update_release_notes === 'string' ? data.app_update_release_notes.trim() : '';
 
       if (Platform.OS === 'android') {
-        const current = Number(Constants.expoConfig?.android?.versionCode || 0);
+        // Use installed native build number; expoConfig can be stale/mismatched in some release paths.
+        const nativeBuild = Number(Application.nativeBuildVersion || 0);
+        const fallbackBuild = Number(Constants.expoConfig?.android?.versionCode || 0);
+        const current = nativeBuild || fallbackBuild;
         if (minAndroid && current && current < minAndroid) {
           setForceUpdateInfo({
             platform: 'android',
@@ -124,7 +128,9 @@ export default function App() {
           });
         }
       } else if (Platform.OS === 'ios') {
-        const current = Number(Constants.expoConfig?.ios?.buildNumber || 0);
+        const nativeBuild = Number(Application.nativeBuildVersion || 0);
+        const fallbackBuild = Number(Constants.expoConfig?.ios?.buildNumber || 0);
+        const current = nativeBuild || fallbackBuild;
         if (minIos && current && current < minIos) {
           setForceUpdateInfo({
             platform: 'ios',

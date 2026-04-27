@@ -94,30 +94,3 @@ def looks_like_many_questions(user_question: str) -> bool:
     return False
 
 
-def bundled_questions_clarification_reply(user_question: str, language: str = "english") -> str:
-    """
-    User-visible clarification when we block a multi-topic bundle before the main model.
-    Match Hindi/Hinglish vs English from the question text.
-    """
-    text = str(user_question or "").strip()
-    lang = str(language or "").strip().lower()
-
-    has_devanagari = bool(re.search(r"[\u0900-\u097F]", text))
-    looks_roman_hindi = bool(re.search(
-        r"\b(kya|kyu|kyon|kab|kaise|mujhe|mera|meri|meri|aap|shaadi|shadi|naukri|paisa|swasthya|bhavishya)\b",
-        text,
-        re.I,
-    ))
-    should_reply_hindi = has_devanagari or looks_roman_hindi or lang in {"hindi", "hinglish"}
-
-    if should_reply_hindi:
-        return (
-            "आपने एक ही संदेश में कई अलग-अलग सवाल पूछे हैं। "
-            "कृपया अभी **एक** सवाल चुनकर भेजें जिस पर आप सबसे पहले ध्यान देना चाहते हैं, "
-            "ताकि हम उसी पर गहरा और स्पष्ट उत्तर दे सकें। बाकी सवाल आप अलग-अलग संदेश में पूछ सकते हैं।"
-        )
-    return (
-        "You've asked several different questions in one message. "
-        "Please send **one** question first—the one that matters most to you right now—"
-        "so we can give it a focused, detailed reading. You can ask the others in separate messages."
-    )

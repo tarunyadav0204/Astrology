@@ -5,7 +5,7 @@ import NorthIndianChart from './Chart/NorthIndianChart';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
+const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSeconds = 80 }) => {
     const { t } = useTranslation();
     const { theme, colors } = useTheme();
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -15,9 +15,32 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
     const shimmerAnim = useRef(new Animated.Value(0)).current;
     const chartContainerRef = useRef(null);
     const hasScrolled = useRef(false);
+    const [remainingSeconds, setRemainingSeconds] = useState(Math.max(0, Number(expectedWaitSeconds) || 0));
+    const [zodiacIndex, setZodiacIndex] = useState(0);
+    const zodiacSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
 
     const hasChartInsights = chartInsights && Array.isArray(chartInsights) && chartInsights.length > 0;
     const hasChartData = chartData && (chartData.planets || chartData.houses);
+
+    useEffect(() => {
+        setRemainingSeconds(Math.max(0, Number(expectedWaitSeconds) || 0));
+    }, [expectedWaitSeconds]);
+
+    useEffect(() => {
+        if (!remainingSeconds) return;
+        const timer = setInterval(() => {
+            setRemainingSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [remainingSeconds]);
+
+    useEffect(() => {
+        if (remainingSeconds > 0) return;
+        const zodiacTimer = setInterval(() => {
+            setZodiacIndex((prev) => (prev + 1) % zodiacSymbols.length);
+        }, 800);
+        return () => clearInterval(zodiacTimer);
+    }, [remainingSeconds, zodiacSymbols.length]);
 
     useEffect(() => {
         if (hasChartInsights && !hasScrolled.current && chartContainerRef.current && scrollViewRef?.current) {
@@ -101,6 +124,14 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
     }, [hasChartInsights, chartInsights]);
 
     const isDarkMode = theme === 'dark';
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    const timerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const timerProgress = Math.max(0, Math.min(1, remainingSeconds / Math.max(1, Number(expectedWaitSeconds) || 1)));
+    const trafficNotice = remainingSeconds === 0
+        ? "High traffic right now - your reading is still being prepared and may take a little longer than usual."
+        : null;
+    const showZodiacLoop = remainingSeconds === 0;
 
     if (hasChartInsights) {
         const currentInsight = chartInsights[currentIndex];
@@ -134,6 +165,29 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                     style={styles.chartBubble}
                 >
                     <Text style={[styles.chartTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
+                    <View style={styles.timerCard}>
+                        <View style={styles.timerTopRow}>
+                            <Text style={styles.timerTitle}>Preparing Your Reading</Text>
+                        </View>
+                        <View style={styles.timerCountdownWrap}>
+                            {showZodiacLoop ? (
+                                <Text style={styles.zodiacLoopText}>{zodiacSymbols[zodiacIndex]}</Text>
+                            ) : (
+                                <Text style={styles.timerText}>{timerText}</Text>
+                            )}
+                        </View>
+                        <View style={styles.timerProgressTrack}>
+                            <LinearGradient
+                                colors={['#f59e0b', '#f97316', '#ec4899']}
+                                start={{ x: 0, y: 0.5 }}
+                                end={{ x: 1, y: 0.5 }}
+                                style={[styles.timerProgressFill, { width: `${Math.max(6, timerProgress * 100)}%` }]}
+                            />
+                        </View>
+                        {!!trafficNotice && (
+                            <Text style={styles.timerTrafficNotice}>{trafficNotice}</Text>
+                        )}
+                    </View>
                     
                     {hasChartData && (
                         <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
@@ -178,6 +232,29 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                 </Animated.View>
                 
                 <Text style={[styles.welcomeTitle, { color: theme === 'dark' ? '#ffd700' : '#ff6b35' }]}>AstroRoshni</Text>
+                <View style={styles.timerCard}>
+                    <View style={styles.timerTopRow}>
+                        <Text style={styles.timerTitle}>Preparing Your Reading</Text>
+                    </View>
+                    <View style={styles.timerCountdownWrap}>
+                        {showZodiacLoop ? (
+                            <Text style={styles.zodiacLoopText}>{zodiacSymbols[zodiacIndex]}</Text>
+                        ) : (
+                            <Text style={styles.timerText}>{timerText}</Text>
+                        )}
+                    </View>
+                    <View style={styles.timerProgressTrack}>
+                        <LinearGradient
+                            colors={['#f59e0b', '#f97316', '#ec4899']}
+                            start={{ x: 0, y: 0.5 }}
+                            end={{ x: 1, y: 0.5 }}
+                            style={[styles.timerProgressFill, { width: `${Math.max(6, timerProgress * 100)}%` }]}
+                        />
+                    </View>
+                    {!!trafficNotice && (
+                        <Text style={styles.timerTrafficNotice}>{trafficNotice}</Text>
+                    )}
+                </View>
                 
                 <View style={styles.divider}>
                     <View style={styles.dividerLine} />
@@ -274,6 +351,70 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(255, 107, 53, 0.3)',
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 8,
+    },
+    timerCard: {
+        width: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.14)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.22)',
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 14,
+        marginBottom: 18,
+    },
+    timerTopRow: {
+        alignItems: 'flex-start',
+        marginBottom: 10,
+    },
+    timerCountdownWrap: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    timerTitle: {
+        color: '#ffe9c7',
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    timerText: {
+        color: '#ffffff',
+        fontSize: 36,
+        fontWeight: '900',
+        letterSpacing: 2,
+        lineHeight: 40,
+        fontVariant: ['tabular-nums'],
+        textShadowColor: 'rgba(255, 255, 255, 0.35)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+    zodiacLoopText: {
+        color: '#ffffff',
+        fontSize: 44,
+        fontWeight: '900',
+        lineHeight: 48,
+        textShadowColor: 'rgba(255, 255, 255, 0.4)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 12,
+    },
+    timerProgressTrack: {
+        width: '100%',
+        height: 8,
+        borderRadius: 999,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    timerProgressFill: {
+        height: '100%',
+        borderRadius: 999,
+    },
+    timerTrafficNotice: {
+        marginTop: 8,
+        color: '#fde68a',
+        fontSize: 11,
+        lineHeight: 16,
+        fontWeight: '600',
     },
     divider: {
         flexDirection: 'row',

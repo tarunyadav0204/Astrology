@@ -655,7 +655,7 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
             cur = execute(
                 conn,
                 f"""
-                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, features
                 FROM subscription_plans
                 WHERE platform = %s
                   AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
@@ -680,7 +680,7 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
             cur = execute(
                 conn,
                 f"""
-                SELECT plan_id, plan_name, 0, NULL, price
+                SELECT plan_id, plan_name, 0, NULL, price, features
                 FROM subscription_plans
                 WHERE platform = %s
                   AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
@@ -688,14 +688,29 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
                 """,
                 ("astroroshni",),
             )
-            rows = [(r[0], r[1], 0, None, r[4]) for r in cur.fetchall()]
+            rows = [(r[0], r[1], 0, None, r[4], r[5]) for r in cur.fetchall()]
     plans = []
     for r in rows:
-        plan_id, name, discount, product_id, price = r[0], r[1], r[2] or 0, r[3], float(r[4]) if r[4] is not None else 0
+        plan_id, name, discount, product_id, price, features_raw = r[0], r[1], r[2] or 0, r[3], float(r[4]) if r[4] is not None else 0, r[5]
         if not product_id:
             continue
         # Fetch live price from Google Play so app shows same price as Play Store
         formatted_price = _get_subscription_price_from_play(PACKAGE_NAME, product_id)
+        features = None
+        benefits = []
+        if features_raw is not None:
+            features = str(features_raw)
+            try:
+                parsed = json.loads(features)
+                if isinstance(parsed, list):
+                    benefits = [str(x).strip() for x in parsed if str(x).strip()]
+                elif isinstance(parsed, dict):
+                    arr = parsed.get("benefits")
+                    if isinstance(arr, list):
+                        benefits = [str(x).strip() for x in arr if str(x).strip()]
+            except Exception:
+                lines = [ln.strip("- \t\r\n") for ln in str(features_raw).splitlines()]
+                benefits = [ln for ln in lines if ln]
         plans.append({
             "plan_id": plan_id,
             "tier_name": name or f"Plan {plan_id}",
@@ -703,6 +718,8 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
             "google_play_product_id": product_id,
             "price": price,
             "formatted_price": formatted_price,
+            "features": features,
+            "benefits": benefits,
         })
     return {"plans": plans}
 
@@ -1891,8 +1908,9 @@ async def get_question_cost_summary(
     else:
         fd = today
         td = today
-    start_dt = datetime.combine(fd, datetime.min.time())
-    end_exclusive_dt = datetime.combine(td + timedelta(days=1), datetime.min.time())
+    # Use ISO timestamp strings for cross-DB compatibility (postgres/sqlite adapters).
+    start_dt = f"{fd.isoformat()} 00:00:00"
+    end_exclusive_dt = f"{(td + timedelta(days=1)).isoformat()} 00:00:00"
 
     # Business rule requested: 1 credit = ₹1
     inr_per_credit = 1.0

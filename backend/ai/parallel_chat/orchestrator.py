@@ -167,6 +167,7 @@ from ai.parallel_chat.parallel_agent_payloads import build_all_parallel_agent_pa
 from ai.parallel_chat.json_utils import parse_branch_json
 from ai.parallel_chat.config import parallel_branch_stagger_s, parallel_branch_timeout_s
 from ai.parallel_chat.prompt_blocks import (
+    CLASSICAL_RULE_MATCH_INSTRUCTION,
     MERGE_ROLE_PREAMBLE,
     build_ashtakavarga_branch_static,
     build_ashtakavarga_branch_static_agent,
@@ -278,6 +279,11 @@ def _json_serializer(obj: Any) -> Any:
 def _json_compact(data: Any) -> str:
     """Compact JSON for LLM variable blocks (indent=2 was inflating char/token counts)."""
     return json.dumps(data, default=_json_serializer, ensure_ascii=False, separators=(",", ":"))
+
+
+def _attach_classical_rule_matches(payload: Dict[str, Any], matches: Any) -> None:
+    if isinstance(payload, dict) and isinstance(matches, dict) and matches.get("matches"):
+        payload["classical_rule_matches"] = copy.deepcopy(matches)
 
 
 def _llm_call_metrics(
@@ -455,6 +461,8 @@ async def _run_branch_json(
     start_delay_s: float = 0.0,
     model_override: Optional[Any] = None,
     model_name_override: Optional[str] = None,
+    stage_provider: Optional[str] = None,
+    stage_model_hint: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if start_delay_s > 0:
         await asyncio.sleep(start_delay_s)
@@ -496,6 +504,12 @@ async def _run_branch_json(
                     static_chars=static_chars,
                     dynamic_chars=dynamic_chars,
                 )
+                metrics["llm_provider"] = (
+                    str((res or {}).get("chat_llm_provider") or stage_provider or "").strip() or None
+                )
+                metrics["llm_model"] = (
+                    str((res or {}).get("chat_llm_model") or stage_model_hint or "").strip() or None
+                )
                 return parsed, metrics
             last_err = RuntimeError(res.get("error") or "branch_failed")
         except Exception as e:
@@ -529,6 +543,8 @@ async def _run_branch_json(
         static_chars=static_chars,
         dynamic_chars=dynamic_chars,
     )
+    metrics["llm_provider"] = stage_provider
+    metrics["llm_model"] = stage_model_hint
     return fallback, metrics
 
 
@@ -604,6 +620,8 @@ async def run_parallel_chat_pipeline(
         av_payload = {"shared_kernel": kernel_lite, "ashtakavarga_context": av_slice, "user_question": user_question}
 
     sd_payload = build_sudarshan_branch_payload(ctx, user_question)
+    classical_rule_matches = ctx.get("classical_rule_matches")
+    _attach_classical_rule_matches(par_payload, classical_rule_matches)
 
     stagger_s = parallel_branch_stagger_s()
     if stagger_s > 0:
@@ -620,12 +638,23 @@ async def run_parallel_chat_pipeline(
         )
 
     t_parallel = time.time()
-    llm_provider = get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
-    gemini_model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
-    cache_resource = None
-    cached_model = None
-    cache_setup_input_chars = 0
-    cache_setup_input_tokens = 0
+    standard_provider = get_chat_llm_provider()
+    standard_gemini_model_name = get_gemini_chat_model()
+    premium_provider = (
+        get_chat_llm_provider_premium() if premium_analysis else standard_provider
+    )
+    premium_gemini_model_name = (
+        get_gemini_premium_model() if premium_analysis else standard_gemini_model_name
+    )
+
+    cache_resource_standard = None
+    cache_resource_premium = None
+    cached_model_standard = None
+    cached_model_premium = None
+    cache_setup_input_chars_standard = 0
+    cache_setup_input_tokens_standard = 0
+    cache_setup_input_chars_premium = 0
+    cache_setup_input_tokens_premium = 0
     cache_payload = {
         "shared_kernel": build_shared_kernel_lite(ctx),
         "user_facts": ctx.get("user_facts"),
@@ -633,11 +662,57 @@ async def run_parallel_chat_pipeline(
         "history": conversation_history or [],
         "current_question": user_question,
     }
-    cache_resource, cached_model, cache_setup_input_chars, cache_setup_input_tokens = await _create_gemini_parallel_cache(
-        llm_provider=llm_provider,
-        model_name=gemini_model_name,
-        cache_payload=cache_payload,
-        cache_label="parallel_chat",
+    use_dual_cache = premium_analysis and (
+        premium_provider != standard_provider
+        or premium_gemini_model_name != standard_gemini_model_name
+    )
+    if use_dual_cache:
+        (
+            cache_resource_standard,
+            cached_model_standard,
+            cache_setup_input_chars_standard,
+            cache_setup_input_tokens_standard,
+        ) = await _create_gemini_parallel_cache(
+            llm_provider=standard_provider,
+            model_name=standard_gemini_model_name,
+            cache_payload=cache_payload,
+            cache_label="parallel_chat_standard",
+        )
+        (
+            cache_resource_premium,
+            cached_model_premium,
+            cache_setup_input_chars_premium,
+            cache_setup_input_tokens_premium,
+        ) = await _create_gemini_parallel_cache(
+            llm_provider=premium_provider,
+            model_name=premium_gemini_model_name,
+            cache_payload=cache_payload,
+            cache_label="parallel_chat_premium",
+        )
+    else:
+        (
+            cache_resource_standard,
+            cached_model_standard,
+            cache_setup_input_chars_standard,
+            cache_setup_input_tokens_standard,
+        ) = await _create_gemini_parallel_cache(
+            llm_provider=premium_provider,
+            model_name=premium_gemini_model_name,
+            cache_payload=cache_payload,
+            cache_label="parallel_chat",
+        )
+        cache_resource_premium = cache_resource_standard
+        cached_model_premium = cached_model_standard
+        cache_setup_input_chars_premium = cache_setup_input_chars_standard
+        cache_setup_input_tokens_premium = cache_setup_input_tokens_standard
+
+    cache_setup_input_chars = (
+        cache_setup_input_chars_standard
+        + (cache_setup_input_chars_premium if use_dual_cache else 0)
+    )
+    cache_setup_input_tokens = (
+        cache_setup_input_tokens_standard
+        + (cache_setup_input_tokens_premium if use_dual_cache else 0)
     )
     try:
         par_task = asyncio.create_task(
@@ -649,8 +724,12 @@ async def run_parallel_chat_pipeline(
                 "parashari",
                 critical=True,
                 start_delay_s=0.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_premium,
+                model_name_override=(
+                    premium_gemini_model_name if cached_model_premium else None
+                ),
+                stage_provider=premium_provider,
+                stage_model_hint=premium_gemini_model_name,
             ) if "parashari" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("parashari", branch_scope_reason or "branch_filtered"))
         )
         jm_task = asyncio.create_task(
@@ -658,12 +737,16 @@ async def run_parallel_chat_pipeline(
                 analyzer,
                 jm_static,
                 jm_payload,
-                premium_analysis,
+                False,
                 "jaimini",
                 critical=False,
                 start_delay_s=1.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_standard,
+                model_name_override=(
+                    standard_gemini_model_name if cached_model_standard else None
+                ),
+                stage_provider=standard_provider,
+                stage_model_hint=standard_gemini_model_name,
             ) if "jaimini" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("jaimini", branch_scope_reason or "branch_filtered"))
         )
         nd_task = asyncio.create_task(
@@ -671,12 +754,16 @@ async def run_parallel_chat_pipeline(
                 analyzer,
                 nd_static,
                 nd_payload,
-                premium_analysis,
+                False,
                 "nadi",
                 critical=False,
                 start_delay_s=2.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_standard,
+                model_name_override=(
+                    standard_gemini_model_name if cached_model_standard else None
+                ),
+                stage_provider=standard_provider,
+                stage_model_hint=standard_gemini_model_name,
             ) if "nadi" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("nadi", branch_scope_reason or "branch_filtered"))
         )
         nk_task = asyncio.create_task(
@@ -684,12 +771,16 @@ async def run_parallel_chat_pipeline(
                 analyzer,
                 nk_static,
                 nk_payload,
-                premium_analysis,
+                False,
                 "nakshatra",
                 critical=False,
                 start_delay_s=3.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_standard,
+                model_name_override=(
+                    standard_gemini_model_name if cached_model_standard else None
+                ),
+                stage_provider=standard_provider,
+                stage_model_hint=standard_gemini_model_name,
             ) if "nakshatra" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("nakshatra", branch_scope_reason or "branch_filtered"))
         )
         kp_task = asyncio.create_task(
@@ -697,12 +788,16 @@ async def run_parallel_chat_pipeline(
                 analyzer,
                 kp_static,
                 kp_payload,
-                premium_analysis,
+                False,
                 "kp",
                 critical=False,
                 start_delay_s=4.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_standard,
+                model_name_override=(
+                    standard_gemini_model_name if cached_model_standard else None
+                ),
+                stage_provider=standard_provider,
+                stage_model_hint=standard_gemini_model_name,
             ) if "kp" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("kp", branch_scope_reason or "branch_filtered"))
         )
         av_task = asyncio.create_task(
@@ -710,12 +805,16 @@ async def run_parallel_chat_pipeline(
                 analyzer,
                 av_static,
                 av_payload,
-                premium_analysis,
+                False,
                 "ashtakavarga",
                 critical=False,
                 start_delay_s=5.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_standard,
+                model_name_override=(
+                    standard_gemini_model_name if cached_model_standard else None
+                ),
+                stage_provider=standard_provider,
+                stage_model_hint=standard_gemini_model_name,
             ) if "ashtakavarga" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("ashtakavarga", branch_scope_reason or "branch_filtered"))
         )
         sd_task = asyncio.create_task(
@@ -723,12 +822,16 @@ async def run_parallel_chat_pipeline(
                 analyzer,
                 sd_static,
                 sd_payload,
-                premium_analysis,
+                False,
                 "sudarshan",
                 critical=False,
                 start_delay_s=6.0 * stagger_s,
-                model_override=cached_model,
-                model_name_override=gemini_model_name if cached_model else None,
+                model_override=cached_model_standard,
+                model_name_override=(
+                    standard_gemini_model_name if cached_model_standard else None
+                ),
+                stage_provider=standard_provider,
+                stage_model_hint=standard_gemini_model_name,
             ) if "sudarshan" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("sudarshan", branch_scope_reason or "branch_filtered"))
         )
         (
@@ -745,7 +848,9 @@ async def run_parallel_chat_pipeline(
         branch_llm_rows: List[Dict[str, Any]] = [par_m, jm_m, nd_m, nk_m, kp_m, av_m, sd_m]
     except Exception as e:
         logger.exception("parallel gather failed: %s", e)
-        await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
+        await _delete_parallel_cache(cache_resource_standard, cache_label="parallel_chat_standard")
+        if cache_resource_premium is not cache_resource_standard:
+            await _delete_parallel_cache(cache_resource_premium, cache_label="parallel_chat_premium")
         raise
 
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
@@ -794,6 +899,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             "enabled_branches": enabled_branches,
             "reason": branch_scope_reason,
             "chart_focus": copy.deepcopy(intent.get("chart_focus")) if isinstance(intent.get("chart_focus"), dict) else None,
+            "classical_rule_matches": copy.deepcopy(classical_rule_matches) if isinstance(classical_rule_matches, dict) else None,
         },
         "partial": {
             "jaimini": jm_out.get("status") == "unavailable" or bool(jm_out.get("error")),
@@ -820,6 +926,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             response_format_instruction,
             user_context_instruction,
             single_native_format_guard,
+            CLASSICAL_RULE_MATCH_INSTRUCTION,
             VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION.strip(),
         ]
     )
@@ -837,8 +944,10 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     syn = await analyzer.generate_text_from_prompt(
         merge_prompt,
         premium_analysis=premium_analysis,
-        model_override=cached_model,
-        model_name_override=gemini_model_name if cached_model else None,
+        model_override=cached_model_premium,
+        model_name_override=(
+            premium_gemini_model_name if cached_model_premium else None
+        ),
         llm_log_tag="parallel_merge",
     )
     synthesis_ms = round((time.time() - t_syn) * 1000, 1)
@@ -855,11 +964,25 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         static_chars=len(merge_static),
         dynamic_chars=len(merge_prompt) - len(merge_static),
     )
+    merge_metrics["llm_provider"] = (
+        str((syn or {}).get("chat_llm_provider") or premium_provider or "").strip() or None
+    )
+    merge_metrics["llm_model"] = (
+        str((syn or {}).get("chat_llm_model") or premium_gemini_model_name or "").strip() or None
+    )
     _parallel_usage_rows = branch_llm_rows + [merge_metrics]
     _parallel_totals = _totals_from_rows(_parallel_usage_rows)
     if cache_setup_input_tokens > 0:
         _parallel_totals["cache_setup_input_chars"] = int(cache_setup_input_chars)
         _parallel_totals["cache_setup_input_tokens"] = int(cache_setup_input_tokens)
+    if cache_setup_input_tokens_standard > 0:
+        _parallel_totals["cache_setup_input_tokens_standard"] = int(cache_setup_input_tokens_standard)
+        _parallel_totals["cache_setup_llm_provider_standard"] = standard_provider
+        _parallel_totals["cache_setup_llm_model_standard"] = standard_gemini_model_name
+    if cache_setup_input_tokens_premium > 0:
+        _parallel_totals["cache_setup_input_tokens_premium"] = int(cache_setup_input_tokens_premium)
+        _parallel_totals["cache_setup_llm_provider_premium"] = premium_provider
+        _parallel_totals["cache_setup_llm_model_premium"] = premium_gemini_model_name
     _parallel_usage_payload = {
         "stages": _parallel_usage_rows,
         "totals": _parallel_totals,
@@ -869,7 +992,9 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
 
     if not syn.get("success") or not syn.get("response"):
         _log_parallel_llm_summary(_parallel_usage_rows)
-        await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
+        await _delete_parallel_cache(cache_resource_standard, cache_label="parallel_chat_standard")
+        if cache_resource_premium is not cache_resource_standard:
+            await _delete_parallel_cache(cache_resource_premium, cache_label="parallel_chat_premium")
         return {
             "success": False,
             "response": "I apologize, but I couldn't generate a merged response. Please try again.",
@@ -880,10 +1005,10 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
                 "synthesis_ms": synthesis_ms,
                 "total_request_time": time.time() - total_request_start,
                 "chat_llm_provider": (
-                    get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
+                    premium_provider if premium_analysis else standard_provider
                 ),
                 "chat_llm_model": syn.get("chat_llm_model")
-                or (get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()),
+                or (premium_gemini_model_name if premium_analysis else standard_gemini_model_name),
                 "parallel_llm_usage": _parallel_usage_payload,
                 "parallel_agent_context": use_agent_ctx,
             },
@@ -903,7 +1028,9 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
     if len(cleaned_text) < 50:
         _log_parallel_llm_summary(_parallel_usage_rows)
-        await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
+        await _delete_parallel_cache(cache_resource_standard, cache_label="parallel_chat_standard")
+        if cache_resource_premium is not cache_resource_standard:
+            await _delete_parallel_cache(cache_resource_premium, cache_label="parallel_chat_premium")
         return {
             "success": False,
             "response": "I received a partial merged response. Please try again.",
@@ -941,7 +1068,9 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     }
     total_time = time.time() - total_request_start
     _log_parallel_llm_summary(_parallel_usage_rows)
-    await _delete_parallel_cache(cache_resource, cache_label="parallel_chat")
+    await _delete_parallel_cache(cache_resource_standard, cache_label="parallel_chat_standard")
+    if cache_resource_premium is not cache_resource_standard:
+        await _delete_parallel_cache(cache_resource_premium, cache_label="parallel_chat_premium")
 
     return {
         "success": True,
@@ -962,7 +1091,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             "total_request_time": total_time,
             "parallel_chat_ms": parallel_ms,
             "synthesis_ms": synthesis_ms,
-            "chat_llm_provider": llm_provider,
+            "chat_llm_provider": premium_provider if premium_analysis else standard_provider,
             "chat_llm_model": model_name,
             "parallel_pipeline": True,
             "parallel_agent_context": use_agent_ctx,

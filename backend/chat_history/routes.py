@@ -8,7 +8,7 @@ import json
 import logging
 from auth import get_current_user
 from db import get_conn, execute
-from ai.question_heuristics import bundled_questions_clarification_reply, looks_like_many_questions
+from ai.question_heuristics import looks_like_many_questions
 
 logger = logging.getLogger(__name__)
 
@@ -641,9 +641,17 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             and not partnership_mode
             and intent.get("status") == "READY"
         ):
-            print("📎 MULTI_TOPIC_BUNDLE (/ask): Forcing CLARIFY before full answer")
-            intent["status"] = "CLARIFY"
-            intent["clarification_question"] = bundled_questions_clarification_reply(question, language)
+            print("📎 MULTI_TOPIC_BUNDLE (/ask): Re-routing via LLM-forced CLARIFY")
+            intent = await intent_router.classify_intent(
+                question,
+                [],
+                user_facts,
+                clarification_count=clarification_count,
+                language=language,
+                force_ready=False,
+                d1_chart=d1_chart,
+                force_clarify=True,
+            )
             intent["chart_insights"] = None
 
         chart_insights = intent.get('chart_insights', [])
@@ -1224,9 +1232,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and not partnership_mode
                 and intent.get("status") == "READY"
             ):
-                print("📎 MULTI_TOPIC_BUNDLE: Forcing CLARIFY before full answer")
-                intent["status"] = "CLARIFY"
-                intent["clarification_question"] = bundled_questions_clarification_reply(combined_question, language)
+                print("📎 MULTI_TOPIC_BUNDLE: Re-routing via LLM-forced CLARIFY")
+                intent = await intent_router.classify_intent(
+                    combined_question,
+                    history,
+                    user_facts,
+                    clarification_count=clarification_count,
+                    language=language,
+                    force_ready=False,
+                    force_clarify=True,
+                )
                 intent["chart_insights"] = None
 
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)

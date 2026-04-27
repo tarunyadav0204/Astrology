@@ -31,6 +31,20 @@ function formatTime(ts) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString();
+}
+
+function formatDateTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 function isLikelyMobileUserAgent(ua) {
   const s = String(ua || '').toLowerCase();
   return (
@@ -277,6 +291,7 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
   const user = data?.user;
   const showProfile = data && !data.ambiguous && user;
   const journey = buildMobileJourney(data?.bigquery_activity || []);
+  const subscriptionRows = data?.subscriptions || [];
 
   return (
     <div className="users-management admin-user-profile">
@@ -361,6 +376,8 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
               {' · '}
               <span>credits {user.credits_balance ?? '—'}</span>
               {' · '}
+              <span>active subscriptions {summary?.active_subscriptions_count ?? 0}</span>
+              {' · '}
               <span>userid {user.userid}</span>
             </p>
             <div className="admin-user-profile-summary-grid">
@@ -373,6 +390,8 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
               <div>Career: <strong>{summary?.insights_counts?.career ?? 0}</strong></div>
               <div>Karma: <strong>{summary?.karma_insights_count ?? 0}</strong></div>
               <div>Event timeline jobs: <strong>{summary?.event_timeline_jobs_count ?? 0}</strong></div>
+              <div>Active subscriptions: <strong>{summary?.active_subscriptions_count ?? 0}</strong></div>
+              <div>Subscription rows: <strong>{summary?.subscriptions_count ?? 0}</strong></div>
               <div className="admin-user-profile-summary-credits">
                 <span className="admin-user-profile-summary-credits-label">
                   Purchased (Google Play &amp; Razorpay)
@@ -405,6 +424,55 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
               <div>Trading monthly: <strong>{summary?.trading_monthly_count ?? 0}</strong></div>
             </div>
           </div>
+
+          <Section title={`Subscriptions (${subscriptionRows.length})`} defaultOpen>
+            <p className="admin-user-profile-section-note">
+              Shows subscription rows stored in our DB. “Bought / recorded” is when the subscription row was created/recorded in our system; “Access end” is the current entitlement end date. Exact Google Play cancellation time is only available if we store subscription lifecycle events separately.
+            </p>
+            <div className="admin-user-profile-table-wrap">
+              <table className="admin-user-profile-table">
+                <thead>
+                  <tr>
+                    <th>Platform</th>
+                    <th>Plan</th>
+                    <th>Tier / discount</th>
+                    <th>Status</th>
+                    <th>Bought / recorded</th>
+                    <th>Start</th>
+                    <th>Access end</th>
+                    <th>Ended</th>
+                    <th>Product</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subscriptionRows.length === 0 ? (
+                    <tr><td colSpan={9}>No subscription rows found.</td></tr>
+                  ) : (
+                    subscriptionRows.map((sub, idx) => {
+                      const discount = Number(sub.discount_percent);
+                      const tierLine = [
+                        sub.tier_name || null,
+                        Number.isFinite(discount) ? `${discount}% off` : null,
+                      ].filter(Boolean).join(' · ');
+                      return (
+                        <tr key={sub.subscription_id || `${sub.platform}-${sub.plan_id}-${idx}`}>
+                          <td>{sub.platform || '—'}</td>
+                          <td>{sub.plan_name || '—'}</td>
+                          <td>{tierLine || '—'}</td>
+                          <td>{sub.is_current ? 'active/current' : (sub.status || '—')}</td>
+                          <td>{formatDateTime(sub.recorded_at || sub.created_at)}</td>
+                          <td>{formatDate(sub.start_date)}</td>
+                          <td>{formatDate(sub.end_date)}</td>
+                          <td>{formatDate(sub.ended_at)}</td>
+                          <td className="mono">{sub.google_play_product_id || '—'}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Section>
 
           <Section title={`Chat questions (${data.chat_questions?.length || 0})`} defaultOpen>
             <div className="admin-user-profile-table-wrap">

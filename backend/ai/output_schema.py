@@ -648,6 +648,14 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
         transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=False)
         prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
 
+    if static_context.get("classical_rule_matches"):
+        prompt_parts.append(
+            "CLASSICAL RULE MATCH USAGE:\n"
+            "- `classical_rule_matches` contains pre-filtered supporting sutra evidence, not a mandate.\n"
+            "- For now only `derived_12th_from_topic_house` is enabled: the 12th counted from the topic house shows expense, sacrifice, loss, release, or investment for that topic.\n"
+            "- Use it only when its evidence makes it relevant; do not force it into the answer if stronger chart/dasha/transit evidence points elsewhere."
+        )
+
     time_context = f"IMPORTANT CURRENT DATE INFORMATION:\n- Today's Date: {current_date_str}\n- Current Time: {current_time_str}\n- Current Year: {current_date.year}\n\nCRITICAL CHART INFORMATION:\n{ascendant_summary}"
     prompt_parts.append(time_context)
     

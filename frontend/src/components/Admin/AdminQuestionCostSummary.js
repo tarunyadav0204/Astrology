@@ -8,10 +8,10 @@ function toLocalDateStr(date) {
   return `${y}-${mo}-${d}`;
 }
 
-function thisMonthRange() {
+function todayRange() {
   const now = new Date();
   return {
-    from: toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
+    from: toLocalDateStr(now),
     to: toLocalDateStr(now),
   };
 }
@@ -47,7 +47,7 @@ export default function AdminQuestionCostSummary() {
   };
 
   useEffect(() => {
-    const r = thisMonthRange();
+    const r = todayRange();
     setFromDate(r.from);
     setToDate(r.to);
     load(r.from, r.to);
@@ -76,7 +76,7 @@ export default function AdminQuestionCostSummary() {
     <div className="credits-dashboard">
       <h2>Question Cost Summary</h2>
       <p className="credit-settings-hint">
-        Includes paid questions and estimated free-first questions. Rule: <strong>1 credit = INR 1</strong>.
+        Includes paid questions and estimated free-first questions. Default range is <strong>today</strong>. Rule: <strong>1 credit = INR 1</strong>.
       </p>
 
       <div className="dashboard-controls">

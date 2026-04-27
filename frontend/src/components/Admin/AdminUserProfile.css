@@ -214,6 +214,13 @@
   background: #fafafa;
 }
 
+.admin-user-profile-section-note {
+  margin: 10px 2px 12px;
+  color: #666;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .admin-user-profile-table-wrap {
   overflow-x: auto;
   max-height: 480px;

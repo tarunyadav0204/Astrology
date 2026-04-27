@@ -53,6 +53,23 @@ function getSubscriptionDisplayPrice(plan, iapSubscriptions) {
   return iap.localizedPrice ?? iap.price ?? plan.price;
 }
 
+/** One-time credit pack price: prefer IAP localized price, fallback to backend fields if available. */
+function getCreditPackDisplayPrice(product, iapProducts) {
+  const productId = product?.product_id || product?.id;
+  const iap = Array.isArray(iapProducts)
+    ? iapProducts.find((p) => (p.productId || p.product_id) === productId)
+    : null;
+  const iapPrice =
+    iap?.localizedPrice ||
+    iap?.oneTimePurchaseOfferDetails?.formattedPrice ||
+    iap?.price ||
+    null;
+  if (iapPrice) return iapPrice;
+  if (product?.localized_price) return product.localized_price;
+  if (product?.formatted_price) return product.formatted_price;
+  return null;
+}
+
 // Lazy-load IAP only on Android to avoid iOS/build issues
 let RNIap = null;
 if (Platform.OS === 'android') {
@@ -774,6 +791,9 @@ const CreditScreen = ({ navigation }) => {
                         const productId = plan.google_play_product_id;
                         const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
                         const isPurchasing = purchasingSubscriptionId === productId;
+                        const benefits = Array.isArray(plan.benefits)
+                          ? plan.benefits.filter(Boolean)
+                          : [];
                         return (
                           <TouchableOpacity
                             key={plan.plan_id ?? productId}
@@ -789,6 +809,15 @@ const CreditScreen = ({ navigation }) => {
                                 <Text style={[styles.buyProductCredits, { color: colors.textSecondary, fontSize: 14 }]}>{displayPrice}</Text>
                               ) : null;
                             })()}
+                            {benefits.length > 0 && (
+                              <View style={styles.planBenefitsWrap}>
+                                {benefits.slice(0, 4).map((benefit, idx) => (
+                                  <Text key={`${productId}-benefit-${idx}`} style={[styles.planBenefitText, { color: colors.textSecondary }]}>
+                                    {'\u2022'} {benefit}
+                                  </Text>
+                                ))}
+                              </View>
+                            )}
                             <View style={[styles.buyProductButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
                               <Text style={styles.buyProductButtonText}>
                                 {isCurrentPlan ? t('credits.page.currentPlan') : isPurchasing ? t('credits.page.processing') : t('credits.page.subscribe')}
@@ -843,6 +872,12 @@ const CreditScreen = ({ navigation }) => {
                       >
                         <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || t('credits.page.productTitleFallback', { count: product.credits })}</Text>
                         <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{t('credits.page.creditsCount', { count: product.credits })}</Text>
+                        {(() => {
+                          const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
+                          return displayPrice ? (
+                            <Text style={[styles.buyProductPrice, { color: colors.textSecondary }]}>{displayPrice}</Text>
+                          ) : null;
+                        })()}
                         <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
                           <Text style={styles.buyProductButtonText}>
                             {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
@@ -1221,6 +1256,11 @@ const styles = StyleSheet.create({
   },
   buyProductCredits: {
     fontSize: 14,
+    marginBottom: 8,
+  },
+  buyProductPrice: {
+    fontSize: 14,
+    fontWeight: '600',
     marginBottom: 12,
   },
   buyProductButton: {
@@ -1232,6 +1272,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  planBenefitsWrap: {
+    marginBottom: 10,
+  },
+  planBenefitText: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 2,
   },
   promoCard: {
     borderRadius: 16,

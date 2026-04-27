@@ -310,6 +310,8 @@ export default function ChatScreen({ navigation, route }) {
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
+  const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(110);
+  const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(210);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
@@ -987,6 +989,7 @@ export default function ChatScreen({ navigation, route }) {
       const data = res?.data || res;
       const pricing = data?.pricing || {};
       const orig = data?.pricing_original || {};
+      const countdown = data?.chat_countdown_seconds || {};
       // Standard chat (user-discounted when VIP)
       const chatVal = pricing.chat != null ? Number(pricing.chat) || 1 : 1;
       const chatOriginal = orig.chat != null ? Number(orig.chat) : null;
@@ -997,6 +1000,14 @@ export default function ChatScreen({ navigation, route }) {
       const premiumOriginal = orig.premium_chat != null ? Number(orig.premium_chat) : null;
       setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
       setPremiumChatCostOriginal(Number.isNaN(premiumOriginal) ? null : premiumOriginal);
+      const standardCountdownVal = Number(countdown.standard);
+      const premiumCountdownVal = Number(countdown.premium);
+      setStandardChatCountdownSeconds(
+        Number.isNaN(standardCountdownVal) || standardCountdownVal <= 0 ? 110 : standardCountdownVal
+      );
+      setPremiumChatCountdownSeconds(
+        Number.isNaN(premiumCountdownVal) || premiumCountdownVal <= 0 ? 210 : premiumCountdownVal
+      );
     } catch (error) {
       console.error('Error fetching chat cost:', error);
     }
@@ -2454,6 +2465,9 @@ export default function ChatScreen({ navigation, route }) {
     });
 
     const loadingMessages = getLoadingMessages(messageText);
+    const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+    const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
+    const expectedWaitSeconds = isProModelFlow ? premiumChatCountdownSeconds : standardChatCountdownSeconds;
 
     // Add processing message immediately
     const clientRequestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -2464,6 +2478,7 @@ export default function ChatScreen({ navigation, route }) {
       role: 'assistant',
       timestamp: new Date().toISOString(),
       isTyping: true,
+      expectedWaitSeconds,
       userMessageId: userMessageId,
       clientRequestId,
       failedQuestion: messageText,
@@ -3243,6 +3258,7 @@ export default function ChatScreen({ navigation, route }) {
                       chartInsights={item.chartInsights}
                       chartData={chartData}
                       scrollViewRef={scrollViewRef}
+                      expectedWaitSeconds={item.expectedWaitSeconds}
                     />
                   </View>
                 );
