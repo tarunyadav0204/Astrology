@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -55,11 +55,13 @@ const applyTierDiscount = (regular, percent) =>
 export default function MembershipComparisonScreen({ navigation }) {
   const { colors, theme } = useTheme();
   const { t } = useTranslation();
+  const { height: windowHeight } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
   const [tierDiscounts, setTierDiscounts] = useState({ silver: 0, gold: 0, platinum: 0 });
+  const [tableViewportHeight, setTableViewportHeight] = useState(0);
   const frozenBodyRef = useRef(null);
   const scrollBodyRef = useRef(null);
   const syncingRef = useRef(false);
@@ -114,7 +116,9 @@ export default function MembershipComparisonScreen({ navigation }) {
 
   const isDark = theme === 'dark';
   const cardBg = isDark ? 'rgba(15,23,42,0.95)' : colors.surface;
-  const tableBodyHeight = Math.max(260, Math.min(560, Dimensions.get('window').height - 360));
+  const fallbackBodyHeight = Math.max(220, Math.min(540, windowHeight - 360));
+  const tableBodyHeight =
+    tableViewportHeight > 0 ? Math.max(220, tableViewportHeight - 42) : fallbackBodyHeight;
 
   const syncVerticalScroll = (source, y) => {
     if (syncingRef.current) return;
@@ -153,7 +157,13 @@ export default function MembershipComparisonScreen({ navigation }) {
             </View>
           ) : null}
 
-          <View style={[styles.tableCard, styles.tableCardFlex, { backgroundColor: cardBg, borderColor: colors.border }]}>
+          <View
+            style={[styles.tableCard, styles.tableCardFlex, { backgroundColor: cardBg, borderColor: colors.border }]}
+            onLayout={(e) => {
+              const h = Number(e?.nativeEvent?.layout?.height || 0);
+              if (h > 0) setTableViewportHeight(h);
+            }}
+          >
             <View style={styles.tableSplitWrap}>
               <View style={[styles.frozenColumn, { borderRightColor: colors.border }]}>
                 <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
@@ -169,6 +179,7 @@ export default function MembershipComparisonScreen({ navigation }) {
                   style={[styles.tableBody, { height: tableBodyHeight }]}
                   showsVerticalScrollIndicator={false}
                   scrollEnabled={false}
+                  nestedScrollEnabled
                 >
                   {rows.map((row, idx) => (
                     <View
@@ -184,7 +195,12 @@ export default function MembershipComparisonScreen({ navigation }) {
                 </ScrollView>
               </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                directionalLockEnabled
+              >
                 <View>
                   <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
                     <Text style={[styles.colSmall, styles.colHeader, styles.headerCell, { color: colors.textSecondary }]} numberOfLines={1}>Regular</Text>
@@ -198,6 +214,7 @@ export default function MembershipComparisonScreen({ navigation }) {
                     style={[styles.tableBody, { height: tableBodyHeight }]}
                     nestedScrollEnabled
                     showsVerticalScrollIndicator
+                    directionalLockEnabled
                     scrollEventThrottle={16}
                     onScroll={(e) => syncVerticalScroll('scroll', e.nativeEvent.contentOffset.y)}
                   >
