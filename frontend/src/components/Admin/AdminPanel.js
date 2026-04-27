@@ -155,6 +155,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifBody, setNotifBody] = useState('');
   const [notifQuestion, setNotifQuestion] = useState('');
   const [notifNativeId, setNotifNativeId] = useState('');
+  const [notifLandingScreen, setNotifLandingScreen] = useState('chat');
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
   const [notifChatSuggestMode, setNotifChatSuggestMode] = useState(false);
@@ -1165,7 +1166,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             user_id: userId,
             title: notifTitle.trim().slice(0, 100),
             body: notifBody.trim().slice(0, 200),
-            ...(notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
+            landing_screen: notifLandingScreen,
+            ...(notifLandingScreen === 'chat' && notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
             ...(notifNativeId && userIds.length === 1 && { native_id: parseInt(notifNativeId, 10) }),
           }),
         });
@@ -1199,6 +1201,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setNotifBody('');
       setNotifQuestion('');
       setNotifNativeId('');
+      setNotifLandingScreen('chat');
     } catch (err) {
       console.error('[Admin Notifications] Request error:', err);
       setNotifResult({ ok: false, message: err.message || 'Request failed' });
@@ -3091,6 +3094,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     />
                   </div>
                   <div className="form-field">
+                    <label>Landing screen</label>
+                    <select
+                      value={notifLandingScreen}
+                      onChange={(e) => setNotifLandingScreen(e.target.value)}
+                    >
+                      <option value="chat">Chat (optional question pre-fill)</option>
+                      <option value="information">Information (open Home modal)</option>
+                      <option value="event_screen">Event Screen</option>
+                      <option value="past_life_karma">Past Life Karma</option>
+                      <option value="career">Career (analysis detail)</option>
+                      <option value="marriage">Marriage (analysis detail)</option>
+                      <option value="health">Health (analysis detail)</option>
+                      <option value="wealth">Wealth (analysis detail)</option>
+                      <option value="progeny">Progeny (analysis detail)</option>
+                      <option value="education">Education (analysis detail)</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
                     <label>Question (optional, max 500 chars)</label>
                     <input
                       type="text"
@@ -3098,7 +3119,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       value={notifQuestion}
                       onChange={(e) => setNotifQuestion(e.target.value)}
                       maxLength={500}
+                      disabled={notifLandingScreen !== 'chat'}
                     />
+                    <small className="form-hint">
+                      Used only when landing screen is Chat.
+                    </small>
                   </div>
                   <div className="form-field">
                     <label>For native (optional)</label>

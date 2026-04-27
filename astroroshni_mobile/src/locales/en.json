@@ -462,6 +462,10 @@
       "muhurat": {
         "title": "Muhurat Planner",
         "description": "Auspicious timing for all events"
+      },
+      "karma": {
+        "title": "Past Life Karma",
+        "description": "Your soul's eternal journey"
       }
     },
     "planet_names": {
@@ -474,6 +478,35 @@
         "Saturn": "Saturn",
         "Rahu": "Rahu",
         "Ketu": "Ketu"
+    },
+    "nakshatra_names": {
+      "Ashwini": "Ashwini",
+      "Bharani": "Bharani",
+      "Krittika": "Krittika",
+      "Rohini": "Rohini",
+      "Mrigashira": "Mrigashira",
+      "Ardra": "Ardra",
+      "Punarvasu": "Punarvasu",
+      "Pushya": "Pushya",
+      "Ashlesha": "Ashlesha",
+      "Magha": "Magha",
+      "Purva_Phalguni": "Purva Phalguni",
+      "Uttara_Phalguni": "Uttara Phalguni",
+      "Hasta": "Hasta",
+      "Chitra": "Chitra",
+      "Swati": "Swati",
+      "Vishakha": "Vishakha",
+      "Anuradha": "Anuradha",
+      "Jyeshtha": "Jyeshtha",
+      "Mula": "Mula",
+      "Purva_Ashadha": "Purva Ashadha",
+      "Uttara_Ashadha": "Uttara Ashadha",
+      "Shravana": "Shravana",
+      "Dhanishta": "Dhanishta",
+      "Shatabhisha": "Shatabhisha",
+      "Purva_Bhadrapada": "Purva Bhadrapada",
+      "Uttara_Bhadrapada": "Uttara Bhadrapada",
+      "Revati": "Revati"
     },
     "signs": {
       "ascendant": "Asc",

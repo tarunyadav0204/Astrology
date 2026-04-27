@@ -185,9 +185,13 @@ async function processNotificationResponse(response, navigationRef) {
   const data = response?.notification?.request?.content?.data;
   if (!data) return;
   const cta = data?.cta;
+  const landingScreenRaw = data?.landing_screen != null ? String(data.landing_screen).trim().toLowerCase() : '';
+  const landingScreen = landingScreenRaw.replace(/[-\s]+/g, '_');
   const slug = data?.slug != null ? String(data.slug).trim() : null;
   const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
   const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
+  const notificationTitle = response?.notification?.request?.content?.title ?? '';
+  const notificationBody = response?.notification?.request?.content?.body ?? '';
   const { storage } = require('./storage');
   const { chartAPI } = require('./api');
   try {
@@ -250,14 +254,66 @@ async function processNotificationResponse(response, navigationRef) {
       }
       // else: leave current selected native unchanged (getBirthDetails stays as is)
     }
-    // Only navigate to chat when we have an actual chat payload.
-    // Previously, notifications with no CTA would always open chat on cold start,
-    // and if the app crashed during initialization, Expo's "last notification response"
-    // could remain stale and cause the user to land on chat unexpectedly.
+    const analysisType =
+      data?.analysis_type != null ? String(data.analysis_type).trim().toLowerCase() : '';
+    const normalizedAnalysisType = analysisType.replace(/[-\s]+/g, '_');
+    const analysisTitles = {
+      career: 'Career Analysis',
+      marriage: 'Marriage Analysis',
+      health: 'Health Analysis',
+      wealth: 'Wealth Analysis',
+      progeny: 'Progeny Analysis',
+      education: 'Education Analysis',
+    };
+    const selectedBirth = await storage.getBirthDetails();
+    const chartId = selectedBirth?.id ?? selectedBirth?._id ?? null;
+
+    // Chat remains default for backward compatibility if CTA is missing but payload has chat fields.
     const sessionId = data?.session_id != null ? String(data.session_id).trim() : null;
     const hasChatPayload = !!(question || sessionId);
+    const shouldOpenChat =
+      landingScreen === 'chat' ||
+      cta === 'astroroshni://chat' ||
+      (!cta && !landingScreen && hasChatPayload);
+    const shouldOpenInfo = landingScreen === 'information' || cta === 'astroroshni://information';
+    const shouldOpenEvent = landingScreen === 'event_screen' || cta === 'astroroshni://event';
+    const shouldOpenKarma = landingScreen === 'past_life_karma' || cta === 'astroroshni://karma';
+    const shouldOpenAnalysis =
+      ['career', 'marriage', 'health', 'wealth', 'progeny', 'education'].includes(landingScreen) ||
+      cta === 'astroroshni://analysis';
 
-    if (navigationRef?.current && (cta === 'astroroshni://chat' || (!cta && hasChatPayload))) {
+    if (navigationRef?.current && shouldOpenInfo) {
+      navigationRef.current.navigate('Home', {
+        resetToGreeting: true,
+        showInfoModal: true,
+        infoTitle: notificationTitle,
+        infoBody: notificationBody,
+        infoNonce: Date.now(),
+      });
+      return;
+    }
+    if (navigationRef?.current && shouldOpenEvent) {
+      navigationRef.current.navigate('EventScreen');
+      return;
+    }
+    if (navigationRef?.current && shouldOpenKarma) {
+      navigationRef.current.navigate('KarmaAnalysis', { chartId });
+      return;
+    }
+    if (navigationRef?.current && shouldOpenAnalysis) {
+      const finalAnalysisType =
+        ['career', 'marriage', 'health', 'wealth', 'progeny', 'education'].includes(landingScreen)
+          ? landingScreen
+          : normalizedAnalysisType;
+      if (finalAnalysisType && analysisTitles[finalAnalysisType]) {
+        navigationRef.current.navigate('AnalysisDetail', {
+          analysisType: finalAnalysisType,
+          title: analysisTitles[finalAnalysisType],
+        });
+        return;
+      }
+    }
+    if (navigationRef?.current && shouldOpenChat) {
       navigationRef.current.navigate('Home', {
         startChat: true,
         ...(question && { initialMessage: question }),

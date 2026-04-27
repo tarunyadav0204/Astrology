@@ -404,6 +404,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
+  const [homeInfoModalPayload, setHomeInfoModalPayload] = useState(null);
   const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   /** Keyboard frame height for bottom inset (iOS + Android; edge-to-edge often breaks adjustResize for RN root). */
@@ -923,6 +924,24 @@ export default function ChatScreen({ navigation, route }) {
           }
         }, 150);
       })();
+    }
+
+    if (route.params?.showInfoModal) {
+      const infoTitle = typeof route.params?.infoTitle === 'string' ? route.params.infoTitle : '';
+      const infoBody = typeof route.params?.infoBody === 'string' ? route.params.infoBody : '';
+      const infoNonce = route.params?.infoNonce ?? Date.now();
+      setShowGreeting(true);
+      setHomeInfoModalPayload({
+        title: infoTitle,
+        body: infoBody,
+        nonce: infoNonce,
+      });
+      navigation.setParams({
+        showInfoModal: undefined,
+        infoTitle: undefined,
+        infoBody: undefined,
+        infoNonce: undefined,
+      });
     }
     
     // Handle mundane mode param
@@ -3088,6 +3107,8 @@ export default function ChatScreen({ navigation, route }) {
               onOptionSelect={handleGreetingOptionSelect}
               navigation={navigation}
               setShowDashaBrowser={setShowDashaBrowser}
+              infoModalPayload={homeInfoModalPayload}
+              onInfoModalConsumed={() => setHomeInfoModalPayload(null)}
             />
           </View>
         ) : (

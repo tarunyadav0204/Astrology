@@ -299,6 +299,8 @@ const CreditScreen = ({ navigation }) => {
   useEffect(() => {
     if (Platform.OS !== 'android' || !RNIap || !hasAnyIapProducts) return;
     let mounted = true;
+    let updateSub = null;
+    let errorSub = null;
     const initIap = async () => {
       try {
         await RNIap.initConnection();
@@ -314,38 +316,45 @@ const CreditScreen = ({ navigation }) => {
         }
         if (!mounted) return;
         setIapReady(true);
+        // Register listeners only after successful connection. On emulators without Play
+        // Billing support, listener registration can throw E_IAP_NOT_AVAILABLE.
+        updateSub = RNIap.purchaseUpdatedListener(async (purchase) => {
+          try {
+            const token = purchase.purchaseToken ?? purchase.purchaseTokenAndroid;
+            const productId = purchase.productId ?? purchase.productIds?.[0];
+            const orderId = purchase.transactionId ?? purchase.transactionIdAndroid ?? purchase.purchaseToken;
+            if (!token || !productId || !orderId) return;
+            const isSubscription = subscriptionProductIds.includes(productId);
+            if (isSubscription) {
+              await handleGooglePlaySubscriptionSuccess(token, productId, orderId);
+              await RNIap.finishTransaction({ purchase, isConsumable: false });
+            } else {
+              await handleGooglePlayPurchaseSuccess(token, productId, orderId);
+              await RNIap.finishTransaction({ purchase, isConsumable: true });
+            }
+          } catch (e) {
+            console.warn('Purchase listener error:', e?.message);
+          }
+        });
+        errorSub = RNIap.purchaseErrorListener?.((error) => {
+          setPurchasingProductId(null);
+          setPurchasingSubscriptionId(null);
+          if (error?.code !== 'E_USER_CANCELLED') {
+            console.warn('Purchase error:', error?.message);
+          }
+        });
+        purchaseListenerRef.current = { updateSub, errorSub };
       } catch (e) {
         if (mounted) setIapReady(false);
+        // Emulator/no-Play devices commonly throw E_IAP_NOT_AVAILABLE; keep screen usable.
+        if (mounted) {
+          setIapProducts([]);
+          setIapSubscriptions([]);
+        }
         console.warn('IAP init failed:', e?.message);
       }
     };
     initIap();
-    const updateSub = RNIap.purchaseUpdatedListener(async (purchase) => {
-      try {
-        const token = purchase.purchaseToken ?? purchase.purchaseTokenAndroid;
-        const productId = purchase.productId ?? purchase.productIds?.[0];
-        const orderId = purchase.transactionId ?? purchase.transactionIdAndroid ?? purchase.purchaseToken;
-        if (!token || !productId || !orderId) return;
-        const isSubscription = subscriptionProductIds.includes(productId);
-        if (isSubscription) {
-          await handleGooglePlaySubscriptionSuccess(token, productId, orderId);
-          await RNIap.finishTransaction({ purchase, isConsumable: false });
-        } else {
-          await handleGooglePlayPurchaseSuccess(token, productId, orderId);
-          await RNIap.finishTransaction({ purchase, isConsumable: true });
-        }
-      } catch (e) {
-        console.warn('Purchase listener error:', e?.message);
-      }
-    });
-    const errorSub = RNIap.purchaseErrorListener?.((error) => {
-      setPurchasingProductId(null);
-      setPurchasingSubscriptionId(null);
-      if (error?.code !== 'E_USER_CANCELLED') {
-        console.warn('Purchase error:', error?.message);
-      }
-    });
-    purchaseListenerRef.current = { updateSub, errorSub };
     return () => {
       mounted = false;
       try {
@@ -778,6 +787,15 @@ const CreditScreen = ({ navigation }) => {
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.vipPlans')}</Text>
+                <TouchableOpacity
+                  style={[styles.membershipHelpButton, { borderColor: colors.cardBorder, backgroundColor: promoCardBg }]}
+                  onPress={() => navigation.navigate('MembershipComparison')}
+                >
+                  <Ionicons name="help-buoy-outline" size={18} color={colors.primary} />
+                  <Text style={[styles.membershipHelpButtonText, { color: colors.primary }]}>
+                    Need help choosing a plan?
+                  </Text>
+                </TouchableOpacity>
                 {subscriptionPlansLoading ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingPlans')}</Text>
                 ) : subscriptionPlansFromPlay.length === 0 ? (
@@ -1178,6 +1196,21 @@ const styles = StyleSheet.create({
   manageSubscriptionLinkText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  membershipHelpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  membershipHelpButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   balanceDecoration: {
     position: 'absolute',

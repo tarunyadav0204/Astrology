@@ -73,12 +73,58 @@ export default function NudgeInboxScreen({ navigation }) {
     const d = item.data || {};
     const slug = d.slug != null ? String(d.slug).trim() : '';
     const cta = d.cta != null ? String(d.cta).trim() : '';
+    const landingScreenRaw =
+      d.landing_screen != null ? String(d.landing_screen).trim().toLowerCase() : '';
+    const landingScreen = landingScreenRaw.replace(/[-\s]+/g, '_');
 
     if (cta === 'astroroshni://blog' && slug) {
       navigation.navigate('BlogPostDetail', { slug });
       return;
     }
-    if (cta === 'astroroshni://chat' || String(item.trigger_id || '') === 'admin') {
+    if (landingScreen === 'information' || cta === 'astroroshni://information') {
+      navigation.navigate('Home', {
+        resetToGreeting: true,
+        showInfoModal: true,
+        infoTitle: item.title || 'Information',
+        infoBody: item.body || '',
+        infoNonce: Date.now(),
+      });
+      return;
+    }
+    if (landingScreen === 'event_screen' || cta === 'astroroshni://event') {
+      navigation.navigate('EventScreen');
+      return;
+    }
+    if (landingScreen === 'past_life_karma' || cta === 'astroroshni://karma') {
+      try {
+        const { storage } = require('../../services/storage');
+        const selectedBirth = await storage.getBirthDetails();
+        const chartId = selectedBirth?.id ?? selectedBirth?._id ?? null;
+        navigation.navigate('KarmaAnalysis', { chartId });
+      } catch (_) {
+        navigation.navigate('KarmaAnalysis');
+      }
+      return;
+    }
+    if (['career', 'marriage', 'health', 'wealth', 'progeny', 'education'].includes(landingScreen) || cta === 'astroroshni://analysis') {
+      const analysisType =
+        ['career', 'marriage', 'health', 'wealth', 'progeny', 'education'].includes(landingScreen)
+          ? landingScreen
+          : (d.analysis_type != null ? String(d.analysis_type).trim().toLowerCase().replace(/[-\s]+/g, '_') : '');
+      const analysisTitles = {
+        career: 'Career Analysis',
+        marriage: 'Marriage Analysis',
+        health: 'Health Analysis',
+        wealth: 'Wealth Analysis',
+        progeny: 'Progeny Analysis',
+        education: 'Education Analysis',
+      };
+      if (analysisType && analysisTitles[analysisType]) {
+        navigation.navigate('AnalysisDetail', { analysisType, title: analysisTitles[analysisType] });
+        return;
+      }
+    }
+    if (cta === 'astroroshni://chat' || landingScreen === 'chat' || String(item.trigger_id || '') === 'admin') {
       const q = d.question != null ? String(d.question).trim() : '';
       navigation.navigate('Home', {
         startChat: true,

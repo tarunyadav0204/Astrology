@@ -42,6 +42,36 @@ const ordinalSuffix = (n) => {
   if (n >= 11 && n <= 13) return 'th';
   switch (n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
 };
+
+const NAKSHATRA_KEY_BY_NAME = {
+  'Ashwini': 'Ashwini',
+  'Bharani': 'Bharani',
+  'Krittika': 'Krittika',
+  'Rohini': 'Rohini',
+  'Mrigashira': 'Mrigashira',
+  'Ardra': 'Ardra',
+  'Punarvasu': 'Punarvasu',
+  'Pushya': 'Pushya',
+  'Ashlesha': 'Ashlesha',
+  'Magha': 'Magha',
+  'Purva Phalguni': 'Purva_Phalguni',
+  'Uttara Phalguni': 'Uttara_Phalguni',
+  'Hasta': 'Hasta',
+  'Chitra': 'Chitra',
+  'Swati': 'Swati',
+  'Vishakha': 'Vishakha',
+  'Anuradha': 'Anuradha',
+  'Jyeshtha': 'Jyeshtha',
+  'Mula': 'Mula',
+  'Purva Ashadha': 'Purva_Ashadha',
+  'Uttara Ashadha': 'Uttara_Ashadha',
+  'Shravana': 'Shravana',
+  'Dhanishta': 'Dhanishta',
+  'Shatabhisha': 'Shatabhisha',
+  'Purva Bhadrapada': 'Purva_Bhadrapada',
+  'Uttara Bhadrapada': 'Uttara_Bhadrapada',
+  'Revati': 'Revati',
+};
 /** Format ISO date "YYYY-MM-DD" as "2nd April 1980" */
 const formatDateOrdinal = (isoDate) => {
   if (!isoDate || typeof isoDate !== 'string') return isoDate || '';
@@ -58,7 +88,14 @@ const getCardScale = (index) => 1;
 /** Sign keys for ascendant description i18n (home.ascendantDescriptions.Aries etc.). */
 const ASCENDANT_SIGN_KEYS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
-export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
+export default function HomeScreen({
+  birthData,
+  onOptionSelect,
+  navigation,
+  setShowDashaBrowser,
+  infoModalPayload,
+  onInfoModalConsumed,
+}) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   useAnalytics('HomeScreen');
@@ -67,6 +104,8 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
+  const [showInfoOnlyModal, setShowInfoOnlyModal] = useState(false);
+  const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({ title: '', body: '' });
 
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -93,6 +132,15 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const [isFABCollapsed, setIsFABCollapsed] = useState(false);
   const lastScrollY = useRef(0);
   const fabWidth = useRef(new Animated.Value(1)).current; // 1 for full, 0 for collapsed
+
+  useEffect(() => {
+    if (!infoModalPayload || !infoModalPayload.nonce) return;
+    setInfoOnlyModalContent({
+      title: String(infoModalPayload.title || '').trim(),
+      body: String(infoModalPayload.body || '').trim(),
+    });
+    setShowInfoOnlyModal(true);
+  }, [infoModalPayload]);
 
   const handleScroll = (event) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
@@ -599,6 +647,17 @@ const loadHomeData = async (nativeData = null) => {
     };
     return colors[planetName] || '#ffffff';
   };
+
+  const getLocalizedPlanetName = (planetName) => {
+    if (!planetName) return t('common.unknown', 'Unknown');
+    return t(`home.planet_names.${planetName}`, planetName);
+  };
+
+  const getLocalizedNakshatraName = (nakshatraName) => {
+    if (!nakshatraName) return t('common.unknown', 'Unknown');
+    const key = NAKSHATRA_KEY_BY_NAME[nakshatraName] || String(nakshatraName).replace(/\s+/g, '_');
+    return t(`home.nakshatra_names.${key}`, nakshatraName);
+  };
   
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
@@ -1025,7 +1084,7 @@ const loadHomeData = async (nativeData = null) => {
                   <TickerItem 
                     icon="time-outline" 
                     label={t('home.ticker.activeMahadasha', 'Active Mahadasha')} 
-                    value={tickerData.mahadasha || t('common.unknown', 'Unknown')}
+                    value={getLocalizedPlanetName(tickerData.mahadasha)}
                     color="#F59E0B"
                     showInfoIcon
                   />
@@ -1038,7 +1097,7 @@ const loadHomeData = async (nativeData = null) => {
                   <TickerItem 
                     icon="star-outline" 
                     label={t('home.ticker.todaysNakshatra', "Today's Nakshatra")} 
-                    value={tickerData.nakshatra || t('common.unknown', 'Unknown')}
+                    value={getLocalizedNakshatraName(tickerData.nakshatra)}
                     color="#8B5CF6"
                     showInfoIcon
                   />
@@ -1167,6 +1226,42 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Magical Dashboard Cards - Moved to Bottom */}
         <View style={styles.dashboardContainer}>
+          <Modal
+            visible={showInfoOnlyModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+              setShowInfoOnlyModal(false);
+              onInfoModalConsumed && onInfoModalConsumed();
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+              onPress={() => {
+                setShowInfoOnlyModal(false);
+                onInfoModalConsumed && onInfoModalConsumed();
+              }}
+            >
+              <TouchableOpacity activeOpacity={1} style={[styles.infoOnlyModalCard, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.infoOnlyModalTitle, { color: colors.text }]}>
+                  {infoOnlyModalContent.title || t('home.infoModal.defaultTitle', 'Information')}
+                </Text>
+                <Text style={[styles.infoOnlyModalBody, { color: colors.textSecondary }]}>
+                  {infoOnlyModalContent.body || t('home.infoModal.defaultBody', 'We have an important update for you.')}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.infoOnlyModalCloseBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    setShowInfoOnlyModal(false);
+                    onInfoModalConsumed && onInfoModalConsumed();
+                  }}
+                >
+                  <Text style={styles.infoOnlyModalCloseText}>{t('languageModal.close', 'Close')}</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
 
 
           {/* Mini Insight Modal - theme aware */}
@@ -3516,6 +3611,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     alignItems: 'center',
+  },
+  infoOnlyModalCard: {
+    width: '88%',
+    borderRadius: 16,
+    padding: 18,
+  },
+  infoOnlyModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  infoOnlyModalBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  infoOnlyModalCloseBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  infoOnlyModalCloseText: {
+    color: '#fff',
+    fontWeight: '700',
   },
   firstQuestionFreeModalClose: {
     position: 'absolute',

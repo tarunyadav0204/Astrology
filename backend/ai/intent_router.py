@@ -516,7 +516,7 @@ You must infer the language of CURRENT QUESTION yourself and use that same langu
 Examples:
 - English question -> English strings.
 - Hindi Devanagari question -> Hindi strings in Devanagari.
-- Hinglish / Roman Hindi question -> Hindi strings in Devanagari, not Roman Hindi.
+- Hinglish / Roman Hindi question -> respond in Roman Hindi (same script style as question), not Devanagari conversion.
 - Tamil question -> Tamil strings.
 - Telugu/Gujarati/Marathi/Bengali/French/German/Russian/Chinese/etc. question -> same language and script.
 
@@ -526,7 +526,7 @@ JSON keys stay English; only end-user string values change language.
 
         chart_insights_message_spec = (
             '- message: SPECIFIC insight about THIS native\'s chart, written in the language and natural script '
-            'you infer from CURRENT QUESTION. For Hinglish/Roman Hindi, write the message in Hindi Devanagari.'
+            'you infer from CURRENT QUESTION. Keep script consistent with CURRENT QUESTION (do not transliterate scripts).'
         )
         chart_insights_example_block = """
         Example structure only. Replace bracketed text with real chart-specific prose in the inferred CURRENT QUESTION language:
@@ -723,8 +723,8 @@ The clarification_question MUST follow the language rule and use the inferred CU
         Return ONLY a JSON object:
         {{
             "status": "CLARIFY" or "READY",
-            "clarification_question": "Your clarifying question here (only if status=CLARIFY; if user wrote Hindi/Hinglish, this string must be Devanagari Hindi)",
-            "chart_insights": [{{"house_number": 1, "message": "Devanagari Hindi prose for Hinglish users; English for English-only questions", "highlight_type": "ascendant"}}],
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY; keep same language + script as CURRENT QUESTION)",
+            "chart_insights": [{{"house_number": 1, "message": "Message must match CURRENT QUESTION language and script style", "highlight_type": "ascendant"}}],
             "mode": "PREDICT_DAILY" or "PREDICT_EVENT_TIMING" or "ANALYZE_PERSONALITY",
             "chart_focus": {{
                 "kind": "chart_specific",

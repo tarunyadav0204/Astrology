@@ -58,6 +58,7 @@ import ErrorOverlay from './src/components/ErrorOverlay';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import AboutScreen from './src/components/About/AboutScreen';
 import SupportScreen from './src/components/Support/SupportScreen';
+import MembershipComparisonScreen from './src/components/Support/MembershipComparisonScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
@@ -587,6 +588,11 @@ export default function App() {
           <Stack.Screen
             name="Support"
             component={SupportScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MembershipComparison"
+            component={MembershipComparisonScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

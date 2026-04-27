@@ -54,6 +54,7 @@ class AdminSendNotificationRequest(BaseModel):
     body: str
     question: Optional[str] = None  # optional; when user taps notification, prefill chat input with this
     native_id: Optional[int] = None  # optional; birth_chart id — app will set this native as selected when user taps
+    landing_screen: Optional[str] = "chat"
 
 
 class AdminGenerateNudgeFromChatRequest(BaseModel):
@@ -94,6 +95,29 @@ def _eligible_notification_optin_where(name: Optional[str]) -> tuple[str, List[A
         parts.append("(u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)")
         params.extend([pat, pat])
     return " AND ".join(parts), params
+
+
+_LANDING_SCREEN_TO_CTA: Dict[str, str] = {
+    "chat": "astroroshni://chat",
+    "information": "astroroshni://information",
+    "event_screen": "astroroshni://event",
+    "past_life_karma": "astroroshni://karma",
+    "career": "astroroshni://analysis",
+    "marriage": "astroroshni://analysis",
+    "health": "astroroshni://analysis",
+    "wealth": "astroroshni://analysis",
+    "progeny": "astroroshni://analysis",
+    "education": "astroroshni://analysis",
+}
+
+
+def _normalize_landing_screen(value: Optional[str]) -> str:
+    raw = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if not raw:
+        return "chat"
+    if raw in _LANDING_SCREEN_TO_CTA:
+        return raw
+    raise HTTPException(status_code=400, detail="Invalid landing_screen")
 
 
 class MarkNudgesReadRequest(BaseModel):
@@ -235,13 +259,20 @@ async def admin_send_notification(
     body_text = (body.body or "").strip()[:200]
     if not title or not body_text:
         raise HTTPException(status_code=400, detail="title and body required")
+    landing_screen = _normalize_landing_screen(body.landing_screen)
     try:
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             tokens = db.get_device_tokens_for_user(conn, body.user_id)
-            push_data: Dict[str, Any] = {"trigger_id": "admin", "cta": "astroroshni://chat"}
-            if body.question and (body.question or "").strip():
+            push_data: Dict[str, Any] = {
+                "trigger_id": "admin",
+                "landing_screen": landing_screen,
+                "cta": _LANDING_SCREEN_TO_CTA[landing_screen],
+            }
+            if landing_screen == "chat" and body.question and (body.question or "").strip():
                 push_data["question"] = (body.question or "").strip()[:500]
+            if landing_screen in {"career", "marriage", "health", "wealth", "progeny", "education"}:
+                push_data["analysis_type"] = landing_screen
             if body.native_id is not None:
                 push_data["native_id"] = str(body.native_id)
             sent = 0

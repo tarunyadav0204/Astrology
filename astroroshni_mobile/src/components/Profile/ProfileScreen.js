@@ -707,12 +707,15 @@ export default function ProfileScreen({ navigation }) {
               ]}
               onPress={() => {
                 Alert.alert(
-                  'Delete Account',
-                  'This will permanently delete your account and associated data. This action cannot be undone.\n\nAre you sure you want to continue?',
+                  t('profile.deleteAccountTitle', 'Delete Account'),
+                  t(
+                    'profile.deleteAccountConfirmBody',
+                    'This will permanently delete your account and associated data. This action cannot be undone.\n\nAre you sure you want to continue?'
+                  ),
                   [
-                    { text: 'Cancel', style: 'cancel' },
+                    { text: t('common.cancel', 'Cancel'), style: 'cancel' },
                     {
-                      text: 'Delete',
+                      text: t('common.delete', 'Delete'),
                       style: 'destructive',
                       onPress: async () => {
                         try {
@@ -728,7 +731,10 @@ export default function ProfileScreen({ navigation }) {
                           if (!res.ok) {
                             const text = await res.text();
                             console.log('Delete account failed:', res.status, text);
-                            Alert.alert('Error', 'Failed to delete account. Please try again.');
+                            Alert.alert(
+                              t('common.error', 'Error'),
+                              t('profile.deleteAccountFailed', 'Failed to delete account. Please try again.')
+                            );
                             return;
                           }
                           await storage.clearAll();
@@ -738,7 +744,13 @@ export default function ProfileScreen({ navigation }) {
                           });
                         } catch (err) {
                           console.error('Delete account error', err);
-                          Alert.alert('Error', 'Something went wrong while deleting your account. Please try again.');
+                          Alert.alert(
+                            t('common.error', 'Error'),
+                            t(
+                              'profile.deleteAccountUnexpectedError',
+                              'Something went wrong while deleting your account. Please try again.'
+                            )
+                          );
                         }
                       },
                     },
@@ -746,7 +758,9 @@ export default function ProfileScreen({ navigation }) {
                 );
               }}
             >
-              <Text style={styles.logoutText}>🗑️ Delete Account & Data</Text>
+              <Text style={styles.logoutText}>
+                {`🗑️ ${t('profile.deleteAccountAndData', 'Delete Account & Data')}`}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -757,7 +771,9 @@ export default function ProfileScreen({ navigation }) {
                 replaceWithLogin(navigation);
               }}
             >
-              <Text style={styles.logoutText}>🚪 Logout</Text>
+              <Text style={styles.logoutText}>
+                {`🚪 ${t('profile.logout', 'Logout')}`}
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.bottomSpacer} />

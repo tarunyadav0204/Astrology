@@ -453,6 +453,10 @@
       "muhurat": {
         "title": "मुहूर्त योजनाकार",
         "description": "सभी घटनाओं के लिए शुभ समय"
+      },
+      "karma": {
+        "title": "पूर्व जन्म कर्म",
+        "description": "आपकी आत्मा की शाश्वत यात्रा"
       }
     },
     "planet_names": {
@@ -465,6 +469,35 @@
       "Saturn": "शनि",
       "Rahu": "राहु",
       "Ketu": "केतु"
+    },
+    "nakshatra_names": {
+      "Ashwini": "अश्विनी",
+      "Bharani": "भरणी",
+      "Krittika": "कृत्तिका",
+      "Rohini": "रोहिणी",
+      "Mrigashira": "मृगशीर्षा",
+      "Ardra": "आर्द्रा",
+      "Punarvasu": "पुनर्वसु",
+      "Pushya": "पुष्य",
+      "Ashlesha": "आश्लेषा",
+      "Magha": "मघा",
+      "Purva_Phalguni": "पूर्वा फाल्गुनी",
+      "Uttara_Phalguni": "उत्तर फाल्गुनी",
+      "Hasta": "हस्त",
+      "Chitra": "चित्रा",
+      "Swati": "स्वाती",
+      "Vishakha": "विशाखा",
+      "Anuradha": "अनुराधा",
+      "Jyeshtha": "ज्येष्ठा",
+      "Mula": "मूल",
+      "Purva_Ashadha": "पूर्वाषाढ़ा",
+      "Uttara_Ashadha": "उत्तराषाढ़ा",
+      "Shravana": "श्रवण",
+      "Dhanishta": "धनिष्ठा",
+      "Shatabhisha": "शतभिषा",
+      "Purva_Bhadrapada": "पूर्व भाद्रपदा",
+      "Uttara_Bhadrapada": "उत्तर भाद्रपदा",
+      "Revati": "रेवती"
     },
     "signs": {
       "ascendant": "लग्न",
