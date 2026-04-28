@@ -2068,7 +2068,12 @@ export default function ChatScreen({ navigation, route }) {
         // console.log(`📊 [POLL END] messageId: ${messageId}, status: ${status.status}, pollCount: ${pollCount}, startTime: ${pollStartTime}, endTime: ${pollEndTime}`);
         
         if (status.status === 'completed') {
-
+          trackEvent('chat_response_received', {
+            source: 'chat_screen',
+            message_type: status.message_type || 'answer',
+            is_resume: !!isResume,
+            response_length: (status.content || '').length,
+          });
           const showFinalMessage = () => {
             setMessagesWithStorage(prev => {
               const processingMsg = prev.find(m => m.messageId === messageId);
@@ -2477,6 +2482,11 @@ export default function ChatScreen({ navigation, route }) {
     
     // Track chat message sent event
     trackAstrologyEvent.chatMessageSent('user_question');
+    trackEvent('chat_message_sent', {
+      source: 'chat_screen',
+      mode: isMundane ? 'mundane' : (partnershipMode ? 'partnership' : 'standard'),
+      message_length: messageText?.length || 0,
+    });
     
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, userMessage];

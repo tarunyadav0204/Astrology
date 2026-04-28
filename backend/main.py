@@ -60,6 +60,12 @@ except Exception as _e:
     _activity_admin_available = False
     activity_admin_router = None
 try:
+    from activity.mobile_routes import router as activity_mobile_router
+    _activity_mobile_available = True
+except Exception as _e:
+    _activity_mobile_available = False
+    activity_mobile_router = None
+try:
     from admin_user_profile_routes import router as admin_user_profile_router
     _admin_user_profile_available = True
 except Exception as _e:
@@ -547,6 +553,8 @@ app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
 if _activity_admin_available and activity_admin_router:
     app.include_router(activity_admin_router, prefix="/api")
+if _activity_mobile_available and activity_mobile_router:
+    app.include_router(activity_mobile_router, prefix="/api")
 if _admin_user_profile_available and admin_user_profile_router:
     app.include_router(admin_user_profile_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")

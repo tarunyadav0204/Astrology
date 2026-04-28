@@ -100,6 +100,7 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
+  const isDark = theme === 'dark';
   const { freeQuestionAvailable } = useCredits();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
@@ -754,7 +755,7 @@ const loadHomeData = async (nativeData = null) => {
                 {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart, personalized insights, and cosmic guidance. You can add or change this anytime.')}
               </Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Home' })}
+                onPress={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
                 activeOpacity={0.85}
                 style={styles.emptyStateCtaWrap}
               >
@@ -1243,7 +1244,13 @@ const loadHomeData = async (nativeData = null) => {
                 onInfoModalConsumed && onInfoModalConsumed();
               }}
             >
-              <TouchableOpacity activeOpacity={1} style={[styles.infoOnlyModalCard, { backgroundColor: colors.surface }]}>
+              <TouchableOpacity
+                activeOpacity={1}
+                style={[
+                  styles.infoOnlyModalCard,
+                  { backgroundColor: isDark ? '#0f172a' : '#ffffff' },
+                ]}
+              >
                 <Text style={[styles.infoOnlyModalTitle, { color: colors.text }]}>
                   {infoOnlyModalContent.title || t('home.infoModal.defaultTitle', 'Information')}
                 </Text>

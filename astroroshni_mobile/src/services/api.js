@@ -702,4 +702,11 @@ export const supportAPI = {
   postMessage: (id, message) => api.post(getEndpoint(`/support/tickets/${id}/messages`), { message }),
 };
 
+export const activityAPI = {
+  sendMobileJourneyBatch: (events = []) =>
+    api.post(getEndpoint('/activity/mobile-events'), {
+      events: Array.isArray(events) ? events : [],
+    }),
+};
+
 export default api;

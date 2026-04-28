@@ -28,6 +28,8 @@ import { useTheme } from '../context/ThemeContext';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { useTranslation } from 'react-i18next';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
+import { trackEvent } from '../utils/analytics';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
@@ -73,6 +75,7 @@ const resolveBirthChartId = (data) => {
 };
 
 export default function EventScreen({ route }) {
+  useAnalytics('EventScreen');
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
@@ -253,6 +256,11 @@ export default function EventScreen({ route }) {
         });
         if (res.data?.cached && res.data?.data) {
           setMonthlyData(res.data.data);
+          trackEvent('yearly_timeline_delivered', {
+            year: Number(y),
+            source: 'event_screen',
+            mode: 'cached',
+          });
           await fetchBalance();
           return true;
         }
@@ -266,6 +274,10 @@ export default function EventScreen({ route }) {
 
   // Fetch Monthly Guide (AI Powered) with Polling
   const fetchMonthlyGuide = useCallback(async (year) => {
+    trackEvent('yearly_timeline_requested', {
+      year: Number(year),
+      source: 'event_screen',
+    });
     stopEventTimelineJob();
     setLoadingMonthly(true);
     setMonthlyData(null);
@@ -311,6 +323,11 @@ export default function EventScreen({ route }) {
 
       if (startResponse.data?.data && !startResponse.data?.job_id) {
         setMonthlyData(startResponse.data.data);
+        trackEvent('yearly_timeline_delivered', {
+          year: Number(year),
+          source: 'event_screen',
+          mode: 'direct',
+        });
         fetchBalance();
         stopEventTimelineJob();
         return;
@@ -332,6 +349,11 @@ export default function EventScreen({ route }) {
         if (!takeOutcome()) return;
         stopEventTimelineJob();
         setMonthlyData(data);
+        trackEvent('yearly_timeline_delivered', {
+          year: Number(year),
+          source: 'event_screen',
+          mode: 'poll_completed',
+        });
         fetchBalance();
       };
 
@@ -766,6 +788,11 @@ export default function EventScreen({ route }) {
   };
 
   const handleMonthlyContinue = () => {
+    trackEvent('monthly_timeline_requested', {
+      year: Number(selectedYear),
+      month: Number(selectedMonth),
+      source: 'event_screen',
+    });
     navigation.navigate('MonthlyDeepScreen', { year: selectedYear, month: selectedMonth });
   };
 

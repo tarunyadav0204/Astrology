@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
-import { authAPI } from '../../../services/api';
+import { authAPI, chartAPI } from '../../../services/api';
 import { storage } from '../../../services/storage';
 import { useCredits } from '../../../credits/CreditContext';
 
@@ -135,12 +135,41 @@ export default function PasswordScreen({
           });
         };
 
-        // Navigate based on self_birth_chart
+        // Route by chart COUNT (not only self chart):
+        // - If user has >=1 chart, pick one and land Home.
+        // - Show BirthProfileIntro only when user truly has zero charts.
         if (response.data.self_birth_chart) {
           resetTo('Home');
         } else {
-          // Show intro screen (explain birth profile, Continue → SelectNative/BirthForm, Skip → Home)
-          resetTo('BirthProfileIntro');
+          try {
+            const chartsRes = await chartAPI.getExistingCharts('', 10, 0);
+            const charts = Array.isArray(chartsRes?.data?.charts) ? chartsRes.data.charts : [];
+            if (charts.length > 0) {
+              const selfChart = charts.find(
+                (c) => String(c?.relation || '').trim().toLowerCase() === 'self'
+              );
+              const selected = selfChart || charts[0];
+              const birthDetails = {
+                id: selected.id ?? selected._id,
+                name: selected.name,
+                date: selected.date,
+                time: selected.time,
+                place: selected.place,
+                latitude: selected.latitude,
+                longitude: selected.longitude,
+                gender: selected.gender,
+                relation: selected.relation,
+                isSelf: String(selected?.relation || '').trim().toLowerCase() === 'self',
+              };
+              await storage.setBirthDetails(birthDetails);
+              resetTo('Home');
+            } else {
+              resetTo('BirthProfileIntro');
+            }
+          } catch (_) {
+            // If charts lookup fails, keep the safe onboarding path.
+            resetTo('BirthProfileIntro');
+          }
         }
       } else {
         // Registration complete - register user and navigate to birth form

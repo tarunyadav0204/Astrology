@@ -21,6 +21,7 @@ import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { trackEvent } from '../utils/analytics';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -124,6 +125,12 @@ export default function MonthlyDeepScreen() {
       if (res.data?.cached && res.data?.data) {
         if (isMountedRef.current) {
           setMonthlyData(res.data.data);
+          trackEvent('monthly_timeline_delivered', {
+            year: Number(year),
+            month: Number(month),
+            source: 'monthly_deep_screen',
+            mode: 'cached',
+          });
           await fetchBalance();
         }
         return true;
@@ -181,6 +188,11 @@ export default function MonthlyDeepScreen() {
 
   const fetchDeepMonth = useCallback(async () => {
     if (!birthData?.id || year == null || month == null) return;
+    trackEvent('monthly_timeline_requested', {
+      year: Number(year),
+      month: Number(month),
+      source: 'monthly_deep_screen',
+    });
     stopDeepMonthJob();
     setGenerating(true);
     loadingIntervalRef.current = setInterval(() => {
@@ -195,6 +207,12 @@ export default function MonthlyDeepScreen() {
       });
       if (startResponse.data?.data && !startResponse.data?.job_id) {
         setMonthlyData(startResponse.data.data);
+        trackEvent('monthly_timeline_delivered', {
+          year: Number(year),
+          month: Number(month),
+          source: 'monthly_deep_screen',
+          mode: 'direct',
+        });
         fetchBalance();
         stopDeepMonthJob();
         return;
@@ -213,6 +231,12 @@ export default function MonthlyDeepScreen() {
         if (!takeOutcome()) return;
         stopDeepMonthJob();
         setMonthlyData(data);
+        trackEvent('monthly_timeline_delivered', {
+          year: Number(year),
+          month: Number(month),
+          source: 'monthly_deep_screen',
+          mode: 'poll_completed',
+        });
         fetchBalance();
       };
 

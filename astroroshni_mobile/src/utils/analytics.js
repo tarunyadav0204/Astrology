@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import axios from 'axios';
+import { trackMobileJourneyEvent } from '../services/journeyTracker';
 
 const GA_MEASUREMENT_ID = 'G-M0C9B8LGMR';
 const API_SECRET = 'TY4n2VL_R6qWdmqGc5rGZg'; // Get from GA4 Admin > Data Streams > Measurement Protocol API secrets
@@ -79,6 +80,12 @@ export const trackScreenView = (screenName) => {
     gtag('event', 'screen_view', { screen_name: screenName });
   } else {
     sendToGA4('screen_view', { screen_name: screenName });
+    // Mirror every screen view into mobile journey pipeline (silent fire-and-forget).
+    trackMobileJourneyEvent('mobile_screen_view', {
+      screen_name: screenName,
+      resource_type: 'screen',
+      resource_id: screenName,
+    });
   }
 };
 
@@ -88,6 +95,12 @@ export const trackEvent = (eventName, params = {}) => {
     gtag('event', eventName, params);
   } else {
     sendToGA4(eventName, params);
+    // Mirror every analytics event to mobile journey events.
+    trackMobileJourneyEvent('mobile_action', {
+      resource_type: 'event',
+      resource_id: eventName,
+      metadata: params || {},
+    });
   }
 };
 

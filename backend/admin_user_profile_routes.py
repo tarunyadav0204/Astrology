@@ -301,9 +301,12 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
                     (user_id,),
                 )
             except Exception:
+                # After a SQL error, Postgres marks the transaction as aborted.
+                # Roll back before issuing fallback SQL.
+                conn.rollback()
                 cur.execute(
                     """
-                    SELECT us.subscription_id, us.userid, us.plan_id,
+                    SELECT us.id AS subscription_id, us.userid, us.plan_id,
                            sp.platform, sp.plan_name, NULL AS tier_name, NULL AS discount_percent,
                            NULL AS google_play_product_id, sp.price, sp.duration_months,
                            us.status, us.start_date, us.end_date, NULL AS recorded_at,

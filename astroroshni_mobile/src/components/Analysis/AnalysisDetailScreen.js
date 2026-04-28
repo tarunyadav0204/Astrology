@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import { cleanupStorage } from '../../services/storageCleanup';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAnalytics } from '../../hooks/useAnalytics';
-import { trackAstrologyEvent } from '../../utils/analytics';
+import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
   useAnalytics('AnalysisDetailScreen');
@@ -48,6 +48,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const [pulseAnim] = useState(new Animated.Value(1));
   const [glowAnim] = useState(new Animated.Value(0));
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
+  const lastTrackedResultRef = useRef(null);
 
   useEffect(() => {
     checkBirthData();
@@ -95,6 +96,21 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       loadStoredAnalysis();
     }
   }, [birthData]);
+
+  useEffect(() => {
+    if (!analysisResult) return;
+    const resultSignature = JSON.stringify({
+      analysisType,
+      keysCount: Object.keys(analysisResult || {}).length,
+      hasSections: !!analysisResult?.sections,
+    });
+    if (lastTrackedResultRef.current === resultSignature) return;
+    lastTrackedResultRef.current = resultSignature;
+    trackEvent('analysis_timeline_delivered', {
+      analysis_name: analysisType,
+      source: 'analysis_detail_screen',
+    });
+  }, [analysisResult, analysisType]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -268,6 +284,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       
       // Track analysis request
       trackAstrologyEvent.analysisRequested(analysisType);
+      trackEvent('analysis_timeline_requested', {
+        analysis_name: analysisType,
+        source: 'analysis_detail_screen',
+        force_regenerate: !!shouldForceRegenerate,
+      });
       
       // console.log('🚀 [DEBUG] Starting analysis:', analysisType);
       // console.log('📊 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));

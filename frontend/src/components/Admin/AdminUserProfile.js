@@ -92,6 +92,50 @@ function inferCtaLabel(method, path) {
 
 function buildMobileJourney(activityRows) {
   const rows = Array.isArray(activityRows) ? activityRows : [];
+  const mobileRows = rows
+    .filter((r) => String(r.action || '').startsWith('mobile_'))
+    .map((r) => ({ ...r, _t: new Date(r.created_at).getTime() }))
+    .filter((r) => Number.isFinite(r._t))
+    .sort((a, b) => a._t - b._t);
+
+  if (mobileRows.length > 0) {
+    const steps = mobileRows
+      .filter((r) => String(r.action || '') === 'mobile_screen_exit')
+      .map((r, idx) => {
+        const md = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
+        const sessionId = String(md.journey_session_id || 'unknown');
+        const screen = String(r.screen_name || md.screen_name || r.resource_id || 'Unknown');
+        const dur = Number(r.duration_ms);
+        const timeSpentMs = Number.isFinite(dur) && dur >= 0 ? dur : 0;
+        const endMs = r._t;
+        const startMs = endMs - timeSpentMs;
+        return {
+          sessionId,
+          screen,
+          startMs,
+          endMs,
+          timeSpentMs,
+          apiCalls: 0,
+          apiLatencyMs: 0,
+          ctas: [String(r.action || 'mobile_screen_exit')],
+          paths: [],
+          _idx: idx,
+        };
+      });
+    const sessionCount = new Set(steps.map((s) => s.sessionId || 'unknown')).size;
+    const totalTimeMs = steps.reduce((acc, s) => acc + (s.timeSpentMs || 0), 0);
+    return {
+      steps,
+      summary: {
+        totalSteps: steps.length,
+        totalSessions: sessionCount,
+        totalTimeMs,
+        totalApiCalls: mobileRows.length,
+        mobileRows: mobileRows.length,
+      },
+    };
+  }
+
   const apiRows = rows
     .filter((r) => String(r.path || '').startsWith('/api/'))
     .filter((r) => String(r.action || '') === 'api_request' || String(r.action || '') === 'api_error')
@@ -100,7 +144,10 @@ function buildMobileJourney(activityRows) {
     .sort((a, b) => a._t - b._t);
 
   if (!apiRows.length) {
-    return { steps: [], summary: { totalSteps: 0, totalTimeMs: 0, totalApiCalls: 0, mobileRows: 0 } };
+    return {
+      steps: [],
+      summary: { totalSteps: 0, totalSessions: 0, totalTimeMs: 0, totalApiCalls: 0, mobileRows: 0 },
+    };
   }
 
   const mobileRowsCount = apiRows.filter((r) => isLikelyMobileUserAgent(r.user_agent)).length;
@@ -151,6 +198,7 @@ function buildMobileJourney(activityRows) {
     steps,
     summary: {
       totalSteps: steps.length,
+      totalSessions: 0,
       totalTimeMs,
       totalApiCalls: sourceRows.length,
       mobileRows: mobileRowsCount,
@@ -535,6 +583,7 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
           <Section title={`Mobile journey (${journey.summary.totalSteps || 0} steps)`} defaultOpen>
             <div className="admin-user-profile-journey-summary">
               <div><strong>Journey time:</strong> {formatDuration(journey.summary.totalTimeMs)}</div>
+              <div><strong>Sessions:</strong> {journey.summary.totalSessions ?? 0}</div>
               <div><strong>API calls used:</strong> {journey.summary.totalApiCalls}</div>
               <div>
                 <strong>Mobile UA rows:</strong>{' '}
@@ -557,6 +606,7 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
                       <span>{formatTime(step.endMs)}</span>
                     </div>
                     <div className="admin-user-profile-journey-metrics">
+                      <div><strong>Session:</strong> <span className="mono">{step.sessionId || '—'}</span></div>
                       <div><strong>Time spent:</strong> {formatDuration(step.timeSpentMs)}</div>
                       <div><strong>Calls:</strong> {step.apiCalls}</div>
                       <div><strong>Total API latency:</strong> {formatDuration(step.apiLatencyMs)}</div>

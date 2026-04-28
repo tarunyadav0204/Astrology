@@ -37,7 +37,7 @@ export default function ProfileScreen({ navigation }) {
   const { credits } = useCredits();
   const [userData, setUserData] = useState(null);
   const [birthData, setBirthData] = useState(null);
-  const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, questionsAsked: 0 });
+  const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, podcastsCount: 0 });
   const [chartData, setChartData] = useState(null);
   const [loadingChart, setLoadingChart] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -101,7 +101,7 @@ export default function ProfileScreen({ navigation }) {
       setUserData(user);
       
       // Fetch user's self birth chart from API
-      const { authAPI } = require('../../services/api');
+      const { authAPI, chatAPI } = require('../../services/api');
       const response = await authAPI.getSelfBirthChart();
       
       
@@ -118,24 +118,36 @@ export default function ProfileScreen({ navigation }) {
       }
       // Load real profile stats (chats, charts, days)
       const statsRes = await authAPI.getUserStats();
+      let podcastsCount = 0;
+      try {
+        const podcastHistoryRes = await chatAPI.getPodcastHistory();
+        const podcasts = podcastHistoryRes?.data?.podcasts;
+        podcastsCount = Array.isArray(podcasts) ? podcasts.length : 0;
+      } catch (_) {}
       if (statsRes.data) {
         setStats({
           totalChats: statsRes.data.total_chat_sessions ?? 0,
           chartsViewed: statsRes.data.total_birth_charts ?? 0,
-          questionsAsked: statsRes.data.total_questions ?? 0,
+          podcastsCount,
         });
       }
     } catch (error) {
       setBirthData(null);
       // Still try to load stats on error (e.g. no self chart but user exists)
       try {
-        const { authAPI } = require('../../services/api');
+        const { authAPI, chatAPI } = require('../../services/api');
         const statsRes = await authAPI.getUserStats();
+        let podcastsCount = 0;
+        try {
+          const podcastHistoryRes = await chatAPI.getPodcastHistory();
+          const podcasts = podcastHistoryRes?.data?.podcasts;
+          podcastsCount = Array.isArray(podcasts) ? podcasts.length : 0;
+        } catch (_) {}
         if (statsRes.data) {
           setStats({
             totalChats: statsRes.data.total_chat_sessions ?? 0,
             chartsViewed: statsRes.data.total_birth_charts ?? 0,
-            questionsAsked: statsRes.data.total_questions ?? 0,
+            podcastsCount,
           });
         }
       } catch (_) {}
@@ -272,21 +284,28 @@ export default function ProfileScreen({ navigation }) {
     </Svg>
   );
 
-  const StatCard = ({ icon, iconElement, value, label, color }) => (
-    <Animated.View style={[styles.statCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-      <LinearGradient
-        colors={[color + '20', color + '10']}
-        style={styles.statGradient}
-      >
-        {iconElement != null ? (
-          <View style={styles.statIconWrap}>{iconElement}</View>
-        ) : (
-          <Text style={[styles.statIcon, { color }]}>{icon}</Text>
-        )}
-        <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
-      </LinearGradient>
-    </Animated.View>
+  const StatCard = ({ icon, iconElement, value, label, color, onPress }) => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      disabled={!onPress}
+      style={{ flex: 1 }}
+    >
+      <Animated.View style={[styles.statCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        <LinearGradient
+          colors={[color + '20', color + '10']}
+          style={styles.statGradient}
+        >
+          {iconElement != null ? (
+            <View style={styles.statIconWrap}>{iconElement}</View>
+          ) : (
+            <Text style={[styles.statIcon, { color }]}>{icon}</Text>
+          )}
+          <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
   );
 
   const ActionButton = ({ icon, label, onPress, color = COLORS.accent }) => (
@@ -412,18 +431,21 @@ export default function ProfileScreen({ navigation }) {
                 value={stats.totalChats}
                 label={t('profile.chats', 'Chats')}
                 color="#4a90e2"
+                onPress={() => navigation.navigate('ChatHistory')}
               />
               <StatCard
                 iconElement={<ChartIconSvg color="#ffd700" size={32} />}
                 value={stats.chartsViewed}
                 label={t('profile.charts', 'Charts')}
                 color="#9c27b0"
+                onPress={() => navigation.navigate('SelectNative', { fromProfile: true })}
               />
               <StatCard
-                icon="❓"
-                value={stats.questionsAsked}
-                label={t('profile.questions', 'Questions')}
+                icon="🎙️"
+                value={stats.podcastsCount}
+                label={t('profile.podcasts', 'Podcasts')}
                 color="#ff6b35"
+                onPress={() => navigation.navigate('PodcastHistory')}
               />
             </View>
 
@@ -758,7 +780,7 @@ export default function ProfileScreen({ navigation }) {
                 );
               }}
             >
-              <Text style={styles.logoutText}>
+              <Text style={[styles.logoutText, { color: '#ffffff' }]}>
                 {`🗑️ ${t('profile.deleteAccountAndData', 'Delete Account & Data')}`}
               </Text>
             </TouchableOpacity>
@@ -771,7 +793,7 @@ export default function ProfileScreen({ navigation }) {
                 replaceWithLogin(navigation);
               }}
             >
-              <Text style={styles.logoutText}>
+              <Text style={[styles.logoutText, { color: '#ffffff' }]}>
                 {`🚪 ${t('profile.logout', 'Logout')}`}
               </Text>
             </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../locales/i18n';
 import {
@@ -27,7 +27,7 @@ import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
 import { pricingAPI } from '../../services/api';
 import { useAnalytics } from '../../hooks/useAnalytics';
-import { trackAstrologyEvent } from '../../utils/analytics';
+import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 
 /** Map AI/backend section heading to karmaAnalysis.sectionTitles.<slug> */
 function karmaSectionTitleSlug(title) {
@@ -86,6 +86,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [showProgress, setShowProgress] = useState(false);
   const [progressTimer, setProgressTimer] = useState(null);
   const [isChangingChart, setIsChangingChart] = useState(false);
+  const lastTrackedAnalysisRef = useRef(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -163,6 +164,21 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [selectedChartId, isChangingChart]);
+
+  useEffect(() => {
+    if (!analysis) return;
+    const signature = JSON.stringify({
+      chartId: selectedChartId,
+      keysCount: Object.keys(analysis || {}).length,
+      hasSections: !!analysis?.sections,
+    });
+    if (lastTrackedAnalysisRef.current === signature) return;
+    lastTrackedAnalysisRef.current = signature;
+    trackEvent('karma_analysis_received', {
+      chart_id: selectedChartId ? String(selectedChartId) : null,
+      source: 'karma_analysis_screen',
+    });
+  }, [analysis, selectedChartId]);
 
   const checkExistingAnalysis = async () => {
     try {
@@ -284,6 +300,11 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       
       // Track karma analysis request
       trackAstrologyEvent.analysisRequested(forceRegenerate ? 'karma_regenerate' : 'karma');
+      trackEvent('karma_analysis_sent', {
+        chart_id: selectedChartId ? String(selectedChartId) : null,
+        source: 'karma_analysis_screen',
+        force_regenerate: !!forceRegenerate,
+      });
       
       const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/karma-analysis/start')}`, {

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../context/ThemeContext';
@@ -51,6 +52,7 @@ const resolveTierDiscounts = (plans = []) => {
 
 const applyTierDiscount = (regular, percent) =>
   Math.max(1, Math.round(Number(regular) * (100 - Number(percent || 0)) / 100));
+const TABLE_ROW_HEIGHT = 64;
 
 export default function MembershipComparisonScreen({ navigation }) {
   const { colors, theme } = useTheme();
@@ -178,8 +180,11 @@ export default function MembershipComparisonScreen({ navigation }) {
                   ref={frozenBodyRef}
                   style={[styles.tableBody, { height: tableBodyHeight }]}
                   showsVerticalScrollIndicator={false}
-                  scrollEnabled={false}
+                  scrollEnabled
                   nestedScrollEnabled
+                  directionalLockEnabled
+                  scrollEventThrottle={16}
+                  onScroll={(e) => syncVerticalScroll('frozen', e.nativeEvent.contentOffset.y)}
                 >
                   {rows.map((row, idx) => (
                     <View
@@ -189,17 +194,23 @@ export default function MembershipComparisonScreen({ navigation }) {
                         { borderBottomColor: idx < rows.length - 1 ? colors.border : 'transparent' },
                       ]}
                     >
-                      <Text style={[styles.colFeature, styles.featureText, { color: colors.text }]}>{row.label}</Text>
+                      <Text
+                        style={[styles.colFeature, styles.featureText, { color: colors.text }]}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
+                      >
+                        {row.label}
+                      </Text>
                     </View>
                   ))}
                 </ScrollView>
               </View>
 
-              <ScrollView
+              <GHScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled
-                directionalLockEnabled
+                contentContainerStyle={styles.priceColumnsContent}
               >
                 <View>
                   <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
@@ -209,12 +220,11 @@ export default function MembershipComparisonScreen({ navigation }) {
                     <Text style={[styles.colSmall, styles.colHeader, styles.headerCell, { color: colors.textSecondary }]} numberOfLines={1}>Gold</Text>
                     <Text style={[styles.colSmall, styles.colHeader, styles.headerCell, { color: colors.textSecondary }]} numberOfLines={1}>Platinum</Text>
                   </View>
-                  <ScrollView
+                  <GHScrollView
                     ref={scrollBodyRef}
                     style={[styles.tableBody, { height: tableBodyHeight }]}
                     nestedScrollEnabled
                     showsVerticalScrollIndicator
-                    directionalLockEnabled
                     scrollEventThrottle={16}
                     onScroll={(e) => syncVerticalScroll('scroll', e.nativeEvent.contentOffset.y)}
                   >
@@ -233,9 +243,9 @@ export default function MembershipComparisonScreen({ navigation }) {
                         <Text style={[styles.colSmall, { color: colors.text }]}>{row.platinum}</Text>
                       </View>
                     ))}
-                  </ScrollView>
+                  </GHScrollView>
                 </View>
-              </ScrollView>
+              </GHScrollView>
             </View>
           </View>
 
@@ -318,7 +328,7 @@ const styles = StyleSheet.create({
   tableDataRow: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    minHeight: 56,
+    height: TABLE_ROW_HEIGHT,
     alignItems: 'center',
   },
   colFeature: {
@@ -337,6 +347,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 10,
     paddingHorizontal: 4,
+  },
+  priceColumnsContent: {
+    minWidth: 454, // 86 + 110 + 86 + 86 + 86
   },
   colHeader: {
     fontSize: 11,

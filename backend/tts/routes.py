@@ -773,7 +773,7 @@ async def podcast_history(current_user: User = Depends(get_current_user)):
         "session_id": r[1],
         "lang": r[2] or "en",
         "preview": r[3],
-        "created_at": r[4],
+        "created_at": (r[4].isoformat() if hasattr(r[4], "isoformat") else (str(r[4]) if r[4] is not None else None)),
       }
       for r in rows
     ],
