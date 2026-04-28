@@ -566,6 +566,16 @@ Keep it warm and polite. Do not ask for birth details.
 The clarification_question MUST follow the language rule and use the inferred CURRENT QUESTION language/script.
 """
 
+        clarification_format_instruction = """
+CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
+- When status is "CLARIFY" and you are presenting multiple choices, format the clarification so users can reply with a single letter.
+- Use wording like: "Type A for ..., Type B for ..., Type C for ...".
+- IMPORTANT: Do NOT hardcode exactly 3 options. Use only the number naturally needed (usually 2-5).
+- If only 2 choices are needed, provide only A-B. If 4 are needed, provide A-D, etc.
+- End with a short fallback like: "or type your topic in your own words."
+- Keep the full clarification in the inferred CURRENT QUESTION language/script.
+"""
+
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification, and to classify the user's intent.
         
@@ -584,6 +594,7 @@ The clarification_question MUST follow the language rule and use the inferred CU
         
         {force_ready_instruction}
         {force_clarify_instruction}
+        {clarification_format_instruction}
         {language_instruction}
 
         CURRENT DATE CONTEXT:
@@ -723,7 +734,7 @@ The clarification_question MUST follow the language rule and use the inferred CU
         Return ONLY a JSON object:
         {{
             "status": "CLARIFY" or "READY",
-            "clarification_question": "Your clarifying question here (only if status=CLARIFY; keep same language + script as CURRENT QUESTION)",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY; when giving options, use lettered quick replies like Type A/Type B with variable count, not fixed 3; keep same language + script as CURRENT QUESTION)",
             "chart_insights": [{{"house_number": 1, "message": "Message must match CURRENT QUESTION language and script style", "highlight_type": "ascendant"}}],
             "mode": "PREDICT_DAILY" or "PREDICT_EVENT_TIMING" or "ANALYZE_PERSONALITY",
             "chart_focus": {{
