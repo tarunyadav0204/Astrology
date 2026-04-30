@@ -52,10 +52,110 @@ def _ensure_chat_messages_parallel_llm_usage(conn):
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parallel_llm_usage TEXT")
 
 
+def _ensure_chat_messages_engagement_updates(conn):
+    """JSON array of non-final wait-time engagement snippets."""
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS engagement_updates TEXT")
+
+
+def _ensure_wait_side_conversation_tables(conn):
+    """Side conversation shown while the main answer is still processing."""
+    execute(conn, """
+        CREATE TABLE IF NOT EXISTS chat_wait_conversations (
+            conversation_id SERIAL PRIMARY KEY,
+            main_message_id INTEGER UNIQUE NOT NULL,
+            session_id TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'active',
+            gemini_cache_name TEXT,
+            gemini_cache_model TEXT,
+            gemini_cache_expires_at TIMESTAMP,
+            cached_context_json TEXT,
+            cached_context_version TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            closed_at TIMESTAMP
+        )
+    """)
+    execute(conn, """
+        CREATE TABLE IF NOT EXISTS chat_wait_conversation_messages (
+            id SERIAL PRIMARY KEY,
+            conversation_id INTEGER NOT NULL,
+            main_message_id INTEGER NOT NULL,
+            sender TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            metadata TEXT
+        )
+    """)
+    execute(conn, "CREATE INDEX IF NOT EXISTS idx_wait_conv_main_message ON chat_wait_conversations (main_message_id)")
+    execute(conn, "CREATE INDEX IF NOT EXISTS idx_wait_conv_user ON chat_wait_conversations (user_id)")
+    execute(conn, "CREATE INDEX IF NOT EXISTS idx_wait_msgs_conv ON chat_wait_conversation_messages (conversation_id, id)")
+
+
 def _ensure_chat_messages_cache_token_cols(conn):
     """Token split columns for cache-aware billing visibility."""
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_cached_input_tokens INTEGER")
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_non_cached_input_tokens INTEGER")
+
+
+def _attach_completed_status_payload(
+    response: dict,
+    *,
+    content,
+    completed_at,
+    terms,
+    glossary,
+    summary_image,
+    follow_up_questions,
+    gate_metadata,
+):
+    """Hydrate the status payload for a completed response."""
+    response["status"] = "completed"
+    response["content"] = content
+    response["completed_at"] = completed_at
+
+    if terms:
+        try:
+            response["terms"] = json.loads(terms)
+        except Exception:
+            response["terms"] = []
+    else:
+        response["terms"] = []
+
+    if glossary:
+        try:
+            response["glossary"] = json.loads(glossary)
+        except Exception:
+            response["glossary"] = {}
+    else:
+        response["glossary"] = {}
+
+    response["summary_image"] = summary_image or None
+
+    if follow_up_questions:
+        try:
+            response["follow_up_questions"] = json.loads(follow_up_questions)
+        except Exception:
+            response["follow_up_questions"] = []
+    else:
+        response["follow_up_questions"] = []
+
+    if gate_metadata:
+        try:
+            meta = json.loads(gate_metadata)
+            response["gate_metadata"] = meta
+            if isinstance(meta, dict) and meta.get("intent_gate"):
+                response["intent_gate"] = meta["intent_gate"]
+        except Exception:
+            pass
+
+    return response
+
+
+def _should_preserve_completed_message(existing_status, existing_content) -> bool:
+    """Never downgrade a saved completed answer because later side-effects failed."""
+    if existing_status != "completed":
+        return False
+    return bool((existing_content or "").strip())
 
 
 def init_chat_tables():
@@ -116,6 +216,8 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_parallel_llm_usage(conn)
+        _ensure_chat_messages_engagement_updates(conn)
+        _ensure_wait_side_conversation_tables(conn)
 
         # Indexes
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)")
@@ -747,13 +849,15 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         with get_conn() as conn:
             _ensure_chat_messages_gate_metadata(conn)
             _ensure_chat_messages_parallel_llm_usage(conn)
+            _ensure_chat_messages_engagement_updates(conn)
+            _ensure_wait_side_conversation_tables(conn)
             conn.commit()
             cur = execute(
                 conn,
                 """
                     SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
                            cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
-                           cm.gate_metadata, cm.parallel_llm_usage
+                           cm.gate_metadata, cm.parallel_llm_usage, cm.engagement_updates
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
                     WHERE cm.message_id = %s
@@ -768,7 +872,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             print(f"❌ [STATUS] Message {message_id} not found")
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, engagement_updates = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -776,57 +880,53 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             raise HTTPException(status_code=403, detail="Access denied")
         
         response = {"status": status, "message_type": message_type or "answer"}
+        wait_side_payload = None
+        with get_conn() as conn:
+            wait_side_payload = _fetch_wait_side_payload(conn, message_id)
+            conn.commit()
+        if wait_side_payload:
+            response["wait_conversation"] = {
+                "enabled": True,
+                "status": wait_side_payload.get("status"),
+                "messages": wait_side_payload.get("messages") or [],
+            }
         
         if status == "completed":
-            response["content"] = content
-            response["completed_at"] = completed_at
-            
-            # Add terms and glossary if they exist
-            if terms:
-                try:
-                    response["terms"] = json.loads(terms)
-                except:
-                    response["terms"] = []
-            else:
-                response["terms"] = []
-                
-            if glossary:
-                try:
-                    response["glossary"] = json.loads(glossary)
-                except:
-                    response["glossary"] = {}
-            else:
-                response["glossary"] = {}
-                
-            # Add summary image if it exists
-            if summary_image:
-                response["summary_image"] = summary_image
-            else:
-                response["summary_image"] = None
-
-            # Add follow up questions
-            if follow_up_questions:
-                try:
-                    response["follow_up_questions"] = json.loads(follow_up_questions)
-                except:
-                    response["follow_up_questions"] = []
-            else:
-                response["follow_up_questions"] = []
-
-            if gate_metadata:
-                try:
-                    meta = json.loads(gate_metadata)
-                    response["gate_metadata"] = meta
-                    if isinstance(meta, dict) and meta.get("intent_gate"):
-                        response["intent_gate"] = meta["intent_gate"]
-                except Exception:
-                    pass
-            
+            _attach_completed_status_payload(
+                response,
+                content=content,
+                completed_at=completed_at,
+                terms=terms,
+                glossary=glossary,
+                summary_image=summary_image,
+                follow_up_questions=follow_up_questions,
+                gate_metadata=gate_metadata,
+            )
+        elif status == "failed" and (content or "").strip():
+            _attach_completed_status_payload(
+                response,
+                content=content,
+                completed_at=completed_at,
+                terms=terms,
+                glossary=glossary,
+                summary_image=summary_image,
+                follow_up_questions=follow_up_questions,
+                gate_metadata=gate_metadata,
+            )
+            response["recovered_after_failure"] = True
+            response["postprocess_error_message"] = error_message or None
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
         elif status == "processing":
             response["started_at"] = started_at
             response["message"] = "Still analyzing your chart..."
+            if engagement_updates:
+                try:
+                    parsed_updates = json.loads(engagement_updates)
+                    if isinstance(parsed_updates, list):
+                        response["engagement_updates"] = parsed_updates
+                except Exception:
+                    response["engagement_updates"] = []
         
         total_time = time.time() - start_time
         # print(f"✅ [STATUS COMPLETE] messageId: {message_id}, status: {status}, total_time: {total_time:.3f}s")
@@ -878,6 +978,95 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         except Exception as log_err:
             print(f"⚠️ Failed to log status error: {log_err}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/wait-conversation/{message_id}/reply")
+async def reply_wait_conversation(message_id: int, request: dict, current_user = Depends(get_current_user)):
+    """User reply in the temporary side conversation while the main answer is processing."""
+    text = sanitize_text(request.get("content") or request.get("text") or "")
+    if not text:
+        raise HTTPException(status_code=422, detail="Missing reply content")
+    try:
+        from chat.wait_conversation_agent import chat_wait_side_conversation_enabled, generate_wait_side_reply
+
+        if not chat_wait_side_conversation_enabled():
+            raise HTTPException(status_code=404, detail="Wait conversation is not enabled")
+
+        with get_conn() as conn:
+            _ensure_wait_side_conversation_tables(conn)
+            cur = execute(
+                conn,
+                """
+                    SELECT c.conversation_id, c.status, c.gemini_cache_name, c.cached_context_json,
+                           cm.status, cs.user_id
+                    FROM chat_wait_conversations c
+                    JOIN chat_messages cm ON cm.message_id = c.main_message_id
+                    JOIN chat_sessions cs ON cs.session_id = c.session_id
+                    WHERE c.main_message_id = %s
+                """,
+                (message_id,),
+            )
+            row = cur.fetchone()
+            if not row or row[5] != current_user.userid:
+                raise HTTPException(status_code=404, detail="Wait conversation not found")
+            conversation_id, conv_status, cache_name, cached_context_json, main_status, _user_id = row
+            if conv_status != "active" or main_status != "processing":
+                raise HTTPException(status_code=409, detail="Wait conversation is no longer active")
+            execute(
+                conn,
+                """
+                    INSERT INTO chat_wait_conversation_messages
+                    (conversation_id, main_message_id, sender, content, metadata)
+                    VALUES (%s, %s, %s, %s, %s)
+                """,
+                (conversation_id, message_id, "user", text, json.dumps({"kind": "user_reply"}, ensure_ascii=False)),
+            )
+            conn.commit()
+
+        with get_conn() as conn:
+            payload = _fetch_wait_side_payload(conn, message_id)
+            conn.commit()
+        if not payload:
+            raise HTTPException(status_code=404, detail="Wait conversation not found")
+        cache_payload = None
+        if cached_context_json:
+            try:
+                cache_payload = json.loads(cached_context_json)
+            except Exception:
+                cache_payload = None
+        assistant_text = await generate_wait_side_reply(
+            user_text=text,
+            conversation_history=payload.get("messages") or [],
+            cache_name=payload.get("gemini_cache_name") or cache_name,
+            cache_payload=cache_payload,
+        )
+        if not assistant_text:
+            assistant_text = "That helps. I’m checking how this fits with the active dasha and house themes while the full reading finishes."
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                    INSERT INTO chat_wait_conversation_messages
+                    (conversation_id, main_message_id, sender, content, metadata)
+                    VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    conversation_id,
+                    message_id,
+                    "assistant",
+                    sanitize_text(assistant_text),
+                    json.dumps({"kind": "assistant_reply"}, ensure_ascii=False),
+                ),
+            )
+            messages = _fetch_wait_side_messages(conn, message_id)
+            conn.commit()
+        return {"wait_conversation": {"enabled": True, "status": "active", "messages": messages}}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.info("wait conversation reply failed message_id=%s: %s", message_id, str(exc)[:200])
+        raise HTTPException(status_code=500, detail="Failed to send wait conversation reply")
+
 
 def get_original_question_for_clarification(session_id, current_message_id, conn):
     """
@@ -973,11 +1162,267 @@ def get_original_user_message_id_for_faq(session_id: str, assistant_message_id: 
     row = cursor.fetchone()
     return row[0] if row else None
 
+
+async def _generate_and_store_engagement_updates(
+    message_id: int,
+    question: str,
+    context: dict,
+    intent: dict,
+    language: str,
+    user_facts: dict,
+):
+    """Best-effort interim snippets while the final answer is still processing."""
+    try:
+        from chat.engagement_agent import generate_wait_engagement_updates
+
+        updates = await generate_wait_engagement_updates(
+            question=question,
+            context=context or {},
+            intent=intent or {},
+            language=language or "english",
+            user_facts=user_facts or {},
+        )
+        if not updates:
+            return
+        with get_conn() as conn:
+            _ensure_chat_messages_engagement_updates(conn)
+            execute(
+                conn,
+                """
+                    UPDATE chat_messages
+                    SET engagement_updates = %s
+                    WHERE message_id = %s AND status = %s
+                """,
+                (json.dumps(updates, ensure_ascii=False), message_id, "processing"),
+            )
+            conn.commit()
+        logger.info("stored %s wait engagement update(s) for message_id=%s", len(updates), message_id)
+    except Exception as exc:
+        logger.info("wait engagement store skipped for message_id=%s: %s", message_id, str(exc)[:200])
+
+
+def _store_engagement_updates_now(message_id: int, updates: list[dict]):
+    """Persist immediate deterministic wait snippets before async generation starts."""
+    if not updates:
+        return
+    try:
+        with get_conn() as conn:
+            _ensure_chat_messages_engagement_updates(conn)
+            execute(
+                conn,
+                """
+                    UPDATE chat_messages
+                    SET engagement_updates = %s
+                    WHERE message_id = %s AND status = %s
+                """,
+                (json.dumps(updates, ensure_ascii=False), message_id, "processing"),
+            )
+            conn.commit()
+    except Exception as exc:
+        logger.info("initial wait engagement store skipped for message_id=%s: %s", message_id, str(exc)[:200])
+
+
+def _fetch_wait_side_messages(conn, main_message_id: int) -> list[dict]:
+    _ensure_wait_side_conversation_tables(conn)
+    cur = execute(
+        conn,
+        """
+            SELECT c.conversation_id, c.status, m.id, m.sender, m.content, m.created_at
+            FROM chat_wait_conversations c
+            LEFT JOIN chat_wait_conversation_messages m ON m.conversation_id = c.conversation_id
+            WHERE c.main_message_id = %s
+            ORDER BY m.id ASC
+        """,
+        (main_message_id,),
+    )
+    rows = cur.fetchall() or []
+    if not rows:
+        return []
+    messages = []
+    for row in rows:
+        if row[2] is None:
+            continue
+        messages.append({
+            "id": row[2],
+            "sender": row[3],
+            "content": row[4],
+            "created_at": row[5].isoformat() if hasattr(row[5], "isoformat") else row[5],
+        })
+    return messages
+
+
+def _fetch_wait_side_payload(conn, main_message_id: int) -> dict | None:
+    _ensure_wait_side_conversation_tables(conn)
+    cur = execute(
+        conn,
+        """
+            SELECT conversation_id, status, gemini_cache_name, gemini_cache_model, cached_context_json
+            FROM chat_wait_conversations
+            WHERE main_message_id = %s
+        """,
+        (main_message_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "conversation_id": row[0],
+        "status": row[1],
+        "gemini_cache_name": row[2],
+        "gemini_cache_model": row[3],
+        "cached_context_json": row[4],
+        "messages": _fetch_wait_side_messages(conn, main_message_id),
+    }
+
+
+async def _start_wait_side_conversation(
+    *,
+    message_id: int,
+    session_id: str,
+    user_id: int,
+    question: str,
+    context: dict,
+    intent: dict,
+    language: str,
+    user_facts: dict,
+):
+    try:
+        from chat.wait_conversation_agent import (
+            build_wait_side_cache_payload,
+            chat_wait_side_conversation_enabled,
+            create_wait_side_cache,
+            generate_wait_side_reply,
+        )
+
+        if not chat_wait_side_conversation_enabled():
+            return
+        cache_payload = build_wait_side_cache_payload(
+            question=question,
+            context=context or {},
+            intent=intent or {},
+            language=language or "english",
+            user_facts=user_facts or {},
+        )
+        cache_name, model_name, expires_at, _cached_model = await create_wait_side_cache(cache_payload=cache_payload)
+        opening = await generate_wait_side_reply(
+            user_text=None,
+            conversation_history=[],
+            cache_name=cache_name,
+            cache_payload=cache_payload,
+        )
+        if not opening:
+            opening = "I’m looking at the active dasha and transit themes while the full answer is prepared. Which part of this question feels most urgent to you right now?"
+        with get_conn() as conn:
+            _ensure_wait_side_conversation_tables(conn)
+            cur = execute(
+                conn,
+                """
+                    INSERT INTO chat_wait_conversations
+                    (main_message_id, session_id, user_id, status, gemini_cache_name, gemini_cache_model,
+                     gemini_cache_expires_at, cached_context_json, cached_context_version)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (main_message_id) DO UPDATE SET
+                        status = chat_wait_conversations.status
+                    RETURNING conversation_id
+                """,
+                (
+                    message_id,
+                    session_id,
+                    user_id,
+                    "active",
+                    cache_name,
+                    model_name,
+                    expires_at,
+                    json.dumps(cache_payload, ensure_ascii=False, default=str),
+                    "v1",
+                ),
+            )
+            conversation_id = cur.fetchone()[0]
+            existing = _fetch_wait_side_messages(conn, message_id)
+            if not existing:
+                execute(
+                    conn,
+                    """
+                        INSERT INTO chat_wait_conversation_messages
+                        (conversation_id, main_message_id, sender, content, metadata)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        conversation_id,
+                        message_id,
+                        "assistant",
+                        sanitize_text(opening),
+                        json.dumps({"kind": "opening"}, ensure_ascii=False),
+                    ),
+                )
+            conn.commit()
+    except Exception as exc:
+        logger.info("wait side conversation start skipped for message_id=%s: %s", message_id, str(exc)[:200])
+
+
+async def _close_wait_side_conversation(message_id: int):
+    try:
+        from chat.wait_conversation_agent import delete_wait_side_cache, generate_wait_side_reply
+
+        with get_conn() as conn:
+            payload = _fetch_wait_side_payload(conn, message_id)
+            if not payload or payload.get("status") != "active":
+                conn.commit()
+                return
+            conn.commit()
+        history = payload.get("messages") or []
+        cache_payload = None
+        if payload.get("cached_context_json"):
+            try:
+                cache_payload = json.loads(payload["cached_context_json"])
+            except Exception:
+                cache_payload = None
+        closing = await generate_wait_side_reply(
+            user_text=None,
+            conversation_history=history,
+            cache_name=payload.get("gemini_cache_name"),
+            cache_payload=cache_payload,
+            closing=True,
+        )
+        if not closing:
+            closing = "I have the full reading ready now. I’ll bring the detailed answer below."
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                    INSERT INTO chat_wait_conversation_messages
+                    (conversation_id, main_message_id, sender, content, metadata)
+                    VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    payload["conversation_id"],
+                    message_id,
+                    "assistant",
+                    sanitize_text(closing),
+                    json.dumps({"kind": "closing"}, ensure_ascii=False),
+                ),
+            )
+            execute(
+                conn,
+                """
+                    UPDATE chat_wait_conversations
+                    SET status = %s, closed_at = %s
+                    WHERE main_message_id = %s
+                """,
+                ("closed", datetime.now(), message_id),
+            )
+            conn.commit()
+        await delete_wait_side_cache(payload.get("gemini_cache_name"))
+    except Exception as exc:
+        logger.info("wait side conversation close skipped for message_id=%s: %s", message_id, str(exc)[:200])
+
+
 async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None):
     """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
     import json
+    import asyncio
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     from ai.gemini_chat_analyzer import GeminiChatAnalyzer
@@ -1504,11 +1949,71 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             context['extracted_context'] = intent['extracted_context']
         
         # Override intent mode for @All_Events to force event prediction
-        if question.startswith('@All_Events'):
+        is_all_events_question = question.startswith('@All_Events')
+        if is_all_events_question:
             print(f"🎯 @All_Events DETECTED - Overriding intent mode to PREDICT_EVENTS_FOR_PERIOD")
             intent['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
             context['intent']['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
             question = question.replace('@All_Events', '').strip()
+
+        # Fire-and-forget wait-time engagement snippets. This must never delay or affect final answers.
+        try:
+            from chat.engagement_agent import (
+                build_initial_wait_engagement_updates,
+                chat_wait_engagement_enabled,
+            )
+
+            if (
+                chat_wait_engagement_enabled()
+                and not partnership_mode
+                and not partner_birth_details
+                and not is_all_events_question
+            ):
+                _store_engagement_updates_now(
+                    message_id,
+                    build_initial_wait_engagement_updates(
+                        question=question,
+                        intent=intent,
+                        language=language,
+                    ),
+                )
+                asyncio.create_task(
+                    _generate_and_store_engagement_updates(
+                        message_id,
+                        question,
+                        context,
+                        intent,
+                        language,
+                        user_facts,
+                    )
+                )
+        except Exception as engagement_start_err:
+            logger.info("wait engagement task not started for message_id=%s: %s", message_id, str(engagement_start_err)[:200])
+
+        # V2 side conversation: starts only after clarification/native gates are resolved and context is ready.
+        try:
+            from chat.wait_conversation_agent import chat_wait_side_conversation_enabled
+
+            if (
+                chat_wait_side_conversation_enabled()
+                and not partnership_mode
+                and not partner_birth_details
+                and not is_all_events_question
+            ):
+                asyncio.create_task(
+                    _start_wait_side_conversation(
+                        message_id=message_id,
+                        session_id=session_id,
+                        user_id=user_id,
+                        question=question,
+                        context=context,
+                        intent=intent,
+                        language=language,
+                        user_facts=user_facts,
+                    )
+                )
+        except Exception as wait_side_start_err:
+            logger.info("wait side conversation task not started for message_id=%s: %s", message_id, str(wait_side_start_err)[:200])
         
         # Generate response
         try:
@@ -1760,6 +2265,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 )
             
             conn.commit()
+
+        if result.get('success'):
+            await _close_wait_side_conversation(message_id)
         
         # Extract facts AFTER transaction commits to avoid database lock
         if result.get('success') and birth_chart_id:
@@ -1797,6 +2305,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         except Exception as log_err:
             print(f"⚠️ Failed to log error to chat_error_logs: {log_err}")
         with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT status, content
+                    FROM chat_messages
+                    WHERE message_id = %s
+                """,
+                (message_id,),
+            )
+            existing_row = cur.fetchone()
+            if existing_row and _should_preserve_completed_message(existing_row[0], existing_row[1]):
+                conn.commit()
+                logger.warning(
+                    "Preserved completed chat message after post-processing error for message_id=%s: %s",
+                    message_id,
+                    str(e)[:240],
+                )
+                return
             execute(
                 conn,
                 """

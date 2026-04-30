@@ -183,6 +183,11 @@ DASHA_DATES_SOVEREIGNTY = """
    - Questions about a specific future or past year/range, or "in 2027", "next year", "Oct 2026–Mar 2027": use unified_dasha_timeline.vimshottari_periods, requested_dasha_summary.vimshottari_sequence or .all_five_levels_sequence (these are computed for the requested period). For each transit in transit_activations, use the dasha periods that fall within that activation's start_date/end_date (from unified_dasha_timeline or requested_dasha_summary).
    - Short-term (daily/weekly/monthly): use period_dasha_activations when present.
 2) DATES ARE AUTHORITATIVE ONLY FROM CONTEXT: Whatever source you chose above, use ONLY the start/end dates given there. Do NOT infer or substitute dates from general knowledge or typical dasha lengths. Example: If the relevant context says Mars-Ketu runs May 2026–October 2026, state exactly that—never substitute October 2026–March 2027 or any other range. The native's birth data determines exact dates; your role is to report and interpret them, not replace them.
+3) DATE-LABEL AUDIT: Compare every cited dasha/window start and end date with today's date from current_date_info / IMPORTANT CURRENT DATE INFORMATION before choosing words:
+   - If start <= today <= end, say "currently running", "active since [start]", or "has been running since [start]".
+   - If start < today, NEVER say "starting [start]", "will start [start]", "transitioning into [period]", "entering [period]", "upcoming", or "आगामी" for that period.
+   - Use "upcoming", "will start", "transitioning into", or "entering" ONLY when the start date is after today.
+   - If end < today, say "past/completed" and never use it as a future trigger.
 """
 
 # 11. HOUSE SIGNIFICATIONS REFERENCE
@@ -217,6 +222,8 @@ CRITICAL: You are the ONLY voice the user hears. The user DOES NOT see the speci
 - Use "upcoming/आगामी" only when the period starts AFTER today's date.
 - If a period already ended before today, label it as past/completed.
 - Never present a past date window as a future trigger.
+- If start <= today <= end, phrase as "currently running", "active since [start]", or "has been running since [start]".
+- Never write "transitioning into", "entering", "starting [date]", or "will start [date]" for a period whose start date is before today. Example: on April 29, 2026, a Venus Antardasha that starts May 23, 2025 must be described as "Venus Antardasha has been running since May 23, 2025", not "transitioning into Venus Antardasha".
 [MERGE-DASHA-FIRST] In predictive/event answers, open technical reasoning from active period lords and their timeframe (from branch outputs), then layer natal/transit nuance. Do not present a natal-only conclusion when branch timing data is available.
 [MERGE-DASHA-SOVEREIGNTY] If any specialist branch provides explicit dasha names/levels/windows, you MUST explicitly include those dasha references in the final answer. Never drop branch-provided dasha timelines in favor of generic narrative.
 [MERGE-TRUTH-OVER-TONE] Accuracy outranks niceness. Do not modify hard astrological conclusions to sound pleasant.

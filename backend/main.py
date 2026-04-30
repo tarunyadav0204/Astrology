@@ -874,6 +874,12 @@ class CompatibilityRequest(BaseModel):
     boy_birth_data: BirthData
     girl_birth_data: BirthData
 
+class CompatibilityPremiumRequest(BaseModel):
+    boy_birth_data: BirthData
+    girl_birth_data: BirthData
+    language: Optional[str] = "english"
+    force_regenerate: Optional[bool] = False
+
 class DailyPredictionRequest(BaseModel):
     birth_data: BirthData
     target_date: Optional[str] = None
@@ -4039,9 +4045,65 @@ async def analyze_compatibility(request: CompatibilityRequest, current_user: Use
     result = analyzer.analyze_compatibility(boy_chart, girl_chart, boy_birth, girl_birth)
     
     return {
+        "api_version": result.get("api_version", "kundli_matching_v2"),
         "boy_details": boy_birth,
         "girl_details": girl_birth,
-        "compatibility_analysis": result
+        "compatibility_analysis": result,
+        "timing_overlay": result.get("timing_overlay"),
+        "rule_profile": result.get("rule_profile"),
+    }
+
+@app.post("/api/compatibility-analysis/premium-report")
+async def analyze_compatibility_premium_report(request: CompatibilityPremiumRequest, current_user: User = Depends(get_current_user)):
+    """Generate or return cached premium compatibility report."""
+    from marriage_matching.premium_report import generate_compatibility_premium_report
+    from credits.credit_service import CreditService
+
+    credit_service = CreditService()
+    base_cost = credit_service.get_credit_setting("marriage_analysis_cost")
+    effective_cost = credit_service.get_effective_cost(current_user.userid, base_cost, "marriage_analysis_cost")
+
+    # Allow cache hit even if current balance is low.
+    if request.force_regenerate:
+        balance = credit_service.get_user_credits(current_user.userid)
+        if balance < effective_cost:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Insufficient credits. You need {effective_cost} credits but have {balance}.",
+            )
+
+    boy_chart = await calculate_chart(request.boy_birth_data, 'mean', current_user)
+    girl_chart = await calculate_chart(request.girl_birth_data, 'mean', current_user)
+    boy_birth = request.boy_birth_data.model_dump()
+    girl_birth = request.girl_birth_data.model_dump()
+
+    result = await generate_compatibility_premium_report(
+        current_user.userid,
+        boy_chart,
+        girl_chart,
+        boy_birth,
+        girl_birth,
+        language=request.language or "english",
+        force_regenerate=bool(request.force_regenerate),
+        effective_cost=effective_cost,
+        credit_service=credit_service,
+        get_conn=get_conn,
+        execute_fn=execute,
+    )
+
+    if not result.get("ok"):
+        detail = result.get("error") or "Premium compatibility report failed."
+        if "Insufficient credits" in detail:
+            raise HTTPException(status_code=402, detail=detail)
+        raise HTTPException(status_code=500, detail=detail)
+
+    return {
+        "api_version": "compatibility_premium_v1",
+        "boy_details": boy_birth,
+        "girl_details": girl_birth,
+        "cached": result.get("cached", False),
+        "effective_cost": effective_cost,
+        "premium_report": result.get("report"),
     }
 
 # Horoscope endpoints

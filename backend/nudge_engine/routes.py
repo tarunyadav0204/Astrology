@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import hmac
+import uuid
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -54,6 +55,17 @@ class AdminSendNotificationRequest(BaseModel):
     body: str
     question: Optional[str] = None  # optional; when user taps notification, prefill chat input with this
     native_id: Optional[int] = None  # optional; birth_chart id — app will set this native as selected when user taps
+    landing_screen: Optional[str] = "chat"
+
+
+class AdminSendBulkNotificationRequest(BaseModel):
+    audience: str = "selected"  # "selected" or "all_matching"
+    user_ids: Optional[List[int]] = None
+    name: Optional[str] = None
+    require_device_token: bool = True
+    title: str
+    body: str
+    question: Optional[str] = None
     landing_screen: Optional[str] = "chat"
 
 
@@ -118,6 +130,26 @@ def _normalize_landing_screen(value: Optional[str]) -> str:
     if raw in _LANDING_SCREEN_TO_CTA:
         return raw
     raise HTTPException(status_code=400, detail="Invalid landing_screen")
+
+
+def _admin_notification_push_data(
+    *,
+    landing_screen: str,
+    question: Optional[str] = None,
+    native_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    push_data: Dict[str, Any] = {
+        "trigger_id": "admin",
+        "landing_screen": landing_screen,
+        "cta": _LANDING_SCREEN_TO_CTA[landing_screen],
+    }
+    if landing_screen == "chat" and question and str(question).strip():
+        push_data["question"] = str(question).strip()[:500]
+    if landing_screen in {"career", "marriage", "health", "wealth", "progeny", "education"}:
+        push_data["analysis_type"] = landing_screen
+    if native_id is not None:
+        push_data["native_id"] = str(native_id)
+    return push_data
 
 
 class MarkNudgesReadRequest(BaseModel):
@@ -264,17 +296,11 @@ async def admin_send_notification(
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             tokens = db.get_device_tokens_for_user(conn, body.user_id)
-            push_data: Dict[str, Any] = {
-                "trigger_id": "admin",
-                "landing_screen": landing_screen,
-                "cta": _LANDING_SCREEN_TO_CTA[landing_screen],
-            }
-            if landing_screen == "chat" and body.question and (body.question or "").strip():
-                push_data["question"] = (body.question or "").strip()[:500]
-            if landing_screen in {"career", "marriage", "health", "wealth", "progeny", "education"}:
-                push_data["analysis_type"] = landing_screen
-            if body.native_id is not None:
-                push_data["native_id"] = str(body.native_id)
+            push_data = _admin_notification_push_data(
+                landing_screen=landing_screen,
+                question=body.question,
+                native_id=body.native_id,
+            )
             sent = 0
             if tokens:
                 for token, platform in tokens:
@@ -318,6 +344,251 @@ async def admin_send_notification(
     except Exception as e:
         logger.exception("Admin send notification failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to send notification") from e
+
+
+def _chunked(items: List[Any], size: int) -> List[List[Any]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def _run_admin_bulk_notification_job(
+    *,
+    job_id: str,
+    admin_userid: int,
+    audience: str,
+    user_ids: List[int],
+    name: Optional[str],
+    require_device_token: bool,
+    title: str,
+    body_text: str,
+    landing_screen: str,
+    question: Optional[str],
+) -> None:
+    sent = 0
+    failed = 0
+    tokens_found = 0
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            db.update_admin_send_job(
+                conn,
+                job_id,
+                status="running",
+                started_at=datetime.now(IST_TZ),
+            )
+            conn.commit()
+
+        with db.get_conn() as conn:
+            if audience == "all_matching":
+                target_user_ids = db.resolve_notification_recipient_user_ids(
+                    conn,
+                    name=name,
+                    require_device_token=require_device_token,
+                )
+            else:
+                target_user_ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit()})
+            conn.commit()
+
+        with db.get_conn() as conn:
+            token_rows = db.get_device_tokens_for_users(conn, target_user_ids)
+            conn.commit()
+
+        tokens_found = len(token_rows)
+        tokens_by_user: Dict[int, List[str]] = defaultdict(list)
+        for uid, token, _platform in token_rows:
+            token_s = str(token or "").strip()
+            if token_s:
+                tokens_by_user[int(uid)].append(token_s)
+
+        with db.get_conn() as conn:
+            db.update_admin_send_job(
+                conn,
+                job_id,
+                total_users=len(target_user_ids),
+                tokens_found=tokens_found,
+                sent=0,
+                failed=0,
+            )
+            conn.commit()
+
+        push_data = _admin_notification_push_data(
+            landing_screen=landing_screen,
+            question=question,
+            native_id=None,
+        )
+        token_messages: List[Dict[str, Any]] = []
+        token_user_ids: List[int] = []
+        for uid in target_user_ids:
+            for token in tokens_by_user.get(int(uid), []):
+                token_messages.append({
+                    "to": token,
+                    "title": title,
+                    "body": body_text,
+                    "sound": "default",
+                    "data": push_data,
+                })
+                token_user_ids.append(int(uid))
+
+        sent_by_user: Dict[int, int] = defaultdict(int)
+        for msg_chunk, uid_chunk in zip(_chunked(token_messages, 500), _chunked(token_user_ids, 500)):
+            results = push_module.send_expo_push_messages(msg_chunk)
+            for uid, ok in zip(uid_chunk, results):
+                if ok:
+                    sent += 1
+                    sent_by_user[int(uid)] += 1
+                else:
+                    failed += 1
+            if len(results) < len(msg_chunk):
+                failed += len(msg_chunk) - len(results)
+            with db.get_conn() as conn:
+                db.update_admin_send_job(
+                    conn,
+                    job_id,
+                    sent=sent,
+                    failed=failed,
+                    tokens_found=tokens_found,
+                    total_users=len(target_user_ids),
+                )
+                conn.commit()
+
+        sent_at_iso = date.today().isoformat()
+        data_json = json.dumps(push_data, ensure_ascii=False)[:8000]
+        delivery_rows = []
+        for uid in target_user_ids:
+            channel = "push" if sent_by_user.get(int(uid), 0) > 0 else "stored"
+            delivery_rows.append((
+                int(uid),
+                "admin",
+                title,
+                body_text,
+                "{}",
+                sent_at_iso,
+                channel,
+                data_json,
+            ))
+
+        for delivery_chunk in _chunked(delivery_rows, 1000):
+            with db.get_conn() as conn:
+                db.insert_deliveries_batch(conn, delivery_chunk)
+                db.update_admin_send_job(
+                    conn,
+                    job_id,
+                    sent=sent,
+                    failed=failed,
+                    tokens_found=tokens_found,
+                    total_users=len(target_user_ids),
+                )
+                conn.commit()
+
+        with db.get_conn() as conn:
+            db.update_admin_send_job(
+                conn,
+                job_id,
+                status="completed",
+                total_users=len(target_user_ids),
+                tokens_found=tokens_found,
+                sent=sent,
+                failed=failed,
+                completed_at=datetime.now(IST_TZ),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.exception("Admin bulk notification job %s failed: %s", job_id, e)
+        try:
+            with db.get_conn() as conn:
+                db.update_admin_send_job(
+                    conn,
+                    job_id,
+                    status="failed",
+                    sent=sent,
+                    failed=failed,
+                    tokens_found=tokens_found,
+                    error=str(e)[:1000],
+                    completed_at=datetime.now(IST_TZ),
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+
+@router.post("/admin/send-bulk", status_code=202)
+async def admin_send_bulk_notification(
+    body: AdminSendBulkNotificationRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a non-blocking bulk custom notification job."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    title = (body.title or "").strip()[:100]
+    body_text = (body.body or "").strip()[:200]
+    if not title or not body_text:
+        raise HTTPException(status_code=400, detail="title and body required")
+    audience = str(body.audience or "selected").strip().lower()
+    if audience not in {"selected", "all_matching"}:
+        raise HTTPException(status_code=400, detail="Invalid audience")
+    user_ids = [int(u) for u in (body.user_ids or []) if str(u).isdigit()]
+    if audience == "selected" and not user_ids:
+        raise HTTPException(status_code=400, detail="Select at least one user")
+    landing_screen = _normalize_landing_screen(body.landing_screen)
+    job_id = uuid.uuid4().hex
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            db.create_admin_send_job(
+                conn,
+                job_id=job_id,
+                admin_userid=current_user.userid,
+                audience=audience,
+                title=title,
+                body=body_text,
+            )
+            conn.commit()
+        background_tasks.add_task(
+            _run_admin_bulk_notification_job,
+            job_id=job_id,
+            admin_userid=current_user.userid,
+            audience=audience,
+            user_ids=user_ids,
+            name=body.name,
+            require_device_token=bool(body.require_device_token),
+            title=title,
+            body_text=body_text,
+            landing_screen=landing_screen,
+            question=body.question,
+        )
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "status": "queued",
+            "message": "Bulk notification job started. You can leave this screen.",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Admin bulk notification start failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to start bulk notification job") from e
+
+
+@router.get("/admin/send-bulk/{job_id}")
+async def admin_send_bulk_notification_status(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            job = db.get_admin_send_job(conn, job_id)
+            conn.commit()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return {"ok": True, "job": job}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Admin bulk notification status failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load bulk notification job") from e
 
 
 @router.post("/admin/generate-nudge-from-chat")

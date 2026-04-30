@@ -216,6 +216,33 @@ def init_nudge_tables(conn) -> None:
 
         execute(
             conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_admin_send_jobs (
+                job_id TEXT PRIMARY KEY,
+                admin_userid INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued',
+                audience TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                total_users INTEGER NOT NULL DEFAULT 0,
+                tokens_found INTEGER NOT NULL DEFAULT 0,
+                sent INTEGER NOT NULL DEFAULT 0,
+                failed INTEGER NOT NULL DEFAULT 0,
+                error TEXT,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMPTZ,
+                completed_at TIMESTAMPTZ
+            )
+            """,
+        )
+        execute(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_admin_send_jobs_created "
+            "ON nudge_admin_send_jobs(created_at DESC)",
+        )
+
+        execute(
+            conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_unread "
             "ON nudge_deliveries(userid) WHERE read_at IS NULL",
         )
@@ -521,6 +548,148 @@ def get_all_device_tokens(conn) -> List[Tuple[int, str, str]]:
     except Exception as e:
         logger.warning("Could not fetch all device tokens: %s", e)
         return []
+
+
+def get_device_tokens_for_users(conn, userids: List[int]) -> List[Tuple[int, str, str]]:
+    """Return (userid, token, platform) for the provided user ids."""
+    ids = [int(u) for u in userids if str(u).isdigit()]
+    if not ids:
+        return []
+    try:
+        cur = execute(
+            conn,
+            "SELECT userid, token, platform FROM device_tokens WHERE userid = ANY(%s)",
+            (ids,),
+        )
+        rows = cur.fetchall()
+        return list(rows) if rows else []
+    except Exception as e:
+        logger.warning("Could not fetch device tokens for users: %s", e)
+        return []
+
+
+def resolve_notification_recipient_user_ids(
+    conn,
+    *,
+    name: Optional[str] = None,
+    require_device_token: bool = True,
+    limit: int = 100000,
+) -> List[int]:
+    """Resolve admin bulk-notification recipients across all pages."""
+    params: List[Any] = []
+    where: List[str] = []
+    join = ""
+    if require_device_token:
+        join = "JOIN (SELECT DISTINCT userid FROM device_tokens) dt ON dt.userid = u.userid"
+    if name and str(name).strip():
+        pat = f"%{str(name).strip()}%"
+        where.append("(u.name ILIKE %s OR COALESCE(u.email, '') ILIKE %s OR COALESCE(u.phone::text, '') ILIKE %s)")
+        params.extend([pat, pat, pat])
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    try:
+        cur = execute(
+            conn,
+            f"""
+            SELECT DISTINCT u.userid
+            FROM users u
+            {join}
+            {where_sql}
+            ORDER BY u.userid ASC
+            LIMIT %s
+            """,
+            tuple(params + [int(limit)]),
+        )
+        rows = cur.fetchall() or []
+        return [int(r[0]) for r in rows]
+    except Exception as e:
+        logger.warning("Could not resolve notification recipient user ids: %s", e)
+        return []
+
+
+def create_admin_send_job(
+    conn,
+    *,
+    job_id: str,
+    admin_userid: int,
+    audience: str,
+    title: str,
+    body: str,
+) -> None:
+    execute(
+        conn,
+        """
+        INSERT INTO nudge_admin_send_jobs
+        (job_id, admin_userid, status, audience, title, body)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (job_id, admin_userid, "queued", audience, title, body),
+    )
+
+
+def update_admin_send_job(conn, job_id: str, **fields: Any) -> None:
+    allowed = {
+        "status",
+        "total_users",
+        "tokens_found",
+        "sent",
+        "failed",
+        "error",
+        "started_at",
+        "completed_at",
+    }
+    updates = []
+    params: List[Any] = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        updates.append(f"{key} = %s")
+        params.append(value)
+    if not updates:
+        return
+    params.append(job_id)
+    execute(
+        conn,
+        f"UPDATE nudge_admin_send_jobs SET {', '.join(updates)} WHERE job_id = %s",
+        tuple(params),
+    )
+
+
+def get_admin_send_job(conn, job_id: str) -> Optional[Dict[str, Any]]:
+    cur = execute(
+        conn,
+        """
+        SELECT job_id, admin_userid, status, audience, title, body,
+               total_users, tokens_found, sent, failed, error,
+               created_at, started_at, completed_at
+        FROM nudge_admin_send_jobs
+        WHERE job_id = %s
+        """,
+        (job_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    keys = [
+        "job_id",
+        "admin_userid",
+        "status",
+        "audience",
+        "title",
+        "body",
+        "total_users",
+        "tokens_found",
+        "sent",
+        "failed",
+        "error",
+        "created_at",
+        "started_at",
+        "completed_at",
+    ]
+    out = dict(zip(keys, row))
+    for key in ("created_at", "started_at", "completed_at"):
+        if hasattr(out.get(key), "isoformat"):
+            out[key] = out[key].isoformat()
+    return out
 
 
 def save_device_token(

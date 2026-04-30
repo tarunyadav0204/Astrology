@@ -43,8 +43,8 @@ RULES:
 1. Start immediately with {{ - no text before
 2. End with }} - no text after  
 3. NO ```json blocks
-4. Wrap astrological terms: <term id="key">Term</term>
-5. Include "glossary" key with term definitions
+4. Do NOT use XML/HTML tags inside JSON string values. Do not write <term id="...">.
+5. Include "glossary" key with term definitions instead of inline term tags
 6. Use <br> for line breaks in strings
 7. Language: {language}
 8. CRITICAL: Each "answer" field must be detailed and comprehensive
@@ -81,6 +81,15 @@ RULES:
             try:
                 # Clean accidental markdown backticks if Gemini ignored the instruction
                 json_clean = re.sub(r'^```json\s*|```$', '', parsed_result['content'], flags=re.MULTILINE).strip()
+                # Older prompts asked for <term id="..."> labels. Inside JSON strings,
+                # the id="..." quotes make otherwise valid JSON impossible to parse.
+                # Keep the readable term text and parse the structured payload.
+                json_clean = re.sub(
+                    r'<term\b[^>]*>(.*?)</term>',
+                    r'\1',
+                    json_clean,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
                 
                 # Find the main JSON object using bracket counting
                 start_idx = json_clean.find('{')

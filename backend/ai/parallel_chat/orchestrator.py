@@ -281,6 +281,19 @@ def _json_compact(data: Any) -> str:
     return json.dumps(data, default=_json_serializer, ensure_ascii=False, separators=(",", ":"))
 
 
+def _timing_label_guard_text(current_date: Optional[datetime] = None) -> str:
+    now = current_date or datetime.now()
+    today = now.strftime("%B %d, %Y")
+    return (
+        "CRITICAL TIMING WORDING AUDIT:\n"
+        f"- Today's date is {today}.\n"
+        "- Before writing any dasha/window as upcoming, starting, will start, entering, or transitioning into, compare its start/end dates with today.\n"
+        "- If start <= today <= end, call it currently running / active since the start date.\n"
+        "- If start < today, never say upcoming, starting, will start, entering, or transitioning into for that period.\n"
+        "- If end < today, call it past/completed and never use it as a future trigger.\n"
+    )
+
+
 def _attach_classical_rule_matches(payload: Dict[str, Any], matches: Any) -> None:
     if isinstance(payload, dict) and isinstance(matches, dict) and matches.get("matches"):
         payload["classical_rule_matches"] = copy.deepcopy(matches)
@@ -467,7 +480,7 @@ async def _run_branch_json(
     if start_delay_s > 0:
         await asyncio.sleep(start_delay_s)
     body = _json_compact(payload)
-    prompt = f"{static_instruction}\n\nVARIABLE_DATA_JSON:\n{body}"
+    prompt = f"{static_instruction}\n\n{_timing_label_guard_text()}\nVARIABLE_DATA_JSON:\n{body}"
     static_chars = len(static_instruction)
     dynamic_chars = len(prompt) - static_chars
     branch_timeout_s = parallel_branch_timeout_s(critical=critical)
@@ -884,7 +897,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     time_context = (
         f"IMPORTANT CURRENT DATE INFORMATION:\n- Today's Date: {current_date.strftime('%B %d, %Y')}\n"
         f"- Current Time: {current_date.strftime('%H:%M UTC')}\n"
-        f"- Current Year: {current_date.year}\n\nCRITICAL CHART INFORMATION:\n{ascendant_summary}"
+        f"- Current Year: {current_date.year}\n\n{_timing_label_guard_text(current_date)}\nCRITICAL CHART INFORMATION:\n{ascendant_summary}"
     )
 
     branch_bundle = {
