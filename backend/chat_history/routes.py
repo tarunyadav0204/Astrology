@@ -727,6 +727,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         force_ready_for_limit = partnership_mode or clarification_count >= 1 or is_notification_question
         
         intent_router = IntentRouter()
+        query_context = request.get("query_context") or request.get("queryContext")
         intent = await intent_router.classify_intent(
             question,
             [],
@@ -734,7 +735,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             clarification_count=clarification_count,
             language=language,
             force_ready=force_ready_for_limit,
-            d1_chart=d1_chart
+            d1_chart=d1_chart,
+            query_context=query_context,
         )
         # Several unrelated topics in one message → clarify first (overrides READY from router)
         if (
@@ -752,6 +754,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 language=language,
                 force_ready=False,
                 d1_chart=d1_chart,
+                query_context=query_context,
                 force_clarify=True,
             )
             intent["chart_insights"] = None
@@ -1653,7 +1656,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             
             print(f"{'='*80}\n")
             
-            intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready)
+            query_context = (
+                cached_intent.get("query_context")
+                if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
+                else None
+            )
+            intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready, query_context=query_context)
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
             MAX_CLARIFICATIONS = 1
             
@@ -1685,6 +1693,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     clarification_count=clarification_count,
                     language=language,
                     force_ready=False,
+                    query_context=query_context,
                     force_clarify=True,
                 )
                 intent["chart_insights"] = None

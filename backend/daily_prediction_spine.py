@@ -14,7 +14,9 @@ from calculators.panchang_calculator import PanchangCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.vedic_graha_drishti import DEFAULT_ASPECTS, GRAHA_HOUSE_ASPECTS
 from context_agents.compact_vedic import SIGN_NAMES, house_lordships_from_ascendant
+from daily.daily_micro_intents import get_daily_micro_intent_profile
 from shared.dasha_calculator import DashaCalculator
+from utils.query_context import resolve_query_now
 
 _DASHA_LEVELS = (
     ("mahadasha", "MD", 8),
@@ -92,6 +94,19 @@ _CATEGORY_HOUSES = {
     "travel": [3, 9, 12],
     "property": [4, 11],
     "general": [1, 4, 7, 10, 11],
+}
+
+_MICRO_INTENT_KARAKAS = {
+    "communication": ["BK", "AmK", "AK"],
+    "interview_meeting": ["AmK", "AK", "BK"],
+    "money_payment": ["AmK", "AK", "DK"],
+    "relationship_outreach": ["DK", "AK", "MK"],
+    "travel_commute": ["BK", "AK", "AmK"],
+    "health_treatment": ["AK", "GK", "MK"],
+    "study_exam": ["PK", "AmK", "AK"],
+    "decision_signing": ["AmK", "AK", "DK"],
+    "confrontation": ["GK", "AK", "BK"],
+    "general_day": ["AK", "AmK", "DK"],
 }
 
 _KARAKA_LABELS = {
@@ -188,6 +203,15 @@ def _same_element_distance(from_sign_name: Any, to_sign_name: Any) -> bool:
 def _event_houses_for_intent(intent: Dict[str, Any], daily_judgment: Dict[str, Any]) -> List[int]:
     category = str(intent.get("category") or "general").lower()
     houses = list(_CATEGORY_HOUSES.get(category, _CATEGORY_HOUSES["general"]))
+    extracted = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else {}
+    micro = extracted.get("daily_micro_intent") if isinstance(extracted.get("daily_micro_intent"), dict) else {}
+    for h in micro.get("houses") or []:
+        try:
+            house_num = int(h)
+        except (TypeError, ValueError):
+            continue
+        if house_num not in houses:
+            houses.append(house_num)
     for row in daily_judgment.get("top_activated_houses") or []:
         try:
             h = int(row.get("house"))
@@ -196,6 +220,18 @@ def _event_houses_for_intent(intent: Dict[str, Any], daily_judgment: Dict[str, A
         if h not in houses:
             houses.append(h)
     return houses[:8]
+
+
+def _resolve_daily_micro_intent(intent: Dict[str, Any]) -> Dict[str, Any]:
+    extracted = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else {}
+    raw = extracted.get("daily_micro_intent") if isinstance(extracted.get("daily_micro_intent"), dict) else {}
+    name = str(raw.get("name") or "general_day")
+    profile = get_daily_micro_intent_profile(name)
+    return {
+        **profile,
+        **raw,
+        "name": name,
+    }
 
 
 def _as_list(value: Any) -> List[Any]:
@@ -520,6 +556,8 @@ def _derive_daily_nadi(
     dasha_rows: List[Dict[str, Any]],
     all_natal_rows: Dict[str, Dict[str, Any]],
     moon_transit: Dict[str, Any],
+    event_houses: List[int],
+    micro_intent: Dict[str, Any],
 ) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
 
@@ -544,6 +582,9 @@ def _derive_daily_nadi(
                 "natal_lordships": natal.get("lordships") or [],
                 "relation": relation,
                 "domains": _house_domains(natal.get("house")),
+                "intent_house_match": _house_in_list(natal.get("house"), event_houses) or any(
+                    _house_in_list(h, event_houses) for h in (natal.get("lordships") or [])
+                ),
             })
 
     for row in dasha_rows:
@@ -558,16 +599,26 @@ def _derive_daily_nadi(
     priority = {"same_sign_conjunction": 2, "trinal_nadi_link": 1}
     rows.sort(
         key=lambda item: (
+            1 if item.get("intent_house_match") else 0,
             _LEVEL_EVENT_WEIGHT.get(str(item.get("level") or ""), 15),
             priority.get(str(item.get("relation") or ""), 0),
         ),
         reverse=True,
     )
+    focus_rows = [row for row in rows if row.get("intent_house_match")]
+    emotional_links = [row for row in rows if row.get("source") == "moon_transit"]
     return {
         "method": "nadi_daily_v1",
         "principle": "Daily Nadi uses exact conjunction or 1/5/9 sign links from the transiting Moon and active dasha lords to natal grahas; other sign relations are not counted as Nadi links.",
         "activation_links": rows[:12],
-        "verdict": "active" if rows else "no_exact_daily_nadi_link_found",
+        "focus_activation_links": focus_rows[:8],
+        "emotional_links": emotional_links[:4],
+        "micro_intent": micro_intent.get("name"),
+        "verdict": (
+            "supports_intent_activation" if focus_rows else
+            "emotional_only_or_background" if emotional_links else
+            "no_exact_daily_nadi_link_found"
+        ),
     }
 
 
@@ -600,10 +651,12 @@ def _derive_daily_jaimini(
     dasha_rows: List[Dict[str, Any]],
     all_natal_rows: Dict[str, Dict[str, Any]],
     moon_transit: Dict[str, Any],
+    micro_intent: Dict[str, Any],
 ) -> Dict[str, Any]:
     karakas = _karaka_rows(static_context, all_natal_rows)
     hits: List[Dict[str, Any]] = []
     moon_from_karakas: List[Dict[str, Any]] = []
+    preferred_karakas = _MICRO_INTENT_KARAKAS.get(str(micro_intent.get("name") or "general_day"), _MICRO_INTENT_KARAKAS["general_day"])
 
     karaka_by_planet = {
         str(row.get("planet")): row
@@ -618,6 +671,7 @@ def _derive_daily_jaimini(
                 "planet": row.get("planet"),
                 "moon_house_from_karaka": distance,
                 "moon_sign": moon_transit.get("sign"),
+                "intent_relevance": row.get("karaka") in preferred_karakas,
             })
 
     for dasha in dasha_rows:
@@ -644,15 +698,31 @@ def _derive_daily_jaimini(
                 "karaka_house": krow.get("house"),
                 "domains": krow.get("domains") or [],
                 "strength": trigger.get("strength"),
+                "intent_relevance": krow.get("karaka") in preferred_karakas,
                 "rule": "Active dasha lord transit touches a Chara Karaka; judge the day through that karaka's agenda and house.",
             })
+    hits.sort(
+        key=lambda item: (
+            1 if item.get("intent_relevance") else 0,
+            _LEVEL_EVENT_WEIGHT.get(str(item.get("level") or ""), 0),
+        ),
+        reverse=True,
+    )
+    focus_hits = [row for row in hits if row.get("intent_relevance")]
 
     return {
         "method": "jaimini_daily_v1",
         "principle": "Daily Jaimini reads the transiting Moon and active PR/SK/PD dasha-lord hits to AK/AmK/DK/GK and other Chara Karakas; broad static karaka biography is secondary.",
         "moon_from_karakas": moon_from_karakas,
         "karaka_hits": hits[:10],
-        "verdict": "active" if hits or moon_from_karakas else "karaka_data_unavailable",
+        "focus_karakas": preferred_karakas,
+        "focus_hits": focus_hits[:6],
+        "micro_intent": micro_intent.get("name"),
+        "verdict": (
+            "focus_karaka_triggered" if focus_hits else
+            "karaka_background_only" if hits or moon_from_karakas else
+            "karaka_data_unavailable"
+        ),
     }
 
 
@@ -688,6 +758,7 @@ def _derive_daily_kp(
     static_context: Dict[str, Any],
     dasha_rows: List[Dict[str, Any]],
     event_houses: List[int],
+    micro_intent: Dict[str, Any],
 ) -> Dict[str, Any]:
     kp = static_context.get("kp_analysis") or {}
     if not isinstance(kp, dict) or kp.get("error"):
@@ -724,16 +795,31 @@ def _derive_daily_kp(
                 "planet": planet,
                 "signifies_houses": houses,
                 "matched_event_houses": matched,
+                "intent_match_count": len(matched),
                 "rule": "KP daily materialization improves when PR/SK/PD lords signify the requested event cusps.",
             })
+    active_hits.sort(
+        key=lambda item: (
+            int(item.get("intent_match_count") or 0),
+            _LEVEL_EVENT_WEIGHT.get(str(item.get("level") or ""), 0),
+        ),
+        reverse=True,
+    )
+    best_hit = active_hits[0] if active_hits else {}
 
     return {
         "method": "kp_daily_v1",
         "available": True,
         "event_houses": event_houses,
+        "micro_intent": micro_intent.get("name"),
         "cusp_chain": cusp_rows,
         "active_dasha_significator_hits": active_hits,
-        "verdict": "supports_materialization" if active_hits else "weak_or_indirect_kp_trigger",
+        "best_hit": best_hit,
+        "verdict": (
+            "strong_materialization_support" if (best_hit.get("intent_match_count") or 0) >= 2 else
+            "supports_materialization" if active_hits else
+            "weak_or_indirect_kp_trigger"
+        ),
     }
 
 
@@ -779,6 +865,7 @@ def _derive_daily_ashtakavarga(
     static_context: Dict[str, Any],
     dasha_rows: List[Dict[str, Any]],
     event_houses: List[int],
+    micro_intent: Dict[str, Any],
 ) -> Dict[str, Any]:
     av_rows = _av_house_rows(static_context)
     if not av_rows or all(row.get("sav", 0) == 0 for row in av_rows.values()):
@@ -823,6 +910,7 @@ def _derive_daily_ashtakavarga(
             "sav": row.get("sav"),
             "planet_bav": bav,
             "strength": strength,
+            "intent_house_match": house in event_houses,
             "rule": "Daily AV judges local usability: active dasha lord's transit house SAV plus that planet's BAV in the sign.",
         })
         if int(row.get("sav") or 0) >= 30 and bav is not None and bav < 3:
@@ -841,14 +929,31 @@ def _derive_daily_ashtakavarga(
                 "conflict": "low_sav_high_planet_bav",
                 "meaning": "The broader field is resistant, but this dasha planet has localized ability to act.",
             })
+    transit_usability.sort(
+        key=lambda item: (
+            1 if item.get("intent_house_match") else 0,
+            {"strong": 3, "workable": 2, "strained": 1}.get(str(item.get("strength") or ""), 0),
+            _LEVEL_EVENT_WEIGHT.get(str(item.get("level") or ""), 0),
+        ),
+        reverse=True,
+    )
+    focus_transits = [row for row in transit_usability if row.get("intent_house_match")]
+    strong_focus = [row for row in focus_transits if row.get("strength") == "strong"]
+    strained_focus = [row for row in focus_transits if row.get("strength") == "strained"]
 
     return {
         "method": "ashtakavarga_daily_v1",
         "available": True,
         "event_house_support": house_support,
         "dasha_transit_usability": transit_usability,
+        "focus_transits": focus_transits[:6],
         "conflicts": conflicts,
-        "verdict": "supportive" if any(row.get("strength") == "strong" for row in transit_usability) else "mixed_or_workable",
+        "micro_intent": micro_intent.get("name"),
+        "verdict": (
+            "supportive_for_intent" if strong_focus else
+            "strained_for_intent" if strained_focus and not strong_focus else
+            "mixed_or_workable"
+        ),
     }
 
 
@@ -863,9 +968,11 @@ def _derive_daily_school_judgments(
     daily_judgment: Dict[str, Any],
 ) -> Dict[str, Any]:
     event_houses = _event_houses_for_intent(intent, daily_judgment)
+    micro_intent = _resolve_daily_micro_intent(intent)
     return {
         "method": "daily_school_judgments_v1",
         "event_houses": event_houses,
+        "micro_intent": micro_intent,
         "parashari": {
             "method": "parashari_daily_v1",
             "principle": "PR/SK/PD are the event triggers; AD/MD are permission. Use transit conjunction/aspect/return evidence before broad natal reading.",
@@ -873,10 +980,10 @@ def _derive_daily_school_judgments(
             "activated_houses": daily_judgment.get("top_activated_houses") or [],
             "massive_result_factors": daily_judgment.get("massive_result_factors") or [],
         },
-        "nadi": _derive_daily_nadi(dasha_rows, all_natal_rows, moon_transit),
-        "jaimini": _derive_daily_jaimini(static_context, dasha_rows, all_natal_rows, moon_transit),
-        "kp": _derive_daily_kp(static_context, dasha_rows, event_houses),
-        "ashtakavarga": _derive_daily_ashtakavarga(static_context, dasha_rows, event_houses),
+        "nadi": _derive_daily_nadi(dasha_rows, all_natal_rows, moon_transit, event_houses, micro_intent),
+        "jaimini": _derive_daily_jaimini(static_context, dasha_rows, all_natal_rows, moon_transit, micro_intent),
+        "kp": _derive_daily_kp(static_context, dasha_rows, event_houses, micro_intent),
+        "ashtakavarga": _derive_daily_ashtakavarga(static_context, dasha_rows, event_houses, micro_intent),
         "merge_rule": (
             "Parashari gives the main day event trigger; KP confirms materialization through event cusps; "
             "Nadi explains subtle linkage/activation; Jaimini explains karaka-level manifestation; "
@@ -898,10 +1005,11 @@ def build_daily_prediction_spine(
     if mode != "PREDICT_DAILY" and not as_of:
         return None
 
+    query_context = intent.get("query_context") if isinstance(intent.get("query_context"), dict) else None
     try:
-        target_dt = datetime.strptime(str(as_of)[:10], "%Y-%m-%d") if as_of else datetime.now()
+        target_dt = datetime.strptime(str(as_of)[:10], "%Y-%m-%d") if as_of else resolve_query_now(query_context).replace(tzinfo=None)
     except (TypeError, ValueError):
-        target_dt = datetime.now()
+        target_dt = resolve_query_now(query_context).replace(tzinfo=None)
     target_dt = target_dt.replace(hour=12, minute=0, second=0, microsecond=0)
 
     d1_chart = static_context.get("d1_chart") or {}

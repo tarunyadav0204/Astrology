@@ -9,6 +9,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from ai.response_parser import ResponseParser
 from ai.flux_image_service import FluxImageService
+from utils.query_context import resolve_query_now
 
 # Load environment variables
 env_paths = [
@@ -550,6 +551,9 @@ class GeminiChatAnalyzer:
         
         # Add current date context and calculate native's age
         enhanced_context = astrological_context.copy()
+        intent_block = enhanced_context.get("intent") or {}
+        query_context = intent_block.get("query_context") if isinstance(intent_block, dict) and isinstance(intent_block.get("query_context"), dict) else None
+        resolved_now = resolve_query_now(query_context)
         
         # Calculate native's current age
         birth_date_str = enhanced_context.get('birth_details', {}).get('date')
@@ -557,18 +561,18 @@ class GeminiChatAnalyzer:
         if birth_date_str:
             try:
                 birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d")
-                current_age = datetime.now().year - birth_date.year
+                current_age = resolved_now.year - birth_date.year
                 # Adjust for birthday not yet occurred this year
-                if datetime.now().month < birth_date.month or \
-                   (datetime.now().month == birth_date.month and datetime.now().day < birth_date.day):
+                if resolved_now.month < birth_date.month or \
+                   (resolved_now.month == birth_date.month and resolved_now.day < birth_date.day):
                     current_age -= 1
             except:
                 current_age = None
         
         enhanced_context['current_date_info'] = {
-            'current_date': datetime.now().strftime("%Y-%m-%d"),
-            'current_year': datetime.now().year,
-            'current_month': datetime.now().strftime("%B"),
+            'current_date': resolved_now.strftime("%Y-%m-%d"),
+            'current_year': resolved_now.year,
+            'current_month': resolved_now.strftime("%B"),
             'native_current_age': current_age,
             'note': 'Use this for reference only. Do not assume transit positions.'
         }
@@ -578,6 +582,22 @@ class GeminiChatAnalyzer:
             'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.',
             'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.'
         }
+
+        intent_mode = str(intent_block.get("mode") or mode or "").upper()
+
+        if intent_mode == "PREDICT_DAILY":
+            from daily.daily_orchestrator import run_daily_chat_pipeline
+
+            print("📅 DAILY_CHAT_PIPELINE: dedicated exact-day pipeline enabled")
+            return await run_daily_chat_pipeline(
+                self,
+                user_question=user_question,
+                astrological_context=enhanced_context,
+                conversation_history=conversation_history or [],
+                language=language,
+                user_context=user_context,
+                premium_analysis=premium_analysis,
+            )
 
         # Optional parallel pipelines. Relational/partnership is gated separately so legacy stays default.
         from ai.parallel_chat.config import should_use_parallel_chat, should_use_parallel_relational_chat

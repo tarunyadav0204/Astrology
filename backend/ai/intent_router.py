@@ -8,6 +8,8 @@ from typing import Any, Dict
 
 from ai.question_heuristics import looks_like_many_questions
 from ai.output_schema import resolve_output_language_policy
+from daily.daily_micro_intents import classify_daily_micro_intent
+from utils.query_context import normalize_query_context, resolve_query_now
 
 _MONTH_NAME_TO_NUM = {
     "january": 1,
@@ -334,6 +336,19 @@ def _extract_specific_date_from_question(user_question: str, *, now: datetime) -
     return None
 
 
+def _normalize_specific_date(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", raw)
+    if not m:
+        return None
+    try:
+        return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+
+
 def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int, now: datetime | None = None) -> None:
     """
     Post-process router output: career/education (and related) questions that ask *when* or *whether*
@@ -342,7 +357,9 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     q = (user_question or "").strip().lower()
     cat = (result.get("category") or "general").strip().lower()
     now_dt = (now or datetime.now()).replace(hour=12, minute=0, second=0, microsecond=0)
-    exact_date = _extract_specific_date_from_question(user_question, now=now_dt)
+    extracted_context = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
+    llm_date = _normalize_specific_date(extracted_context.get("specific_date")) if extracted_context else None
+    exact_date = llm_date or _extract_specific_date_from_question(user_question, now=now_dt)
 
     if exact_date:
         dt = datetime.strptime(exact_date, "%Y-%m-%d")
@@ -391,6 +408,19 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
         result["needs_transits"] = True
 
 
+def apply_daily_micro_intent_guards(result: Dict[str, Any], user_question: str) -> None:
+    mode = str(result.get("mode") or "").upper()
+    if mode != "PREDICT_DAILY":
+        return
+    result.setdefault("extracted_context", {})
+    if not isinstance(result["extracted_context"], dict):
+        result["extracted_context"] = {}
+    result["extracted_context"]["daily_micro_intent"] = classify_daily_micro_intent(
+        user_question,
+        category=str(result.get("category") or "general"),
+    )
+
+
 class IntentRouter:
     """
     Classifies user queries into various analysis modes for the astrology chat AI.
@@ -430,7 +460,7 @@ class IntentRouter:
             print(f"⚠️ Intent router model {name} not available ({e}), using fallback")
             return self.model
         
-    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False) -> Dict[str, str]:
+    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False, query_context: Dict[str, Any] | None = None) -> Dict[str, str]:
         """
         Returns: {'status': 'CLARIFY' | 'READY', 'mode': 'PREDICT_DAILY' | 'ANALYZE_PERSONALITY' | ..., 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}, 'extracted_context': {...}, 'context_type': 'birth' | 'annual'}
         """
@@ -445,9 +475,11 @@ class IntentRouter:
         print(f"{'='*80}")
         print(f"Question: {user_question}")
         
-        current_year = datetime.now().year
-        current_month = datetime.now().strftime('%B')
-        current_date = datetime.now().strftime('%Y-%m-%d')
+        resolved_now = resolve_query_now(query_context)
+        normalized_query_context = normalize_query_context(query_context)
+        current_year = resolved_now.year
+        current_month = resolved_now.strftime('%B')
+        current_date = resolved_now.strftime('%Y-%m-%d')
         
         # Build conversation context
         history_text = ""
@@ -670,6 +702,14 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - Questions about SPECIFIC DAYS, DATES, or SHORT PERIODS (today, this week, this month) → ALWAYS use "birth" context_type.
         - Questions about ENTIRE YEARS or ANNUAL FORECASTS → use "annual" context_type.
 
+        SPECIFIC DATE EXTRACTION:
+        - If the user is asking about an exact day, relative day, or clearly date-bound daily event, you MUST return `extracted_context.specific_date` in normalized `YYYY-MM-DD` format.
+        - Examples:
+          - "How is today?" → use TODAY'S DATE from the current date context above.
+          - "How is tomorrow?" → resolve relative to TODAY'S DATE from the current date context above.
+          - "What will happen on 12th Sep 2028?" → `2028-09-12`
+        - If the question is not about one exact day, leave `extracted_context.specific_date` empty or omit it.
+
         TRANSIT DETECTION:
         - "When will..." questions → needs_transits: true
         - "What period is good for..." → needs_transits: true
@@ -745,7 +785,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                 "phrase": "the phrase or implied lens you detected",
                 "requested": ["D10"]
             }} or null,
-            "extracted_context": {{ "timeframe": "2025", "aspect": "promotion" }},
+            "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD when exact-day question, else omit or empty" }},
             "context_type": "annual" or "birth",
             "category": "category_name",
             "year": "SPECIFIC_YEAR_FROM_QUESTION (only for annual context_type)",
@@ -828,7 +868,10 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             else:
                 result['chart_insights'] = []
             
-            apply_transit_timing_guards(result, user_question, current_year=current_year)
+            apply_transit_timing_guards(result, user_question, current_year=current_year, now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now)
+            apply_daily_micro_intent_guards(result, user_question)
+            if normalized_query_context:
+                result["query_context"] = normalized_query_context
 
             if result.get('needs_transits') and 'transit_request' not in result:
                 result['transit_request'] = {
@@ -860,7 +903,10 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                         "yearMonthMap": {str(current_year): [current_month]}
                     }
                 }
-                apply_transit_timing_guards(result, user_question, current_year=current_year)
+                apply_transit_timing_guards(result, user_question, current_year=current_year, now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now)
+                apply_daily_micro_intent_guards(result, user_question)
+                if normalized_query_context:
+                    result["query_context"] = normalized_query_context
                 apply_chart_focus_guards(result, user_question)
                 return result
             elif is_timing_question:
@@ -873,6 +919,8 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                         "yearMonthMap": {str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)}
                     }
                 }
+                if normalized_query_context:
+                    result["query_context"] = normalized_query_context
                 apply_chart_focus_guards(result, user_question)
                 return result
             else:
@@ -881,6 +929,8 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                     "divisional_charts": ["D1", "D9"],
                     "chart_insights": [],
                 }
+                if normalized_query_context:
+                    result["query_context"] = normalized_query_context
                 apply_chart_focus_guards(result, user_question)
                 return result
     

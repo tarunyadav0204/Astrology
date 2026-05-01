@@ -362,17 +362,23 @@ class CreditService:
             return False
 
     def expire_user_subscription_for_platform(self, userid: int, platform: str = "astroroshni") -> bool:
-        """Set end_date to yesterday for the user's active subscription on this platform, so they no longer appear subscribed. Used when app has no purchase token to sync (e.g. after cancel, device may not return the purchase)."""
+        """Expire only already-lapsed subscriptions.
+
+        Older mobile builds call this when Play does not return a purchase token. That can happen for
+        cancelled-but-paid-through subscriptions, so future end_date rows must be preserved.
+        """
         from db import get_conn, execute
         try:
             with get_conn() as conn:
                 end_expr = self._date_yesterday_expr()
+                today_expr = self._date_today_expr()
                 cursor = execute(
                     conn,
                     f"""
                     UPDATE user_subscriptions
                     SET end_date = {end_expr}
                     WHERE userid = ? AND status = 'active'
+                      AND end_date < {today_expr}
                       AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
                     """,
                     (userid, platform),

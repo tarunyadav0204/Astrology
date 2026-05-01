@@ -4,6 +4,7 @@ from auth import get_current_user, User
 from pydantic import BaseModel
 from encryption_utils import EncryptionManager
 from db import get_conn, execute
+from types import SimpleNamespace
 
 try:
     encryptor = EncryptionManager()
@@ -12,6 +13,37 @@ except ValueError as e:
     encryptor = None
 
 router = APIRouter()
+
+SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+
+
+def _get_ascendant_sign_summary(chart: dict) -> dict:
+    """Best-effort zodiac summary for chart lists; never block profile loading."""
+    try:
+        from calculators.chart_calculator import ChartCalculator
+        birth_obj = SimpleNamespace(
+            name=chart.get('name') or 'Native',
+            date=str(chart.get('date') or '').split('T')[0],
+            time=str(chart.get('time') or '').split('T')[-1][:5],
+            latitude=float(chart.get('latitude')),
+            longitude=float(chart.get('longitude')),
+            timezone=chart.get('timezone') or '',
+            place=chart.get('place') or '',
+        )
+        if not birth_obj.date or not birth_obj.time:
+            return {}
+        chart_data = ChartCalculator({}).calculate_chart(birth_obj)
+        ascendant = chart_data.get('ascendant')
+        if ascendant is None:
+            return {}
+        sign_index = int(float(ascendant) / 30) % 12
+        return {
+            'ascendant_sign': sign_index,
+            'ascendant_sign_name': SIGN_NAMES[sign_index],
+        }
+    except Exception as exc:
+        print(f"⚠️ Could not calculate ascendant sign for birth chart list item: {exc}")
+        return {}
 
 class ShareChartRequest(BaseModel):
     chart_id: int
@@ -132,6 +164,7 @@ async def get_birth_charts(
                 'gender': row[10] or '',
                 'relation': row[11] or 'other'
             }
+        chart.update(_get_ascendant_sign_summary(chart))
         charts.append(chart)
     
     return {

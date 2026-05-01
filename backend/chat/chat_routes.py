@@ -54,6 +54,7 @@ class ChatRequest(BaseModel):
     partner_timezone: Optional[str] = Field(None, alias="partnerTimezone")
     partner_gender: Optional[str] = Field(None, alias="partnerGender")
     partnership_relationship: Optional[str] = Field(None, alias="partnershipRelationship")
+    query_context: Optional[Dict] = Field(None, alias="queryContext")
     
     class Config:
         populate_by_name = True  # Allows both snake_case and camelCase
@@ -197,6 +198,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         request.question,
                         chat_history=chat_history,
                         clarification_count=clarification_count,
+                        query_context=request.query_context,
                     ),
                     timeout=35.0,
                 )

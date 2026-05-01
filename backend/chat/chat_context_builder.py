@@ -38,6 +38,7 @@ from calculators.jaimini_full_analyzer import JaiminiFullAnalyzer
 from calculators.nadi_linkage_calculator import NadiLinkageCalculator
 from calculators.pushkara_calculator import PushkaraCalculator
 from calculators.sudarshana_chakra_calculator import SudarshanaChakraCalculator
+from utils.query_context import resolve_query_now
 from calculators.sudarshana_dasha_calculator import SudarshanaDashaCalculator
 from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
 from app.kp.services.chart_service import KPChartService
@@ -202,7 +203,8 @@ class ChatContextBuilder:
         # print(f"   Static context time: {static_time:.2f}s")
         
         # Dynamic Cache Key (birth_hash + current_date + requested_period + intent_result)
-        current_date_str = datetime.now().strftime("%Y-%m-%d")
+        query_context = intent_result.get("query_context") if isinstance(intent_result, dict) and isinstance(intent_result.get("query_context"), dict) else None
+        current_date_str = resolve_query_now(query_context).strftime("%Y-%m-%d") if query_context else datetime.now().strftime("%Y-%m-%d")
         period_str = json.dumps(requested_period, sort_keys=True) if requested_period else "none"
         intent_str = json.dumps(intent_result, sort_keys=True) if intent_result else "none"
         dynamic_cache_key = f"{birth_hash}_{current_date_str}_{period_str}_{intent_str}"

@@ -590,15 +590,13 @@ def _sync_subscription_from_play(
         payment_state = purchase.get("paymentState")
         if payment_state not in (0, 1):
             raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
-    from datetime import datetime, timedelta
+    from datetime import datetime
     expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
     start_ms = purchase.get("startTimeMillis") or expiry_ms
     start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
-    # If user cancelled on Play, set end_date to yesterday so they stop appearing as subscribed immediately
-    if accept_any_payment_state and purchase.get("userCancellationTimeMillis"):
-        end_date = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
-    else:
-        end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
+    # Google keeps cancelled subscriptions entitled until expiryTimeMillis.
+    # userCancellationTimeMillis only means renewal is off, not that access ended.
+    end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
     success = credit_service.set_user_subscription(userid, plan_id, start_date, end_date)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
@@ -639,7 +637,9 @@ async def sync_google_play_subscription(
 
 @router.post("/google-play/subscription/clear")
 async def clear_subscription_no_purchase(current_user: User = Depends(get_current_user)):
-    """Clear subscription status when the app could not get any purchase token from the device (e.g. after user cancelled, getAvailablePurchases may return empty). Expires the user's subscription so the UI stops showing 'Current plan'. Call this only when the user has a subscription in our DB but the device returns no subscription purchase to sync."""
+    """Backward-compatible endpoint for older apps that call clear when Play returns no token.
+    Do not expire future-dated subscriptions here; cancelled users keep benefits until end_date.
+    """
     try:
         updated = credit_service.expire_user_subscription_for_platform(current_user.userid, "astroroshni")
         return {"success": True, "cleared": updated, "message": "Subscription status updated." if updated else "No active subscription to clear."}
