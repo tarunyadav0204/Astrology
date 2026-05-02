@@ -53,6 +53,8 @@ function MessageBubble({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
+  const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
+  const isInstantChatMessage = messageChatTier === 'instant';
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
   const [isLoadingPodcast, setIsLoadingPodcast] = useState(false);
@@ -1193,6 +1195,7 @@ function MessageBubble({
 
   // Promo CTA on ChatScreen: skip the credits modal; user already consented in PodcastPromoModal.
   useEffect(() => {
+    if (isInstantChatMessage) return;
     if (!podcastAutoLaunchMessageId || !podcastAutoLaunchKey) return;
     const mid = message.messageId;
     if (!mid || String(mid) !== String(podcastAutoLaunchMessageId)) return;
@@ -1231,6 +1234,7 @@ function MessageBubble({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playPodcast closes over latest message/session; avoid re-firing loops
   }, [
+    isInstantChatMessage,
     podcastAutoLaunchKey,
     podcastAutoLaunchMessageId,
     message.messageId,
@@ -1642,7 +1646,7 @@ function MessageBubble({
             )}
             {message.role === 'assistant' && (
               <>
-                {!(isPlayingPodcast || isPausedPodcast) && (
+                {!isInstantChatMessage && !(isPlayingPodcast || isPausedPodcast) && (
                   <TouchableOpacity
                     style={[styles.actionButton, styles.listenPodcastButton]}
                     onPress={onPodcastButtonPress}
@@ -1655,7 +1659,7 @@ function MessageBubble({
                     )}
                   </TouchableOpacity>
                 )}
-                {(isPlayingPodcast || isPausedPodcast) && (
+                {!isInstantChatMessage && (isPlayingPodcast || isPausedPodcast) && (
                   <>
                     {isPlayingPodcast && (
                       <TouchableOpacity
@@ -1681,17 +1685,19 @@ function MessageBubble({
                     </TouchableOpacity>
                   </>
                 )}
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={sharePodcastAudio}
-                  disabled={isSharingPodcast || isLoadingPodcast}
-                >
-                  {isSharingPodcast ? (
-                    <ActivityIndicator size="small" color="#666" />
-                  ) : (
-                    <Ionicons name="share-outline" size={16} color="#666" />
-                  )}
-                </TouchableOpacity>
+                {!isInstantChatMessage && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={sharePodcastAudio}
+                    disabled={isSharingPodcast || isLoadingPodcast}
+                  >
+                    {isSharingPodcast ? (
+                      <ActivityIndicator size="small" color="#666" />
+                    ) : (
+                      <Ionicons name="share-outline" size={16} color="#666" />
+                    )}
+                  </TouchableOpacity>
+                )}
               </>
             )}
             <TouchableOpacity

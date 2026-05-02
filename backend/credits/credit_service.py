@@ -202,6 +202,7 @@ class CreditService:
             # Insert default credit costs
             defaults = [
                 ("chat_question_cost", 1, "Credits per chat question"),
+                ("instant_chat_cost", 1, "Credits per instant chat answer"),
                 ("wealth_analysis_cost", 5, "Credits per wealth analysis"),
                 ("marriage_analysis_cost", 3, "Credits per marriage analysis"),
                 ("health_analysis_cost", 3, "Credits per health analysis"),
@@ -976,7 +977,7 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
-            'chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
+            'chat_question_cost', 'instant_chat_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',

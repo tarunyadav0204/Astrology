@@ -444,6 +444,7 @@ const AdminChatHistory = () => {
                       : message.sender === 'assistant'
                         ? 'assistant'
                         : 'assistant';
+                  const isInstantUsage = message.parallel_llm_usage?.kind === 'instant_chat_usage';
                   const answerModelLabel =
                     role === 'assistant' ? formatLlmLabel(selectedSession || {}) : null;
                   const label =
@@ -462,7 +463,7 @@ const AdminChatHistory = () => {
                       dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
                     />
                     <div className="message-meta">
-                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && (
+                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && !isInstantUsage && (
                         <button
                           type="button"
                           className="message-branch-btn"

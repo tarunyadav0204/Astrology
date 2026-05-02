@@ -1,7 +1,7 @@
 import React from 'react';
 
 const CompatibilityReport = ({ analysis, boyDetails, girlDetails }) => {
-  const { manglik_analysis, recommendation } = analysis;
+  const { manglik_analysis, recommendation, timing_overlay: timingOverlay } = analysis;
 
   const getManglikSeverityColor = (severity) => {
     switch (severity) {
@@ -81,6 +81,27 @@ const CompatibilityReport = ({ analysis, boyDetails, girlDetails }) => {
             {recommendation.proceed ? '✅ Proceed' : '❌ Not Recommended'}
           </div>
         </div>
+
+        {recommendation.timing_note && (
+          <div className="recommendation-card" style={{ marginTop: 12 }}>
+            <div className="recommendation-text">
+              <strong>Timing note:</strong> {recommendation.timing_note}
+            </div>
+          </div>
+        )}
+
+        {timingOverlay?.shared?.next_favorable_windows?.length > 0 && (
+          <div className="remedies-section">
+            <h5>🗓 Best Joint Windows</h5>
+            <ul>
+              {timingOverlay.shared.next_favorable_windows.slice(0, 3).map((window, index) => (
+                <li key={index}>
+                  {window.start_date} to {window.end_date} - {String(window.climate || '').replace(/_/g, ' ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {recommendation.remedies && recommendation.remedies.length > 0 && (
           <div className="remedies-section">

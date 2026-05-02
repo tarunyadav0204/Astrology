@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS } from '../utils/constants';
+import { buildQueryContext } from '../utils/queryContext';
 import { Alert } from 'react-native';
 
 // Same JWT as Authorization; some CDNs/proxies strip Authorization on mobile — backend accepts this too.
@@ -214,10 +215,11 @@ export const authAPI = {
 
 export const chatAPI = {
   sendMessage: (birthData, message, language = 'english') => 
-    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed' }),
+    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed', query_context: buildQueryContext() }),
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
+  getSession: (sessionId) => api.get(getEndpoint(`/chat-v2/session/${sessionId}`)),
   clearHistory: () => api.delete(getEndpoint('/chat/history')),
-  createSession: () => api.post(getEndpoint('/chat/session')),
+  createSession: () => api.post(getEndpoint('/chat/session'), { query_context: buildQueryContext() }),
   saveMessage: (sessionId, sender, content) => 
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
   getEventPeriods: (birthData) => api.post(getEndpoint('/chat/event-periods'), birthData),
@@ -228,7 +230,7 @@ export const chatAPI = {
     api.get(getEndpoint('/chat/monthly-events/cached-years'), {
       params: { birth_chart_id: Number(birthChartId) },
     }),
-  getYogas: (birthData) => api.post(getEndpoint('/chat/ask'), { ...birthData, question: 'yogas', include_context: true }),
+  getYogas: (birthData) => api.post(getEndpoint('/chat/ask'), { ...birthData, question: 'yogas', include_context: true, query_context: buildQueryContext() }),
   deductCredits: (amount) => api.post(getEndpoint('/credits/spend'), { 
     amount, 
     feature: 'event_timeline', 
@@ -627,6 +629,21 @@ export const marriageAPI = {
     };
     return api.post(getEndpoint('/marriage/ai-insights'), requestData);
   },
+};
+
+export const relationshipAPI = {
+  analyzeCompatibility: (personOneBirthData, personTwoBirthData) =>
+    api.post(getEndpoint('/compatibility-analysis'), {
+      boy_birth_data: personOneBirthData,
+      girl_birth_data: personTwoBirthData,
+    }),
+  getPremiumCompatibilityReport: (personOneBirthData, personTwoBirthData, language = 'english', forceRegenerate = false) =>
+    api.post(getEndpoint('/compatibility-analysis/premium-report'), {
+      boy_birth_data: personOneBirthData,
+      girl_birth_data: personTwoBirthData,
+      language,
+      force_regenerate: forceRegenerate,
+    }),
 };
 
 export const pricingAPI = {

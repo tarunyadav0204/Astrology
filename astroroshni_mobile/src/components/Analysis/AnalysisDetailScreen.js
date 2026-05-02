@@ -26,10 +26,11 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
-  useAnalytics('AnalysisDetailScreen');
+  const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
+  const analyticsScreenName = analysisType ? `AnalysisDetail:${analysisType}` : 'AnalysisDetailScreen';
+  useAnalytics(analyticsScreenName);
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
-  const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
   const { credits, fetchBalance } = useCredits();
   const [cost, setCost] = useState(costFromParams ?? 0);
   const [originalCost, setOriginalCost] = useState(

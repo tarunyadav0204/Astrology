@@ -41,6 +41,7 @@ import { storage } from '../../services/storage';
 import { chatAPI, pricingAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { buildQueryContext } from '../../utils/queryContext';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { useTheme } from '../../context/ThemeContext';
@@ -60,6 +61,28 @@ const cardWidth = screenWidth * 0.3;
 const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 const CHAT_RATING_PROMPT_STATE_KEY = 'chatRatingPromptState_v1';
+const INSTANT_LOADER_LINES = [
+  'chat.instantLoader.lineChart',
+  'chat.instantLoader.lineDasha',
+  'chat.instantLoader.lineTransits',
+  'chat.instantLoader.lineHouses',
+  'chat.instantLoader.lineTiming',
+  'chat.instantLoader.lineSynthesis',
+  'chat.instantLoader.lineAnswer',
+  'chat.instantLoader.lineFinal',
+];
+const INSTANT_LOADER_FALLBACKS = [
+  'I am reading the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.',
+  'Now I am checking the running dasha pattern and seeing which planet is currently carrying more weight in the question.',
+  'I am comparing the present transits with the natal promise to separate a short-term signal from a deeper pattern.',
+  'The relevant houses are being matched with the question, so the answer can stay specific and practical.',
+  'I am checking whether the timing looks active right now, building slowly, or already passing out of focus.',
+  'The main signals are being combined now, especially where two or more factors point in the same direction.',
+  'I am turning the chart signals into a short answer you can use, without making it unnecessarily long.',
+  'Almost ready. I am tightening the response so it gives you the clearest takeaway first.',
+];
+const INSTANT_LOADER_WORD_MS = 180;
+const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_FALLBACKS.join(' ').split(/\s+/).filter(Boolean).length;
 
 /** Dev testing: force rating modal on chat open (no question/scroll). Set to false after testing. */
 const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
@@ -307,12 +330,17 @@ export default function ChatScreen({ navigation, route }) {
   const [countrySearchQuery, setCountrySearchQuery] = useState('');
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [chatCost, setChatCost] = useState(1);
+  const [instantChatCost, setInstantChatCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
+  const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
   const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
   const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(110);
   const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(210);
+  const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showChatModeIntro, setShowChatModeIntro] = useState(false);
+  const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
@@ -320,6 +348,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showPremiumTooltip, setShowPremiumTooltip] = useState(true);
   const tooltipResetRef = useRef(true);
   const freeUsedThisSendRef = useRef(false);
+  const chatModeIntroShownKeyRef = useRef(null);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -363,10 +392,19 @@ export default function ChatScreen({ navigation, route }) {
       setShowPremiumBadge(false);
     }
   }, [isPremiumAnalysis]);
+
+  useEffect(() => {
+    if (!instantChatEnabled && isInstantAnalysis) {
+      setIsInstantAnalysis(false);
+    }
+  }, [instantChatEnabled, isInstantAnalysis]);
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [waitSideReplying, setWaitSideReplying] = useState(false);
+  const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -374,6 +412,7 @@ export default function ChatScreen({ navigation, route }) {
   const menuScrollViewRef = useRef(null);
   const menuLogoGlow = useRef(new Animated.Value(0)).current;
   const menuJustClosedAt = useRef(0);
+  const hasInstantTypingMessage = messages.some((msg) => msg?.isTyping && msg?.chatTier === 'instant');
 
   useEffect(() => {
     let animation;
@@ -401,6 +440,25 @@ export default function ChatScreen({ navigation, route }) {
     };
   }, [showMenu]);
 
+  useEffect(() => {
+    if (!hasInstantTypingMessage) {
+      setInstantLoaderWordCount(1);
+      return undefined;
+    }
+    const interval = setInterval(() => {
+      setInstantLoaderWordCount((count) => Math.min(count + 1, INSTANT_LOADER_MAX_WORDS));
+    }, INSTANT_LOADER_WORD_MS);
+    return () => clearInterval(interval);
+  }, [hasInstantTypingMessage]);
+
+  useEffect(() => {
+    if (!hasInstantTypingMessage) return undefined;
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [hasInstantTypingMessage, instantLoaderWordCount]);
+
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
@@ -415,12 +473,42 @@ export default function ChatScreen({ navigation, route }) {
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
+  const instantScrollRetryRef = useRef([]);
+  const messageTierByIdRef = useRef({});
+  const suppressAutoOpenChatRef = useRef(false);
+  const keepChatOpenAfterNativeSelectRef = useRef(false);
+  const startFreshSessionAfterNativeSelectRef = useRef(false);
+  /** Set synchronously when applying route prefill so birthData/focus effects do not force greeting in the same tick. */
+  const partnershipPrefillInProgressRef = useRef(false);
   const [forceGreeting, setForceGreeting] = useState(false);
   const [chartData, setChartData] = useState(null);
   const [loadingChart, setLoadingChart] = useState(false);
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
   const lastMessageRef = useRef(null);
+
+  const clearInstantScrollRetries = () => {
+    instantScrollRetryRef.current.forEach((id) => clearTimeout(id));
+    instantScrollRetryRef.current = [];
+  };
+
+  const scrollToBottomReliably = (animated = true) => {
+    const run = () => scrollViewRef.current?.scrollToEnd({ animated });
+    run();
+    clearInstantScrollRetries();
+    instantScrollRetryRef.current = [
+      setTimeout(run, 40),
+      setTimeout(run, 120),
+      setTimeout(run, 260),
+    ];
+  };
+
+  const rememberMessageTier = (messageId, tier) => {
+    if (!messageId) return;
+    const normalized = String(tier || '').trim().toLowerCase();
+    if (!normalized) return;
+    messageTierByIdRef.current[messageId] = normalized;
+  };
   
   // Calibration state
   const [calibrationEvent, setCalibrationEvent] = useState(null);
@@ -874,8 +962,33 @@ export default function ChatScreen({ navigation, route }) {
     
     // Handle navigation params
     if (route.params?.resetToGreeting) {
+      suppressAutoOpenChatRef.current = true;
       setShowGreeting(true);
       navigation.setParams({ resetToGreeting: undefined });
+      setTimeout(() => {
+        suppressAutoOpenChatRef.current = false;
+      }, 800);
+    }
+
+    if (route.params?.returnToChat) {
+      const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
+      keepChatOpenAfterNativeSelectRef.current = true;
+      startFreshSessionAfterNativeSelectRef.current = true;
+      navigation.setParams({
+        returnToChat: undefined,
+        birthData: undefined,
+        birthDetails: undefined,
+        birthChartId: undefined,
+      });
+      if (selectedBirthData?.name) {
+        setMessages([]);
+        setSessionId(null);
+        setLoading(false);
+        setIsTyping(false);
+        setPendingMessages(new Set());
+        setBirthData(selectedBirthData);
+      }
+      setShowGreeting(false);
     }
     
     // Handle start chat param (e.g. from notification tap). Refresh birth data from storage
@@ -888,28 +1001,8 @@ export default function ChatScreen({ navigation, route }) {
         await checkBirthData();
         if (responseReadySessionId) {
           try {
-            const token = await AsyncStorage.getItem('authToken');
-            const res = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${responseReadySessionId}`)}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (res.ok) {
-              const data = await res.json();
-              const msgs = (data.messages || []).map((m) => ({
-                messageId: m.message_id,
-                role: m.sender,
-                content: m.content || '',
-                timestamp: m.timestamp,
-                id: `${m.message_id}_${m.timestamp}`,
-                native_name: m.native_name ?? data.native_name ?? null,
-                terms: m.terms,
-                glossary: m.glossary,
-                images: m.images,
-                message_type: m.message_type,
-                intent_gate: m.intent_gate,
-                gate_metadata: m.gate_metadata,
-              }));
-              setSessionId(responseReadySessionId);
-              setMessagesWithStorage(msgs);
+            const restored = await reconcileSessionFromServer(responseReadySessionId, { force: true, openChat: true });
+            if (restored) {
               setShowGreeting(false);
               return;
             }
@@ -943,10 +1036,36 @@ export default function ChatScreen({ navigation, route }) {
         infoNonce: undefined,
       });
     }
+
+    if (route.params?.reopenDashaBrowser) {
+      const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
+      navigation.setParams({
+        reopenDashaBrowser: undefined,
+        birthData: undefined,
+        birthDetails: undefined,
+        birthChartId: undefined,
+      });
+      if (selectedBirthData?.name) {
+        setBirthData(selectedBirthData);
+      }
+      setShowGreeting(true);
+      setTimeout(() => setShowDashaBrowser(true), 100);
+    }
+
+    if (route.params?.prefillPartnership) {
+      const prefill = route.params.prefillPartnership;
+      navigation.setParams({ prefillPartnership: undefined });
+      partnershipPrefillInProgressRef.current = true;
+      startPrefilledPartnership(prefill);
+      setTimeout(() => {
+        partnershipPrefillInProgressRef.current = false;
+      }, 120);
+    }
     
     // Handle mundane mode param
     if (route.params?.mode === 'mundane') {
       setIsMundane(true);
+      setIsInstantAnalysis(false);
       setIsPremiumAnalysis(false); // No premium in mundane
       setShowModeSelector(false);
       if (route.params?.mundaneContext) {
@@ -987,6 +1106,7 @@ export default function ChatScreen({ navigation, route }) {
           setOtherRelationText('');
           setNativeSearchQuery('');
         }
+        setIsInstantAnalysis(false);
         setIsPremiumAnalysis(false);
         setShowModeSelector(false);
         return true;
@@ -995,6 +1115,7 @@ export default function ChatScreen({ navigation, route }) {
     });
     
     return () => {
+      clearInstantScrollRetries();
       unsubscribe();
       backHandler.remove();
     };
@@ -1008,12 +1129,18 @@ export default function ChatScreen({ navigation, route }) {
       const data = res?.data || res;
       const pricing = data?.pricing || {};
       const orig = data?.pricing_original || {};
+      const features = data?.features || {};
       const countdown = data?.chat_countdown_seconds || {};
       // Standard chat (user-discounted when VIP)
       const chatVal = pricing.chat != null ? Number(pricing.chat) || 1 : 1;
       const chatOriginal = orig.chat != null ? Number(orig.chat) : null;
       setChatCost(chatVal);
       setChatCostOriginal(Number.isNaN(chatOriginal) ? null : chatOriginal);
+      const instantVal = pricing.instant_chat != null ? Number(pricing.instant_chat) || 1 : 1;
+      const instantOriginal = orig.instant_chat != null ? Number(orig.instant_chat) : null;
+      setInstantChatCost(Number.isNaN(instantVal) || instantVal <= 0 ? 1 : instantVal);
+      setInstantChatCostOriginal(Number.isNaN(instantOriginal) ? null : instantOriginal);
+      setInstantChatEnabled(Boolean(features.instant_chat_enabled));
       // Premium chat (user-discounted when VIP; same source as standard)
       const premiumVal = pricing.premium_chat != null ? Number(pricing.premium_chat) : 3;
       const premiumOriginal = orig.premium_chat != null ? Number(orig.premium_chat) : null;
@@ -1035,6 +1162,8 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     
     if (birthData) {
+      const shouldKeepChatOpen = keepChatOpenAfterNativeSelectRef.current;
+      const shouldStartFreshSession = startFreshSessionAfterNativeSelectRef.current;
       // Create unique person ID from birth data
       const personId = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
       
@@ -1043,7 +1172,9 @@ export default function ChatScreen({ navigation, route }) {
         // Different person selected - clear current state
         setMessages([]);
         setSessionId(null);
-        setShowGreeting(true);
+        if (!shouldKeepChatOpen && !partnershipPrefillInProgressRef.current && !partnershipMode) {
+          setShowGreeting(true);
+        }
       }
       
       // Only update if person ID actually changed
@@ -1056,15 +1187,23 @@ export default function ChatScreen({ navigation, route }) {
         setChartData(null); // Clear cached data
         loadChartData(birthData);
         loadDashaData(birthData);
+
+        if (shouldStartFreshSession) {
+          setMessages([]);
+          setSessionId(null);
+          setLoading(false);
+          setIsTyping(false);
+          setShowGreeting(false);
+          keepChatOpenAfterNativeSelectRef.current = false;
+          startFreshSessionAfterNativeSelectRef.current = false;
+          return;
+        }
         
         // Load messages from storage immediately
         loadMessagesFromStorage(personId).then(storedMessages => {
           if (storedMessages.length > 0) {
             setMessages(storedMessages);
-            // Only auto-switch to chat if not app startup
-            if (!isAppStartup && messages.length === 0) {
-              setShowGreeting(false);
-            }
+            // Keep Home as the default view; history is restored only after the user opens chat.
             
             // Set flag to auto-scroll when content renders
             setTimeout(() => {
@@ -1093,7 +1232,13 @@ export default function ChatScreen({ navigation, route }) {
               }, 100);
             }
           } else {
-            setShowGreeting(true);
+            if (!shouldKeepChatOpen && !partnershipPrefillInProgressRef.current && !partnershipMode) {
+              setShowGreeting(true);
+            }
+          }
+          if (shouldKeepChatOpen) {
+            setShowGreeting(false);
+            keepChatOpenAfterNativeSelectRef.current = false;
           }
           // Reset force greeting and app startup after handling
           if (forceGreeting) {
@@ -1109,10 +1254,22 @@ export default function ChatScreen({ navigation, route }) {
         setTimeout(() => {
           checkPendingResponses(personId);
         }, 200);
+
+        // Reconcile with the server in the background so completed answers recover
+        // even if the local cache was left in an error or processing state.
+        if (!partnershipMode && !partnershipPrefillInProgressRef.current) {
+          setTimeout(() => {
+            loadChatHistory();
+          }, 300);
+        }
+      } else if (shouldKeepChatOpen) {
+        setShowGreeting(false);
+        keepChatOpenAfterNativeSelectRef.current = false;
+        startFreshSessionAfterNativeSelectRef.current = false;
       }
     } else {
     }
-  }, [birthData]);
+  }, [birthData, partnershipMode]);
 
   // Save messages to AsyncStorage per person (like web app)
   const saveMessagesToStorage = async (messages, personId = currentPersonId) => {
@@ -1156,16 +1313,14 @@ export default function ChatScreen({ navigation, route }) {
   // Load messages when screen focuses - but don't interfere with ongoing polling
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      const shouldStayOnGreeting = forceGreeting || route.params?.resetToGreeting || suppressAutoOpenChatRef.current;
       if (currentPersonId) {
         loadMessagesFromStorage(currentPersonId).then(storedMessages => {
           if (storedMessages.length > 0) {
             // Only update messages if we don't have any current messages to avoid overwriting
             const prevLength = messages.length;
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
-            // Don't auto-switch if app startup or we already have messages loaded
-            if (!isAppStartup && messages.length === 0) {
-              setShowGreeting(false);
-            }
+            // Keep Home as the default view; history is restored only after the user opens chat.
             
             // Set flag to scroll if we loaded new messages and not showing greeting
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
@@ -1196,20 +1351,34 @@ export default function ChatScreen({ navigation, route }) {
             }
           }
         });
+        if (!partnershipMode && !shouldStayOnGreeting && !loading && !isTyping) {
+          setTimeout(() => {
+            loadChatHistory();
+          }, 150);
+        }
       }
     });
     
     return unsubscribe;
-  }, [currentPersonId, loading, isTyping, showGreeting, pendingMessages, sessionId]);
+  }, [currentPersonId, loading, isTyping, showGreeting, pendingMessages, sessionId, forceGreeting, route.params?.resetToGreeting, partnershipMode]);
 
   // First question free: standard chat only (not partnership, not mundane)
   const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
     ? 0
-    : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
+    : (
+        isPremiumAnalysis
+          ? premiumChatCost
+          : (instantChatEnabled && isInstantAnalysis)
+            ? instantChatCost
+            : partnershipMode
+              ? partnershipCost
+              : chatCost
+      );
   const freeQuestionNotificationGate =
     freeQuestionRequiresNotifications &&
     !partnershipMode &&
     !isMundane &&
+    !isInstantAnalysis &&
     !isPremiumAnalysis &&
     credits < effectiveChatCost;
 
@@ -1231,10 +1400,47 @@ export default function ChatScreen({ navigation, route }) {
     setShowPartnershipModal(true);
   };
 
+  function startPrefilledPartnership(prefill) {
+    if (!prefill?.nativeChart || !prefill?.partnerChart) {
+      return;
+    }
+
+    setPartnershipMode(true);
+    setIsInstantAnalysis(false);
+    setIsPremiumAnalysis(false);
+    setShowModeSelector(false);
+    setShowGreeting(false);
+    setShowMenu(false);
+    setShowPartnershipModal(false);
+    setShowPartnershipSetupModal(false);
+    setPartnershipStep(4);
+    setPartnershipSubStep(0);
+    setPartnershipRelation(prefill.relationshipType || 'Partnership');
+    setIsTypingOtherRelation(false);
+    setOtherRelationText('');
+    setNativeSearchQuery('');
+    setNativeChart(prefill.nativeChart);
+    setPartnerChart(prefill.partnerChart);
+
+    const setupMessage = {
+      id: `prefill_partnership_${Date.now()}`,
+      content: `Everything set! Analysis for **${prefill.nativeChart.name}** & **${prefill.partnerChart.name}** (${prefill.relationshipType || 'Partnership'}) is ready.\n\nAsk any question about your compatibility!`,
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessagesWithStorage([setupMessage]);
+
+    if (prefill.initialPrompt) {
+      setInputText(prefill.initialPrompt);
+    }
+  }
+
   const confirmPartnershipMode = () => {
     loadSavedCharts(); // Refresh charts when starting partnership mode
     setShowPartnershipModal(false);
     setPartnershipMode(true);
+    setIsInstantAnalysis(false);
     setIsPremiumAnalysis(false); // No premium in partnership
     setShowModeSelector(false);
     setPartnershipStep(0);
@@ -1726,6 +1932,8 @@ export default function ChatScreen({ navigation, route }) {
     
     if (option.action === 'partnership') {
       openPartnershipModal(option.cost);
+    } else if (option.action === 'relationshipMatch') {
+      navigation.navigate('RelationshipMatch');
     } else if (option.action === 'mundane') {
       openMundaneModal(option.cost);
     } else if (option.action === 'periods') {
@@ -1777,6 +1985,7 @@ export default function ChatScreen({ navigation, route }) {
         setIsMundane(false);
         setMundaneContext(null);
       }
+      setIsInstantAnalysis(false);
       setIsPremiumAnalysis(false);
       setShowModeSelector(false);
       
@@ -1867,7 +2076,96 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
+  const mapSessionMessagesToClient = (sessionData) => {
+    return (sessionData?.messages || []).map((m) => ({
+      messageId: m.message_id,
+      role: m.sender,
+      content: m.content || '',
+      timestamp: m.timestamp,
+      id: `${m.message_id}_${m.timestamp}`,
+      native_name: m.native_name ?? sessionData?.native_name ?? null,
+      terms: m.terms || [],
+      glossary: m.glossary || {},
+      images: m.images || [],
+      message_type: m.message_type,
+      intent_gate: m.intent_gate,
+      gate_metadata: m.gate_metadata,
+      isTyping: false,
+      showRestartButton: false,
+      showSendRetryButton: false,
+    }));
+  };
+
+  const fetchSessionMessagesFromServer = async (targetSessionId) => {
+    if (!targetSessionId) return null;
+    try {
+      const response = await chatAPI.getSession(targetSessionId);
+      const data = response?.data || response;
+      return {
+        sessionId: targetSessionId,
+        messages: mapSessionMessagesToClient(data),
+      };
+    } catch (error) {
+      console.error('Error fetching chat session from server:', error?.response?.data || error?.message || error);
+      return null;
+    }
+  };
+
+  const reconcileSessionFromServer = async (targetSessionId, options = {}) => {
+    const {
+      preferNonEmpty = true,
+      expectedMessageId = null,
+      force = false,
+      openChat = false,
+    } = options;
+    const payload = await fetchSessionMessagesFromServer(targetSessionId);
+    if (!payload) return false;
+
+    const serverMessages = payload.messages || [];
+    if (!serverMessages.length) return false;
+
+    const hasExpectedMessage = expectedMessageId
+      ? serverMessages.some(
+          (msg) => msg.messageId === expectedMessageId && msg.role === 'assistant' && (msg.content || '').trim()
+        )
+      : true;
+
+    if (!hasExpectedMessage && !force) {
+      return false;
+    }
+
+    const hasMeaningfulServerContent = serverMessages.some((msg) => msg.role === 'assistant' && (msg.content || '').trim());
+    if (preferNonEmpty && !hasMeaningfulServerContent && !force) {
+      return false;
+    }
+
+    setSessionId(payload.sessionId);
+    setMessagesWithStorage(serverMessages);
+    if (openChat) {
+      setShowGreeting(false);
+    }
+    return true;
+  };
+
   const loadChatHistory = async () => {
+    if (!birthData) return false;
+    const personId = currentPersonId || `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+    try {
+      const storedSessionsRaw = await AsyncStorage.getItem(`chatSessions_${personId}`);
+      const storedSessionIds = storedSessionsRaw ? JSON.parse(storedSessionsRaw) : [];
+      const candidates = [...storedSessionIds];
+      if (sessionId && !candidates.includes(sessionId)) {
+        candidates.push(sessionId);
+      }
+      const latestSessionId = candidates.filter(Boolean).slice(-1)[0];
+      if (!latestSessionId) {
+        return false;
+      }
+      return await reconcileSessionFromServer(latestSessionId, { preferNonEmpty: true, force: true });
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      return false;
+    }
   };
 
   const loadLanguagePreference = async () => {
@@ -1883,7 +2181,9 @@ export default function ChatScreen({ navigation, route }) {
       
       // Different endpoint for mundane vs personal
       const endpoint = isMundane ? '/mundane/session' : '/chat-v2/session';
-      const body = isMundane ? {} : { birth_chart_id: birthData?.id };
+      const body = isMundane
+        ? { query_context: buildQueryContext() }
+        : { birth_chart_id: birthData?.id, query_context: buildQueryContext() };
       
       if (!isMundane && !birthData?.id) {
         Alert.alert(
@@ -2020,6 +2320,125 @@ export default function ChatScreen({ navigation, route }) {
     ];
   };
 
+  const mergeEngagementUpdates = (existing = [], incoming = []) => {
+    if (!Array.isArray(incoming) || incoming.length === 0) return existing || [];
+    const byId = new Map();
+    (Array.isArray(existing) ? existing : []).forEach((item) => {
+      if (item?.id) byId.set(item.id, item);
+    });
+    incoming.forEach((item, idx) => {
+      const text = typeof item?.text === 'string' ? item.text.trim() : '';
+      if (!text) return;
+      const id = item.id || `engagement_${idx}_${text.slice(0, 24)}`;
+      byId.set(id, {
+        id,
+        type: item.type || 'insight',
+        text,
+      });
+    });
+    return Array.from(byId.values()).slice(0, 3);
+  };
+
+  const renderEngagementUpdates = (updates = []) => {
+    if (!Array.isArray(updates) || updates.length === 0) return null;
+    const labelForType = (type) => {
+      if (type === 'fact_question') return 'Quick question';
+      if (type === 'curiosity') return 'Chart curiosity';
+      return 'While I prepare this';
+    };
+    return (
+      <View style={styles.engagementUpdatesWrap}>
+        {updates.map((update) => (
+          <View
+            key={update.id}
+            style={[
+              styles.engagementUpdateCard,
+              {
+                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#fff7ed',
+                borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.28)' : '#fed7aa',
+              },
+            ]}
+          >
+            <Text style={[styles.engagementUpdateLabel, { color: colors.primary }]}>
+              {labelForType(update.type)}
+            </Text>
+            <Text style={[styles.engagementUpdateText, { color: colors.text }]}>
+              {update.text}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const normalizeWaitConversation = (payload) => {
+    if (!payload || !payload.enabled) return null;
+    const messagesList = Array.isArray(payload.messages) ? payload.messages : [];
+    return {
+      enabled: true,
+      status: payload.status || 'active',
+      messages: messagesList
+        .filter((msg) => msg && typeof msg.content === 'string' && msg.content.trim())
+        .map((msg, idx) => ({
+          id: msg.id || `wait_${idx}_${String(msg.content).slice(0, 20)}`,
+          sender: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content.trim(),
+          created_at: msg.created_at,
+        })),
+    };
+  };
+
+  const renderWaitConversation = (waitConversation) => {
+    if (!waitConversation?.enabled || !Array.isArray(waitConversation.messages) || waitConversation.messages.length === 0) {
+      return null;
+    }
+    return (
+      <View style={styles.waitConversationWrap}>
+        <View style={[
+          styles.waitConversationHeader,
+          { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#fff7ed' },
+        ]}>
+          <Text style={[styles.waitConversationTitle, { color: colors.text }]}>
+            Preparing your full reading
+          </Text>
+          <Text style={[styles.waitConversationSubtitle, { color: colors.textSecondary }]}>
+            Keep chatting here until the detailed answer is ready.
+          </Text>
+        </View>
+        {waitConversation.messages.map((msg) => {
+          const isUser = msg.sender === 'user';
+          return (
+            <View
+              key={msg.id}
+              style={[
+                styles.waitConversationBubble,
+                isUser ? styles.waitConversationBubbleUser : styles.waitConversationBubbleAssistant,
+                {
+                  backgroundColor: isUser
+                    ? colors.primary
+                    : (theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#ffffff'),
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : '#fed7aa',
+                },
+              ]}
+            >
+              <Text style={[
+                styles.waitConversationText,
+                { color: isUser ? '#ffffff' : colors.text },
+              ]}>
+                {msg.content}
+              </Text>
+            </View>
+          );
+        })}
+        {waitSideReplying && (
+          <Text style={[styles.waitConversationTyping, { color: colors.textSecondary }]}>
+            Thinking about your reply...
+          </Text>
+        )}
+      </View>
+    );
+  };
+
   const pollForResponse = async (messageId, processingMessageId, currentSessionId, userQuestion = '', isResume = false) => {
     if (!messageId) {
       return;
@@ -2074,7 +2493,19 @@ export default function ChatScreen({ navigation, route }) {
             is_resume: !!isResume,
             response_length: (status.content || '').length,
           });
+          const processingMessageForTier = messages.find(
+            (msg) => msg.messageId === messageId || msg.id === processingMessageId
+          );
+          const rememberedTier =
+            messageTierByIdRef.current[messageId] ||
+            (processingMessageId ? messageTierByIdRef.current[processingMessageId] : '') ||
+            '';
+          const fallbackTier = String(processingMessageForTier?.chatTier || rememberedTier || '').trim().toLowerCase();
+          const resolvedChatTier = String(status.chat_tier || status.chatTier || rememberedTier || fallbackTier).trim().toLowerCase();
+          const isInstantTierResponse = resolvedChatTier === 'instant';
+
           const showFinalMessage = () => {
+            const waitConversation = normalizeWaitConversation(status.wait_conversation);
             setMessagesWithStorage(prev => {
               const processingMsg = prev.find(m => m.messageId === messageId);
               const userMsg = processingMsg?.userMessageId ? prev.find(m => m.id === processingMsg.userMessageId) : null;
@@ -2088,11 +2519,13 @@ export default function ChatScreen({ navigation, route }) {
                       terms: status.terms || [],
                       glossary: status.glossary || {},
                       message_type: status.message_type || 'answer',
+                      chatTier: resolvedChatTier || msg.chatTier,
                       summary_image: status.summary_image || null,
                       follow_up_questions: status.follow_up_questions || [],
                       native_name: chartName,
                       intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
                       gate_metadata: status.gate_metadata || null,
+                      waitConversation: waitConversation || msg.waitConversation,
                     }
                   : msg
               );
@@ -2117,10 +2550,23 @@ export default function ChatScreen({ navigation, route }) {
             }
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
-            if (!gatedNoCharge && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+            if (!gatedNoCharge && !isInstantTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
               setRatingEligibleMessageId(messageId);
               setPodcastPromoMessageId(messageId);
               setPodcastPromoVisible(true);
+            } else if (isInstantTierResponse) {
+              // Instant mode should not trigger post-answer podcast/review prompts.
+              setRatingEligibleMessageId(null);
+              setRatingPromptPending(false);
+              setRatingPromptMessageId(null);
+              setPodcastPromoVisible(false);
+              setPodcastPromoMessageId(null);
+              setPodcastAutoLaunchKey(0);
+              if (ratingPromptVisible) {
+                setRatingPromptVisible(false);
+              }
+              // Instant answers are short; jump to latest message for chat-like feel.
+              scrollToBottomReliably(true);
             }
           };
 
@@ -2144,6 +2590,35 @@ export default function ChatScreen({ navigation, route }) {
         // Still processing - continue polling
         if (status.status === 'processing') {
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
+          const waitConversation = normalizeWaitConversation(status.wait_conversation);
+          if (waitConversation) {
+            setMessagesWithStorage(prev => prev.map(msg =>
+              msg.messageId === messageId || msg.id === processingMessageId
+                ? {
+                    ...msg,
+                    messageId: msg.messageId || messageId,
+                    waitConversation,
+                  }
+                : msg
+            ));
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 80);
+          }
+          if (Array.isArray(status.engagement_updates) && status.engagement_updates.length > 0) {
+            setMessagesWithStorage(prev => prev.map(msg =>
+              msg.messageId === messageId || msg.id === processingMessageId
+                ? {
+                    ...msg,
+                    messageId: msg.messageId || messageId,
+                    engagementUpdates: mergeEngagementUpdates(msg.engagementUpdates, status.engagement_updates),
+                  }
+                : msg
+            ));
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 80);
+          }
           
           pollCount++;
           if (pollCount < maxPolls) {
@@ -2222,6 +2697,18 @@ export default function ChatScreen({ navigation, route }) {
           }
           return;
         }
+
+        const recoveredFromServer = await reconcileSessionFromServer(currentSessionId || sessionId, {
+          expectedMessageId: messageId,
+          preferNonEmpty: true,
+          openChat: true,
+        });
+        if (recoveredFromServer) {
+          setLoading(false);
+          setIsTyping(false);
+          await removePendingMessage(messageId);
+          return;
+        }
         
         setMessagesWithStorage(prev => prev.map(msg => 
           msg.messageId === messageId 
@@ -2267,6 +2754,7 @@ export default function ChatScreen({ navigation, route }) {
       try {
         // When using first question free, send as standard so backend applies free-question logic
         const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+        const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
         
         // Prepend relationship info to question for better backend context/logging
         const finalQuestion = (partnershipMode && partnershipRelation)
@@ -2276,9 +2764,11 @@ export default function ChatScreen({ navigation, route }) {
         const requestBody = {
           session_id: activeSessionId,
           question: finalQuestion,
+          query_context: buildQueryContext(),
           language: language || 'english',
           response_style: 'detailed',
-          premium_analysis: useFreeQuestion ? false : isPremiumAnalysis,
+          premium_analysis: useFreeQuestion ? false : (useInstantChat ? false : isPremiumAnalysis),
+          chat_tier: useInstantChat ? 'instant' : 'standard',
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
             name: nativeChart.name,
@@ -2346,7 +2836,8 @@ export default function ChatScreen({ navigation, route }) {
         }
 
         const result = await response.json();
-        const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights } = result;
+        const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights, chat_tier } = result;
+        const serverTier = String(chat_tier || (useInstantChat ? 'instant' : 'standard')).trim().toLowerCase();
 
         console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
         console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
@@ -2355,6 +2846,8 @@ export default function ChatScreen({ navigation, route }) {
         if (!assistantMessageId) {
           throw new Error('No message ID received from server');
         }
+        rememberMessageTier(assistantMessageId, serverTier);
+        rememberMessageTier(processingMessageId, serverTier);
 
         // Native profile gate or clarification returned synchronously (no credit spend / no poll)
         if (
@@ -2374,11 +2867,12 @@ export default function ChatScreen({ navigation, route }) {
           setMessagesWithStorage((prev) =>
             prev.map((msg) =>
               msg.id === processingMessageId
-                ? {
+                  ? {
                     ...msg,
                     messageId: assistantMessageId,
                     content: result.content || '',
                     isTyping: false,
+                    chatTier: serverTier || msg.chatTier,
                     message_type: result.message_type,
                     terms: [],
                     glossary: {},
@@ -2417,7 +2911,14 @@ export default function ChatScreen({ navigation, route }) {
         setMessagesWithStorage(prev => {
           const updated = prev.map(msg => {
             if (msg.id === processingMessageId) {
-              const updatedMsg = { ...msg, messageId: assistantMessageId, chartInsights: chart_insights, showSendRetryButton: false };
+              const effectiveTier = serverTier || msg.chatTier;
+              const updatedMsg = {
+                ...msg,
+                messageId: assistantMessageId,
+                chatTier: effectiveTier,
+                chartInsights: effectiveTier === 'instant' ? [] : chart_insights,
+                showSendRetryButton: false,
+              };
               return updatedMsg;
             }
             return msg;
@@ -2438,7 +2939,241 @@ export default function ChatScreen({ navigation, route }) {
     await attemptSend();
   };
 
+  const activeWaitSideMessage = messages.find(
+    (msg) => msg.isTyping && msg.messageId && msg.waitConversation?.enabled && msg.waitConversation?.status === 'active'
+  );
+
+  useEffect(() => {
+    const shouldShowModeIntro =
+      !showGreeting &&
+      birthData &&
+      !partnershipMode &&
+      !isMundane &&
+      !loading &&
+      !isTyping &&
+      !activeWaitSideMessage &&
+      !showChatModeIntro &&
+      !sessionId;
+
+    if (!shouldShowModeIntro) return;
+
+    const draftMessageId = messages[0]?.id || 'empty';
+    const introKey = `draft:${currentPersonId || birthData?.id || birthData?.name || 'native'}:${draftMessageId}`;
+    if (chatModeIntroShownKeyRef.current === introKey) return;
+
+    chatModeIntroShownKeyRef.current = introKey;
+    setShowChatModeIntro(true);
+  }, [
+    activeWaitSideMessage,
+    birthData,
+    currentPersonId,
+    isMundane,
+    isTyping,
+    loading,
+    messages,
+    partnershipMode,
+    sessionId,
+    showChatModeIntro,
+    showGreeting,
+  ]);
+
+  const getChatModeKey = () => {
+    if (!partnershipMode && !isMundane && freeQuestionAvailable) return 'standard';
+    if (isPremiumAnalysis) return 'premium';
+    if (instantChatEnabled && isInstantAnalysis) return 'instant';
+    return 'standard';
+  };
+
+  const getChatModeName = (modeKey = getChatModeKey()) => {
+    if (modeKey === 'premium') return t('chat.modeIntro.premium.name', 'Premium');
+    if (modeKey === 'instant') return t('chat.modeIntro.instant.name', 'Instant');
+    return t('chat.modeIntro.standard.name', 'Standard');
+  };
+
+  const formatModeCost = (cost) => {
+    const numericCost = Number(cost) || 0;
+    if (numericCost <= 0) return t('chat.modeIntro.free', 'Free');
+    const unit = numericCost === 1
+      ? t('chat.modeIntro.credit', 'credit')
+      : t('chat.modeIntro.credits', 'credits');
+    return `${numericCost} ${unit}`;
+  };
+
+  const switchChatMode = (modeKey) => {
+    if (modeKey === 'instant') {
+      setIsInstantAnalysis(true);
+      setIsPremiumAnalysis(false);
+    } else if (modeKey === 'premium') {
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(true);
+    } else {
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(false);
+    }
+    setShowModeSelector(false);
+    setShowChatModeIntro(false);
+  };
+
+  const chatModeOptions = [
+    ...(instantChatEnabled ? [{
+      key: 'instant',
+      icon: 'flash',
+      name: t('chat.modeIntro.instant.name', 'Instant'),
+      benefit: t('chat.modeIntro.instant.benefit', 'Fastest replies for quick follow-ups and simple questions.'),
+      bestFor: t('chat.modeIntro.instant.bestFor', 'Best when you want a concise answer now.'),
+      cost: instantChatCost,
+      originalCost: instantChatCostOriginal,
+    }] : []),
+    {
+      key: 'standard',
+      icon: 'chatbubble-ellipses',
+      name: t('chat.modeIntro.standard.name', 'Standard'),
+      benefit: t('chat.modeIntro.standard.benefit', 'Balanced depth and speed for most astrology questions.'),
+      bestFor: t('chat.modeIntro.standard.bestFor', 'Best default when you want useful detail.'),
+      cost: chatCost,
+      originalCost: chatCostOriginal,
+    },
+    {
+      key: 'premium',
+      icon: 'sparkles',
+      name: t('chat.modeIntro.premium.name', 'Premium'),
+      benefit: t('chat.modeIntro.premium.benefit', 'Deepest analysis for important decisions and complex topics.'),
+      bestFor: t('chat.modeIntro.premium.bestFor', 'Best when accuracy and detail matter more than speed.'),
+      cost: premiumChatCost,
+      originalCost: premiumChatCostOriginal,
+    },
+  ];
+
+  const renderInstantTypingIndicator = () => {
+    const isDark = theme === 'dark';
+    let remainingWords = instantLoaderWordCount;
+    const typedLines = INSTANT_LOADER_LINES.map((lineKey, index) => {
+      const line = t(lineKey, INSTANT_LOADER_FALLBACKS[index]);
+      const words = line.split(/\s+/).filter(Boolean);
+      if (remainingWords <= 0) return null;
+      const visibleWordCount = Math.min(remainingWords, words.length);
+      remainingWords -= words.length;
+      return {
+        key: lineKey,
+        text: words.slice(0, visibleWordCount).join(' '),
+        isComplete: visibleWordCount >= words.length,
+      };
+    }).filter(Boolean);
+    const latestTypedIndex = typedLines.length - 1;
+    return (
+      <View
+        style={[
+          styles.instantTypingBubble,
+          {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(249, 115, 22, 0.10)',
+            borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(249, 115, 22, 0.18)',
+          },
+        ]}
+      >
+        {typedLines.map((line, index) => {
+          const isLatest = index === latestTypedIndex;
+          return (
+            <Text
+              key={line.key}
+              style={[
+                styles.instantTypingLabel,
+                index > 0 && styles.instantTypingLabelSpaced,
+                { color: isLatest ? colors.text : colors.textSecondary },
+              ]}
+            >
+              {line.text}
+              {isLatest && !line.isComplete ? <Text style={styles.instantTypingCursor}>|</Text> : null}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const sendWaitConversationReply = async (messageText = inputText) => {
+    const text = (messageText || '').trim();
+    const mainMessageId = activeWaitSideMessage?.messageId;
+    if (!text || !mainMessageId || waitSideReplying) {
+      return;
+    }
+    setInputText('');
+    setWaitSideReplying(true);
+    const localId = `wait_local_${Date.now()}`;
+    setMessagesWithStorage(prev => prev.map(msg => {
+      if (msg.messageId !== mainMessageId) return msg;
+      const existing = msg.waitConversation || { enabled: true, status: 'active', messages: [] };
+      return {
+        ...msg,
+        waitConversation: {
+          ...existing,
+          messages: [
+            ...(Array.isArray(existing.messages) ? existing.messages : []),
+            { id: localId, sender: 'user', content: text, created_at: new Date().toISOString() },
+          ],
+        },
+      };
+    }));
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/wait-conversation/${mainMessageId}/reply`)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: text }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      const result = await response.json();
+      const waitConversation = normalizeWaitConversation(result.wait_conversation);
+      if (waitConversation) {
+        setMessagesWithStorage(prev => prev.map(msg =>
+          msg.messageId === mainMessageId
+            ? { ...msg, waitConversation }
+            : msg
+        ));
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
+    } catch (error) {
+      console.error('❌ Wait conversation reply failed:', error);
+      setMessagesWithStorage(prev => prev.map(msg => {
+        if (msg.messageId !== mainMessageId) return msg;
+        const existing = msg.waitConversation || { enabled: true, status: 'active', messages: [] };
+        return {
+          ...msg,
+          waitConversation: {
+            ...existing,
+            messages: [
+              ...(Array.isArray(existing.messages) ? existing.messages : []),
+              {
+                id: `wait_error_${Date.now()}`,
+                sender: 'assistant',
+                content: 'I could not send that side reply, but your full answer is still being prepared.',
+                created_at: new Date().toISOString(),
+              },
+            ],
+          },
+        };
+      }));
+    } finally {
+      setWaitSideReplying(false);
+    }
+  };
+
   const sendMessage = async (messageText = inputText) => {
+    if (activeWaitSideMessage) {
+      await sendWaitConversationReply(messageText);
+      return;
+    }
     if (!messageText.trim() || !birthData) {
       return;
     }
@@ -2446,6 +3181,8 @@ export default function ChatScreen({ navigation, route }) {
     setRatingEligibleMessageId(null);
     setRatingPromptPending(false);
     setRatingPromptMessageId(null);
+    setPodcastPromoVisible(false);
+    setPodcastPromoMessageId(null);
 
     // Partnership Step 2: Relationship description
     if (partnershipMode && partnershipStep === 2) {
@@ -2496,6 +3233,8 @@ export default function ChatScreen({ navigation, route }) {
     const loadingMessages = getLoadingMessages(messageText);
     const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
     const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
+    const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+    const outgoingTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
     const expectedWaitSeconds = isProModelFlow ? premiumChatCountdownSeconds : standardChatCountdownSeconds;
 
     // Add processing message immediately
@@ -2507,11 +3246,13 @@ export default function ChatScreen({ navigation, route }) {
       role: 'assistant',
       timestamp: new Date().toISOString(),
       isTyping: true,
+      chatTier: outgoingTier,
       expectedWaitSeconds,
       userMessageId: userMessageId,
       clientRequestId,
       failedQuestion: messageText,
     };
+    rememberMessageTier(processingMessageId, outgoingTier);
     
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, processingMessage];
@@ -2549,6 +3290,7 @@ export default function ChatScreen({ navigation, route }) {
       if (isMundane) {
         const mundaneBody = {
           session_id: currentSessionId,
+          query_context: buildQueryContext(),
           country: selectedCountry.name,
           year: selectedYear,
           latitude: selectedCountry.lat,
@@ -2964,6 +3706,7 @@ export default function ChatScreen({ navigation, route }) {
                     setOtherRelationText('');
                     setNativeSearchQuery('');
                   }
+                  setIsInstantAnalysis(false);
                   setIsPremiumAnalysis(false);
                   setShowModeSelector(false);
                 }}
@@ -3010,7 +3753,13 @@ export default function ChatScreen({ navigation, route }) {
                   {birthData ? (
                     <NativeSelectorChip
                       birthData={birthData}
-                      onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
+                      onPress={() => {
+                        keepChatOpenAfterNativeSelectRef.current = true;
+                        navigation.navigate('SelectNative', {
+                          returnTo: 'Home',
+                          returnParams: { returnToChat: true },
+                        });
+                      }}
                       maxLength={8}
                       showIcon={false}
                       style={styles.headerNativeChip}
@@ -3054,7 +3803,7 @@ export default function ChatScreen({ navigation, route }) {
                 onPress={() => navigation.navigate('Credits')}
               >
                 <Text style={[styles.creditText, { color: colors.text }]}>
-                  {isPremiumAnalysis ? '⚡' : '💳'} {credits}
+                  {isPremiumAnalysis ? '👑' : (isInstantAnalysis ? '⚡' : '💳')} {credits}
                   {effectiveChatCost === 0 && (
                     <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · Free</Text>
                   )}
@@ -3155,6 +3904,7 @@ export default function ChatScreen({ navigation, route }) {
                   style={styles.partnershipBadgeClose}
                   onPress={() => {
                     setPartnershipMode(false);
+                    setIsInstantAnalysis(false);
                     setIsPremiumAnalysis(false);
                     setShowModeSelector(false);
                     setNativeChart(null);
@@ -3283,6 +4033,20 @@ export default function ChatScreen({ navigation, route }) {
               const isLastMessage = index === messages.length - 1;
 
               if (item.isTyping) {
+                if (item.waitConversation?.enabled && Array.isArray(item.waitConversation.messages) && item.waitConversation.messages.length > 0) {
+                  return (
+                    <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                      {renderWaitConversation(item.waitConversation)}
+                    </View>
+                  );
+                }
+                if (item.chatTier === 'instant') {
+                  return (
+                    <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                      {renderInstantTypingIndicator()}
+                    </View>
+                  );
+                }
                 return (
                   <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
                     <LoadingBubble
@@ -3291,6 +4055,7 @@ export default function ChatScreen({ navigation, route }) {
                       scrollViewRef={scrollViewRef}
                       expectedWaitSeconds={item.expectedWaitSeconds}
                     />
+                    {renderEngagementUpdates(item.engagementUpdates)}
                   </View>
                 );
               }
@@ -3416,7 +4181,13 @@ export default function ChatScreen({ navigation, route }) {
                 {' '}
                 {t('chat.inputScopeOr', 'or')}{' '}
                 <Text
-                  onPress={() => navigation.navigate('SelectNative')}
+                  onPress={() => {
+                    keepChatOpenAfterNativeSelectRef.current = true;
+                    navigation.navigate('SelectNative', {
+                      returnTo: 'Home',
+                      returnParams: { returnToChat: true },
+                    });
+                  }}
                   style={[styles.chatInputScopeLink, { color: colors.primary }]}
                   accessibilityRole="link"
                   accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
@@ -3442,16 +4213,40 @@ export default function ChatScreen({ navigation, route }) {
               {/* Expanded row to the left: Standard | Premium with cost/discount (only when not partnership/mundane) */}
               {!partnershipMode && !isMundane && showModeSelector && (
                 <View style={styles.modeSelectorExpanded}>
+                  {instantChatEnabled && (
+                    <TouchableOpacity
+                      style={[
+                        styles.modeSelectorPill,
+                        isInstantAnalysis && styles.modeSelectorPillActive,
+                        isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.30)' : 'rgba(249, 115, 22, 0.18)' },
+                        !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                      ]}
+                      onPress={() => { setIsInstantAnalysis(true); setIsPremiumAnalysis(false); setShowModeSelector(false); }}
+                    >
+                      <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeInstant', 'Instant')}</Text>
+                      <View style={styles.modeSelectorCostRow}>
+                        {instantChatCostOriginal != null && instantChatCostOriginal > instantChatCost ? (
+                          <>
+                            <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{instantChatCostOriginal}</Text>
+                            <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{instantChatCost}</Text>
+                          </>
+                        ) : (
+                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{instantChatCost}</Text>
+                        )}
+                        <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{instantChatCost !== 1 ? 's' : ''}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={[
                       styles.modeSelectorPill,
-                      !isPremiumAnalysis && styles.modeSelectorPillActive,
-                      !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
-                      isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                      !isPremiumAnalysis && !isInstantAnalysis && styles.modeSelectorPillActive,
+                      !isPremiumAnalysis && !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
+                      (isPremiumAnalysis || isInstantAnalysis) && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}
-                    onPress={() => { setIsPremiumAnalysis(false); setShowModeSelector(false); }}
+                    onPress={() => { setIsInstantAnalysis(false); setIsPremiumAnalysis(false); setShowModeSelector(false); }}
                   >
-                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>Standard</Text>
+                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeStandard', 'Standard')}</Text>
                     <View style={styles.modeSelectorCostRow}>
                       {chatCostOriginal != null && chatCostOriginal > chatCost ? (
                         <>
@@ -3471,9 +4266,9 @@ export default function ChatScreen({ navigation, route }) {
                       isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 215, 0, 0.2)' },
                       !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}
-                    onPress={() => { setIsPremiumAnalysis(true); setShowModeSelector(false); }}
+                    onPress={() => { setIsInstantAnalysis(false); setIsPremiumAnalysis(true); setShowModeSelector(false); }}
                   >
-                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>Premium</Text>
+                    <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modePremium', 'Premium')}</Text>
                     <View style={styles.modeSelectorCostRow}>
                       {premiumChatCostOriginal != null && premiumChatCostOriginal > premiumChatCost ? (
                         <>
@@ -3499,6 +4294,7 @@ export default function ChatScreen({ navigation, route }) {
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder={
+                  activeWaitSideMessage ? "Reply while the full answer is prepared..." :
                   loading ? "Analyzing..." :
                   freeQuestionNotificationGate
                     ? "Turn on notifications to unlock your free question"
@@ -3512,7 +4308,10 @@ export default function ChatScreen({ navigation, route }) {
                 }
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
                 maxLength={500}
-                editable={!loading && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
+                editable={
+                  !!activeWaitSideMessage ||
+                  (!loading && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
+                }
                 multiline
                 blurOnSubmit={false}
               />
@@ -3520,7 +4319,10 @@ export default function ChatScreen({ navigation, route }) {
               {!partnershipMode && !isMundane && (
                 <TouchableOpacity
                   style={styles.premiumToggleButton}
-                  onPress={() => setShowModeSelector(prev => !prev)}
+                  onPress={() => {
+                    setShowModeSelector(false);
+                    setShowChatModeIntro(true);
+                  }}
                   onLongPress={() => setShowPremiumModal(true)}
                 >
                   <Animated.View
@@ -3543,6 +4345,13 @@ export default function ChatScreen({ navigation, route }) {
                       >
                         <Text style={styles.premiumIconText}>P</Text>
                       </LinearGradient>
+                    ) : isInstantAnalysis ? (
+                      <LinearGradient
+                        colors={['#ff8c5a', '#ff6b35']}
+                        style={styles.premiumIconGradient}
+                      >
+                        <Text style={styles.premiumIconText}>I</Text>
+                      </LinearGradient>
                     ) : (
                       <View style={styles.premiumIconInactive}>
                         <Text style={styles.premiumIconTextInactive}>S</Text>
@@ -3555,23 +4364,27 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  (loading || !inputText.trim() || (credits < effectiveChatCost && !freeQuestionNotificationGate) || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
+                  ((!activeWaitSideMessage && loading) || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => {
-                  if (freeQuestionNotificationGate) {
+                  if (!activeWaitSideMessage && freeQuestionNotificationGate) {
                     openNotificationsForFreeQuestion();
                     return;
                   }
                   sendMessage();
                 }}
-                disabled={loading || !inputText.trim() || (credits < effectiveChatCost && !freeQuestionNotificationGate) || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
+                disabled={(!activeWaitSideMessage && loading) || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
-                  colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
+                  colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : (isInstantAnalysis ? ['#fb923c', '#f97316'] : ['#ff6b35', '#ff8c5a'])}
                   style={styles.modernSendGradient}
                 >
-                  {loading ? (
+                  {waitSideReplying ? (
+                    <Text style={styles.modernSendText}>...</Text>
+                  ) : loading && !activeWaitSideMessage ? (
                     <Text style={styles.modernSendText}>⏳</Text>
+                  ) : activeWaitSideMessage ? (
+                    <Ionicons name="send" size={20} color={COLORS.white} />
                   ) : freeQuestionNotificationGate ? (
                     <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
                   ) : credits < effectiveChatCost ? (
@@ -3584,6 +4397,21 @@ export default function ChatScreen({ navigation, route }) {
                 </LinearGradient>
               </TouchableOpacity>
             </LinearGradient>
+
+            {!partnershipMode && !isMundane && !isKeyboardVisible && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowChatModeIntro(true)}
+                style={styles.chatModeReminder}
+              >
+                <Text style={[styles.chatModeReminderText, { color: colors.textSecondary }]}>
+                  {t('chat.modeIntro.tapToChange', {
+                    mode: getChatModeName(),
+                    defaultValue: `${getChatModeName()} mode · tap S/I/P to change`,
+                  })}
+                </Text>
+              </TouchableOpacity>
+            )}
             
             {effectiveChatCost === 0 && !isKeyboardVisible && (
               <View style={styles.firstQuestionFreeBanner}>
@@ -3744,6 +4572,111 @@ export default function ChatScreen({ navigation, route }) {
           </View>
         </Modal>
 
+        <Modal
+          visible={showChatModeIntro}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowChatModeIntro(false)}
+        >
+          <TouchableOpacity
+            style={styles.chatModeIntroOverlay}
+            activeOpacity={1}
+            onPress={() => setShowChatModeIntro(false)}
+          >
+            <View
+              style={[
+                styles.chatModeIntroSheet,
+                {
+                  backgroundColor: theme === 'dark' ? '#24113f' : '#fffaf5',
+                  borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.28)' : 'rgba(234, 88, 12, 0.18)',
+                },
+              ]}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={styles.chatModeIntroHandle} />
+              <Text style={[styles.chatModeIntroEyebrow, { color: colors.primary }]}>
+                {t('chat.modeIntro.eyebrow', 'Chat mode')}
+              </Text>
+              <Text style={[styles.chatModeIntroTitle, { color: colors.text }]}>
+                {t('chat.modeIntro.title', {
+                  mode: getChatModeName(),
+                  defaultValue: `You are in ${getChatModeName()} mode`,
+                })}
+              </Text>
+              <Text style={[styles.chatModeIntroBody, { color: colors.textSecondary }]}>
+                {t(
+                  'chat.modeIntro.body',
+                  'Choose how fast and deep you want this answer. You can change modes anytime from the S/I/P button near the message box.'
+                )}
+              </Text>
+
+              <View style={styles.chatModeIntroRows}>
+                {chatModeOptions.map((option) => {
+                  const isCurrent = option.key === getChatModeKey();
+                  const hasDiscount = option.originalCost != null && Number(option.originalCost) > Number(option.cost || 0);
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      activeOpacity={0.86}
+                      onPress={() => switchChatMode(option.key)}
+                      style={[
+                        styles.chatModeIntroRow,
+                        {
+                          backgroundColor: isCurrent
+                            ? (theme === 'dark' ? 'rgba(249, 115, 22, 0.18)' : 'rgba(249, 115, 22, 0.10)')
+                            : (theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)'),
+                          borderColor: isCurrent
+                            ? 'rgba(249, 115, 22, 0.45)'
+                            : (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                        },
+                      ]}
+                    >
+                      <View style={[styles.chatModeIntroIcon, { backgroundColor: isCurrent ? colors.primary : 'rgba(249, 115, 22, 0.16)' }]}>
+                        <Ionicons name={option.icon} size={17} color={isCurrent ? '#fff' : colors.primary} />
+                      </View>
+                      <View style={styles.chatModeIntroRowText}>
+                        <View style={styles.chatModeIntroRowHeader}>
+                          <Text style={[styles.chatModeIntroModeName, { color: colors.text }]}>{option.name}</Text>
+                          {isCurrent ? (
+                            <Text style={[styles.chatModeIntroCurrent, { color: colors.primary }]}>
+                              {t('chat.modeIntro.current', 'Current')}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.chatModeIntroBenefit, { color: colors.textSecondary }]}>{option.benefit}</Text>
+                        <Text style={[styles.chatModeIntroBestFor, { color: colors.textTertiary || colors.textSecondary }]}>{option.bestFor}</Text>
+                      </View>
+                      <View style={styles.chatModeIntroCostWrap}>
+                        {hasDiscount ? (
+                          <Text style={[styles.chatModeIntroOriginalCost, { color: colors.textTertiary || colors.textSecondary }]}>
+                            {formatModeCost(option.originalCost)}
+                          </Text>
+                        ) : null}
+                        <Text style={[styles.chatModeIntroCost, { color: colors.text }]}>
+                          {formatModeCost(option.cost)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setShowChatModeIntro(false)}
+                style={[styles.chatModeIntroContinue, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.chatModeIntroContinueText}>
+                  {t('chat.modeIntro.continue', {
+                    mode: getChatModeName(),
+                    defaultValue: `Continue in ${getChatModeName()}`,
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
         {/* Menu Drawer */}
         <Modal
           visible={showMenu}
@@ -3859,7 +4792,13 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
-                        navigation.navigate('SelectNative');
+                        if (!showGreeting) {
+                          keepChatOpenAfterNativeSelectRef.current = true;
+                        }
+                        navigation.navigate('SelectNative', !showGreeting ? {
+                          returnTo: 'Home',
+                          returnParams: { returnToChat: true },
+                        } : undefined);
                       });
                     }}
                   >
@@ -4543,6 +5482,7 @@ export default function ChatScreen({ navigation, route }) {
           onClose={() => setShowDashaBrowser(false)}
           birthData={birthData}
           onRequireBirthData={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Home' })}
+          selectNativeReturnTo="Home"
         />
 
         {/* Enhanced Analysis Popup */}
@@ -5158,6 +6098,223 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexGrow: 1,
   },
+  engagementUpdatesWrap: {
+    marginTop: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  engagementUpdateCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  engagementUpdateLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  engagementUpdateText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  waitConversationWrap: {
+    marginTop: 8,
+    marginBottom: 12,
+    gap: 10,
+  },
+  waitConversationHeader: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 115, 22, 0.22)',
+  },
+  waitConversationTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  waitConversationSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  waitConversationBubble: {
+    maxWidth: '88%',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  waitConversationBubbleAssistant: {
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 6,
+  },
+  waitConversationBubbleUser: {
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 6,
+  },
+  waitConversationText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  waitConversationTyping: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginLeft: 4,
+  },
+  instantTypingBubble: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 18,
+    borderBottomLeftRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    maxWidth: '82%',
+  },
+  instantTypingLabel: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  instantTypingLabelSpaced: {
+    marginTop: 8,
+  },
+  instantTypingCursor: {
+    fontWeight: '800',
+  },
+  chatModeIntroOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  chatModeIntroSheet: {
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 24,
+    borderWidth: 1,
+    maxHeight: '86%',
+  },
+  chatModeIntroHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(148, 163, 184, 0.55)',
+    marginBottom: 14,
+  },
+  chatModeIntroEyebrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  chatModeIntroTitle: {
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  chatModeIntroBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+    marginBottom: 14,
+  },
+  chatModeIntroRows: {
+    gap: 10,
+  },
+  chatModeIntroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  chatModeIntroIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  chatModeIntroRowText: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  chatModeIntroRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  chatModeIntroModeName: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  chatModeIntroCurrent: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  chatModeIntroBenefit: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  chatModeIntroBestFor: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  chatModeIntroCostWrap: {
+    alignItems: 'flex-end',
+    minWidth: 58,
+  },
+  chatModeIntroOriginalCost: {
+    fontSize: 11,
+    fontWeight: '700',
+    textDecorationLine: 'line-through',
+    marginBottom: 1,
+  },
+  chatModeIntroCost: {
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  chatModeIntroContinue: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  chatModeIntroContinueText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  chatModeReminder: {
+    alignSelf: 'center',
+    paddingTop: 8,
+    paddingHorizontal: 12,
+  },
+  chatModeReminderText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
 
   suggestionsContainer: {
     paddingVertical: 8,
@@ -5301,16 +6458,17 @@ const styles = StyleSheet.create({
   modeSelectorExpanded: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
     marginRight: 8,
     paddingVertical: 4,
   },
   modeSelectorPill: {
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     borderRadius: 10,
     alignItems: 'center',
-    minWidth: 72,
+    minWidth: 68,
   },
   modeSelectorPillActive: {
     borderWidth: 1,

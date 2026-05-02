@@ -169,6 +169,13 @@ class GeminiChatAnalyzer:
         """Resolve model from admin settings for this request (no server restart needed)."""
         from utils.admin_settings import get_gemini_chat_model, get_gemini_premium_model
         name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
+        return self.get_named_gemini_model(name, premium_analysis=premium_analysis)
+
+    def get_named_gemini_model(self, model_name: str, *, premium_analysis: bool = False):
+        """Resolve a specific Gemini model id with the same cache/fallback behavior as standard chat."""
+        name = (model_name or "").strip()
+        if not name:
+            return self.premium_model if premium_analysis and self.premium_model else self.model
         if name in self._model_cache:
             return self._model_cache[name]
         try:
@@ -336,6 +343,7 @@ class GeminiChatAnalyzer:
         model_name_override: Optional[str] = None,
         llm_log_tag: Optional[str] = None,
         request_timeout_s: Optional[float] = None,
+        force_gemini: bool = False,
     ) -> Dict[str, Any]:
         """
         Single LLM completion for an arbitrary prompt (parallel chat branches + merge).
@@ -371,7 +379,9 @@ class GeminiChatAnalyzer:
             else max(1.0, min(600.0, float(request_timeout_s)))
         )
         llm_provider = (
-            get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
+            "gemini"
+            if force_gemini
+            else (get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider())
         )
         model_name = ""
         token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}

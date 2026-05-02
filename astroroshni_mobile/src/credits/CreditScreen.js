@@ -376,7 +376,7 @@ const CreditScreen = ({ navigation }) => {
     }
   };
 
-  /** On Android: get current subscription from Play and sync to our backend. If no purchase found (e.g. after cancel) but we still have tier, clear our DB so UI updates. */
+  /** On Android: get current subscription from Play and sync to our backend when a token is available. */
   const syncSubscriptionWithPlay = async () => {
     if (Platform.OS !== 'android' || !RNIap || subscriptionProductIds.length === 0) return;
     try {
@@ -402,19 +402,14 @@ const CreditScreen = ({ navigation }) => {
         }
       }
       if (!synced) {
-        await creditAPI.clearSubscriptionNoPurchase();
+        console.warn('No Google Play subscription purchase found to sync; preserving server subscription until its end date.');
       }
       await fetchBalance();
       await fetchSubscriptionDetails();
     } catch (e) {
       console.warn('Subscription sync with Play failed:', e?.message);
-      try {
-        await creditAPI.clearSubscriptionNoPurchase();
-        await fetchBalance();
-        await fetchSubscriptionDetails();
-      } catch (clearErr) {
-        console.warn('Clear subscription failed:', clearErr?.message);
-      }
+      await fetchBalance();
+      await fetchSubscriptionDetails();
     }
   };
 
@@ -423,7 +418,7 @@ const CreditScreen = ({ navigation }) => {
     if (refreshSubscriptionStatusLoading) return;
     setRefreshSubscriptionStatusLoading(true);
     try {
-      await creditAPI.clearSubscriptionNoPurchase();
+      await syncSubscriptionWithPlay();
       await fetchBalance();
       await fetchSubscriptionDetails();
       setPurchaseModal({

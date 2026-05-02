@@ -299,6 +299,15 @@ def _attach_classical_rule_matches(payload: Dict[str, Any], matches: Any) -> Non
         payload["classical_rule_matches"] = copy.deepcopy(matches)
 
 
+def _cached_shared_context_note(keys: List[str]) -> str:
+    joined = ", ".join(k for k in keys if k)
+    return (
+        "USE CACHED SHARED CONTEXT:\n"
+        f"- Reuse these cached keys instead of expecting them repeated below: {joined}.\n"
+        "- Treat the cached shared context as authoritative for these items.\n"
+    )
+
+
 def _llm_call_metrics(
     stage: str,
     prompt: str,
@@ -476,11 +485,21 @@ async def _run_branch_json(
     model_name_override: Optional[str] = None,
     stage_provider: Optional[str] = None,
     stage_model_hint: Optional[str] = None,
+    cached_shared_context_keys: Optional[List[str]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if start_delay_s > 0:
         await asyncio.sleep(start_delay_s)
     body = _json_compact(payload)
-    prompt = f"{static_instruction}\n\n{_timing_label_guard_text()}\nVARIABLE_DATA_JSON:\n{body}"
+    shared_context_note = (
+        f"{_cached_shared_context_note(cached_shared_context_keys or [])}\n"
+        if cached_shared_context_keys
+        else ""
+    )
+    prompt = (
+        f"{static_instruction}\n\n"
+        f"{shared_context_note}"
+        f"{_timing_label_guard_text()}\nVARIABLE_DATA_JSON:\n{body}"
+    )
     static_chars = len(static_instruction)
     dynamic_chars = len(prompt) - static_chars
     branch_timeout_s = parallel_branch_timeout_s(critical=critical)
@@ -727,6 +746,29 @@ async def run_parallel_chat_pipeline(
         cache_setup_input_tokens_standard
         + (cache_setup_input_tokens_premium if use_dual_cache else 0)
     )
+    shared_context_keys = [
+        "shared_kernel",
+        "user_facts",
+        "extracted_context",
+        "history",
+        "current_question",
+    ]
+    cache_active = bool(cached_model_standard or cached_model_premium)
+    if cache_active:
+        if "user_question" in par_payload:
+            par_payload = {k: v for k, v in par_payload.items() if k != "user_question"}
+        if "user_question" in jm_payload:
+            jm_payload = {k: v for k, v in jm_payload.items() if k != "user_question"}
+        if "user_question" in nd_payload:
+            nd_payload = {k: v for k, v in nd_payload.items() if k != "user_question"}
+        if "user_question" in nk_payload:
+            nk_payload = {k: v for k, v in nk_payload.items() if k != "user_question"}
+        if "user_question" in kp_payload:
+            kp_payload = {k: v for k, v in kp_payload.items() if k != "user_question"}
+        if "user_question" in av_payload:
+            av_payload = {k: v for k, v in av_payload.items() if k != "user_question"}
+        if "user_question" in sd_payload:
+            sd_payload = {k: v for k, v in sd_payload.items() if k != "user_question"}
     try:
         par_task = asyncio.create_task(
             _run_branch_json(
@@ -743,6 +785,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=premium_provider,
                 stage_model_hint=premium_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_premium else None,
             ) if "parashari" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("parashari", branch_scope_reason or "branch_filtered"))
         )
         jm_task = asyncio.create_task(
@@ -760,6 +803,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=standard_provider,
                 stage_model_hint=standard_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_standard else None,
             ) if "jaimini" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("jaimini", branch_scope_reason or "branch_filtered"))
         )
         nd_task = asyncio.create_task(
@@ -777,6 +821,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=standard_provider,
                 stage_model_hint=standard_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_standard else None,
             ) if "nadi" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("nadi", branch_scope_reason or "branch_filtered"))
         )
         nk_task = asyncio.create_task(
@@ -794,6 +839,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=standard_provider,
                 stage_model_hint=standard_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_standard else None,
             ) if "nakshatra" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("nakshatra", branch_scope_reason or "branch_filtered"))
         )
         kp_task = asyncio.create_task(
@@ -811,6 +857,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=standard_provider,
                 stage_model_hint=standard_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_standard else None,
             ) if "kp" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("kp", branch_scope_reason or "branch_filtered"))
         )
         av_task = asyncio.create_task(
@@ -828,6 +875,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=standard_provider,
                 stage_model_hint=standard_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_standard else None,
             ) if "ashtakavarga" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("ashtakavarga", branch_scope_reason or "branch_filtered"))
         )
         sd_task = asyncio.create_task(
@@ -845,6 +893,7 @@ async def run_parallel_chat_pipeline(
                 ),
                 stage_provider=standard_provider,
                 stage_model_hint=standard_gemini_model_name,
+                cached_shared_context_keys=shared_context_keys if cached_model_standard else None,
             ) if "sudarshan" in enabled_branch_set else asyncio.sleep(0, result=_skipped_branch_output("sudarshan", branch_scope_reason or "branch_filtered"))
         )
         (
@@ -925,10 +974,20 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     }
     _merge_lang = str(language or "english").strip() or "english"
     mq_focus = build_multi_question_focus_instruction(_merge_lang)
+    merge_cached_note = (
+        _cached_shared_context_note(shared_context_keys)
+        if cached_model_premium
+        else ""
+    )
     merge_user = (
-        f"{time_context}\n\nSPECIALIST_BRANCH_OUTPUTS_JSON:\n"
+        f"{time_context}\n\n"
+        f"{merge_cached_note}"
+        f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n"
         f"{_json_compact(branch_bundle)}\n"
-        f"{hist_text}\n{mq_focus}\nCURRENT QUESTION: {user_question}\n{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
+        f"{'' if cached_model_premium else hist_text + chr(10)}"
+        f"{mq_focus}\n"
+        f"{'' if cached_model_premium else f'CURRENT QUESTION: {user_question}' + chr(10)}"
+        f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
     )
     merge_static = "\n\n".join(
         [

@@ -1154,6 +1154,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
+            get_gemini_instant_model,
             get_event_timeline_model,
             get_podcast_provider,
             get_chat_llm_provider,
@@ -1161,6 +1162,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_openai_premium_model,
             get_deepseek_chat_model,
             get_deepseek_premium_model,
+            is_instant_chat_enabled,
+            get_instant_chat_user_allowlist,
             get_setting,
         )
         with get_conn() as conn:
@@ -1181,6 +1184,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_chat_model": get_gemini_chat_model(),
             "gemini_premium_model": get_gemini_premium_model(),
             "gemini_analysis_model": get_gemini_analysis_model(),
+            "gemini_instant_chat_model": get_gemini_instant_model(),
             "event_timeline_model": get_event_timeline_model(),
             "chat_llm_provider": get_chat_llm_provider(),
             "chat_llm_provider_premium": _premium_ui,
@@ -1189,6 +1193,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "deepseek_chat_model": get_deepseek_chat_model(),
             "deepseek_premium_model": get_deepseek_premium_model(),
             "podcast_provider": get_podcast_provider(),
+            "instant_chat_enabled": is_instant_chat_enabled(),
+            "instant_chat_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_instant_chat_user_allowlist())
+            ),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")

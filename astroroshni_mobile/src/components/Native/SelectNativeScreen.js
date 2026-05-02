@@ -51,7 +51,7 @@ const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign
             <View style={styles.profileInfo}>
               <View style={styles.profileLeft}>
                 <View style={styles.zodiacIcon}>
-                  <Text style={styles.zodiacText}>{getZodiacSign(profile.name)}</Text>
+                  <Text style={styles.zodiacText}>{getZodiacSign(profile)}</Text>
                 </View>
                 <View style={styles.profileDetails}>
                   <View style={styles.nameRow}>
@@ -96,6 +96,23 @@ const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign
   );
 };
 
+const normalizeGender = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized.startsWith('m')) return 'male';
+  if (normalized.startsWith('f')) return 'female';
+  return normalized;
+};
+
+const shouldShowForGenderFilter = (profile, genderFilter) => {
+  const filter = normalizeGender(genderFilter);
+  if (!filter) return true;
+
+  const gender = normalizeGender(profile?.gender);
+  if (filter === 'male') return gender !== 'female';
+  if (filter === 'female') return gender !== 'male';
+  return true;
+};
+
 export default function SelectNativeScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
@@ -117,11 +134,14 @@ export default function SelectNativeScreen({ navigation, route }) {
   const shareSearchDebounceRef = useRef(null);
   const fromProfile = route.params?.fromProfile;
   const returnTo = route.params?.returnTo;
+  const selectorTarget = route.params?.selectorTarget;
+  const nativeGenderFilter = route.params?.nativeGenderFilter;
+  const returnParams = route.params?.returnParams || {};
 
   useFocusEffect(
     React.useCallback(() => {
       loadProfiles({ reset: true });
-    }, [])
+    }, [nativeGenderFilter])
   );
 
   const PAGE_SIZE = 10;
@@ -138,7 +158,8 @@ export default function SelectNativeScreen({ navigation, route }) {
       // Fetch saved charts from API
       const { chartAPI } = require('../../services/api');
       const nextOffset = reset ? 0 : offset;
-      const response = await chartAPI.getExistingCharts(search.trim(), PAGE_SIZE, nextOffset);
+      const fetchLimit = nativeGenderFilter ? 50 : PAGE_SIZE;
+      const response = await chartAPI.getExistingCharts(search.trim(), fetchLimit, nextOffset);
       const apiCharts = response.data.charts || [];
       
       const profileList = [];
@@ -159,13 +180,17 @@ export default function SelectNativeScreen({ navigation, route }) {
           gender: chart.gender,
           relation: rel || 'other',
           isSelf: rel === 'self',
+          ascendantSign: chart.ascendant_sign,
+          ascendantSignName: chart.ascendant_sign_name,
         });
       });
       
-      setProfiles(prev => (reset ? profileList : [...prev, ...profileList]));
-      setOffset(nextOffset + profileList.length);
+      const filteredProfiles = profileList.filter((profile) => shouldShowForGenderFilter(profile, nativeGenderFilter));
+
+      setProfiles(prev => (reset ? filteredProfiles : [...prev, ...filteredProfiles]));
+      setOffset(nextOffset + apiCharts.length);
       setHasMore(!!response.data?.has_more);
-      setTotalCharts(response.data?.total || 0);
+      setTotalCharts(nativeGenderFilter ? null : (response.data?.total || 0));
       
       if (currentNative) {
         setSelectedProfile(currentNative.name);
@@ -174,9 +199,11 @@ export default function SelectNativeScreen({ navigation, route }) {
       // Fallback to local storage if API fails
       if (reset) {
         const savedProfiles = await storage.getBirthProfiles();
-        setProfiles(savedProfiles);
+        const filteredProfiles = (savedProfiles || []).filter((profile) => shouldShowForGenderFilter(profile, nativeGenderFilter));
+        setProfiles(filteredProfiles);
         setOffset(savedProfiles.length);
         setHasMore(false);
+        setTotalCharts(filteredProfiles.length);
       }
     } finally {
       setListLoading(false);
@@ -246,9 +273,11 @@ export default function SelectNativeScreen({ navigation, route }) {
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate(returnTo, {
+          ...returnParams,
           birthData: profileWithId,
           birthDetails: profileWithId,
           birthChartId: profileWithId.id,
+          selectorTarget,
         });
       } else {
         await storage.setBirthDetails(profileWithId);
@@ -408,13 +437,34 @@ export default function SelectNativeScreen({ navigation, route }) {
     // Don't clear selectedProfileForMenu here - keep it for share modal
   };
 
-  const getZodiacSign = (profileName) => {
-    // Avoid expensive per-profile chart API calls on list load.
-    // Keep icon deterministic from profile name.
+  const handleHeaderBack = () => {
+    if (returnTo === 'Home') {
+      navigation.navigate('Home', returnParams.returnToChat ? returnParams : { resetToGreeting: true });
+      return;
+    }
+    if (returnTo) {
+      navigation.navigate(returnTo, returnParams);
+      return;
+    }
+    navigation.goBack();
+  };
+
+  const getZodiacSign = (profile) => {
     const icons = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
-    if (!profileName) return icons[0];
-    const hash = profileName.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-    return icons[hash % icons.length];
+    const signValue = profile?.ascendantSign ?? profile?.ascendant_sign ?? profile?.lagnaSign ?? profile?.lagna_sign;
+    if (typeof signValue === 'number' && signValue >= 0 && signValue < icons.length) {
+      return icons[signValue];
+    }
+    const numericSign = Number(signValue);
+    if (Number.isInteger(numericSign) && numericSign >= 0 && numericSign < icons.length) {
+      return icons[numericSign];
+    }
+    if (Number.isInteger(numericSign) && numericSign >= 1 && numericSign <= icons.length) {
+      return icons[numericSign - 1];
+    }
+    const signName = String(profile?.ascendantSignName || profile?.ascendant_sign_name || '').trim().toLowerCase();
+    const signIndex = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'].indexOf(signName);
+    return signIndex >= 0 ? icons[signIndex] : '✦';
   };
 
   return (
@@ -426,7 +476,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => returnTo ? navigation.navigate(returnTo) : navigation.goBack()} style={styles.backButton}>
+            <TouchableOpacity onPress={handleHeaderBack} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Select Native</Text>
@@ -448,7 +498,11 @@ export default function SelectNativeScreen({ navigation, route }) {
                 ? 'Select mother\'s chart'
                 : returnTo === 'KarmaAnalysis'
                   ? t('karmaAnalysis.selectNativePrompt')
-                  : 'Choose a profile for astrological analysis'}
+                  : nativeGenderFilter === 'male'
+                    ? 'Choose a boy chart for Kundli matching'
+                    : nativeGenderFilter === 'female'
+                      ? 'Choose a girl chart for Kundli matching'
+                      : 'Choose a profile for astrological analysis'}
             </Text>
 
             {(totalCharts > PAGE_SIZE || localSearchQuery.length > 0 || profiles.length > 0) && (
@@ -499,7 +553,7 @@ export default function SelectNativeScreen({ navigation, route }) {
                   <ActivityIndicator size="small" color="#ff6b35" />
                 ) : (
                   <Text style={[styles.loadMoreText, { color: colors.text }]}>
-                    Load more ({profiles.length}/{totalCharts || '?'})
+                    {nativeGenderFilter ? 'Load more matching charts' : `Load more (${profiles.length}/${totalCharts || '?'})`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -508,8 +562,14 @@ export default function SelectNativeScreen({ navigation, route }) {
             {profiles.length === 0 && (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>👤</Text>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No Profiles Found</Text>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Add your birth details to get started</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  {nativeGenderFilter ? 'No Matching Charts Found' : 'No Profiles Found'}
+                </Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {nativeGenderFilter
+                    ? 'Charts without gender are also shown here. Add a new chart or load more if you have many saved charts.'
+                    : 'Add your birth details to get started'}
+                </Text>
                 <TouchableOpacity 
                   style={styles.addProfileButton}
                   onPress={() => navigation.navigate('BirthForm')}

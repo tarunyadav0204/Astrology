@@ -24,6 +24,7 @@ import CreditScreen from './src/credits/CreditScreen';
 import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
+import RelationshipMatchScreen from './src/components/Relationship/RelationshipMatchScreen';
 import KarmaAnalysisScreen from './src/components/KarmaAnalysis/KarmaAnalysisScreen';
 import ChartScreen from './src/components/Chart/ChartScreen';
 import PlanetaryPositionsScreen from './src/components/Chart/PlanetaryPositionsScreen';
@@ -443,6 +444,11 @@ export default function App() {
           <Stack.Screen 
             name="AnalysisDetail" 
             component={AnalysisDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="RelationshipMatch"
+            component={RelationshipMatchScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

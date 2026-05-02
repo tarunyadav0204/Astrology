@@ -129,7 +129,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiChatModel, setGeminiChatModel] = useState('');
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
+  const [geminiInstantChatModel, setGeminiInstantChatModel] = useState('');
   const [eventTimelineModel, setEventTimelineModel] = useState('');
+  const [instantChatEnabled, setInstantChatEnabled] = useState(false);
+  const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
   const [chatLlmProviderPremium, setChatLlmProviderPremium] = useState('');
   const [openaiModelOptions, setOpenaiModelOptions] = useState([]);
@@ -161,6 +164,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifChatSuggestMode, setNotifChatSuggestMode] = useState(false);
   const [notifGenerateFromChatLoading, setNotifGenerateFromChatLoading] = useState(false);
   const [selectedNotifUserIds, setSelectedNotifUserIds] = useState([]); // multi-select
+  const [notifBulkAudience, setNotifBulkAudience] = useState('selected'); // 'selected' | 'all_matching'
+  const [notifBulkRequireToken, setNotifBulkRequireToken] = useState(true);
+  const [notifBulkJob, setNotifBulkJob] = useState(null);
   const [notifSearchName, setNotifSearchName] = useState('');
   const [notifPage, setNotifPage] = useState(1);
   const [notifTotal, setNotifTotal] = useState(0);
@@ -249,6 +255,35 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   }, [activeTab, activeSubTab, notifSubTab]);
 
+  useEffect(() => {
+    const jobId = notifBulkJob?.job_id;
+    const status = notifBulkJob?.status;
+    if (!jobId || !['queued', 'running'].includes(status)) return undefined;
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/nudge/admin/send-bulk/${jobId}`, {
+          headers: getAdminAuthHeaders(),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.job) {
+          setNotifBulkJob(data.job);
+          setNotifResult({
+            ok: data.job.status !== 'failed',
+            message:
+              data.job.status === 'completed'
+                ? `Bulk notification completed. Devices reached: ${data.job.sent} of ${data.job.tokens_found}.`
+                : `Bulk notification ${data.job.status}. Devices reached so far: ${data.job.sent} of ${data.job.tokens_found}.`,
+          });
+        }
+      } catch (e) {
+        console.error('[Admin Notifications] Bulk job status error:', e);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [notifBulkJob]);
+
   const fetchAllowedDevices = async () => {
     setAllowedDevicesLoading(true);
     try {
@@ -285,7 +320,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
+      setGeminiInstantChatModel(data.gemini_instant_chat_model || '');
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
+      setInstantChatEnabled(Boolean(data.instant_chat_enabled));
+      setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
       setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
@@ -496,6 +534,59 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       }
     } catch (error) {
       console.error('Error updating debug logging:', error);
+    }
+  };
+
+  const handleSaveInstantChatSettings = async () => {
+    setGeminiModelsSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes, modelRes] = await Promise.all([
+        fetch('/api/admin/settings/instant_chat_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'instant_chat_enabled',
+            value: instantChatEnabled ? 'true' : 'false',
+            description: 'Feature flag for prototype instant chat lane',
+          }),
+        }),
+        fetch('/api/admin/settings/instant_chat_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'instant_chat_user_allowlist',
+            value: instantChatUserAllowlist,
+            description: 'Optional CSV user allowlist for instant chat. Empty = all users when enabled.',
+          }),
+        }),
+        fetch('/api/admin/settings/gemini_instant_chat_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'gemini_instant_chat_model',
+            value: geminiInstantChatModel,
+            description: 'Gemini model for prototype instant chat',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok || !modelRes.ok) {
+        const enabledErr = await enabledRes.json().catch(() => ({}));
+        const allowlistErr = await allowlistRes.json().catch(() => ({}));
+        const modelErr = await modelRes.json().catch(() => ({}));
+        alert(
+          'Failed to save instant chat settings: ' +
+            (enabledErr.detail || allowlistErr.detail || modelErr.detail || 'check console')
+        );
+        return;
+      }
+      alert('Instant chat settings saved. Eligibility updates apply to new requests immediately.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving instant chat settings:', error);
+      alert('Failed to save instant chat settings.');
+    } finally {
+      setGeminiModelsSaving(false);
     }
   };
 
@@ -1143,19 +1234,26 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
   const handleSendNotification = async () => {
     const userIds = selectedNotifUserIds.map((id) => parseInt(id, 10)).filter(Boolean);
-    if (!userIds.length || !notifTitle.trim() || !notifBody.trim()) {
-      const msg = 'Please select at least one user and enter both title and body.';
+    const isAllMatching = notifBulkAudience === 'all_matching';
+    if ((!isAllMatching && !userIds.length) || !notifTitle.trim() || !notifBody.trim()) {
+      const msg = isAllMatching
+        ? 'Please enter both title and body.'
+        : 'Please select at least one user and enter both title and body.';
       setNotifResult({ ok: false, message: msg });
       console.warn('[Admin Notifications] Validation failed:', msg);
       return;
     }
+    if (notifNativeId && (isAllMatching || userIds.length !== 1)) {
+      setNotifResult({ ok: false, message: 'Native-specific notifications can only be sent to one selected user.' });
+      return;
+    }
     setNotifSending(true);
     setNotifResult(null);
-    console.log('[Admin Notifications] Sending to user_ids=', userIds, 'title=', notifTitle.trim().slice(0, 50));
+    setNotifBulkJob(null);
+    console.log('[Admin Notifications] Sending audience=', notifBulkAudience, 'user_ids=', userIds, 'title=', notifTitle.trim().slice(0, 50));
     try {
-      let totalSent = 0;
-      let totalTokensFound = 0;
-      for (const userId of userIds) {
+      if (notifNativeId && userIds.length === 1) {
+        const userId = userIds[0];
         const response = await fetch('/api/nudge/admin/send', {
           method: 'POST',
           headers: {
@@ -1186,22 +1284,45 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           setNotifResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
           return;
         }
-        totalSent += data.sent || 0;
-        totalTokensFound += data.tokens_found || 0;
+        setNotifResult(data);
+      } else {
+        const response = await fetch('/api/nudge/admin/send-bulk', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAdminAuthHeaders(),
+          },
+          body: JSON.stringify({
+            audience: notifBulkAudience,
+            user_ids: notifBulkAudience === 'selected' ? userIds : undefined,
+            name: notifBulkAudience === 'all_matching' ? (notifSearchName.trim() || undefined) : undefined,
+            require_device_token: notifBulkRequireToken,
+            title: notifTitle.trim().slice(0, 100),
+            body: notifBody.trim().slice(0, 200),
+            landing_screen: notifLandingScreen,
+            ...(notifLandingScreen === 'chat' && notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
+          }),
+        });
+        const data = await response.json().catch(() => ({ detail: 'Invalid response' }));
+        if (!response.ok) {
+          const message = data.detail || data.message || 'Failed to start bulk send';
+          setNotifResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
+          return;
+        }
+        setNotifBulkJob({ job_id: data.job_id, status: data.status || 'queued', sent: 0, tokens_found: 0, total_users: 0, failed: 0 });
+        setNotifResult({
+          ok: true,
+          message: data.message || 'Bulk notification job started. You can leave this screen.',
+        });
       }
-      const summary = {
-        ok: true,
-        sent: totalSent,
-        tokens_found: totalTokensFound,
-        message: `Notifications sent. Devices reached: ${totalSent} of ${totalTokensFound}.`,
-      };
-      console.log('[Admin Notifications] Success batch:', summary);
-      setNotifResult(summary);
       setNotifTitle('');
       setNotifBody('');
       setNotifQuestion('');
       setNotifNativeId('');
       setNotifLandingScreen('chat');
+      if (!isAllMatching) {
+        setSelectedNotifUserIds([]);
+      }
     } catch (err) {
       console.error('[Admin Notifications] Request error:', err);
       setNotifResult({ ok: false, message: err.message || 'Request failed' });
@@ -2968,6 +3089,45 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </div>
                   <div className="form-field">
                     <label>Recipients</label>
+                    <div className="notif-audience-options">
+                      <label className="notif-inline-checkbox">
+                        <input
+                          type="radio"
+                          name="notif-audience"
+                          value="selected"
+                          checked={notifBulkAudience === 'selected'}
+                          onChange={() => setNotifBulkAudience('selected')}
+                          disabled={notifChatSuggestMode}
+                        />
+                        <span>Selected users</span>
+                      </label>
+                      <label className="notif-inline-checkbox">
+                        <input
+                          type="radio"
+                          name="notif-audience"
+                          value="all_matching"
+                          checked={notifBulkAudience === 'all_matching'}
+                          onChange={() => {
+                            setNotifBulkAudience('all_matching');
+                            setSelectedNotifUserIds([]);
+                          }}
+                          disabled={notifChatSuggestMode}
+                        />
+                        <span>
+                          All matching users{notifSearchName.trim() ? ` for "${notifSearchName.trim()}"` : ''}
+                        </span>
+                      </label>
+                      {notifBulkAudience === 'all_matching' && (
+                        <label className="notif-inline-checkbox notif-audience-suboption">
+                          <input
+                            type="checkbox"
+                            checked={notifBulkRequireToken}
+                            onChange={(e) => setNotifBulkRequireToken(e.target.checked)}
+                          />
+                          <span>Only users with notification devices registered</span>
+                        </label>
+                      )}
+                    </div>
                     <div className="notif-search-row">
                       <input
                         type="text"
@@ -2989,10 +3149,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                               <input
                                 type="checkbox"
                                 id="notif-select-all"
-                                disabled={notifChatSuggestMode}
+                                disabled={notifChatSuggestMode || notifBulkAudience === 'all_matching'}
                                 checked={users.length > 0 && users.every((u) => selectedNotifUserIds.includes(u.userid))}
                                 onChange={(e) => {
-                                  if (notifChatSuggestMode) return;
+                                  if (notifChatSuggestMode || notifBulkAudience === 'all_matching') return;
                                   if (e.target.checked) {
                                     const pageIds = new Set(users.map((u) => u.userid));
                                     setSelectedNotifUserIds((prev) => [...new Set([...prev, ...pageIds])]);
@@ -3018,8 +3178,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                 <td className="notif-td-checkbox">
                                   <input
                                     type="checkbox"
+                                    disabled={notifBulkAudience === 'all_matching'}
                                     checked={checked}
                                     onChange={(e) => {
+                                      if (notifBulkAudience === 'all_matching') return;
                                       if (notifChatSuggestMode) {
                                         if (e.target.checked) {
                                           setSelectedNotifUserIds([id]);
@@ -3068,7 +3230,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         </button>
                       </div>
                     )}
-                    <div className="notif-user-summary">{selectedNotifUserIds.length} selected</div>
+                    <div className="notif-user-summary">
+                      {notifBulkAudience === 'all_matching'
+                        ? `All matching users${notifSearchName.trim() ? ` for "${notifSearchName.trim()}"` : ''} will be sent in the background.`
+                        : `${selectedNotifUserIds.length} selected`}
+                    </div>
                     <small className="form-hint">
                       Only users with registered device tokens will actually receive a push notification.
                     </small>
@@ -3130,7 +3296,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <select
                       value={notifNativeId}
                       onChange={(e) => setNotifNativeId(e.target.value)}
-                      disabled={loading || selectedNotifUserIds.length !== 1}
+                      disabled={loading || notifBulkAudience === 'all_matching' || selectedNotifUserIds.length !== 1}
                     >
                       <option value="">Any — use user&apos;s current selection</option>
                       {(charts || [])
@@ -3141,19 +3307,33 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           </option>
                         ))}
                     </select>
-                    <small className="form-hint">When user taps, app will switch to this native before opening chat.</small>
+                    <small className="form-hint">When user taps, app will switch to this native before opening chat. Available only for one selected user.</small>
                   </div>
                   <div className="form-buttons">
                     <button
                       type="button"
                       onClick={handleSendNotification}
-                      disabled={notifSending || selectedNotifUserIds.length === 0 || !notifTitle.trim() || !notifBody.trim()}
+                      disabled={
+                        notifSending ||
+                        (notifBulkAudience === 'selected' && selectedNotifUserIds.length === 0) ||
+                        !notifTitle.trim() ||
+                        !notifBody.trim()
+                      }
                       className="create-btn"
                     >
-                      {notifSending ? 'Sending...' : 'Send Notification'}
+                      {notifSending ? 'Starting...' : notifBulkAudience === 'all_matching' ? 'Start Bulk Send' : 'Send Notification'}
                     </button>
                   </div>
                 </div>
+                {notifBulkJob && (
+                  <div className={`notif-result ${notifBulkJob.status === 'failed' ? 'error' : 'success'}`}>
+                    <strong>Bulk job:</strong> {notifBulkJob.status}
+                    <div>
+                      Users targeted: {notifBulkJob.total_users || 0} · Tokens found: {notifBulkJob.tokens_found || 0} · Sent: {notifBulkJob.sent || 0} · Failed: {notifBulkJob.failed || 0}
+                    </div>
+                    {notifBulkJob.error && <div>{notifBulkJob.error}</div>}
+                  </div>
+                )}
                 {notifResult && (
                   <div className={`notif-result ${notifResult.ok ? 'success' : 'error'}`}>
                     {notifResult.ok ? (
@@ -3663,6 +3843,65 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     ))}
                   </select>
                 )}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Instant chat prototype</h3>
+              <p className="settings-hint">
+                Hard feature gate for the prototype instant chat lane. When disabled, clients should hide instant mode and the backend will silently fall back to the existing standard pipeline. If the allowlist is empty, all users are eligible when enabled.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable instant chat</strong>
+                  <p>Master switch for the prototype instant conversational lane.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={instantChatEnabled}
+                    onChange={(e) => setInstantChatEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={instantChatUserAllowlist}
+                  onChange={(e) => setInstantChatUserAllowlist(e.target.value)}
+                  placeholder="e.g. 12, 45, 78"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Gemini model — instant chat</strong>
+                  <p>Dedicated Gemini model for the instant lane. This stays separate from standard and premium chat.</p>
+                </div>
+                <select
+                  value={geminiInstantChatModel}
+                  onChange={(e) => setGeminiInstantChatModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={`gi-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveInstantChatSettings}
+                  disabled={geminiModelsSaving}
+                >
+                  {geminiModelsSaving ? 'Saving…' : 'Save instant chat settings'}
+                </button>
               </div>
             </div>
 

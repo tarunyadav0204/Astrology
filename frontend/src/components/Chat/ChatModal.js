@@ -15,6 +15,7 @@ import PartnerChartModal from './PartnerChartModal';
 import ChatPartnerSelector from './ChatPartnerSelector';
 import { apiService } from '../../services/apiService';
 import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
+import { buildQueryContext } from '../../utils/queryContext';
 
 import './ChatModal.css';
 
@@ -474,7 +475,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    birth_chart_id: birth_chart_id || null
+                    birth_chart_id: birth_chart_id || null,
+                    query_context: buildQueryContext(),
                 })
             });
             
@@ -537,6 +539,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             const requestData = {
                 session_id: currentSessionId,
                 question: message,
+                query_context: buildQueryContext(),
                 language,
                 response_style: responseStyle,
                 premium_analysis: useFreeQuestion ? false : !!(options.premium_analysis),

@@ -3,6 +3,7 @@ import json
 import os
 import re
 import asyncio
+import random
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
@@ -264,6 +265,66 @@ def merge_divisional_charts_with_category_defaults(result: Dict) -> None:
     result["divisional_charts"] = out
 
 
+def _build_usage_stage(
+    *,
+    stage: str,
+    llm_model: str | None,
+    prompt_chars: int,
+    response_chars: int,
+    token_usage: Dict[str, Any] | None,
+    success: bool,
+    elapsed_ms: float | None = None,
+) -> Dict[str, Any]:
+    tu = token_usage or {}
+    row: Dict[str, Any] = {
+        "stage": stage,
+        "llm_model": llm_model or "",
+        "input_chars": int(prompt_chars or 0),
+        "output_chars": int(response_chars or 0),
+        "input_tokens": int(tu.get("input_tokens") or 0),
+        "output_tokens": int(tu.get("output_tokens") or 0),
+        "cached_tokens": int(tu.get("cached_tokens") or 0),
+        "non_cached_input_tokens": int(
+            tu.get("non_cached_input_tokens")
+            or max(0, int(tu.get("input_tokens") or 0) - int(tu.get("cached_tokens") or 0))
+        ),
+        "success": bool(success),
+    }
+    if elapsed_ms is not None:
+        row["elapsed_ms"] = round(float(elapsed_ms), 1)
+    return row
+
+
+def _is_transient_intent_error(exc: Exception) -> bool:
+    text = str(exc or "").lower()
+    markers = [
+        "504",
+        "deadline",
+        "timeout",
+        "timed out",
+        "cancelled",
+        "canceled",
+        "prefill",
+        "failed to close the streaming context",
+        "thread is cancelled before we get prefill results",
+        "unavailable",
+        "internal",
+    ]
+    return any(marker in text for marker in markers)
+
+
+def _usage_totals_from_stages(stages: list[Dict[str, Any]]) -> Dict[str, Any]:
+    return {
+        "input_chars": sum(int(s.get("input_chars") or 0) for s in stages),
+        "output_chars": sum(int(s.get("output_chars") or 0) for s in stages),
+        "input_tokens": sum(int(s.get("input_tokens") or 0) for s in stages),
+        "output_tokens": sum(int(s.get("output_tokens") or 0) for s in stages),
+        "cached_tokens": sum(int(s.get("cached_tokens") or 0) for s in stages),
+        "non_cached_input_tokens": sum(int(s.get("non_cached_input_tokens") or 0) for s in stages),
+        "elapsed_ms_sum": round(sum(float(s.get("elapsed_ms") or 0) for s in stages), 1),
+    }
+
+
 def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None:
     """
     Attach deterministic chart-focus metadata and ensure explicitly requested divisionals
@@ -336,6 +397,33 @@ def _extract_specific_date_from_question(user_question: str, *, now: datetime) -
     return None
 
 
+def _extract_month_window_from_question(user_question: str, *, now: datetime) -> dict[str, Any] | None:
+    q = (user_question or "").strip()
+    if not q:
+        return None
+    low = q.lower()
+    month_re = r"(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)"
+    # Month-year only. Avoid matching when an exact day is also present.
+    pat = re.search(rf"\b{month_re}(?:\s+|,\s*)(20\d{{2}})\b", low)
+    if not pat:
+        return None
+    month_token = str(pat.group(1) or "").strip().lower()
+    year = int(pat.group(2))
+    month_num = _MONTH_NAME_TO_NUM.get(month_token)
+    if not month_num:
+        return None
+    # Skip if the matched month-year is part of an exact-day expression already handled elsewhere.
+    before = low[: pat.start()]
+    if re.search(r"\b\d{1,2}(?:st|nd|rd|th)?\s*$", before):
+        return None
+    month_name = datetime(year, month_num, 1).strftime("%B")
+    return {
+        "year": year,
+        "month": month_name,
+        "timeframe": f"{month_name} {year}",
+    }
+
+
 def _normalize_specific_date(value: Any) -> str | None:
     raw = str(value or "").strip()
     if not raw:
@@ -358,8 +446,25 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     cat = (result.get("category") or "general").strip().lower()
     now_dt = (now or datetime.now()).replace(hour=12, minute=0, second=0, microsecond=0)
     extracted_context = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
+    month_window = _extract_month_window_from_question(user_question, now=now_dt)
     llm_date = _normalize_specific_date(extracted_context.get("specific_date")) if extracted_context else None
     exact_date = llm_date or _extract_specific_date_from_question(user_question, now=now_dt)
+
+    if month_window and not exact_date:
+        result["mode"] = "PREDICT_PERIOD_OUTLOOK"
+        result["context_type"] = "birth"
+        result["analysis_type"] = "PERIOD_OUTLOOK"
+        result["needs_transits"] = True
+        result.setdefault("extracted_context", {})
+        if isinstance(result["extracted_context"], dict):
+            result["extracted_context"]["timeframe"] = month_window["timeframe"]
+            result["extracted_context"].pop("specific_date", None)
+        result["transit_request"] = {
+            "startYear": month_window["year"],
+            "endYear": month_window["year"],
+            "yearMonthMap": {str(month_window["year"]): [month_window["month"]]},
+        }
+        result.pop("dasha_as_of", None)
 
     if exact_date:
         dt = datetime.strptime(exact_date, "%Y-%m-%d")
@@ -459,6 +564,378 @@ class IntentRouter:
         except Exception as e:
             print(f"⚠️ Intent router model {name} not available ({e}), using fallback")
             return self.model
+
+    def _finalize_router_result(
+        self,
+        result: Dict[str, Any],
+        *,
+        user_question: str,
+        current_year: int,
+        current_month: str,
+        resolved_now: datetime,
+        normalized_query_context: Dict[str, Any] | None,
+        include_chart_insights: bool,
+    ) -> Dict[str, Any]:
+        if 'status' not in result:
+            result['status'] = 'READY'
+        if 'mode' not in result or result['mode'] is None:
+            result['mode'] = 'PREDICT_EVENTS_FOR_PERIOD' if any(w in user_question.lower() for w in ['all events', 'events', 'timeline']) else 'ANALYZE_PERSONALITY'
+        if 'context_type' not in result:
+            result['context_type'] = 'birth'
+        if 'category' not in result or result['category'] is None:
+            result['category'] = 'general'
+        if 'extracted_context' not in result or not isinstance(result.get('extracted_context'), dict):
+            result['extracted_context'] = {}
+        if 'needs_transits' not in result:
+            qlow = user_question.lower()
+            result['needs_transits'] = result['context_type'] in ['birth', 'annual'] and any(
+                word in qlow
+                for word in [
+                    'when',
+                    'timing',
+                    'period',
+                    'year',
+                    '2025',
+                    '2026',
+                    '2027',
+                    'will i',
+                    'which year',
+                    'first job',
+                ]
+            )
+        if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
+            result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
+        merge_divisional_charts_with_category_defaults(result)
+        apply_chart_focus_guards(result, user_question)
+
+        if include_chart_insights:
+            raw_insights = result.get('chart_insights')
+            if isinstance(raw_insights, list) and raw_insights:
+                valid = [x for x in raw_insights if isinstance(x, dict) and x.get('house_number') and x.get('message')]
+                result['chart_insights'] = valid
+            else:
+                result['chart_insights'] = []
+        else:
+            result['chart_insights'] = []
+
+        apply_transit_timing_guards(
+            result,
+            user_question,
+            current_year=current_year,
+            now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now,
+        )
+        apply_daily_micro_intent_guards(result, user_question)
+        if normalized_query_context:
+            result["query_context"] = normalized_query_context
+
+        if result.get('needs_transits') and 'transit_request' not in result:
+            result['transit_request'] = {
+                "startYear": current_year,
+                "endYear": current_year + 2,
+                "yearMonthMap": {
+                    str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                    for y in range(current_year, current_year + 3)
+                }
+            }
+        return result
+
+    def _build_fallback_intent_result(
+        self,
+        *,
+        user_question: str,
+        current_year: int,
+        current_month: str,
+        resolved_now: datetime,
+        normalized_query_context: Dict[str, Any] | None,
+    ) -> Dict[str, Any]:
+        is_timing_question = any(w in user_question.lower() for w in ['when', 'time', 'date', 'year', 'month', 'will i', 'should i'])
+        is_daily_question = any(w in user_question.lower() for w in ['today', 'tomorrow', 'day after tomorrow', 'daily'])
+
+        if is_daily_question:
+            result = {
+                "status": "READY", "extracted_context": {}, "mode": "PREDICT_DAILY", "context_type": "birth", "category": "general", "needs_transits": True,
+                "divisional_charts": ["D1", "D9"],
+                "chart_insights": [],
+                "transit_request": {
+                    "startYear": current_year, "endYear": current_year,
+                    "yearMonthMap": {str(current_year): [current_month]}
+                }
+            }
+            apply_transit_timing_guards(result, user_question, current_year=current_year, now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now)
+            apply_daily_micro_intent_guards(result, user_question)
+            if normalized_query_context:
+                result["query_context"] = normalized_query_context
+            apply_chart_focus_guards(result, user_question)
+            return result
+        if is_timing_question:
+            result = {
+                "status": "READY", "extracted_context": {}, "mode": "PREDICT_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,
+                "divisional_charts": ["D1", "D9"],
+                "chart_insights": [],
+                "transit_request": {
+                    "startYear": current_year, "endYear": current_year + 2,
+                    "yearMonthMap": {str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)}
+                }
+            }
+            if normalized_query_context:
+                result["query_context"] = normalized_query_context
+            apply_chart_focus_guards(result, user_question)
+            return result
+        result = {
+            "status": "READY", "extracted_context": {}, "mode": "ANALYZE_PERSONALITY", "context_type": "birth", "category": "general", "needs_transits": False,
+            "divisional_charts": ["D1", "D9"],
+            "chart_insights": [],
+        }
+        if normalized_query_context:
+            result["query_context"] = normalized_query_context
+        apply_chart_focus_guards(result, user_question)
+        return result
+
+    def _build_instant_history_text(self, chat_history: list | None) -> str:
+        history = chat_history or []
+        if not history:
+            return ""
+        lines = [
+            "\nRecent conversation (ONLY if directly relevant to the current message):",
+        ]
+        for msg in history[-2:]:
+            q = str(msg.get("question", "")).strip()
+            a = str(msg.get("response", "")).strip()
+            if q:
+                lines.append(f"User: {q[:220]}")
+            if a:
+                lines.append(f"Assistant: {a[:260]}")
+        return "\n".join(lines)
+
+    async def classify_instant_intent(
+        self,
+        user_question: str,
+        chat_history: list = None,
+        clarification_count: int = 0,
+        max_clarifications: int | None = None,
+        language: str = 'english',
+        force_ready: bool = False,
+        force_clarify: bool = False,
+        query_context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        import time
+
+        intent_start = time.time()
+        print(f"\n{'='*80}")
+        print("⚡ INSTANT INTENT CLASSIFICATION STARTED")
+        print(f"{'='*80}")
+        print(f"Question: {user_question}")
+
+        resolved_now = resolve_query_now(query_context)
+        normalized_query_context = normalize_query_context(query_context)
+        current_year = resolved_now.year
+        current_month = resolved_now.strftime('%B')
+        current_date = resolved_now.strftime('%Y-%m-%d')
+
+        history_text = self._build_instant_history_text(chat_history)
+        _lang = str(language or "english").strip() or "english"
+        language_policy = resolve_output_language_policy(_lang, user_question)
+        app_language = language_policy.get("app_language", _lang)
+
+        clarification_limit_text = ""
+        if max_clarifications is not None and clarification_count >= max_clarifications:
+            clarification_limit_text = """
+You have already reached the clarification limit for this conversation.
+You must now return status "READY" and proceed without asking another clarification.
+"""
+
+        force_ready_instruction = ""
+        if force_ready:
+            force_ready_instruction = """
+You must return status "READY".
+Do not ask any clarification.
+If the question is vague, make a reasonable assumption and proceed.
+"""
+
+        force_clarify_instruction = ""
+        if force_clarify:
+            force_clarify_instruction = """
+You must return status "CLARIFY".
+Ask exactly one short clarification question to narrow the user's topic.
+Do not ask for birth details.
+"""
+
+        prompt = f"""
+You are the lightweight intent router for an astrology chat. Keep this fast and minimal.
+
+Your job:
+- classify the user's current question
+- decide if clarification is needed
+- identify if it is a daily / exact-date / timing / personality / topic-potential / remedy style question
+- extract an exact `specific_date` in YYYY-MM-DD when the user is asking about one exact day
+
+Do NOT generate chart insights.
+Do NOT explain your reasoning.
+Do NOT ask for birth details.
+Do NOT add formatting, bullets, or extra prose outside JSON.
+
+Language rule:
+- If you return `clarification_question`, write it in the same language/script style as the current user question.
+- If unclear, fall back to app language "{app_language}".
+
+Current date context:
+- Today: {current_date}
+- Current year: {current_year}
+- Current month: {current_month}
+
+{clarification_limit_text}
+{force_ready_instruction}
+{force_clarify_instruction}
+{history_text}
+
+Current question: "{user_question}"
+
+Rules:
+- Use `PREDICT_DAILY` for today/tomorrow/exact-day questions.
+- Use `PREDICT_PERIOD_OUTLOOK` for "next 3 months", "this year", "coming months" style outlooks.
+- Use `LIFESPAN_EVENT_TIMING` for simple "when will X happen?" timing questions.
+- Use `ANALYZE_PERSONALITY` for personality/self-understanding questions.
+- Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
+- Use `RECOMMEND_REMEDY_FOR_PROBLEM` for remedy requests tied to a specific problem.
+- IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
+- Return `CLARIFY` when the user has not made the core topic specific enough to answer well in one instant reply.
+- Good reasons to `CLARIFY`:
+  - the message mixes unrelated areas like career + marriage + money
+  - the user says something broad like "tell me about my life", "what is coming", "analyze my chart", "what do you see" without a clear focus
+  - the user asks for timing or prediction but the event/topic itself is unclear
+  - the user asks "which is better?" or "what about this?" but the reference is ambiguous from recent chat
+- IMPORTANT FOLLOW-UP RULE:
+  - if the user is challenging, questioning, or asking you to justify a previous claim, do NOT clarify
+  - examples: "you said...", "how exactly?", "why do you think that?", "what relation does X have with Y?", "on what basis?"
+  - these should return `READY` and be treated as a follow-up explanation, usually keeping the same category as the immediately relevant recent exchange
+- Do NOT `CLARIFY` for straightforward single-topic questions like:
+  - "How is my career this month?"
+  - "Will today go well?"
+  - "When will I get married?"
+  - "How is my relationship with my husband?"
+  - "You said Rahu activates my 10th house. How?"
+  - "Why do you think that about my behavior?"
+- If the user message bundles multiple unrelated asks, prefer `CLARIFY` unless clarification has already been used.
+- If asking about an exact day, relative day, or specific date-bound event, return `extracted_context.specific_date` in YYYY-MM-DD.
+- Resolve "today", "tomorrow", and "day after tomorrow" from the current date context above.
+- Set `needs_transits=true` for daily, timing, and period outlook questions. Otherwise false unless clearly timing-sensitive.
+- `context_type` is usually `birth`; use `annual` only for whole-year forecast style questions.
+- Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
+- When you do return `CLARIFY`, ask only one short narrowing question and give 2-4 quick options when helpful.
+
+Return ONLY this JSON shape:
+{{
+  "status": "CLARIFY" or "READY",
+  "clarification_question": "short question only when status=CLARIFY",
+  "chart_insights": [],
+  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+  "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
+  "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD when relevant"}},
+  "context_type": "birth" or "annual",
+  "category": "career" or "job" or "promotion" or "business" or "love" or "relationship" or "marriage" or "partner" or "wealth" or "money" or "finance" or "health" or "disease" or "property" or "home" or "child" or "pregnancy" or "education" or "learning" or "travel" or "visa" or "foreign" or "gain" or "wish" or "general" or "son" or "daughter" or "mother" or "father" or "spouse" or "siblings" or "children" or "family" or "soul" or "spirituality" or "purpose" or "dharma" or "vehicles" or "timing",
+  "year": "year only when annual is clearly asked",
+  "needs_transits": true or false,
+  "divisional_charts": ["D1","D9"],
+  "transit_request": {{"startYear": 2026, "endYear": 2026, "yearMonthMap": {{"2026":["January"]}}}}
+}}
+"""
+
+        model = self._get_model()
+        model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
+        print("\n📤 INSTANT INTENT ROUTER REQUEST:")
+        print(f"Model: {model_name}")
+        print(f"Prompt length: {len(prompt)} characters")
+        token_usage: Dict[str, Any] = {}
+        response_chars = 0
+
+        try:
+            response = None
+            gemini_start = time.time()
+            last_error: Exception | None = None
+            for attempt in range(2):
+                try:
+                    per_request_timeout = 18 if attempt == 0 else 22
+                    wall_timeout = 22.0 if attempt == 0 else 26.0
+                    response = await asyncio.wait_for(
+                        model.generate_content_async(
+                            prompt,
+                            request_options={"timeout": per_request_timeout},
+                        ),
+                        timeout=wall_timeout,
+                    )
+                    break
+                except Exception as attempt_exc:
+                    last_error = attempt_exc
+                    if attempt == 0 and _is_transient_intent_error(attempt_exc):
+                        await asyncio.sleep(0.35 + random.uniform(0.05, 0.2))
+                        continue
+                    raise
+            if response is None and last_error is not None:
+                raise last_error
+            gemini_time = time.time() - gemini_start
+            cleaned = response.text.replace('```json', '').replace('```', '').strip()
+            response_chars = len(cleaned)
+            try:
+                usage_meta = getattr(response, "usage_metadata", None)
+                if usage_meta is not None:
+                    token_usage = {
+                        "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
+                        "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
+                        "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
+                        "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
+                    }
+                    token_usage["non_cached_input_tokens"] = max(
+                        0,
+                        int(token_usage.get("input_tokens") or 0)
+                        - int(token_usage.get("cached_tokens") or 0),
+                    )
+            except Exception:
+                pass
+            print(f"🔍 RAW INSTANT INTENT RESPONSE: {cleaned}")
+            result = json.loads(cleaned)
+            total_time = time.time() - intent_start
+            print(f"✅ Instant intent: {result.get('status')} | Mode: {result.get('mode')} | Category: {result.get('category')} | Gemini: {gemini_time:.2f}s | Total: {total_time:.2f}s")
+            final = self._finalize_router_result(
+                result,
+                user_question=user_question,
+                current_year=current_year,
+                current_month=current_month,
+                resolved_now=resolved_now,
+                normalized_query_context=normalized_query_context,
+                include_chart_insights=False,
+            )
+            final["_llm_usage_stage"] = _build_usage_stage(
+                stage="instant_intent_router",
+                llm_model=model_name,
+                prompt_chars=len(prompt),
+                response_chars=response_chars,
+                token_usage=token_usage,
+                success=True,
+                elapsed_ms=gemini_time * 1000.0,
+            )
+            return final
+        except Exception as e:
+            total_time = time.time() - intent_start
+            print("\n❌ INSTANT INTENT CLASSIFICATION FAILED")
+            print(f"Error: {e}")
+            print(f"Total time: {total_time:.3f}s")
+            fallback = self._build_fallback_intent_result(
+                user_question=user_question,
+                current_year=current_year,
+                current_month=current_month,
+                resolved_now=resolved_now,
+                normalized_query_context=normalized_query_context,
+            )
+            fallback["_llm_usage_stage"] = _build_usage_stage(
+                stage="instant_intent_router",
+                llm_model=model_name,
+                prompt_chars=len(prompt),
+                response_chars=response_chars,
+                token_usage=token_usage,
+                success=False,
+                elapsed_ms=(time.time() - intent_start) * 1000.0,
+            )
+            return fallback
         
     async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False, query_context: Dict[str, Any] | None = None) -> Dict[str, str]:
         """
@@ -828,111 +1305,27 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             total_time = time.time() - intent_start
             print(f"✅ Intent: {result.get('status')} | Mode: {result.get('mode')} | Category: {result.get('category')} | Time: {total_time:.2f}s")
             
-            # Add fallback values if missing
-            if 'status' not in result:
-                result['status'] = 'READY'
-            if 'mode' not in result or result['mode'] is None:
-                result['mode'] = 'PREDICT_EVENTS_FOR_PERIOD' if any(w in user_question.lower() for w in ['all events', 'events', 'timeline']) else 'ANALYZE_PERSONALITY'
-            if 'context_type' not in result:
-                result['context_type'] = 'birth'
-            if 'category' not in result or result['category'] is None:
-                result['category'] = 'general'
-            if 'extracted_context' not in result:
-                result['extracted_context'] = {}
-            if 'needs_transits' not in result:
-                qlow = user_question.lower()
-                result['needs_transits'] = result['context_type'] in ['birth', 'annual'] and any(
-                    word in qlow
-                    for word in [
-                        'when',
-                        'timing',
-                        'period',
-                        'year',
-                        '2025',
-                        '2026',
-                        '2027',
-                        'will i',
-                        'which year',
-                        'first job',
-                    ]
-                )
-            if 'divisional_charts' not in result:
-                result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
-            merge_divisional_charts_with_category_defaults(result)
-            apply_chart_focus_guards(result, user_question)
-            # Only keep chart_insights when the model returned a valid list of insight objects
-            raw_insights = result.get('chart_insights')
-            if isinstance(raw_insights, list) and raw_insights:
-                valid = [x for x in raw_insights if isinstance(x, dict) and x.get('house_number') and x.get('message')]
-                result['chart_insights'] = valid
-            else:
-                result['chart_insights'] = []
-            
-            apply_transit_timing_guards(result, user_question, current_year=current_year, now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now)
-            apply_daily_micro_intent_guards(result, user_question)
-            if normalized_query_context:
-                result["query_context"] = normalized_query_context
-
-            if result.get('needs_transits') and 'transit_request' not in result:
-                result['transit_request'] = {
-                    "startYear": current_year,
-                    "endYear": current_year + 2,
-                    "yearMonthMap": {
-                        str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)
-                    }
-                }
-
-            return result
+            return self._finalize_router_result(
+                result,
+                user_question=user_question,
+                current_year=current_year,
+                current_month=current_month,
+                resolved_now=resolved_now,
+                normalized_query_context=normalized_query_context,
+                include_chart_insights=True,
+            )
         except Exception as e:
             total_time = time.time() - intent_start
             print(f"\n❌ INTENT CLASSIFICATION FAILED")
             print(f"Error: {e}")
             print(f"Total time: {total_time:.3f}s")
-            
-            # Fallback logic
-            is_timing_question = any(w in user_question.lower() for w in ['when', 'time', 'date', 'year', 'month', 'will i', 'should i'])
-            is_daily_question = any(w in user_question.lower() for w in ['today', 'tomorrow', 'day after tomorrow', 'daily'])
-
-            if is_daily_question:
-                result = {
-                    "status": "READY", "extracted_context": {}, "mode": "PREDICT_DAILY", "context_type": "birth", "category": "general", "needs_transits": True,
-                    "divisional_charts": ["D1", "D9"],
-                    "chart_insights": [],
-                    "transit_request": {
-                        "startYear": current_year, "endYear": current_year,
-                        "yearMonthMap": {str(current_year): [current_month]}
-                    }
-                }
-                apply_transit_timing_guards(result, user_question, current_year=current_year, now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now)
-                apply_daily_micro_intent_guards(result, user_question)
-                if normalized_query_context:
-                    result["query_context"] = normalized_query_context
-                apply_chart_focus_guards(result, user_question)
-                return result
-            elif is_timing_question:
-                result = {
-                    "status": "READY", "extracted_context": {}, "mode": "PREDICT_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,
-                    "divisional_charts": ["D1", "D9"],
-                    "chart_insights": [],
-                    "transit_request": {
-                        "startYear": current_year, "endYear": current_year + 2,
-                        "yearMonthMap": {str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)}
-                    }
-                }
-                if normalized_query_context:
-                    result["query_context"] = normalized_query_context
-                apply_chart_focus_guards(result, user_question)
-                return result
-            else:
-                result = {
-                    "status": "READY", "extracted_context": {}, "mode": "ANALYZE_PERSONALITY", "context_type": "birth", "category": "general", "needs_transits": False,
-                    "divisional_charts": ["D1", "D9"],
-                    "chart_insights": [],
-                }
-                if normalized_query_context:
-                    result["query_context"] = normalized_query_context
-                apply_chart_focus_guards(result, user_question)
-                return result
+            return self._build_fallback_intent_result(
+                user_question=user_question,
+                current_year=current_year,
+                current_month=current_month,
+                resolved_now=resolved_now,
+                normalized_query_context=normalized_query_context,
+            )
     
     def _get_default_divisional_charts(self, category: str) -> list:
         """Get default divisional charts based on question category (see _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY)."""

@@ -19,11 +19,13 @@ import { pricingAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
 export default function AnalysisHubScreen({ navigation }) {
   useAnalytics('AnalysisHubScreen');
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const { credits } = useCredits();
@@ -131,9 +133,18 @@ export default function AnalysisHubScreen({ navigation }) {
         description: 'Understand health vulnerabilities, body constitution, and preventive measures'
       },
       {
+        id: 'relationshipMatch',
+        title: 'Kundli Matching',
+        subtitle: 'Two-chart relationship compatibility',
+        icon: '💞',
+        gradient: ['#fb7185', '#f97316'],
+        description: 'See a trust-first compatibility verdict, timing climate, strengths, and caution areas before going deeper',
+        isFree: true,
+      },
+      {
         id: 'marriage',
-        title: 'Marriage Analysis',
-        subtitle: 'Relationship compatibility & timing',
+        title: 'My Marriage Analysis',
+        subtitle: 'Your marriage timing & partner patterns',
         icon: '💕',
         gradient: ['#FF69B4', '#DC143C'],
         description: 'Explore relationship patterns, marriage timing, and partner compatibility'
@@ -164,6 +175,11 @@ export default function AnalysisHubScreen({ navigation }) {
   };
 
   const handleAnalysisSelect = (analysisType) => {
+    if (analysisType.id === 'relationshipMatch') {
+      navigation.navigate('RelationshipMatch');
+      return;
+    }
+
     if (credits < analysisType.cost) {
       navigation.navigate('Credits');
       return;
@@ -291,7 +307,9 @@ export default function AnalysisHubScreen({ navigation }) {
                             </LinearGradient>
                           </View>
                           <View style={[styles.costBadge, { backgroundColor: colors.primary }]}>
-                            {analysis.originalCost != null && analysis.originalCost > analysis.cost ? (
+                            {analysis.isFree ? (
+                              <Text style={[styles.costText, { color: '#fff' }]}>{t('relationshipMatch.freeCompare')}</Text>
+                            ) : analysis.originalCost != null && analysis.originalCost > analysis.cost ? (
                               <View style={styles.costWithDiscount}>
                                 <Text style={[styles.costText, styles.costOriginal, { color: '#fff' }]}>{analysis.originalCost}</Text>
                                 <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>

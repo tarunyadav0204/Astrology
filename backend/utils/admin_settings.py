@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, Set
 
 # Allowed Gemini model IDs (with models/ prefix for API). Used by admin UI and as fallbacks.
 GEMINI_MODEL_OPTIONS = [
@@ -16,6 +16,7 @@ GEMINI_MODEL_OPTIONS = [
 DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite-preview"
 DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
 DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite-preview"
+DEFAULT_GEMINI_INSTANT_MODEL = "models/gemini-2.5-flash-lite"
 
 # Chat only: which vendor handles `GeminiChatAnalyzer.generate_chat_response` (analysis stays on Gemini).
 CHAT_LLM_GEMINI = "gemini"
@@ -76,6 +77,12 @@ def get_setting(key: str) -> Optional[str]:
         return None
 
 
+def _parse_bool_setting(value: Optional[str], default: bool = False) -> bool:
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def get_gemini_chat_model() -> str:
     """Model ID for standard chat (e.g. models/gemini-2.5-flash). From admin_settings or default."""
     value = get_setting("gemini_chat_model")
@@ -98,6 +105,14 @@ def get_gemini_analysis_model() -> str:
     if value and value.strip():
         return value.strip()
     return DEFAULT_GEMINI_ANALYSIS_MODEL
+
+
+def get_gemini_instant_model() -> str:
+    """Model ID for instant chat. From admin_settings or default."""
+    value = get_setting("gemini_instant_chat_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_GEMINI_INSTANT_MODEL
 
 
 def get_event_timeline_model() -> str:
@@ -170,6 +185,45 @@ def is_debug_logging_enabled() -> bool:
     """Check if debug logging is enabled"""
     value = get_setting('debug_logging_enabled')
     return value == 'true' if value else False
+
+
+def is_instant_chat_enabled() -> bool:
+    """Global feature flag for the instant chat prototype."""
+    return _parse_bool_setting(get_setting("instant_chat_enabled"), default=False)
+
+
+def get_instant_chat_user_allowlist() -> Set[int]:
+    """Optional CSV/whitespace-separated user id allowlist. Empty set means all users."""
+    raw = (get_setting("instant_chat_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            user_ids.add(int(cleaned))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def instant_chat_enabled_for_user(user_id: Optional[int]) -> bool:
+    """
+    Global OFF disables instant chat for everyone.
+    Global ON + empty allowlist enables for all users.
+    Global ON + allowlist enables only listed users.
+    """
+    if not is_instant_chat_enabled():
+        return False
+    allowlist = get_instant_chat_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
 
 
 PODCAST_PROVIDER_TTS = "tts"

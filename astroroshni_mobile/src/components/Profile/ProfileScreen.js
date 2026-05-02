@@ -30,7 +30,7 @@ import NorthIndianChart from '../Chart/NorthIndianChart';
 
 const { width } = Dimensions.get('window');
 
-export default function ProfileScreen({ navigation }) {
+export default function ProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
   useAnalytics('ProfileScreen');
   const { theme, toggleTheme, colors } = useTheme();
@@ -70,6 +70,21 @@ export default function ProfileScreen({ navigation }) {
     
     return unsubscribe;
   }, [navigation]);
+
+  useEffect(() => {
+    if (!route.params?.reopenDashaBrowser) return;
+    const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
+    navigation.setParams({
+      reopenDashaBrowser: undefined,
+      birthData: undefined,
+      birthDetails: undefined,
+      birthChartId: undefined,
+    });
+    if (selectedBirthData?.name) {
+      setBirthData(selectedBirthData);
+    }
+    setTimeout(() => setShowDashaBrowser(true), 100);
+  }, [navigation, route.params?.reopenDashaBrowser]);
 
   const startAnimations = () => {
     Animated.parallel([
@@ -848,6 +863,7 @@ export default function ProfileScreen({ navigation }) {
         onClose={() => setShowDashaBrowser(false)}
         birthData={birthData}
         onRequireBirthData={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Profile' })}
+        selectNativeReturnTo="Profile"
       />
     </View>
   );

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { ScrollView as GHScrollView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { parseCalendarDateInput } from '../../utils/birthDateUtils';
@@ -24,6 +25,7 @@ import YoginiDashaTab from './YoginiDashaTab';
 import CharaDashaTab from './CharaDashaTab';
 import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import DateNavigator from '../Common/DateNavigator';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent } from '../../utils/analytics';
 import { useTranslation } from 'react-i18next';
@@ -48,10 +50,18 @@ const getShortSign = (sign) => {
 };
 
 
-const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData }) => {
+const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData, selectNativeReturnTo = 'Home' }) => {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
+  const dashaColors = {
+    background: isDark ? '#2d1b4e' : colors.background,
+    surface: isDark ? '#3b2861' : colors.cardBackground,
+    raised: isDark ? '#4a2c6d' : colors.surface,
+    border: isDark ? 'rgba(196, 181, 253, 0.28)' : colors.cardBorder,
+    softControl: isDark ? 'rgba(196, 181, 253, 0.18)' : colors.surface,
+  };
   useAnalytics('CascadingDashaBrowser');
 
   const insets = useSafeAreaInsets();
@@ -107,6 +117,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     if (state === State.END && Math.abs(translationY) < 80 && (translationX > 70 || velocityX > 700)) {
       onClose?.();
     }
+  };
+
+  const handleSelectNative = () => {
+    onClose?.();
+    navigation.navigate('SelectNative', {
+      returnTo: selectNativeReturnTo,
+      returnParams: { reopenDashaBrowser: true },
+    });
   };
 
   const tSign = (sign) => {
@@ -784,7 +802,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     const tabStyle = (key) => [styles.dashaTypeTab, tabActive(key) && { backgroundColor: colors.primary }];
     const tabTextStyle = (key) => ({ color: tabActive(key) ? '#fff' : colors.textSecondary });
     return (
-      <View style={[styles.dashaTypeSelector, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+      <View style={[styles.dashaTypeSelector, { backgroundColor: dashaColors.surface }]}>
         <GHScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
           <TouchableOpacity
             style={tabStyle('vimshottari')}
@@ -901,7 +919,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     const antarProgress = currentAntar ? calculateProgress(currentAntar.start, currentAntar.end) : 0;
     
     return (
-      <View style={[styles.currentStatusCard, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}>
+      <View style={[styles.currentStatusCard, { backgroundColor: dashaColors.surface, borderColor: dashaColors.border }]}>
         <Text style={[styles.currentStatusTitle, { color: colors.primary }]}>{t('dasha.currentBPHSKalachakra')}</Text>
         
         <View style={styles.compactPeriodRow}>
@@ -926,7 +944,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           </View>
         </View>
         
-        <View style={[styles.compactProgressBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+        <View style={[styles.compactProgressBar, { backgroundColor: dashaColors.softControl }]}>
           <View style={[styles.compactProgressFill, { width: `${mahaProgress}%`, backgroundColor: colors.primary }]} />
           <Text style={[styles.compactProgressText, { color: colors.text }]}>{Math.round(mahaProgress)}% • {getRemainingTime(currentMaha.end)}</Text>
         </View>
@@ -945,7 +963,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     
     if (!cascadingData) {
       return (
-        <View style={[styles.breadcrumb, dashaType === 'vimshottari' && { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderRadius: 8 }]}>
+        <View style={[styles.breadcrumb, dashaType === 'vimshottari' && { backgroundColor: dashaColors.surface, borderRadius: 8 }]}>
           <Text style={[styles.breadcrumbText, dashaType === 'vimshottari' && { color: colors.textSecondary }]}>{t('dasha.selectDashas')}</Text>
         </View>
       );
@@ -980,14 +998,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     
     const vimTheme = dashaType === 'vimshottari';
     return (
-      <View style={[styles.breadcrumb, vimTheme && { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+      <View style={[styles.breadcrumb, vimTheme && { backgroundColor: dashaColors.surface }]}>
         {breadcrumbItems.length === 0 ? (
           <Text style={[styles.breadcrumbText, vimTheme && { color: colors.textSecondary }]}>{t('dasha.selectDashasHierarchy')}</Text>
         ) : (
           <GHScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.breadcrumbScroll}>
             {breadcrumbItems.map((item, index) => (
               <View key={`breadcrumb-${item.planet}-${index}`} style={styles.breadcrumbRow}>
-                <View style={[styles.breadcrumbCard, vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
+                <View style={[styles.breadcrumbCard, vimTheme && { backgroundColor: dashaColors.raised, borderColor: dashaColors.border }]}>
                   <Text style={[styles.breadcrumbPlanet, vimTheme && { color: colors.primary }]}>{t(`planets.${item.planet}`, item.planet)}</Text>
                   {item.details && (
                     <>
@@ -1440,7 +1458,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   const renderKalchakraViewToggle = () => {
     const active = (mode) => kalchakraViewMode === mode;
     return (
-      <View style={[styles.kalchakraViewToggle, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+      <View style={[styles.kalchakraViewToggle, { backgroundColor: dashaColors.surface }]}>
         <TouchableOpacity
           style={[styles.viewToggleBtn, active('chips') && { backgroundColor: colors.primary }]}
           onPress={() => setKalchakraViewMode('chips')}
@@ -1466,7 +1484,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   const renderKalchakraWheel = () => {
     if (!kalchakraData) {
       return (
-        <View style={[styles.wheelContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+        <View style={[styles.wheelContainer, { backgroundColor: dashaColors.surface }]}>
           <Text style={[styles.wheelTitle, { color: colors.text }]}>{t('dasha.loadingWheel')}</Text>
         </View>
       );
@@ -1525,7 +1543,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     };
 
     return (
-      <View style={[styles.wheelContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+      <View style={[styles.wheelContainer, { backgroundColor: dashaColors.surface }]}>
         <View style={styles.wheelHeader}>
           <Text style={[styles.wheelTitle, { color: colors.primary }]}>{t('dasha.kalchakraWheel')}</Text>
           <Text style={[styles.wheelSubtitle, { color: colors.textSecondary }]}>{tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)} ({kalchakraData.direction})</Text>
@@ -1856,7 +1874,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   const renderKalchakraTimeline = () => {
     if (!kalchakraData) {
       return (
-        <View style={[styles.timelineContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+        <View style={[styles.timelineContainer, { backgroundColor: dashaColors.surface }]}>
           <Text style={[styles.timelineTitle, { color: colors.text }]}>{t('dasha.loadingTimeline')}</Text>
         </View>
       );
@@ -1868,11 +1886,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
       if (current) return isDark ? colors.primary : '#e8f5e8';
       if (deha) return isDark ? 'rgba(255,205,210,0.3)' : '#ffebee';
       if (jeeva) return isDark ? 'rgba(232,245,233,0.3)' : '#e3f2fd';
-      return isDark ? colors.surface : colors.cardBackground;
+      return isDark ? dashaColors.raised : colors.cardBackground;
     };
 
     return (
-      <View style={[styles.timelineContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+      <View style={[styles.timelineContainer, { backgroundColor: dashaColors.surface }]}>
         <View style={styles.timelineHeader}>
           <Text style={[styles.timelineTitle, { color: colors.primary }]}>{t('dasha.kalchakraTimeline')}</Text>
           <View style={styles.dehaJeevaInfo}>
@@ -1881,8 +1899,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           </View>
         </View>
         
-        <View style={[styles.timelineTable, { borderColor: colors.cardBorder }]}>
-          <View style={[styles.tableHeader, { backgroundColor: isDark ? colors.background : colors.surface }]}>
+        <View style={[styles.timelineTable, { borderColor: dashaColors.border }]}>
+          <View style={[styles.tableHeader, { backgroundColor: dashaColors.raised }]}>
             <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.sign')}</Text>
             <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.gati')}</Text>
             <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.duration')}</Text>
@@ -1897,7 +1915,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
             const isJeeva = maha.name === kalchakraData.jeeva;
             
             return (
-              <View key={index} style={[styles.tableRow, { backgroundColor: rowBg(isCurrent, isDeha, isJeeva), borderBottomColor: colors.cardBorder }]}>
+              <View key={index} style={[styles.tableRow, { backgroundColor: rowBg(isCurrent, isDeha, isJeeva), borderBottomColor: dashaColors.border }]}>
                 <View style={styles.signCell}>
                   <Text style={[styles.signText, { color: colors.text }, isCurrent && { color: isDark ? '#fff' : '#2e7d32', fontWeight: '700' }]}>
                     {tSign(maha.name)}
@@ -1948,7 +1966,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
         
         {kalchakraViewMode === 'chips' && (
           <React.Fragment>
-            <View style={[styles.selectorContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+            <View style={[styles.selectorContainer, { backgroundColor: dashaColors.surface }]}>
               <Text style={[styles.selectorLabel, { color: colors.text }]}>{t('dasha.kalchakraMahadasha')}</Text>
               <GHScrollView 
                 ref={scrollRefs.kalchakra_maha}
@@ -1957,7 +1975,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                 style={styles.optionsScroll}
               >
                 {mahaOptions.length === 0 ? (
-                  <View style={[styles.optionCard, styles.disabledOption, { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
+                  <View style={[styles.optionCard, styles.disabledOption, { backgroundColor: dashaColors.raised, borderColor: dashaColors.border }]}>
                     <Text style={[styles.disabledOptionText, { color: colors.textSecondary }]}>{t('dasha.noPeriods')}</Text>
                   </View>
                 ) : (
@@ -1968,8 +1986,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                     const endDate = new Date(period.end);
                     const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
                     const progress = calculateProgress(period.start, period.end);
-                    const cardBg = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.primary : (isDark ? colors.background : colors.surface);
-                    const cardBorder = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.primary : colors.cardBorder;
+                    const cardBg = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.primary : dashaColors.raised;
+                    const cardBorder = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.primary : dashaColors.border;
                     const textColor = (isSelected || isActuallyCurrent) ? '#fff' : colors.text;
                     const subColor = (isSelected || isActuallyCurrent) ? '#fff' : colors.textSecondary;
                     return (
@@ -1997,7 +2015,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
             </View>
             
             {selectedDashas.kalchakra_maha && antarOptions.length > 0 && (
-              <View style={[styles.selectorContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+              <View style={[styles.selectorContainer, { backgroundColor: dashaColors.surface }]}>
                 <Text style={[styles.selectorLabel, { color: colors.text }]}>{t('dasha.kalchakraAntardasha')} ({tSign(selectedDashas.kalchakra_maha)})</Text>
                 <GHScrollView 
                   ref={scrollRefs.kalchakra_antar}
@@ -2009,8 +2027,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                     const isSelected = selectedDashas.kalchakra_antar === period.name;
                     const isActuallyCurrent = period.current;
                     const progress = calculateProgress(period.start, period.end);
-                    const antarBg = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.success : (isDark ? colors.background : colors.surface);
-                    const antarBorder = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.success : colors.cardBorder;
+                    const antarBg = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.success : dashaColors.raised;
+                    const antarBorder = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.success : dashaColors.border;
                     const antarText = (isSelected || isActuallyCurrent) ? '#fff' : colors.text;
                     const antarSub = (isSelected || isActuallyCurrent) ? '#fff' : colors.textSecondary;
                     return (
@@ -2055,8 +2073,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   const renderSystemInfoModal = () => (
     <Modal visible={showSystemInfo} animationType="slide" transparent>
       <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-        <View style={[styles.systemInfoModal, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
-          <View style={[styles.systemInfoHeader, { borderBottomColor: colors.cardBorder }]}>
+        <View style={[styles.systemInfoModal, { backgroundColor: dashaColors.surface }]}>
+          <View style={[styles.systemInfoHeader, { borderBottomColor: dashaColors.border }]}>
             <Text style={[styles.systemInfoTitle, { color: colors.primary }]}>{t('dasha.bphsKalchakraDasha')}</Text>
             <TouchableOpacity onPress={() => setShowSystemInfo(false)}>
               <Text style={[styles.modalCloseIcon, { color: colors.text }]}>✕</Text>
@@ -2098,11 +2116,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     const vimTheme = dashaType === 'vimshottari';
 
     return (
-      <View style={[styles.selectorContainer, vimTheme && { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+      <View style={[styles.selectorContainer, vimTheme && { backgroundColor: dashaColors.surface }]}>
         <Text style={[styles.selectorLabel, vimTheme && { color: colors.text }]}>{title}</Text>
         <GHScrollView ref={scrollRefs[dashaLevel]} horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
           {options.length === 0 ? (
-            <View style={[styles.optionCard, styles.disabledOption, vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
+            <View style={[styles.optionCard, styles.disabledOption, vimTheme && { backgroundColor: dashaColors.raised, borderColor: dashaColors.border }]}>
               <Text style={[styles.disabledOptionText, vimTheme && { color: colors.textSecondary }]}>{t('dasha.noOptions')}</Text>
             </View>
           ) : (
@@ -2118,7 +2136,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
                   key={`${dasha.planet}-${index}`}
                   style={[
                     styles.optionCard,
-                    vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder },
+                    vimTheme && { backgroundColor: dashaColors.raised, borderColor: dashaColors.border },
                     isSelected && (vimTheme ? { backgroundColor: colors.primary, borderColor: colors.primary } : styles.selectedOptionCard),
                     isActuallyCurrent && !isSelected && (vimTheme ? { backgroundColor: colors.accent, borderColor: colors.accent } : styles.currentOptionCard)
                   ]}
@@ -2164,7 +2182,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
         <View
-          style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+          style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
           {...modalSwipeHandlers}
         >
           <StatusBar barStyle={colors.statusBarStyle} />
@@ -2172,8 +2190,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
             <View style={styles.edgeSwipeZone} />
           </PanGestureHandler>
-          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+          <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
               <Icon name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
@@ -2210,7 +2228,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
         <View
-          style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+          style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
           {...modalSwipeHandlers}
         >
           <StatusBar barStyle={colors.statusBarStyle} />
@@ -2218,8 +2236,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
             <View style={styles.edgeSwipeZone} />
           </PanGestureHandler>
-          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+          <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
               <Icon name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
@@ -2238,7 +2256,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
         <View
-          style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+          style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
           {...modalSwipeHandlers}
         >
           <StatusBar barStyle={colors.statusBarStyle} />
@@ -2246,8 +2264,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
             <View style={styles.edgeSwipeZone} />
           </PanGestureHandler>
-          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+          <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
               <Icon name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
@@ -2267,7 +2285,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View
-        style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+        style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
         {...modalSwipeHandlers}
       >
         <StatusBar barStyle={colors.statusBarStyle} />
@@ -2275,15 +2293,31 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
             <View style={styles.edgeSwipeZone} />
           </PanGestureHandler>
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
-          <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+        <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
+          <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
             <Icon name="arrow-back" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserFor', { name: birthData?.name || t('common.user') })}</Text>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {t('dasha.browserTitle')}
+            </Text>
+            {birthData ? (
+              <NativeSelectorChip
+                birthData={birthData}
+                onPress={handleSelectNative}
+                maxLength={12}
+                showIcon={false}
+                style={styles.headerNativeChip}
+              />
+            ) : null}
+          </View>
           <View style={styles.placeholder} />
         </View>
         
-        <GHScrollView style={[styles.content, { backgroundColor: colors.background }]}>
+        <GHScrollView
+          style={[styles.content, { backgroundColor: dashaColors.background }]}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 32, 56) }}
+        >
           {renderDashaTypeSelector()}
           {dashaType === 'vimshottari' && renderDateNavigation()}
           {renderBreadcrumb()}
@@ -2339,6 +2373,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  headerNativeChip: {
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   placeholder: {
     width: 40,

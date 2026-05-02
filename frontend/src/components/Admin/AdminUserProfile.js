@@ -99,7 +99,7 @@ function buildMobileJourney(activityRows) {
     .sort((a, b) => a._t - b._t);
 
   if (mobileRows.length > 0) {
-    const steps = mobileRows
+    let steps = mobileRows
       .filter((r) => String(r.action || '') === 'mobile_screen_exit')
       .map((r, idx) => {
         const md = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
@@ -122,6 +122,28 @@ function buildMobileJourney(activityRows) {
           _idx: idx,
         };
       });
+    if (steps.length === 0) {
+      steps = mobileRows
+        .filter((r) => String(r.action || '') === 'mobile_screen_view')
+        .map((r, idx) => {
+          const md = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
+          const sessionId = String(md.journey_session_id || 'unknown');
+          const screen = String(r.screen_name || md.screen_name || r.resource_id || 'Unknown');
+          const t = r._t;
+          return {
+            sessionId,
+            screen,
+            startMs: t,
+            endMs: t,
+            timeSpentMs: 0,
+            apiCalls: 0,
+            apiLatencyMs: 0,
+            ctas: [String(r.action || 'mobile_screen_view')],
+            paths: [],
+            _idx: idx,
+          };
+        });
+    }
     const sessionCount = new Set(steps.map((s) => s.sessionId || 'unknown')).size;
     const totalTimeMs = steps.reduce((acc, s) => acc + (s.timeSpentMs || 0), 0);
     return {

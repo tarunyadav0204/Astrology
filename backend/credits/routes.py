@@ -1262,6 +1262,7 @@ def _get_pricing_with_originals():
     """Returns effective pricing and original (for display when discount set). Backward compatible."""
     keys_map = [
         ("chat", "chat_question_cost"),
+        ("instant_chat", "instant_chat_cost"),
         ("premium_chat", "premium_chat_cost"),
         ("partnership", "partnership_analysis_cost"),
         ("events", "event_timeline_cost"),
@@ -1317,10 +1318,14 @@ def _get_chat_countdown_settings() -> Dict[str, int]:
 @router.get("/settings/analysis-pricing")
 async def get_analysis_pricing():
     """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough). Unauthenticated; base/admin pricing."""
+    from utils.admin_settings import is_instant_chat_enabled
     pricing, pricing_original = _get_pricing_with_originals()
     result = {
         "pricing": pricing,
         "chat_countdown_seconds": _get_chat_countdown_settings(),
+        "features": {
+            "instant_chat_enabled": is_instant_chat_enabled(),
+        },
     }
     if pricing_original:
         result["pricing_original"] = pricing_original
@@ -1330,6 +1335,7 @@ async def get_analysis_pricing():
 # Keys map for user-tier discounted pricing (same as _get_pricing_with_originals)
 _PRICING_KEYS_MAP = [
     ("chat", "chat_question_cost"),
+    ("instant_chat", "instant_chat_cost"),
     ("premium_chat", "premium_chat_cost"),
     ("partnership", "partnership_analysis_cost"),
     ("events", "event_timeline_cost"),
@@ -1355,6 +1361,7 @@ _PRICING_KEYS_MAP = [
 @router.get("/settings/my-pricing")
 async def get_my_pricing(current_user: User = Depends(get_current_user)):
     """Authenticated: return user pricing quickly with one DB roundtrip for settings + one for subscription."""
+    from utils.admin_settings import instant_chat_enabled_for_user
     pricing = {}
     pricing_original = {}
     discount_percent = 0
@@ -1448,6 +1455,9 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         "pricing": pricing,
         "subscription_discount_percent": discount_percent,
         "chat_countdown_seconds": _get_chat_countdown_settings(),
+        "features": {
+            "instant_chat_enabled": instant_chat_enabled_for_user(current_user.userid),
+        },
     }
     if tier_name:
         result["subscription_tier_name"] = tier_name

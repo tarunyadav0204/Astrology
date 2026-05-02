@@ -1,4 +1,7 @@
 import { AppState, Platform } from 'react-native';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
+import * as Device from 'expo-device';
 import { activityAPI } from './api';
 
 const FLUSH_INTERVAL_MS = 4000;
@@ -54,6 +57,40 @@ const sanitizeMetadata = (metadata) => {
   return out;
 };
 
+const getAppVersionMetadata = () => {
+  const appVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version;
+  const nativeBuildVersion = Application.nativeBuildVersion || undefined;
+  const fallbackAndroidCode = Constants.expoConfig?.android?.versionCode;
+  const fallbackIosBuild = Constants.expoConfig?.ios?.buildNumber;
+  const platformBuild =
+    Platform.OS === 'android'
+      ? (nativeBuildVersion || fallbackAndroidCode)
+      : Platform.OS === 'ios'
+      ? (nativeBuildVersion || fallbackIosBuild)
+      : nativeBuildVersion;
+
+  return {
+    app_version: appVersion,
+    native_build_version: nativeBuildVersion,
+    platform_build_version: platformBuild != null ? String(platformBuild) : undefined,
+    android_version_code:
+      Platform.OS === 'android' && platformBuild != null ? Number(platformBuild) || String(platformBuild) : undefined,
+    ios_build_number:
+      Platform.OS === 'ios' && platformBuild != null ? String(platformBuild) : undefined,
+  };
+};
+
+const getDeviceMetadata = () => ({
+  device_name: Device.deviceName,
+  device_model_name: Device.modelName,
+  device_brand: Device.brand,
+  device_manufacturer: Device.manufacturer,
+  os_name: Device.osName,
+  os_version: Device.osVersion,
+  os_build_id: Device.osBuildId,
+  android_api_level: Platform.OS === 'android' ? Device.platformApiLevel : undefined,
+});
+
 export const trackMobileJourneyEvent = (action, payload = {}) => {
   try {
     if (!appStateListenerAttached) {
@@ -74,6 +111,8 @@ export const trackMobileJourneyEvent = (action, payload = {}) => {
       resource_id: payload.resource_id ? String(payload.resource_id).slice(0, 200) : undefined,
       metadata: sanitizeMetadata({
         platform: Platform.OS,
+        ...getAppVersionMetadata(),
+        ...getDeviceMetadata(),
         journey_session_id: session.sessionId,
         journey_session_started_at: new Date(session.sessionStartedAtMs).toISOString(),
         ...payload.metadata,

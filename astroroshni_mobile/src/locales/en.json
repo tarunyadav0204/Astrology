@@ -93,7 +93,7 @@
   "support": {
     "title": "Support",
     "newTicket": "New support ticket",
-    "noTickets": "No tickets yet. Tap below to contact the team.",
+    "noTickets": "No tickets yet. Tap New support ticket to contact the team.",
     "subject": "Subject",
     "subjectPlaceholder": "Brief summary",
     "message": "Message",
@@ -139,6 +139,133 @@
     "partnership": "Partnership",
     "partner": "Partner",
     "history": "History"
+  },
+  "relationshipMatch": {
+    "title": "Kundli Matching",
+    "subtitle": "Select charts and compare",
+    "heroTitle": "See the real relationship picture",
+    "heroBody": "Get a free match first: overall compatibility, current relationship timing, key strengths, caution areas, and the next favorable window.",
+    "freeBadge": "Relationship Match",
+    "freeCompare": "Free",
+    "ruleProfileActive": "Your match summary includes compatibility, relationship strengths, caution areas, and important timing guidance.",
+    "ruleProfilePending": "Once you compare, we will show the main compatibility signals and timing guidance for this match.",
+    "selectionTitle": "Match two Kundlis",
+    "selectionBody": "Select the boy's and girl's birth charts to get a free compatibility summary first.",
+    "boyChart": "Boy's chart",
+    "girlChart": "Girl's chart",
+    "freeReportLabel": "Free compatibility summary",
+    "compatibilityScore": "Overall compatibility",
+    "changeCharts": "Change charts",
+    "detailGunaTitle": "See detailed guna breakdown",
+    "detailGunaSubtitle": "Open this if you want the traditional scoring details.",
+    "detailChartTitle": "See chart and timing details",
+    "detailChartSubtitle": "Optional deeper factors behind the summary.",
+    "bestWindowBody": "This is the most supportive window found in the free match summary.",
+    "personOne": "Boy's chart",
+    "personTwo": "Girl's chart",
+    "selectProfile": "Select or add chart",
+    "selectPersonOne": "Choose boy's chart",
+    "selectPersonTwo": "Choose girl's chart",
+    "notSelected": "Not selected yet",
+    "profileReady": "Chart ready",
+    "compareButton": "Compare Kundlis for Free",
+    "helperNote": "The first compatibility summary is free. The full relationship report is optional.",
+    "incompleteTitle": "Choose both charts",
+    "incompleteBody": "Please select two birth profiles before starting kundli matching.",
+    "errorTitle": "Could not compare charts",
+    "errorBody": "Please try again in a moment.",
+    "climate": {
+      "highly_favorable": "Highly favorable",
+      "favorable": "Favorable",
+      "mixed": "Mixed",
+      "challenging": "Challenging"
+    },
+    "defaultVerdict": "Relationship verdict ready",
+    "defaultTimingNote": "Timing analysis is available, but we could not summarize it yet.",
+    "metrics": {
+      "guna": "Traditional score",
+      "manglik": "Compatibility caution",
+      "timing": "Timing support",
+      "window": "Current period"
+    },
+    "whyTitle": "Why this match looks this way",
+    "whyBody": "These are the key astrological signals shaping the match, beyond the headline guna score.",
+    "watchoutsTitle": "What needs care",
+    "ashtakoota": {
+      "title": "Ashtakoota guna breakdown",
+      "subtitle": "Raw score: {{raw}}/36 • Effective score after exceptions: {{effective}}/36",
+      "varna": "Varna",
+      "vashya": "Vashya",
+      "tara": "Tara",
+      "yoni": "Yoni",
+      "grahaMaitri": "Graha Maitri",
+      "gana": "Gana",
+      "bhakoot": "Bhakoot",
+      "nadi": "Nadi"
+    },
+    "crossChartTitle": "How the two charts interact",
+    "crossChartBody": "This deeper detail currently reads as {{band}} when the relationship signals are combined.",
+    "crossMetrics": {
+      "moon": "Emotional fit",
+      "venusMars": "Attraction signal",
+      "marsVenus": "Response signal",
+      "navamsaPair": "Long-term support"
+    },
+    "marriageSupportTitle": "Marriage support in each chart",
+    "marriageSupportBody": "This deeper section checks whether each person's own chart supports stable relationship decisions.",
+    "d1Marriage": "Main chart",
+    "d9Marriage": "Deeper marriage chart",
+    "navamsaLayer": "Long-term relationship layer",
+    "rootFruit": "Long-term support compared with the main chart: {{value}}",
+    "keyStrengths": "What supports this match",
+    "keyRisks": "What needs care",
+    "noStrengthsYet": "No major strength highlights were returned for this result yet.",
+    "noRisksYet": "No major caution highlights were returned for this result yet.",
+    "bestWindow": "Best time window",
+    "windowContext": "Timing overlap: {{boy}} and {{girl}}",
+    "timingDeepTitle": "Timing in both charts",
+    "timingDeepBody": "This compares each person's current relationship timing and highlights where their windows support or challenge each other.",
+    "currentClimateLabel": "Current climate: {{value}}",
+    "currentWindowScore": "Current timing",
+    "bestWindowScore": "Best timing",
+    "neutralEvidenceTitle": "Other important details",
+    "premiumReportTitle": "Premium Relationship Report",
+    "unlockPremiumReport": "Unlock Full Relationship Report • {{credits}} credits",
+    "regeneratePremiumReport": "Regenerate Relationship Report • {{credits}} credits",
+    "downloadFullReport": "Download full relationship report",
+    "noReportTitle": "No report to download yet",
+    "noReportBody": "Compare two charts first, then download the report.",
+    "unlockBeforeDownloadTitle": "Unlock the full report first",
+    "unlockBeforeDownloadBody": "Generate the premium relationship report before downloading it.",
+    "downloadErrorTitle": "Could not download report",
+    "downloadErrorBody": "Please try again in a moment.",
+    "generatingPremium": "Generating premium report...",
+    "premiumErrorTitle": "Could not unlock premium report",
+    "premiumErrorBody": "Please try again in a moment.",
+    "practicalMeaning": "Practical meaning",
+    "decisionGuidance": "Decision guidance",
+    "finalSummary": "Final summary",
+    "priorityActions": "Priority actions",
+    "premiumTitle": "Want the full marriage decision report?",
+    "premiumTease": "Unlock a clearer report for family discussions, long-term stability risks, timing, and practical next steps.",
+    "locked": {
+      "one": "Clearer go/no-go guidance for this match",
+      "two": "Hidden long-term stability risks",
+      "three": "Timing guidance for next steps",
+      "four": "Practical advice for families and decisions"
+    },
+    "askAiCta": "Ask AI About This Match • {{credits}} credits",
+    "marriageCta": "See My Marriage Analysis • {{credits}} credits",
+    "followupLabel": "Relationship Follow-up",
+    "premiumPrompt": "Analyze compatibility between {{personOne}} and {{personTwo}}. Focus on {{risk}} and explain whether this is a good marriage decision now.",
+    "defaultRiskPrompt": "the main relationship risk",
+    "myMarriageAnalysis": "My Marriage Analysis",
+    "notAvailable": "Not available",
+    "noProfilesTitle": "Add two birth charts to compare",
+    "noProfilesBody": "Kundli matching works best when both birth profiles are saved in the app. Add your first chart now and come back for the comparison.",
+    "addProfile": "Add Birth Profile",
+    "selectSavedChart": "Select or Add Chart",
+    "addAnotherChart": "Add Another Chart"
   },
   "chartTypes": {
     "lagna": {
@@ -348,7 +475,43 @@
     "preparingInsights": "Preparing your cosmic insights...",
     "fascinatingInsights": "Meanwhile, let me show you some fascinating insights about your chart...",
     "thankYou": "Thank you for reaching out to AstroRoshni with your question.",
-    "deeplyAnalyzing": "I am deeply analyzing your celestial chart to provide you with the most accurate insights. This sacred process takes a moment..."
+    "deeplyAnalyzing": "I am deeply analyzing your celestial chart to provide you with the most accurate insights. This sacred process takes a moment...",
+    "instantLoader": {
+      "lineChart": "I am reading the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.",
+      "lineDasha": "Now I am checking the running dasha pattern and seeing which planet is currently carrying more weight in the question.",
+      "lineTransits": "I am comparing the present transits with the natal promise to separate a short-term signal from a deeper pattern.",
+      "lineHouses": "The relevant houses are being matched with the question, so the answer can stay specific and practical.",
+      "lineTiming": "I am checking whether the timing looks active right now, building slowly, or already passing out of focus.",
+      "lineSynthesis": "The main signals are being combined now, especially where two or more factors point in the same direction.",
+      "lineAnswer": "I am turning the chart signals into a short answer you can use, without making it unnecessarily long.",
+      "lineFinal": "Almost ready. I am tightening the response so it gives you the clearest takeaway first."
+    },
+    "modeIntro": {
+      "eyebrow": "Chat mode",
+      "title": "You are in {{mode}} mode",
+      "body": "Choose how fast and deep you want this answer. You can change modes anytime from the S/I/P button near the message box.",
+      "current": "Current",
+      "credit": "credit",
+      "credits": "credits",
+      "free": "Free",
+      "continue": "Continue in {{mode}}",
+      "tapToChange": "{{mode}} mode · tap S/I/P to change",
+      "instant": {
+        "name": "Instant",
+        "benefit": "Fastest replies for quick follow-ups and simple questions.",
+        "bestFor": "Best when you want a concise answer now."
+      },
+      "standard": {
+        "name": "Standard",
+        "benefit": "Balanced depth and speed for most astrology questions.",
+        "bestFor": "Best default when you want useful detail."
+      },
+      "premium": {
+        "name": "Premium",
+        "benefit": "Deepest analysis for important decisions and complex topics.",
+        "bestFor": "Best when accuracy and detail matter more than speed."
+      }
+    }
   },
   "home": {
     "greeting": {
@@ -409,13 +572,18 @@
         "title": "Ask Any Question",
         "description": "Get insights about your personality, relationships, career, or any astrological topic"
       },
-      "partnership": {
-        "title": "Partnership Analysis",
-        "description": "Analyze compatibility and relationship dynamics between two people"
-      },
-      "mundane": {
-        "title": "Global Markets & Events",
-        "description": "Analyze world events, stock markets, politics, and economic trends"
+    "partnership": {
+      "title": "Partnership Analysis",
+      "description": "Analyze compatibility and relationship dynamics between two people"
+    },
+    "kundliMatch": {
+      "title": "Kundli Matching",
+      "description": "Get a structured free compatibility verdict, timing climate, strengths, and caution areas",
+      "teaser": "Free match first. Deeper insight only if you want it."
+    },
+    "mundane": {
+      "title": "Global Markets & Events",
+      "description": "Analyze world events, stock markets, politics, and economic trends"
       },
       "events": {
         "title": "What Will Manifest",

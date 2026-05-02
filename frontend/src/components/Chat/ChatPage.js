@@ -16,6 +16,7 @@ import { authService } from '../../services/authService';
 import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
 import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
+import { buildQueryContext } from '../../utils/queryContext';
 import '../Shared/nativeSelectorChip.css';
 import './ChatPage.css';
 
@@ -550,6 +551,7 @@ const ChatPage = () => {
                 },
                 body: JSON.stringify({
                     birth_chart_id: birthChartId,
+                    query_context: buildQueryContext(),
                 }),
             });
 
@@ -1252,6 +1254,7 @@ const ChatPage = () => {
         const requestData = {
             session_id: currentSessionId,
             question: questionForApi,
+            query_context: buildQueryContext(),
             language: 'english',
             response_style: 'detailed',
             premium_analysis: useFreeQuestion ? false : !!options.premium_analysis,
@@ -1409,7 +1412,7 @@ const ChatPage = () => {
             // console.log('Token exists:', !!token);
             // console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
             
-            const requestBody = { ...birthData, question: message };
+            const requestBody = { ...birthData, question: message, query_context: buildQueryContext() };
             if (isAdmin) {
                 requestBody.include_context = true;
             }

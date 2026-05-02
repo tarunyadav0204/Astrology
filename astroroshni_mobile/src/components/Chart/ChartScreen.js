@@ -244,6 +244,21 @@ export default function ChartScreen({ navigation, route }) {
     });
     return unsubscribe;
   }, [navigation]);
+
+  useEffect(() => {
+    if (!route.params?.reopenDashaBrowser) return;
+    const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
+    navigation.setParams({
+      reopenDashaBrowser: undefined,
+      birthData: undefined,
+      birthDetails: undefined,
+      birthChartId: undefined,
+    });
+    if (selectedBirthData?.name) {
+      setBirthData(selectedBirthData);
+    }
+    setTimeout(() => setShowDashaBrowser(true), 100);
+  }, [navigation, route.params?.reopenDashaBrowser]);
   
 
 
@@ -463,7 +478,7 @@ export default function ChartScreen({ navigation, route }) {
           )}
         </SafeAreaView>
         
-        <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} />
+        <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} selectNativeReturnTo="Chart" />
         
         {/* House Insights Drawer */}
         <Modal

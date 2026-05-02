@@ -39,7 +39,41 @@ def coerce_chat_birth_details(bd):
     return out
 
 
+def _merge_with_original_question_if_present(
+    original_question: str | None,
+    followup_text: str,
+    *,
+    max_len: int = 600,
+    original_truncate_len: int = 260,
+) -> str:
+    """Preserve original event/topic context by prepending original question when present."""
+    base = (followup_text or "").strip()
+    orig = (original_question or "").strip()
+    if not orig:
+        return base
+    merged = f"{orig} {base}".strip()
+    if len(merged) > max_len:
+        merged = f"{orig[:original_truncate_len]}... {base}".strip()
+    return merged
+
+
+def _compact_stage_totals(stages):
+    rows = [s for s in (stages or []) if isinstance(s, dict)]
+    return {
+        "input_chars": sum(int(s.get("input_chars") or 0) for s in rows),
+        "output_chars": sum(int(s.get("output_chars") or 0) for s in rows),
+        "input_tokens": sum(int(s.get("input_tokens") or 0) for s in rows),
+        "output_tokens": sum(int(s.get("output_tokens") or 0) for s in rows),
+        "cached_tokens": sum(int(s.get("cached_tokens") or 0) for s in rows),
+        "non_cached_input_tokens": sum(int(s.get("non_cached_input_tokens") or 0) for s in rows),
+        "elapsed_ms_sum": round(sum(float(s.get("elapsed_ms") or 0) for s in rows), 1),
+    }
+
+
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
+
+STANDARD_MAX_CLARIFICATIONS = 1
+INSTANT_MAX_CLARIFICATIONS = 3
 
 
 def _ensure_chat_messages_gate_metadata(conn):
@@ -480,6 +514,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     language = request.get("language", "english")
     response_style = request.get("response_style", "detailed")
     premium_analysis = request.get("premium_analysis", False)
+    requested_chat_tier = str(request.get("chat_tier") or request.get("chatTier") or "standard").strip().lower()
     partnership_mode = request.get("partnership_mode", False) or request.get("partnershipMode", False)
     partner_birth_details = request.get("partner_birth_details") or {
         'name': request.get('partner_name') or request.get('partnerName'),
@@ -508,27 +543,42 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             or partner_birth_details.get('relationshipType')
         )
     
+    from utils.admin_settings import instant_chat_enabled_for_user
+
+    instant_chat_requested = requested_chat_tier == "instant"
+    instant_chat_active = (
+        instant_chat_requested
+        and not premium_analysis
+        and not partnership_mode
+        and instant_chat_enabled_for_user(current_user.userid)
+    )
+    effective_chat_tier = "instant" if instant_chat_active else "standard"
+
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
     if partnership_mode:
         chat_cost = credit_service.get_credit_setting('partnership_analysis_cost')
     elif premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
+    elif instant_chat_active:
+        chat_cost = credit_service.get_credit_setting('instant_chat_cost')
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
-    is_standard_chat = not partnership_mode and not premium_analysis
+    is_standard_chat = not partnership_mode and not premium_analysis and not instant_chat_active
     free_available = credit_service.is_free_standard_chat_question_available(current_user.userid)
     using_free_question = is_standard_chat and free_available
     chat_key = (
         'partnership_analysis_cost'
         if partnership_mode
-        else ('premium_chat_cost' if premium_analysis else 'chat_question_cost')
+        else ('premium_chat_cost' if premium_analysis else ('instant_chat_cost' if instant_chat_active else 'chat_question_cost'))
     )
     effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
 
     print(f"💳 CREDIT CHECK (chat-v2):")
     print(f"   User ID: {current_user.userid}")
+    print(f"   Requested chat tier: {requested_chat_tier}")
+    print(f"   Effective chat tier: {effective_chat_tier}")
     print(f"   Partnership Mode: {partnership_mode}")
     print(f"   Premium Analysis: {premium_analysis}")
     print(f"   Chat cost: {chat_cost} credits, effective: {effective_cost} (free_question: {using_free_question})")
@@ -539,6 +589,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             analysis_type = "Partnership Analysis"
         elif premium_analysis:
             analysis_type = "Premium Deep Analysis"
+        elif instant_chat_active:
+            analysis_type = "Instant Chat"
         else:
             analysis_type = "Standard Analysis"
         print(f"❌ INSUFFICIENT CREDITS: Need {effective_cost}, have {user_balance}")
@@ -589,6 +641,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     "message_id": assistant_message_id,
                     "status": "processing",
                     "message_type": "answer",
+                    "chat_tier": effective_chat_tier,
                     "chart_insights": [],
                     "loading_messages": [],
                 }
@@ -637,12 +690,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
             conn.commit()
         return {
-            "user_message_id": user_message_id,
-            "message_id": assistant_message_id,
-            "status": "completed",
-            "message_type": "answer",
-            "content": REFUSAL_MESSAGE,
-            "chart_insights": [],
+                "user_message_id": user_message_id,
+                "message_id": assistant_message_id,
+                "status": "completed",
+                "message_type": "answer",
+                "chat_tier": effective_chat_tier,
+                "content": REFUSAL_MESSAGE,
+                "chart_insights": [],
         }
 
     # Get chart insights from intent router BEFORE starting background task
@@ -650,57 +704,85 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     try:
         user_facts = {}
         d1_chart = None
-        with get_conn() as conn:
-            cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
-            session_data = cur.fetchone()
-            birth_chart_id = session_data[0] if session_data else None
+        if not instant_chat_active:
+            with get_conn() as conn:
+                cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
+                session_data = cur.fetchone()
+                birth_chart_id = session_data[0] if session_data else None
+                
+                if birth_chart_id:
+                    fact_extractor = FactExtractor()
+                    user_facts = fact_extractor.get_facts(birth_chart_id)
             
-            if birth_chart_id:
-                fact_extractor = FactExtractor()
-                user_facts = fact_extractor.get_facts(birth_chart_id)
-        
-        # Build minimal D1 chart for intent router
-        from calculators.chart_calculator import ChartCalculator
-        from types import SimpleNamespace
-        birth_obj = SimpleNamespace(**birth_details)
-        chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(birth_obj)
-        
-        # Extract D1 chart with houses and planets
-        d1_chart = {
-            'ascendant': chart_data.get('ascendant', 0),
-            'houses': [],
-            'planets': {}
-        }
-        
-        # Add houses with signs
-        asc_sign = int(chart_data['ascendant'] / 30)
-        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
-                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
-        for i in range(12):
-            house_sign = (asc_sign + i) % 12
-            d1_chart['houses'].append({
-                'house_number': i + 1,
-                'sign': sign_names[house_sign],
-                'planets': []
-            })
-        
-        # Add planets to houses
-        for planet_name, planet_data in chart_data.get('planets', {}).items():
-            house_num = planet_data.get('house', 1)
-            sign_num = planet_data.get('sign', 0)
-            d1_chart['planets'][planet_name] = {
-                'house': house_num,
-                'sign': sign_names[sign_num]
+            # Build minimal D1 chart for intent router
+            from calculators.chart_calculator import ChartCalculator
+            from types import SimpleNamespace
+            birth_obj = SimpleNamespace(**birth_details)
+            chart_calc = ChartCalculator({})
+            chart_data = chart_calc.calculate_chart(birth_obj)
+            
+            # Extract D1 chart with houses and planets
+            d1_chart = {
+                'ascendant': chart_data.get('ascendant', 0),
+                'houses': [],
+                'planets': {}
             }
-            d1_chart['houses'][house_num - 1]['planets'].append(planet_name)
+            
+            # Add houses with signs
+            asc_sign = int(chart_data['ascendant'] / 30)
+            sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                         'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+            for i in range(12):
+                house_sign = (asc_sign + i) % 12
+                d1_chart['houses'].append({
+                    'house_number': i + 1,
+                    'sign': sign_names[house_sign],
+                    'planets': []
+                })
+            
+            # Add planets to houses
+            for planet_name, planet_data in chart_data.get('planets', {}).items():
+                house_num = planet_data.get('house', 1)
+                sign_num = planet_data.get('sign', 0)
+                d1_chart['planets'][planet_name] = {
+                    'house': house_num,
+                    'sign': sign_names[sign_num]
+                }
+                d1_chart['houses'][house_num - 1]['planets'].append(planet_name)
         
         # Get clarification count from conversation state
         clarification_count = 0
+        history = []
         with get_conn() as conn:
             cur = execute(conn, "SELECT clarification_count FROM conversation_state WHERE session_id = %s", (session_id,))
             state_row = cur.fetchone()
             clarification_count = state_row[0] if state_row else 0
+
+            # Build last answered exchanges so instant router can understand follow-ups.
+            cur = execute(
+                conn,
+                """
+                    SELECT sender, content, message_type
+                    FROM chat_messages
+                    WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
+                      AND content != ''
+                    ORDER BY timestamp ASC
+                """,
+                (session_id,),
+            )
+            history_rows = cur.fetchall() or []
+            i = 0
+            while i < len(history_rows) - 1:
+                if history_rows[i][0] == 'user' and history_rows[i+1][0] == 'assistant':
+                    if history_rows[i+1][2] == 'answer':
+                        history.append({
+                            "question": history_rows[i][1],
+                            "response": history_rows[i+1][1],
+                        })
+                    i += 2
+                else:
+                    i += 1
+            history = history[-3:] if len(history) > 3 else history
         
         # Detect notification-originated questions to avoid clarification loops
         q_lower = (question or "").strip().lower()
@@ -723,40 +805,82 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             if "festival" in q_lower and "remedies" in q_lower:
                 is_notification_question = True
         
+        max_clarifications = INSTANT_MAX_CLARIFICATIONS if instant_chat_active else STANDARD_MAX_CLARIFICATIONS
+
+        # If user is replying to a prior clarification, merge with original question so topic survives
+        # (e.g., "car battery failure" + "last week of April").
+        combined_question = question
+        if clarification_count > 0:
+            with get_conn() as conn:
+                original_question = get_original_question_for_clarification(session_id, assistant_message_id, conn)
+            combined_question = _merge_with_original_question_if_present(
+                original_question,
+                question,
+                max_len=600,
+                original_truncate_len=260,
+            )
+
         # Force READY if clarification limit reached, partnership mode, or notification-originated question
-        force_ready_for_limit = partnership_mode or clarification_count >= 1 or is_notification_question
+        force_ready_for_limit = (
+            partnership_mode
+            or clarification_count >= max_clarifications
+            or is_notification_question
+        )
         
         intent_router = IntentRouter()
         query_context = request.get("query_context") or request.get("queryContext")
-        intent = await intent_router.classify_intent(
-            question,
-            [],
-            user_facts,
-            clarification_count=clarification_count,
-            language=language,
-            force_ready=force_ready_for_limit,
-            d1_chart=d1_chart,
-            query_context=query_context,
-        )
-        # Several unrelated topics in one message → clarify first (overrides READY from router)
-        if (
-            looks_like_many_questions(question)
-            and clarification_count < 1
-            and not partnership_mode
-            and intent.get("status") == "READY"
-        ):
-            print("📎 MULTI_TOPIC_BUNDLE (/ask): Re-routing via LLM-forced CLARIFY")
+        if instant_chat_active:
+            intent = await intent_router.classify_instant_intent(
+                combined_question,
+                history,
+                clarification_count=clarification_count,
+                max_clarifications=max_clarifications,
+                language=language,
+                force_ready=force_ready_for_limit,
+                query_context=query_context,
+            )
+        else:
             intent = await intent_router.classify_intent(
-                question,
+                combined_question,
                 [],
                 user_facts,
                 clarification_count=clarification_count,
                 language=language,
-                force_ready=False,
+                force_ready=force_ready_for_limit,
                 d1_chart=d1_chart,
                 query_context=query_context,
-                force_clarify=True,
             )
+        # Several unrelated topics in one message → clarify first (overrides READY from router)
+        if (
+            looks_like_many_questions(combined_question)
+            and clarification_count < max_clarifications
+            and not partnership_mode
+            and intent.get("status") == "READY"
+        ):
+            print("📎 MULTI_TOPIC_BUNDLE (/ask): Re-routing via LLM-forced CLARIFY")
+            if instant_chat_active:
+                intent = await intent_router.classify_instant_intent(
+                    combined_question,
+                    history,
+                    clarification_count=clarification_count,
+                    max_clarifications=max_clarifications,
+                    language=language,
+                    force_ready=False,
+                    query_context=query_context,
+                    force_clarify=True,
+                )
+            else:
+                intent = await intent_router.classify_intent(
+                    combined_question,
+                    [],
+                    user_facts,
+                    clarification_count=clarification_count,
+                    language=language,
+                    force_ready=False,
+                    d1_chart=d1_chart,
+                    query_context=query_context,
+                    force_clarify=True,
+                )
             intent["chart_insights"] = None
 
         chart_insights = intent.get('chart_insights', [])
@@ -768,7 +892,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             intent['lab_mode'] = True
         
         # Handle clarification immediately - do NOT start background task
-        if intent.get('status') == 'CLARIFY':
+        if intent.get('status') == 'CLARIFY' and clarification_count < max_clarifications:
             print(f"❓ CLARIFICATION NEEDED - Returning immediately without background task")
             clarification_question = intent.get('clarification_question', 'Could you provide more details?')
             
@@ -798,16 +922,18 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 )
 
                 conn.commit()
-            
             print(f"✅ CLARIFICATION SAVED - Returning to user")
             return {
                 "user_message_id": user_message_id,
                 "message_id": assistant_message_id,
                 "status": "completed",
                 "message_type": "clarification",
+                "chat_tier": effective_chat_tier,
                 "content": clarification_question,
                 "chart_insights": chart_insights
             }
+        elif intent.get('status') == 'CLARIFY':
+            print("⚠️ Clarification requested but limit reached - falling back to READY handling")
             
     except Exception as e:
         print(f"⚠️ Failed to get chart insights: {e}")
@@ -825,7 +951,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save; using_free_question for first-question-free; effective_cost for deduction)
     background_tasks.add_task(
         process_gemini_response,
-        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost
+        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier
     )
     
     print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
@@ -835,6 +961,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "message_id": assistant_message_id,
         "status": "processing",
         "message": "Analyzing your chart...",
+        "chat_tier": effective_chat_tier,
         "chart_insights": chart_insights,
         "d1_chart": d1_chart
     }
@@ -1420,7 +1547,7 @@ async def _close_wait_side_conversation(message_id: int):
         logger.info("wait side conversation close skipped for message_id=%s: %s", message_id, str(exc)[:200])
 
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None, chat_tier: str = "standard"):
     """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
@@ -1434,8 +1561,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from ai.intent_router import IntentRouter
     from chat.fact_extractor import FactExtractor
     from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
+    from chat.instant_chat_pipeline import generate_instant_chat_response
     
     try:
+        effective_chat_tier = str(chat_tier or "standard").strip().lower()
+        is_instant_chat = effective_chat_tier == "instant"
         # Refuse death-related questions without calling the model
         if is_death_related(question):
             print(f"🚫 Death-related question detected in background task - saving refusal")
@@ -1460,7 +1590,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         # Get user facts for intent routing
         user_facts = {}
-        if birth_chart_id:
+        if birth_chart_id and not is_instant_chat:
             fact_extractor = FactExtractor()
             user_facts = fact_extractor.get_facts(birth_chart_id)
             if user_facts:
@@ -1628,27 +1758,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 with get_conn() as conn:
                     original_question = get_original_question_for_clarification(session_id, message_id, conn)
                     if original_question:
-                        # Detect if user changed topic (response is long and doesn't look like clarification)
-                        word_count = len(question.split())
-                        clarification_keywords = ['all', 'everything', 'yes', 'no', 'both', 'any', 'every']
-                        looks_like_clarification = word_count < 10 or any(kw in question.lower() for kw in clarification_keywords)
-                        
-                        print(f"   Word count: {word_count}")
-                        print(f"   Has clarification keywords: {any(kw in question.lower() for kw in clarification_keywords)}")
-                        print(f"   Looks like clarification: {looks_like_clarification}")
-                        
-                        if looks_like_clarification:
-                            # Combine with original, truncate if too long
-                            combined = f"{original_question} {question}"
-                            if len(combined) > 500:
-                                combined = f"{original_question[:200]}... {question}"
-                            combined_question = combined
-                            print(f"🔗 COMBINED QUESTION:")
-                            print(f"   Original: {original_question}")
-                            print(f"   Clarification: {question}")
-                            print(f"   Combined: {combined_question}")
-                        else:
-                            print(f"🔄 USER CHANGED TOPIC: Treating as new question")
+                        combined_question = _merge_with_original_question_if_present(
+                            original_question,
+                            question,
+                            max_len=500,
+                            original_truncate_len=200,
+                        )
+                        print(f"🔗 COMBINED QUESTION:")
+                        print(f"   Original: {original_question}")
+                        print(f"   Clarification: {question}")
+                        print(f"   Combined: {combined_question}")
                     else:
                         print(f"   ⚠️ No original question found, using current question only")
             else:
@@ -1661,9 +1780,28 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
                 else None
             )
-            intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready, query_context=query_context)
+            max_clarifications = INSTANT_MAX_CLARIFICATIONS if is_instant_chat else STANDARD_MAX_CLARIFICATIONS
+            if is_instant_chat:
+                intent = await intent_router.classify_instant_intent(
+                    combined_question,
+                    history,
+                    clarification_count=clarification_count,
+                    max_clarifications=max_clarifications,
+                    language=language,
+                    force_ready=force_ready,
+                    query_context=query_context,
+                )
+            else:
+                intent = await intent_router.classify_intent(
+                    combined_question,
+                    history,
+                    user_facts,
+                    language=language,
+                    force_ready=force_ready,
+                    query_context=query_context,
+                )
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
-            MAX_CLARIFICATIONS = 1
+            MAX_CLARIFICATIONS = max_clarifications
             
             # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap
             # Do NOT apply when the message bundles several topics (Hindi often uses "." not "?") — user should clarify first.
@@ -1686,16 +1824,28 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and intent.get("status") == "READY"
             ):
                 print("📎 MULTI_TOPIC_BUNDLE: Re-routing via LLM-forced CLARIFY")
-                intent = await intent_router.classify_intent(
-                    combined_question,
-                    history,
-                    user_facts,
-                    clarification_count=clarification_count,
-                    language=language,
-                    force_ready=False,
-                    query_context=query_context,
-                    force_clarify=True,
-                )
+                if is_instant_chat:
+                    intent = await intent_router.classify_instant_intent(
+                        combined_question,
+                        history,
+                        clarification_count=clarification_count,
+                        max_clarifications=max_clarifications,
+                        language=language,
+                        force_ready=False,
+                        query_context=query_context,
+                        force_clarify=True,
+                    )
+                else:
+                    intent = await intent_router.classify_intent(
+                        combined_question,
+                        history,
+                        user_facts,
+                        clarification_count=clarification_count,
+                        language=language,
+                        force_ready=False,
+                        query_context=query_context,
+                        force_clarify=True,
+                    )
                 intent["chart_insights"] = None
 
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
@@ -1786,7 +1936,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Build context based on intent
         context_start = time.time()
         
-        if partnership_mode and partner_birth_details:
+        if is_instant_chat:
+            print(f"\n{'='*80}")
+            print(f"⚡ INSTANT CHAT MODE - Skipping deep context build")
+            print(f"{'='*80}")
+            context = {
+                "analysis_type": "instant_chat",
+                "instant_chat": True,
+                "intent": intent,
+                "birth_details": {
+                    "name": birth_data.get("name"),
+                    "date": birth_data.get("date"),
+                    "time": birth_data.get("time"),
+                    "place": birth_data.get("place"),
+                },
+            }
+            context_time = time.time() - context_start
+            print(f"✅ Instant chat pseudo-context prepared in {context_time:.3f}s")
+            print(f"{'='*80}\n")
+        elif partnership_mode and partner_birth_details:
             print(f"\n{'='*80}")
             print(f"👥 PARTNERSHIP MODE - Building synastry context")
             print(f"{'='*80}")
@@ -1950,11 +2118,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     print(f"📚 Filtered user facts for category '{intent_category}': {list(user_facts.keys())}")
         
         # Inject user facts into context
-        if user_facts:
+        if user_facts and not is_instant_chat:
             context['user_facts'] = user_facts
         
         # Inject extracted context from clarifications
-        if intent.get('extracted_context'):
+        if intent.get('extracted_context') and not is_instant_chat:
             context['extracted_context'] = intent['extracted_context']
         
         # Override intent mode for @All_Events to force event prediction
@@ -1974,6 +2142,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
             if (
                 chat_wait_engagement_enabled()
+                and not is_instant_chat
                 and not partnership_mode
                 and not partner_birth_details
                 and not is_all_events_question
@@ -2005,6 +2174,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
             if (
                 chat_wait_side_conversation_enabled()
+                and not is_instant_chat
                 and not partnership_mode
                 and not partner_birth_details
                 and not is_all_events_question
@@ -2032,17 +2202,27 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             log_chat_error(user_id, birth_data.get('name', 'Unknown'), '', init_error, question, birth_data, 'backend')
             raise init_error
 
-        result = await analyzer.generate_chat_response(
-            user_question=question,
-            astrological_context=context,
-            conversation_history=history,
-            language=language,
-            response_style=response_style,
-            premium_analysis=premium_analysis,
-            mode=intent.get('mode', 'default'),
-            use_thinking_level_high=False,
-            user_id=user_id,
-        )
+        if is_instant_chat:
+            result = await generate_instant_chat_response(
+                analyzer,
+                question=question,
+                birth_data=birth_data,
+                intent=intent,
+                history=history,
+                language=language,
+            )
+        else:
+            result = await analyzer.generate_chat_response(
+                user_question=question,
+                astrological_context=context,
+                conversation_history=history,
+                language=language,
+                response_style=response_style,
+                premium_analysis=premium_analysis,
+                mode=intent.get('mode', 'default'),
+                use_thinking_level_high=False,
+                user_id=user_id,
+            )
         
         # Update database with result
         with get_conn() as conn:
@@ -2057,7 +2237,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 credit_service = CreditService()
                 if using_free_question:
                     credit_service.mark_free_chat_question_used(user_id)
-                    analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
+                    if is_instant_chat:
+                        analysis_type = "Instant Chat"
+                    else:
+                        analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                     credit_service.record_zero_cost_feature_usage(
                         user_id,
                         "chat_question",
@@ -2067,11 +2250,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     success = True
                 else:
                     amount_to_deduct = effective_cost if effective_cost is not None else chat_cost
-                    analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
+                    if is_instant_chat:
+                        analysis_type = "Instant Chat"
+                    else:
+                        analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                     success = credit_service.spend_credits(
                         user_id,
                         amount_to_deduct,
-                        'chat_question',
+                        'instant_chat' if is_instant_chat else 'chat_question',
                         f"{analysis_type}: {question[:50]}..."
                     )
                     if success:
@@ -2127,6 +2313,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     
                     timing_save = result.get("timing") or {}
                     parallel_usage_blob = timing_save.get("parallel_llm_usage")
+                    if is_instant_chat:
+                        instant_stages = []
+                        if isinstance(cached_intent, dict) and isinstance(cached_intent.get("_llm_usage_stage"), dict):
+                            first_stage = dict(cached_intent.get("_llm_usage_stage") or {})
+                            first_stage["stage"] = "instant_intent_entry"
+                            instant_stages.append(first_stage)
+                        if isinstance(intent, dict) and isinstance(intent.get("_llm_usage_stage"), dict):
+                            second_stage = dict(intent.get("_llm_usage_stage") or {})
+                            second_stage["stage"] = "instant_intent_background"
+                            instant_stages.append(second_stage)
+                        if isinstance(result.get("instant_llm_usage_stage"), dict):
+                            instant_stages.append(dict(result.get("instant_llm_usage_stage") or {}))
+                        if instant_stages:
+                            parallel_usage_blob = {
+                                "kind": "instant_chat_usage",
+                                "stages": instant_stages,
+                                "totals": _compact_stage_totals(instant_stages),
+                            }
                     specialist_branch_outputs = None
                     if isinstance(parallel_usage_blob, dict):
                         specialist_branch_outputs = parallel_usage_blob.get("specialist_branch_outputs")
@@ -2138,6 +2342,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     parallel_usage_json = (
                         json.dumps(parallel_usage_blob) if parallel_usage_blob else None
                     )
+                    token_usage_to_store = result.get("token_usage") or {}
+                    prompt_chars_to_store = result.get("llm_prompt_chars")
+                    response_chars_to_store = result.get("llm_response_chars")
+                    if is_instant_chat and isinstance(parallel_usage_blob, dict):
+                        totals = parallel_usage_blob.get("totals") if isinstance(parallel_usage_blob.get("totals"), dict) else {}
+                        token_usage_to_store = {
+                            "input_tokens": int(totals.get("input_tokens") or 0),
+                            "output_tokens": int(totals.get("output_tokens") or 0),
+                            "cached_tokens": int(totals.get("cached_tokens") or 0),
+                            "non_cached_input_tokens": int(totals.get("non_cached_input_tokens") or 0),
+                        }
+                        prompt_chars_to_store = int(totals.get("input_chars") or 0)
+                        response_chars_to_store = int(totals.get("output_chars") or 0)
 
                     if isinstance(specialist_branch_outputs, dict) and specialist_branch_outputs:
                         try:
@@ -2207,12 +2424,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             datetime.now(),
                             language,
                             intent_router_ms,
-                            int((result.get("token_usage") or {}).get("input_tokens") or 0) or None,
-                            int((result.get("token_usage") or {}).get("output_tokens") or 0) or None,
-                            int((result.get("token_usage") or {}).get("cached_tokens") or 0) or None,
-                            int((result.get("token_usage") or {}).get("non_cached_input_tokens") or 0) or None,
-                            int(result["llm_prompt_chars"]) if result.get("llm_prompt_chars") is not None else None,
-                            int(result["llm_response_chars"]) if result.get("llm_response_chars") is not None else None,
+                            int((token_usage_to_store or {}).get("input_tokens") or 0) or None,
+                            int((token_usage_to_store or {}).get("output_tokens") or 0) or None,
+                            int((token_usage_to_store or {}).get("cached_tokens") or 0) or None,
+                            int((token_usage_to_store or {}).get("non_cached_input_tokens") or 0) or None,
+                            int(prompt_chars_to_store) if prompt_chars_to_store is not None else None,
+                            int(response_chars_to_store) if response_chars_to_store is not None else None,
                             parallel_usage_json,
                             message_id,
                         ),

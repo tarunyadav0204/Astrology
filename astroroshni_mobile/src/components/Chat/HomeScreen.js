@@ -886,6 +886,16 @@ const loadHomeData = async (nativeData = null) => {
       originalCost: pricingOriginal.partnership
     },
     {
+      id: 'kundliMatch',
+      icon: '💞',
+      title: t('home.options.kundliMatch.title', 'Kundli Matching'),
+      description: t('home.options.kundliMatch.description', 'Get a structured free compatibility verdict, timing climate, strengths, and caution areas'),
+      teaser: t('home.options.kundliMatch.teaser', 'Free match first. Deeper insight only if you want it.'),
+      action: 'relationshipMatch',
+      cost: 0,
+      originalCost: null,
+    },
+    {
       id: 'mundane',
       icon: '🌍',
       title: t('home.options.mundane.title', 'Global Markets & Events'),
@@ -2558,12 +2568,15 @@ const loadHomeData = async (nativeData = null) => {
 // Separate component to avoid hooks order violation
 function OptionCard({ option, index, onOptionSelect }) {
   const { theme, colors, androidLightCardFixStyle } = useTheme();
+  const { t } = useTranslation();
   
   if (!option) return null;
   const gradientColors = option.id === 'events' 
     ? ['#FFD700', '#FF8C00'] 
     : option.id === 'ashtakvarga'
     ? ['#9C27B0', '#E91E63']
+    : option.id === 'kundliMatch'
+    ? ['#ec4899', '#f97316']
     : ['#ff6b35', '#ff8c5a'];
 
   // Glass gradient for the card background – same look on iOS and Android
@@ -2599,7 +2612,12 @@ function OptionCard({ option, index, onOptionSelect }) {
               <Text style={[styles.optionTeaser, { color: colors.accent }]}>{option.teaser}</Text>
             ) : null}
           </View>
-          {option.cost != null && option.cost > 0 && (
+          {option.cost === 0 ? (
+            <View style={[styles.costBadge, styles.freeCostBadge]}>
+              <Icon name="sparkles" size={10} color="#ffffff" />
+              <Text style={[styles.costText, styles.freeCostText]}>{t('relationshipMatch.freeCompare', 'Free')}</Text>
+            </View>
+          ) : option.cost != null && option.cost > 0 ? (
             <View style={styles.costBadge}>
               <Icon name="flash" size={8} color="#854d0e" />
               {option.originalCost != null && option.originalCost > option.cost ? (
@@ -2611,7 +2629,7 @@ function OptionCard({ option, index, onOptionSelect }) {
                 <Text style={styles.costText}>{option.cost}</Text>
               )}
             </View>
-          )}
+          ) : null}
           <Icon name="chevron-forward" size={24} color={colors.textTertiary} />
         </LinearGradient>
       </TouchableOpacity>
@@ -3352,11 +3370,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     elevation: 4,
   },
+  freeCostBadge: {
+    backgroundColor: 'rgba(236, 72, 153, 0.95)',
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+  },
   costText: {
     fontSize: 12,
     fontWeight: '800',
     color: '#854d0e',
     marginLeft: 3,
+  },
+  freeCostText: {
+    color: '#ffffff',
   },
   costWithDiscount: {
     flexDirection: 'row',

@@ -41,6 +41,9 @@ const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
   const [error, setError] = useState(null);
   const [formKey, setFormKey] = useState(0);
 
+  const compatibilityAnalysis = compatibilityResult?.compatibility_analysis;
+  const timingOverlay = compatibilityResult?.timing_overlay || compatibilityAnalysis?.timing_overlay;
+
   const handlePartnerSubmit = async (boyData, girlData) => {
     setLoading(true);
     setError(null);
@@ -151,18 +154,26 @@ const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
       </div>
       
       <div className="overall-compatibility-score">
-        <h3>{compatibilityResult.compatibility_analysis.overall_score.percentage}%</h3>
-        <p>{compatibilityResult.compatibility_analysis.overall_score.grade}</p>
+        <h3>{compatibilityAnalysis.overall_score.percentage}%</h3>
+        <p>{compatibilityAnalysis.overall_score.grade}</p>
         <span>Overall Compatibility</span>
       </div>
+
+      {timingOverlay?.shared?.current_window && (
+        <div className="overall-compatibility-score" style={{ marginTop: 16 }}>
+          <h3>{Math.round(timingOverlay.shared.joint_readiness_score || 0)}%</h3>
+          <p>{String(timingOverlay.shared.current_window.climate || 'unknown').replace(/_/g, ' ')}</p>
+          <span>Current Marriage Timing Climate</span>
+        </div>
+      )}
       
       <GunaScoreCard 
-        gunaMilan={compatibilityResult.compatibility_analysis.guna_milan}
-        overallScore={compatibilityResult.compatibility_analysis.overall_score}
+        gunaMilan={compatibilityAnalysis.guna_milan}
+        overallScore={compatibilityAnalysis.overall_score}
       />
       
       <CompatibilityReport 
-        analysis={compatibilityResult.compatibility_analysis}
+        analysis={compatibilityAnalysis}
         boyDetails={compatibilityResult.boy_details}
         girlDetails={compatibilityResult.girl_details}
       />
