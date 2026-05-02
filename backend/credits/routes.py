@@ -1318,13 +1318,14 @@ def _get_chat_countdown_settings() -> Dict[str, int]:
 @router.get("/settings/analysis-pricing")
 async def get_analysis_pricing():
     """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough). Unauthenticated; base/admin pricing."""
-    from utils.admin_settings import is_instant_chat_enabled
+    from utils.admin_settings import is_instant_chat_enabled, get_chat_static_suggestions
     pricing, pricing_original = _get_pricing_with_originals()
     result = {
         "pricing": pricing,
         "chat_countdown_seconds": _get_chat_countdown_settings(),
         "features": {
             "instant_chat_enabled": is_instant_chat_enabled(),
+            "chat_static_suggestions": get_chat_static_suggestions(),
         },
     }
     if pricing_original:
@@ -1361,7 +1362,7 @@ _PRICING_KEYS_MAP = [
 @router.get("/settings/my-pricing")
 async def get_my_pricing(current_user: User = Depends(get_current_user)):
     """Authenticated: return user pricing quickly with one DB roundtrip for settings + one for subscription."""
-    from utils.admin_settings import instant_chat_enabled_for_user
+    from utils.admin_settings import instant_chat_enabled_for_user, get_chat_static_suggestions
     pricing = {}
     pricing_original = {}
     discount_percent = 0
@@ -1457,6 +1458,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         "chat_countdown_seconds": _get_chat_countdown_settings(),
         "features": {
             "instant_chat_enabled": instant_chat_enabled_for_user(current_user.userid),
+            "chat_static_suggestions": get_chat_static_suggestions(),
         },
     }
     if tier_name:

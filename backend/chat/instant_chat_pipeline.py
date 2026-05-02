@@ -80,6 +80,51 @@ HOUSE_THEME_LABELS = {
     12: "expenses, retreat, isolation, foreign or hidden matters",
 }
 
+SIGN_STYLE_THEMES = {
+    "Aries": "direct, fast, and action-first",
+    "Taurus": "steady, practical, and comfort-oriented",
+    "Gemini": "curious, verbal, and mentally restless",
+    "Cancer": "protective, feeling-led, and receptive",
+    "Leo": "expressive, proud, and visibly self-driven",
+    "Virgo": "analytical, careful, and improvement-focused",
+    "Libra": "relational, balancing, and diplomacy-seeking",
+    "Scorpio": "intense, private, and all-or-nothing",
+    "Sagittarius": "frank, expansive, and principle-driven",
+    "Capricorn": "serious, strategic, and responsibility-led",
+    "Aquarius": "independent, unconventional, and idea-driven",
+    "Pisces": "sensitive, imaginative, and porous",
+}
+
+NAKSHATRA_STYLE_THEMES = {
+    "Ashwini": "fast-starting, instinctive, and action-led",
+    "Bharani": "intense, carrying, and morally pressured",
+    "Krittika": "sharp, cutting, and clarifying",
+    "Rohini": "attractive, growth-seeking, and attachment-forming",
+    "Mrigashira": "curious, searching, and mentally roaming",
+    "Ardra": "restless, stormy, and truth-pulling",
+    "Punarvasu": "resetting, hopeful, and return-oriented",
+    "Pushya": "protective, dutiful, and stabilizing",
+    "Ashlesha": "psychological, strategic, and binding",
+    "Magha": "status-aware, ancestral, and throne-conscious",
+    "Purva Phalguni": "expressive, pleasure-seeking, and performative",
+    "Uttara Phalguni": "reliable, contractual, and support-giving",
+    "Hasta": "skillful, tactical, and hands-on",
+    "Chitra": "crafted, image-aware, and design-driven",
+    "Swati": "independent, flexible, and wind-like",
+    "Vishakha": "goal-fixed, driven, and branching",
+    "Anuradha": "loyal, relational, and network-building",
+    "Jyeshtha": "protective, proud, and control-seeking",
+    "Mula": "root-seeking, disruptive, and truth-digging",
+    "Purva Ashadha": "assertive, persuasive, and wave-making",
+    "Uttara Ashadha": "enduring, duty-bound, and victory-oriented",
+    "Shravana": "observant, listening, and pattern-tracking",
+    "Dhanishta": "rhythmic, performative, and socially driven",
+    "Shatabhisha": "detached, analytical, and system-breaking",
+    "Purva Bhadrapada": "extreme, idealistic, and intensity-prone",
+    "Uttara Bhadrapada": "deep, restrained, and internally steady",
+    "Revati": "gentle, guiding, and protective",
+}
+
 PARASHARI_TOPIC_MAP = {
     "career": "career",
     "job": "career",
@@ -128,6 +173,31 @@ ANSWER_MODES = [
     "topic_reading",
 ]
 
+TARGET_SUBJECTS = {
+    "self": {"label": "self", "base_house": 1},
+    "spouse": {"label": "spouse/partner", "base_house": 7},
+    "partner": {"label": "spouse/partner", "base_house": 7},
+    "wife": {"label": "wife", "base_house": 7},
+    "husband": {"label": "husband", "base_house": 7},
+    "child": {"label": "child", "base_house": 5},
+    "first_child": {"label": "first child", "base_house": 5},
+    "second_child": {"label": "second child", "base_house": 7},
+    "third_child": {"label": "third child", "base_house": 9},
+    "younger_brother": {"label": "younger brother", "base_house": 3},
+    "younger_sister": {"label": "younger sister", "base_house": 3},
+    "younger_sibling": {"label": "younger sibling", "base_house": 3},
+    "elder_brother": {"label": "elder brother", "base_house": 11},
+    "elder_sister": {"label": "elder sister", "base_house": 11},
+    "elder_sibling": {"label": "elder sibling", "base_house": 11},
+    "sibling": {"label": "sibling", "base_house": 3},
+    "brother": {"label": "brother", "base_house": 3},
+    "sister": {"label": "sister", "base_house": 3},
+    "mother": {"label": "mother", "base_house": 4},
+    "father": {"label": "father", "base_house": 9},
+    "maternal_uncle": {"label": "maternal uncle", "base_house": 6},
+    "uncle": {"label": "uncle", "base_house": 6},
+}
+
 
 def _truncate(text: str, limit: int) -> str:
     raw = (text or "").strip()
@@ -138,6 +208,60 @@ def _truncate(text: str, limit: int) -> str:
 
 def _normalize_question_text(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def _normalize_relationship_target_key(value: str) -> str:
+    key = re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+    return key
+
+
+def _fallback_target_subject(question: str) -> Dict[str, Any]:
+    q = _normalize_question_text(question)
+    checks = [
+        ("second child", "second_child"),
+        ("first child", "first_child"),
+        ("third child", "third_child"),
+        ("younger brother", "younger_brother"),
+        ("younger sister", "younger_sister"),
+        ("elder brother", "elder_brother"),
+        ("older brother", "elder_brother"),
+        ("elder sister", "elder_sister"),
+        ("older sister", "elder_sister"),
+        ("maternal uncle", "maternal_uncle"),
+        ("wife", "wife"),
+        ("husband", "husband"),
+        ("spouse", "spouse"),
+        ("partner", "partner"),
+        ("child", "child"),
+        ("children", "child"),
+        ("brother", "brother"),
+        ("sister", "sister"),
+        ("sibling", "sibling"),
+        ("mother", "mother"),
+        ("father", "father"),
+        ("uncle", "uncle"),
+    ]
+    for needle, key in checks:
+        if needle in q:
+            meta = TARGET_SUBJECTS.get(key) or {}
+            return {
+                "key": key,
+                "label": meta.get("label") or key.replace("_", " "),
+                "base_house": meta.get("base_house"),
+                "confidence": "low",
+                "source": "fallback",
+            }
+    return {
+        "key": "self",
+        "label": "self",
+        "base_house": 1,
+        "confidence": "low",
+        "source": "fallback_self",
+    }
+
+
+def _rotate_house_num(native_house: int, anchor_house: int) -> int:
+    return ((int(native_house) - int(anchor_house)) % 12) + 1
 
 
 def _get_house_lordships(ascendant_sign_index: int) -> Dict[str, List[int]]:
@@ -650,6 +774,337 @@ def _risk_specific_lines(
     return deduped[:limit]
 
 
+def _build_personality_axes(
+    birth_summary: Dict[str, Any],
+    natal_snapshot: Dict[str, Any],
+) -> List[str]:
+    out: List[str] = []
+    ascendant = (birth_summary.get("ascendant") or {}) if isinstance(birth_summary, dict) else {}
+    asc_sign = str(ascendant.get("sign") or "")
+    asc_nak = ((ascendant.get("nakshatra") or {}) if isinstance(ascendant.get("nakshatra"), dict) else {})
+    asc_nak_name = str(asc_nak.get("name") or "")
+    moon = (birth_summary.get("moon") or {}) if isinstance(birth_summary, dict) else {}
+    moon_sign = str(moon.get("sign") or "")
+    moon_house = _safe_int(moon.get("house"))
+    moon_nak = ((moon.get("nakshatra") or {}) if isinstance(moon.get("nakshatra"), dict) else {})
+    moon_nak_name = str(moon_nak.get("name") or "")
+    key_planets = (natal_snapshot.get("key_planets") or {}) if isinstance(natal_snapshot, dict) else {}
+
+    if asc_sign:
+        line = f"Core temperament anchor: Ascendant in {asc_sign} gives an outer style that is {SIGN_STYLE_THEMES.get(asc_sign, 'distinctive and sign-colored')}."
+        if asc_nak_name:
+            line += f" Nakshatra flavor from {asc_nak_name} adds a subtler tone that is {NAKSHATRA_STYLE_THEMES.get(asc_nak_name, 'psychologically specific and motive-colored')}."
+        out.append(line)
+    if moon_sign:
+        moon_line = ""
+        if moon_house is not None:
+            moon_line = f"Emotional style anchor: Moon in {moon_sign} in house {moon_house} shows how the person processes feelings, safety, and inner reactions."
+        else:
+            moon_line = f"Emotional style anchor: Moon in {moon_sign} shows how the person processes feelings, safety, and inner reactions."
+        if moon_nak_name:
+            moon_line += f" Nakshatra flavor from {moon_nak_name} makes the emotional style more {NAKSHATRA_STYLE_THEMES.get(moon_nak_name, 'motive-colored and psychologically textured')}."
+        out.append(moon_line)
+
+    second_house_planets: List[str] = []
+    for planet in ["Mercury", "Mars", "Saturn", "Rahu", "Ketu", "Jupiter", "Sun", "Venus", "Moon"]:
+        row = key_planets.get(planet) or {}
+        if _safe_int(row.get("house")) == 2:
+            second_house_planets.append(planet)
+    if second_house_planets:
+        out.append(
+            f"Expression and speech anchor: house 2 is loaded with {', '.join(second_house_planets[:4])}, so communication, tone, and value-expression are major parts of the personality pattern."
+        )
+
+    mars = key_planets.get("Mars") or {}
+    saturn = key_planets.get("Saturn") or {}
+    pressure_bits: List[str] = []
+    if _safe_int(mars.get("house")) is not None:
+        pressure_bits.append(f"Mars in house {_safe_int(mars.get('house'))}")
+    if _safe_int(saturn.get("house")) is not None:
+        pressure_bits.append(f"Saturn in house {_safe_int(saturn.get('house'))}")
+    if pressure_bits:
+        out.append(
+            f"Pressure-response anchor: {' and '.join(pressure_bits[:2])} show how the person reacts under stress, conflict, and sustained pressure."
+        )
+
+    sun = key_planets.get("Sun") or {}
+    jupiter = key_planets.get("Jupiter") or {}
+    values_bits: List[str] = []
+    if _safe_int(sun.get("house")) is not None:
+        values_bits.append(f"Sun in house {_safe_int(sun.get('house'))}")
+    if _safe_int(jupiter.get("house")) is not None:
+        values_bits.append(f"Jupiter in house {_safe_int(jupiter.get('house'))}")
+    if values_bits:
+        out.append(
+            f"Value and guidance anchor: {' and '.join(values_bits[:2])} help show what principles, beliefs, and meaning-patterns guide the person."
+        )
+
+    deduped = list(dict.fromkeys(out))
+    return deduped[:5]
+
+
+def _planet_names_in_house(key_planets: Dict[str, Any], house: int) -> List[str]:
+    out: List[str] = []
+    for planet in PLANET_SEQUENCE:
+        row = (key_planets or {}).get(planet) or {}
+        if _safe_int(row.get("house")) == house:
+            out.append(planet)
+    return out
+
+
+def _lord_of_house(house_lordships: Dict[str, List[int]], target_house: int) -> str:
+    for planet, houses in (house_lordships or {}).items():
+        if target_house in (houses or []):
+            return str(planet)
+    return ""
+
+
+def _planet_flavor_line(planet: str, row: Dict[str, Any]) -> str:
+    if not planet or not isinstance(row, dict):
+        return ""
+    sign = str(row.get("sign") or "")
+    nak = (row.get("nakshatra") or {}) if isinstance(row.get("nakshatra"), dict) else {}
+    nak_name = str(nak.get("name") or "")
+    bits = [planet]
+    if sign:
+        bits.append(f"in {sign} ({SIGN_STYLE_THEMES.get(sign, 'sign-colored')})")
+    if nak_name:
+        bits.append(f"through {nak_name} ({NAKSHATRA_STYLE_THEMES.get(nak_name, 'nakshatra-colored')})")
+    return " ".join(bits)
+
+
+def _build_target_chart_context(
+    birth_summary: Dict[str, Any],
+    natal_snapshot: Dict[str, Any],
+    current_transits_formatted: Dict[str, Any],
+    target_subject: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    target = target_subject if isinstance(target_subject, dict) else {}
+    target_key = str(target.get("key") or "self")
+    target_label = str(target.get("label") or (TARGET_SUBJECTS.get(target_key) or {}).get("label") or "self")
+    anchor_house = _safe_int(target.get("base_house")) or _safe_int((TARGET_SUBJECTS.get(target_key) or {}).get("base_house")) or 1
+    asc_sign = str(((birth_summary.get("ascendant") or {}) if isinstance(birth_summary.get("ascendant"), dict) else {}).get("sign") or "")
+    try:
+        asc_sign_index = SIGN_NAMES.index(asc_sign)
+    except ValueError:
+        asc_sign_index = 0
+    target_asc_index = (asc_sign_index + anchor_house - 1) % 12
+    target_house_lordships = _get_house_lordships(target_asc_index)
+    key_planets = (natal_snapshot.get("key_planets") or {}) if isinstance(natal_snapshot, dict) else {}
+    rotated_key_planets: Dict[str, Dict[str, Any]] = {}
+    for planet, row in key_planets.items():
+        if not isinstance(row, dict):
+            continue
+        native_house = _safe_int(row.get("house"))
+        rotated_row = dict(row)
+        if native_house is not None:
+            rotated_house = _rotate_house_num(native_house, anchor_house)
+            rotated_row["native_house"] = native_house
+            rotated_row["house_from_target"] = rotated_house
+            rotated_row["house"] = rotated_house
+        rotated_key_planets[str(planet)] = rotated_row
+    rotated_transits: Dict[str, Dict[str, Any]] = {}
+    for planet, row in (current_transits_formatted or {}).items():
+        if not isinstance(row, dict):
+            continue
+        native_house = _safe_int(row.get("house_from_lagna"))
+        rotated_row = dict(row)
+        if native_house is not None:
+            rotated_house = _rotate_house_num(native_house, anchor_house)
+            rotated_row["house_from_native"] = native_house
+            rotated_row["house_from_target"] = rotated_house
+            rotated_row["house"] = rotated_house
+        rotated_transits[str(planet)] = rotated_row
+    return {
+        "key": target_key,
+        "label": target_label,
+        "anchor_house": anchor_house,
+        "target_ascendant_sign": SIGN_NAMES[target_asc_index],
+        "target_house_lordships": target_house_lordships,
+        "target_key_planets": rotated_key_planets,
+        "target_transits": rotated_transits,
+    }
+
+
+def _target_context_as_birth_summary(target_chart_context: Dict[str, Any]) -> Dict[str, Any]:
+    key_planets = (target_chart_context.get("target_key_planets") or {}) if isinstance(target_chart_context, dict) else {}
+    moon = (key_planets.get("Moon") or {}) if isinstance(key_planets, dict) else {}
+    return {
+        "ascendant": {
+            "sign": target_chart_context.get("target_ascendant_sign"),
+            "degree": None,
+            "nakshatra": None,
+        },
+        "moon": {
+            "sign": moon.get("sign"),
+            "house": moon.get("house_from_target"),
+            "nakshatra": moon.get("nakshatra"),
+        },
+    }
+
+
+def _target_context_as_natal_snapshot(target_chart_context: Dict[str, Any]) -> Dict[str, Any]:
+    target_planets = (target_chart_context.get("target_key_planets") or {}) if isinstance(target_chart_context, dict) else {}
+    rotated_planets: Dict[str, Dict[str, Any]] = {}
+    for planet, row in target_planets.items():
+        if not isinstance(row, dict):
+            continue
+        rotated = dict(row)
+        if _safe_int(rotated.get("house_from_target")) is not None:
+            rotated["house"] = _safe_int(rotated.get("house_from_target"))
+        rotated_planets[str(planet)] = rotated
+    return {
+        "house_lordships": target_chart_context.get("target_house_lordships") or {},
+        "key_planets": rotated_planets,
+    }
+
+
+def _build_area_behavior_axes(
+    birth_summary: Dict[str, Any],
+    natal_snapshot: Dict[str, Any],
+) -> Dict[str, List[str]]:
+    house_lordships = (natal_snapshot.get("house_lordships") or {}) if isinstance(natal_snapshot, dict) else {}
+    key_planets = (natal_snapshot.get("key_planets") or {}) if isinstance(natal_snapshot, dict) else {}
+    axes: Dict[str, List[str]] = {}
+
+    def build_axis(name: str, houses: List[int], label: str, extra_planets: List[str] | None = None) -> None:
+        lines: List[str] = []
+        for house in houses:
+            lord = _lord_of_house(house_lordships, house)
+            occupants = _planet_names_in_house(key_planets, house)
+            parts: List[str] = []
+            if lord:
+                lord_row = key_planets.get(lord) or {}
+                lord_flavor = _planet_flavor_line(lord, lord_row)
+                if lord_flavor:
+                    parts.append(f"house {house} lord is {lord_flavor}")
+            if occupants:
+                occ_bits: List[str] = []
+                for occ in occupants[:2]:
+                    occ_row = key_planets.get(occ) or {}
+                    occ_bits.append(_planet_flavor_line(occ, occ_row) or occ)
+                parts.append(f"occupants include {', '.join(occ_bits)}")
+            if parts:
+                lines.append(f"{label} axis through house {house}: " + "; ".join(parts) + ".")
+        for planet in (extra_planets or []):
+            row = key_planets.get(planet) or {}
+            if row:
+                flavor = _planet_flavor_line(planet, row)
+                if flavor:
+                    lines.append(f"{label} is also colored by {flavor}.")
+        if lines:
+            axes[name] = list(dict.fromkeys(lines))[:3]
+
+    build_axis("home_behavior", [4], "Home/emotional-base")
+    build_axis("work_behavior", [6, 10], "Work/public-persona")
+    build_axis("relationship_behavior", [7], "One-to-one/relationship")
+    build_axis("children_family_behavior", [5, 2], "Children/family-affection")
+    build_axis("speech_expression", [2, 3], "Speech/expression")
+    build_axis("pressure_conflict_response", [6, 8], "Pressure/conflict-response", extra_planets=["Mars", "Saturn", "Rahu"])
+    return axes
+
+
+def _build_person_profile_axes(
+    natal_snapshot: Dict[str, Any],
+    divisional_support: Dict[str, Any],
+    relationship_target: Optional[Dict[str, Any]],
+    target_chart_context: Optional[Dict[str, Any]] = None,
+) -> List[str]:
+    house_lordships = (natal_snapshot.get("house_lordships") or {}) if isinstance(natal_snapshot, dict) else {}
+    key_planets = (natal_snapshot.get("key_planets") or {}) if isinstance(natal_snapshot, dict) else {}
+    out: List[str] = []
+
+    target = relationship_target if isinstance(relationship_target, dict) else {}
+    target_key = str(target.get("key") or "spouse")
+    target_label = str(target.get("label") or TARGET_SUBJECTS.get(target_key, {}).get("label") or "person")
+    base_house = _safe_int(target.get("base_house"))
+    if base_house is None:
+        base_house = _safe_int((TARGET_SUBJECTS.get(target_key) or {}).get("base_house")) or 7
+
+    target_lord = _lord_of_house(house_lordships, base_house)
+    if target_lord:
+        row = key_planets.get(target_lord) or {}
+        flavor = _planet_flavor_line(target_lord, row)
+        if flavor:
+            house = _safe_int(row.get("house"))
+            if house is not None:
+                out.append(
+                    f"{target_label.capitalize()} nature anchor: the key house is {base_house} and its lord is {flavor}, placed in house {house}, so this person's nature should be read mainly from this pattern rather than from the native's ascendant."
+                )
+            else:
+                out.append(
+                    f"{target_label.capitalize()} nature anchor: the key house is {base_house} and its lord is {flavor}, so this person's nature should be read mainly from this pattern rather than from the native's ascendant."
+                )
+
+    occupants = _planet_names_in_house(key_planets, base_house)
+    if occupants:
+        occ_bits: List[str] = []
+        for occ in occupants[:3]:
+            occ_row = key_planets.get(occ) or {}
+            occ_bits.append(_planet_flavor_line(occ, occ_row) or occ)
+        out.append(f"{target_label.capitalize()} expression axis: house {base_house} is occupied by {', '.join(occ_bits)}, which colors how this person behaves and presents themselves.")
+
+    speech_house = ((base_house + 1 - 1) % 12) + 1
+    speech_lord = _lord_of_house(house_lordships, speech_house)
+    if speech_lord:
+        row = key_planets.get(speech_lord) or {}
+        flavor = _planet_flavor_line(speech_lord, row)
+        if flavor:
+            out.append(
+                f"{target_label.capitalize()} communication axis: second-from-target house {speech_house} is led by {flavor}, which helps describe speech, values, and day-to-day expression."
+            )
+
+    charts = ((divisional_support.get("topic") or {}).get("charts") or {}) if isinstance(divisional_support, dict) else {}
+    d9 = charts.get("D9") if isinstance(charts, dict) else None
+    if isinstance(d9, dict):
+        for row in d9.get("rows") or []:
+            if not isinstance(row, dict):
+                continue
+            house = _safe_int(row.get("h"))
+            if house == base_house:
+                lord = str(row.get("lord") or "")
+                occ = ", ".join(str(v) for v in (row.get("occ") or [])[:3])
+                bits: List[str] = []
+                if lord:
+                    bits.append(f"lord {lord}")
+                if occ:
+                    bits.append(f"occupants {occ}")
+                if bits:
+                    out.append(f"D9 {target_label} confirmation: in D9, house {base_house} is specifically marked by " + ", ".join(bits) + ".")
+                break
+
+    current_topic = (divisional_support.get("current_topic") or {}) if isinstance(divisional_support, dict) else {}
+    d9_current = (current_topic.get("charts") or {}).get("D9") if isinstance(current_topic, dict) else None
+    if isinstance(d9_current, dict):
+        rows = d9_current.get("rows") or []
+        for row in rows[:2]:
+            if not isinstance(row, dict):
+                continue
+            lvl = str(row.get("lvl") or "").upper()
+            planet = str(row.get("p") or "")
+            house = _safe_int(row.get("h"))
+            if planet and house is not None:
+                out.append(f"Current D9 {target_label}-tone support: {lvl} {planet} connects through D9 house {house}.")
+                break
+
+    if isinstance(target_chart_context, dict) and target_chart_context:
+        rotated_birth_summary = _target_context_as_birth_summary(target_chart_context)
+        rotated_snapshot = _target_context_as_natal_snapshot(target_chart_context)
+        rotated_personality = _build_personality_axes(rotated_birth_summary, rotated_snapshot)
+        rotated_axes = _build_area_behavior_axes(rotated_birth_summary, rotated_snapshot)
+        if rotated_personality:
+            out.append(f"{target_label.capitalize()} core-from-target context: {rotated_personality[0]}")
+            if len(rotated_personality) > 1:
+                out.append(f"{target_label.capitalize()} emotional-from-target context: {rotated_personality[1]}")
+        rel_axis = (rotated_axes.get("relationship_behavior") or [])[:1]
+        speech_axis = (rotated_axes.get("speech_expression") or [])[:1]
+        for line in rel_axis + speech_axis:
+            out.append(f"{target_label.capitalize()} target-context axis: {line}")
+
+    deduped = list(dict.fromkeys(out))
+    return deduped[:4]
+
+
 def _house_activation_mechanisms(
     focus_houses: List[int],
     hi: Dict[str, Any],
@@ -822,6 +1277,7 @@ def _build_answer_mode_router_prompt(question: str, intent: Optional[Dict[str, A
         "context_type": str(intent.get("context_type") or ""),
         "recent_history": recent_items,
         "allowed_answer_modes": ANSWER_MODES,
+        "allowed_target_subjects": sorted(TARGET_SUBJECTS.keys()),
     }
     context_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"""
@@ -845,8 +1301,16 @@ Answer mode meanings:
 - remedy_action: user asks what to do, how to fix, remedy, upay, practical action
 - topic_reading: default focused reading when none of the above fit best
 
+Also infer the target_subject_key from the allowed_target_subjects list.
+Examples:
+- questions about the native themselves -> self
+- wife/husband/spouse/partner -> spouse-type target
+- first child / second child -> the matching child target
+- younger brother / elder sister -> the matching sibling target
+- maternal uncle / uncle -> the closest matching uncle target
+
 Return JSON only:
-{{"answer_mode":"one_of_the_allowed_modes","confidence":"high|medium|low","reason":"very short reason"}}
+{{"answer_mode":"one_of_the_allowed_modes","confidence":"high|medium|low","reason":"very short reason","target_subject_key":"allowed_target_or_self"}}
 
 INPUT:
 {context_json}
@@ -859,7 +1323,7 @@ async def _infer_answer_mode_with_llm(
     question: str,
     intent: Optional[Dict[str, Any]],
     history: List[Dict[str, Any]],
-) -> str:
+) -> Dict[str, Any]:
     prompt = _build_answer_mode_router_prompt(question, intent, history)
     model_name = get_gemini_instant_model()
     selected_model = analyzer.get_named_gemini_model(model_name, premium_analysis=False)
@@ -875,25 +1339,53 @@ async def _infer_answer_mode_with_llm(
         )
     except Exception as exc:
         logger.warning("instant answer mode llm classification failed: %s", exc)
-        return _infer_answer_mode(question, intent, history)
+        return {"answer_mode": _infer_answer_mode(question, intent, history), "target_subject": _fallback_target_subject(question)}
     if not llm_result.get("success"):
         logger.warning("instant answer mode llm classification unsuccessful: %s", llm_result.get("error"))
-        return _infer_answer_mode(question, intent, history)
+        return {"answer_mode": _infer_answer_mode(question, intent, history), "target_subject": _fallback_target_subject(question)}
     raw = str(llm_result.get("response") or "").strip()
+    target_subject: Optional[Dict[str, Any]] = None
     try:
         data = json.loads(raw)
         mode = str(data.get("answer_mode") or "").strip()
+        target_key = _normalize_relationship_target_key(data.get("target_subject_key") or "")
+        if target_key in TARGET_SUBJECTS:
+            meta = TARGET_SUBJECTS.get(target_key) or {}
+            target_subject = {
+                "key": target_key,
+                "label": meta.get("label") or target_key.replace("_", " "),
+                "base_house": meta.get("base_house"),
+                "confidence": str(data.get("confidence") or "medium"),
+                "source": "llm",
+            }
         if mode in ANSWER_MODES:
-            return mode
+            if target_subject is None:
+                target_subject = _fallback_target_subject(question)
+            return {"answer_mode": mode, "target_subject": target_subject}
     except Exception:
         pass
     m = re.search(r'"answer_mode"\s*:\s*"([^"]+)"', raw)
     if m:
         mode = str(m.group(1) or "").strip()
         if mode in ANSWER_MODES:
-            return mode
+            target_match = re.search(r'"target_subject_key"\s*:\s*"([^"]+)"', raw)
+            if target_match:
+                target_key = _normalize_relationship_target_key(target_match.group(1) or "")
+                if target_key in TARGET_SUBJECTS:
+                    meta = TARGET_SUBJECTS.get(target_key) or {}
+                    target_subject = {
+                            "key": target_key,
+                            "label": meta.get("label") or target_key.replace("_", " "),
+                            "base_house": meta.get("base_house"),
+                            "confidence": "medium",
+                            "source": "llm_regex",
+                    }
+            if target_subject is None:
+                target_subject = _fallback_target_subject(question)
+            return {"answer_mode": mode, "target_subject": target_subject}
     logger.warning("instant answer mode llm output invalid, falling back: %s", _truncate(raw, 240))
-    return _infer_answer_mode(question, intent, history)
+    fallback_mode = _infer_answer_mode(question, intent, history)
+    return {"answer_mode": fallback_mode, "target_subject": _fallback_target_subject(question)}
 
 
 def _top_dasha_lines(levels: Dict[str, Any], limit: int = 3) -> List[str]:
@@ -1148,19 +1640,19 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
     elif answer_mode == "trait_nature":
         base.update(
             {
-                "primary_evidence": ["natal_snapshot", "house_activation", "divisional_support.topic"],
+                "primary_evidence": ["personality_axes", "area_behavior_axes", "natal_snapshot", "house_activation", "divisional_specifics"],
                 "secondary_evidence": ["active_dashas_formatted"],
-                "avoid_drift": ["current dasha dominating the answer", "broad event prediction", "random transit commentary"],
-                "answer_skeleton": "Core natal tendency -> How it expresses -> One caution/strength -> Practical takeaway",
+                "avoid_drift": ["current dasha dominating the answer", "broad event prediction", "random transit commentary", "generic flattering summary", "whole-life summary without personality structure"],
+                "answer_skeleton": "Core temperament -> Emotional style -> Expression/communication -> Pressure response -> Two area-specific behavior patterns (such as work/home/relationship/speech) -> One strength and one caution",
             }
         )
     elif answer_mode == "relationship_person":
         base.update(
             {
-                "primary_evidence": ["topic_signals", "focus_houses", "divisional_support.topic", "activation_mechanisms"],
+                "primary_evidence": ["person_profile_axes", "target_subject", "target_chart_context", "topic_signals", "focus_houses", "divisional_specifics", "activation_mechanisms"],
                 "secondary_evidence": ["natal_snapshot", "active_dashas_formatted"],
-                "avoid_drift": ["current-period narrative unless asked", "full marriage timing", "career detours"],
-                "answer_skeleton": "Person/nature indication -> Temperament/value pattern -> Communication/relating style -> One caution",
+                "avoid_drift": ["current-period narrative unless asked", "full marriage timing", "career detours", "using the native's ascendant or Moon as the asked person's direct personality anchor"],
+                "answer_skeleton": "Target-person anchor -> Temperament/value pattern -> Communication/relating style -> One caution",
             }
         )
     elif answer_mode == "timing_window":
@@ -1239,6 +1731,10 @@ def _normalize_instant_evidence(
     instant_parashari: Dict[str, Any],
     current_transits_formatted: Dict[str, Any],
     current_dashas_context: Dict[str, Any],
+    birth_summary: Optional[Dict[str, Any]] = None,
+    natal_snapshot: Optional[Dict[str, Any]] = None,
+    relationship_target: Optional[Dict[str, Any]] = None,
+    target_chart_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     contract = _build_answer_mode_contract(
         answer_mode,
@@ -1282,6 +1778,14 @@ def _normalize_instant_evidence(
         current_transits_formatted,
         period_window,
     )
+    personality_axes = _build_personality_axes(birth_summary or {}, natal_snapshot or {})
+    area_behavior_axes = _build_area_behavior_axes(birth_summary or {}, natal_snapshot or {})
+    person_profile_axes = _build_person_profile_axes(
+        natal_snapshot or {},
+        divisional_support,
+        relationship_target,
+        target_chart_context,
+    )
     divisional_specifics = _divisional_specific_lines(divisional_support, navamsa_root_fruit, limit=2)
     risk_specifics = _risk_specific_lines(top_risks, mechanisms, instant_parashari.get("transit_pressure") or {}, limit=2)
     claim_gates = {
@@ -1302,6 +1806,11 @@ def _normalize_instant_evidence(
         "answer_mode_contract": contract,
         "primary_drivers": primary_drivers,
         "secondary_modifiers": risk_specifics or [],
+        "personality_axes": personality_axes,
+        "area_behavior_axes": area_behavior_axes,
+        "person_profile_axes": person_profile_axes,
+        "target_subject": relationship_target or {"key": "self", "label": "self", "base_house": 1},
+        "target_chart_context": target_chart_context or {},
         "mechanism_links": mechanisms,
         "dasha_chain_synthesis": dasha_chain_lines,
         "dasha_level_effects": dasha_level_effects,
@@ -1429,6 +1938,57 @@ def _instant_parashari_instruction_block(
 ) -> str:
     period_span = int((period_window or {}).get("span_days") or 0)
     contract = (normalized_evidence or {}).get("answer_mode_contract") or {}
+    if answer_mode == "trait_nature":
+        primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "personality axes"
+        secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "secondary modifiers"
+        avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "broad drift"
+        skeleton = str(contract.get("answer_skeleton") or "Core temperament -> Emotional style -> Expression/communication -> Pressure response -> Two area-specific behavior patterns -> One strength and one caution")
+        return "\n".join(
+            [
+                f"This answer uses universal answer mode `{answer_mode}`.",
+                "CRITICAL: Follow the method instructions below exactly.",
+                "CRITICAL: Treat this as a stable personality/behavior reading, not a period prediction.",
+                "CRITICAL: Your response will be marked failed if you turn this into a life summary, if you let current dasha dominate without being asked, or if you flatten behavior into one generic trait.",
+                f"Answer skeleton: {skeleton}.",
+                f"Primary evidence priority: {primary}.",
+                f"Secondary evidence only after primary evidence: {secondary}.",
+                f"Avoid these drifts: {avoid}.",
+                "- `normalized_evidence.personality_axes`: start from these first for core temperament, emotional style, expression, and pressure response.",
+                "- `normalized_evidence.area_behavior_axes`: use these to distinguish home behavior, work behavior, relationship behavior, children/family behavior, speech/expression, and pressure/conflict response.",
+                "- `normalized_evidence.divisional_specifics`: if you mention D9 or any divisional support, cite at least one concrete line from here. Otherwise do not mention it.",
+                "- `normalized_evidence.mechanism_links`: use these only to justify a behavior pattern if needed; do not let them take over the whole answer.",
+                "Use rashi as style/flavor and nakshatra as motive/texture whenever those are available in the provided evidence.",
+                "If the question is broad, mention at least two area-specific behavior patterns after the core personality read.",
+                "If the question points to one area like work, home, spouse, children, speech, or pressure, prioritize that area behavior axis first.",
+                "Do not mention current transits unless they are explicitly necessary, which is rare for this category.",
+                "Do not give vague flattering language. Prefer plain, mechanism-first wording.",
+            ]
+        )
+    if answer_mode == "relationship_person":
+        primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "person profile axes"
+        secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "secondary modifiers"
+        avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "native-self drift"
+        skeleton = str(contract.get("answer_skeleton") or "Target-person anchor -> Temperament/value pattern -> Communication/relating style -> One caution")
+        return "\n".join(
+            [
+                f"This answer uses universal answer mode `{answer_mode}`.",
+                "CRITICAL: Follow the method instructions below exactly.",
+                "CRITICAL: Treat this as a reading about the asked person, not the native directly.",
+                "CRITICAL: Your response will be marked failed if you describe the asked person by using the native's Lagna, Moon, or natal houses as if they belonged directly to that person.",
+                f"Answer skeleton: {skeleton}.",
+                f"Primary evidence priority: {primary}.",
+                f"Secondary evidence only after primary evidence: {secondary}.",
+                f"Avoid these drifts: {avoid}.",
+                "- `normalized_evidence.target_subject`: this tells you who the reading is about and which anchor house defines them.",
+                "- `target_chart_context`: this is the rotated chart frame for the asked person. If the target_subject is not self, use this as the primary frame for ascendant, houses, planets, and transits.",
+                "- `normalized_evidence.person_profile_axes`: start from these first for nature, temperament, communication, and relating style.",
+                "- `normalized_evidence.divisional_specifics`: if you mention D9 or divisional support, cite a concrete line from here or do not mention it.",
+                "If you mention a house position for the asked person, it must come from the target chart context or target-based profile axes, not from the native's direct house placement.",
+                "Do not bring in current dasha or transit narration unless it is explicitly needed for this relationship-person answer.",
+                "Do not flatten all relatives into spouse logic. Follow the target_subject and target_chart_context provided.",
+                "Use plain, mechanism-first wording rather than flattering or dramatic language.",
+            ]
+        )
     time_authority_block = (
         "Time authority rule: follow `instant_parashari.source`. "
         "If source is `window` or `day`, the asked period overrides generic current-chart narration."
@@ -1474,6 +2034,11 @@ def _instant_parashari_instruction_block(
             "- `normalized_evidence`: this is the main evidence hierarchy for this answer. Prefer it over freelancing from raw context.",
             "- `normalized_evidence.primary_drivers`: start from these first.",
             "- `normalized_evidence.secondary_modifiers`: use them to soften, complicate, or caution the answer after the primary drivers.",
+            "- `normalized_evidence.personality_axes`: this is critical for trait/nature/characteristics questions. Start from these stable natal anchors before widening into any other interpretation.",
+            "- `normalized_evidence.area_behavior_axes`: this is critical for behavior questions. Use it to distinguish home behavior, work behavior, relationship behavior, children/family behavior, speech/expression, and pressure/conflict response instead of flattening behavior into one generic trait.",
+            "- `normalized_evidence.person_profile_axes`: this is critical for relationship-person questions. Use it before anything else for wife, husband, partner, child, sibling, parent, or other asked-person behavior and characteristics.",
+            "- `normalized_evidence.target_subject`: this tells you which person the reading is about and which house is being used as the anchor. Follow it rather than defaulting to the native's personality anchors.",
+            "- `target_chart_context`: if the target_subject is not self, this is the rotated target chart frame. Use it as the primary chart context for that person's houses, planets, and transits.",
             "- `normalized_evidence.mechanism_links`: use these when you need to justify why a house or topic is being activated.",
             "- `normalized_evidence.dasha_level_effects`: this is critical for timing/window answers. Use it to distinguish what MD sets in the background, what AD carries as the main channel, what PD sharpens for the month/window, and what Sookshma/Prana trigger more finely.",
             "- `normalized_evidence.dasha_chain_synthesis`: this is critical for timing/window answers. Read each active dasha lord through natal residence, ruled houses, active aspects, and current transit house before you synthesize the final themes.",
@@ -1509,6 +2074,12 @@ def _instant_parashari_instruction_block(
             "Do not use dramatic or salesy phrases like 'highly active', 'potentially productive', 'massive emphasis', 'feast-or-famine', 'big breakthrough', or similar language unless the evidence is unusually explicit and you immediately prove it.",
             "Do not add extra future windows, sub-periods, or trigger dates beyond the asked range unless those windows are explicitly present in the provided evidence. If the user asked about coming months, stay with the coming months unless the backend evidence specifically highlights a narrower later window.",
             "For finance answers, keep the structure tight: direct trend -> main mechanism -> main caution -> practical use. Do not widen into investment sectors, windfalls, or broad market-style language unless the user asked for that.",
+            "For trait/nature/characteristics answers, treat the question as a stable personality reading unless the user explicitly asks about the current period. Start from core temperament, emotional style, expression, and pressure response. Do not let current dasha dominate unless the user asks how the current period is affecting behavior.",
+            "For behavior questions, do not assume behavior is flat across all life areas. If the question points toward work, home, spouse, children, speech, or pressure, use the corresponding area-behavior axis. If the question is broad, use core temperament first and then mention at least two area-specific behavior patterns that are strongly supported.",
+            "For behavior and personality answers, use rashi as style/flavor and nakshatra as subtler motive/texture whenever those are available in the provided evidence.",
+            "If the user asks something like 'Define me as a person', do not give a life summary. Give a personality architecture from the chart: who they are at core, how they process emotion, how they speak/express, how they handle pressure, then at least two area-specific behavior patterns, then one strength and one caution.",
+            "For relationship-person questions, do not use the native's ascendant, Moon, or personality axes as the asked person's direct personality anchor. Start from the target house, its lord, occupants, and the corresponding D9 confirmation.",
+            "If the question is about wife, husband, spouse, child, sibling, parent, uncle, or another relative, your answer fails if you describe that person using the native's Lagna/Moon as if it belongs to them.",
             "For event-prediction answers, do not jump to 'yes' just because career, marriage, money, or movement houses are active. Activation can mean pressure, desire, preparation, negotiation, or restructuring; it does not automatically mean the event will happen.",
             "For event-prediction answers, separate these clearly: what supports the event, what obstructs it, and what remains uncertain. If the evidence is mixed, say it is mixed. Do not force a positive verdict.",
             "If the chart shows movement more clearly than completion, say that. If it shows pressure more clearly than result, say that. If it shows possibility but not certainty, say that.",
@@ -1536,6 +2107,7 @@ def _planet_row(planet_data: Dict[str, Any]) -> Dict[str, Any]:
         "house": planet_data.get("house"),
         "degree": round(float(planet_data.get("degree", 0) or 0), 2),
         "retrograde": bool(planet_data.get("retrograde")),
+        "nakshatra": planet_data.get("nakshatra"),
     }
 
 
@@ -1545,6 +2117,7 @@ def _build_instant_context(
     intent: Optional[Dict[str, Any]],
     history: List[Dict[str, Any]],
     answer_mode_override: Optional[str] = None,
+    target_subject_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     birth_obj = SimpleNamespace(**birth_data)
     chart_calc = ChartCalculator({})
@@ -1578,6 +2151,7 @@ def _build_instant_context(
         except ValueError:
             transit_anchor = dasha_anchor
     transit_calc = RealTransitCalculator()
+    asc_nakshatra = transit_calc.get_nakshatra_from_longitude(ascendant_longitude)
 
     transit_rows: Dict[str, Dict[str, Any]] = {}
     for planet in sorted(focus_planets | {"Saturn", "Jupiter", "Rahu", "Ketu"}):
@@ -1596,6 +2170,25 @@ def _build_instant_context(
         planet: _planet_row(chart_data.get("planets", {}).get(planet, {}))
         for planet in PLANET_SEQUENCE
         if chart_data.get("planets", {}).get(planet)
+    }
+    birth_summary = {
+        "name": birth_data.get("name"),
+        "date": birth_data.get("date"),
+        "time": birth_data.get("time"),
+        "place": birth_data.get("place"),
+        "ascendant": {
+            "sign": ascendant_sign_name,
+            "degree": round(ascendant_longitude % 30, 2),
+            "nakshatra": asc_nakshatra,
+        },
+        "moon": {
+            **_planet_row(chart_data.get("planets", {}).get("Moon", {})),
+            "nakshatra": chart_data.get("planets", {}).get("Moon", {}).get("nakshatra"),
+        },
+    }
+    natal_snapshot = {
+        "house_lordships": house_lordships,
+        "key_planets": key_planets,
     }
 
     def _compact_dasha(level: str) -> Dict[str, Any]:
@@ -1631,6 +2224,7 @@ def _build_instant_context(
     }
 
     answer_mode = str(answer_mode_override or "").strip() or _infer_answer_mode(question, intent, history)
+    target_subject = target_subject_override if isinstance(target_subject_override, dict) else None
     try:
         instant_parashari = _compact_parashari_evidence(
             birth_data=birth_data,
@@ -1665,12 +2259,23 @@ def _build_instant_context(
 
     current_dashas_context = instant_parashari.get("active_dashas_formatted") or {}
     current_transits_context = _format_transit_context(transit_rows)
+    target_chart_context = _build_target_chart_context(
+        birth_summary,
+        natal_snapshot,
+        current_transits_context,
+        target_subject,
+    )
+    target_birth_summary = _target_context_as_birth_summary(target_chart_context)
     normalized_evidence = _normalize_instant_evidence(
         answer_mode=instant_parashari.get("answer_mode") or "topic_reading",
         category=category,
         instant_parashari=instant_parashari,
         current_transits_formatted=current_transits_context,
         current_dashas_context=current_dashas_context,
+        birth_summary=birth_summary,
+        natal_snapshot=natal_snapshot,
+        relationship_target=target_subject,
+        target_chart_context=target_chart_context,
     )
 
     is_general_month_window = (
@@ -1686,6 +2291,80 @@ def _build_instant_context(
     prompt_instant_parashari = dict(instant_parashari)
     prompt_normalized_evidence = dict(normalized_evidence)
     claim_gates = (normalized_evidence.get("claim_gates") or {}) if isinstance(normalized_evidence.get("claim_gates"), dict) else {}
+    if answer_mode == "trait_nature":
+        prompt_current_transits = {}
+        prompt_transits_context = {}
+        prompt_instant_parashari = {
+            k: v
+            for k, v in prompt_instant_parashari.items()
+            if k in {
+                "source",
+                "category",
+                "focus_houses",
+                "topic_key",
+                "divisional_support",
+                "activation_mechanisms",
+                "navamsa_root_fruit",
+                "answer_mode",
+                "period_window",
+                "time_relation",
+            }
+        }
+        prompt_normalized_evidence = {
+            k: v
+            for k, v in prompt_normalized_evidence.items()
+            if k in {
+                "answer_mode_contract",
+                "primary_drivers",
+                "personality_axes",
+                "area_behavior_axes",
+                "mechanism_links",
+                "divisional_specifics",
+                "claim_gates",
+                "avoid_drift",
+            }
+        }
+        recent_history = recent_history[-1:]
+    if answer_mode == "relationship_person":
+        prompt_current_transits = {}
+        prompt_transits_context = {}
+        prompt_instant_parashari = {
+            k: v
+            for k, v in prompt_instant_parashari.items()
+            if k in {
+                "source",
+                "category",
+                "focus_houses",
+                "topic_key",
+                "divisional_support",
+                "activation_mechanisms",
+                "answer_mode",
+                "period_window",
+                "time_relation",
+            }
+        }
+        prompt_normalized_evidence = {
+            k: v
+            for k, v in prompt_normalized_evidence.items()
+            if k in {
+                "answer_mode_contract",
+                "person_profile_axes",
+                "target_subject",
+                "target_chart_context",
+                "mechanism_links",
+                "divisional_specifics",
+                "claim_gates",
+                "avoid_drift",
+            }
+        }
+        natal_snapshot = {}
+        current_dashas_context = {}
+        birth_summary = {
+            **target_birth_summary,
+            "name": str((target_subject or {}).get("label") or "target person"),
+            "source": "rotated_target_context",
+        }
+        recent_history = recent_history[-1:]
     if not claim_gates.get("allow_divisional_mentions"):
         prompt_instant_parashari.pop("divisional_support", None)
         prompt_instant_parashari.pop("navamsa_root_fruit", None)
@@ -1713,20 +2392,7 @@ def _build_instant_context(
         prompt_instant_parashari.pop("top_supports", None)
 
     return {
-        "birth_summary": {
-            "name": birth_data.get("name"),
-            "date": birth_data.get("date"),
-            "time": birth_data.get("time"),
-            "place": birth_data.get("place"),
-            "ascendant": {
-                "sign": ascendant_sign_name,
-                "degree": round(ascendant_longitude % 30, 2),
-            },
-            "moon": {
-                **_planet_row(chart_data.get("planets", {}).get("Moon", {})),
-                "nakshatra": chart_data.get("planets", {}).get("Moon", {}).get("nakshatra"),
-            },
-        },
+        "birth_summary": birth_summary,
         "intent_summary": {
             "category": category,
             "mode": (intent or {}).get("mode") or "birth",
@@ -1736,11 +2402,10 @@ def _build_instant_context(
             "focus_houses": focus["houses"],
             "focus_planets": sorted(focus_planets),
             "extracted_context": (intent or {}).get("extracted_context") or {},
+            "target_subject": target_subject or {"key": "self", "label": "self", "base_house": 1},
         },
-        "natal_snapshot": {
-            "house_lordships": house_lordships,
-            "key_planets": key_planets,
-        },
+        "natal_snapshot": natal_snapshot,
+        "target_chart_context": target_chart_context,
         "current_dashas": {
             "as_of": dasha_anchor.strftime("%Y-%m-%d"),
             "levels": current_dashas_context,
@@ -1802,6 +2467,7 @@ Style rules:
 - Use `normalized_evidence.answer_mode_contract.answer_skeleton` as the structural backbone of the response.
 - If the question is about career, relationship, wealth, or health, use the corresponding `instant_parashari.topic_signals` and `divisional_support` to keep the answer precise.
 - If the question is about a specific facet inside a broader area, answer that facet directly from the house activation and dasha logic instead of widening the answer into a whole life summary.
+- If `intent_summary.target_subject.key` is not `self`, treat `target_chart_context` as the primary chart frame for that person instead of reading only from the native's direct Lagna context.
 - No decorative headers unless absolutely needed.
 
 USER QUESTION:
@@ -1821,18 +2487,21 @@ async def generate_instant_chat_response(
     history: List[Dict[str, Any]],
     language: str = "english",
 ) -> Dict[str, Any]:
-    answer_mode = await _infer_answer_mode_with_llm(
+    mode_selection = await _infer_answer_mode_with_llm(
         analyzer,
         question=question,
         intent=intent,
         history=history,
     )
+    answer_mode = str((mode_selection or {}).get("answer_mode") or "topic_reading")
+    target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
     instant_context = _build_instant_context(
         birth_data=birth_data,
         question=question,
         intent=intent,
         history=history,
         answer_mode_override=answer_mode,
+        target_subject_override=target_subject,
     )
     prompt = _build_instant_prompt(question, instant_context, language)
     model_name = get_gemini_instant_model()

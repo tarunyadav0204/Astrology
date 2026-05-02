@@ -29,7 +29,7 @@ _stub_module("shared.dasha_calculator", DashaCalculator=_Dummy)
 _stub_module("utils.admin_settings", get_gemini_instant_model=lambda: "stub-model")
 _stub_module("utils.query_context", resolve_query_now=lambda qc=None: __import__("datetime").datetime(2026, 5, 1, 12, 0, 0))
 
-from chat.instant_chat_pipeline import _all_house_activation_from_levels, _build_answer_mode_contract, _build_month_tone_signals, _divisional_specific_lines, _infer_answer_mode, _normalize_question_text, _risk_specific_lines
+from chat.instant_chat_pipeline import _all_house_activation_from_levels, _build_answer_mode_contract, _build_month_tone_signals, _build_person_profile_axes, _build_target_chart_context, _divisional_specific_lines, _fallback_target_subject, _infer_answer_mode, _normalize_question_text, _risk_specific_lines, _target_context_as_birth_summary
 
 
 def test_infer_answer_mode_for_explanation():
@@ -50,6 +50,21 @@ def test_infer_answer_mode_for_trait_question():
     assert mode == "trait_nature"
 
 
+def test_build_answer_mode_contract_for_trait_nature_uses_personality_axes():
+    contract = _build_answer_mode_contract(
+        "trait_nature",
+        "general",
+        {"kind": "current", "span_days": 1},
+        "current",
+    )
+    assert contract["answer_mode"] == "trait_nature"
+    assert "personality_axes" in contract["primary_evidence"]
+    assert "area_behavior_axes" in contract["primary_evidence"]
+    assert "Core temperament" in contract["answer_skeleton"]
+    assert "Two area-specific behavior patterns" in contract["answer_skeleton"]
+    assert "current dasha dominating the answer" in contract["avoid_drift"]
+
+
 def test_infer_answer_mode_for_period_window():
     mode = _infer_answer_mode(
         "How will October 2026 be for me?",
@@ -67,8 +82,92 @@ def test_build_answer_mode_contract_for_relationship_person():
         "current",
     )
     assert contract["answer_mode"] == "relationship_person"
-    assert "topic_signals" in contract["primary_evidence"]
+    assert "person_profile_axes" in contract["primary_evidence"]
+    assert "target_subject" in contract["primary_evidence"]
+    assert "target_chart_context" in contract["primary_evidence"]
     assert "current-period narrative unless asked" in contract["avoid_drift"]
+    assert "native's ascendant" in " ".join(contract["avoid_drift"])
+
+
+def test_fallback_target_subject_handles_second_child_and_younger_brother():
+    second_child = _fallback_target_subject("What is my second child's nature?")
+    younger_brother = _fallback_target_subject("Tell me about my younger brother")
+    assert second_child["key"] == "second_child"
+    assert second_child["base_house"] == 7
+    assert younger_brother["key"] == "younger_brother"
+    assert younger_brother["base_house"] == 3
+
+
+def test_build_person_profile_axes_uses_target_house_not_native_lagna():
+    axes = _build_person_profile_axes(
+        {
+            "house_lordships": {
+                "Moon": [1],
+                "Sun": [2],
+                "Mercury": [3, 12],
+                "Venus": [4, 11],
+                "Mars": [5, 10],
+                "Jupiter": [6, 9],
+                "Saturn": [7, 8],
+            },
+            "key_planets": {
+                "Moon": {"sign": "Libra", "house": 4},
+                "Sun": {"sign": "Pisces", "house": 9},
+                "Mercury": {"sign": "Aquarius", "house": 8},
+                "Venus": {"sign": "Taurus", "house": 11},
+                "Mars": {"sign": "Leo", "house": 2},
+                "Jupiter": {"sign": "Leo", "house": 2},
+                "Saturn": {"sign": "Leo", "house": 2},
+                "Rahu": {"sign": "Leo", "house": 2},
+            },
+        },
+        {},
+        {"key": "younger_brother", "label": "younger brother", "base_house": 3},
+    )
+    assert axes
+    joined = " ".join(axes).lower()
+    assert "younger brother" in joined
+    assert "key house is 3" in joined
+
+
+def test_build_target_chart_context_rotates_houses_for_target():
+    ctx = _build_target_chart_context(
+        {"ascendant": {"sign": "Cancer"}},
+        {
+            "key_planets": {
+                "Saturn": {"sign": "Leo", "house": 2},
+                "Moon": {"sign": "Libra", "house": 4},
+            }
+        },
+        {
+            "Jupiter": {"sign": "Gemini", "house_from_lagna": 12},
+        },
+        {"key": "younger_brother", "label": "younger brother", "base_house": 3},
+    )
+    assert ctx["anchor_house"] == 3
+    assert ctx["target_ascendant_sign"] == "Virgo"
+    assert ctx["target_key_planets"]["Saturn"]["house"] == 12
+    assert ctx["target_key_planets"]["Saturn"]["native_house"] == 2
+    assert ctx["target_key_planets"]["Saturn"]["house_from_target"] == 12
+    assert ctx["target_transits"]["Jupiter"]["house"] == 10
+    assert ctx["target_transits"]["Jupiter"]["house_from_native"] == 12
+    assert ctx["target_transits"]["Jupiter"]["house_from_target"] == 10
+
+
+def test_target_context_as_birth_summary_uses_target_ascendant():
+    ctx = _build_target_chart_context(
+        {"ascendant": {"sign": "Cancer"}},
+        {
+            "key_planets": {
+                "Moon": {"sign": "Libra", "house": 4},
+            }
+        },
+        {},
+        {"key": "wife", "label": "wife", "base_house": 7},
+    )
+    summary = _target_context_as_birth_summary(ctx)
+    assert summary["ascendant"]["sign"] == "Capricorn"
+    assert summary["moon"]["house"] == 10
 
 
 def test_build_answer_mode_contract_for_timing_window_prefers_ranked_areas():
@@ -191,8 +290,13 @@ def test_normalize_question_text_treats_same_retry_as_same_question():
 if __name__ == "__main__":
     test_infer_answer_mode_for_explanation()
     test_infer_answer_mode_for_trait_question()
+    test_build_answer_mode_contract_for_trait_nature_uses_personality_axes()
     test_infer_answer_mode_for_period_window()
     test_build_answer_mode_contract_for_relationship_person()
+    test_fallback_target_subject_handles_second_child_and_younger_brother()
+    test_build_person_profile_axes_uses_target_house_not_native_lagna()
+    test_build_target_chart_context_rotates_houses_for_target()
+    test_target_context_as_birth_summary_uses_target_ascendant()
     test_build_answer_mode_contract_for_timing_window_prefers_ranked_areas()
     test_build_answer_mode_contract_for_event_prediction_is_investigative()
     test_all_house_activation_from_levels_covers_full_chart()

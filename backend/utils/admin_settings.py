@@ -226,6 +226,31 @@ def instant_chat_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def get_chat_static_suggestions() -> list[str]:
+    """Admin-defined static suggestion chips for mobile chat."""
+    raw = (get_setting("chat_static_suggestions") or "").strip()
+    if not raw:
+        return []
+
+    try:
+        import json
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return [
+                str(item).strip()
+                for item in parsed
+                if str(item or "").strip()
+            ][:20]
+    except Exception:
+        pass
+
+    return [
+        line.strip()
+        for line in raw.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        if line.strip()
+    ][:20]
+
+
 PODCAST_PROVIDER_TTS = "tts"
 PODCAST_PROVIDER_NOTEBOOK_LM = "notebook_lm"
 

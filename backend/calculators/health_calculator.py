@@ -20,7 +20,7 @@ class HealthCalculator(BaseCalculator):
         self.house_strength_calc = HouseStrengthCalculator(chart_data)
         self.aspect_calc = AspectCalculator(chart_data)
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
-        self.shadbala_calc = ShadbalaCalculator(chart_data)
+        self.shadbala_calc = ShadbalaCalculator(chart_data, birth_data)
         self.yoga_calc = YogaCalculator(chart_data=chart_data)
         
         # Health house mappings
