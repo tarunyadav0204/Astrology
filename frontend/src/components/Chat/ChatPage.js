@@ -159,7 +159,16 @@ const ChatPage = () => {
     const navigate = useNavigate();
     const { birthData } = useAstrology();
     const singleChartWizardProfile = useMemo(() => singleChartProfileDisplay(birthData), [birthData]);
-    const { credits, chatCost, partnershipCost, fetchBalance, freeQuestionAvailable, podcastCost } = useCredits();
+    const {
+        credits,
+        chatCost,
+        partnershipCost,
+        fetchBalance,
+        freeQuestionAvailable,
+        podcastCost,
+        instantChatEnabled,
+        speechChatEnabled,
+    } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -2479,15 +2488,17 @@ const ChatPage = () => {
                             )}
                         </div>
                         <div className="chat-header-toolbar__actions">
+                            {!isMundaneMode && !isPartnershipMode && instantChatEnabled && speechChatEnabled && birthData && (
                             <button
                                 type="button"
                                 className="chat-header-btn"
-                                title="Open speech chat"
+                                title="Talk with Tara (voice chat)"
                                 onClick={() => navigate('/speech-chat')}
                             >
                                 <span className="chat-header-btn__full">Voice</span>
                                 <span className="chat-header-btn__icon" aria-hidden="true">🎤</span>
                             </button>
+                            )}
                             <button
                                 type="button"
                                 className="chat-header-btn"

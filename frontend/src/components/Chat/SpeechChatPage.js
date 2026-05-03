@@ -2,10 +2,31 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
-import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
 import { buildQueryContext } from '../../utils/queryContext';
 import textToSpeech from '../../utils/textToSpeech';
+import { speakThinkingHandoff } from '../../utils/speechThinkingHandoff';
 import './SpeechChatPage.css';
+
+const POLL_INTERVAL_MS = 1400;
+
+function readStoredWebUserName() {
+    try {
+        const raw = localStorage.getItem('user');
+        const u = raw ? JSON.parse(raw) : null;
+        return String(u?.name || u?.full_name || '').trim();
+    } catch {
+        return '';
+    }
+}
+
+function buildTaraGreeting(displayName, chartFirstName) {
+    const chart = String(chartFirstName || 'this').trim();
+    const user = String(displayName || '').trim();
+    if (user) {
+        return `Hello ${user}, I'm Tara, your voice guide on AstroRoshni. Thanks for sharing ${chart}'s chart. How can I help you? Do you have a question for me?`;
+    }
+    return `Hello, I'm Tara, your voice guide on AstroRoshni. Thanks for sharing ${chart}'s chart. How can I help you? Do you have a question for me?`;
+}
 
 const getSpeechRecognitionClass = () => {
     if (typeof window === 'undefined') return null;
@@ -26,17 +47,17 @@ const toChatBirthDetails = (birthData) => ({
     gender: birthData?.gender || '',
 });
 
-const statusLabelMap = {
-    idle: 'Tap the mic to start talking',
-    listening: 'Listening… speak naturally',
-    thinking: 'Reading the chart…',
-    speaking: 'AstroRoshni is speaking',
-};
-
 const SpeechChatPage = () => {
     const navigate = useNavigate();
     const { birthData } = useAstrology();
-    const { credits, chatCost, fetchBalance, freeQuestionAvailable } = useCredits();
+    const {
+        credits,
+        fetchBalance,
+        instantChatCost,
+        speechChatCost,
+        instantChatEnabled,
+        speechChatEnabled,
+    } = useCredits();
 
     const [sessionId, setSessionId] = useState(null);
     const [turns, setTurns] = useState([]);
@@ -47,6 +68,7 @@ const SpeechChatPage = () => {
     const [handsFree, setHandsFree] = useState(true);
     const [followUps, setFollowUps] = useState([]);
     const [isSpeechSupported, setIsSpeechSupported] = useState(() => Boolean(getSpeechRecognitionClass()));
+    const [displayUserName] = useState(() => readStoredWebUserName());
 
     const recognitionRef = useRef(null);
     const finalTranscriptRef = useRef('');
@@ -56,6 +78,18 @@ const SpeechChatPage = () => {
     const thinkingTurnIdRef = useRef(null);
     const autoRestartTimerRef = useRef(null);
     const scrollRef = useRef(null);
+    const greetedRef = useRef(false);
+    const startListeningRef = useRef(() => {});
+    const handsFreeRef = useRef(handsFree);
+
+    handsFreeRef.current = handsFree;
+
+    const taraStatusLabels = useMemo(() => ({
+        idle: 'Tap the mic to ask Tara',
+        listening: 'Listening… speak naturally',
+        thinking: 'Tara is reading the chart…',
+        speaking: 'Tara is speaking',
+    }), []);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -89,6 +123,15 @@ const SpeechChatPage = () => {
         if (!birthData?.name) return 'your selected chart';
         return `${birthData.name}'s chart`;
     }, [birthData]);
+
+    const headerSubtitle = useMemo(() => {
+        if (!birthData?.name) return 'Voice guide on AstroRoshni · Instant spoken answers';
+        return `Voice guide on AstroRoshni · Instant answers for ${birthData.name}`;
+    }, [birthData?.name]);
+
+    useEffect(() => {
+        greetedRef.current = false;
+    }, [birthData?.id]);
 
     const ensureSession = async () => {
         if (sessionId) return sessionId;
@@ -167,6 +210,18 @@ const SpeechChatPage = () => {
             setErrorText('Select a birth chart before starting speech chat.');
             return;
         }
+        if (!speechChatEnabled) {
+            setErrorText('Voice chat is not available for your account right now.');
+            return;
+        }
+        if (!instantChatEnabled) {
+            setErrorText('Instant chat is turned off right now. Use typed chat instead.');
+            return;
+        }
+        if (credits < speechChatCost) {
+            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for speech chat.`);
+            return;
+        }
 
         const SpeechRecognitionClass = getSpeechRecognitionClass();
         if (!SpeechRecognitionClass) {
@@ -236,7 +291,11 @@ const SpeechChatPage = () => {
             const shouldSend = shouldAutoSendSpeechRef.current;
             shouldAutoSendSpeechRef.current = false;
             if (shouldSend && transcript) {
-                sendQuestion(transcript);
+                void (async () => {
+                    await speakThinkingHandoff();
+                    if (!mountedRef.current) return;
+                    sendQuestion(transcript);
+                })();
             } else {
                 setStatus('idle');
             }
@@ -255,6 +314,16 @@ const SpeechChatPage = () => {
     const sendQuestion = async (questionText) => {
         const question = String(questionText || '').trim();
         if (!question) {
+            setStatus('idle');
+            return;
+        }
+        if (!speechChatEnabled || !instantChatEnabled) {
+            setErrorText('Speech chat is not available right now.');
+            setStatus('idle');
+            return;
+        }
+        if (credits < speechChatCost) {
+            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for speech chat.`);
             setStatus('idle');
             return;
         }
@@ -286,6 +355,7 @@ const SpeechChatPage = () => {
             response_style: 'concise',
             premium_analysis: false,
             chat_tier: 'instant',
+            speech_chat: true,
             native_name: birthData?.name,
             birth_details: toChatBirthDetails(birthData),
             client_request_id: `speech_web_${Date.now()}_${Math.random().toString(36).slice(2)}`,
@@ -368,7 +438,7 @@ const SpeechChatPage = () => {
             if (pollCount >= maxPolls) {
                 throw new Error('Speech reply is taking too long.');
             }
-            setTimeout(() => poll().catch(handlePollError), 2500);
+            setTimeout(() => poll().catch(handlePollError), POLL_INTERVAL_MS);
         };
 
         const handlePollError = (error) => {
@@ -404,8 +474,45 @@ const SpeechChatPage = () => {
 
     const handleFollowUp = (question) => {
         interruptAssistantSpeech();
-        sendQuestion(question);
+        setStatus('thinking');
+        void (async () => {
+            await speakThinkingHandoff();
+            if (!mountedRef.current) return;
+            sendQuestion(question);
+        })();
     };
+
+    startListeningRef.current = startListening;
+
+    useEffect(() => {
+        if (greetedRef.current || !birthData?.name || status !== 'idle') return;
+        if (!speechChatEnabled || !instantChatEnabled) return;
+
+        const greeting = buildTaraGreeting(displayUserName, birthData.name);
+        if (!greeting) return;
+
+        greetedRef.current = true;
+        setErrorText('');
+        setStatus('speaking');
+
+        textToSpeech.speak(greeting, {
+            rate: 0.95,
+            pitch: 1,
+            onEnd: () => {
+                if (!mountedRef.current) return;
+                if (handsFreeRef.current) {
+                    autoRestartTimerRef.current = setTimeout(() => {
+                        if (mountedRef.current) startListeningRef.current();
+                    }, 260);
+                    return;
+                }
+                setStatus('idle');
+            },
+            onError: () => {
+                if (mountedRef.current) setStatus('idle');
+            },
+        });
+    }, [birthData?.name, displayUserName, status, speechChatEnabled, instantChatEnabled]);
 
     return (
         <div className="speech-chat-page">
@@ -415,9 +522,12 @@ const SpeechChatPage = () => {
                         ← Back to chat
                     </button>
                     <div className="speech-chat-header__text">
-                        <p className="speech-chat-kicker">Instant Speech Chat</p>
-                        <h1>Talk to AstroRoshni</h1>
-                        <p>Voice-first conversation for {chartLabel}</p>
+                        <p className="speech-chat-kicker">AstroRoshni · Voice</p>
+                        <div className="speech-chat-title-row">
+                            <h1>Tara</h1>
+                            <span className="speech-chat-tara-badge" aria-hidden>✦</span>
+                        </div>
+                        <p>{headerSubtitle}</p>
                     </div>
                     <label className="speech-chat-toggle">
                         <input
@@ -432,9 +542,21 @@ const SpeechChatPage = () => {
                 {!birthData ? (
                     <section className="speech-chat-empty">
                         <h2>Select a chart first</h2>
-                        <p>Speech chat needs a birth chart so AstroRoshni knows which chart to read.</p>
+                        <p>Tara needs a birth chart so she knows which chart to read.</p>
                         <button type="button" onClick={() => navigate('/chat')}>
                             Choose chart in chat
+                        </button>
+                    </section>
+                ) : !speechChatEnabled || !instantChatEnabled ? (
+                    <section className="speech-chat-empty">
+                        <h2>Speech chat unavailable</h2>
+                        <p>
+                            {!speechChatEnabled
+                                ? 'Voice features are not enabled for your account right now.'
+                                : 'Instant chat is turned off. You can still use typed chat from the main chat screen.'}
+                        </p>
+                        <button type="button" onClick={() => navigate('/chat')}>
+                            Back to chat
                         </button>
                     </section>
                 ) : (
@@ -445,14 +567,18 @@ const SpeechChatPage = () => {
                                     type="button"
                                     className="speech-chat-mic"
                                     onClick={handleMicPress}
-                                    disabled={status === 'thinking' || !isSpeechSupported}
+                                    disabled={
+                                        status === 'thinking'
+                                        || !isSpeechSupported
+                                        || credits < speechChatCost
+                                    }
                                 >
                                     {status === 'speaking' ? 'Interrupt' : status === 'listening' ? 'Stop' : 'Talk'}
                                 </button>
                             </div>
-                            <p className="speech-chat-status">{statusLabelMap[status] || statusLabelMap.idle}</p>
+                            <p className="speech-chat-status">{taraStatusLabels[status] || taraStatusLabels.idle}</p>
                             <p className="speech-chat-meta">
-                                Credits: {credits} · Instant chat: {freeQuestionAvailable ? 'free first question' : `${chatCost} credit${chatCost !== 1 ? 's' : ''}`}
+                                Credits: {credits} · Speech chat (Tara): {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
                             </p>
                             {errorText ? <p className="speech-chat-error">{errorText}</p> : null}
                         </section>
@@ -463,8 +589,8 @@ const SpeechChatPage = () => {
                                 <p>{currentTranscript || 'Your transcript will appear here while you speak.'}</p>
                             </div>
                             <div className="speech-chat-live-card speech-chat-live-card--answer">
-                                <span className="speech-chat-live-label">AstroRoshni</span>
-                                <p>{currentAnswer || 'Replies will be spoken aloud here.'}</p>
+                                <span className="speech-chat-live-label">Tara</span>
+                                <p>{currentAnswer || 'Tara will speak her reply here.'}</p>
                             </div>
                         </section>
 
@@ -486,8 +612,8 @@ const SpeechChatPage = () => {
                                         <p>{turn.question}</p>
                                     </div>
                                     <div className="speech-turn__answer">
-                                        <span>AstroRoshni said</span>
-                                        <p>{turn.pending ? 'Reading the chart…' : turn.answer}</p>
+                                        <span>Tara said</span>
+                                        <p>{turn.pending ? 'Tara is reading the chart…' : turn.answer}</p>
                                     </div>
                                 </article>
                             ))}

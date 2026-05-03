@@ -372,10 +372,10 @@ export default function ChatScreen({ navigation, route }) {
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const [showPremiumTooltip, setShowPremiumTooltip] = useState(true);
-  const tooltipResetRef = useRef(true);
   const freeUsedThisSendRef = useRef(false);
   const chatModeIntroShownKeyRef = useRef(null);
+  /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
+  const modeIntroSuppressOpenUntilRef = useRef(0);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -3045,7 +3045,11 @@ export default function ChatScreen({ navigation, route }) {
       setIsPremiumAnalysis(false);
     }
     setShowModeSelector(false);
-    setShowChatModeIntro(false);
+    modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
+    // Close after this frame so the sheet row consumes the gesture; avoids overlay / S/I/P getting a ghost press.
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => setShowChatModeIntro(false));
+    });
   };
 
   const chatModeOptions = [
@@ -4393,9 +4397,13 @@ export default function ChatScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={styles.premiumToggleButton}
                   onPress={() => {
+                    if (Date.now() < modeIntroSuppressOpenUntilRef.current) {
+                      return;
+                    }
                     setShowModeSelector(false);
                     setShowChatModeIntro(true);
                   }}
+                  delayPressIn={50}
                   onLongPress={() => setShowPremiumModal(true)}
                 >
                   <Animated.View
@@ -4525,33 +4533,6 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             
-            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && !isKeyboardVisible && (
-              <View style={styles.premiumTooltip}>
-                <TouchableOpacity 
-                  style={styles.tooltipClose}
-                  onPress={() => {
-                    console.log('❌ Tooltip closed');
-                    tooltipResetRef.current = true;
-                    setShowPremiumTooltip(false);
-                  }}
-                >
-                  <Text style={styles.tooltipCloseText}>✕</Text>
-                </TouchableOpacity>
-                <Text style={styles.tooltipText}>⚡ Premium Analysis</Text>
-                <Text style={styles.tooltipSubtext}>Get deeper insights</Text>
-                <TouchableOpacity 
-                  style={styles.tooltipButton}
-                  onPress={() => {
-                    console.log('💡 Learn More clicked');
-                    tooltipResetRef.current = true;
-                    setShowPremiumTooltip(false);
-                    setShowPremiumModal(true);
-                  }}
-                >
-                  <Text style={styles.tooltipButtonText}>Learn More</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
         </View>
@@ -4657,13 +4638,22 @@ export default function ChatScreen({ navigation, route }) {
           visible={showChatModeIntro}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowChatModeIntro(false)}
+          onRequestClose={() => {
+            modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
+            setShowChatModeIntro(false);
+          }}
         >
-          <TouchableOpacity
-            style={styles.chatModeIntroOverlay}
-            activeOpacity={1}
-            onPress={() => setShowChatModeIntro(false)}
-          >
+          <View style={styles.chatModeIntroOverlay}>
+            <TouchableOpacity
+              style={styles.chatModeIntroDimmer}
+              activeOpacity={1}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.modeIntro.dismissOverlay', 'Dismiss')}
+              onPress={() => {
+                modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
+                setShowChatModeIntro(false);
+              }}
+            />
             <View
               style={[
                 styles.chatModeIntroSheet,
@@ -4672,7 +4662,6 @@ export default function ChatScreen({ navigation, route }) {
                   borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.28)' : 'rgba(234, 88, 12, 0.18)',
                 },
               ]}
-              onStartShouldSetResponder={() => true}
             >
               <View style={styles.chatModeIntroHandle} />
               <Text style={[styles.chatModeIntroEyebrow, { color: colors.primary }]}>
@@ -4744,7 +4733,10 @@ export default function ChatScreen({ navigation, route }) {
 
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setShowChatModeIntro(false)}
+                onPress={() => {
+                  modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
+                  setShowChatModeIntro(false);
+                }}
                 style={[styles.chatModeIntroContinue, { backgroundColor: colors.primary }]}
               >
                 <Text style={styles.chatModeIntroContinueText}>
@@ -4755,7 +4747,7 @@ export default function ChatScreen({ navigation, route }) {
                 </Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
 
         {/* Menu Drawer */}
@@ -6283,8 +6275,11 @@ const styles = StyleSheet.create({
   },
   chatModeIntroOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'flex-end',
+  },
+  chatModeIntroDimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   chatModeIntroSheet: {
     borderTopLeftRadius: 26,
@@ -6294,6 +6289,8 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderWidth: 1,
     maxHeight: '86%',
+    zIndex: 2,
+    elevation: 24,
   },
   chatModeIntroHandle: {
     alignSelf: 'center',
@@ -7583,55 +7580,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(244, 114, 182, 0.05)',
     borderTopRightRadius: 20,
     borderBottomRightRadius: 20,
-  },
-  premiumTooltip: {
-    position: 'absolute',
-    bottom: 80,
-    right: 10,
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
-    width: 180,
-    zIndex: 1000,
-  },
-  tooltipText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  tooltipSubtext: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-  },
-  tooltipButton: {
-    backgroundColor: '#ff6b35',
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  tooltipButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tooltipClose: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    padding: 4,
-    zIndex: 1001,
-  },
-  tooltipCloseText: {
-    fontSize: 16,
-    color: '#999',
   },
   premiumBadge: {
     position: 'absolute',

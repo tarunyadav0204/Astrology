@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -14,10 +16,16 @@ import java.util.Locale
 
 class SpeechRecognitionModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext), RecognitionListener {
+  companion object {
+    private const val MINIMUM_LISTENING_MILLIS = 2500L
+    private const val COMPLETE_SILENCE_MILLIS = 1800L
+    private const val POSSIBLY_COMPLETE_SILENCE_MILLIS = 1200L
+  }
 
   private var speechRecognizer: SpeechRecognizer? = null
   private var pendingPromise: Promise? = null
   private var currentLocale: String = Locale.getDefault().toLanguageTag()
+  private val mainHandler = Handler(Looper.getMainLooper())
 
   override fun getName(): String = "SpeechRecognition"
 
@@ -28,54 +36,82 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
 
   @ReactMethod
   fun startListening(locale: String?, promise: Promise) {
-    if (!SpeechRecognizer.isRecognitionAvailable(reactContext)) {
-      promise.reject("not_available", "Speech recognition is not available on this device")
-      return
-    }
-    if (ContextCompat.checkSelfPermission(reactContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-      promise.reject("no_permission", "Microphone permission is required")
-      return
-    }
-    if (pendingPromise != null) {
-      promise.reject("busy", "Speech recognition is already active")
-      return
-    }
-    // RN 0.80+: use context activity (bare `currentActivity` is not in scope on legacy modules).
-    val activity: Activity? = getCurrentActivity()
-    if (activity == null) {
-      promise.reject("no_activity", "No active screen available for speech recognition")
-      return
-    }
+    try {
+      if (!SpeechRecognizer.isRecognitionAvailable(reactContext)) {
+        promise.reject("not_available", "Speech recognition is not available on this device")
+        return
+      }
+      if (ContextCompat.checkSelfPermission(reactContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        promise.reject("no_permission", "Microphone permission is required")
+        return
+      }
+      if (pendingPromise != null) {
+        promise.reject("busy", "Speech recognition is already active")
+        return
+      }
+      val activity: Activity? = getCurrentActivity()
+      if (activity == null) {
+        promise.reject("no_activity", "No active screen available for speech recognition")
+        return
+      }
 
-    currentLocale = normalizeLocale(locale)
-    pendingPromise = promise
+      currentLocale = normalizeLocale(locale)
+      pendingPromise = promise
+      mainHandler.post {
+        try {
+          val recognizer = speechRecognizer ?: SpeechRecognizer.createSpeechRecognizer(activity).also {
+            it.setRecognitionListener(this)
+            speechRecognizer = it
+          }
 
-    val recognizer = speechRecognizer ?: SpeechRecognizer.createSpeechRecognizer(reactContext).also {
-      it.setRecognitionListener(this)
-      speechRecognizer = it
+          val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLocale)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, reactContext.packageName)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, MINIMUM_LISTENING_MILLIS)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, COMPLETE_SILENCE_MILLIS)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, POSSIBLY_COMPLETE_SILENCE_MILLIS)
+          }
+          recognizer.startListening(intent)
+        } catch (e: Exception) {
+          val currentPromise = pendingPromise
+          pendingPromise = null
+          currentPromise?.reject("start_failed", e.message ?: "Could not start speech recognition", e)
+        }
+      }
+    } catch (e: Exception) {
+      pendingPromise = null
+      promise.reject("start_failed", e.message ?: "Could not start speech recognition", e)
     }
-
-    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-      putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-      putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-      putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLocale)
-      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
-      putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, reactContext.packageName)
-    }
-    recognizer.startListening(intent)
   }
 
   @ReactMethod
   fun stopListening() {
-    speechRecognizer?.stopListening()
+    mainHandler.post {
+      try {
+        speechRecognizer?.stopListening()
+      } catch (e: Exception) {
+        val promise = pendingPromise
+        pendingPromise = null
+        promise?.reject("stop_failed", e.message ?: "Could not stop speech recognition", e)
+      }
+    }
   }
 
   @ReactMethod
   fun cancelListening() {
     pendingPromise?.reject("cancelled", "Speech recognition cancelled")
     pendingPromise = null
-    speechRecognizer?.cancel()
+    mainHandler.post {
+      try {
+        speechRecognizer?.cancel()
+      } catch (e: Exception) {
+        // ignore cancellation failures
+      }
+    }
   }
 
   @ReactMethod
@@ -130,8 +166,14 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
 
   override fun invalidate() {
     pendingPromise = null
-    speechRecognizer?.destroy()
-    speechRecognizer = null
+    mainHandler.post {
+      try {
+        speechRecognizer?.destroy()
+      } catch (e: Exception) {
+        // ignore
+      }
+      speechRecognizer = null
+    }
     super.invalidate()
   }
 

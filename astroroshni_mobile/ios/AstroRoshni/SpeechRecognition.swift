@@ -105,6 +105,7 @@ class SpeechRecognition: RCTEventEmitter {
 
       let request = SFSpeechAudioBufferRecognitionRequest()
       request.shouldReportPartialResults = true
+      request.taskHint = .dictation
 
       pendingResolve = resolve
       pendingReject = reject

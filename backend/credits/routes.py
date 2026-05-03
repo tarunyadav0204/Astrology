@@ -1263,6 +1263,7 @@ def _get_pricing_with_originals():
     keys_map = [
         ("chat", "chat_question_cost"),
         ("instant_chat", "instant_chat_cost"),
+        ("speech_chat", "speech_chat_cost"),
         ("premium_chat", "premium_chat_cost"),
         ("partnership", "partnership_analysis_cost"),
         ("events", "event_timeline_cost"),
@@ -1342,6 +1343,7 @@ async def get_analysis_pricing():
 _PRICING_KEYS_MAP = [
     ("chat", "chat_question_cost"),
     ("instant_chat", "instant_chat_cost"),
+    ("speech_chat", "speech_chat_cost"),
     ("premium_chat", "premium_chat_cost"),
     ("partnership", "partnership_analysis_cost"),
     ("events", "event_timeline_cost"),

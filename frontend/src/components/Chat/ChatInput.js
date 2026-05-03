@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCredits } from '../../context/CreditContext';
+import { speakThinkingHandoff } from '../../utils/speechThinkingHandoff';
 
 const MOBILE_PREMIUM_MQ = '(max-width: 768px)';
 
@@ -36,6 +37,9 @@ const ChatInput = ({
         freeQuestionAvailable,
         freeQuestionRequiresNotifications,
         fetchBalance,
+        instantChatCost,
+        instantChatEnabled,
+        speechChatEnabled,
     } = useCredits();
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
@@ -114,10 +118,21 @@ const ChatInput = ({
     const effectiveCost = useFreeQuestionEligible ? 0 : currentCost;
 
     const canSendMessage = !isLoading && credits >= effectiveCost && !isLocked;
+    const useInstantVoiceSend =
+        showPremiumControls
+        && !isPremiumAnalysis
+        && !isPartnershipMode
+        && !isMundaneMode
+        && instantChatEnabled
+        && speechChatEnabled;
+    const canSendInstantMessage = !isLoading && !isLocked && credits >= instantChatCost;
 
     const commitSend = (text, premiumOverride = null, sendOptions = {}) => {
         const trimmed = String(text || '').trim();
-        if (!trimmed || !canSendMessage) return false;
+        const isInstantSend = Boolean(sendOptions.instant_chat || sendOptions.chat_tier === 'instant');
+        if (!trimmed) return false;
+        if (isInstantSend && !canSendInstantMessage) return false;
+        if (!isInstantSend && !canSendMessage) return false;
         const premiumForSend = useFreeQuestionEligible ? false : (premiumOverride ?? isPremiumAnalysis);
         onSendMessage(trimmed, {
             premium_analysis: premiumForSend,
@@ -142,8 +157,12 @@ const ChatInput = ({
         setIsSpeechListening(false);
     };
 
+    const canStartSpeechSession =
+        speechChatEnabled
+        && (useInstantVoiceSend ? canSendInstantMessage : canSendMessage);
+
     const startSpeechRecognition = () => {
-        if (!canSendMessage) return;
+        if (!canStartSpeechSession) return;
 
         const SpeechRecognitionClass = getSpeechRecognitionClass();
         if (!SpeechRecognitionClass) {
@@ -208,13 +227,22 @@ const ChatInput = ({
             const shouldSend = shouldAutoSendSpeechRef.current;
             shouldAutoSendSpeechRef.current = false;
 
-            if (shouldSend && transcriptToSend && canSendMessage) {
-                commitSend(transcriptToSend, false, {
-                    premium_analysis: false,
-                    chat_tier: 'instant',
-                    instant_chat: true,
-                });
-            }
+            if (!shouldSend || !transcriptToSend) return;
+
+            void (async () => {
+                if (useInstantVoiceSend && canSendInstantMessage) {
+                    await speakThinkingHandoff();
+                    commitSend(transcriptToSend, false, {
+                        premium_analysis: false,
+                        chat_tier: 'instant',
+                        instant_chat: true,
+                    });
+                    return;
+                }
+                if (canSendMessage) {
+                    commitSend(transcriptToSend, false, {});
+                }
+            })();
         };
 
         recognitionRef.current = recognition;
@@ -488,7 +516,7 @@ const ChatInput = ({
                     type="button"
                     className={`speech-button ${isSpeechListening ? 'speech-button--listening' : ''}`}
                     onClick={handleSpeechButton}
-                    disabled={!isSpeechSupported || isLoading || credits < effectiveCost || isLocked}
+                    disabled={!isSpeechSupported || !speechChatEnabled || isLoading || isLocked || (useInstantVoiceSend ? credits < instantChatCost : credits < effectiveCost)}
                     aria-label={
                         isAssistantSpeaking
                             ? 'Interrupt and ask a follow-up'
@@ -499,11 +527,15 @@ const ChatInput = ({
                     title={
                         !isSpeechSupported
                             ? 'Speech recognition is not supported in this browser'
-                            : isAssistantSpeaking
-                                ? 'Interrupt and ask the next question'
-                                : isSpeechListening
-                                ? 'Stop listening'
-                                : 'Speak your question'
+                            : !speechChatEnabled
+                                ? 'Voice features are not available right now'
+                                : useInstantVoiceSend && credits < instantChatCost
+                                    ? `Instant speech uses ${instantChatCost} credit${instantChatCost !== 1 ? 's' : ''}`
+                                    : isAssistantSpeaking
+                                        ? 'Interrupt and ask the next question'
+                                        : isSpeechListening
+                                            ? 'Stop listening'
+                                            : 'Speak your question'
                     }
                 >
                     <span className="speech-button__icon" aria-hidden="true">

@@ -26,6 +26,10 @@ export const CreditProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
     const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
+    const [instantChatCost, setInstantChatCost] = useState(1);
+    const [speechChatCost, setSpeechChatCost] = useState(1);
+    const [instantChatEnabled, setInstantChatEnabled] = useState(true);
+    const [speechChatEnabled, setSpeechChatEnabled] = useState(true);
 
     const fetchBalance = useCallback(async () => {
         try {
@@ -94,6 +98,7 @@ export const CreditProvider = ({ children }) => {
         try {
             const token = localStorage.getItem('token');
             let pricing = {};
+            let features = null;
             if (token) {
                 const response = await fetch('/api/credits/settings/my-pricing', {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -101,6 +106,7 @@ export const CreditProvider = ({ children }) => {
                 if (response.ok) {
                     const data = await response.json();
                     pricing = data.pricing || {};
+                    features = data.features ?? null;
                 }
             }
             if (Object.keys(pricing).length === 0) {
@@ -108,6 +114,7 @@ export const CreditProvider = ({ children }) => {
                 if (response.ok) {
                     const data = await response.json();
                     pricing = data.pricing || {};
+                    if (!features) features = data.features ?? null;
                 }
             }
             if (pricing.chat != null) setChatCost(Number(pricing.chat) || 1);
@@ -120,6 +127,29 @@ export const CreditProvider = ({ children }) => {
             if (pricing.career != null) setCareerCost(Number(pricing.career) || 12);
             if (pricing.progeny != null) setProgenyCost(Number(pricing.progeny) || 15);
             if (pricing.events != null) setEventsCost(Number(pricing.events) || 100);
+
+            const chatNum = pricing.chat != null ? Number(pricing.chat) || 1 : null;
+            let resolvedInstant = null;
+            if (pricing.instant_chat != null) {
+                resolvedInstant = Number(pricing.instant_chat) || chatNum || 1;
+            } else if (chatNum != null) {
+                resolvedInstant = chatNum;
+            }
+            if (resolvedInstant != null) {
+                setInstantChatCost(resolvedInstant);
+            }
+            if (pricing.speech_chat != null) {
+                setSpeechChatCost(Number(pricing.speech_chat) || resolvedInstant || chatNum || 1);
+            } else if (resolvedInstant != null) {
+                setSpeechChatCost(resolvedInstant);
+            } else if (chatNum != null) {
+                setSpeechChatCost(chatNum);
+            }
+
+            if (features && typeof features === 'object') {
+                setInstantChatEnabled(features.instant_chat_enabled !== false);
+                setSpeechChatEnabled(features.speech_chat_enabled !== false);
+            }
         } catch (error) {
             console.error('Error fetching pricing:', error);
         }
@@ -203,6 +233,10 @@ export const CreditProvider = ({ children }) => {
             eventsCost,
             freeQuestionAvailable,
             freeQuestionRequiresNotifications,
+            instantChatCost,
+            speechChatCost,
+            instantChatEnabled,
+            speechChatEnabled,
             loading,
             fetchBalance,
             fetchCosts,

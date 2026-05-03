@@ -18,6 +18,7 @@ import { creditAPI, pricingAPI } from '../../services/api';
 const FEATURE_ROWS = [
   { key: 'chat', label: 'Standard chat' },
   { key: 'instant_chat', label: 'Instant chat' },
+  { key: 'speech_chat', label: 'Speech chat (Tara)' },
   { key: 'premium_chat', label: 'Premium chat' },
   { key: 'career', label: 'Career analysis' },
   { key: 'marriage', label: 'Marriage analysis' },

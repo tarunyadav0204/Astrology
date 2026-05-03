@@ -203,6 +203,7 @@ class CreditService:
             defaults = [
                 ("chat_question_cost", 1, "Credits per chat question"),
                 ("instant_chat_cost", 1, "Credits per instant chat answer"),
+                ("speech_chat_cost", 1, "Credits per speech chat turn (Tara / voice-first)"),
                 ("wealth_analysis_cost", 5, "Credits per wealth analysis"),
                 ("marriage_analysis_cost", 3, "Credits per marriage analysis"),
                 ("health_analysis_cost", 3, "Credits per health analysis"),
@@ -977,7 +978,7 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
-            'chat_question_cost', 'instant_chat_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
+            'chat_question_cost', 'instant_chat_cost', 'speech_chat_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
@@ -1004,6 +1005,25 @@ class CreditService:
                     "description": row[2],
                     "discount": row[3] if len(row) > 3 else None,
                 })
+            # Ensure speech_chat_cost exists so admin Feature Costs always shows it
+            if not any(s["key"] == "speech_chat_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('speech_chat_cost', 1, 'Credits per speech chat turn (Tara / voice-first)')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "speech_chat_cost",
+                        "value": 1,
+                        "description": "Credits per speech chat turn (Tara / voice-first)",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
             # Ensure podcast_cost exists so admin Feature Costs always shows it
             if not any(s["key"] == "podcast_cost" for s in settings):
                 try:

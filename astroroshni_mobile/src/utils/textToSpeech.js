@@ -36,6 +36,16 @@ const normalizeVoice = (voice) => ({
   quality: voice.quality || null,
 });
 
+const FEMALE_HINTS = [
+  'female', 'woman', 'samantha', 'karen', 'moira', 'tessa', 'veena',
+  'aditi', 'neerja', 'priya', 'raveena', 'kavya', 'pooja', 'shruti',
+];
+
+const MALE_HINTS = [
+  'male', 'man', 'daniel', 'alex', 'fred', 'jorge', 'rishi', 'aarav',
+  'male_', '_male',
+];
+
 const scoreVoice = (voice, lang) => {
   const identifier = String(voice.identifier || '').toLowerCase();
   const name = String(voice.name || '').toLowerCase();
@@ -47,13 +57,15 @@ const scoreVoice = (voice, lang) => {
     else if (language.startsWith('hi')) score += 100;
     else if (language === 'en-in') score += 40;
   } else {
-    if (language === 'en-in') score += 120;
-    else if (language.startsWith('en')) score += 100;
-    else if (language.startsWith('hi')) score += 20;
+    if (language.startsWith('en') && !language.endsWith('-in')) score += 140;
+    else if (language === 'en-in') score += 100;
+    else if (language.startsWith('en')) score += 90;
+    else if (language.startsWith('hi')) score += 10;
   }
 
-  if (name.includes('female') || name.includes('woman') || identifier.includes('female')) score += 30;
-  if (name.includes('india') || name.includes('indian') || language.endsWith('-in')) score += 20;
+  if (FEMALE_HINTS.some((hint) => name.includes(hint) || identifier.includes(hint))) score += 80;
+  if (MALE_HINTS.some((hint) => name.includes(hint) || identifier.includes(hint))) score -= 50;
+  if (lang !== 'hi' && (name.includes('india') || name.includes('indian') || language.endsWith('-in'))) score -= 20;
   if (voice.quality === 'Enhanced') score += 10;
   if (voice.quality === 'Default') score += 5;
 
@@ -75,8 +87,17 @@ const pickSystemVoice = async (lang, requestedVoiceName) => {
       if (exactMatch) return exactMatch;
     }
 
-    const ranked = [...voices].sort((a, b) => scoreVoice(b, lang) - scoreVoice(a, lang));
-    return ranked[0] || null;
+      const ranked = [...voices].sort((a, b) => scoreVoice(b, lang) - scoreVoice(a, lang));
+      if (__DEV__) {
+        console.log('[TTS] Ranked system voices', ranked.slice(0, 8).map((voice) => ({
+          identifier: voice.identifier,
+          name: voice.name,
+          language: voice.language,
+          quality: voice.quality,
+          score: scoreVoice(voice, lang),
+        })));
+      }
+      return ranked[0] || null;
   } catch (e) {
     console.warn('[TTS] Could not inspect system voices', e?.message || e);
     return null;
@@ -104,7 +125,7 @@ export const textToSpeech = {
         language: speechLanguage,
         voice: voice?.identifier,
         rate: lang === 'hi' ? 0.92 : 0.95,
-        pitch: 1.0,
+        pitch: lang === 'hi' ? 1.02 : 1.06,
         onDone: () => {
           if (onDone) onDone();
         },
