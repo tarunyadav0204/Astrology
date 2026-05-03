@@ -226,6 +226,45 @@ def instant_chat_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def is_speech_chat_enabled() -> bool:
+    """Global feature flag for mobile speech input (mic) + /api/speech/transcribe."""
+    return _parse_bool_setting(get_setting("speech_chat_enabled"), default=False)
+
+
+def get_speech_chat_user_allowlist() -> Set[int]:
+    """Optional CSV user id allowlist for speech chat. Empty set means all users when speech is enabled."""
+    raw = (get_setting("speech_chat_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            user_ids.add(int(cleaned))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def speech_chat_enabled_for_user(user_id: Optional[int]) -> bool:
+    """
+    Global OFF disables speech for everyone.
+    Global ON + empty allowlist enables for all users.
+    Global ON + allowlist enables only listed users.
+    """
+    if not is_speech_chat_enabled():
+        return False
+    allowlist = get_speech_chat_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
 def get_chat_static_suggestions() -> list[str]:
     """Admin-defined static suggestion chips for mobile chat."""
     raw = (get_setting("chat_static_suggestions") or "").strip()

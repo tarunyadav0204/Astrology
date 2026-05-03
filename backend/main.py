@@ -90,6 +90,7 @@ except Exception as _e:
 from credits.routes import router as credits_router
 from credits.razorpay_routes import router as razorpay_credits_router
 from tts.routes import router as tts_router
+from speech.routes import router as speech_router
 from credits.credit_request_routes import router as credit_request_router
 from blank_chart.routes import router as blank_chart_router
 from education.routes import router as education_router
@@ -560,6 +561,7 @@ if _admin_user_profile_available and admin_user_profile_router:
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(razorpay_credits_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
+app.include_router(speech_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")
 app.include_router(blank_chart_router, prefix="/api")
 app.include_router(education_router, prefix="/api")

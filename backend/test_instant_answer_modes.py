@@ -29,7 +29,7 @@ _stub_module("shared.dasha_calculator", DashaCalculator=_Dummy)
 _stub_module("utils.admin_settings", get_gemini_instant_model=lambda: "stub-model")
 _stub_module("utils.query_context", resolve_query_now=lambda qc=None: __import__("datetime").datetime(2026, 5, 1, 12, 0, 0))
 
-from chat.instant_chat_pipeline import _all_house_activation_from_levels, _build_answer_mode_contract, _build_month_tone_signals, _build_person_profile_axes, _build_target_chart_context, _divisional_specific_lines, _fallback_target_subject, _infer_answer_mode, _normalize_question_text, _risk_specific_lines, _target_context_as_birth_summary
+from chat.instant_chat_pipeline import _all_house_activation_from_levels, _build_answer_mode_contract, _build_month_tone_signals, _build_person_profile_axes, _build_target_chart_context, _divisional_specific_lines, _fallback_target_subject, _infer_answer_mode, _normalize_question_text, _risk_specific_lines, _rotate_instant_parashari_for_target, _target_context_as_birth_summary
 
 
 def test_infer_answer_mode_for_explanation():
@@ -170,6 +170,40 @@ def test_target_context_as_birth_summary_uses_target_ascendant():
     assert summary["moon"]["house"] == 10
 
 
+def test_rotate_instant_parashari_for_target_reanchors_houses():
+    target_ctx = _build_target_chart_context(
+        {"ascendant": {"sign": "Cancer"}},
+        {
+            "key_planets": {
+                "Saturn": {"sign": "Leo", "house": 2},
+                "Moon": {"sign": "Libra", "house": 4},
+            }
+        },
+        {
+            "Saturn": {"sign": "Pisces", "house_from_lagna": 9},
+        },
+        {"key": "wife", "label": "wife", "base_house": 7},
+    )
+    rotated = _rotate_instant_parashari_for_target(
+        {
+            "focus_houses": [1, 6, 8, 12],
+            "active_dashas": {"md": {"p": "Saturn", "rh": [7, 8], "h": 2, "ahs": [2, 4, 8, 11]}},
+            "active_dashas_formatted": {"md": {"planet": "Saturn", "natal_house": 2, "natal_sign": "Leo", "lordships": [7, 8]}},
+            "house_activation": {"2": {"r": [], "o": ["md"], "a": ["md"]}, "8": {"r": ["md"], "o": [], "a": ["md"]}},
+            "transit_pressure": {"dp": [{"tp": "Saturn", "np": "Mercury", "th": 9, "nh": 8, "at": "9th_house"}]},
+            "top_supports": ["MD runs through Saturn from house 2, linking houses 7, 8."],
+            "top_risks": ["Health pattern is tied to house 8."],
+        },
+        target_ctx,
+        [1, 6, 8, 12],
+    )
+    assert rotated["active_dashas_formatted"]["md"]["natal_house"] == 8
+    assert rotated["active_dashas"]["md"]["h"] == 8
+    assert rotated["active_dashas"]["md"]["rh"] == [1, 2]
+    assert rotated["transit_pressure"]["dp"][0]["th"] == 3
+    assert rotated["transit_pressure"]["dp"][0]["nh"] == 2
+
+
 def test_build_answer_mode_contract_for_timing_window_prefers_ranked_areas():
     contract = _build_answer_mode_contract(
         "timing_window",
@@ -196,6 +230,22 @@ def test_build_answer_mode_contract_for_event_prediction_is_investigative():
     assert contract["answer_mode"] == "event_prediction"
     assert "question-led yes bias" in contract["avoid_drift"]
     assert "Evidence-led verdict" in contract["answer_skeleton"]
+
+
+def test_build_answer_mode_contract_for_problem_diagnosis_uses_target_context():
+    contract = _build_answer_mode_contract(
+        "problem_diagnosis",
+        "health",
+        {"kind": "window", "span_days": 30},
+        "past",
+    )
+    assert contract["answer_mode"] == "problem_diagnosis"
+    assert "target_subject" in contract["primary_evidence"]
+    assert "target_chart_context" in contract["primary_evidence"]
+    assert "cinematic injury narrative" in contract["avoid_drift"]
+    assert "target-relative houses" in contract["answer_skeleton"]
+    assert "dramatic injury phrasing" in contract["avoid_drift"]
+    assert "overstated causal certainty" in contract["avoid_drift"]
 
 
 def test_all_house_activation_from_levels_covers_full_chart():
@@ -297,8 +347,10 @@ if __name__ == "__main__":
     test_build_person_profile_axes_uses_target_house_not_native_lagna()
     test_build_target_chart_context_rotates_houses_for_target()
     test_target_context_as_birth_summary_uses_target_ascendant()
+    test_rotate_instant_parashari_for_target_reanchors_houses()
     test_build_answer_mode_contract_for_timing_window_prefers_ranked_areas()
     test_build_answer_mode_contract_for_event_prediction_is_investigative()
+    test_build_answer_mode_contract_for_problem_diagnosis_uses_target_context()
     test_all_house_activation_from_levels_covers_full_chart()
     test_build_month_tone_signals_disabled_without_sun_contact()
     test_build_month_tone_signals_enabled_for_dasha_activated_house()

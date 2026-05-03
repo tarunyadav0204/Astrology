@@ -1164,6 +1164,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_deepseek_premium_model,
             is_instant_chat_enabled,
             get_instant_chat_user_allowlist,
+            is_speech_chat_enabled,
+            get_speech_chat_user_allowlist,
             get_setting,
         )
         with get_conn() as conn:
@@ -1196,6 +1198,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "instant_chat_enabled": is_instant_chat_enabled(),
             "instant_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_instant_chat_user_allowlist())
+            ),
+            "speech_chat_enabled": is_speech_chat_enabled(),
+            "speech_chat_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_speech_chat_user_allowlist())
             ),
         }
     except Exception as e:

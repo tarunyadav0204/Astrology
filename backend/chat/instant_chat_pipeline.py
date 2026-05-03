@@ -264,6 +264,37 @@ def _rotate_house_num(native_house: int, anchor_house: int) -> int:
     return ((int(native_house) - int(anchor_house)) % 12) + 1
 
 
+def _rotate_house_list(houses: List[Any], anchor_house: int) -> List[int]:
+    out: List[int] = []
+    for house in houses or []:
+        h = _safe_int(house)
+        if h is None:
+            continue
+        out.append(_rotate_house_num(h, anchor_house))
+    return out
+
+
+def _rewrite_house_refs(text: str, anchor_house: int) -> str:
+    raw = str(text or "")
+    if not raw:
+        return raw
+
+    def repl_single(match: re.Match[str]) -> str:
+        num = _safe_int(match.group(1))
+        if num is None:
+            return match.group(0)
+        return f"house {_rotate_house_num(num, anchor_house)}"
+
+    def repl_list(match: re.Match[str]) -> str:
+        nums = re.findall(r"\d+", match.group(1) or "")
+        rotated = [str(_rotate_house_num(int(n), anchor_house)) for n in nums]
+        return f"houses {', '.join(rotated)}"
+
+    raw = re.sub(r"houses\s+((?:\d+\s*,\s*)*\d+)", repl_list, raw)
+    raw = re.sub(r"house\s+(\d+)", repl_single, raw)
+    return raw
+
+
 def _get_house_lordships(ascendant_sign_index: int) -> Dict[str, List[int]]:
     sign_lords = {
         0: "Mars",
@@ -914,6 +945,7 @@ def _build_target_chart_context(
             rotated_row["house_from_native"] = native_house
             rotated_row["house_from_target"] = rotated_house
             rotated_row["house"] = rotated_house
+            rotated_row["house_from_lagna"] = rotated_house
         rotated_transits[str(planet)] = rotated_row
     return {
         "key": target_key,
@@ -957,6 +989,123 @@ def _target_context_as_natal_snapshot(target_chart_context: Dict[str, Any]) -> D
         "house_lordships": target_chart_context.get("target_house_lordships") or {},
         "key_planets": rotated_planets,
     }
+
+
+def _rotate_active_dashas_context(
+    current_dashas_context: Dict[str, Any],
+    target_chart_context: Dict[str, Any],
+) -> Dict[str, Any]:
+    target_house_lordships = (target_chart_context.get("target_house_lordships") or {}) if isinstance(target_chart_context, dict) else {}
+    target_planets = (target_chart_context.get("target_key_planets") or {}) if isinstance(target_chart_context, dict) else {}
+    out: Dict[str, Any] = {}
+    for lvl, row in (current_dashas_context or {}).items():
+        if not isinstance(row, dict):
+            continue
+        planet = str(row.get("planet") or "")
+        rotated = dict(row)
+        target_row = (target_planets.get(planet) or {}) if planet else {}
+        house = _safe_int(target_row.get("house"))
+        if house is not None:
+            rotated["natal_house"] = house
+        rotated["lordships"] = target_house_lordships.get(planet, []) if planet else []
+        out[str(lvl)] = rotated
+    return out
+
+
+def _rotate_raw_active_dashas(
+    raw_levels: Dict[str, Any],
+    target_chart_context: Dict[str, Any],
+) -> Dict[str, Any]:
+    target_house_lordships = (target_chart_context.get("target_house_lordships") or {}) if isinstance(target_chart_context, dict) else {}
+    target_planets = (target_chart_context.get("target_key_planets") or {}) if isinstance(target_chart_context, dict) else {}
+    out: Dict[str, Any] = {}
+    for lvl, row in (raw_levels or {}).items():
+        if not isinstance(row, dict):
+            continue
+        planet = str(row.get("p") or "")
+        rotated = dict(row)
+        target_row = (target_planets.get(planet) or {}) if planet else {}
+        house = _safe_int(target_row.get("house"))
+        if house is not None:
+            rotated["h"] = house
+        rotated["rh"] = target_house_lordships.get(planet, []) if planet else []
+        rotated["ahs"] = _rotate_house_list(row.get("ahs") or [], _safe_int(target_chart_context.get("anchor_house")) or 1)
+        out[str(lvl)] = rotated
+    return out
+
+
+def _rotate_house_activation_map(hi: Dict[str, Any], anchor_house: int) -> Dict[str, Dict[str, List[str]]]:
+    out: Dict[str, Dict[str, List[str]]] = {}
+    for house_key, row in (hi or {}).items():
+        house = _safe_int(house_key)
+        if house is None or not isinstance(row, dict):
+            continue
+        rotated_house = _rotate_house_num(house, anchor_house)
+        out[str(rotated_house)] = {
+            "r": list(row.get("r") or []),
+            "o": list(row.get("o") or []),
+            "a": list(row.get("a") or []),
+        }
+    return out
+
+
+def _rotate_transit_pressure(tr: Dict[str, Any], anchor_house: int) -> Dict[str, Any]:
+    out: Dict[str, Any] = {k: v for k, v in (tr or {}).items() if k not in {"dp", "th", "nh", "n"}}
+    rows: List[Dict[str, Any]] = []
+    th_counts: Dict[str, int] = {}
+    nh_counts: Dict[str, int] = {}
+    for row in (tr.get("dp") or []):
+        if not isinstance(row, dict):
+            continue
+        rotated = dict(row)
+        th = _safe_int(row.get("th"))
+        nh = _safe_int(row.get("nh"))
+        if th is not None:
+            rotated_th = _rotate_house_num(th, anchor_house)
+            rotated["th"] = rotated_th
+            th_counts[str(rotated_th)] = th_counts.get(str(rotated_th), 0) + 1
+        if nh is not None:
+            rotated_nh = _rotate_house_num(nh, anchor_house)
+            rotated["nh"] = rotated_nh
+            nh_counts[str(rotated_nh)] = nh_counts.get(str(rotated_nh), 0) + 1
+        if row.get("at"):
+            rotated["at"] = _rewrite_house_refs(str(row.get("at") or ""), anchor_house)
+        rows.append(rotated)
+    out["dp"] = rows
+    out["n"] = len(rows)
+    if th_counts:
+        out["th"] = th_counts
+    if nh_counts:
+        out["nh"] = nh_counts
+    return out
+
+
+def _rotate_instant_parashari_for_target(
+    instant_parashari: Dict[str, Any],
+    target_chart_context: Dict[str, Any],
+    category_focus_houses: List[int],
+) -> Dict[str, Any]:
+    anchor_house = _safe_int(target_chart_context.get("anchor_house")) or 1
+    rotated = dict(instant_parashari or {})
+    raw_levels = instant_parashari.get("active_dashas") or {}
+    hi = instant_parashari.get("house_activation") or {}
+    rotated_raw_levels = _rotate_raw_active_dashas(raw_levels, target_chart_context)
+    rotated_hi = _rotate_house_activation_map(hi, anchor_house)
+    rotated_tr = _rotate_transit_pressure(instant_parashari.get("transit_pressure") or {}, anchor_house)
+    rotated["active_dashas"] = rotated_raw_levels
+    rotated["active_dashas_formatted"] = _rotate_active_dashas_context(
+        instant_parashari.get("active_dashas_formatted") or {},
+        target_chart_context,
+    )
+    rotated["house_activation"] = rotated_hi
+    rotated["transit_pressure"] = rotated_tr
+    rotated["top_supports"] = [_rewrite_house_refs(v, anchor_house) for v in (instant_parashari.get("top_supports") or [])[:4]]
+    rotated["top_risks"] = [_rewrite_house_refs(v, anchor_house) for v in (instant_parashari.get("top_risks") or [])[:3]]
+    focus_houses = category_focus_houses or list(instant_parashari.get("focus_houses") or [])
+    rotated["focus_houses"] = focus_houses
+    rotated["dominant_houses"] = [line for line in _dominant_house_lines(rotated_hi, limit=3)]
+    rotated["activation_mechanisms"] = _house_activation_mechanisms(focus_houses, rotated_hi, rotated_raw_levels, limit=3)
+    return rotated
 
 
 def _build_area_behavior_axes(
@@ -1694,12 +1843,19 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
     elif answer_mode == "problem_diagnosis":
         base.update(
             {
-                "primary_evidence": ["top_risks", "activation_mechanisms", "transit_pressure"],
-                "secondary_evidence": ["divisional_support.current_topic", "active_dashas_formatted"],
-                "avoid_drift": ["generic reassurance", "unasked remedy list", "broad event prediction"],
-                "answer_skeleton": "Main astrological cause -> How it is being activated -> Why it persists/softens -> Practical handling",
+                "primary_evidence": ["top_risks", "activation_mechanisms", "transit_pressure", "active_dashas_formatted", "target_subject", "target_chart_context"],
+                "secondary_evidence": ["divisional_support.current_topic"],
+                "avoid_drift": ["generic reassurance", "unasked remedy list", "broad event prediction", "cinematic injury narrative", "using native-frame health houses for a non-self target"],
+                "answer_skeleton": "Main vulnerable target-relative houses -> Exact dasha activation -> Trigger layer if clearly supported -> Why the event or problem became tangible -> Practical handling",
             }
         )
+        if cat == "health" and str(time_relation or "").lower() == "past":
+            base["answer_skeleton"] = "Past vulnerable target-relative houses -> Exact active dasha lords -> Trigger layer only if clearly supported -> Why the event likely became tangible -> Brief caution on certainty"
+            base["avoid_drift"] = list(base["avoid_drift"]) + [
+                "treating one house as a complete injury verdict",
+                "overstated causal certainty",
+                "dramatic injury phrasing",
+            ]
     elif answer_mode == "remedy_action":
         base.update(
             {
@@ -1989,6 +2145,38 @@ def _instant_parashari_instruction_block(
                 "Use plain, mechanism-first wording rather than flattering or dramatic language.",
             ]
         )
+    if answer_mode == "problem_diagnosis":
+        primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "risk and activation evidence"
+        secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "secondary modifiers"
+        avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "generic drift"
+        skeleton = str(contract.get("answer_skeleton") or "Main vulnerable target-relative houses -> Exact dasha activation -> Trigger layer if clearly supported -> Why the event or problem became tangible -> Practical handling")
+        diagnosis_time_note = ""
+        if str(category or "").lower() == "health" and str(time_relation or "").lower() == "past":
+            diagnosis_time_note = "This is a past health-event diagnosis. Use restrained evidentiary language like likely vulnerability, likely trigger, or supports injury risk unless the provided evidence is unusually explicit."
+        return "\n".join(
+            [
+                f"This answer uses universal answer mode `{answer_mode}`.",
+                "CRITICAL: Follow the method instructions below exactly.",
+                "CRITICAL: For diagnosis questions, explain the problem from exact chart mechanisms, not from polished or cinematic storytelling.",
+                "CRITICAL: If the target_subject is not self, use the rotated target chart context for houses, dasha houses, and transit pressure. Using the native's direct health frame for a relative is a failed answer.",
+                "CRITICAL: Do not say an event was 'caused by' a transit or dasha layer unless the provided evidence clearly supports it. Prefer wording like supports injury, raises vulnerability, or likely trigger.",
+                f"Answer skeleton: {skeleton}.",
+                f"Primary evidence priority: {primary}.",
+                f"Secondary evidence only after primary evidence: {secondary}.",
+                f"Avoid these drifts: {avoid}.",
+                diagnosis_time_note,
+                "- `normalized_evidence.target_subject`: if this is not self, name and follow the target person being analyzed.",
+                "- `target_chart_context`: for non-self questions, this is the primary frame for houses, planets, and transits.",
+                "- `activation_mechanisms`: use these to show the exact vulnerable houses and why they are activated.",
+                "- `active_dashas_formatted`: make the active period lords visible if they materially explain the problem.",
+                "- `transit_pressure`: use this only as a sharpening layer, not as a complete explanation by itself.",
+                "- `normalized_evidence.risk_specifics`: if you use words like vulnerability, injury, obstruction, or suddenness, tie them to a concrete mechanism from here or from the activation links.",
+                "For past health or injury questions, first identify the target-relative vulnerable houses, then show which dasha levels activated them, then mention a trigger layer only if it is clearly supported.",
+                "Do not use dramatic phrases like high-intensity, specifically targeted, double-hit, double-activation, perfect storm, final spotlight, karmic knot, wear-and-tear, or physical resilience was at a low point unless the evidence is unusually explicit and you immediately prove it.",
+                "Do not treat one house, one transit, or one planet as a complete injury verdict by itself. Show the vulnerability pattern first, then the activation, then only a limited trigger claim if supported.",
+                "Do not widen the answer into generic personality or broad fate narrative. Stay with the mechanism of the asked problem.",
+            ]
+        )
     time_authority_block = (
         "Time authority rule: follow `instant_parashari.source`. "
         "If source is `window` or `day`, the asked period overrides generic current-chart narration."
@@ -2266,14 +2454,34 @@ def _build_instant_context(
         target_subject,
     )
     target_birth_summary = _target_context_as_birth_summary(target_chart_context)
+    is_non_self_target = str((target_subject or {}).get("key") or "self") != "self"
+    evidence_birth_summary = birth_summary
+    evidence_natal_snapshot = natal_snapshot
+    evidence_current_transits_context = current_transits_context
+    evidence_current_dashas_context = current_dashas_context
+    evidence_instant_parashari = instant_parashari
+    if is_non_self_target:
+        evidence_birth_summary = {
+            **target_birth_summary,
+            "name": str((target_subject or {}).get("label") or "target person"),
+            "source": "rotated_target_context",
+        }
+        evidence_natal_snapshot = _target_context_as_natal_snapshot(target_chart_context)
+        evidence_current_transits_context = dict(target_chart_context.get("target_transits") or {})
+        evidence_instant_parashari = _rotate_instant_parashari_for_target(
+            instant_parashari,
+            target_chart_context,
+            focus["houses"],
+        )
+        evidence_current_dashas_context = evidence_instant_parashari.get("active_dashas_formatted") or {}
     normalized_evidence = _normalize_instant_evidence(
-        answer_mode=instant_parashari.get("answer_mode") or "topic_reading",
+        answer_mode=evidence_instant_parashari.get("answer_mode") or "topic_reading",
         category=category,
-        instant_parashari=instant_parashari,
-        current_transits_formatted=current_transits_context,
-        current_dashas_context=current_dashas_context,
-        birth_summary=birth_summary,
-        natal_snapshot=natal_snapshot,
+        instant_parashari=evidence_instant_parashari,
+        current_transits_formatted=evidence_current_transits_context,
+        current_dashas_context=evidence_current_dashas_context,
+        birth_summary=evidence_birth_summary,
+        natal_snapshot=evidence_natal_snapshot,
         relationship_target=target_subject,
         target_chart_context=target_chart_context,
     )
@@ -2283,12 +2491,12 @@ def _build_instant_context(
         and str(category or "").lower() in {"general", "timing"}
         and str((period_window or {}).get("kind") or "") == "window"
     )
-    prompt_transits_context = dict(current_transits_context)
+    prompt_transits_context = dict(evidence_current_transits_context)
     prompt_current_transits = {
         "as_of_local": transit_anchor.strftime("%Y-%m-%d %H:%M"),
-        "planets": dict(transit_rows),
+        "planets": dict(evidence_current_transits_context),
     }
-    prompt_instant_parashari = dict(instant_parashari)
+    prompt_instant_parashari = dict(evidence_instant_parashari)
     prompt_normalized_evidence = dict(normalized_evidence)
     claim_gates = (normalized_evidence.get("claim_gates") or {}) if isinstance(normalized_evidence.get("claim_gates"), dict) else {}
     if answer_mode == "trait_nature":
@@ -2359,11 +2567,7 @@ def _build_instant_context(
         }
         natal_snapshot = {}
         current_dashas_context = {}
-        birth_summary = {
-            **target_birth_summary,
-            "name": str((target_subject or {}).get("label") or "target person"),
-            "source": "rotated_target_context",
-        }
+        birth_summary = evidence_birth_summary
         recent_history = recent_history[-1:]
     if not claim_gates.get("allow_divisional_mentions"):
         prompt_instant_parashari.pop("divisional_support", None)
@@ -2392,7 +2596,7 @@ def _build_instant_context(
         prompt_instant_parashari.pop("top_supports", None)
 
     return {
-        "birth_summary": birth_summary,
+        "birth_summary": evidence_birth_summary if is_non_self_target else birth_summary,
         "intent_summary": {
             "category": category,
             "mode": (intent or {}).get("mode") or "birth",
@@ -2404,11 +2608,11 @@ def _build_instant_context(
             "extracted_context": (intent or {}).get("extracted_context") or {},
             "target_subject": target_subject or {"key": "self", "label": "self", "base_house": 1},
         },
-        "natal_snapshot": natal_snapshot,
+        "natal_snapshot": evidence_natal_snapshot if is_non_self_target else natal_snapshot,
         "target_chart_context": target_chart_context,
         "current_dashas": {
             "as_of": dasha_anchor.strftime("%Y-%m-%d"),
-            "levels": current_dashas_context,
+            "levels": evidence_current_dashas_context if is_non_self_target else current_dashas_context,
         },
         "current_transits": prompt_current_transits,
         "current_transits_formatted": prompt_transits_context,
