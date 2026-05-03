@@ -19,6 +19,7 @@ import {
   Keyboard,
   StatusBar,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -68,7 +69,15 @@ const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineHouses',
   'chat.instantLoader.lineTiming',
   'chat.instantLoader.lineSynthesis',
+  'chat.instantLoader.lineDashaTiming',
+  'chat.instantLoader.lineTransitTiming',
+  'chat.instantLoader.lineHousePattern',
+  'chat.instantLoader.lineContext',
+  'chat.instantLoader.lineConfidence',
+  'chat.instantLoader.linePractical',
+  'chat.instantLoader.lineTone',
   'chat.instantLoader.lineAnswer',
+  'chat.instantLoader.lineReview',
   'chat.instantLoader.lineFinal',
 ];
 const INSTANT_LOADER_FALLBACKS = [
@@ -78,11 +87,28 @@ const INSTANT_LOADER_FALLBACKS = [
   'The relevant houses are being matched with the question, so the answer can stay specific and practical.',
   'I am checking whether the timing looks active right now, building slowly, or already passing out of focus.',
   'The main signals are being combined now, especially where two or more factors point in the same direction.',
+  'I am narrowing the dasha timing so past, current, and upcoming influences are not mixed together.',
+  'The transit picture is being checked against the question, especially where it activates the same houses again.',
+  'I am looking for repeated house patterns because repeated signals are more useful than one isolated placement.',
+  'Your exact question and recent chat context are being kept in view so the reply does not drift into a general reading.',
+  'I am separating stronger chart evidence from weaker hints, so the answer can say what is clear and what is uncertain.',
+  'Now I am turning the astrology into practical language, without losing the main chart reasoning.',
+  'I am keeping the response short enough for instant mode while still answering the real question.',
   'I am turning the chart signals into a short answer you can use, without making it unnecessarily long.',
+  'I am reviewing the final wording so the takeaway is clear before the answer appears.',
   'Almost ready. I am tightening the response so it gives you the clearest takeaway first.',
 ];
 const INSTANT_LOADER_WORD_MS = 180;
 const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_FALLBACKS.join(' ').split(/\s+/).filter(Boolean).length;
+const DEFAULT_CHAT_SUGGESTIONS = [
+  'What does my birth chart say about my career?',
+  'When is a good time for marriage?',
+  'What are my health vulnerabilities?',
+  'Tell me about my current dasha period',
+  'What do the current transits mean for me?',
+  'Show me significant periods in my life',
+  'What are my strengths and weaknesses?',
+];
 
 /** Dev testing: force rating modal on chat open (no question/scroll). Set to false after testing. */
 const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
@@ -338,6 +364,7 @@ export default function ChatScreen({ navigation, route }) {
   const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(110);
   const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(210);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
+  const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
   const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
@@ -405,6 +432,16 @@ export default function ChatScreen({ navigation, route }) {
   const [isTyping, setIsTyping] = useState(false);
   const [waitSideReplying, setWaitSideReplying] = useState(false);
   const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
+  const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
+  /** Keeps suggestion chips off-screen until the user asks for them — saves vertical space for messages. */
+  const [showTopicIdeas, setShowTopicIdeas] = useState(false);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      setShowTopicIdeas(false);
+    }
+  }, [messages.length]);
+
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -849,16 +886,6 @@ export default function ChatScreen({ navigation, route }) {
     { elevation: getCardElevation(3) }
   ];
 
-  const suggestions = [
-    "What does my birth chart say about my career?",
-    "When is a good time for marriage?",
-    "What are my health vulnerabilities?",
-    "Tell me about my current dasha period",
-    "What do the current transits mean for me?",
-    "Show me significant periods in my life",
-    "What are my strengths and weaknesses?"
-  ];
-
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
     const signs = {
@@ -1141,6 +1168,13 @@ export default function ChatScreen({ navigation, route }) {
       setInstantChatCost(Number.isNaN(instantVal) || instantVal <= 0 ? 1 : instantVal);
       setInstantChatCostOriginal(Number.isNaN(instantOriginal) ? null : instantOriginal);
       setInstantChatEnabled(Boolean(features.instant_chat_enabled));
+      setSpeechChatEnabled(Boolean(features.speech_chat_enabled));
+      const adminSuggestions = Array.isArray(features.chat_static_suggestions)
+        ? features.chat_static_suggestions
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+        : [];
+      setSuggestions(adminSuggestions.length ? adminSuggestions : DEFAULT_CHAT_SUGGESTIONS);
       // Premium chat (user-discounted when VIP; same source as standard)
       const premiumVal = pricing.premium_chat != null ? Number(pricing.premium_chat) : 3;
       const premiumOriginal = orig.premium_chat != null ? Number(orig.premium_chat) : null;
@@ -3060,6 +3094,7 @@ export default function ChatScreen({ navigation, route }) {
       };
     }).filter(Boolean);
     const latestTypedIndex = typedLines.length - 1;
+    const isTakingLonger = instantLoaderWordCount >= INSTANT_LOADER_MAX_WORDS;
     return (
       <View
         style={[
@@ -3086,6 +3121,14 @@ export default function ChatScreen({ navigation, route }) {
             </Text>
           );
         })}
+        {isTakingLonger ? (
+          <View style={styles.instantTakingLongerRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.instantTakingLongerText, { color: colors.textSecondary }]}>
+              {t('chat.instantLoader.takingLonger', 'This is taking a little longer. I am still working on your answer...')}
+            </Text>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -4122,14 +4165,14 @@ export default function ChatScreen({ navigation, route }) {
         <View
           style={{
           backgroundColor: 'transparent',
-          paddingTop: 12,
+          paddingTop: 4,
           marginHorizontal: -12,
           paddingHorizontal: 12,
           paddingBottom: keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
         }}
         >
-        {/* Suggestions (only show when not loading and not showing greeting) */}
-        {!loading && !showGreeting && messages.length > 0 && (
+        {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
+        {!loading && !showGreeting && messages.length > 0 && showTopicIdeas && (
           <View style={styles.suggestionsContainer}>
             <GHScrollView
               horizontal
@@ -4161,43 +4204,73 @@ export default function ChatScreen({ navigation, route }) {
         {!showGreeting && (
           <View style={styles.unifiedInputContainer}>
             {!partnershipMode && !isMundane && birthData && (
-              <Text
-                style={[styles.chatInputScopeHint, { color: colors.textSecondary }]}
-                maxFontSizeMultiplier={1.35}
-              >
-                {t('chat.inputScopeAskAbout', 'Ask about')}{' '}
+              <View style={styles.chatInputScopeRow}>
                 <Text
-                  style={[styles.chatInputScopeName, { color: colors.text }]}
-                  accessibilityLabel={
-                    inputScopeNativeTrimmed.length > 7
-                      ? inputScopeNativeTrimmed
-                      : undefined
-                  }
+                  style={[styles.chatInputScopeHint, { color: colors.textSecondary, flex: 1 }]}
+                  maxFontSizeMultiplier={1.35}
+                  numberOfLines={2}
                 >
-                  {inputScopeNativeTrimmed
-                    ? inputScopeNativeShown
-                    : t('chat.yourChart', 'your chart')}
+                  {t('chat.inputScopeAskAbout', 'Ask about')}{' '}
+                  <Text
+                    style={[styles.chatInputScopeName, { color: colors.text }]}
+                    accessibilityLabel={
+                      inputScopeNativeTrimmed.length > 7
+                        ? inputScopeNativeTrimmed
+                        : undefined
+                    }
+                  >
+                    {inputScopeNativeTrimmed
+                      ? inputScopeNativeShown
+                      : t('chat.yourChart', 'your chart')}
+                  </Text>
+                  {' · '}
+                  <Text
+                    onPress={() => {
+                      keepChatOpenAfterNativeSelectRef.current = true;
+                      navigation.navigate('SelectNative', {
+                        returnTo: 'Home',
+                        returnParams: { returnToChat: true },
+                      });
+                    }}
+                    style={[styles.chatInputScopeLink, { color: colors.primary }]}
+                    accessibilityRole="link"
+                    accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
+                  >
+                    {t('chat.inputScopeSelectChart', 'Change chart')}
+                  </Text>
                 </Text>
-                {' '}
-                {t('chat.inputScopeOr', 'or')}{' '}
-                <Text
-                  onPress={() => {
-                    keepChatOpenAfterNativeSelectRef.current = true;
-                    navigation.navigate('SelectNative', {
-                      returnTo: 'Home',
-                      returnParams: { returnToChat: true },
-                    });
-                  }}
-                  style={[styles.chatInputScopeLink, { color: colors.primary }]}
-                  accessibilityRole="link"
-                  accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
-                >
-                  {t(
-                    'chat.inputScopeSelectChart',
-                    'select or create another birth chart'
-                  )}
-                </Text>
-              </Text>
+                {!loading && messages.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setShowTopicIdeas((v) => !v)}
+                    style={[
+                      styles.topicIdeasToggle,
+                      {
+                        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(249, 115, 22, 0.25)',
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(249, 115, 22, 0.06)',
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showTopicIdeas }}
+                    accessibilityLabel={
+                      showTopicIdeas
+                        ? t('chat.topicIdeasHideA11y', 'Hide suggested questions')
+                        : t('chat.topicIdeasShowA11y', 'Show suggested questions')
+                    }
+                  >
+                    <Ionicons
+                      name={showTopicIdeas ? 'chevron-up' : 'sparkles-outline'}
+                      size={14}
+                      color={colors.primary}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={[styles.topicIdeasToggleText, { color: colors.text }]}>
+                      {showTopicIdeas
+                        ? t('chat.topicIdeasHide', 'Hide')
+                        : t('chat.topicIdeas', 'Ideas')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
             <LinearGradient
                       colors={Platform.OS === 'android'
@@ -4361,6 +4434,28 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
               )}
 
+              {!partnershipMode && !isMundane && instantChatEnabled && speechChatEnabled && birthData && (
+                <TouchableOpacity
+                  style={styles.speechMicButton}
+                  onPress={() =>
+                    navigation.navigate('SpeechChat', {
+                      birthData,
+                      language,
+                    })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={t('chat.speechChatCta', 'Speak your question')}
+                  accessibilityHint={t('chat.speechChatCtaSubtext', 'Instant spoken answers')}
+                >
+                  <LinearGradient
+                    colors={['#fb923c', '#f97316']}
+                    style={styles.speechMicGradient}
+                  >
+                    <Ionicons name="mic" size={20} color={COLORS.white} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
@@ -4398,20 +4493,6 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
 
-            {!partnershipMode && !isMundane && !isKeyboardVisible && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setShowChatModeIntro(true)}
-                style={styles.chatModeReminder}
-              >
-                <Text style={[styles.chatModeReminderText, { color: colors.textSecondary }]}>
-                  {t('chat.modeIntro.tapToChange', {
-                    mode: getChatModeName(),
-                    defaultValue: `${getChatModeName()} mode · tap S/I/P to change`,
-                  })}
-                </Text>
-              </TouchableOpacity>
-            )}
             
             {effectiveChatCost === 0 && !isKeyboardVisible && (
               <View style={styles.firstQuestionFreeBanner}>
@@ -6188,6 +6269,18 @@ const styles = StyleSheet.create({
   instantTypingCursor: {
     fontWeight: '800',
   },
+  instantTakingLongerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  instantTakingLongerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
   chatModeIntroOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
@@ -6305,32 +6398,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  chatModeReminder: {
-    alignSelf: 'center',
-    paddingTop: 8,
-    paddingHorizontal: 12,
-  },
-  chatModeReminderText: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '600',
-  },
-
   suggestionsContainer: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
   suggestionsContent: {
     paddingHorizontal: 4,
   },
   suggestionChip: {
-    marginRight: 8,
+    marginRight: 6,
     borderRadius: 20,
     overflow: 'hidden',
   },
   suggestionChipGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.2)',
     borderRadius: 20,
@@ -6343,14 +6425,31 @@ const styles = StyleSheet.create({
 
   unifiedInputContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 4,
+  },
+  chatInputScopeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 2,
+    gap: 8,
   },
   chatInputScopeHint: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    fontSize: 12,
+    lineHeight: 16,
     flexWrap: 'wrap',
+  },
+  topicIdeasToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  topicIdeasToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   chatInputScopeName: {
     fontWeight: '700',
@@ -6431,6 +6530,19 @@ const styles = StyleSheet.create({
   premiumIconTextInactive: {
     fontSize: 24,
     opacity: 0.7,
+  },
+  speechMicButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginRight: 4,
+  },
+  speechMicGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modernSendButton: {
     width: 44,

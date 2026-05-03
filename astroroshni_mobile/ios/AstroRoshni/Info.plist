@@ -47,9 +47,9 @@
 		<true/>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app does not use the microphone.</string>
+	<string>AstroRoshni uses the microphone so you can ask chat questions by speaking.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>This app uses speech recognition for voice commands.</string>
+	<string>AstroRoshni uses speech recognition to turn your spoken question into text.</string>
 	<key>RCTNewArchEnabled</key>
 	<false/>
 	<key>UILaunchScreen</key>

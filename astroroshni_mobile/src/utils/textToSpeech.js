@@ -1,8 +1,10 @@
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Speech from 'expo-speech';
 import { chatAPI } from '../services/api';
 
 let currentSound = null;
+let speechTempUri = null;
 /** Callbacks for the currently loaded podcast (onPause, onResume, onStop). Cleared when stop or done. */
 let podcastCallbacks = null;
 /** Temp file path for current podcast; cleared when playback ends or stops so we can delete it. */
@@ -11,47 +13,109 @@ let podcastTempUri = null;
 let seekPromise = null;
 let pendingSeekMillis = null;
 
+const stopLoadedAudio = async () => {
+  if (currentSound) {
+    try {
+      await currentSound.stopAsync();
+      await currentSound.unloadAsync();
+    } catch {
+      // ignore
+    }
+    currentSound = null;
+  }
+  if (speechTempUri) {
+    FileSystem.deleteAsync(speechTempUri, { idempotent: true }).catch(() => {});
+    speechTempUri = null;
+  }
+};
+
+const normalizeVoice = (voice) => ({
+  identifier: voice.identifier,
+  language: voice.language || '',
+  name: voice.name || voice.identifier || '',
+  quality: voice.quality || null,
+});
+
+const scoreVoice = (voice, lang) => {
+  const identifier = String(voice.identifier || '').toLowerCase();
+  const name = String(voice.name || '').toLowerCase();
+  const language = String(voice.language || '').toLowerCase();
+  let score = 0;
+
+  if (lang === 'hi') {
+    if (language === 'hi-in') score += 120;
+    else if (language.startsWith('hi')) score += 100;
+    else if (language === 'en-in') score += 40;
+  } else {
+    if (language === 'en-in') score += 120;
+    else if (language.startsWith('en')) score += 100;
+    else if (language.startsWith('hi')) score += 20;
+  }
+
+  if (name.includes('female') || name.includes('woman') || identifier.includes('female')) score += 30;
+  if (name.includes('india') || name.includes('indian') || language.endsWith('-in')) score += 20;
+  if (voice.quality === 'Enhanced') score += 10;
+  if (voice.quality === 'Default') score += 5;
+
+  return score;
+};
+
+const pickSystemVoice = async (lang, requestedVoiceName) => {
+  try {
+    const rawVoices = await Speech.getAvailableVoicesAsync();
+    const voices = Array.isArray(rawVoices) ? rawVoices.map(normalizeVoice) : [];
+    if (!voices.length) return null;
+
+    if (requestedVoiceName) {
+      const requested = String(requestedVoiceName).toLowerCase();
+      const exactMatch = voices.find((voice) =>
+        String(voice.identifier || '').toLowerCase() === requested ||
+        String(voice.name || '').toLowerCase() === requested
+      );
+      if (exactMatch) return exactMatch;
+    }
+
+    const ranked = [...voices].sort((a, b) => scoreVoice(b, lang) - scoreVoice(a, lang));
+    return ranked[0] || null;
+  } catch (e) {
+    console.warn('[TTS] Could not inspect system voices', e?.message || e);
+    return null;
+  }
+};
+
 export const textToSpeech = {
   async speak(text, { language = 'english', voiceName, onDone, onError } = {}) {
     try {
       if (!text || !text.trim()) return;
 
-      if (currentSound) {
-        try {
-          await currentSound.stopAsync();
-          await currentSound.unloadAsync();
-        } catch {
-          // ignore
-        }
-        currentSound = null;
-      }
-
+      await Speech.stop();
+      await stopLoadedAudio();
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
-      console.log('[TTS] Requesting audio from backend', { lang, voiceName, textLength: text.length });
-      const response = await chatAPI.tts(text, lang, voiceName);
-      console.log('[TTS] Backend response received', { hasData: !!response?.data, keys: Object.keys(response?.data || {}) });
-      const base64Audio = response?.data?.audio;
-      if (!base64Audio || typeof base64Audio !== 'string') {
-        console.warn('[TTS] Missing or invalid audio field in response', response?.data);
-        if (onError) onError(new Error('TTS: missing audio data from server'));
-        return;
-      }
-      const dataUri = `data:audio/mpeg;base64,${base64Audio}`;
-      console.log('[TTS] Creating sound from data URI, base64Length:', base64Audio.length);
-
-      const { sound } = await Audio.Sound.createAsync({ uri: dataUri });
-      console.log('[TTS] Sound created, starting playback');
-      currentSound = sound;
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          if (onDone) onDone();
-          sound.unloadAsync();
-          currentSound = null;
-        }
+      const voice = await pickSystemVoice(lang, voiceName);
+      const speechLanguage = voice?.language || (lang === 'hi' ? 'hi-IN' : 'en-IN');
+      console.log('[TTS] Using system speech voice', {
+        lang,
+        voiceIdentifier: voice?.identifier || null,
+        voiceName: voice?.name || null,
+        speechLanguage,
       });
 
-      await sound.playAsync();
+      Speech.speak(text, {
+        language: speechLanguage,
+        voice: voice?.identifier,
+        rate: lang === 'hi' ? 0.92 : 0.95,
+        pitch: 1.0,
+        onDone: () => {
+          if (onDone) onDone();
+        },
+        onStopped: () => {
+          if (onDone) onDone();
+        },
+        onError: (e) => {
+          console.error('[TTS] system speech error', e);
+          if (onError) onError(e);
+        },
+      });
     } catch (e) {
       console.error('[TTS] speak error', e);
       if (onError) onError(e);
@@ -59,20 +123,20 @@ export const textToSpeech = {
   },
 
   async stop() {
-    if (currentSound) {
-      try {
-        await currentSound.stopAsync();
-        await currentSound.unloadAsync();
-      } catch {
-        // ignore
-      }
-      currentSound = null;
+    try {
+      await Speech.stop();
+    } catch {
+      // ignore
     }
+    await stopLoadedAudio();
   },
 
   async isSpeaking() {
-    // We don't track this from Audio; keep for API compatibility if needed
-    return !!currentSound;
+    try {
+      return !!currentSound || await Speech.isSpeakingAsync();
+    } catch {
+      return !!currentSound;
+    }
   },
 
   async playPodcast(messageContent, { language = 'english', messageId, sessionId, preview, nativeName, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
@@ -310,24 +374,18 @@ export const textToSpeech = {
 
   async getAvailableVoices() {
     try {
-      const response = await chatAPI.getTtsVoices();
-      const voices = response?.data?.voices || [];
-      // Map backend voice objects into a simpler shape for UI:
-      // identifier = Google voice name, language = first language code
-      return voices.map((v) => ({
-        identifier: v.name,
-        language: (v.language_codes && v.language_codes[0]) || '',
-        name: v.name,
-        gender: v.ssml_gender,
-      }));
+      const voices = await Speech.getAvailableVoicesAsync();
+      return Array.isArray(voices)
+        ? voices.map((voice) => ({
+            identifier: voice.identifier,
+            language: voice.language || '',
+            name: voice.name || voice.identifier || '',
+            quality: voice.quality || '',
+          }))
+        : [];
     } catch (e) {
       console.error('[TTS] getAvailableVoices error', e);
-      // Fallback to a couple of sensible defaults
-      return [
-        { identifier: 'en-IN-Neural2-A', language: 'en-IN', name: 'English (India) A', gender: 'FEMALE' },
-        { identifier: 'hi-IN-Neural2-C', language: 'hi-IN', name: 'Hindi (India) C', gender: 'FEMALE' },
-      ];
+      return [];
     }
   },
 };
-

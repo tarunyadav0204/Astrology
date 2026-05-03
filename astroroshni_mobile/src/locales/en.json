@@ -483,8 +483,17 @@
       "lineHouses": "The relevant houses are being matched with the question, so the answer can stay specific and practical.",
       "lineTiming": "I am checking whether the timing looks active right now, building slowly, or already passing out of focus.",
       "lineSynthesis": "The main signals are being combined now, especially where two or more factors point in the same direction.",
+      "lineDashaTiming": "I am narrowing the dasha timing so past, current, and upcoming influences are not mixed together.",
+      "lineTransitTiming": "The transit picture is being checked against the question, especially where it activates the same houses again.",
+      "lineHousePattern": "I am looking for repeated house patterns because repeated signals are more useful than one isolated placement.",
+      "lineContext": "Your exact question and recent chat context are being kept in view so the reply does not drift into a general reading.",
+      "lineConfidence": "I am separating stronger chart evidence from weaker hints, so the answer can say what is clear and what is uncertain.",
+      "linePractical": "Now I am turning the astrology into practical language, without losing the main chart reasoning.",
+      "lineTone": "I am keeping the response short enough for instant mode while still answering the real question.",
       "lineAnswer": "I am turning the chart signals into a short answer you can use, without making it unnecessarily long.",
-      "lineFinal": "Almost ready. I am tightening the response so it gives you the clearest takeaway first."
+      "lineReview": "I am reviewing the final wording so the takeaway is clear before the answer appears.",
+      "lineFinal": "Almost ready. I am tightening the response so it gives you the clearest takeaway first.",
+      "takingLonger": "This is taking a little longer. I am still working on your answer..."
     },
     "modeIntro": {
       "eyebrow": "Chat mode",
@@ -511,7 +520,45 @@
         "benefit": "Deepest analysis for important decisions and complex topics.",
         "bestFor": "Best when accuracy and detail matter more than speed."
       }
-    }
+    },
+    "speechChatCta": "Speak your question",
+    "speechChatCtaSubtext": "Instant spoken answers",
+    "inputScopeSelectChart": "Change chart",
+    "topicIdeas": "Ideas",
+    "topicIdeasHide": "Hide",
+    "topicIdeasShowA11y": "Show suggested questions",
+    "topicIdeasHideA11y": "Hide suggested questions"
+  },
+  "speechChat": {
+    "profileRequired": "Birth chart required",
+    "profileRequiredBody": "Please select or create a birth chart before using speech chat.",
+    "micPermissionTitle": "Microphone permission needed",
+    "micPermissionBody": "Please allow microphone access so AstroRoshni can hear your question.",
+    "nativeBuildRequired": "Speech input needs a development build of the app. Expo Go cannot access the native speech recognizer.",
+    "nativeUnavailable": "Speech recognition is not available on this device right now.",
+    "noMicInput": "No clear microphone input was captured. If you are using an emulator, its mic passthrough may be off. Please try again or test on a real phone.",
+    "reviewTitle": "Check your question",
+    "reviewPlaceholder": "Edit the transcript if needed",
+    "tryAgain": "Try again",
+    "askNow": "Ask now",
+    "recordingError": "Recording failed. Please try again.",
+    "noTranscript": "I could not understand that. Please try again.",
+    "sessionError": "Could not start a speech chat session.",
+    "askError": "Could not send your question.",
+    "answerError": "Answer failed. Please try again.",
+    "timeout": "The answer is taking too long. Please try again.",
+    "genericError": "Something went wrong. Please try again.",
+    "statusIdle": "Tap the mic and ask your question",
+    "statusIdleHandsFree": "Tap the mic and AstroRoshni will keep listening after each answer",
+    "statusListening": "Listening... tap again when done",
+    "statusTranscribing": "Finishing your question...",
+    "statusThinking": "Reading the chart...",
+    "statusSpeaking": "Speaking the answer... tap to stop",
+    "handsFreeLabel": "Hands-free follow-up",
+    "handsFreeOn": "On",
+    "handsFreeOff": "Off",
+    "heardSoFar": "Heard so far",
+    "currentQuestion": "Current question"
   },
   "home": {
     "greeting": {

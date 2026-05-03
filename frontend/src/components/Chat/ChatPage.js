@@ -17,6 +17,7 @@ import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
 import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
 import { buildQueryContext } from '../../utils/queryContext';
+import textToSpeech from '../../utils/textToSpeech';
 import '../Shared/nativeSelectorChip.css';
 import './ChatPage.css';
 
@@ -201,6 +202,9 @@ const ChatPage = () => {
     const [podcastPromoOpen, setPodcastPromoOpen] = useState(false);
     const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
     const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
+    const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
+    const activeSpeechReplyIdRef = useRef(null);
+    const spokenAutoReplyKeysRef = useRef(new Set());
 
     const openBirthModalEmpty = () => {
         setBirthFormGatePrefill(null);
@@ -611,6 +615,61 @@ const ChatPage = () => {
     useEffect(() => {
         return scrollChatThreadAfterMessagesChange(messages, scrollToBottom);
     }, [messages]);
+
+    useEffect(() => () => {
+        textToSpeech.stop();
+    }, []);
+
+    useEffect(() => {
+        const autoSpeakMessage = messages.find((m) => (
+            m?.role === 'assistant'
+            && m?.autoSpeakReply
+            && !m?.isProcessing
+            && String(m?.content || '').trim()
+        ));
+
+        if (!autoSpeakMessage) return;
+
+        const speechKey = String(autoSpeakMessage.processingClientId || autoSpeakMessage.messageId || '');
+        if (!speechKey || spokenAutoReplyKeysRef.current.has(speechKey)) return;
+
+        spokenAutoReplyKeysRef.current.add(speechKey);
+        activeSpeechReplyIdRef.current = speechKey;
+
+        const content = String(autoSpeakMessage.content || '').trim();
+        textToSpeech.stop();
+        textToSpeech.speak(content, {
+            onStart: () => {
+                setIsAssistantSpeaking(true);
+            },
+            onEnd: () => {
+                setIsAssistantSpeaking(false);
+                if (activeSpeechReplyIdRef.current === speechKey) {
+                    activeSpeechReplyIdRef.current = null;
+                }
+            },
+            onError: () => {
+                setIsAssistantSpeaking(false);
+                if (activeSpeechReplyIdRef.current === speechKey) {
+                    activeSpeechReplyIdRef.current = null;
+                }
+            },
+        });
+
+        setMessages((prev) =>
+            prev.map((m) =>
+                (String(m.processingClientId || m.messageId || '') === speechKey)
+                    ? { ...m, autoSpeakReply: false }
+                    : m
+            )
+        );
+    }, [messages]);
+
+    const interruptAssistantSpeech = () => {
+        textToSpeech.stop();
+        setIsAssistantSpeaking(false);
+        activeSpeechReplyIdRef.current = null;
+    };
 
     const addGreetingMessage = (overrideText = null) => {
         const place = birthData?.place && !birthData.place.includes(',') ? birthData.place : `${birthData?.latitude}, ${birthData?.longitude}`;
@@ -1065,20 +1124,23 @@ const ChatPage = () => {
                     setMessages(prev =>
                         prev.map(m =>
                             m.processingClientId === processingClientId
-                                ? {
-                                    ...m,
-                                    messageId: assistantMessageId,
-                                    content,
-                                    isProcessing: false,
-                                    isTyping: false,
-                                    message_type: status.message_type || 'answer',
-                                    intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
-                                    gate_metadata: status.gate_metadata || null,
-                                    terms: status.terms || [],
-                                    glossary: status.glossary || {},
-                                    summary_image: status.summary_image || null,
-                                    follow_up_questions: status.follow_up_questions || [],
-                                }
+                                ? (() => {
+                                    return {
+                                        ...m,
+                                        messageId: assistantMessageId,
+                                        content,
+                                        isProcessing: false,
+                                        isTyping: false,
+                                        message_type: status.message_type || 'answer',
+                                        intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
+                                        gate_metadata: status.gate_metadata || null,
+                                        terms: status.terms || [],
+                                        glossary: status.glossary || {},
+                                        summary_image: status.summary_image || null,
+                                        follow_up_questions: status.follow_up_questions || [],
+                                        autoSpeakReply: Boolean(m.autoSpeakReply),
+                                    };
+                                })()
                                 : m
                         )
                     );
@@ -1215,6 +1277,7 @@ const ChatPage = () => {
             loadingMessage: '🔮 Analyzing your birth chart...',
             chartData: chartDataForMessage,
             chartInsights: [],
+            autoSpeakReply: Boolean(options?.instant_chat),
         };
 
         setMessages(prev => [...prev, processingMessage]);
@@ -1256,12 +1319,16 @@ const ChatPage = () => {
             question: questionForApi,
             query_context: buildQueryContext(),
             language: 'english',
-            response_style: 'detailed',
+            response_style: options?.instant_chat ? 'concise' : 'detailed',
             premium_analysis: useFreeQuestion ? false : !!options.premium_analysis,
             partnership_mode: isPartnershipMode,
             native_name: partnershipBirth?.name,
             birth_details: birthForAsk,
         };
+
+        if (options?.chat_tier) {
+            requestData.chat_tier = options.chat_tier;
+        }
 
         if (isPartnershipMode && partnershipSecond) {
             const partnerNorm = normalizeBirthDetailsForChat(partnershipSecond);
@@ -2415,6 +2482,15 @@ const ChatPage = () => {
                             <button
                                 type="button"
                                 className="chat-header-btn"
+                                title="Open speech chat"
+                                onClick={() => navigate('/speech-chat')}
+                            >
+                                <span className="chat-header-btn__full">Voice</span>
+                                <span className="chat-header-btn__icon" aria-hidden="true">🎤</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="chat-header-btn"
                                 title="Change analysis type"
                                 onClick={() => {
                                     resetThreadForWizard(null);
@@ -2496,6 +2572,8 @@ const ChatPage = () => {
                     isPartnershipMode={isPartnershipMode}
                     isMundaneMode={isMundaneMode}
                     isLocked={isWizardLocked}
+                    isAssistantSpeaking={isAssistantSpeaking}
+                    onInterruptAssistantSpeech={interruptAssistantSpeech}
                 />
             )}
 

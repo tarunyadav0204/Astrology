@@ -37,9 +37,9 @@ import { Platform } from 'react-native';
 
 // API Configuration for AstroRoshni
 // Set to true to test against local backend (emulator: Android 10.0.2.2:8001, iOS localhost:8001). Set false for production.
-const USE_DEV_API = false;
+const USE_DEV_API = true;
 // For simulator leave empty (uses localhost/10.0.2.2). For physical device set your machine IP, e.g. 'http://192.168.1.10:8001'
-const DEV_API_HOST = '';
+const DEV_API_HOST = 'http://192.168.68.106:8001';
 // Test VM backend over HTTPS (recommended for physical devices)
 const TEST_API_URL = 'https://test.astroroshni.com';
 // Production backend
@@ -54,13 +54,13 @@ const getApiUrl = () => {
 
   // Uncomment exactly one of these for non-dev builds / manual switching:
   // return TEST_API_URL;
-  // return PROD_API_URL;
+  return PROD_API_URL;
 
-  if (Platform.OS === 'ios') {
-    return 'http://localhost:8001';
-  } else {
-    return 'http://10.0.2.2:8001';
-  }
+  // if (Platform.OS === 'ios') {
+  //   return 'http://localhost:8001';
+  // } else {
+  //   return 'http://10.0.2.2:8001';
+  // }
 };
 
 export const API_BASE_URL = getApiUrl();

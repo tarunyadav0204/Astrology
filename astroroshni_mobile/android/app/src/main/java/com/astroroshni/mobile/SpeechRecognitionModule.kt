@@ -1,0 +1,160 @@
+package com.astroroshni.mobile
+
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.core.content.ContextCompat
+import com.facebook.react.bridge.*
+import java.util.Locale
+
+class SpeechRecognitionModule(private val reactContext: ReactApplicationContext) :
+  ReactContextBaseJavaModule(reactContext), RecognitionListener {
+
+  private var speechRecognizer: SpeechRecognizer? = null
+  private var pendingPromise: Promise? = null
+  private var currentLocale: String = Locale.getDefault().toLanguageTag()
+
+  override fun getName(): String = "SpeechRecognition"
+
+  @ReactMethod
+  fun isAvailable(promise: Promise) {
+    promise.resolve(SpeechRecognizer.isRecognitionAvailable(reactContext))
+  }
+
+  @ReactMethod
+  fun startListening(locale: String?, promise: Promise) {
+    if (!SpeechRecognizer.isRecognitionAvailable(reactContext)) {
+      promise.reject("not_available", "Speech recognition is not available on this device")
+      return
+    }
+    if (ContextCompat.checkSelfPermission(reactContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+      promise.reject("no_permission", "Microphone permission is required")
+      return
+    }
+    if (pendingPromise != null) {
+      promise.reject("busy", "Speech recognition is already active")
+      return
+    }
+    // RN 0.80+: use context activity (bare `currentActivity` is not in scope on legacy modules).
+    val activity: Activity? = getCurrentActivity()
+    if (activity == null) {
+      promise.reject("no_activity", "No active screen available for speech recognition")
+      return
+    }
+
+    currentLocale = normalizeLocale(locale)
+    pendingPromise = promise
+
+    val recognizer = speechRecognizer ?: SpeechRecognizer.createSpeechRecognizer(reactContext).also {
+      it.setRecognitionListener(this)
+      speechRecognizer = it
+    }
+
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+      putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+      putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+      putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLocale)
+      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+      putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, reactContext.packageName)
+    }
+    recognizer.startListening(intent)
+  }
+
+  @ReactMethod
+  fun stopListening() {
+    speechRecognizer?.stopListening()
+  }
+
+  @ReactMethod
+  fun cancelListening() {
+    pendingPromise?.reject("cancelled", "Speech recognition cancelled")
+    pendingPromise = null
+    speechRecognizer?.cancel()
+  }
+
+  @ReactMethod
+  fun addListener(eventName: String?) {
+    // Required for NativeEventEmitter compatibility.
+  }
+
+  @ReactMethod
+  fun removeListeners(count: Int) {
+    // Required for NativeEventEmitter compatibility.
+  }
+
+  override fun onReadyForSpeech(params: Bundle?) {}
+  override fun onBeginningOfSpeech() {}
+  override fun onRmsChanged(rmsdB: Float) {}
+  override fun onBufferReceived(buffer: ByteArray?) {}
+  override fun onEndOfSpeech() {}
+  override fun onEvent(eventType: Int, params: Bundle?) {}
+
+  override fun onPartialResults(partialResults: Bundle?) {
+    val partial = partialResults
+      ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+      ?.firstOrNull()
+      ?.trim()
+      ?: return
+    // RN 0.81 / New Arch: prefer emitDeviceEvent over getJSModule(RCTDeviceEventEmitter).
+    if (reactContext.hasActiveReactInstance()) {
+      reactContext.emitDeviceEvent("SpeechRecognitionPartial", partial)
+    }
+  }
+
+  override fun onResults(results: Bundle?) {
+    val transcript = results
+      ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+      ?.firstOrNull()
+      ?.trim()
+      ?: ""
+    val promise = pendingPromise
+    pendingPromise = null
+    if (transcript.isBlank()) {
+      promise?.reject("no_speech", "No speech detected")
+    } else {
+      promise?.resolve(transcript)
+    }
+  }
+
+  override fun onError(error: Int) {
+    val promise = pendingPromise
+    pendingPromise = null
+    promise?.reject(errorCode(error), errorMessage(error))
+  }
+
+  override fun invalidate() {
+    pendingPromise = null
+    speechRecognizer?.destroy()
+    speechRecognizer = null
+    super.invalidate()
+  }
+
+  private fun normalizeLocale(locale: String?): String {
+    val raw = (locale ?: "").trim().lowercase(Locale.US)
+    return when {
+      raw.startsWith("hi") || raw == "hindi" -> "hi-IN"
+      raw.startsWith("en") || raw == "english" || raw.isBlank() -> "en-US"
+      else -> locale ?: Locale.getDefault().toLanguageTag()
+    }
+  }
+
+  private fun errorCode(error: Int): String = "speech_error_$error"
+
+  private fun errorMessage(error: Int): String = when (error) {
+    SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+    SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client error"
+    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Speech recognition permission denied"
+    SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Speech recognition network error"
+    SpeechRecognizer.ERROR_NO_MATCH -> "Could not understand the speech"
+    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Speech recognizer is busy"
+    SpeechRecognizer.ERROR_SERVER -> "Speech recognition server error"
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech was detected"
+    else -> "Speech recognition failed"
+  }
+}

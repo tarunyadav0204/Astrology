@@ -3,6 +3,17 @@ import { useCredits } from '../../context/CreditContext';
 
 const MOBILE_PREMIUM_MQ = '(max-width: 768px)';
 
+const getSpeechRecognitionClass = () => {
+    if (typeof window === 'undefined') return null;
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+};
+
+const getSpeechRecognitionLang = (isMundaneMode = false, isPartnershipMode = false) => {
+    if (isMundaneMode) return 'en-US';
+    if (isPartnershipMode) return 'en-US';
+    return 'en-US';
+};
+
 const ChatInput = ({
     onSendMessage,
     isLoading,
@@ -13,6 +24,8 @@ const ChatInput = ({
     isPartnershipMode = false,
     isMundaneMode = false,
     isLocked = false, // when true, composer is disabled until guided steps are completed
+    isAssistantSpeaking = false,
+    onInterruptAssistantSpeech = () => {},
 }) => {
     const {
         credits,
@@ -27,10 +40,17 @@ const ChatInput = ({
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
     const [showModeSelector, setShowModeSelector] = useState(false);
+    const [isSpeechSupported, setIsSpeechSupported] = useState(() => Boolean(getSpeechRecognitionClass()));
+    const [isSpeechListening, setIsSpeechListening] = useState(false);
+    const [speechError, setSpeechError] = useState('');
     const [isMobileLayout, setIsMobileLayout] = useState(
         typeof window !== 'undefined' && window.matchMedia(MOBILE_PREMIUM_MQ).matches
     );
     const suggestionsScrollRef = useRef(null);
+    const recognitionRef = useRef(null);
+    const finalTranscriptRef = useRef('');
+    const shouldAutoSendSpeechRef = useRef(false);
+    const messageRef = useRef('');
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -40,6 +60,14 @@ const ChatInput = ({
         mq.addEventListener('change', onChange);
         return () => mq.removeEventListener('change', onChange);
     }, []);
+
+    useEffect(() => {
+        setIsSpeechSupported(Boolean(getSpeechRecognitionClass()));
+    }, []);
+
+    useEffect(() => {
+        messageRef.current = message;
+    }, [message]);
 
     useEffect(() => {
         if (isPartnershipMode || isMundaneMode) {
@@ -71,17 +99,141 @@ const ChatInput = ({
         }
     }, [followUpQuestion, onFollowUpUsed]);
 
+    useEffect(() => () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.onstart = null;
+            recognitionRef.current.onresult = null;
+            recognitionRef.current.onerror = null;
+            recognitionRef.current.onend = null;
+            recognitionRef.current.abort();
+            recognitionRef.current = null;
+        }
+    }, []);
+
     const currentCost = isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost);
     const effectiveCost = useFreeQuestionEligible ? 0 : currentCost;
+
+    const canSendMessage = !isLoading && credits >= effectiveCost && !isLocked;
+
+    const commitSend = (text, premiumOverride = null, sendOptions = {}) => {
+        const trimmed = String(text || '').trim();
+        if (!trimmed || !canSendMessage) return false;
+        const premiumForSend = useFreeQuestionEligible ? false : (premiumOverride ?? isPremiumAnalysis);
+        onSendMessage(trimmed, {
+            premium_analysis: premiumForSend,
+            ...sendOptions,
+        });
+        setMessage('');
+        setSpeechError('');
+        finalTranscriptRef.current = '';
+        messageRef.current = '';
+        return true;
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (isLocked) return;
-        const premiumForSend = useFreeQuestionEligible ? false : isPremiumAnalysis;
-        if (message.trim() && !isLoading && credits >= effectiveCost) {
-            onSendMessage(message.trim(), { premium_analysis: premiumForSend });
-            setMessage('');
+        commitSend(message);
+    };
+
+    const stopSpeechRecognition = () => {
+        shouldAutoSendSpeechRef.current = true;
+        recognitionRef.current?.stop();
+        setIsSpeechListening(false);
+    };
+
+    const startSpeechRecognition = () => {
+        if (!canSendMessage) return;
+
+        const SpeechRecognitionClass = getSpeechRecognitionClass();
+        if (!SpeechRecognitionClass) {
+            setSpeechError('Speech recognition is not supported in this browser.');
+            return;
         }
+
+        setSpeechError('');
+        finalTranscriptRef.current = '';
+        shouldAutoSendSpeechRef.current = true;
+
+        const recognition = new SpeechRecognitionClass();
+        recognition.lang = getSpeechRecognitionLang(isMundaneMode, isPartnershipMode);
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+            setIsSpeechListening(true);
+            setSpeechError('');
+            setMessage('');
+        };
+
+        recognition.onresult = (event) => {
+            let finalText = '';
+            let interimText = '';
+
+            for (let i = 0; i < event.results.length; i += 1) {
+                const fragment = event.results[i]?.[0]?.transcript || '';
+                if (event.results[i].isFinal) {
+                    finalText += fragment;
+                } else {
+                    interimText += fragment;
+                }
+            }
+
+            const combined = `${finalText} ${interimText}`.trim();
+            finalTranscriptRef.current = finalText.trim();
+            setMessage(combined);
+        };
+
+        recognition.onerror = (event) => {
+            setIsSpeechListening(false);
+            recognitionRef.current = null;
+            if (event?.error === 'aborted') return;
+            shouldAutoSendSpeechRef.current = false;
+            if (event?.error === 'no-speech') {
+                setSpeechError('No speech was detected. Please try again.');
+                return;
+            }
+            if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+                setSpeechError('Microphone permission was blocked for this site.');
+                return;
+            }
+            setSpeechError('Speech recognition failed. Please try again.');
+        };
+
+        recognition.onend = () => {
+            setIsSpeechListening(false);
+            recognitionRef.current = null;
+            const transcriptToSend = String(finalTranscriptRef.current || messageRef.current || '').trim();
+            const shouldSend = shouldAutoSendSpeechRef.current;
+            shouldAutoSendSpeechRef.current = false;
+
+            if (shouldSend && transcriptToSend && canSendMessage) {
+                commitSend(transcriptToSend, false, {
+                    premium_analysis: false,
+                    chat_tier: 'instant',
+                    instant_chat: true,
+                });
+            }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+    };
+
+    const handleSpeechButton = () => {
+        if (isAssistantSpeaking) {
+            onInterruptAssistantSpeech();
+            setTimeout(() => {
+                startSpeechRecognition();
+            }, 120);
+            return;
+        }
+        if (isSpeechListening) {
+            stopSpeechRecognition();
+            return;
+        }
+        startSpeechRecognition();
     };
 
     const suggestions = isMundaneMode
@@ -332,6 +484,35 @@ const ChatInput = ({
                     disabled={isLoading || credits < effectiveCost || isLocked}
                     className={`chat-input${useCompactPremium && showModeSelector ? ' chat-input--mode-select-open' : ''}`}
                 />
+                <button
+                    type="button"
+                    className={`speech-button ${isSpeechListening ? 'speech-button--listening' : ''}`}
+                    onClick={handleSpeechButton}
+                    disabled={!isSpeechSupported || isLoading || credits < effectiveCost || isLocked}
+                    aria-label={
+                        isAssistantSpeaking
+                            ? 'Interrupt and ask a follow-up'
+                            : isSpeechListening
+                                ? 'Stop listening'
+                                : 'Speak your question'
+                    }
+                    title={
+                        !isSpeechSupported
+                            ? 'Speech recognition is not supported in this browser'
+                            : isAssistantSpeaking
+                                ? 'Interrupt and ask the next question'
+                                : isSpeechListening
+                                ? 'Stop listening'
+                                : 'Speak your question'
+                    }
+                >
+                    <span className="speech-button__icon" aria-hidden="true">
+                        {isAssistantSpeaking ? '⏭' : isSpeechListening ? '■' : '🎤'}
+                    </span>
+                    <span className="speech-button__label">
+                        {isAssistantSpeaking ? 'Interrupt' : isSpeechListening ? 'Stop' : 'Speak'}
+                    </span>
+                </button>
                 {useCompactPremium && (
                     <>
                         <button
@@ -391,6 +572,16 @@ const ChatInput = ({
                     </span>
                 </button>
             </form>
+            {(speechError || isSpeechListening) && (
+                <div className={`speech-status ${speechError ? 'speech-status--error' : 'speech-status--listening'}`}>
+                    {speechError || 'Listening… speak naturally and pause when done.'}
+                </div>
+            )}
+            {!speechError && !isSpeechListening && isAssistantSpeaking && (
+                <div className="speech-status speech-status--listening">
+                    AstroRoshni is speaking. Tap the mic to interrupt and ask the next question.
+                </div>
+            )}
             {!creditsLoading && (
                 <div className="credit-info chat-composer-footnote">
                     Credits: {credits} |{' '}

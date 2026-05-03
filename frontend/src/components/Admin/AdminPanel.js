@@ -40,7 +40,11 @@ function promoCodeIsActive(value) {
 
 function formatDateTimeIST(value) {
   if (!value) return '—';
-  const d = new Date(value);
+  const raw = String(value).trim();
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+  // Backend Postgres timestamps are UTC but often arrive without a timezone suffix.
+  const normalized = hasTimezone ? raw : `${raw.replace(' ', 'T')}Z`;
+  const d = new Date(normalized);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString('en-IN', {
     year: 'numeric',
@@ -133,6 +137,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [eventTimelineModel, setEventTimelineModel] = useState('');
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
+  const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
+  const [speechChatUserAllowlist, setSpeechChatUserAllowlist] = useState('');
+  const [speechChatSaving, setSpeechChatSaving] = useState(false);
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
   const [chatLlmProviderPremium, setChatLlmProviderPremium] = useState('');
   const [openaiModelOptions, setOpenaiModelOptions] = useState([]);
@@ -145,6 +152,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatCountdownStandardSeconds, setChatCountdownStandardSeconds] = useState('110');
   const [chatCountdownPremiumSeconds, setChatCountdownPremiumSeconds] = useState('210');
   const [chatCountdownSaving, setChatCountdownSaving] = useState(false);
+  const [chatStaticSuggestions, setChatStaticSuggestions] = useState('');
+  const [chatStaticSuggestionsSaving, setChatStaticSuggestionsSaving] = useState(false);
   const [podcastProvider, setPodcastProvider] = useState('tts');
   const [podcastProviderSaving, setPodcastProviderSaving] = useState(false);
   const [allowedDevices, setAllowedDevices] = useState([]);
@@ -311,11 +320,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       const releaseNotes = data.settings.find(s => s.key === 'app_update_release_notes');
       const timerStandard = data.settings.find((s) => s.key === 'chat_countdown_standard_seconds');
       const timerPremium = data.settings.find((s) => s.key === 'chat_countdown_premium_seconds');
+      const staticSuggestions = data.settings.find((s) => s.key === 'chat_static_suggestions');
       setAndroidMinVersion(androidMin?.value ?? '');
       setIosMinVersion(iosMin?.value ?? '');
       setAppUpdateReleaseNotes(releaseNotes?.value ?? '');
       setChatCountdownStandardSeconds((timerStandard?.value ?? '110').toString());
       setChatCountdownPremiumSeconds((timerPremium?.value ?? '210').toString());
+      setChatStaticSuggestions(staticSuggestions?.value ?? '');
       setGeminiModelOptions(data.gemini_model_options || []);
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
@@ -324,6 +335,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
+      setSpeechChatEnabled(Boolean(data.speech_chat_enabled));
+      setSpeechChatUserAllowlist(data.speech_chat_user_allowlist || '');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
       setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
@@ -590,6 +603,49 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
+  const handleSaveSpeechChatSettings = async () => {
+    setSpeechChatSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes] = await Promise.all([
+        fetch('/api/admin/settings/speech_chat_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'speech_chat_enabled',
+            value: speechChatEnabled ? 'true' : 'false',
+            description: 'Feature flag for mobile speech input (mic) and /api/speech/transcribe',
+          }),
+        }),
+        fetch('/api/admin/settings/speech_chat_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'speech_chat_user_allowlist',
+            value: speechChatUserAllowlist,
+            description: 'Optional CSV user allowlist for speech chat. Empty = all users when enabled.',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok) {
+        const enabledErr = await enabledRes.json().catch(() => ({}));
+        const allowlistErr = await allowlistRes.json().catch(() => ({}));
+        alert(
+          'Failed to save speech chat settings: ' +
+            (enabledErr.detail || allowlistErr.detail || 'check console')
+        );
+        return;
+      }
+      alert('Speech chat settings saved. Clients pick this up on the next pricing/features fetch.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving speech chat settings:', error);
+      alert('Failed to save speech chat settings.');
+    } finally {
+      setSpeechChatSaving(false);
+    }
+  };
+
   const handleSaveChatCountdownSettings = async () => {
     const standard = Number(chatCountdownStandardSeconds);
     const premium = Number(chatCountdownPremiumSeconds);
@@ -633,6 +689,46 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save chat countdown settings.');
     } finally {
       setChatCountdownSaving(false);
+    }
+  };
+
+  const handleSaveChatStaticSuggestions = async () => {
+    const lines = chatStaticSuggestions
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      alert('Add at least one suggestion, one per line.');
+      return;
+    }
+    if (lines.length > 20) {
+      alert('Please keep static suggestions to 20 or fewer.');
+      return;
+    }
+    setChatStaticSuggestionsSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/chat_static_suggestions', {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'chat_static_suggestions',
+          value: lines.join('\n'),
+          description: 'Static chat suggestion chips shown above the mobile chat input, one per line',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save chat suggestions: ' + (err.detail || 'unknown error'));
+        return;
+      }
+      setChatStaticSuggestions(lines.join('\n'));
+      alert('Chat suggestions saved. Mobile clients will use them on next pricing refresh.');
+      fetchAdminSettings();
+    } catch (e) {
+      console.error('Error saving chat suggestions:', e);
+      alert('Failed to save chat suggestions.');
+    } finally {
+      setChatStaticSuggestionsSaving(false);
     }
   };
 
@@ -3906,6 +4002,52 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
 
             <div className="settings-section">
+              <h3>Speech input (mobile)</h3>
+              <p className="settings-hint">
+                Controls the microphone entry point on the mobile chat screen and access to{' '}
+                <code>/api/speech/transcribe</code>. Speech answers use instant chat; keep instant chat enabled for
+                end-to-end speech flows. If the allowlist is empty, all users are eligible when this switch is on.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable speech input</strong>
+                  <p>Master switch for the speak / transcribe flow on supported app builds.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={speechChatEnabled}
+                    onChange={(e) => setSpeechChatEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={speechChatUserAllowlist}
+                  onChange={(e) => setSpeechChatUserAllowlist(e.target.value)}
+                  placeholder="e.g. 12, 45, 78"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveSpeechChatSettings}
+                  disabled={speechChatSaving}
+                >
+                  {speechChatSaving ? 'Saving…' : 'Save speech input settings'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
               <h3>Chat loading countdown</h3>
               <p className="settings-hint">
                 Controls how long the chat loading timer runs before it switches to the high-traffic waiting state.
@@ -3944,6 +4086,36 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={chatCountdownSaving}
                 >
                   {chatCountdownSaving ? 'Saving…' : 'Save countdown timers'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Mobile chat suggestion chips</h3>
+              <p className="settings-hint">
+                Static questions shown above the mobile chat input. Enter one suggestion per line; the app shows the first three as chips.
+              </p>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Static suggestions</strong>
+                  <p>These replace the hard-coded mobile chat suggestions after the app refreshes pricing/config.</p>
+                </div>
+                <textarea
+                  value={chatStaticSuggestions}
+                  onChange={(e) => setChatStaticSuggestions(e.target.value)}
+                  placeholder={'What does my birth chart say about my career?\nWhen is a good time for marriage?\nWhat are my health vulnerabilities?'}
+                  rows={6}
+                  style={{ width: '100%', maxWidth: '640px', minHeight: '140px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveChatStaticSuggestions}
+                  disabled={chatStaticSuggestionsSaving}
+                >
+                  {chatStaticSuggestionsSaving ? 'Saving…' : 'Save chat suggestions'}
                 </button>
               </div>
             </div>

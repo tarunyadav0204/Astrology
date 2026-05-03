@@ -126,6 +126,107 @@
   color: #6c757d;
 }
 
+.admin-activity-unique-chart-card {
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-activity-unique-chart-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.admin-activity-unique-chart-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #343a40;
+}
+
+.admin-activity-unique-chart-header span,
+.admin-activity-unique-axis-labels {
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.admin-activity-unique-chart {
+  display: flex;
+  min-height: 220px;
+  gap: 12px;
+}
+
+.admin-activity-unique-y-axis {
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #6c757d;
+  font-size: 12px;
+  padding: 4px 0 26px;
+}
+
+.admin-activity-unique-bars {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(64px, 1fr));
+  gap: 14px;
+  border-left: 1px solid #e9ecef;
+  border-bottom: 1px solid #e9ecef;
+  padding: 4px 12px 0;
+  overflow-x: auto;
+}
+
+.admin-activity-unique-bar-item {
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.admin-activity-unique-bar-track {
+  width: 100%;
+  height: 170px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.admin-activity-unique-bar {
+  width: 70%;
+  min-height: 4px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #ff8c5a 0%, #ff6b35 100%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding-top: 6px;
+  transition: height 0.2s ease;
+}
+
+.admin-activity-unique-x-label {
+  margin-top: 8px;
+  color: #495057;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.admin-activity-unique-axis-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
 .admin-activity-distinct-section {
   margin-bottom: 28px;
 }

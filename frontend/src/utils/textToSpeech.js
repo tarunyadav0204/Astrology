@@ -12,6 +12,22 @@ class TextToSpeech {
         }
     }
 
+    getPreferredVoice(voices = []) {
+        if (!Array.isArray(voices) || voices.length === 0) return null;
+
+        return (
+            voices.find((voice) => (
+                String(voice?.lang || '').toLowerCase().startsWith('en')
+                && String(voice?.name || '').toLowerCase().includes('female')
+            ))
+            || voices.find((voice) => (
+                String(voice?.lang || '').toLowerCase().startsWith('en')
+            ))
+            || voices[0]
+            || null
+        );
+    }
+
     // Clean markdown and formatting from text
     cleanText(text) {
         return text
@@ -46,14 +62,12 @@ class TextToSpeech {
             this.currentUtterance.pitch = options.pitch || 1;
             this.currentUtterance.volume = options.volume || 1;
             
-            // Set voice (prefer English voices)
+            // Set voice (prefer English female voice first)
             const voices = this.synth.getVoices();
-            const englishVoice = voices.find(voice => 
-                voice.lang.startsWith('en') && voice.name.includes('Female')
-            ) || voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+            const preferredVoice = this.getPreferredVoice(voices);
             
-            if (englishVoice) {
-                this.currentUtterance.voice = englishVoice;
+            if (preferredVoice) {
+                this.currentUtterance.voice = preferredVoice;
             }
 
             // Event handlers

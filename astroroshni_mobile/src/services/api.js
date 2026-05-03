@@ -218,6 +218,12 @@ export const chatAPI = {
     api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed', query_context: buildQueryContext() }),
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
   getSession: (sessionId) => api.get(getEndpoint(`/chat-v2/session/${sessionId}`)),
+  createV2Session: (birthChartId) =>
+    api.post(getEndpoint('/chat-v2/session'), { birth_chart_id: birthChartId, query_context: buildQueryContext() }),
+  askV2: (requestBody) =>
+    api.post(getEndpoint('/chat-v2/ask'), { ...requestBody, query_context: requestBody?.query_context || buildQueryContext() }),
+  getMessageStatus: (messageId) =>
+    api.get(getEndpoint(`/chat-v2/status/${messageId}`)),
   clearHistory: () => api.delete(getEndpoint('/chat/history')),
   createSession: () => api.post(getEndpoint('/chat/session'), { query_context: buildQueryContext() }),
   saveMessage: (sessionId, sender, content) => 
@@ -269,6 +275,20 @@ export const chatAPI = {
       rating,
       comment,
     }),
+};
+
+export const speechAPI = {
+  transcribeAudio: (audioFile, language = 'english') => {
+    const form = new FormData();
+    form.append('language', language || 'english');
+    form.append('audio', audioFile);
+    return api.post(getEndpoint('/speech/transcribe'), form, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: API_TIMEOUT,
+    });
+  },
 };
 
 export const wealthAPI = {

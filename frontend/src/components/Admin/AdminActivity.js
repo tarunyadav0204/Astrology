@@ -10,6 +10,14 @@ const COLUMNS = [
   'ip', 'user_agent', 'created_at',
 ];
 
+const UNIQUE_USER_WINDOWS = [
+  { label: '5 min', ms: 5 * 60 * 1000 },
+  { label: '15 min', ms: 15 * 60 * 1000 },
+  { label: '30 min', ms: 30 * 60 * 1000 },
+  { label: '1 hour', ms: 60 * 60 * 1000 },
+  { label: '1 day', ms: 24 * 60 * 60 * 1000 },
+];
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -31,6 +39,14 @@ function parseActivityUserId(row) {
   const n = parseInt(String(v).trim(), 10);
   if (!n || Number.isNaN(n) || n <= 0) return null;
   return n;
+}
+
+function activityUserKey(row) {
+  const uid = parseActivityUserId(row);
+  if (uid != null) return `id:${uid}`;
+  const phone = String(row?.user_phone || '').trim();
+  if (phone) return `phone:${phone}`;
+  return null;
 }
 
 export default function AdminActivity({ onOpenUserProfile }) {
@@ -97,6 +113,19 @@ export default function AdminActivity({ onOpenUserProfile }) {
   useEffect(() => {
     fetchActivity();
   }, [fetchActivity]);
+
+  const uniqueUserWindowStats = UNIQUE_USER_WINDOWS.map((windowDef) => {
+    const cutoff = Date.now() - windowDef.ms;
+    const users = new Set();
+    activity.forEach((row) => {
+      const createdMs = new Date(row?.created_at).getTime();
+      if (!Number.isFinite(createdMs) || createdMs < cutoff) return;
+      const userKey = activityUserKey(row);
+      if (userKey) users.add(userKey);
+    });
+    return { ...windowDef, count: users.size };
+  });
+  const maxUniqueWindowCount = Math.max(1, ...uniqueUserWindowStats.map((item) => item.count));
 
   const handleSort = (col) => {
     if (sortBy === col) {
@@ -238,6 +267,43 @@ export default function AdminActivity({ onOpenUserProfile }) {
 
       {!loading && !error && (
         <>
+          <div className="admin-activity-unique-chart-card">
+            <div className="admin-activity-unique-chart-header">
+              <h3>Unique users by recent window</h3>
+              <span>Rolling from current time</span>
+            </div>
+            <div className="admin-activity-unique-chart">
+              <div className="admin-activity-unique-y-axis">
+                <span>{maxUniqueWindowCount}</span>
+                <span>{Math.round(maxUniqueWindowCount / 2)}</span>
+                <span>0</span>
+              </div>
+              <div className="admin-activity-unique-bars" role="img" aria-label="Unique users in last 5 minutes, 15 minutes, 30 minutes, 1 hour, and 1 day">
+                {uniqueUserWindowStats.map((item) => {
+                  const heightPct = item.count === 0 ? 2 : Math.max(8, (item.count / maxUniqueWindowCount) * 100);
+                  return (
+                    <div className="admin-activity-unique-bar-item" key={item.label}>
+                      <div className="admin-activity-unique-bar-track">
+                        <div
+                          className="admin-activity-unique-bar"
+                          style={{ height: `${heightPct}%` }}
+                          title={`${item.label}: ${item.count} unique users`}
+                        >
+                          <span>{item.count}</span>
+                        </div>
+                      </div>
+                      <div className="admin-activity-unique-x-label">{item.label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="admin-activity-unique-axis-labels">
+              <span>Y axis: unique users</span>
+              <span>X axis: recent time window</span>
+            </div>
+          </div>
+
           <div className="admin-activity-distinct-section">
             <h3 className="admin-activity-distinct-heading">
               Users in date range

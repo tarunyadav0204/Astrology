@@ -26,6 +26,7 @@ import PanchangPage from './components/Panchang/PanchangPage';
 import MuhuratFinderPage from './components/MuhuratFinder/MuhuratFinderPage';
 import AdminPanel from './components/Admin/AdminPanel';
 import ChatPage from './components/Chat/ChatPage';
+import SpeechChatPage from './components/Chat/SpeechChatPage';
 import MythsVsReality from './components/Education/MythsVsReality';
 import AdvancedCourses from './components/Education/AdvancedCourses';
 import BeginnersGuide from './components/Education/BeginnersGuide';
@@ -60,7 +61,7 @@ import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/doma
 function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  if (pathname === '/chat' || pathname.startsWith('/tools/')) return null;
+  if (pathname === '/chat' || pathname === '/speech-chat' || pathname.startsWith('/tools/')) return null;
   const handleOpenChat = () => {
     if (user) {
       navigate('/chat');
@@ -728,6 +729,7 @@ function App() {
             />
           } />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/speech-chat" element={<SpeechChatPage />} />
           <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
