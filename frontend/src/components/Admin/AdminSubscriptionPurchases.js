@@ -79,6 +79,11 @@ const AdminSubscriptionPurchases = () => {
           <strong>start date</strong> (period start). <strong>Recorded</strong> is when the row was saved.
         </p>
         <p className="play-refund-hint">
+          State meanings: <strong>current_active</strong> = currently valid;{' '}
+          <strong>inactive_superseded</strong> = older row replaced by another active row on same platform;{' '}
+          <strong>inactive_ended</strong> = ended in past.
+        </p>
+        <p className="play-refund-hint">
           Active range:{' '}
           {appliedRange.from && appliedRange.to
             ? `${appliedRange.from} → ${appliedRange.to}`
@@ -129,12 +134,14 @@ const AdminSubscriptionPurchases = () => {
                     <th>Product ID</th>
                     <th>End</th>
                     <th>Status</th>
+                    <th>State</th>
+                    <th>Cancelled/ended (est.)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {purchases.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="play-refund-empty">
+                      <td colSpan={13} className="play-refund-empty">
                         No subscription rows in this period.
                       </td>
                     </tr>
@@ -152,6 +159,8 @@ const AdminSubscriptionPurchases = () => {
                         <td className="order-id-cell">{row.google_play_product_id || '—'}</td>
                         <td className="date-cell">{formatTs(row.end_date)}</td>
                         <td>{row.status || '—'}</td>
+                        <td>{row.lifecycle_state || '—'}</td>
+                        <td className="date-cell">{formatTs(row.cancelled_or_ended_at_estimate)}</td>
                       </tr>
                     ))
                   )}

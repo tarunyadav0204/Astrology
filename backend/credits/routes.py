@@ -1908,6 +1908,31 @@ async def admin_subscription_purchases(
                    us.start_date,
                    us.end_date,
                    us.created_at AS recorded_at,
+                   CASE
+                       WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN TRUE
+                       ELSE FALSE
+                   END AS is_current,
+                   CASE
+                       WHEN us.status <> 'active' AND us.end_date < CURRENT_DATE THEN us.end_date
+                       WHEN us.status <> 'active' THEN us.created_at
+                       ELSE NULL
+                   END AS cancelled_or_ended_at_estimate,
+                   CASE
+                       WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN 'current_active'
+                       WHEN us.status <> 'active'
+                            AND EXISTS (
+                                SELECT 1
+                                FROM user_subscriptions us2
+                                JOIN subscription_plans sp2 ON sp2.plan_id = us2.plan_id
+                                WHERE us2.userid = us.userid
+                                  AND sp2.platform = sp.platform
+                                  AND us2.status = 'active'
+                                  AND us2.end_date >= CURRENT_DATE
+                            ) THEN 'inactive_superseded'
+                       WHEN us.status <> 'active' AND us.end_date < CURRENT_DATE THEN 'inactive_ended'
+                       WHEN us.status <> 'active' THEN 'inactive_unknown'
+                       ELSE 'active_not_current'
+                   END AS lifecycle_state,
                    ROW_NUMBER() OVER (
                        PARTITION BY us.userid, us.plan_id, DATE(us.start_date), DATE(us.end_date)
                        ORDER BY us.created_at DESC NULLS LAST, us.id DESC
@@ -1924,7 +1949,8 @@ async def admin_subscription_purchases(
         + """
         SELECT row_id, subscription_id, userid, user_name, user_phone, platform,
                plan_name, tier_name, google_play_product_id, plan_price,
-               plan_discount_percent, status, start_date, end_date, recorded_at
+               plan_discount_percent, status, start_date, end_date, recorded_at,
+               is_current, cancelled_or_ended_at_estimate, lifecycle_state
         FROM ranked
         WHERE rn = 1
         ORDER BY start_date DESC, row_id DESC
