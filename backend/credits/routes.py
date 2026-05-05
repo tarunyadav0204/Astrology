@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
+import base64
 import logging
 import os
 import re
@@ -597,11 +598,40 @@ def _sync_subscription_from_play(
     # Google keeps cancelled subscriptions entitled until expiryTimeMillis.
     # userCancellationTimeMillis only means renewal is off, not that access ended.
     end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
+    # Keep token->user mapping fresh so RTDN worker can resolve ownership.
+    try:
+        credit_service.upsert_play_subscription_token(userid, purchase_token, product_id)
+    except Exception:
+        pass
     success = credit_service.set_user_subscription(userid, plan_id, start_date, end_date)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
     tier_name = credit_service.get_subscription_tier_name(userid)
     return {"tier_name": tier_name or product_id, "end_date": end_date}
+
+
+def _extract_rtdn_payload_from_pubsub_push(body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Pub/Sub push body format:
+    {
+      "message": {"data": "<base64-json>", "messageId": "...", ...},
+      "subscription": "..."
+    }
+    """
+    if not isinstance(body, dict):
+        return {}
+    msg = body.get("message")
+    if not isinstance(msg, dict):
+        return {}
+    data_b64 = str(msg.get("data") or "").strip()
+    if not data_b64:
+        return {}
+    try:
+        raw = base64.b64decode(data_b64)
+        parsed = json.loads(raw.decode("utf-8"))
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
 
 
 @router.post("/google-play/subscription/sync")
@@ -633,6 +663,77 @@ async def sync_google_play_subscription(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not sync subscription: {str(e)}")
+
+
+@router.post("/google-play/rtdn/push")
+async def google_play_rtdn_push(body: Dict[str, Any]):
+    """
+    Pub/Sub push endpoint for Google Play RTDN events.
+    Returns 200 for handled/ignored events so Pub/Sub can ack and move on.
+    """
+    msg = body.get("message") if isinstance(body, dict) else None
+    message_id = str((msg or {}).get("messageId") or (msg or {}).get("message_id") or "").strip()
+    payload = _extract_rtdn_payload_from_pubsub_push(body)
+    if not payload:
+        logger.warning("RTDN push: invalid payload envelope (message_id=%s)", message_id or "n/a")
+        return {"success": True, "ignored": "invalid_payload"}
+
+    if isinstance(payload.get("testNotification"), dict):
+        logger.info("RTDN push: test notification received (message_id=%s)", message_id or "n/a")
+        return {"success": True, "test": True}
+
+    sub_notif = payload.get("subscriptionNotification")
+    if not isinstance(sub_notif, dict):
+        logger.info("RTDN push: non-subscription message ignored (message_id=%s)", message_id or "n/a")
+        return {"success": True, "ignored": "non_subscription_event"}
+
+    purchase_token = str(sub_notif.get("purchaseToken") or "").strip()
+    product_id = str(sub_notif.get("subscriptionId") or "").strip()
+    notification_type = sub_notif.get("notificationType")
+    event_time_millis = payload.get("eventTimeMillis")
+
+    if not purchase_token or not product_id:
+        logger.warning("RTDN push: missing token/product (message_id=%s)", message_id or "n/a")
+        return {"success": True, "ignored": "missing_token_or_product"}
+
+    # Idempotency key (stable enough for at-least-once delivery).
+    event_id = "|".join(
+        [
+            purchase_token,
+            product_id,
+            str(notification_type or ""),
+            str(event_time_millis or ""),
+            message_id or "",
+        ]
+    )
+    if credit_service.has_processed_play_subscription_event(event_id):
+        return {"success": True, "duplicate": True}
+
+    userid = credit_service.get_user_id_by_play_purchase_token(purchase_token)
+    if userid is None:
+        logger.warning(
+            "RTDN push: unknown purchase token; ignoring (product=%s message_id=%s)",
+            product_id,
+            message_id or "n/a",
+        )
+        return {"success": True, "ignored": "unknown_purchase_token"}
+
+    # Accept any payment state: for cancellation/expiry transitions we still need updated end_date.
+    _sync_subscription_from_play(
+        userid=userid,
+        product_id=product_id,
+        purchase_token=purchase_token,
+        accept_any_payment_state=True,
+    )
+    credit_service.log_play_subscription_event(
+        event_id=event_id,
+        purchase_token=purchase_token,
+        product_id=product_id,
+        notification_type=int(notification_type) if notification_type is not None else None,
+        event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
+        payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+    )
+    return {"success": True}
 
 
 @router.post("/google-play/subscription/clear")

@@ -186,6 +186,31 @@ class CreditService:
                 )
             ''')
 
+            # RTDN idempotency log: one row per processed Google Play subscription event.
+            execute(conn, '''
+                CREATE TABLE IF NOT EXISTS play_subscription_event_log (
+                    id BIGSERIAL PRIMARY KEY,
+                    event_id TEXT NOT NULL UNIQUE,
+                    purchase_token TEXT,
+                    product_id TEXT,
+                    notification_type INTEGER,
+                    event_time_millis BIGINT,
+                    payload_json TEXT,
+                    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            execute(conn, '''
+                CREATE TABLE IF NOT EXISTS play_subscription_token_map (
+                    id BIGSERIAL PRIMARY KEY,
+                    userid INTEGER NOT NULL,
+                    purchase_token TEXT NOT NULL UNIQUE,
+                    product_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
             # Backfill: users who have ever paid for a chat question should not get "first question free"
             try:
                 execute(conn, """
@@ -333,7 +358,15 @@ class CreditService:
         return row[0] if row else None
 
     def set_user_subscription(self, userid: int, plan_id: int, start_date: str, end_date: str) -> bool:
-        """Set user's subscription to plan_id (deactivate other plans on same platform, add new active row). Dates YYYY-MM-DD."""
+        """
+        Set user's subscription entitlement window for a plan.
+
+        Behavior:
+        - Keep membership valid until end_date (entitlement window from Play).
+        - Idempotent per (userid, plan_id, start_date, end_date): re-sync should not create duplicate rows.
+        - Ensure only one current active row on a platform.
+        Dates are YYYY-MM-DD.
+        """
         from db import get_conn, execute
         try:
             with get_conn() as conn:
@@ -342,21 +375,191 @@ class CreditService:
                 if not row:
                     return False
                 platform = row[0]
+
+                # Cleanup: rows that are marked active but already lapsed should not stay active.
+                today_expr = self._date_today_expr()
                 execute(
                     conn,
-                    """
-                    UPDATE user_subscriptions SET status = 'inactive'
-                    WHERE userid = ? AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                    f"""
+                    UPDATE user_subscriptions
+                    SET status = 'inactive'
+                    WHERE userid = ?
+                      AND status = 'active'
+                      AND end_date < {today_expr}
+                      AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
                     """,
                     (userid, platform),
                 )
+
+                # Idempotency key for a single billing cycle entitlement window.
+                cursor = execute(
+                    conn,
+                    """
+                    SELECT id
+                    FROM user_subscriptions
+                    WHERE userid = ?
+                      AND plan_id = ?
+                      AND DATE(start_date) = DATE(?)
+                      AND DATE(end_date) = DATE(?)
+                    ORDER BY created_at DESC NULLS LAST, id DESC
+                    LIMIT 1
+                    """,
+                    (userid, plan_id, start_date, end_date),
+                )
+                existing = cursor.fetchone()
+
+                if existing:
+                    keep_id = existing[0]
+                    execute(
+                        conn,
+                        """
+                        UPDATE user_subscriptions
+                        SET status = 'active',
+                            start_date = ?,
+                            end_date = ?
+                        WHERE id = ?
+                        """,
+                        (start_date, end_date, keep_id),
+                    )
+                    execute(
+                        conn,
+                        """
+                        UPDATE user_subscriptions
+                        SET status = 'inactive'
+                        WHERE userid = ?
+                          AND id <> ?
+                          AND status = 'active'
+                          AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                        """,
+                        (userid, keep_id, platform),
+                    )
+                else:
+                    execute(
+                        conn,
+                        """
+                        UPDATE user_subscriptions
+                        SET status = 'inactive'
+                        WHERE userid = ?
+                          AND status = 'active'
+                          AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                        """,
+                        (userid, platform),
+                    )
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
+                        VALUES (?, ?, ?, ?, 'active')
+                        """,
+                        (userid, plan_id, start_date, end_date),
+                    )
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def upsert_play_subscription_token(self, userid: int, purchase_token: str, product_id: Optional[str] = None) -> bool:
+        """Persist purchase_token -> userid mapping for RTDN processing."""
+        from db import get_conn, execute
+        token = (purchase_token or "").strip()
+        if not token:
+            return False
+        try:
+            with get_conn() as conn:
                 execute(
                     conn,
                     """
-                    INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
-                    VALUES (?, ?, ?, ?, 'active')
+                    INSERT INTO play_subscription_token_map (userid, purchase_token, product_id, created_at, last_seen_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (purchase_token) DO UPDATE
+                      SET userid = EXCLUDED.userid,
+                          product_id = EXCLUDED.product_id,
+                          last_seen_at = CURRENT_TIMESTAMP
                     """,
-                    (userid, plan_id, start_date, end_date),
+                    (userid, token, (product_id or "").strip() or None),
+                )
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def get_user_id_by_play_purchase_token(self, purchase_token: str) -> Optional[int]:
+        """Resolve userid from purchase token map. Returns None when unknown."""
+        from db import get_conn, execute
+        token = (purchase_token or "").strip()
+        if not token:
+            return None
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT userid
+                    FROM play_subscription_token_map
+                    WHERE purchase_token = ?
+                    LIMIT 1
+                    """,
+                    (token,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                try:
+                    return int(row[0])
+                except (TypeError, ValueError):
+                    return None
+        except Exception:
+            return None
+
+    def has_processed_play_subscription_event(self, event_id: str) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        if not eid:
+            return False
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT 1 FROM play_subscription_event_log WHERE event_id = ? LIMIT 1",
+                    (eid,),
+                )
+                return bool(cur.fetchone())
+        except Exception:
+            return False
+
+    def log_play_subscription_event(
+        self,
+        *,
+        event_id: str,
+        purchase_token: Optional[str],
+        product_id: Optional[str],
+        notification_type: Optional[int],
+        event_time_millis: Optional[int],
+        payload_json: Optional[str],
+    ) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        if not eid:
+            return False
+        try:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO play_subscription_event_log (
+                        event_id, purchase_token, product_id, notification_type, event_time_millis, payload_json, processed_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (event_id) DO NOTHING
+                    """,
+                    (
+                        eid,
+                        (purchase_token or "").strip() or None,
+                        (product_id or "").strip() or None,
+                        int(notification_type) if notification_type is not None else None,
+                        int(event_time_millis) if event_time_millis is not None else None,
+                        payload_json,
+                    ),
                 )
                 conn.commit()
                 return True
