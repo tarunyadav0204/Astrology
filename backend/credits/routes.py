@@ -1890,29 +1890,49 @@ async def admin_subscription_purchases(
         base_from += " AND (u.name ILIKE %s OR u.phone ILIKE %s)"
         params.extend([q, q])
 
-    select_sql = (
+    dedup_cte = (
         """
-        SELECT us.id AS row_id,
-               us.id AS subscription_id,
-               us.userid,
-               u.name AS user_name,
-               u.phone AS user_phone,
-               sp.platform,
-               sp.plan_name,
-               sp.tier_name,
-               sp.google_play_product_id,
-               sp.price AS plan_price,
-               sp.discount_percent AS plan_discount_percent,
-               us.status,
-               us.start_date,
-               us.end_date,
-               us.created_at AS recorded_at
+        WITH ranked AS (
+            SELECT us.id AS row_id,
+                   us.id AS subscription_id,
+                   us.userid,
+                   u.name AS user_name,
+                   u.phone AS user_phone,
+                   sp.platform,
+                   sp.plan_name,
+                   sp.tier_name,
+                   sp.google_play_product_id,
+                   sp.price AS plan_price,
+                   sp.discount_percent AS plan_discount_percent,
+                   us.status,
+                   us.start_date,
+                   us.end_date,
+                   us.created_at AS recorded_at,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY us.userid, us.plan_id, DATE(us.start_date), DATE(us.end_date)
+                       ORDER BY us.created_at DESC NULLS LAST, us.id DESC
+                   ) AS rn
         """
         + base_from
-        + " ORDER BY us.start_date DESC, us.id DESC LIMIT %s OFFSET %s"
+        + """
+        )
+        """
     )
 
-    count_sql = "SELECT COUNT(*) " + base_from
+    select_sql = (
+        dedup_cte
+        + """
+        SELECT row_id, subscription_id, userid, user_name, user_phone, platform,
+               plan_name, tier_name, google_play_product_id, plan_price,
+               plan_discount_percent, status, start_date, end_date, recorded_at
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY start_date DESC, row_id DESC
+        LIMIT %s OFFSET %s
+        """
+    )
+
+    count_sql = dedup_cte + "SELECT COUNT(*) FROM ranked WHERE rn = 1"
 
     try:
         with get_conn() as conn:
