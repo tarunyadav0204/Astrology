@@ -1804,6 +1804,146 @@ async def get_razorpay_transactions(
     }
 
 
+def _serialize_admin_subscription_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """JSON-friendly values for admin subscription purchase list."""
+    out: Dict[str, Any] = {}
+    for key, val in row.items():
+        if val is None:
+            out[key] = None
+        elif hasattr(val, "isoformat"):
+            out[key] = val.isoformat()
+        elif isinstance(val, (int, float, str, bool)):
+            out[key] = val
+        else:
+            # Decimal etc.
+            try:
+                out[key] = float(val)
+            except (TypeError, ValueError):
+                out[key] = str(val)
+    return out
+
+
+@router.get("/admin/subscription-purchases")
+async def admin_subscription_purchases(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    query: Optional[str] = None,
+    page: Optional[int] = 1,
+    limit: Optional[int] = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Paid subscription rows from user_subscriptions (excludes free plans).
+    Filter by subscription start date (start_date), inclusive YYYY-MM-DD range.
+    Optional wildcard on user name or phone.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from datetime import date as date_type, timedelta
+
+    today = date_type.today()
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    elif from_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = today
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    elif to_date:
+        try:
+            td = date_type.fromisoformat(to_date)
+            fd = td - timedelta(days=30)
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    else:
+        fd = today - timedelta(days=30)
+        td = today
+
+    page = max(1, page or 1)
+    limit = max(1, min(200, limit or 50))
+    offset = (page - 1) * limit
+
+    base_from = """
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+        JOIN users u ON u.userid = us.userid
+        WHERE DATE(us.start_date) >= %s AND DATE(us.start_date) <= %s
+          AND (
+            (sp.google_play_product_id IS NOT NULL AND TRIM(sp.google_play_product_id) <> '')
+            OR COALESCE(sp.price, 0) > 0
+          )
+    """
+    params: List[Any] = [fd.isoformat(), td.isoformat()]
+    if query and query.strip():
+        q = f"%{query.strip()}%"
+        base_from += " AND (u.name ILIKE %s OR u.phone ILIKE %s)"
+        params.extend([q, q])
+
+    select_sql = (
+        """
+        SELECT us.id AS row_id,
+               us.id AS subscription_id,
+               us.userid,
+               u.name AS user_name,
+               u.phone AS user_phone,
+               sp.platform,
+               sp.plan_name,
+               sp.tier_name,
+               sp.google_play_product_id,
+               sp.price AS plan_price,
+               sp.discount_percent AS plan_discount_percent,
+               us.status,
+               us.start_date,
+               us.end_date,
+               us.created_at AS recorded_at
+        """
+        + base_from
+        + " ORDER BY us.start_date DESC, us.id DESC LIMIT %s OFFSET %s"
+    )
+
+    count_sql = "SELECT COUNT(*) " + base_from
+
+    try:
+        with get_conn() as conn:
+            cur = execute(conn, count_sql, tuple(params))
+            count_row = cur.fetchone()
+            total = int(count_row[0]) if count_row and count_row[0] is not None else 0
+
+            cur = execute(conn, select_sql, tuple(params + [limit, offset]))
+            colnames = [d[0] for d in (cur.description or [])]
+            raw_rows = cur.fetchall() or []
+            purchases = [
+                _serialize_admin_subscription_row(dict(zip(colnames, r)))
+                for r in raw_rows
+            ]
+    except Exception as e:
+        logger.exception("GET /admin/subscription-purchases failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load subscription purchases: {e!s}",
+        ) from e
+
+    return {
+        "from_date": fd.isoformat(),
+        "to_date": td.isoformat(),
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "purchases": purchases,
+    }
+
+
 @router.get("/admin/dashboard")
 async def get_credits_dashboard(
     from_date: Optional[str] = None,

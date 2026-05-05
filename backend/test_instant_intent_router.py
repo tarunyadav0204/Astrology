@@ -152,8 +152,58 @@ def test_instant_router_keeps_ready_for_straightforward_daily():
     assert result["extracted_context"]["specific_date"] == "2026-05-02"
 
 
+def test_instant_router_refines_marriage_from_weak_timing_category():
+    payload = {
+        "status": "READY",
+        "mode": "LIFESPAN_EVENT_TIMING",
+        "extracted_context": {},
+        "context_type": "birth",
+        "category": "timing",
+        "needs_transits": True,
+        "divisional_charts": ["D1", "D9"],
+    }
+    router = _TestRouter(payload)
+    result = asyncio.run(
+        router.classify_instant_intent(
+            "When will I get married?",
+            [],
+            clarification_count=0,
+            max_clarifications=3,
+            language="english",
+        )
+    )
+    assert result["category"] == "marriage"
+    assert result["mode"] == "LIFESPAN_EVENT_TIMING"
+
+
+def test_instant_router_normalizes_predict_event_timing_and_refines_job():
+    payload = {
+        "status": "READY",
+        "mode": "PREDICT_EVENT_TIMING",
+        "extracted_context": {},
+        "context_type": "birth",
+        "category": "general",
+        "needs_transits": True,
+        "divisional_charts": ["D1", "D9"],
+    }
+    router = _TestRouter(payload)
+    result = asyncio.run(
+        router.classify_instant_intent(
+            "When will I get a job?",
+            [],
+            clarification_count=0,
+            max_clarifications=3,
+            language="english",
+        )
+    )
+    assert result["mode"] == "LIFESPAN_EVENT_TIMING"
+    assert result["category"] == "job"
+
+
 if __name__ == "__main__":
     test_instant_router_allows_clarify_for_broad_question()
     test_instant_router_not_limited_to_single_clarification()
     test_instant_router_keeps_ready_for_straightforward_daily()
+    test_instant_router_refines_marriage_from_weak_timing_category()
+    test_instant_router_normalizes_predict_event_timing_and_refines_job()
     print("instant intent router tests passed")

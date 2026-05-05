@@ -526,6 +526,114 @@ def apply_daily_micro_intent_guards(result: Dict[str, Any], user_question: str) 
     )
 
 
+_WEAK_INTENT_CATEGORIES = frozenset({"general", "timing", ""})
+
+
+def _normalize_question_for_intent(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def _refine_life_event_category(user_question: str, result: Dict[str, Any]) -> None:
+    """When category is generic, infer marriage/job/child/etc. from life-event timing phrasing."""
+    cat = str(result.get("category") or "").strip().lower()
+    if cat not in _WEAK_INTENT_CATEGORIES:
+        return
+    q = _normalize_question_for_intent(user_question)
+    if not q:
+        return
+
+    def _set(cat_out: str, aspect: str | None = None) -> None:
+        result["category"] = cat_out
+        if aspect:
+            result.setdefault("extracted_context", {})
+            if isinstance(result.get("extracted_context"), dict):
+                result["extracted_context"].setdefault("aspect", aspect)
+
+    # Reconciliation / return (before generic "love")
+    if any(
+        k in q
+        for k in (
+            "come back",
+            "comeback",
+            "will he come",
+            "will she come",
+            "will they come",
+            "get back together",
+            "back together",
+            "reconcile",
+            "patch up",
+            "return to me",
+            "lover back",
+            " ex ",
+            " ex?",
+            " ex.",
+            "my ex",
+            "leave me and",
+        )
+    ):
+        _set("relationship", "reconciliation")
+        return
+
+    if any(k in q for k in ("shaadi", "vivah", "married", "marriage", "wedding", "get married", "marry him", "marry her", "marry me")):
+        _set("marriage", "marriage")
+        return
+    if " marry" in q or q.startswith("marry ") or "marry?" in q:
+        _set("marriage", "marriage")
+        return
+
+    if any(k in q for k in ("pregnant", "pregnancy", "conceive", "conception", "expecting a baby", "expecting baby")):
+        _set("pregnancy", "pregnancy")
+        return
+    if any(k in q for k in ("have a baby", "have baby", "get a child", "get child", "have a child", "have child", "give birth", "baby boy", "baby girl")):
+        _set("child", "children")
+        return
+    if any(k in q for k in (" son ", " daughter ", " my son", " my daughter", " kids ", " kid ", "children", "baccha", "bachcha", "bacha")):
+        _set("child", "children")
+        return
+
+    if any(k in q for k in ("get a job", "get job", "new job", "first job", "naukri", "rozgar", "employment", "get hired", "job offer")):
+        _set("job", "job")
+        return
+    if any(k in q for k in ("promotion", "salary hike", "pay raise", "raise at work")):
+        _set("promotion", "promotion")
+        return
+    if any(k in q for k in ("career", "profession", "professional life")):
+        _set("career", "career")
+        return
+
+    if any(k in q for k in ("wealth", "become rich", "get rich", "financially", "windfall", "inherit")):
+        _set("wealth", "wealth")
+        return
+    if any(k in q for k in (" money ", " money?", "make money", "earn money", "financial ")):
+        _set("money", "money")
+        return
+
+    if any(k in q for k in ("health", "recover", "disease", "illness", "sick ", " surgery")):
+        _set("health", "health")
+        return
+
+    if any(k in q for k in ("buy a house", "buy house", "buy a home", "buy home", "property", "real estate")):
+        _set("property", "property")
+        return
+
+    if any(k in q for k in ("visa", " abroad", "move abroad", "settle abroad")):
+        _set("visa", "visa")
+        return
+    if "travel" in q or " trip " in q:
+        _set("travel", "travel")
+        return
+
+    if any(k in q for k in ("fall in love", "find love", " soulmate", " meet someone", "get a partner")):
+        _set("love", "love")
+        return
+
+
+def _normalize_lifespan_timing_mode(result: Dict[str, Any]) -> None:
+    mode_u = str(result.get("mode") or "").strip().upper()
+    if mode_u == "PREDICT_EVENT_TIMING":
+        result["mode"] = "LIFESPAN_EVENT_TIMING"
+
+
 class IntentRouter:
     """
     Classifies user queries into various analysis modes for the astrology chat AI.
@@ -580,10 +688,12 @@ class IntentRouter:
             result['status'] = 'READY'
         if 'mode' not in result or result['mode'] is None:
             result['mode'] = 'PREDICT_EVENTS_FOR_PERIOD' if any(w in user_question.lower() for w in ['all events', 'events', 'timeline']) else 'ANALYZE_PERSONALITY'
+        _normalize_lifespan_timing_mode(result)
         if 'context_type' not in result:
             result['context_type'] = 'birth'
         if 'category' not in result or result['category'] is None:
             result['category'] = 'general'
+        _refine_life_event_category(user_question, result)
         if 'extracted_context' not in result or not isinstance(result.get('extracted_context'), dict):
             result['extracted_context'] = {}
         if 'needs_transits' not in result:
@@ -669,7 +779,7 @@ class IntentRouter:
             return result
         if is_timing_question:
             result = {
-                "status": "READY", "extracted_context": {}, "mode": "PREDICT_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,
+                "status": "READY", "extracted_context": {}, "mode": "LIFESPAN_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,
                 "divisional_charts": ["D1", "D9"],
                 "chart_insights": [],
                 "transit_request": {
@@ -677,6 +787,9 @@ class IntentRouter:
                     "yearMonthMap": {str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)}
                 }
             }
+            _refine_life_event_category(user_question, result)
+            result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
+            merge_divisional_charts_with_category_defaults(result)
             if normalized_query_context:
                 result["query_context"] = normalized_query_context
             apply_chart_focus_guards(result, user_question)
@@ -822,6 +935,11 @@ Rules:
 - `context_type` is usually `birth`; use `annual` only for whole-year forecast style questions.
 - Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
 - When you do return `CLARIFY`, ask only one short narrowing question and give 2-4 quick options when helpful.
+
+CATEGORY for "when will I…" life-event questions (CRITICAL):
+- Never use `category: "timing"` as a substitute for the life area. `timing` is only when there is no identifiable topic (e.g. "when will it happen?" with no subject).
+- Pick the most specific `category` from the allowed list: job, career, marriage, love, relationship, child, pregnancy, wealth, money, health, property, visa, travel, etc.
+- Examples: "When will I get a job?" -> job; "When will I get married?" / "Shaadi kab?" -> marriage; "When will I have a baby?" -> child or pregnancy; "When will my ex come back?" -> relationship; "Kab naukri milegi?" -> job.
 
 Return ONLY this JSON shape:
 {{

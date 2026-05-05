@@ -163,9 +163,10 @@ export default function SpeechChatScreen({ navigation, route }) {
   }, []);
 
   useEffect(() => {
+    if (!currentTranscript) return undefined;
     const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     return () => clearTimeout(timer);
-  }, [turns, currentTranscript, status]);
+  }, [currentTranscript]);
 
   useEffect(() => {
     pulseAnim.stopAnimation();
@@ -673,6 +674,7 @@ export default function SpeechChatScreen({ navigation, route }) {
           </View>
         </View>
 
+        <View style={styles.mainColumn}>
         <ScrollView ref={scrollRef} style={styles.conversation} contentContainerStyle={styles.conversationContent}>
           {turns.length === 0 && !currentTranscript ? (
             <View style={[styles.emptyCard, { borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}>
@@ -735,6 +737,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         ) : null}
 
         {errorText ? <Text style={[styles.errorText, { color: colors.error }]}>{errorText}</Text> : null}
+        </View>
 
         <LinearGradient
           colors={
@@ -947,6 +950,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
+    flexShrink: 0,
+  },
+  mainColumn: {
+    flex: 1,
+    minHeight: 0,
   },
   backButton: {
     width: 40,
@@ -1049,6 +1057,7 @@ const styles = StyleSheet.create({
   followUpRow: {
     gap: 8,
     marginBottom: 10,
+    flexShrink: 0,
   },
   followUpChip: {
     borderWidth: 1,
@@ -1065,6 +1074,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 13,
     marginBottom: 8,
+    flexShrink: 0,
   },
   controlsShell: {
     marginHorizontal: -18,
@@ -1075,6 +1085,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     overflow: 'hidden',
+    flexShrink: 0,
   },
   controls: {
     alignItems: 'center',

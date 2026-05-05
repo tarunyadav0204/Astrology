@@ -2302,6 +2302,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent=intent,
                 history=history,
                 language=language,
+                speech_mode=bool(speech_chat_billing),
             )
         else:
             result = await analyzer.generate_chat_response(
@@ -2327,7 +2328,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
                 # Deduct credits on successful response (or mark first question free as used)
                 credit_service = CreditService()
-                if using_free_question:
+                skip_instant_charge = bool(is_instant_chat and result.get("skip_instant_credit_charge"))
+                if skip_instant_charge:
+                    success = True
+                    print(f"⏭️ Instant conversational ack for user {user_id} — no credits charged")
+                elif using_free_question:
                     credit_service.mark_free_chat_question_used(user_id)
                     if is_instant_chat:
                         analysis_type = "Speech chat" if speech_chat_billing else "Instant Chat"

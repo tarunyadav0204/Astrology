@@ -18,6 +18,11 @@ import { apiService } from '../../services/apiService';
 import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
 import { buildQueryContext } from '../../utils/queryContext';
 import textToSpeech from '../../utils/textToSpeech';
+import {
+    INSTANT_LOADER_LINES,
+    INSTANT_LOADER_WORD_MS,
+    getInstantLoaderMaxWords,
+} from '../../constants/instantChatLoader';
 import '../Shared/nativeSelectorChip.css';
 import './ChatPage.css';
 
@@ -167,6 +172,7 @@ const ChatPage = () => {
         freeQuestionAvailable,
         podcastCost,
         instantChatEnabled,
+        instantChatCost,
         speechChatEnabled,
     } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
@@ -214,6 +220,33 @@ const ChatPage = () => {
     const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
     const activeSpeechReplyIdRef = useRef(null);
     const spokenAutoReplyKeysRef = useRef(new Set());
+    const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
+    const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
+
+    const hasInstantTypingMessage = useMemo(
+        () => messages.some(
+            (m) => m.isTyping && String(m.chatTier || m.chat_tier || '').toLowerCase() === 'instant'
+        ),
+        [messages]
+    );
+
+    useEffect(() => {
+        if (!instantChatEnabled && isInstantAnalysis) {
+            setIsInstantAnalysis(false);
+        }
+    }, [instantChatEnabled, isInstantAnalysis]);
+
+    useEffect(() => {
+        if (!hasInstantTypingMessage) {
+            setInstantLoaderWordCount(1);
+            return undefined;
+        }
+        const maxW = getInstantLoaderMaxWords();
+        const t = setInterval(() => {
+            setInstantLoaderWordCount((c) => Math.min(c + 1, maxW));
+        }, INSTANT_LOADER_WORD_MS);
+        return () => clearInterval(t);
+    }, [hasInstantTypingMessage]);
 
     const openBirthModalEmpty = () => {
         setBirthFormGatePrefill(null);
@@ -1126,33 +1159,37 @@ const ChatPage = () => {
                         "This answer didn't save any text. Please try your question again, or contact support if it keeps happening.";
                     const mt = status.message_type || 'answer';
                     const gated = mt === 'native_gate' || mt === 'clarification';
-                    if (!gated && String(content).trim().length >= 80) {
-                        setPodcastPromoMessageId(assistantMessageId);
-                        setPodcastPromoOpen(true);
-                    }
-                    setMessages(prev =>
-                        prev.map(m =>
+
+                    setMessages((prev) => {
+                        const wasInstantTier = prev.some(
+                            (m) =>
+                                m.processingClientId === processingClientId
+                                && String(m.chatTier || '').toLowerCase() === 'instant'
+                        );
+                        if (!gated && !wasInstantTier && String(content).trim().length >= 80) {
+                            setPodcastPromoMessageId(assistantMessageId);
+                            setPodcastPromoOpen(true);
+                        }
+                        return prev.map((m) =>
                             m.processingClientId === processingClientId
-                                ? (() => {
-                                    return {
-                                        ...m,
-                                        messageId: assistantMessageId,
-                                        content,
-                                        isProcessing: false,
-                                        isTyping: false,
-                                        message_type: status.message_type || 'answer',
-                                        intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
-                                        gate_metadata: status.gate_metadata || null,
-                                        terms: status.terms || [],
-                                        glossary: status.glossary || {},
-                                        summary_image: status.summary_image || null,
-                                        follow_up_questions: status.follow_up_questions || [],
-                                        autoSpeakReply: Boolean(m.autoSpeakReply),
-                                    };
-                                })()
+                                ? {
+                                    ...m,
+                                    messageId: assistantMessageId,
+                                    content,
+                                    isProcessing: false,
+                                    isTyping: false,
+                                    message_type: status.message_type || 'answer',
+                                    intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
+                                    gate_metadata: status.gate_metadata || null,
+                                    terms: status.terms || [],
+                                    glossary: status.glossary || {},
+                                    summary_image: status.summary_image || null,
+                                    follow_up_questions: status.follow_up_questions || [],
+                                    autoSpeakReply: Boolean(m.autoSpeakReply),
+                                }
                                 : m
-                        )
-                    );
+                        );
+                    });
                     setIsLoading(false);
                     fetchBalance();
                     return;
@@ -1177,18 +1214,20 @@ const ChatPage = () => {
                 }
 
                 if (status.status === 'processing') {
-                    // If chart_insights wasn't provided, fall back to rotating loading strings.
                     const loadingList = status.loading_messages || [];
-                    if (Array.isArray(loadingList) && loadingList.length > 0) {
-                        const next = loadingList[Math.floor(Math.random() * loadingList.length)];
-                        setMessages(prev =>
-                            prev.map(m =>
-                                m.processingClientId === processingClientId
-                                    ? { ...m, loadingMessage: next, isProcessing: true, isTyping: true }
-                                    : m
-                            )
-                        );
-                    }
+                    setMessages((prev) =>
+                        prev.map((m) => {
+                            if (m.processingClientId !== processingClientId) return m;
+                            if (String(m.chatTier || '').toLowerCase() === 'instant') {
+                                return { ...m, isProcessing: true, isTyping: true };
+                            }
+                            if (Array.isArray(loadingList) && loadingList.length > 0) {
+                                const next = loadingList[Math.floor(Math.random() * loadingList.length)];
+                                return { ...m, loadingMessage: next, isProcessing: true, isTyping: true };
+                            }
+                            return { ...m, isProcessing: true, isTyping: true };
+                        })
+                    );
 
                     pollCount++;
                     if (pollCount < maxPolls) {
@@ -1274,6 +1313,14 @@ const ChatPage = () => {
         }
 
         const processingClientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const useFreeQuestion = !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
+        const useInstantChat =
+            !useFreeQuestion
+            && !isPartnershipMode
+            && !isMundaneMode
+            && instantChatEnabled
+            && Boolean(options?.instant_chat || String(options?.chat_tier || '').toLowerCase() === 'instant');
+
         const processingMessage = {
             role: 'assistant',
             content: '',
@@ -1283,9 +1330,12 @@ const ChatPage = () => {
             isProcessing: true,
             isTyping: true,
             message_type: 'answer',
-            loadingMessage: '🔮 Analyzing your birth chart...',
+            chatTier: useInstantChat ? 'instant' : undefined,
+            loadingMessage: useInstantChat
+                ? INSTANT_LOADER_LINES[0]
+                : '🔮 Analyzing your birth chart...',
             chartData: chartDataForMessage,
-            chartInsights: [],
+            chartInsights: useInstantChat ? [] : [],
             autoSpeakReply: Boolean(options?.instant_chat),
         };
 
@@ -1300,8 +1350,6 @@ const ChatPage = () => {
             isPartnershipMode && relationshipLabel
                 ? `[Relationship: ${relationshipLabel}] ${message}`
                 : message;
-
-        const useFreeQuestion = !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
 
         const birthForAsk = normalizeBirthDetailsForChat(partnershipBirth);
         if (!birthForAsk || !Number.isFinite(birthForAsk.latitude) || !Number.isFinite(birthForAsk.longitude)) {
@@ -1328,14 +1376,17 @@ const ChatPage = () => {
             question: questionForApi,
             query_context: buildQueryContext(),
             language: 'english',
-            response_style: options?.instant_chat ? 'concise' : 'detailed',
-            premium_analysis: useFreeQuestion ? false : !!options.premium_analysis,
+            response_style: useInstantChat || options?.instant_chat ? 'concise' : 'detailed',
+            premium_analysis: useFreeQuestion || useInstantChat ? false : !!options.premium_analysis,
             partnership_mode: isPartnershipMode,
             native_name: partnershipBirth?.name,
             birth_details: birthForAsk,
         };
 
-        if (options?.chat_tier) {
+        if (useInstantChat) {
+            requestData.chat_tier = 'instant';
+            requestData.instant_chat = true;
+        } else if (options?.chat_tier) {
             requestData.chat_tier = options.chat_tier;
         }
 
@@ -1401,15 +1452,21 @@ const ChatPage = () => {
                 prev.map(m => (m.messageId === userMessageId ? { ...m, messageId: serverUserMessageId, isFromDatabase: true } : m))
             );
 
+            const serverTier = String(result.chat_tier || (useInstantChat ? 'instant' : 'standard')).trim().toLowerCase();
+
             setMessages(prev =>
                 prev.map(m =>
                     m.processingClientId === processingClientId
                         ? {
                             ...m,
                             messageId: assistantMessageId,
-                            chartInsights,
+                            chatTier: serverTier || m.chatTier,
+                            chartInsights: serverTier === 'instant' ? [] : chartInsights,
                             chartData: chartDataForMessage,
-                            loadingMessage: loadingMessages[0] || m.loadingMessage,
+                            loadingMessage:
+                                serverTier === 'instant'
+                                    ? (m.loadingMessage || INSTANT_LOADER_LINES[0])
+                                    : (loadingMessages[0] || m.loadingMessage),
                         }
                         : m
                 )
@@ -2530,7 +2587,14 @@ const ChatPage = () => {
                                 aria-label="Open credits"
                                 onClick={() => setShowCreditsModal(true)}
                             >
-                                <span className="credits-full">{credits} · {isPartnershipMode ? partnershipCost : chatCost}/q</span>
+                                <span className="credits-full">
+                                    {credits} ·{' '}
+                                    {isPartnershipMode
+                                        ? `${partnershipCost}/q`
+                                        : instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode
+                                            ? `${instantChatCost}/q (instant)`
+                                            : `${chatCost}/q`}
+                                </span>
                                 <span className="credits-short">{credits}</span>
                             </button>
                         </div>
@@ -2562,6 +2626,7 @@ const ChatPage = () => {
                             onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
                             podcastAutoLaunchMessageId={podcastPromoMessageId}
                             podcastAutoLaunchKey={podcastAutoLaunchKey}
+                            instantLoaderRevealWords={instantLoaderWordCount}
                         />
                         <div ref={messagesEndRef} />
                     </div>
@@ -2585,6 +2650,8 @@ const ChatPage = () => {
                     isLocked={isWizardLocked}
                     isAssistantSpeaking={isAssistantSpeaking}
                     onInterruptAssistantSpeech={interruptAssistantSpeech}
+                    instantMode={isInstantAnalysis}
+                    onInstantModeChange={setIsInstantAnalysis}
                 />
             )}
 

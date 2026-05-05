@@ -1044,6 +1044,12 @@ button.chat-header-credits.credits-display:active {
         box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
     }
 
+    .chat-premium-mode-pill--active-instant {
+        background: rgba(251, 146, 60, 0.22);
+        border-color: rgba(234, 88, 12, 0.5);
+        box-shadow: 0 2px 8px rgba(249, 115, 22, 0.18);
+    }
+
     .chat-premium-mode-pill__label {
         font-size: 13px;
         font-weight: 700;
@@ -1090,6 +1096,10 @@ button.chat-header-credits.credits-display:active {
         border-color: rgba(250, 204, 21, 0.75);
     }
 
+    .chat-premium-sp-toggle--instant {
+        border-color: rgba(249, 115, 22, 0.65);
+    }
+
     .chat-premium-sp-toggle__inner {
         font-size: 15px;
         font-weight: 800;
@@ -1102,6 +1112,10 @@ button.chat-header-credits.credits-display:active {
 
     .chat-premium-sp-toggle__inner--p {
         color: #c2410c;
+    }
+
+    .chat-premium-sp-toggle__inner--i {
+        color: #ea580c;
     }
 
     .chat-premium-enhanced-icon {
@@ -1672,6 +1686,66 @@ button.chat-header-credits.credits-display:active {
     border-radius: 12px;
     padding: 10px 12px;
     margin-bottom: 6px;
+}
+
+.message-bubble.instant-typing .message-text {
+    max-width: 100%;
+}
+
+.instant-typing-bubble {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.14), rgba(255, 200, 120, 0.1));
+    border: 1px solid rgba(255, 107, 53, 0.38);
+    color: #7c2d12;
+    line-height: 1.45;
+    font-size: 14px;
+}
+
+.instant-typing-bubble__label {
+    font-weight: 800;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #c2410c;
+    margin-bottom: 8px;
+}
+
+.instant-typing-line {
+    color: #431407;
+}
+
+.instant-typing-line--spaced {
+    margin-top: 6px;
+}
+
+.instant-typing-text {
+    white-space: pre-wrap;
+}
+
+.instant-typing-cursor {
+    display: inline-block;
+    margin-left: 2px;
+    font-weight: 300;
+    color: #ea580c;
+    animation: instantTypingBlink 1s step-end infinite;
+}
+
+@keyframes instantTypingBlink {
+    50% {
+        opacity: 0;
+    }
+}
+
+.instant-typing-longer {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(234, 88, 12, 0.25);
+    font-size: 13px;
+    color: #9a3412;
+    font-weight: 600;
 }
 
 .suggestions {

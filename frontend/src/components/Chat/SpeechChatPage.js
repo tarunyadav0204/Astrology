@@ -63,7 +63,6 @@ const SpeechChatPage = () => {
     const [turns, setTurns] = useState([]);
     const [status, setStatus] = useState('idle');
     const [currentTranscript, setCurrentTranscript] = useState('');
-    const [currentAnswer, setCurrentAnswer] = useState('');
     const [errorText, setErrorText] = useState('');
     const [handsFree, setHandsFree] = useState(true);
     const [followUps, setFollowUps] = useState([]);
@@ -85,11 +84,13 @@ const SpeechChatPage = () => {
     handsFreeRef.current = handsFree;
 
     const taraStatusLabels = useMemo(() => ({
-        idle: 'Tap the mic to ask Tara',
-        listening: 'Listening… speak naturally',
-        thinking: 'Tara is reading the chart…',
-        speaking: 'Tara is speaking',
-    }), []);
+        idle: handsFree
+            ? 'Tap the mic and AstroRoshni will keep listening after each answer'
+            : 'Tap the mic and ask your question',
+        listening: 'Listening… tap again when done',
+        thinking: 'Reading the chart…',
+        speaking: 'Speaking the answer… tap to stop',
+    }), [handsFree]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -113,11 +114,14 @@ const SpeechChatPage = () => {
     }, []);
 
     useEffect(() => {
+        if (!currentTranscript) return undefined;
+        const el = scrollRef.current;
+        if (!el) return undefined;
         const timer = setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+            el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
         }, 60);
         return () => clearTimeout(timer);
-    }, [turns, currentTranscript, currentAnswer, status]);
+    }, [currentTranscript]);
 
     const chartLabel = useMemo(() => {
         if (!birthData?.name) return 'your selected chart';
@@ -168,7 +172,6 @@ const SpeechChatPage = () => {
             autoRestartTimerRef.current = null;
         }
         setStatus('idle');
-        setCurrentAnswer('');
     };
 
     const speakAnswer = (answerText) => {
@@ -180,14 +183,12 @@ const SpeechChatPage = () => {
 
         interruptAssistantSpeech();
         setStatus('speaking');
-        setCurrentAnswer(trimmed);
 
         textToSpeech.speak(trimmed, {
             rate: 0.93,
             pitch: 1,
             onEnd: () => {
                 if (!mountedRef.current) return;
-                setCurrentAnswer('');
                 setStatus('idle');
                 if (handsFree) {
                     autoRestartTimerRef.current = setTimeout(() => {
@@ -199,7 +200,6 @@ const SpeechChatPage = () => {
             },
             onError: () => {
                 if (!mountedRef.current) return;
-                setCurrentAnswer('');
                 setStatus('idle');
             },
         });
@@ -236,7 +236,6 @@ const SpeechChatPage = () => {
 
         setErrorText('');
         setCurrentTranscript('');
-        setCurrentAnswer('');
         finalTranscriptRef.current = '';
         liveTranscriptRef.current = '';
         shouldAutoSendSpeechRef.current = true;
@@ -344,7 +343,6 @@ const SpeechChatPage = () => {
         ]);
         setFollowUps([]);
         setCurrentTranscript(question);
-        setCurrentAnswer('');
         setStatus('thinking');
 
         const requestBody = {
@@ -514,29 +512,30 @@ const SpeechChatPage = () => {
         });
     }, [birthData?.name, displayUserName, status, speechChatEnabled, instantChatEnabled]);
 
+    const micBusy = status === 'thinking';
+
+    const sessionActive = Boolean(birthData && speechChatEnabled && instantChatEnabled);
+
     return (
-        <div className="speech-chat-page">
-            <div className="speech-chat-shell">
+        <div className={`speech-chat-page ${sessionActive ? 'speech-chat-page--session' : ''}`}>
+            <div className={`speech-chat-shell ${sessionActive ? 'speech-chat-shell--session' : ''}`}>
                 <header className="speech-chat-header">
-                    <button type="button" className="speech-chat-back" onClick={() => navigate('/chat')}>
-                        ← Back to chat
+                    <button type="button" className="speech-chat-back" onClick={() => navigate('/chat')} aria-label="Back to chat">
+                        <svg className="speech-chat-back-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                            <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                        </svg>
                     </button>
                     <div className="speech-chat-header__text">
-                        <p className="speech-chat-kicker">AstroRoshni · Voice</p>
                         <div className="speech-chat-title-row">
                             <h1>Tara</h1>
                             <span className="speech-chat-tara-badge" aria-hidden>✦</span>
                         </div>
-                        <p>{headerSubtitle}</p>
+                        <p className="speech-chat-header__subtitle">{headerSubtitle}</p>
                     </div>
-                    <label className="speech-chat-toggle">
-                        <input
-                            type="checkbox"
-                            checked={handsFree}
-                            onChange={(e) => setHandsFree(e.target.checked)}
-                        />
-                        <span>Hands-free follow-up</span>
-                    </label>
+                    <div className="speech-chat-live-badge" role="status">
+                        <span className="speech-chat-live-dot" aria-hidden />
+                        <span className="speech-chat-live-badge-text">Live</span>
+                    </div>
                 </header>
 
                 {!birthData ? (
@@ -561,63 +560,131 @@ const SpeechChatPage = () => {
                     </section>
                 ) : (
                     <>
-                        <section className="speech-chat-stage">
-                            <div className={`speech-chat-orb speech-chat-orb--${status}`}>
+                        <div className="speech-chat-body">
+                            <div className="speech-chat-scroll" ref={scrollRef}>
+                                <div className="speech-chat-conversation">
+                                    {turns.length === 0 && !currentTranscript ? (
+                                        <div className="speech-chat-empty-card">
+                                            <span className="speech-chat-empty-card-icon" aria-hidden>🎙</span>
+                                            <h2 className="speech-chat-empty-card-title">Ask by speaking</h2>
+                                            <p className="speech-chat-empty-card-body">
+                                                Keep questions short and natural. Tara answers aloud and suggests follow-ups.
+                                            </p>
+                                        </div>
+                                    ) : null}
+
+                                    {turns.map((turn) => (
+                                        <article key={turn.id} className="speech-turn">
+                                            <div className="speech-turn__question">
+                                                <span>You asked</span>
+                                                <p>{turn.question}</p>
+                                            </div>
+                                            <div className="speech-turn__answer">
+                                                <span>Tara answered</span>
+                                                <p>{turn.pending ? 'Tara is reading the chart…' : turn.answer}</p>
+                                            </div>
+                                        </article>
+                                    ))}
+
+                                    {currentTranscript ? (
+                                        <div
+                                            className={`speech-chat-live-card ${status !== 'idle' ? 'speech-chat-live-card--pulse' : ''}`}
+                                        >
+                                            <span className="speech-chat-live-card-label">
+                                                {status === 'listening' ? 'Heard so far' : 'Current question'}
+                                            </span>
+                                            <p>{currentTranscript}</p>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            {followUps.length > 0 && status === 'idle' ? (
+                                <div className="speech-chat-followups">
+                                    {followUps.map((item) => (
+                                        <button key={item} type="button" className="speech-chat-followup-chip" onClick={() => handleFollowUp(item)}>
+                                            {item}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : null}
+
+                            {errorText ? <p className="speech-chat-error speech-chat-error--inline">{errorText}</p> : null}
+                        </div>
+
+                        <div className="speech-chat-controls-shell">
+                            <div className="speech-chat-wave-backdrop" aria-hidden>
+                                <div className="speech-chat-wave-blob speech-chat-wave-blob--1" />
+                                <div className="speech-chat-wave-blob speech-chat-wave-blob--2" />
+                                <div className="speech-chat-wave-blob speech-chat-wave-blob--3" />
+                            </div>
+                            <div className="speech-chat-controls">
+                                <div className={`speech-chat-voice-stage speech-chat-voice-stage--${status}`}>
+                                    <div className="speech-chat-voice-glow" />
+                                    <div className="speech-chat-wave-row">
+                                        {[0, 1, 2, 3, 4].map((i) => (
+                                            <span key={i} className={`speech-chat-wave-bar speech-chat-wave-bar--${i}`} />
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <button
                                     type="button"
-                                    className="speech-chat-mic"
-                                    onClick={handleMicPress}
-                                    disabled={
-                                        status === 'thinking'
-                                        || !isSpeechSupported
-                                        || credits < speechChatCost
-                                    }
+                                    className={`speech-chat-hands-free ${handsFree ? 'speech-chat-hands-free--on' : ''}`}
+                                    onClick={() => setHandsFree((v) => !v)}
                                 >
-                                    {status === 'speaking' ? 'Interrupt' : status === 'listening' ? 'Stop' : 'Talk'}
+                                    <span className="speech-chat-hands-free-icon" aria-hidden>{handsFree ? '◉' : '○'}</span>
+                                    <span className="speech-chat-hands-free-label">Hands-free follow-up</span>
+                                    <span className={`speech-chat-hands-free-state ${handsFree ? 'is-on' : ''}`}>
+                                        {handsFree ? 'On' : 'Off'}
+                                    </span>
                                 </button>
-                            </div>
-                            <p className="speech-chat-status">{taraStatusLabels[status] || taraStatusLabels.idle}</p>
-                            <p className="speech-chat-meta">
-                                Credits: {credits} · Speech chat (Tara): {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
-                            </p>
-                            {errorText ? <p className="speech-chat-error">{errorText}</p> : null}
-                        </section>
 
-                        <section className="speech-chat-live">
-                            <div className="speech-chat-live-card">
-                                <span className="speech-chat-live-label">You</span>
-                                <p>{currentTranscript || 'Your transcript will appear here while you speak.'}</p>
-                            </div>
-                            <div className="speech-chat-live-card speech-chat-live-card--answer">
-                                <span className="speech-chat-live-label">Tara</span>
-                                <p>{currentAnswer || 'Tara will speak her reply here.'}</p>
-                            </div>
-                        </section>
+                                <p className="speech-chat-status">{taraStatusLabels[status] || taraStatusLabels.idle}</p>
+                                <p className="speech-chat-meta">
+                                    Credits: {credits} · Speech chat (Tara): {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
+                                </p>
 
-                        {followUps.length > 0 ? (
-                            <section className="speech-chat-followups">
-                                {followUps.map((item) => (
-                                    <button key={item} type="button" onClick={() => handleFollowUp(item)}>
-                                        {item}
+                                <div className="speech-chat-mic-outer">
+                                    <button
+                                        type="button"
+                                        className={`speech-chat-mic speech-chat-mic--${status}`}
+                                        onClick={handleMicPress}
+                                        disabled={micBusy || !isSpeechSupported || credits < speechChatCost}
+                                        aria-label={
+                                            status === 'speaking'
+                                                ? 'Stop speaking'
+                                                : status === 'listening'
+                                                    ? 'Stop listening'
+                                                    : 'Start microphone'
+                                        }
+                                    >
+                                        {micBusy ? (
+                                            <span className="speech-chat-mic-spinner" aria-hidden />
+                                        ) : (
+                                            <>
+                                                {status === 'speaking' ? (
+                                                    <svg className="speech-chat-mic-icon" viewBox="0 0 24 24" width="36" height="36" aria-hidden>
+                                                        <path fill="currentColor" d="M6 6h12v12H6z" />
+                                                    </svg>
+                                                ) : status === 'listening' ? (
+                                                    <svg className="speech-chat-mic-icon" viewBox="0 0 24 24" width="36" height="36" aria-hidden>
+                                                        <path fill="currentColor" d="M6 6h12v12H6z" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="speech-chat-mic-icon" viewBox="0 0 24 24" width="36" height="36" aria-hidden>
+                                                        <path
+                                                            fill="currentColor"
+                                                            d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"
+                                                        />
+                                                    </svg>
+                                                )}
+                                            </>
+                                        )}
                                     </button>
-                                ))}
-                            </section>
-                        ) : null}
-
-                        <section className="speech-chat-turns" ref={scrollRef}>
-                            {turns.map((turn) => (
-                                <article key={turn.id} className="speech-turn">
-                                    <div className="speech-turn__question">
-                                        <span>You asked</span>
-                                        <p>{turn.question}</p>
-                                    </div>
-                                    <div className="speech-turn__answer">
-                                        <span>Tara said</span>
-                                        <p>{turn.pending ? 'Tara is reading the chart…' : turn.answer}</p>
-                                    </div>
-                                </article>
-                            ))}
-                        </section>
+                                </div>
+                            </div>
+                        </div>
                     </>
                 )}
             </div>

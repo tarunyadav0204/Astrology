@@ -10,6 +10,7 @@ import {
     base64ToAudioBlob,
     podcastLangFromUiLanguage,
 } from './podcastPlayback';
+import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 
 /** Lucide-style 24×24 outline icons to match mobile Ionicons outline look */
 const IC = {
@@ -156,6 +157,7 @@ const MessageBubble = ({
     onNativeGateOpenAddProfile,
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
+    instantLoaderRevealWords = 1,
 }) => {
     const { podcastCost, refreshBalance } = useCredits();
     const [showActions, setShowActions] = useState(false);
@@ -165,6 +167,13 @@ const MessageBubble = ({
     const insightsKey = message?.processingClientId ?? message?.messageId ?? null;
     const chartInsights = Array.isArray(message?.chartInsights) ? message.chartInsights : [];
     const [insightIndex, setInsightIndex] = useState(0);
+    const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
+    const isInstantTypingBubble =
+        (message.isTyping || message.isProcessing) && messageChatTier === 'instant';
+    const instantTypingState = useMemo(
+        () => (isInstantTypingBubble ? buildInstantTypingLines(Math.max(1, instantLoaderRevealWords)) : null),
+        [isInstantTypingBubble, instantLoaderRevealWords]
+    );
 
     useEffect(() => {
         if (!insightsKey) return;
@@ -821,7 +830,7 @@ const MessageBubble = ({
     return (
         <div 
             ref={messageRef}
-            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''} ${message.message_type === 'clarification' ? 'clarification' : ''} ${isNativeGate ? 'native-gate' : ''}`}
+            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''} ${isInstantTypingBubble ? 'instant-typing' : ''} ${message.message_type === 'clarification' ? 'clarification' : ''} ${isNativeGate ? 'native-gate' : ''}`}
             onTouchStart={isMobile() ? handleLongPress : undefined}
             onClick={(e) => {
                 if (isMobile() && showActions) {
@@ -915,6 +924,28 @@ const MessageBubble = ({
                     }}
                 >
                     {(message.isTyping || message.isProcessing) ? (
+                        isInstantTypingBubble && instantTypingState ? (
+                            <div className="instant-typing-bubble" aria-live="polite">
+                                <div className="instant-typing-bubble__label">Instant analysis</div>
+                                {instantTypingState.lines.map((line, index) => {
+                                    const isLatest = index === instantTypingState.lines.length - 1;
+                                    return (
+                                        <div
+                                            key={line.key}
+                                            className={`instant-typing-line${index > 0 ? ' instant-typing-line--spaced' : ''}`}
+                                        >
+                                            <span className="instant-typing-text">{line.text}</span>
+                                            {isLatest && !line.isComplete ? (
+                                                <span className="instant-typing-cursor" aria-hidden="true">|</span>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
+                                {instantTypingState.isTakingLonger ? (
+                                    <div className="instant-typing-longer">{INSTANT_LOADER_TAKING_LONGER}</div>
+                                ) : null}
+                            </div>
+                        ) : (
                         <>
                             <div className="processing-chart-skeleton">
                                 <div style={{ fontWeight: 900, marginBottom: 6 }}>Chart in progress...</div>
@@ -1031,6 +1062,7 @@ const MessageBubble = ({
                                 )}
                             </div>
                         </>
+                        )
                     ) : (
                         <>
                             {/* Always use ResponseRenderer for assistant messages */}

@@ -11,6 +11,7 @@ import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
+import AdminSubscriptionPurchases from './AdminSubscriptionPurchases';
 import AdminRazorpayRefund from './AdminRazorpayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
@@ -1908,6 +1909,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             Subscription Plans
           </button>
           <button
+            className={`subtab ${activeSubTab === 'subscriptionPurchases' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('subscriptionPurchases')}
+          >
+            Subscription purchases
+          </button>
+          <button
             className={`subtab ${activeSubTab === 'questionCost' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('questionCost')}
           >
@@ -2035,21 +2042,21 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   {!usersFiltersCollapsed && (
                     <div className="users-management-filters">
                       <label>
-                        <span>Phone</span>
-                        <input
-                          type="text"
-                          placeholder="Search by phone"
-                          value={usersSearchPhone}
-                          onChange={(e) => setUsersSearchPhone(e.target.value)}
-                        />
-                      </label>
-                      <label>
                         <span>Name or email</span>
                         <input
                           type="text"
                           placeholder="Search by name or email"
                           value={usersSearchName}
                           onChange={(e) => setUsersSearchName(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Phone</span>
+                        <input
+                          type="text"
+                          placeholder="Search by phone"
+                          value={usersSearchPhone}
+                          onChange={(e) => setUsersSearchPhone(e.target.value)}
                         />
                       </label>
                       <label>
@@ -2962,6 +2969,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'questionCost' && (
           <AdminQuestionCostSummary />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'subscriptionPurchases' && (
+          <AdminSubscriptionPurchases />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'playRefund' && (

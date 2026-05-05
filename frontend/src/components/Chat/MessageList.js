@@ -27,6 +27,7 @@ const MessageList = ({
     onNativeGateOpenAddProfile,
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
+    instantLoaderRevealWords = 1,
 }) => {
     return (
         <div className="message-list">
@@ -61,6 +62,7 @@ const MessageList = ({
                                 onNativeGateOpenAddProfile={onNativeGateOpenAddProfile}
                                 podcastAutoLaunchMessageId={podcastAutoLaunchMessageId}
                                 podcastAutoLaunchKey={podcastAutoLaunchKey}
+                                instantLoaderRevealWords={instantLoaderRevealWords}
                             />
                         </div>
                         <FeedbackComponent 
