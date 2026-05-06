@@ -191,9 +191,27 @@ def _ensure_wait_side_conversation_tables(conn):
             metadata TEXT
         )
     """)
-    execute(conn, "CREATE INDEX IF NOT EXISTS idx_wait_conv_main_message ON chat_wait_conversations (main_message_id)")
-    execute(conn, "CREATE INDEX IF NOT EXISTS idx_wait_conv_user ON chat_wait_conversations (user_id)")
-    execute(conn, "CREATE INDEX IF NOT EXISTS idx_wait_msgs_conv ON chat_wait_conversation_messages (conversation_id, id)")
+
+    def _try_create_index(sql: str):
+        try:
+            execute(conn, sql)
+        except Exception as exc:
+            msg = str(exc or "")
+            # Some production DB roles can read/write these tables but are not their owner,
+            # so Postgres rejects CREATE INDEX IF NOT EXISTS during request handling.
+            # If the table is already deployed, we should continue instead of failing chat polling.
+            if "must be owner of table chat_wait_conversations" in msg or "must be owner of table chat_wait_conversation_messages" in msg:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                logger.warning("Skipping wait-side index ensure due to table ownership: %s", msg)
+                return
+            raise
+
+    _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_conv_main_message ON chat_wait_conversations (main_message_id)")
+    _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_conv_user ON chat_wait_conversations (user_id)")
+    _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_msgs_conv ON chat_wait_conversation_messages (conversation_id, id)")
 
 
 def _ensure_chat_messages_cache_token_cols(conn):
@@ -1627,17 +1645,28 @@ def _store_engagement_updates_now(message_id: int, updates: list[dict]):
 
 def _fetch_wait_side_messages(conn, main_message_id: int) -> list[dict]:
     _ensure_wait_side_conversation_tables(conn)
-    cur = execute(
-        conn,
-        """
-            SELECT c.conversation_id, c.status, m.id, m.sender, m.content, m.created_at
-            FROM chat_wait_conversations c
-            LEFT JOIN chat_wait_conversation_messages m ON m.conversation_id = c.conversation_id
-            WHERE c.main_message_id = %s
-            ORDER BY m.id ASC
-        """,
-        (main_message_id,),
-    )
+    try:
+        cur = execute(
+            conn,
+            """
+                SELECT c.conversation_id, c.status, m.id, m.sender, m.content, m.created_at
+                FROM chat_wait_conversations c
+                LEFT JOIN chat_wait_conversation_messages m ON m.conversation_id = c.conversation_id
+                WHERE c.main_message_id = %s
+                ORDER BY m.id ASC
+            """,
+            (main_message_id,),
+        )
+    except Exception as exc:
+        msg = str(exc or "")
+        if "permission denied for table chat_wait_conversations" in msg or "permission denied for table chat_wait_conversation_messages" in msg:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.warning("Skipping wait-side message fetch due to table permissions: %s", msg)
+            return []
+        raise
     rows = cur.fetchall() or []
     if not rows:
         return []
@@ -1656,15 +1685,26 @@ def _fetch_wait_side_messages(conn, main_message_id: int) -> list[dict]:
 
 def _fetch_wait_side_payload(conn, main_message_id: int) -> dict | None:
     _ensure_wait_side_conversation_tables(conn)
-    cur = execute(
-        conn,
-        """
-            SELECT conversation_id, status, gemini_cache_name, gemini_cache_model, cached_context_json
-            FROM chat_wait_conversations
-            WHERE main_message_id = %s
-        """,
-        (main_message_id,),
-    )
+    try:
+        cur = execute(
+            conn,
+            """
+                SELECT conversation_id, status, gemini_cache_name, gemini_cache_model, cached_context_json
+                FROM chat_wait_conversations
+                WHERE main_message_id = %s
+            """,
+            (main_message_id,),
+        )
+    except Exception as exc:
+        msg = str(exc or "")
+        if "permission denied for table chat_wait_conversations" in msg:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.warning("Skipping wait-side payload fetch due to table permissions: %s", msg)
+            return None
+        raise
     row = cur.fetchone()
     if not row:
         return None

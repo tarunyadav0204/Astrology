@@ -3009,6 +3009,8 @@ export default function ChatScreen({ navigation, route }) {
   );
 
   useEffect(() => {
+    if (Date.now() < modeIntroSuppressOpenUntilRef.current) return;
+
     const shouldShowModeIntro =
       !showGreeting &&
       birthData &&
