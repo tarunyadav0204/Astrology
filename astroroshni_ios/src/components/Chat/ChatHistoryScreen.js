@@ -61,8 +61,8 @@ const SkeletonCard = () => {
 export default function ChatHistoryScreen({ navigation }) {
   useAnalytics('ChatHistoryScreen');
   const { theme, colors, getCardElevation } = useTheme();
-  const [chatSessions, setChatSessions] = useState([]);
-  const [filteredSessions, setFilteredSessions] = useState([]);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [filteredRows, setFilteredRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,37 +71,21 @@ export default function ChatHistoryScreen({ navigation }) {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadChatHistory();
     loadFavorites();
-    
+
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
   useEffect(() => {
-    filterSessions();
-  }, [searchQuery, chatSessions]);
+    filterHistoryRows();
+  }, [searchQuery, historyRows]);
 
   const loadFavorites = async () => {
     try {
@@ -118,29 +102,48 @@ export default function ChatHistoryScreen({ navigation }) {
         return;
       }
       
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=20`, {
-        method: 'GET',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      const response = await fetch(
+        `${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=20&list_mode=messages`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
         }
-      });
-      
+      );
+
       if (response.ok) {
         const data = await response.json();
-        const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-        
+        let rows = Array.isArray(data.messages) ? data.messages : [];
+        if (
+          rows.length === 0 &&
+          Array.isArray(data.sessions) &&
+          data.sessions.length > 0
+        ) {
+          rows = data.sessions.map((s) => ({
+            message_id: `legacy-session-${s.session_id}`,
+            session_id: s.session_id,
+            sender: 'user',
+            preview: s.preview || '',
+            timestamp: s.last_activity_at || s.created_at,
+            session_created_at: s.created_at,
+            session_last_activity_at: s.last_activity_at || s.created_at,
+            native_name: s.native_name,
+          }));
+        }
+
         if (append) {
-          setChatSessions(prev => {
-            const existingIds = new Set(prev.map(s => s.session_id));
-            const newSessions = sessions.filter(s => !existingIds.has(s.session_id));
-            return [...prev, ...newSessions];
+          setHistoryRows((prev) => {
+            const seen = new Set(prev.map((r) => `${r.session_id}:${r.message_id}`));
+            const next = rows.filter((r) => !seen.has(`${r.session_id}:${r.message_id}`));
+            return [...prev, ...next];
           });
         } else {
-          setChatSessions(sessions);
+          setHistoryRows(rows);
           setPage(1);
         }
-        
+
         setHasMore(data.pagination?.has_more || false);
       } else if (response.status === 401) {
         await storage.removeAuthToken();
@@ -158,15 +161,19 @@ export default function ChatHistoryScreen({ navigation }) {
     }
   };
 
-  const filterSessions = () => {
-    if (!searchQuery.trim()) {
-      setFilteredSessions(chatSessions);
+  const filterHistoryRows = () => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      setFilteredRows(historyRows);
       return;
     }
-    const filtered = chatSessions.filter(session =>
-      session.preview?.toLowerCase().includes(searchQuery.toLowerCase())
+    setFilteredRows(
+      historyRows.filter(
+        (row) =>
+          (row.preview || '').toLowerCase().includes(q) ||
+          (row.native_name || '').toLowerCase().includes(q)
+      )
     );
-    setFilteredSessions(filtered);
   };
 
   const onRefresh = () => {
@@ -242,19 +249,28 @@ export default function ChatHistoryScreen({ navigation }) {
     return then.toLocaleDateString();
   };
 
-  const ChatSessionCard = React.memo(({ item, index }) => {
+  const HistoryMessageCard = React.memo(({ item, index }) => {
     const isFavorite = favorites.includes(item.session_id);
     const cardAnim = useRef(new Animated.Value(0)).current;
+    const isUser = item.sender === 'user';
+    const senderLabel = isUser ? 'You' : item.sender === 'assistant' || item.sender === 'ai' ? 'Assistant' : (item.sender || 'Message');
 
     useEffect(() => {
       Animated.spring(cardAnim, {
         toValue: 1,
-        delay: index * 100,
+        delay: Math.min(index, 8) * 40,
         tension: 50,
         friction: 7,
         useNativeDriver: true,
       }).start();
     }, []);
+
+    const sessionStub = {
+      session_id: item.session_id,
+      native_name: item.native_name,
+      created_at: item.session_created_at,
+      last_activity_at: item.session_last_activity_at,
+    };
 
     return (
       <Animated.View
@@ -266,13 +282,7 @@ export default function ChatHistoryScreen({ navigation }) {
               {
                 translateY: cardAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [50, 0],
-                }),
-              },
-              {
-                scale: cardAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1],
+                  outputRange: [24, 0],
                 }),
               },
             ],
@@ -281,7 +291,7 @@ export default function ChatHistoryScreen({ navigation }) {
       >
         <TouchableOpacity
           style={[styles.sessionCard, { elevation: getCardElevation(8) }]}
-          onPress={() => viewChatSession(item)}
+          onPress={() => viewChatSession(sessionStub)}
           activeOpacity={0.9}
         >
           <LinearGradient
@@ -293,37 +303,40 @@ export default function ChatHistoryScreen({ navigation }) {
             <View style={styles.sessionHeader}>
               <View style={styles.sessionIconContainer}>
                 <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
-                  style={styles.sessionIconGradient}
+                  colors={isUser ? ['#3b82f6', '#60a5fa'] : ['#ff6b35', '#ff8c5a']}
+                  style={[styles.sessionIconGradient, styles.messageSenderIcon]}
                 >
-                  <Text style={styles.sessionIcon}>💬</Text>
+                  <Text style={styles.sessionIcon}>{isUser ? '👤' : '✨'}</Text>
                 </LinearGradient>
               </View>
               <View style={styles.sessionInfo}>
                 <View style={styles.sessionTitleRow}>
-                  {item.native_name && (
-                    <Text style={[styles.nativeName, { color: colors.text }]}>{item.native_name}</Text>
-                  )}
-                  <Text style={[styles.sessionDate, { color: colors.textSecondary }]}>{getRelativeTime(item.created_at)}</Text>
+                  <View style={styles.messageTitleLeft}>
+                    <Text style={[styles.senderPill, { color: colors.text, borderColor: colors.textSecondary }]}>
+                      {senderLabel}
+                    </Text>
+                    {item.native_name ? (
+                      <Text style={[styles.nativeName, { color: colors.text }]} numberOfLines={1}>
+                        {item.native_name}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.sessionDate, { color: colors.textSecondary }]}>
+                    {getRelativeTime(item.timestamp || item.session_last_activity_at || item.session_created_at)}
+                  </Text>
                 </View>
-                {item.unread && (
-                  <Animated.View style={[styles.unreadBadge, { transform: [{ scale: pulseAnim }] }]}>
-                    <Text style={styles.unreadText}>New</Text>
-                  </Animated.View>
-                )}
               </View>
             </View>
 
-            <Text style={[styles.sessionPreview, { color: colors.textSecondary }]} numberOfLines={2}>
-              {item.preview || 'Chat conversation'}
+            <Text style={[styles.sessionPreview, { color: colors.textSecondary }]} numberOfLines={3}>
+              {item.preview || '—'}
             </Text>
 
             <View style={styles.sessionFooter}>
               <Text style={[styles.sessionTime, { color: colors.textSecondary }]}>
-                {new Date(item.created_at).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {item.timestamp
+                  ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : ''}
               </Text>
               <View style={styles.sessionActions}>
                 <TouchableOpacity
@@ -344,8 +357,8 @@ export default function ChatHistoryScreen({ navigation }) {
     );
   });
 
-  const renderChatSession = React.useCallback(({ item, index }) => (
-    <ChatSessionCard item={item} index={index} />
+  const renderHistoryRow = React.useCallback(({ item, index }) => (
+    <HistoryMessageCard item={item} index={index} />
   ), [favorites]);
 
   const renderEmptyState = () => (
@@ -360,7 +373,7 @@ export default function ChatHistoryScreen({ navigation }) {
       </View>
       <Text style={styles.emptyTitle}>No Chat History</Text>
       <Text style={styles.emptyText}>
-        {searchQuery ? 'No chats match your search' : 'Start a conversation to see your chat history here'}
+        {searchQuery ? 'No messages match your search' : 'Start a conversation to see your messages here'}
       </Text>
       {!searchQuery && (
         <TouchableOpacity
@@ -401,7 +414,7 @@ export default function ChatHistoryScreen({ navigation }) {
               <Icon name="search" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search conversations..."
+                placeholder="Search messages..."
                 placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -421,9 +434,13 @@ export default function ChatHistoryScreen({ navigation }) {
             </View>
           ) : (
             <FlatList
-              data={filteredSessions}
-              renderItem={renderChatSession}
-              keyExtractor={(item, index) => item.session_id || `session-${index}-${Date.now()}`}
+              data={filteredRows}
+              renderItem={renderHistoryRow}
+              keyExtractor={(item, index) =>
+                item.session_id != null && item.message_id != null
+                  ? `${item.session_id}-${item.message_id}`
+                  : `msg-${index}`
+              }
               contentContainerStyle={[styles.listContainer, { paddingBottom: loadingMore ? 200 : 100 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={
@@ -447,7 +464,7 @@ export default function ChatHistoryScreen({ navigation }) {
                       <View style={styles.loadingMore}>
                         <SkeletonCard />
                         <SkeletonCard />
-                        <Text style={styles.loadingMoreText}>Loading more chats...</Text>
+                        <Text style={styles.loadingMoreText}>Loading more messages...</Text>
                       </View>
                     ) : (
                       <TouchableOpacity 
@@ -455,7 +472,7 @@ export default function ChatHistoryScreen({ navigation }) {
                         onPress={loadMore}
                       >
                         <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.loadMoreGradient}>
-                          <Text style={styles.loadMoreText}>Load More Chats</Text>
+                          <Text style={styles.loadMoreText}>Load more</Text>
                         </LinearGradient>
                       </TouchableOpacity>
                     )}
@@ -561,6 +578,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  messageSenderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  messageTitleLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 8,
+    minWidth: 0,
+  },
+  senderPill: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   sessionIcon: {
     fontSize: 24,

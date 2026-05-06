@@ -53,7 +53,7 @@ export default function ProfileScreen({ navigation, route }) {
 
   useEffect(() => {
     loadUserData();
-    startAnimations();
+    const stopAnimations = startAnimations();
     const loadLanguage = async () => {
       const savedLanguage = await storage.getLanguage();
       if (savedLanguage) {
@@ -68,7 +68,10 @@ export default function ProfileScreen({ navigation, route }) {
       loadUserData();
     });
     
-    return unsubscribe;
+    return () => {
+      stopAnimations?.();
+      unsubscribe();
+    };
   }, [navigation]);
 
   useEffect(() => {
@@ -101,13 +104,17 @@ export default function ProfileScreen({ navigation, route }) {
       }),
     ]).start();
 
-    Animated.loop(
+    const rotateLoop = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
         duration: 20000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotateLoop.start();
+    return () => {
+      rotateLoop.stop();
+    };
   };
 
   const loadUserData = async () => {

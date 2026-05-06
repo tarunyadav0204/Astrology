@@ -3,11 +3,21 @@ import { getAdminAuthHeaders } from '../../services/adminService';
 import { formatChatMessageHtml as formatMessageContent } from '../../utils/markdown';
 import './AdminChatHistory.css';
 
+const USER_PAGE_SIZE = 10;
+const SESSION_MESSAGE_PAGE_SIZE = 20;
+
 const AdminChatHistory = () => {
-  const [sessions, setSessions] = useState([]);
+  const [userRows, setUserRows] = useState([]);
+  const [listPage, setListPage] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
+  const [listTotalPages, setListTotalPages] = useState(0);
+  const [listHasMore, setListHasMore] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [sessionMsgLoading, setSessionMsgLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessionQuery, setSessionQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [branchModal, setBranchModal] = useState({
     open: false,
     loading: false,
@@ -17,39 +27,66 @@ const AdminChatHistory = () => {
   });
 
   useEffect(() => {
-    fetchAllChatHistory();
-  }, []);
+    const t = setTimeout(() => setDebouncedQuery(sessionQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [sessionQuery]);
 
-  const fetchAllChatHistory = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/admin/chat/all-history', {
-        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
-      });
-      
-      if (response.ok) {
+  useEffect(() => {
+    setListPage(1);
+  }, [debouncedQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(listPage),
+          limit: String(USER_PAGE_SIZE),
+        });
+        if (debouncedQuery) params.set('q', debouncedQuery);
+        const response = await fetch(`/api/admin/chat/users?${params.toString()}`, {
+          headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        });
+        if (!response.ok || cancelled) return;
         const data = await response.json();
-        setSessions(data.sessions || []);
+        if (cancelled) return;
+        setUserRows(Array.isArray(data.users) ? data.users : []);
+        setListTotal(Number(data.total) || 0);
+        setListTotalPages(Number(data.total_pages) || 0);
+        setListHasMore(Boolean(data.has_more));
+      } catch (error) {
+        if (!cancelled) console.error('Error fetching chat users:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching all chat history:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [listPage, debouncedQuery]);
 
-  const fetchSessionDetails = async (sessionId) => {
+  const fetchSessionDetails = async (userId, page = 1) => {
     try {
-      const response = await fetch(`/api/admin/chat/session/${sessionId}`, {
+      setSessionMsgLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(SESSION_MESSAGE_PAGE_SIZE),
+      });
+      const response = await fetch(`/api/admin/chat/user-thread/${userId}?${params.toString()}`, {
         headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
       });
       
       if (response.ok) {
         const data = await response.json();
+        setSelectedUserId(userId);
         setSelectedSession(data);
       }
     } catch (error) {
-      console.error('Error fetching session details:', error);
+      console.error('Error fetching user thread:', error);
+    } finally {
+      setSessionMsgLoading(false);
     }
   };
 
@@ -184,29 +221,60 @@ const AdminChatHistory = () => {
     return mod || prov || null;
   };
 
-  const filteredSessions = useMemo(() => {
-    const q = sessionQuery.trim().toLowerCase();
-    if (!q) return sessions;
-    return sessions.filter((s) => {
-      const hay = [
-        s.user_name,
-        s.user_phone,
-        s.native_name,
-        s.preview,
-        s.session_id,
-        s.chat_llm_provider,
-        s.chat_llm_model,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return hay.includes(q);
+  const listRangeLabel = useMemo(() => {
+    if (!listTotal) return '0 users';
+    const start = (listPage - 1) * USER_PAGE_SIZE + 1;
+    const end = Math.min(listPage * USER_PAGE_SIZE, listTotal);
+    return `${start}–${end} of ${listTotal}`;
+  }, [listPage, listTotal]);
+
+  const sessionPagination = selectedSession?.pagination || null;
+  const sessionRangeLabel = useMemo(() => {
+    if (!sessionPagination?.total) return '0 messages';
+    const start = (sessionPagination.page - 1) * sessionPagination.limit + 1;
+    const end = Math.min(sessionPagination.page * sessionPagination.limit, sessionPagination.total);
+    return `${start}–${end} of ${sessionPagination.total}`;
+  }, [sessionPagination]);
+
+  const renderMessageSidebar = () => {
+    return userRows.map((row) => {
+      const isActive = selectedUserId != null && Number(selectedUserId) === Number(row.user_id);
+      return (
+        <div
+          key={`user-${row.user_id}`}
+          role="button"
+          tabIndex={0}
+          className={`session-card admin-chat-message-row ${isActive ? 'active' : ''}`}
+          onClick={() => fetchSessionDetails(row.user_id, 1)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fetchSessionDetails(row.user_id, 1);
+            }
+          }}
+        >
+          <div className="admin-chat-user-group-name">
+            <strong>{row.user_name || 'Unknown'}</strong>
+            {row.user_phone ? (
+              <span className="admin-chat-user-group-phone"> · {row.user_phone}</span>
+            ) : null}
+          </div>
+          <div className="admin-chat-user-group-hint">User ID: {row.user_id ?? '—'}</div>
+          <div className="admin-chat-message-time">{formatDate(row.last_activity_at)}</div>
+          <div className="session-preview">
+            {Number(row.message_count || 0).toLocaleString()} total messages
+          </div>
+        </div>
+      );
     });
-  }, [sessions, sessionQuery]);
+  };
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape' && selectedSession) setSelectedSession(null);
+      if (e.key === 'Escape' && selectedSession) {
+        setSelectedSession(null);
+        setSelectedUserId(null);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -236,7 +304,7 @@ const AdminChatHistory = () => {
     };
   }, [selectedSession]);
 
-  const msgCount = selectedSession?.messages?.length ?? 0;
+  const msgCount = selectedSession?.pagination?.total ?? selectedSession?.messages?.length ?? 0;
 
   return (
     <>
@@ -248,81 +316,77 @@ const AdminChatHistory = () => {
       <div className="admin-chat-history-intro">
         <h2>Chat history</h2>
         <p className="admin-chat-history-hint admin-chat-history-hint--desktop">
-          Open a session for a full-width transcript. Press <kbd>Esc</kbd> to close the
-          conversation.
+          Left panel lists users (10 per page). Click a user to load their full message timeline
+          (user + assistant) in the right pane. Press <kbd>Esc</kbd> to close the conversation.
         </p>
         <p className="admin-chat-history-hint admin-chat-history-hint--mobile">
-          Tap a session to open it full screen. Use <strong>Back</strong> or the close control to
-          return here.
+          Tap a user row to open their full chat timeline. Use <strong>Back</strong> or the close
+          control to return here.
         </p>
       </div>
 
       <div className={`admin-chat-content ${selectedSession ? 'has-selection' : ''}`}>
-        <aside className="sessions-sidebar" aria-label="Chat sessions">
+        <aside className="sessions-sidebar" aria-label="Users with chat history">
           <div className="sessions-list-header">
-            <h3>Sessions</h3>
-            {!loading && sessions.length > 0 && (
-              <span className="sessions-count">{sessions.length}</span>
+            <h3>Users</h3>
+            {!loading && listTotal > 0 && (
+              <span className="sessions-count" title="Total matching users">
+                {listTotal}
+              </span>
             )}
           </div>
-          {sessions.length > 0 && (
-            <div className="sessions-search-wrap">
-              <label className="sessions-search-label" htmlFor="admin-chat-session-filter">
-                Filter
-              </label>
-              <input
-                id="admin-chat-session-filter"
-                type="search"
-                className="sessions-search-input"
-                placeholder="Name, phone, chart, model, preview…"
-                value={sessionQuery}
-                onChange={(e) => setSessionQuery(e.target.value)}
-                autoComplete="off"
-              />
-            </div>
-          )}
+          <div className="sessions-search-wrap">
+            <label className="sessions-search-label" htmlFor="admin-chat-session-filter">
+              Search
+            </label>
+            <input
+              id="admin-chat-session-filter"
+              type="search"
+              className="sessions-search-input"
+              placeholder="User name, phone, user id…"
+              value={sessionQuery}
+              onChange={(e) => setSessionQuery(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
           <div className="sessions-list">
             {loading ? (
-              <div className="loading">Loading sessions…</div>
-            ) : sessions.length === 0 ? (
-              <div className="no-sessions">No chat sessions found.</div>
-            ) : filteredSessions.length === 0 ? (
-              <div className="no-sessions">No sessions match your filter.</div>
+              <div className="loading">Loading users…</div>
+            ) : userRows.length === 0 ? (
+              <div className="no-sessions">
+                {listTotal === 0 && !debouncedQuery
+                  ? 'No users found.'
+                  : 'No users match your search.'}
+              </div>
             ) : (
-              filteredSessions.map((session) => (
-                <div
-                  key={session.session_id}
-                  role="button"
-                  tabIndex={0}
-                  className={`session-card ${
-                    selectedSession?.session_id === session.session_id ? 'active' : ''
-                  }`}
-                  onClick={() => fetchSessionDetails(session.session_id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      fetchSessionDetails(session.session_id);
-                    }
-                  }}
-                >
-                  <div className="session-user">
-                    <strong>{session.user_name || 'Unknown'}</strong>
-                    <span className="session-phone"> {session.user_phone}</span>
-                  </div>
-                  {session.native_name && (
-                    <div className="session-card-native">Chart: {session.native_name}</div>
-                  )}
-                  {formatLlmLabel(session) && (
-                    <div className="session-card-model" title="LLM used for the latest completed answer in this session">
-                      Model: {formatLlmLabel(session)}
-                    </div>
-                  )}
-                  <div className="session-date">{formatDate(session.created_at)}</div>
-                  <div className="session-preview">{session.preview || 'Chat session'}</div>
-                </div>
-              ))
+              renderMessageSidebar()
             )}
           </div>
+          {!loading && listTotal > 0 && (
+            <div className="sessions-pagination" role="navigation" aria-label="User list pages">
+              <button
+                type="button"
+                className="sessions-page-btn"
+                disabled={listPage <= 1}
+                onClick={() => setListPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span className="sessions-page-info">
+                Page {listPage}
+                {listTotalPages ? ` / ${listTotalPages}` : ''}
+                <span className="sessions-page-range"> · {listRangeLabel}</span>
+              </span>
+              <button
+                type="button"
+                className="sessions-page-btn"
+                disabled={!listHasMore}
+                onClick={() => setListPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </aside>
 
         <div className="session-detail-pane">
@@ -332,19 +396,22 @@ const AdminChatHistory = () => {
                 <button
                   type="button"
                   className="session-back"
-                  onClick={() => setSelectedSession(null)}
-                  aria-label="Back to sessions list"
+                  onClick={() => {
+                    setSelectedSession(null);
+                    setSelectedUserId(null);
+                  }}
+                  aria-label="Back to user list"
                 >
                   <span className="session-back-icon" aria-hidden="true">
                     ←
                   </span>
-                  <span className="session-back-label">Sessions</span>
+                  <span className="session-back-label">Users</span>
                 </button>
                 <div className="session-header-center">
                   <h3 className="session-header-title">
-                    <span className="session-header-title-text">Conversation</span>
-                    {selectedSession.native_name && (
-                      <span className="session-native-name">{selectedSession.native_name}</span>
+                    <span className="session-header-title-text">{selectedSession.user_name || 'Conversation'}</span>
+                    {selectedSession.user_phone && (
+                      <span className="session-native-name">{selectedSession.user_phone}</span>
                     )}
                   </h3>
                   {msgCount > 0 && (
@@ -411,13 +478,51 @@ const AdminChatHistory = () => {
                 <button
                   type="button"
                   className="session-close"
-                  onClick={() => setSelectedSession(null)}
+                  onClick={() => {
+                    setSelectedSession(null);
+                    setSelectedUserId(null);
+                  }}
                   aria-label="Close conversation"
                 >
                   <span aria-hidden="true">×</span>
                 </button>
               </div>
 
+              {selectedUserId != null && sessionPagination && (
+                <div className="session-messages-pagination" role="navigation" aria-label="Session message pages">
+                  <button
+                    type="button"
+                    className="sessions-page-btn"
+                    disabled={sessionMsgLoading || sessionPagination.page <= 1}
+                    onClick={() =>
+                      fetchSessionDetails(
+                        selectedUserId,
+                        Math.max(1, sessionPagination.page - 1)
+                      )
+                    }
+                  >
+                    Previous
+                  </button>
+                  <span className="sessions-page-info">
+                    Page {sessionPagination.page}
+                    {sessionPagination.total_pages ? ` / ${sessionPagination.total_pages}` : ''}
+                    <span className="sessions-page-range"> · {sessionRangeLabel}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="sessions-page-btn"
+                    disabled={sessionMsgLoading || !sessionPagination.has_more}
+                    onClick={() =>
+                      fetchSessionDetails(
+                        selectedUserId,
+                        sessionPagination.page + 1
+                      )
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
               <div className="messages-container">
                 {selectedSession.messages.map((message, index) => {
                   const parallelStages = Array.isArray(message.parallel_llm_usage?.stages)
@@ -736,10 +841,10 @@ const AdminChatHistory = () => {
                 <span className="session-detail-empty-icon" aria-hidden="true">
                   💬
                 </span>
-                <p className="session-detail-empty-title">Select a session</p>
+                <p className="session-detail-empty-title">Select a user</p>
                 <p className="session-detail-empty-text">
-                  Choose a conversation from the list to read the full thread. Assistant replies use
-                  the full width for easier reading.
+                  Choose a user on the left to open their full timeline (user + assistant) sorted by
+                  time. Assistant replies use the full width for easier reading.
                 </p>
               </div>
             </div>

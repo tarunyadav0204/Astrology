@@ -9,16 +9,17 @@ const ZodiacLoader = ({ size = 60 }) => {
   const glow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const rotationLoop = Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
         duration: 4000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotationLoop.start();
 
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glow, {
           toValue: 1,
@@ -33,7 +34,13 @@ const ZodiacLoader = ({ size = 60 }) => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    glowLoop.start();
+
+    return () => {
+      rotationLoop.stop();
+      glowLoop.stop();
+    };
   }, []);
 
   const rotate = rotation.interpolate({

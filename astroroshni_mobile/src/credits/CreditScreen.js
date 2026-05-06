@@ -213,7 +213,7 @@ const CreditScreen = ({ navigation }) => {
     ]).start();
     
     // Pulse animation for credit balance
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.05,
@@ -226,7 +226,8 @@ const CreditScreen = ({ navigation }) => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
     
     // Refresh credits and subscription when screen comes into focus. On Android, sync with Google Play first so we reflect upgrades/cancels/renewals.
     const unsubscribe = navigation.addListener('focus', () => {
@@ -238,7 +239,10 @@ const CreditScreen = ({ navigation }) => {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      pulseLoop.stop();
+      unsubscribe();
+    };
   }, [navigation, iapReady, subscriptionProductIds]);
 
   // Fetch Google Play products from backend (Android only)

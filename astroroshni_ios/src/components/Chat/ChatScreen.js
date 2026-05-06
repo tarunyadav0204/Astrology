@@ -1935,6 +1935,7 @@ export default function ChatScreen({ navigation, route }) {
     clientRequestId,
   }) => {
     const token = await AsyncStorage.getItem('authToken');
+    let activeSessionId = currentSessionId;
 
     const attemptSend = async (attempt = 1) => {
       try {
@@ -1947,7 +1948,7 @@ export default function ChatScreen({ navigation, route }) {
           : messageText;
 
         const requestBody = {
-          session_id: currentSessionId,
+          session_id: activeSessionId,
           question: finalQuestion,
           language: language || 'english',
           response_style: 'detailed',
@@ -2000,6 +2001,36 @@ export default function ChatScreen({ navigation, route }) {
 
         if (!response.ok) {
           const errorText = await response.text();
+          const sessionMissing =
+            response.status === 404 &&
+            /session not found/i.test(errorText) &&
+            attempt === 1 &&
+            !isMundane;
+          if (sessionMissing) {
+            console.warn('🔄 Stale chat session — creating a new one and retrying once');
+            setSessionId(null);
+            const newSessionId = await createSession();
+            if (newSessionId) {
+              setSessionId(newSessionId);
+              activeSessionId = newSessionId;
+              return attemptSend(2);
+            }
+          }
+          const sessionTurnLimit =
+            response.status === 409 &&
+            /session_turn_limit/i.test(errorText) &&
+            attempt === 1 &&
+            !isMundane;
+          if (sessionTurnLimit) {
+            console.warn('🔄 Session turn limit — starting a new chat session and retrying once');
+            setSessionId(null);
+            const newSessionId = await createSession();
+            if (newSessionId) {
+              setSessionId(newSessionId);
+              activeSessionId = newSessionId;
+              return attemptSend(2);
+            }
+          }
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
@@ -2022,7 +2053,7 @@ export default function ChatScreen({ navigation, route }) {
         console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
 
         // Start polling IMMEDIATELY before state updates to avoid delay
-        pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
+        pollForResponse(assistantMessageId, processingMessageId, activeSessionId, messageText);
 
         // Update user message with real DB ID (async, non-blocking)
         if (user_message_id) {

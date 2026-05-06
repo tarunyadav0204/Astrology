@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  FlatList,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -381,8 +380,9 @@ export default function ChatScreen({ navigation, route }) {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    let glowLoop;
     if (isPremiumAnalysis) {
-      Animated.loop(
+      glowLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
@@ -395,7 +395,8 @@ export default function ChatScreen({ navigation, route }) {
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      glowLoop.start();
       
       // Show badge
       setShowPremiumBadge(true);
@@ -414,9 +415,13 @@ export default function ChatScreen({ navigation, route }) {
         }).start(() => setShowPremiumBadge(false));
       }, 3000);
       
-      return () => clearTimeout(timer);
+      return () => {
+        glowLoop?.stop?.();
+        clearTimeout(timer);
+      };
     } else {
       setShowPremiumBadge(false);
+      glowLoop?.stop?.();
     }
   }, [isPremiumAnalysis]);
 
@@ -510,6 +515,17 @@ export default function ChatScreen({ navigation, route }) {
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
+  /** FlatList uses scrollToOffset; ScrollView uses scrollTo — keep measureLayout-based scrolls working. */
+  const scrollMessageListToY = (y, animated = false) => {
+    const node = scrollViewRef.current;
+    if (!node) return;
+    const offset = Math.max(0, y);
+    if (typeof node.scrollToOffset === 'function') {
+      node.scrollToOffset({ offset, animated });
+    } else if (typeof node.scrollTo === 'function') {
+      node.scrollTo({ y: offset, animated });
+    }
+  };
   const instantScrollRetryRef = useRef([]);
   const messageTierByIdRef = useRef({});
   const suppressAutoOpenChatRef = useRef(false);
@@ -1245,7 +1261,7 @@ export default function ChatScreen({ navigation, route }) {
                 lastMessageRef.current?.measureLayout(
                   scrollViewRef.current,
                   (x, y) => {
-                    scrollViewRef.current?.scrollTo({ y: y, animated: false });
+                    scrollMessageListToY(y, false);
                   },
                   () => {}
                 );
@@ -1363,7 +1379,7 @@ export default function ChatScreen({ navigation, route }) {
                   lastMessageRef.current?.measureLayout(
                     scrollViewRef.current,
                     (x, y) => {
-                      scrollViewRef.current?.scrollTo({ y: y, animated: false });
+                      scrollMessageListToY(y, false);
                     },
                     () => {}
                   );
@@ -2029,7 +2045,7 @@ export default function ChatScreen({ navigation, route }) {
           lastMessageRef.current?.measureLayout(
             scrollViewRef.current,
             (x, y) => {
-              scrollViewRef.current?.scrollTo({ y: y, animated: false });
+              scrollMessageListToY(y, false);
             },
             () => {}
           );
@@ -2866,6 +2882,21 @@ export default function ChatScreen({ navigation, route }) {
               return attemptSend(2);
             }
           }
+          const sessionTurnLimit =
+            response.status === 409 &&
+            /session_turn_limit/i.test(errorText) &&
+            attempt === 1 &&
+            !isMundane;
+          if (sessionTurnLimit) {
+            console.warn('🔄 Session turn limit — starting a new chat session and retrying once');
+            setSessionId(null);
+            const newSessionId = await createSession();
+            if (newSessionId) {
+              setSessionId(newSessionId);
+              activeSessionId = newSessionId;
+              return attemptSend(2);
+            }
+          }
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
@@ -3681,24 +3712,6 @@ export default function ChatScreen({ navigation, route }) {
     triggerRatingPrompt(messageId, 'answer_scroll_bottom');
   };
 
-  const renderMessage = ({ item }) => (
-    <MessageBubble
-      message={item}
-      language={language}
-      podcastAutoLaunchMessageId={podcastPromoMessageId}
-      podcastAutoLaunchKey={podcastAutoLaunchKey}
-    />
-  );
-
-  const renderSuggestion = ({ item }) => (
-    <TouchableOpacity
-      style={styles.suggestionButton}
-      onPress={() => setInputText(item)}
-    >
-      <Text style={[styles.suggestionText, { color: colors.text }]}>{item}</Text>
-    </TouchableOpacity>
-  );
-
   const inputScopeNativeTrimmed = birthData?.name?.trim() ?? '';
   const inputScopeNativeShown =
     inputScopeNativeTrimmed.length > 7
@@ -3967,135 +3980,135 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             </View>
           )}
-          <GHScrollView 
+          <GHFlatList
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
+            data={messages}
+            keyExtractor={(item, index) =>
+              item?.id != null && String(item.id) !== ''
+                ? `${String(item.id)}-${index}`
+                : `chat-row-${index}`
+            }
             showsVerticalScrollIndicator={false}
             onScroll={handleMessagesScroll}
             scrollEventThrottle={120}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="none"
+            removeClippedSubviews={Platform.OS === 'android'}
+            initialNumToRender={12}
+            maxToRenderPerBatch={8}
+            windowSize={10}
+            updateCellsBatchingPeriod={50}
             {...(Platform.OS === 'ios'
               ? {
                   contentInsetAdjustmentBehavior: 'never',
-                  removeClippedSubviews: false,
                 }
               : {})}
-          >
-            {/* Calibration Card - COMMENTED OUT */}
-            {/* {calibrationEvent && !calibrationEvent.verified && (
-              <CalibrationCard 
-                data={calibrationEvent}
-                onConfirm={() => handleCalibrationConfirm(calibrationEvent)}
-                onReject={() => handleCalibrationReject(calibrationEvent)}
-              />
-            )} */}
-            
-            {/* Signs Display – only for native-centric chat, not Global Markets (mundane) */}
-            {birthData && !isMundane && (
-              <View style={styles.signsContainer}>
-                <LinearGradient
-                  colors={Platform.OS === 'android'
-                    ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
-                    : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
-                  style={styles.signsGradient}
-                >
-                  <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
-                  <View style={styles.signsRow}>
-                    <View style={styles.signItem}>
-                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ {t('home.signs.sun', 'Sun')}</Text>
-                      <Text style={[styles.signValue, { color: colors.text }]}>
-                        {loadingChart ? '...' : (chartData?.planets?.Sun ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign)}` : '...')}
-                      </Text>
-                    </View>
-                    <View style={styles.signItem}>
-                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 {t('home.signs.moon', 'Moon')}</Text>
-                      <Text style={[styles.signValue, { color: colors.text }]}>
-                        {loadingChart ? '...' : (chartData?.planets?.Moon ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign)}` : '...')}
-                      </Text>
-                    </View>
-                    <View style={styles.signItem}>
-                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ {t('home.signs.ascendant', 'Ascendant')}</Text>
-                      <Text style={[styles.signValue, { color: colors.text }]}>
-                        {loadingChart ? '...' : (chartData?.houses?.[0] ? `${getSignIcon(chartData.houses[0].sign)} ${getSignName(chartData.houses[0].sign)}` : '...')}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  {/* Current Running Dashas */}
-                  {dashaData && (
-                    <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-                      <GHFlatList
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        data={[
-                          dashaData.maha_dashas?.find(d => d.current),
-                          dashaData.antar_dashas?.find(d => d.current),
-                          dashaData.pratyantar_dashas?.find(d => d.current),
-                          dashaData.sookshma_dashas?.find(d => d.current),
-                          dashaData.prana_dashas?.find(d => d.current)
-                        ].filter(Boolean)}
-                        keyExtractor={(item, index) => index.toString()}
-                        renderItem={({ item: dasha }) => {
-                          if (!dasha || !dasha.planet || !dasha.start || !dasha.end) return null;
-                          const planetColor = getPlanetColor(dasha.planet);
-                          const startDateObj = new Date(dasha.start);
-                          const endDateObj = new Date(dasha.end);
-                          const startDate = !isNaN(startDateObj.getTime()) ? startDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
-                          const endDate = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
-                          return (
-                            <TouchableOpacity 
-                              style={[
-                                styles.dashaChip,
-                                {
-                                  backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
-                                  borderColor: planetColor,
-                                  borderWidth: 2,
-                                },
-                              ]}
-                              onPress={() => setShowDashaBrowser(true)}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
-                              <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
-                              <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
-                            </TouchableOpacity>
-                          );
-                        }}
-                        contentContainerStyle={styles.dashaFlatListContent}
-                        snapToInterval={cardWidth + 8}
-                        decelerationRate="fast"
-                        pagingEnabled={false}
-                      />
-                    </Animated.View>
-                  )}
-                </LinearGradient>
-              </View>
-            )}
-            
+            ListHeaderComponent={
+              <>
+                {/* Signs Display – only for native-centric chat, not Global Markets (mundane) */}
+                {birthData && !isMundane && (
+                  <View style={styles.signsContainer}>
+                    <LinearGradient
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
+                      style={styles.signsGradient}
+                    >
+                      <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
+                      <View style={styles.signsRow}>
+                        <View style={styles.signItem}>
+                          <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ {t('home.signs.sun', 'Sun')}</Text>
+                          <Text style={[styles.signValue, { color: colors.text }]}>
+                            {loadingChart ? '...' : (chartData?.planets?.Sun ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign)}` : '...')}
+                          </Text>
+                        </View>
+                        <View style={styles.signItem}>
+                          <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 {t('home.signs.moon', 'Moon')}</Text>
+                          <Text style={[styles.signValue, { color: colors.text }]}>
+                            {loadingChart ? '...' : (chartData?.planets?.Moon ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign)}` : '...')}
+                          </Text>
+                        </View>
+                        <View style={styles.signItem}>
+                          <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ {t('home.signs.ascendant', 'Ascendant')}</Text>
+                          <Text style={[styles.signValue, { color: colors.text }]}>
+                            {loadingChart ? '...' : (chartData?.houses?.[0] ? `${getSignIcon(chartData.houses[0].sign)} ${getSignName(chartData.houses[0].sign)}` : '...')}
+                          </Text>
+                        </View>
+                      </View>
 
-            
-            {messages.map((item, index) => {
+                      {dashaData && (
+                        <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
+                          <GHFlatList
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            data={[
+                              dashaData.maha_dashas?.find(d => d.current),
+                              dashaData.antar_dashas?.find(d => d.current),
+                              dashaData.pratyantar_dashas?.find(d => d.current),
+                              dashaData.sookshma_dashas?.find(d => d.current),
+                              dashaData.prana_dashas?.find(d => d.current)
+                            ].filter(Boolean)}
+                            keyExtractor={(dashaItem, dashaIndex) => dashaIndex.toString()}
+                            renderItem={({ item: dasha }) => {
+                              if (!dasha || !dasha.planet || !dasha.start || !dasha.end) return null;
+                              const planetColor = getPlanetColor(dasha.planet);
+                              const startDateObj = new Date(dasha.start);
+                              const endDateObj = new Date(dasha.end);
+                              const startDate = !isNaN(startDateObj.getTime()) ? startDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
+                              const endDate = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
+                              return (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dashaChip,
+                                    {
+                                      backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
+                                      borderColor: planetColor,
+                                      borderWidth: 2,
+                                    },
+                                  ]}
+                                  onPress={() => setShowDashaBrowser(true)}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
+                                  <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
+                                  <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
+                                </TouchableOpacity>
+                              );
+                            }}
+                            contentContainerStyle={styles.dashaFlatListContent}
+                            snapToInterval={cardWidth + 8}
+                            decelerationRate="fast"
+                            pagingEnabled={false}
+                          />
+                        </Animated.View>
+                      )}
+                    </LinearGradient>
+                  </View>
+                )}
+              </>
+            }
+            renderItem={({ item, index }) => {
               const isLastMessage = index === messages.length - 1;
 
               if (item.isTyping) {
                 if (item.waitConversation?.enabled && Array.isArray(item.waitConversation.messages) && item.waitConversation.messages.length > 0) {
                   return (
-                    <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                    <View ref={isLastMessage ? lastMessageRef : null}>
                       {renderWaitConversation(item.waitConversation)}
                     </View>
                   );
                 }
                 if (item.chatTier === 'instant') {
                   return (
-                    <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                    <View ref={isLastMessage ? lastMessageRef : null}>
                       {renderInstantTypingIndicator()}
                     </View>
                   );
                 }
                 return (
-                  <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                  <View ref={isLastMessage ? lastMessageRef : null}>
                     <LoadingBubble
                       chartInsights={item.chartInsights}
                       chartData={chartData}
@@ -4107,10 +4120,9 @@ export default function ChatScreen({ navigation, route }) {
                 );
               }
 
-              // Render Partnership Setup Card
               if (item.setupType === 'partnership' && partnershipMode) {
                 return (
-                  <View key={item.id} style={{ marginBottom: 16 }}>
+                  <View style={{ marginBottom: 16 }}>
                     <LinearGradient
                       colors={['rgba(255, 107, 53, 0.1)', 'rgba(249, 115, 22, 0.05)']}
                       style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.2)' }}
@@ -4136,7 +4148,7 @@ export default function ChatScreen({ navigation, route }) {
               }
 
               return (
-                <View key={item.id}>
+                <View>
                   <View ref={isLastMessage ? lastMessageRef : null}>
                     <MessageBubble
                       message={item}
@@ -4151,8 +4163,6 @@ export default function ChatScreen({ navigation, route }) {
                       podcastAutoLaunchMessageId={podcastPromoMessageId}
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
                     />
-
-                    {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
                   </View>
                   <FeedbackComponent
                     message={item}
@@ -4162,8 +4172,8 @@ export default function ChatScreen({ navigation, route }) {
                   />
                 </View>
               );
-            })}
-          </GHScrollView>
+            }}
+          />
 
         {/* Suggestions + Input: lift by keyboard frame when open (Android needs this with edge-to-edge). */}
         <View

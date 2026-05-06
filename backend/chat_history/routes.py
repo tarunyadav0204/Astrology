@@ -1,7 +1,7 @@
 """
 Chat History API Routes
 """
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from datetime import datetime, timedelta
 import uuid
 import json
@@ -141,6 +141,11 @@ router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
 STANDARD_MAX_CLARIFICATIONS = 1
 INSTANT_MAX_CLARIFICATIONS = 3
+
+# Cap user turns per session so threads do not grow without bound in DB/UI. Clients must POST /session
+# and retry when they receive SESSION_TURN_LIMIT_PREFIX (HTTP 409). Model context already uses ~last 3 Q&A.
+MAX_USER_MESSAGES_PER_CHAT_SESSION = 40
+SESSION_TURN_LIMIT_PREFIX = "session_turn_limit"
 
 
 def _ensure_chat_messages_gate_metadata(conn):
@@ -386,15 +391,122 @@ async def save_chat_message(request: dict, current_user = Depends(get_current_us
     return {"message": "Message saved"}
 
 @router.get("/history")
-async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depends(get_current_user)):
-    """Get user's chat session history with pagination"""
-    # Calculate offset
+async def get_chat_history(
+    page: int = 1,
+    limit: int = 20,
+    list_mode: str = Query(
+        "sessions",
+        description="sessions: one row per chat thread (default). messages: one row per message, newest first.",
+    ),
+    current_user=Depends(get_current_user),
+):
+    """Get user's chat history with pagination (sessions or individual messages)."""
     offset = (page - 1) * limit
+    mode = (list_mode or "sessions").strip().lower()
+    if mode not in ("sessions", "messages"):
+        mode = "sessions"
+
+    if mode == "messages":
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT COUNT(*)
+                    FROM chat_messages cm
+                    INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                    WHERE cs.user_id = %s
+                      AND EXISTS (
+                          SELECT 1 FROM chat_messages mu
+                          WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                      )
+                """,
+                (current_user.userid,),
+            )
+            total_count_row = cur.fetchone()
+            total_count = total_count_row[0] if total_count_row else 0
+
+            cur = execute(
+                conn,
+                """
+                    SELECT
+                        cm.message_id,
+                        cm.session_id,
+                        cm.sender,
+                        cm.content,
+                        cm.timestamp,
+                        cs.created_at,
+                        bc.name AS native_name_raw,
+                        (
+                            SELECT MAX(m2.timestamp)
+                            FROM chat_messages m2
+                            WHERE m2.session_id = cs.session_id
+                        ) AS session_last_activity_at
+                    FROM chat_messages cm
+                    INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                    LEFT JOIN birth_charts bc ON cs.birth_chart_id = bc.id
+                    WHERE cs.user_id = %s
+                      AND EXISTS (
+                          SELECT 1 FROM chat_messages mu
+                          WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                      )
+                    ORDER BY cm.timestamp DESC NULLS LAST, cm.message_id DESC
+                    LIMIT %s OFFSET %s
+                """,
+                (current_user.userid, limit, offset),
+            )
+            rows = cur.fetchall() or []
+
+        from encryption_utils import EncryptionManager
+
+        encryptor = EncryptionManager()
+        message_items = []
+        for row in rows:
+            raw_name = row[6] if len(row) > 6 else None
+            native_name = None
+            if raw_name:
+                try:
+                    native_name = encryptor.decrypt(raw_name)
+                except Exception:
+                    native_name = raw_name
+            raw_content = row[3] or ""
+            preview = raw_content[:100] + "..." if len(raw_content) > 100 else raw_content
+            session_last = row[7] if len(row) > 7 else None
+            message_items.append(
+                {
+                    "message_id": row[0],
+                    "session_id": row[1],
+                    "sender": row[2],
+                    "preview": preview,
+                    "timestamp": row[4],
+                    "session_created_at": row[5],
+                    "session_last_activity_at": session_last,
+                    "native_name": native_name,
+                }
+            )
+
+        return {
+            "list_mode": "messages",
+            "messages": message_items,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "has_more": offset + limit < total_count,
+            },
+        }
 
     with get_conn() as conn:
         cur = execute(
             conn,
-            "SELECT COUNT(*) FROM chat_sessions WHERE user_id = %s",
+            """
+                SELECT COUNT(*)
+                FROM chat_sessions cs
+                WHERE cs.user_id = %s
+                  AND EXISTS (
+                      SELECT 1 FROM chat_messages mu
+                      WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                  )
+            """,
             (current_user.userid,),
         )
         total_count_row = cur.fetchone()
@@ -408,7 +520,12 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
                     cs.created_at,
                     cm.content as first_message,
                     cs.birth_chart_id,
-                    bc.name as native_name
+                    bc.name as native_name,
+                    (
+                        SELECT MAX(m2.timestamp)
+                        FROM chat_messages m2
+                        WHERE m2.session_id = cs.session_id
+                    ) AS last_activity_at
                 FROM chat_sessions cs
                 LEFT JOIN chat_messages cm ON cs.session_id = cm.session_id
                     AND cm.sender = 'user'
@@ -419,41 +536,51 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
                     )
                 LEFT JOIN birth_charts bc ON cs.birth_chart_id = bc.id
                 WHERE cs.user_id = %s
-                ORDER BY cs.created_at DESC
+                  AND EXISTS (
+                      SELECT 1 FROM chat_messages mu
+                      WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                  )
+                ORDER BY last_activity_at DESC NULLS LAST, cs.created_at DESC
                 LIMIT %s OFFSET %s
             """,
             (current_user.userid, limit, offset),
         )
         sessions = cur.fetchall() or []
-    
+
     from encryption_utils import EncryptionManager
+
     encryptor = EncryptionManager()
-    
+
     history = []
     for session in sessions:
         native_name = None
         if session[4]:  # If native_name exists
             try:
                 native_name = encryptor.decrypt(session[4])
-            except:
+            except Exception:
                 native_name = session[4]  # Use as-is if decryption fails
-        
-        history.append({
-            "session_id": session[0],
-            "created_at": session[1],
-            "preview": session[2][:100] + "..." if session[2] and len(session[2]) > 100 else session[2],
-            "birth_chart_id": session[3],
-            "native_name": native_name
-        })
-    
+
+        last_act = session[5] if len(session) > 5 else None
+        history.append(
+            {
+                "session_id": session[0],
+                "created_at": session[1],
+                "last_activity_at": last_act,
+                "preview": session[2][:100] + "..." if session[2] and len(session[2]) > 100 else session[2],
+                "birth_chart_id": session[3],
+                "native_name": native_name,
+            }
+        )
+
     return {
+        "list_mode": "sessions",
         "sessions": history,
         "pagination": {
             "page": page,
             "limit": limit,
             "total": total_count,
-            "has_more": offset + limit < total_count
-        }
+            "has_more": offset + limit < total_count,
+        },
     }
 
 @router.get("/session/{session_id}")
@@ -735,6 +862,22 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     "chart_insights": [],
                     "loading_messages": [],
                 }
+
+        # Per-session size cap (new turns only; idempotent retries return above).
+        cur = execute(
+            conn,
+            "SELECT COUNT(*) FROM chat_messages WHERE session_id = %s AND sender = 'user'",
+            (session_id,),
+        )
+        user_turn_count = (cur.fetchone() or [0])[0] or 0
+        if user_turn_count >= MAX_USER_MESSAGES_PER_CHAT_SESSION:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{SESSION_TURN_LIMIT_PREFIX}: This conversation has reached the maximum length "
+                    f"({MAX_USER_MESSAGES_PER_CHAT_SESSION} questions). Please start a new chat to continue."
+                ),
+            )
 
         # Save user question (sanitized)
         cur = execute(

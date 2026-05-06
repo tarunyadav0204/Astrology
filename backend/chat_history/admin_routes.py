@@ -1,7 +1,7 @@
 import re
 import os
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 import json
@@ -341,6 +341,23 @@ _FIXED_INPUT_TOKENS_PER_QUESTION = max(1, int(round(_FIXED_INPUT_CHARS_PER_QUEST
 _LIGHT_INPUT_CHARS_PER_QUESTION = 5_000
 _LIGHT_INPUT_TOKENS_PER_QUESTION = max(1, int(round(_LIGHT_INPUT_CHARS_PER_QUESTION / 4.0)))
 
+# Subquery: count user turns that are not short replies immediately after an assistant clarification.
+_ADMIN_MAIN_QUESTION_COUNT_SQL = """
+(SELECT COUNT(*)::int FROM chat_messages um
+ WHERE um.session_id = cs.session_id
+ AND um.sender = 'user'
+ AND NOT EXISTS (
+   SELECT 1 FROM chat_messages prev
+   WHERE prev.session_id = um.session_id
+   AND prev.sender = 'assistant'
+   AND prev.message_type = 'clarification'
+   AND prev.message_id = (
+     SELECT MAX(m2.message_id) FROM chat_messages m2
+     WHERE m2.session_id = um.session_id AND m2.message_id < um.message_id
+   )
+))
+"""
+
 @router.get("/admin/chat/history/{user_id}")
 async def get_user_chat_history(user_id: int, current_user: dict = Depends(require_admin)):
     """Get chat history for a specific user (admin only)"""
@@ -374,15 +391,23 @@ async def get_user_chat_history(user_id: int, current_user: dict = Depends(requi
             )
             cur = execute(
                 conn,
-                """
+                f"""
                 SELECT session_id, created_at,
                        (SELECT content FROM chat_messages
                         WHERE session_id = cs.session_id
                         AND sender = 'user'
-                        ORDER BY timestamp ASC LIMIT 1) as preview
+                        ORDER BY message_id DESC LIMIT 1) as preview,
+                       {_ADMIN_MAIN_QUESTION_COUNT_SQL.strip()} AS main_question_count
                 FROM chat_sessions cs
                 WHERE user_id = %s
-                ORDER BY created_at DESC
+                  AND EXISTS (
+                      SELECT 1 FROM chat_messages mu
+                      WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                  )
+                ORDER BY COALESCE(
+                    (SELECT MAX(timestamp) FROM chat_messages WHERE session_id = cs.session_id),
+                    cs.created_at
+                ) DESC NULLS LAST
                 """,
                 (user_id,),
             )
@@ -391,10 +416,12 @@ async def get_user_chat_history(user_id: int, current_user: dict = Depends(requi
         for row in rows:
             preview = row[2]
             preview_str = (preview[:100] + '...') if preview and len(preview) > 100 else preview
+            mq = row[3] if len(row) > 3 and row[3] is not None else 0
             sessions.append({
                 'session_id': row[0],
                 'created_at': _timestamp_to_ist_iso(row[1]),
                 'preview': preview_str,
+                'main_question_count': int(mq),
             })
         return {"sessions": sessions}
     except Exception as e:
@@ -411,7 +438,7 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
         with get_conn() as conn:
             cur = execute(
                 conn,
-                """
+                f"""
                 SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id,
                        cs.chat_llm_provider, cs.chat_llm_model,
                        u.name, u.phone,
@@ -419,14 +446,22 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                        (SELECT content FROM chat_messages
                         WHERE session_id = cs.session_id
                         AND sender = 'user'
-                        ORDER BY timestamp ASC LIMIT 1) as preview,
+                        ORDER BY message_id DESC LIMIT 1) as preview,
+                       {_ADMIN_MAIN_QUESTION_COUNT_SQL.strip()} AS main_question_count,
                        (SELECT MAX(timestamp) FROM chat_messages
                         WHERE session_id = cs.session_id) as last_activity,
                        'new' as system_type
                 FROM chat_sessions cs
                 LEFT JOIN users u ON cs.user_id = u.userid
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-                ORDER BY cs.created_at DESC
+                WHERE EXISTS (
+                    SELECT 1 FROM chat_messages mu
+                    WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                )
+                ORDER BY COALESCE(
+                    (SELECT MAX(timestamp) FROM chat_messages WHERE session_id = cs.session_id),
+                    cs.created_at
+                ) DESC NULLS LAST
                 LIMIT 500
                 """,
                 (),
@@ -439,9 +474,10 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                         native_name = enc.decrypt(raw)
                     except Exception:
                         native_name = raw
-                display_time = row[10] if row[10] else row[2]
+                display_time = row[11] if row[11] else row[2]
                 preview = row[9]
                 preview_str = (preview[:100] + '...') if preview and len(preview) > 100 else preview
+                mq = row[10] if row[10] is not None else 0
                 sessions.append({
                     'session_id': row[0],
                     'user_id': row[1],
@@ -449,7 +485,8 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                     'user_phone': row[7] or 'No phone',
                     'created_at': _timestamp_to_ist_iso(display_time),
                     'preview': preview_str,
-                    'system_type': row[11],
+                    'main_question_count': int(mq),
+                    'system_type': row[12],
                     'native_name': native_name,
                     'chat_llm_provider': row[4],
                     'chat_llm_model': row[5],
@@ -473,14 +510,16 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                     birth_data = conv_data.get('birth_data', {})
                     user_name = birth_data.get('name', f'Legacy User #{row[0][:8]}')
                     if messages:
-                        first_question = messages[0].get('question', 'Chat conversation')
+                        last_q = (messages[-1].get('question') or messages[-1].get('response') or 'Chat conversation')
+                        preview_legacy = last_q[:100] + '...' if len(last_q) > 100 else last_q
                         sessions.append({
                             'session_id': row[0],
                             'user_id': 'legacy',
                             'user_name': user_name,
                             'user_phone': 'Legacy System',
                             'created_at': _timestamp_to_ist_iso(row[2]),
-                            'preview': first_question[:100] + '...' if len(first_question) > 100 else first_question,
+                            'preview': preview_legacy,
+                            'main_question_count': len(messages),
                             'system_type': row[3],
                         })
                 except Exception:
@@ -490,6 +529,348 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
         return {"sessions": sessions[:500]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching all chat history: {str(e)}")
+
+
+@router.get("/admin/chat/all-history-messages")
+async def get_all_chat_history_messages(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+    q: Optional[str] = Query(
+        None,
+        description="Filter by user name, phone, message text, or session id (substring match).",
+    ),
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Paginated chat messages across all users (newest first), for admin left-panel lists.
+    Scoped to sessions that have at least one user message (same as all-history).
+    """
+    try:
+        from encryption_utils import EncryptionManager
+
+        enc = EncryptionManager()
+        offset = (page - 1) * limit
+        search = (q or "").strip()
+        search_clause = ""
+        search_params: Tuple[Any, ...] = ()
+        if search:
+            pat = f"%{search}%"
+            search_clause = """
+                AND (
+                    COALESCE(u.name, '') ILIKE %s
+                    OR COALESCE(u.phone, '') ILIKE %s
+                    OR COALESCE(cm.content, '') ILIKE %s
+                    OR COALESCE(cs.session_id::text, '') ILIKE %s
+                )
+            """
+            search_params = (pat, pat, pat, pat)
+
+        base_where = """
+            EXISTS (
+                SELECT 1 FROM chat_messages mu
+                WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+            )
+        """
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT COUNT(*)
+                FROM chat_messages cm
+                INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                LEFT JOIN users u ON cs.user_id = u.userid
+                WHERE {base_where}
+                {search_clause}
+                """,
+                search_params,
+            )
+            total_row = cur.fetchone()
+            total = int(total_row[0] or 0) if total_row else 0
+
+            cur = execute(
+                conn,
+                f"""
+                SELECT
+                    cm.message_id,
+                    cm.session_id,
+                    cm.sender,
+                    cm.content,
+                    cm.timestamp,
+                    cs.user_id,
+                    u.name,
+                    u.phone,
+                    bc.name AS native_name_raw
+                FROM chat_messages cm
+                INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                LEFT JOIN users u ON cs.user_id = u.userid
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE {base_where}
+                {search_clause}
+                ORDER BY cm.timestamp DESC NULLS LAST, cm.message_id DESC
+                LIMIT %s OFFSET %s
+                """,
+                search_params + (limit, offset),
+            )
+            rows = cur.fetchall() or []
+
+        messages_out: List[Dict[str, Any]] = []
+        for row in rows:
+            raw_native = row[8] if len(row) > 8 else None
+            native_name = None
+            if raw_native:
+                try:
+                    native_name = enc.decrypt(raw_native)
+                except Exception:
+                    native_name = raw_native
+            raw_content = row[3] or ""
+            preview = (
+                (raw_content[:120] + "…") if len(raw_content) > 120 else raw_content
+            )
+            messages_out.append(
+                {
+                    "message_id": row[0],
+                    "session_id": str(row[1]) if row[1] is not None else None,
+                    "sender": row[2],
+                    "preview": preview,
+                    "timestamp": _timestamp_to_ist_iso(row[4]),
+                    "user_id": row[5],
+                    "user_name": row[6] or "Unknown User",
+                    "user_phone": row[7] or "",
+                    "native_name": native_name,
+                }
+            )
+
+        total_pages = (total + limit - 1) // limit if limit else 0
+        return {
+            "messages": messages_out,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "total_pages": total_pages,
+            "has_more": offset + limit < total,
+        }
+    except Exception as e:
+        logger.exception("get_all_chat_history_messages failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching chat messages: {str(e)}",
+        )
+
+
+@router.get("/admin/chat/users")
+async def get_admin_chat_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    q: Optional[str] = Query(
+        None,
+        description="Filter by user name, phone, or user id (substring match).",
+    ),
+    current_user: dict = Depends(require_admin),
+):
+    """Paginated users for admin chat left panel (one row per user)."""
+    try:
+        offset = (page - 1) * limit
+        search = (q or "").strip()
+        search_clause = ""
+        params: Tuple[Any, ...] = ()
+        if search:
+            pat = f"%{search}%"
+            search_clause = """
+                AND (
+                    COALESCE(u.name, '') ILIKE %s
+                    OR COALESCE(u.phone, '') ILIKE %s
+                    OR COALESCE(cs.user_id::text, '') ILIKE %s
+                )
+            """
+            params = (pat, pat, pat)
+
+        base_where = """
+            EXISTS (
+                SELECT 1 FROM chat_messages mu
+                WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+            )
+        """
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT COUNT(*)
+                FROM (
+                    SELECT cs.user_id
+                    FROM chat_sessions cs
+                    LEFT JOIN users u ON cs.user_id = u.userid
+                    WHERE {base_where}
+                    {search_clause}
+                    GROUP BY cs.user_id
+                ) t
+                """,
+                params,
+            )
+            total_row = cur.fetchone()
+            total = int(total_row[0] or 0) if total_row else 0
+
+            cur = execute(
+                conn,
+                f"""
+                SELECT
+                    cs.user_id,
+                    COALESCE(u.name, 'Unknown User') AS user_name,
+                    COALESCE(u.phone, '') AS user_phone,
+                    MAX(cm.timestamp) AS last_activity_at,
+                    COUNT(cm.message_id) AS message_count
+                FROM chat_sessions cs
+                LEFT JOIN users u ON cs.user_id = u.userid
+                LEFT JOIN chat_messages cm ON cm.session_id = cs.session_id
+                WHERE {base_where}
+                {search_clause}
+                GROUP BY cs.user_id, user_name, user_phone
+                ORDER BY MAX(cm.timestamp) DESC NULLS LAST
+                LIMIT %s OFFSET %s
+                """,
+                params + (limit, offset),
+            )
+            rows = cur.fetchall() or []
+
+        users: List[Dict[str, Any]] = []
+        for row in rows:
+            users.append(
+                {
+                    "user_id": row[0],
+                    "user_name": row[1] or "Unknown User",
+                    "user_phone": row[2] or "",
+                    "last_activity_at": _timestamp_to_ist_iso(row[3]),
+                    "message_count": int(row[4] or 0),
+                }
+            )
+
+        total_pages = (total + limit - 1) // limit if limit else 0
+        return {
+            "users": users,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "total_pages": total_pages,
+            "has_more": offset + limit < total,
+        }
+    except Exception as e:
+        logger.exception("get_admin_chat_users failed")
+        raise HTTPException(status_code=500, detail=f"Error fetching chat users: {str(e)}")
+
+
+@router.get("/admin/chat/user-thread/{user_id}")
+async def get_admin_chat_user_thread(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(require_admin),
+):
+    """Paginated merged timeline for a user across all sessions (user+assistant)."""
+    try:
+        from encryption_utils import EncryptionManager
+
+        enc = EncryptionManager()
+        offset = (page - 1) * limit
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT COALESCE(name, 'Unknown User'), COALESCE(phone, '') FROM users WHERE userid = %s",
+                (user_id,),
+            )
+            user_row = cur.fetchone()
+
+            cur = execute(
+                conn,
+                """
+                SELECT COUNT(*)
+                FROM chat_messages cm
+                INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                WHERE cs.user_id = %s
+                """,
+                (user_id,),
+            )
+            total_row = cur.fetchone()
+            total = int(total_row[0] or 0) if total_row else 0
+
+            cur = execute(
+                conn,
+                """
+                SELECT
+                    cm.message_id,
+                    cm.session_id,
+                    cm.sender,
+                    cm.content,
+                    cm.timestamp,
+                    bc.name AS native_name_raw
+                FROM chat_messages cm
+                INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE cs.user_id = %s
+                ORDER BY cm.timestamp ASC NULLS LAST, cm.message_id ASC
+                LIMIT %s OFFSET %s
+                """,
+                (user_id, limit, offset),
+            )
+            rows = cur.fetchall() or []
+
+        if not user_row and total == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        messages: List[Dict[str, Any]] = []
+        for row in rows:
+            native_name = None
+            raw_native = row[5] if len(row) > 5 else None
+            if raw_native:
+                try:
+                    native_name = enc.decrypt(raw_native)
+                except Exception:
+                    native_name = raw_native
+            messages.append(
+                {
+                    "message_id": row[0],
+                    "session_id": row[1],
+                    "sender": row[2],
+                    "content": row[3],
+                    "timestamp": _timestamp_to_ist_iso(row[4]),
+                    "native_name": native_name,
+                    "llm_input_tokens": None,
+                    "llm_output_tokens": None,
+                    "llm_cached_input_tokens": None,
+                    "llm_non_cached_input_tokens": None,
+                    "llm_prompt_chars": None,
+                    "llm_response_chars": None,
+                    "parallel_llm_usage": None,
+                    "llm_cache_setup_input_tokens": None,
+                    "cost_estimate": None,
+                }
+            )
+
+        total_pages = (total + limit - 1) // limit if limit else 0
+        return {
+            "view_mode": "user_thread",
+            "user_id": user_id,
+            "user_name": (user_row[0] if user_row else "Unknown User"),
+            "user_phone": (user_row[1] if user_row else ""),
+            "native_name": None,
+            "chat_llm_provider": None,
+            "chat_llm_model": None,
+            "messages": messages,
+            "cost_summary": None,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+                "has_more": offset + limit < total,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_admin_chat_user_thread failed")
+        raise HTTPException(status_code=500, detail=f"Error fetching user thread: {str(e)}")
 
 
 @router.get("/admin/event-timeline/history")
@@ -674,7 +1055,12 @@ async def get_event_timeline_history(
         raise HTTPException(status_code=500, detail=f"Error fetching event timeline history: {str(e)}")
 
 @router.get("/admin/chat/session/{session_id}")
-async def get_session_details(session_id: str, current_user: dict = Depends(require_admin)):
+async def get_session_details(
+    session_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(require_admin),
+):
     """Get detailed messages for a specific session (admin only). Includes native_name (birth chart name) for the session."""
     try:
         with get_conn() as conn:
@@ -705,6 +1091,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 except Exception:
                     native_name = raw_name
 
+            offset = (page - 1) * limit
             with get_conn() as conn:
                 cur = execute(
                     conn,
@@ -750,6 +1137,17 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 )
                 cur = execute(
                     conn,
+                    """
+                    SELECT COUNT(*)
+                    FROM chat_messages
+                    WHERE session_id = %s
+                    """,
+                    (session_id,),
+                )
+                msg_total_row = cur.fetchone()
+                msg_total = int(msg_total_row[0] or 0) if msg_total_row else 0
+                cur = execute(
+                    conn,
                     f"""
                     SELECT message_id, sender, content, timestamp, {select_message_type},
                            {select_llm_input_tokens}, {select_llm_output_tokens},
@@ -759,8 +1157,9 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     FROM chat_messages
                     WHERE session_id = %s
                     ORDER BY message_id ASC
+                    LIMIT %s OFFSET %s
                     """,
-                    (session_id,),
+                    (session_id, limit, offset),
                 )
                 msg_rows = cur.fetchall() or []
             session_input_tokens_est = sum(
@@ -925,6 +1324,13 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     "output_cost_inr_estimate": round(total_output_inr, 6),
                     "total_cost_inr_estimate": round(total_inr, 6),
                     "note": "Estimated from assistant answer rows only. For parallel responses, each stage is priced using its own model rates when stage metadata is present.",
+                },
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": msg_total,
+                    "total_pages": (msg_total + limit - 1) // limit if limit else 0,
+                    "has_more": offset + limit < msg_total,
                 },
             }
 

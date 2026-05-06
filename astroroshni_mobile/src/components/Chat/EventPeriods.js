@@ -33,12 +33,20 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const starAnims = useRef([...Array(15)].map(() => new Animated.Value(0))).current;
+  const loopHandlesRef = useRef([]);
 
   useEffect(() => {
     if (visible) {
       loadEventPeriods();
       startAnimations();
+    } else {
+      loopHandlesRef.current.forEach((loop) => loop?.stop?.());
+      loopHandlesRef.current = [];
     }
+    return () => {
+      loopHandlesRef.current.forEach((loop) => loop?.stop?.());
+      loopHandlesRef.current = [];
+    };
   }, [visible, selectedYear]);
 
   // Separate effect for debugging state changes
@@ -46,6 +54,8 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   }, [loading, error, periods.length, selectedYear]);
 
   const startAnimations = () => {
+    loopHandlesRef.current.forEach((loop) => loop?.stop?.());
+    loopHandlesRef.current = [];
     fadeAnim.setValue(0);
     slideAnim.setValue(50);
     
@@ -63,15 +73,17 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
       }),
     ]).start();
 
-    Animated.loop(
+    const rotateLoop = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
         duration: 20000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotateLoop.start();
+    loopHandlesRef.current.push(rotateLoop);
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.1,
@@ -84,10 +96,12 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
+    loopHandlesRef.current.push(pulseLoop);
 
     starAnims.forEach((anim, index) => {
-      Animated.loop(
+      const starLoop = Animated.loop(
         Animated.sequence([
           Animated.delay(index * 150),
           Animated.timing(anim, {
@@ -101,7 +115,9 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      starLoop.start();
+      loopHandlesRef.current.push(starLoop);
     });
   };
 

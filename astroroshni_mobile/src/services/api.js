@@ -18,6 +18,9 @@ const api = axios.create({
   }
 });
 
+// Auth calls should fail fast; long timeouts are only needed for analysis/chat jobs.
+const AUTH_API_TIMEOUT_MS = 20000;
+
 // Add auth token to requests.
 // Login/register do not need a Bearer token; every other protected route does.
 // On React Native iOS, Axios 1.x sometimes drops the header unless it is set in several
@@ -195,14 +198,14 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (credentials) => api.post(getEndpoint('/login'), credentials),
-  register: (userData) => api.post(getEndpoint('/register'), userData),
-  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData),
-  logout: () => api.post(getEndpoint('/logout')),
-  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data),
-  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data),
-  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data),
-  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data),
+  login: (credentials) => api.post(getEndpoint('/login'), credentials, { timeout: AUTH_API_TIMEOUT_MS }),
+  register: (userData) => api.post(getEndpoint('/register'), userData, { timeout: AUTH_API_TIMEOUT_MS }),
+  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, { timeout: AUTH_API_TIMEOUT_MS }),
+  logout: () => api.post(getEndpoint('/logout'), {}, { timeout: AUTH_API_TIMEOUT_MS }),
+  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data, { timeout: AUTH_API_TIMEOUT_MS }),
+  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS }),
+  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS }),
+  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data, { timeout: AUTH_API_TIMEOUT_MS }),
   updateSelfBirthChart: (birthData, clearExisting = true, chartId = null) => {
     let params = clearExisting ? '?clear_existing=true' : '?clear_existing=false';
     if (chartId) params += `&chart_id=${chartId}`;

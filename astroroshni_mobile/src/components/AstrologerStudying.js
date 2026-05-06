@@ -12,27 +12,35 @@ const AstrologerStudying = () => {
   const glow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const rotationLoop = Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
         duration: 20000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotationLoop.start();
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 2000, useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 0, duration: 2000, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glow, { toValue: 1, duration: 3000, useNativeDriver: true }),
         Animated.timing(glow, { toValue: 0, duration: 3000, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    glowLoop.start();
+    return () => {
+      rotationLoop.stop();
+      pulseLoop.stop();
+      glowLoop.stop();
+    };
   }, []);
 
   const rotate = rotation.interpolate({

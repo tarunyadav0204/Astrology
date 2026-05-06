@@ -13,25 +13,27 @@ const CrystalBallLoader = ({ size = 60 }) => {
   const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const rotation1Loop = Animated.loop(
       Animated.timing(rotation1, {
         toValue: 1,
         duration: 3000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotation1Loop.start();
 
-    Animated.loop(
+    const rotation2Loop = Animated.loop(
       Animated.timing(rotation2, {
         toValue: 1,
         duration: 4000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotation2Loop.start();
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1.15,
@@ -46,16 +48,25 @@ const CrystalBallLoader = ({ size = 60 }) => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
-    Animated.loop(
+    const shimmerLoop = Animated.loop(
       Animated.timing(shimmer, {
         toValue: 1,
         duration: 2000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    shimmerLoop.start();
+
+    return () => {
+      rotation1Loop.stop();
+      rotation2Loop.stop();
+      pulseLoop.stop();
+      shimmerLoop.stop();
+    };
   }, []);
 
   const rotate1 = rotation1.interpolate({

@@ -76,7 +76,7 @@ export default function ChatViewScreen({ route, navigation }) {
       }),
     ]).start();
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.1,
@@ -89,10 +89,11 @@ export default function ChatViewScreen({ route, navigation }) {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
-    starAnims.forEach((anim, index) => {
-      Animated.loop(
+    const starLoops = starAnims.map((anim, index) => {
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.delay(index * 150),
           Animated.timing(anim, {
@@ -106,8 +107,14 @@ export default function ChatViewScreen({ route, navigation }) {
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      loop.start();
+      return loop;
     });
+    return () => {
+      pulseLoop.stop();
+      starLoops.forEach((loop) => loop?.stop?.());
+    };
   }, []);
 
   const getRelativeTime = (date) => {

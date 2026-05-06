@@ -48,7 +48,13 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
                 chartContainerRef.current?.measureLayout(
                     scrollViewRef.current,
                     (x, y, width, height) => {
-                        scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 100), animated: true });
+                        const node = scrollViewRef.current;
+                        const targetY = Math.max(0, y - 100);
+                        if (node?.scrollToOffset) {
+                            node.scrollToOffset({ offset: targetY, animated: true });
+                        } else {
+                            node?.scrollTo?.({ y: targetY, animated: true });
+                        }
                         hasScrolled.current = true;
                     },
                     () => {}
@@ -58,8 +64,10 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
     }, [hasChartInsights]);
 
     useEffect(() => {
+        const loops = [];
+        let interval;
         if (hasChartInsights) {
-            Animated.loop(
+            const glowLoop = Animated.loop(
                 Animated.sequence([
                     Animated.timing(glowAnim, {
                         toValue: 1,
@@ -74,11 +82,13 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
                         useNativeDriver: true,
                     }),
                 ])
-            ).start();
+            );
+            glowLoop.start();
+            loops.push(glowLoop);
             
             // Rotate insights slowly; keep a stable min height so the scroll view content
             // size does not jump (iOS ScrollView would "bounce" as the user reads).
-            const interval = setInterval(() => {
+            interval = setInterval(() => {
                 Animated.timing(fadeAnim, {
                     toValue: 0,
                     duration: 500,
@@ -92,10 +102,8 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
                     }).start();
                 });
             }, 15000);
-            
-            return () => clearInterval(interval);
         } else {
-            Animated.loop(
+            const pulseLoop = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, {
                         toValue: 1.1,
@@ -110,17 +118,25 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
                         useNativeDriver: true,
                     }),
                 ])
-            ).start();
+            );
+            pulseLoop.start();
+            loops.push(pulseLoop);
             
-            Animated.loop(
+            const shimmerLoop = Animated.loop(
                 Animated.timing(shimmerAnim, {
                     toValue: 1,
                     duration: 2000,
                     easing: Easing.linear,
                     useNativeDriver: true,
                 })
-            ).start();
+            );
+            shimmerLoop.start();
+            loops.push(shimmerLoop);
         }
+        return () => {
+            if (interval) clearInterval(interval);
+            loops.forEach((loop) => loop?.stop?.());
+        };
     }, [hasChartInsights, chartInsights]);
 
     const isDarkMode = theme === 'dark';

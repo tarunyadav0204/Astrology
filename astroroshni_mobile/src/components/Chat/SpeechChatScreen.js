@@ -480,10 +480,10 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const askInstant = async (question) => {
-    const activeSessionId = await ensureSession();
+    let activeSessionId = await ensureSession();
     if (!activeSessionId) throw new Error(t('speechChat.sessionError', 'Could not start a speech chat session.'));
-    const requestBody = {
-      session_id: activeSessionId,
+    const buildAskBody = (sid) => ({
+      session_id: sid,
       question,
       query_context: buildQueryContext(),
       language: language || 'english',
@@ -494,8 +494,26 @@ export default function SpeechChatScreen({ navigation, route }) {
       native_name: birthData?.name,
       birth_details: toChatBirthDetails(birthData),
       client_request_id: `speech_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    };
-    const askResponse = await chatAPI.askV2(requestBody);
+    });
+    let askResponse;
+    try {
+      askResponse = await chatAPI.askV2(buildAskBody(activeSessionId));
+    } catch (err) {
+      const status = err?.response?.status;
+      const detailRaw = err?.response?.data?.detail;
+      const detail = typeof detailRaw === 'string' ? detailRaw : JSON.stringify(detailRaw || '');
+      if (status === 409 && /session_turn_limit/i.test(detail) && birthData?.id) {
+        setSessionId(null);
+        const created = await chatAPI.createV2Session(birthData.id);
+        const nextSid = created?.data?.session_id;
+        if (!nextSid) throw err;
+        setSessionId(nextSid);
+        activeSessionId = nextSid;
+        askResponse = await chatAPI.askV2(buildAskBody(activeSessionId));
+      } else {
+        throw err;
+      }
+    }
     const askData = askResponse?.data || {};
     if (askData.status === 'completed') {
       await handleCompletedAnswer(question, askData);

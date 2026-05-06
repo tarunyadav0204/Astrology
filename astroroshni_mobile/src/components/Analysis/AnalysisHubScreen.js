@@ -51,7 +51,7 @@ export default function AnalysisHubScreen({ navigation }) {
       }),
     ]).start();
 
-    Animated.loop(
+    const logoGlowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(logoGlow, {
           toValue: 1,
@@ -64,10 +64,14 @@ export default function AnalysisHubScreen({ navigation }) {
           useNativeDriver: false,
         }),
       ])
-    ).start();
+    );
+    logoGlowLoop.start();
     
     fetchPricing();
     loadBirthData();
+    return () => {
+      logoGlowLoop.stop();
+    };
   }, []);
   
   const loadBirthData = async () => {

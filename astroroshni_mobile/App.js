@@ -70,6 +70,7 @@ import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
+const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -107,8 +108,16 @@ export default function App() {
   const SPLASH_MIN_MS = 3000;
 
   const checkForceUpdate = async () => {
+    let timeoutId = null;
+    let controller = null;
     try {
-      const res = await fetch(`${API_BASE_URL}${getEndpoint('/app/config')}`);
+      controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      if (controller) {
+        timeoutId = setTimeout(() => controller.abort(), APP_CONFIG_FETCH_TIMEOUT_MS);
+      }
+      const res = await fetch(`${API_BASE_URL}${getEndpoint('/app/config')}`, {
+        signal: controller?.signal,
+      });
       if (!res.ok) return;
       const data = await res.json();
 
@@ -147,6 +156,10 @@ export default function App() {
       // If config fetch fails, do not block app usage.
       if (__DEV__) {
         console.warn('[App] Failed to fetch app config for version gate:', e?.message || e);
+      }
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     }
   };

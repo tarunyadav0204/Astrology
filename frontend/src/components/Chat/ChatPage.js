@@ -1371,8 +1371,9 @@ const ChatPage = () => {
             return;
         }
 
+        let askSessionId = currentSessionId;
         const requestData = {
-            session_id: currentSessionId,
+            session_id: askSessionId,
             question: questionForApi,
             query_context: buildQueryContext(),
             language: 'english',
@@ -1422,7 +1423,7 @@ const ChatPage = () => {
         }
 
         try {
-            const response = await fetch('/api/chat-v2/ask', {
+            let response = await fetch('/api/chat-v2/ask', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -1432,8 +1433,35 @@ const ChatPage = () => {
             });
 
             if (!response.ok) {
-                const t = await response.text().catch(() => '');
-                throw new Error(`chat-v2/ask failed: HTTP ${response.status} ${t}`);
+                let t = await response.text().catch(() => '');
+                const turnLimit =
+                    response.status === 409 &&
+                    /session_turn_limit/i.test(t) &&
+                    !isMundaneMode;
+                if (turnLimit) {
+                    const newSid = await createChatV2Session();
+                    if (newSid) {
+                        setChatV2SessionId(newSid);
+                        askSessionId = newSid;
+                        const retryBody = { ...requestData, session_id: newSid };
+                        response = await fetch('/api/chat-v2/ask', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(retryBody),
+                        });
+                        if (!response.ok) {
+                            t = await response.text().catch(() => '');
+                            throw new Error(`chat-v2/ask failed: HTTP ${response.status} ${t}`);
+                        }
+                    } else {
+                        throw new Error(`chat-v2/ask failed: HTTP ${response.status} ${t}`);
+                    }
+                } else {
+                    throw new Error(`chat-v2/ask failed: HTTP ${response.status} ${t}`);
+                }
             }
 
             const result = await response.json();

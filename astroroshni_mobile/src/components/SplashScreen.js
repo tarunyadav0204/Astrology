@@ -10,7 +10,7 @@ const SplashScreen = () => {
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
@@ -23,7 +23,8 @@ const SplashScreen = () => {
           useNativeDriver: false,
         }),
       ])
-    ).start();
+    );
+    glowLoop.start();
 
     Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -38,6 +39,9 @@ const SplashScreen = () => {
             useNativeDriver: true,
         }),
     ]).start();
+    return () => {
+      glowLoop.stop();
+    };
   }, []);
 
   return (

@@ -10,16 +10,17 @@ const CosmicLoader = ({ size = 60 }) => {
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const rotationLoop = Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
         duration: 3000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotationLoop.start();
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1.2,
@@ -34,7 +35,13 @@ const CosmicLoader = ({ size = 60 }) => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
+
+    return () => {
+      rotationLoop.stop();
+      pulseLoop.stop();
+    };
   }, []);
 
   const rotate = rotation.interpolate({

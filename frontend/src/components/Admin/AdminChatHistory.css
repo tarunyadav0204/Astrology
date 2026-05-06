@@ -134,6 +134,190 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.admin-chat-user-group-header {
+  padding: 10px 16px 8px;
+  background: linear-gradient(180deg, #e9ecef 0%, #f1f3f5 100%);
+  border-bottom: 1px solid #dee2e6;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.admin-chat-user-group-name {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: #212529;
+}
+
+.admin-chat-user-group-phone {
+  font-weight: 500;
+  color: #495057;
+}
+
+.admin-chat-user-group-hint {
+  font-size: 0.68rem;
+  color: #868e96;
+  margin-top: 2px;
+  font-family: ui-monospace, monospace;
+}
+
+.session-card.active .admin-chat-user-group-hint {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.session-card.active .admin-chat-user-group-name {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.session-card.active .admin-chat-user-group-phone {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.admin-chat-message-row {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.admin-chat-message-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-chat-sender-pill {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  background: #fff;
+  color: #495057;
+}
+
+.admin-chat-sender-pill--user {
+  border-color: #74c0fc;
+  background: #e7f5ff;
+  color: #1864ab;
+}
+
+.admin-chat-sender-pill--assistant {
+  border-color: #ffc9c9;
+  background: #fff5f5;
+  color: #c92a2a;
+}
+
+.admin-chat-message-time {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #868e96;
+}
+
+.session-card.active .admin-chat-message-time {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.session-card.active .admin-chat-sender-pill {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.session-card.active .admin-chat-sender-pill--user {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.session-card.active .admin-chat-sender-pill--assistant {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.admin-chat-session-id {
+  font-size: 0.68rem;
+  color: #868e96;
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+.admin-chat-session-id code {
+  font-size: 0.65rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.session-card.active .admin-chat-session-id {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.session-card.active .admin-chat-session-id code {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.sessions-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.sessions-page-btn {
+  border: 1px solid #ced4da;
+  background: #fff;
+  color: #495057;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sessions-page-btn:hover:not(:disabled) {
+  border-color: #e91e63;
+  color: #c2185b;
+}
+
+.sessions-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sessions-page-info {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #495057;
+  text-align: center;
+  flex: 1;
+  min-width: 120px;
+}
+
+.sessions-page-range {
+  font-weight: 500;
+  color: #868e96;
+}
+
+.session-messages-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #f1f3f5;
+  border-bottom: 1px solid #f1f3f5;
+  background: #fafbfc;
+}
+
 .session-card {
   padding: 14px 16px;
   border-bottom: 1px solid #e9ecef;
@@ -204,6 +388,30 @@
 
 .session-card.active .session-date {
   color: rgba(255, 255, 255, 0.95);
+}
+
+.session-main-question-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+.session-card.active .session-main-question-count {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.session-preview-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #868e96;
+  margin-bottom: 2px;
+}
+
+.session-card.active .session-preview-label {
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .session-preview {
