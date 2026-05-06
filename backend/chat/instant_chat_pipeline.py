@@ -210,7 +210,7 @@ EVENT_CATEGORY_KARAKAS: Dict[str, frozenset] = {
     "general": frozenset({"Moon", "Sun", "Jupiter"}),
 }
 
-_INSTANT_EVENT_HORIZON_DAYS = int(365 * 5)
+_INSTANT_EVENT_HORIZON_DAYS = int(365 * 3)
 
 _PLANET_ASPECT_OFFSETS = {
     "Sun": [7],
@@ -1024,7 +1024,7 @@ def _build_forward_event_dasha_scan(
     *,
     limit: int = 12,
 ) -> Dict[str, Any]:
-    """Ranked MD–AD segments over the next ~5 years relevant to the event category."""
+    """Ranked MD–AD segments over the next ~3 years relevant to the event category."""
     cat = str(category or "general").lower()
     karakas = EVENT_CATEGORY_KARAKAS.get(cat, frozenset())
     end_local = now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS)
@@ -1070,6 +1070,44 @@ def _build_forward_event_dasha_scan(
         "focus_houses": list(focus_houses),
         "periods": periods,
     }
+
+
+def _horizon_dasha_segments_for_event(
+    *,
+    birth_data: Dict[str, Any],
+    chart_data: Dict[str, Any],
+    house_lordships: Dict[str, List[int]],
+    now_local: datetime,
+    focus_houses: List[int],
+    transit_calc: RealTransitCalculator,
+    ascendant_longitude: float,
+    category: str,
+    limit: int = 12,
+) -> Dict[str, Any]:
+    """Ranked MD/AD/PD phase segments across the next bounded event horizon."""
+    horizon_window = {
+        "kind": "horizon",
+        "start": now_local.strftime("%Y-%m-%d"),
+        "end": (now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS)).strftime("%Y-%m-%d"),
+        "span_days": _INSTANT_EVENT_HORIZON_DAYS,
+        "label": "next 3 years",
+        "use_pd": True,
+        "use_sk_pr": False,
+    }
+    segs = _window_dasha_segments_for_period(
+        birth_data=birth_data,
+        chart_data=chart_data,
+        house_lordships=house_lordships,
+        period_window=horizon_window,
+        focus_houses=focus_houses,
+        transit_calc=transit_calc,
+        ascendant_longitude=ascendant_longitude,
+        category=category,
+        limit=limit,
+    )
+    if isinstance(segs, dict):
+        segs["label"] = "next 3 years"
+    return segs
 
 
 def _window_dasha_segments_for_period(
@@ -2233,9 +2271,9 @@ Examples:
 - younger brother / elder sister -> the matching sibling target
 - maternal uncle / uncle -> the closest matching uncle target
 
-Also decide if instant chat should first ask for a specific year:
-- Set `needs_year_clarification=true` only when the user is asking open-ended lifetime timing for an event (for example "when will I get married", "when will I get a job") without a concrete target year.
-- Set `needs_year_clarification=false` when a specific year/window is already given, or when the question is not lifetime event timing.
+Instant chat now handles open-ended event timing by scanning a bounded forward horizon itself:
+- Set `needs_year_clarification=false` for open-ended event timing like "when will I get married" or "when will I get a job"; do not ask for a specific year first.
+- Set `needs_year_clarification=false` when a specific year/window is already given, or when the question is not event timing.
 
 Return JSON only:
 {{"answer_mode":"one_of_the_allowed_modes","confidence":"high|medium|low","reason":"very short reason","target_subject_key":"allowed_target_or_self","needs_year_clarification":true_or_false}}
@@ -2286,7 +2324,7 @@ async def _infer_answer_mode_with_llm(
                 "confidence": str(data.get("confidence") or "medium"),
                 "source": "llm",
             }
-        needs_year_clarification = bool(data.get("needs_year_clarification") is True)
+        needs_year_clarification = False
         if mode in ANSWER_MODES:
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
@@ -2315,9 +2353,7 @@ async def _infer_answer_mode_with_llm(
                     }
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
-            needs_year_clarification = bool(
-                re.search(r'"needs_year_clarification"\s*:\s*true', raw, re.IGNORECASE)
-            )
+            needs_year_clarification = False
             return {
                 "answer_mode": mode,
                 "target_subject": target_subject,
@@ -2667,6 +2703,7 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
                 "primary_evidence": [
                     "timing_policy",
                     "forward_event_dasha_scan",
+                    "horizon_dasha_segments",
                     "horizon_transit_anchors",
                     "window_dasha_segments",
                     "active_dashas_formatted",
@@ -2682,8 +2719,9 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
                     "ignoring timing_policy restrictions for minors",
                     "inventing specific years or wedding dates not supported by forward_event_dasha_scan or current evidence",
                     "answering only from the current MD/AD when ranked horizon periods show a stronger later window",
+                    "flattening the next 3 years into one static dasha pair when horizon_dasha_segments show AD or PD changes",
                 ],
-                "answer_skeleton": "Apply timing_policy (age-appropriate) -> Verdict using current activation plus ranked MD–AD windows from forward_event_dasha_scan -> Jupiter/Saturn horizon anchors if useful -> Support vs obstruction vs uncertainty -> Practical takeaway",
+                "answer_skeleton": "Apply timing_policy (age-appropriate) -> Verdict using the strongest ranked windows in the next 3 years -> Phase shifts from horizon_dasha_segments (AD/PD changes) -> Support vs obstruction vs uncertainty -> Practical takeaway",
             }
         )
     elif answer_mode == "potential_capacity":
@@ -2778,6 +2816,7 @@ def _normalize_instant_evidence(
     active_area_rows = _rank_house_activation_rows(hi_for_area_ranking, limit=4)
     stable_transits = _stable_transit_context(current_transits_formatted, period_window)
     window_dasha_segments = instant_parashari.get("window_dasha_segments") or {}
+    horizon_dasha_segments = instant_parashari.get("horizon_dasha_segments") or {}
     month_tone = _build_month_tone_signals(
         current_transits_formatted,
         current_dashas_context,
@@ -2825,6 +2864,7 @@ def _normalize_instant_evidence(
     if str((period_window or {}).get("kind") or "") == "window":
         contradiction_flags.append("Do not narrate the whole month from a one-day Sun or Moon snapshot; use MD/AD/PD first and treat only slow-planet transits as month-wide anchors.")
     horizon_lines: List[str] = []
+    horizon_segment_lines: List[str] = []
     if answer_mode == "event_prediction":
         fd_scan = instant_parashari.get("forward_event_dasha_scan") or {}
         strong_lines: List[str] = []
@@ -2839,6 +2879,12 @@ def _normalize_instant_evidence(
             else:
                 strong_lines.append(line)
         horizon_lines = strong_lines + weak_lines
+        for seg in (horizon_dasha_segments.get("segments") or [])[:6]:
+            horizon_segment_lines.append(
+                f"horizon phase {seg.get('start')}–{seg.get('end')}: "
+                f"{seg.get('mahadasha')}-{seg.get('antardasha')}-{seg.get('pratyantardasha')} "
+                f"(score {seg.get('relevance_score')}; houses {seg.get('activated_focus_houses')}; {seg.get('why')})"
+            )
     primary_drivers = top_supports
     if answer_mode == "timing_window":
         seg_lines: List[str] = []
@@ -2849,8 +2895,8 @@ def _normalize_instant_evidence(
                 f"(score {seg.get('relevance_score')}; houses {seg.get('activated_focus_houses')}; {seg.get('why')})"
             )
         primary_drivers = seg_lines or window_area_lines or top_supports
-    elif answer_mode == "event_prediction" and horizon_lines:
-        primary_drivers = list(top_supports) + horizon_lines[:8]
+    elif answer_mode == "event_prediction" and (horizon_lines or horizon_segment_lines):
+        primary_drivers = list(top_supports) + horizon_lines[:6] + horizon_segment_lines[:4]
     normalized = {
         "answer_mode_contract": contract,
         "primary_drivers": primary_drivers,
@@ -2896,6 +2942,7 @@ def _normalize_instant_evidence(
     if answer_mode == "event_prediction":
         normalized["timing_policy"] = instant_parashari.get("timing_policy") or {}
         normalized["forward_event_dasha_scan"] = instant_parashari.get("forward_event_dasha_scan") or {}
+        normalized["horizon_dasha_segments"] = horizon_dasha_segments
         normalized["horizon_transit_anchors"] = instant_parashari.get("horizon_transit_anchors") or {}
     if answer_mode in {"event_prediction", "timing_window"}:
         normalized["window_dasha_segments"] = window_dasha_segments
@@ -3091,17 +3138,21 @@ def _instant_parashari_instruction_block(
         notes_list = [str(x) for x in (tp.get("notes") or []) if str(x).strip()]
         notes_block = " ".join(notes_list) if notes_list else ""
         fd = (normalized_evidence or {}).get("forward_event_dasha_scan") or {}
+        horizon_segments = (normalized_evidence or {}).get("horizon_dasha_segments") or {}
         n_periods = len(fd.get("periods") or [])
+        n_horizon_segments = len(horizon_segments.get("segments") or [])
         horizon_end = str(fd.get("horizon_end") or "")
         return "\n".join(
             [
                 f"This answer uses universal answer mode `{answer_mode}`.",
                 "CRITICAL: Follow the method instructions below exactly.",
                 "CRITICAL: Act like an investigator — support, obstruction, and uncertainty before the verdict.",
-                "CRITICAL: Use the full ~5-year Vimshottari horizon in `instant_parashari.forward_event_dasha_scan` together with current activation. Do not answer as if only 'right now' exists unless the horizon list is empty.",
+                "CRITICAL: Use the ranked next ~3-year Vimshottari horizon in `instant_parashari.forward_event_dasha_scan` together with current activation. Do not answer as if only 'right now' exists unless the horizon list is empty.",
                 "CRITICAL: Obey `instant_parashari.timing_policy` as hard rules (especially for children/teens). If restrictions forbid a near-term marriage or similar claim, comply fully.",
-                "CRITICAL: For asked windows (like a year), use `instant_parashari.window_dasha_segments` phase-by-phase. Do not collapse the full window into one single dasha pair.",
+                "CRITICAL: For asked windows (like a year), use `instant_parashari.window_dasha_segments` phase-by-phase. For open-ended lifetime-style event timing, use `instant_parashari.horizon_dasha_segments` phase-by-phase across the next 3 years. Do not collapse the full horizon into one single dasha pair.",
                 "CRITICAL: Score confidence higher when active dasha lords are transiting on or aspecting their natal houses (already encoded in segment scoring and reasons).",
+                "CRITICAL: Your response will be marked failed if you mention only the current MD/AD when `forward_event_dasha_scan` or `horizon_dasha_segments` show stronger later AD/PD windows inside the next 3 years.",
+                "CRITICAL: When AD or PD changes across the horizon materially change the event support, mention that shift explicitly instead of smoothing all years into one generic trend.",
                 f"Answer skeleton: {skeleton}.",
                 f"Primary evidence priority: {primary}.",
                 f"Secondary evidence only after primary evidence: {secondary}.",
@@ -3109,11 +3160,12 @@ def _instant_parashari_instruction_block(
                 f"Timing policy: life_stage={tp.get('life_stage', 'unknown')}, age_years={tp.get('age_years', 'unknown')}, event_category={tp.get('event_category', '')}.",
                 f"Age-based restrictions: {restr_block}",
                 notes_block,
-                f"Horizon scan: {n_periods} ranked MD–AD segments through ~{horizon_end} (see `instant_parashari.forward_event_dasha_scan.periods`). Prefer the strongest-ranked windows when discussing when the event is more likely to materialize.",
+                f"Horizon scan: {n_periods} ranked MD–AD windows through ~{horizon_end} plus {n_horizon_segments} ranked MD/AD/PD phase segments in the next 3 years. Prefer the strongest-ranked windows when discussing when the event is more likely to materialize.",
                 "If a horizon row is tagged as `background/weak period`, treat it as lower-priority context and avoid making it the headline timing window unless stronger rows are absent.",
                 "CRITICAL: When you mention the CURRENT active dasha chain, read it only from `normalized_evidence.current_timing.active_dashas` (or `current_dasha_chain`). Do NOT infer current MD/AD/PD from `forward_event_dasha_scan` future windows.",
                 "- `instant_parashari.horizon_transit_anchors`: optional Jupiter/Saturn sign+house at start and end of the horizon; use as a light confirmation layer, not a replacement for dasha.",
                 "- `instant_parashari.window_dasha_segments`: this is the phase timeline for the asked window with MD/AD/PD, activated houses, and reinforcement reasons. Use top segments first.",
+                "- `instant_parashari.horizon_dasha_segments`: this is the ranked next-3-year phase timeline with MD/AD/PD and reinforcement reasons. Use it for open-ended event timing to show where the support strengthens or weakens.",
                 "- `normalized_evidence.primary_drivers`: includes compact horizon lines — cite them when you name future windows.",
                 "- `activation_mechanisms` and `active_dashas_formatted`: current-period mechanisms; combine with horizon windows (near vs later activation).",
                 "- `topic_signals`: topic-specific Parashari summary for the event category.",
@@ -3436,6 +3488,16 @@ def _build_instant_context(
             ascendant_longitude,
             now_local,
             now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS),
+        )
+        instant_parashari["horizon_dasha_segments"] = _horizon_dasha_segments_for_event(
+            birth_data=birth_data,
+            chart_data=chart_data,
+            house_lordships=house_lordships,
+            now_local=now_local,
+            focus_houses=list(focus["houses"]),
+            transit_calc=transit_calc,
+            ascendant_longitude=ascendant_longitude,
+            category=category,
         )
     if str((period_window or {}).get("kind") or "") == "window":
         instant_parashari["window_dasha_segments"] = _window_dasha_segments_for_period(

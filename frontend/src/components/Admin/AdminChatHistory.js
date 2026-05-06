@@ -48,7 +48,17 @@ const AdminChatHistory = () => {
         const response = await fetch(`/api/admin/chat/users?${params.toString()}`, {
           headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
         });
-        if (!response.ok || cancelled) return;
+        if (!response.ok || cancelled) {
+          if (!cancelled) {
+            const errText = await response.text().catch(() => '');
+            console.error('Error fetching chat users:', response.status, errText);
+            setUserRows([]);
+            setListTotal(0);
+            setListTotalPages(0);
+            setListHasMore(false);
+          }
+          return;
+        }
         const data = await response.json();
         if (cancelled) return;
         setUserRows(Array.isArray(data.users) ? data.users : []);
@@ -305,6 +315,32 @@ const AdminChatHistory = () => {
   }, [selectedSession]);
 
   const msgCount = selectedSession?.pagination?.total ?? selectedSession?.messages?.length ?? 0;
+  const displayedMessages = useMemo(() => {
+    const base = Array.isArray(selectedSession?.messages) ? selectedSession.messages : [];
+    if (!base.length) return base;
+    // For merged user-thread view, show newer dates first but keep natural in-day flow.
+    if (selectedSession?.view_mode === 'user_thread') {
+      const groups = new Map();
+      base.forEach((m) => {
+        const d = parseUtcTimestamp(m?.timestamp);
+        const key = d
+          ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          : 'unknown';
+        const arr = groups.get(key) || [];
+        arr.push(m);
+        groups.set(key, arr);
+      });
+      const sortedKeys = Array.from(groups.keys()).sort((a, b) => String(b).localeCompare(String(a)));
+      return sortedKeys.flatMap((k) =>
+        (groups.get(k) || []).slice().sort((a, b) => {
+          const ta = parseUtcTimestamp(a?.timestamp)?.getTime() || 0;
+          const tb = parseUtcTimestamp(b?.timestamp)?.getTime() || 0;
+          return ta - tb;
+        })
+      );
+    }
+    return base;
+  }, [selectedSession]);
 
   return (
     <>
@@ -524,7 +560,7 @@ const AdminChatHistory = () => {
                 </div>
               )}
               <div className="messages-container">
-                {selectedSession.messages.map((message, index) => {
+                {displayedMessages.map((message, index) => {
                   const parallelStages = Array.isArray(message.parallel_llm_usage?.stages)
                     ? message.parallel_llm_usage.stages
                     : [];
@@ -677,7 +713,7 @@ const AdminChatHistory = () => {
                           INR {message.cost_estimate.cost_inr_estimate.toFixed(4)}
                         </span>
                       )}
-                      <span className="message-time">{formatTimeIST(message.timestamp)}</span>
+                      <span className="message-time">{formatDate(message.timestamp)}</span>
                     </div>
                     {Array.isArray(message.parallel_llm_usage?.stages) &&
                       message.parallel_llm_usage.stages.length > 0 && (

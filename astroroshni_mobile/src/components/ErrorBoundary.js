@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { recordRuntimeIssue } from '../services/runtimeGuard';
 
 class InnerErrorBoundary extends React.Component {
   constructor(props) {
@@ -14,6 +15,12 @@ class InnerErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    recordRuntimeIssue(error, {
+      fatal: false,
+      source: 'react_error_boundary',
+      metadata: info,
+    }).catch(() => {});
+
     if (__DEV__) {
       console.error('[ErrorBoundary] Caught error:', error, info);
     }
@@ -87,4 +94,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

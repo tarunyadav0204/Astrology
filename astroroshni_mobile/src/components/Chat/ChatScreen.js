@@ -113,6 +113,8 @@ const DEFAULT_CHAT_SUGGESTIONS = [
 const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
 /** Dev testing: if true, never redirect to Play/App Store from Rate now. */
 const DEBUG_IN_APP_REVIEW_ONLY = false;
+const CHAT_RENDER_WINDOW_DEFAULT = 80;
+const CHAT_RENDER_WINDOW_STEP = 80;
 
 /** Listing with showAllReviews so users land near ratings when we must fall back to the browser/Play app. */
 const ANDROID_PACKAGE_NAME = 'com.astroroshni.mobile';
@@ -512,6 +514,7 @@ export default function ChatScreen({ navigation, route }) {
   const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
+  const [renderedMessageCount, setRenderedMessageCount] = useState(CHAT_RENDER_WINDOW_DEFAULT);
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
@@ -539,6 +542,21 @@ export default function ChatScreen({ navigation, route }) {
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
   const lastMessageRef = useRef(null);
+  const visibleMessages =
+    messages.length > renderedMessageCount
+      ? messages.slice(-renderedMessageCount)
+      : messages;
+  const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
+
+  useEffect(() => {
+    setRenderedMessageCount(CHAT_RENDER_WINDOW_DEFAULT);
+  }, [currentPersonId, sessionId, showGreeting]);
+
+  useEffect(() => {
+    if (messages.length <= CHAT_RENDER_WINDOW_DEFAULT && renderedMessageCount !== CHAT_RENDER_WINDOW_DEFAULT) {
+      setRenderedMessageCount(CHAT_RENDER_WINDOW_DEFAULT);
+    }
+  }, [messages.length, renderedMessageCount]);
 
   const clearInstantScrollRetries = () => {
     instantScrollRetryRef.current.forEach((id) => clearTimeout(id));
@@ -1258,13 +1276,7 @@ export default function ChatScreen({ navigation, route }) {
             // Set flag to auto-scroll when content renders
             setTimeout(() => {
               if (messages.length > 0) {
-                lastMessageRef.current?.measureLayout(
-                  scrollViewRef.current,
-                  (x, y) => {
-                    scrollMessageListToY(y, false);
-                  },
-                  () => {}
-                );
+                scrollToBottomReliably(false);
               }
             }, 50);
             
@@ -1376,13 +1388,7 @@ export default function ChatScreen({ navigation, route }) {
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
               setTimeout(() => {
                 if (storedMessages.length > 0) {
-                  lastMessageRef.current?.measureLayout(
-                    scrollViewRef.current,
-                    (x, y) => {
-                      scrollMessageListToY(y, false);
-                    },
-                    () => {}
-                  );
+                  scrollToBottomReliably(false);
                 }
               }, 50);
             }
@@ -2042,13 +2048,7 @@ export default function ChatScreen({ navigation, route }) {
       // Set flag to scroll when content renders
       setTimeout(() => {
         if (messages.length > 0) {
-          lastMessageRef.current?.measureLayout(
-            scrollViewRef.current,
-            (x, y) => {
-              scrollMessageListToY(y, false);
-            },
-            () => {}
-          );
+          scrollToBottomReliably(false);
         }
       }, 50);
       
@@ -3712,6 +3712,10 @@ export default function ChatScreen({ navigation, route }) {
     triggerRatingPrompt(messageId, 'answer_scroll_bottom');
   };
 
+  const showOlderMessages = () => {
+    setRenderedMessageCount((prev) => Math.min(messages.length, prev + CHAT_RENDER_WINDOW_STEP));
+  };
+
   const inputScopeNativeTrimmed = birthData?.name?.trim() ?? '';
   const inputScopeNativeShown =
     inputScopeNativeTrimmed.length > 7
@@ -3984,7 +3988,7 @@ export default function ChatScreen({ navigation, route }) {
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
-            data={messages}
+            data={visibleMessages}
             keyExtractor={(item, index) =>
               item?.id != null && String(item.id) !== ''
                 ? `${String(item.id)}-${index}`
@@ -4007,6 +4011,19 @@ export default function ChatScreen({ navigation, route }) {
               : {})}
             ListHeaderComponent={
               <>
+                {hiddenMessageCount > 0 && (
+                  <View style={styles.historyWindowContainer}>
+                    <TouchableOpacity
+                      style={styles.historyWindowButton}
+                      onPress={showOlderMessages}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.historyWindowButtonText}>
+                        Load earlier messages ({hiddenMessageCount} hidden)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 {/* Signs Display – only for native-centric chat, not Global Markets (mundane) */}
                 {birthData && !isMundane && (
                   <View style={styles.signsContainer}>
@@ -4090,7 +4107,7 @@ export default function ChatScreen({ navigation, route }) {
               </>
             }
             renderItem={({ item, index }) => {
-              const isLastMessage = index === messages.length - 1;
+              const isLastMessage = index === visibleMessages.length - 1;
 
               if (item.isTyping) {
                 if (item.waitConversation?.enabled && Array.isArray(item.waitConversation.messages) && item.waitConversation.messages.length > 0) {
@@ -6180,6 +6197,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 12,
     flexGrow: 1,
+  },
+  historyWindowContainer: {
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  historyWindowButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(249, 115, 22, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(249, 115, 22, 0.35)',
+  },
+  historyWindowButtonText: {
+    color: '#ffedd5',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   engagementUpdatesWrap: {
     marginTop: 8,

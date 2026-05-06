@@ -66,6 +66,11 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
+import {
+  clearFatalRuntimeError,
+  installRuntimeGuard,
+  subscribeToFatalRuntimeError,
+} from './src/services/runtimeGuard';
 import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
@@ -77,11 +82,18 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState('Welcome');
   const [initialTheme, setInitialTheme] = useState(null);
   const [forceUpdateInfo, setForceUpdateInfo] = useState(null);
+  const [fatalRuntimeError, setFatalRuntimeError] = useState(null);
+  const [isRecoveringFromCrash, setIsRecoveringFromCrash] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const navigationRef = useRef(null);
 
   useEffect(() => {
+    installRuntimeGuard();
+    const unsubscribe = subscribeToFatalRuntimeError(setFatalRuntimeError);
+
     bootstrap();
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -300,8 +312,81 @@ export default function App() {
     }
   };
 
+  const handleRecoverFromFatalError = async () => {
+    setIsRecoveringFromCrash(true);
+    try {
+      await clearFatalRuntimeError();
+      setFatalRuntimeError(null);
+      setForceUpdateInfo(null);
+      setIsLoading(true);
+      await bootstrap();
+    } finally {
+      setIsRecoveringFromCrash(false);
+    }
+  };
+
   if (isLoading) {
     return <SplashScreen />;
+  }
+
+  if (fatalRuntimeError) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor="#7f1d1d" />
+        <View style={{ flex: 1, backgroundColor: '#1f2937', padding: 24, justifyContent: 'center' }}>
+          <View
+            style={{
+              backgroundColor: '#111827',
+              borderRadius: 20,
+              padding: 24,
+              borderWidth: 1,
+              borderColor: '#374151',
+            }}
+          >
+            <Text style={{ color: '#f9fafb', fontSize: 24, fontWeight: '700', marginBottom: 12 }}>
+              App recovered from an unexpected error
+            </Text>
+            <Text style={{ color: '#d1d5db', fontSize: 15, lineHeight: 22, marginBottom: 20 }}>
+              We blocked a JavaScript crash and moved the app to a safe screen. You can try again without fully closing the app.
+            </Text>
+            <Text style={{ color: '#fca5a5', fontSize: 13, marginBottom: 24 }}>
+              {fatalRuntimeError.message || 'Unknown runtime error'}
+            </Text>
+            <TouchableOpacity
+              onPress={handleRecoverFromFatalError}
+              disabled={isRecoveringFromCrash}
+              style={{
+                backgroundColor: '#f97316',
+                borderRadius: 999,
+                paddingVertical: 14,
+                alignItems: 'center',
+                marginBottom: 12,
+                opacity: isRecoveringFromCrash ? 0.7 : 1,
+              }}
+            >
+              {isRecoveringFromCrash ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700' }}>Try again</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                clearFatalRuntimeError().catch(() => {});
+                setFatalRuntimeError(null);
+                setInitialRoute('Welcome');
+              }}
+              style={{
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#d1d5db', fontSize: 15, fontWeight: '600' }}>Go to welcome screen</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaProvider>
+    );
   }
 
   if (forceUpdateInfo) {

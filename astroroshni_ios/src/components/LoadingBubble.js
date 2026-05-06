@@ -22,14 +22,8 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
     useEffect(() => {
         if (hasChartInsights && !hasScrolled.current && chartContainerRef.current && scrollViewRef?.current) {
             setTimeout(() => {
-                chartContainerRef.current?.measureLayout(
-                    scrollViewRef.current,
-                    (x, y, width, height) => {
-                        scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 100), animated: true });
-                        hasScrolled.current = true;
-                    },
-                    () => {}
-                );
+                scrollViewRef.current?.scrollToEnd?.({ animated: true });
+                hasScrolled.current = true;
             }, 300);
         }
     }, [hasChartInsights]);

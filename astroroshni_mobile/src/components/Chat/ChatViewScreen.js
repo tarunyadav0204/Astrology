@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -11,55 +11,103 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MessageBubble from './MessageBubble';
-import { COLORS } from '../../utils/constants';
+import { storage } from '../../services/storage';
+import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
+const DAY_SESSION_BATCH_SIZE = 2;
+
+function getDateKey(timestamp) {
+  if (!timestamp) return 'unknown';
+  const d = new Date(timestamp);
+  if (Number.isNaN(d.getTime())) return 'unknown';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function mapSessionMessages(sessionData, dayKey = null) {
+  const messages = (sessionData?.messages || []).map((msg, idx) => ({
+    messageId: msg.message_id ?? msg.messageId,
+    role:
+      msg.sender === 'ai' || msg.sender === 'assistant'
+        ? 'assistant'
+        : msg.sender === 'user'
+          ? 'user'
+          : msg.sender,
+    content: msg.content,
+    timestamp: msg.completed_at || msg.timestamp,
+    id: `${msg.message_id ?? msg.messageId ?? idx}_${msg.completed_at || msg.timestamp}`,
+    native_name: msg.native_name ?? sessionData.native_name ?? null,
+    terms: msg.terms,
+    glossary: msg.glossary,
+    images: msg.images,
+    message_type: msg.message_type,
+    intent_gate: msg.intent_gate,
+    gate_metadata: msg.gate_metadata,
+  }));
+
+  return dayKey ? messages.filter((msg) => getDateKey(msg.timestamp) === dayKey) : messages;
+}
+
+function MessageRow({ message, index, sessionId, onDelete }) {
+  return (
+    <View>
+      <MessageBubble
+        message={message}
+        language="english"
+        onDelete={onDelete}
+        sessionId={sessionId}
+      />
+    </View>
+  );
+}
 
 export default function ChatViewScreen({ route, navigation }) {
   const { theme, colors, getCardElevation } = useTheme();
   const { session } = route.params;
   const [messages, setMessages] = useState(session.messages || []);
+  const [isLoadingInitialMessages, setIsLoadingInitialMessages] = useState(false);
+  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState('');
+  const daySessionIds = Array.from(new Set((session?.session_ids || []).filter(Boolean)));
+  const isDayTranscript = daySessionIds.length > 0;
+  const [loadedSessionCount, setLoadedSessionCount] = useState(
+    isDayTranscript && Array.isArray(session.messages) && session.messages.length > 0
+      ? daySessionIds.length
+      : 0
+  );
   
   const handleDeleteMessage = (messageId) => {
     setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
   };
   
-  // Debug logging
-  useEffect(() => {
-    console.log('📅 TIMESTAMP DEBUG:');
-    console.log('Session created_at:', session.created_at);
-    console.log('Session created_at type:', typeof session.created_at);
-    
-    const firstMsg = messages.find(m => m.sender === 'user');
-    if (firstMsg) {
-      console.log('First user message timestamp:', firstMsg.timestamp);
-      console.log('First user message timestamp type:', typeof firstMsg.timestamp);
-      
-      const date = new Date(firstMsg.timestamp);
-      console.log('Parsed Date object:', date);
-      console.log('Date.toString():', date.toString());
-      console.log('Date.toISOString():', date.toISOString());
-      console.log('Date.toLocaleString():', date.toLocaleString());
-      console.log('Date.toLocaleTimeString():', date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
-      console.log('Device timezone offset (minutes):', new Date().getTimezoneOffset());
-    }
-    
-    console.log('All messages:', JSON.stringify(messages, null, 2));
-  }, []);
-  
-  // Count conversation pairs (question + answer = 1 conversation)
-  const conversationCount = Math.floor(messages.filter(m => m.sender === 'user').length);
+  // One conversation = one final assistant answer (clarification turns are excluded).
+  const isUserMessage = (msg) => (msg?.sender || msg?.role) === 'user';
+  const isAssistantMessage = (msg) => (msg?.sender || msg?.role) === 'assistant';
+  const answerCount = messages.filter(
+    (msg) => isAssistantMessage(msg) && msg?.message_type === 'answer'
+  ).length;
+  const conversationCount = answerCount > 0 ? answerCount : messages.filter(isUserMessage).length;
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const starAnims = useRef([...Array(15)].map(() => new Animated.Value(0))).current;
+  const starPositions = useRef(
+    [...Array(15)].map(() => ({
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+    }))
+  ).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -117,6 +165,127 @@ export default function ChatViewScreen({ route, navigation }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isDayTranscript || messages.length > 0 || loadedSessionCount > 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadInitialBatch = async () => {
+      setIsLoadingInitialMessages(true);
+      setLoadMoreError('');
+      try {
+        const authToken = await storage.getAuthToken();
+        if (!authToken) {
+          navigation.replace('Login');
+          return;
+        }
+
+        const batchSessionIds = daySessionIds.slice(0, DAY_SESSION_BATCH_SIZE);
+        const responses = await Promise.all(
+          batchSessionIds.map((sid) =>
+            fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${sid}`)}`, {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${authToken}` },
+            })
+          )
+        );
+
+        if (cancelled) return;
+
+        if (responses.some((response) => response.status === 401)) {
+          await storage.removeAuthToken();
+          navigation.replace('Login');
+          return;
+        }
+
+        const okResponses = responses.filter((response) => response.ok);
+        const sessions = await Promise.all(okResponses.map((response) => response.json()));
+        const nextMessages = sessions
+          .flatMap((sessionData) => mapSessionMessages(sessionData, session?.date_key))
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        if (cancelled) return;
+
+        setMessages(nextMessages);
+        setLoadedSessionCount(batchSessionIds.length);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadMoreError('Failed to load messages for this day.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingInitialMessages(false);
+        }
+      }
+    };
+
+    loadInitialBatch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [daySessionIds, isDayTranscript, loadedSessionCount, messages.length, navigation, session?.date_key]);
+
+  const hasMoreMessages = isDayTranscript && loadedSessionCount < daySessionIds.length;
+
+  const loadMoreMessages = async () => {
+    if (!hasMoreMessages || isLoadingMoreMessages) return;
+
+    setIsLoadingMoreMessages(true);
+    setLoadMoreError('');
+    try {
+      const authToken = await storage.getAuthToken();
+      if (!authToken) {
+        navigation.replace('Login');
+        return;
+      }
+
+      const nextSessionIds = daySessionIds.slice(
+        loadedSessionCount,
+        loadedSessionCount + DAY_SESSION_BATCH_SIZE
+      );
+      const responses = await Promise.all(
+        nextSessionIds.map((sid) =>
+          fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${sid}`)}`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${authToken}` },
+          })
+        )
+      );
+
+      if (responses.some((response) => response.status === 401)) {
+        await storage.removeAuthToken();
+        navigation.replace('Login');
+        return;
+      }
+
+      const okResponses = responses.filter((response) => response.ok);
+      const sessions = await Promise.all(okResponses.map((response) => response.json()));
+      const nextMessages = sessions.flatMap((sessionData) => mapSessionMessages(sessionData, session?.date_key));
+
+      setMessages((prev) => {
+        const seen = new Set(prev.map((msg) => msg.id || msg.messageId));
+        const merged = [...prev];
+        for (const message of nextMessages) {
+          const key = message.id || message.messageId;
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(message);
+          }
+        }
+        merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        return merged;
+      });
+      setLoadedSessionCount((prev) => prev + nextSessionIds.length);
+    } catch (error) {
+      setLoadMoreError('Failed to load more messages.');
+    } finally {
+      setIsLoadingMoreMessages(false);
+    }
+  };
+
   const getRelativeTime = (date) => {
     const now = new Date();
     const then = new Date(date);
@@ -149,7 +318,7 @@ export default function ChatViewScreen({ route, navigation }) {
   };
 
   const continueConversation = () => {
-    navigation.navigate('Home');
+    navigation.navigate('Home', { startChat: true });
   };
 
   return (
@@ -159,16 +328,14 @@ export default function ChatViewScreen({ route, navigation }) {
         
         {/* Twinkling Stars */}
         {starAnims.map((anim, index) => {
-          const top = Math.random() * 100;
-          const left = Math.random() * 100;
           return (
             <Animated.View
               key={index}
               style={[
                 styles.star,
                 {
-                  top: `${top}%`,
-                  left: `${left}%`,
+                  top: starPositions[index].top,
+                  left: starPositions[index].left,
                   opacity: anim,
                 },
               ]}
@@ -200,7 +367,7 @@ export default function ChatViewScreen({ route, navigation }) {
                   <Text style={[styles.nativeName, { color: colors.text }]}>{session.native_name}</Text>
                 )}
                 <Text style={[styles.headerTitle, { color: colors.text }]}>
-                  {getRelativeTime(session.created_at)}
+                  {session?.date_label || getRelativeTime(session.created_at)}
                 </Text>
                 <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                   {conversationCount} {conversationCount === 1 ? 'conversation' : 'conversations'}
@@ -230,7 +397,7 @@ export default function ChatViewScreen({ route, navigation }) {
                 <Icon name="calendar-outline" size={16} color={colors.textSecondary} />
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {(() => {
-                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const firstMsg = messages.find(isUserMessage);
                     const timestamp = firstMsg?.timestamp || session.created_at;
                     const utcTimestamp = (timestamp && typeof timestamp === 'string')
                       ? (timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z')
@@ -248,7 +415,7 @@ export default function ChatViewScreen({ route, navigation }) {
                 <Icon name="time-outline" size={16} color={colors.textSecondary} />
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {(() => {
-                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const firstMsg = messages.find(isUserMessage);
                     const timestamp = firstMsg?.timestamp || session.created_at;
                     const utcTimestamp = (timestamp && typeof timestamp === 'string')
                       ? (timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z')
@@ -271,59 +438,65 @@ export default function ChatViewScreen({ route, navigation }) {
           </Animated.View>
 
           {/* Messages */}
-          <ScrollView 
+          <FlatList
+            data={messages}
+            renderItem={({ item, index }) => (
+              <MessageRow
+                message={item}
+                index={index}
+                onDelete={handleDeleteMessage}
+                sessionId={session?.session_id}
+              />
+            )}
+            keyExtractor={(item, index) => String(item?.id || item?.messageId || `${item?.timestamp}_${index}`)}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
-          >
-            {Array.isArray(messages) && messages.length > 0 ? (
-              messages.map((message, index) => {
-                const MessageCard = () => {
-                  const msgAnim = useRef(new Animated.Value(0)).current;
-
-                  useEffect(() => {
-                    Animated.spring(msgAnim, {
-                      toValue: 1,
-                      delay: index * 100,
-                      tension: 50,
-                      friction: 7,
-                      useNativeDriver: true,
-                    }).start();
-                  }, []);
-
-                  return (
-                    <Animated.View
-                      style={{
-                        opacity: msgAnim,
-                        transform: [
-                          {
-                            translateY: msgAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [30, 0],
-                            }),
-                          },
-                        ],
-                      }}
-                    >
-                      <MessageBubble 
-                        message={message} 
-                        language="english"
-                        onDelete={handleDeleteMessage}
-                        sessionId={session?.session_id}
-                      />
-                    </Animated.View>
-                  );
-                };
-
-                return <MessageCard key={`${message.timestamp}_${index}`} />;
-              })
-            ) : (
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS === 'android'}
+            ListEmptyComponent={
+              isLoadingInitialMessages ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator size="large" color="#ff6b35" />
+                  <Text style={styles.loadingText}>Loading messages...</Text>
+                </View>
+              ) : (
               <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
                 <Text style={styles.emptyIcon}>💬</Text>
                 <Text style={styles.emptyText}>No messages to display</Text>
               </Animated.View>
-            )}
-          </ScrollView>
+              )
+            }
+            ListFooterComponent={
+              <>
+                {loadMoreError ? (
+                  <View style={styles.loadMoreContainer}>
+                    <Text style={styles.loadMoreError}>{loadMoreError}</Text>
+                  </View>
+                ) : null}
+                {hasMoreMessages ? (
+                  <View style={styles.loadMoreContainer}>
+                    <TouchableOpacity
+                      style={styles.loadMoreButton}
+                      onPress={loadMoreMessages}
+                      disabled={isLoadingMoreMessages}
+                    >
+                      {isLoadingMoreMessages ? (
+                        <ActivityIndicator color="#ffffff" />
+                      ) : (
+                        <Text style={styles.loadMoreText}>Load more messages</Text>
+                      )}
+                    </TouchableOpacity>
+                    <Text style={styles.loadMoreMeta}>
+                      Loaded {loadedSessionCount} of {daySessionIds.length} chat sessions for this day
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            }
+          />
 
           {/* Floating Action Buttons */}
           <Animated.View style={[styles.floatingButtons, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
@@ -486,6 +659,48 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  loadingState: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+  },
+  loadMoreContainer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  loadMoreButton: {
+    minWidth: 190,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: '#ff6b35',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  loadMoreMeta: {
+    marginTop: 10,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  loadMoreError: {
+    marginBottom: 10,
+    fontSize: 13,
+    color: '#fecaca',
     textAlign: 'center',
   },
   floatingButtons: {

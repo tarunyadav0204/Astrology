@@ -8,7 +8,6 @@ import json
 import logging
 from auth import get_current_user
 from db import get_conn, execute
-from ai.question_heuristics import looks_like_many_questions
 
 logger = logging.getLogger(__name__)
 
@@ -396,15 +395,88 @@ async def get_chat_history(
     limit: int = 20,
     list_mode: str = Query(
         "sessions",
-        description="sessions: one row per chat thread (default). messages: one row per message, newest first.",
+        description="sessions: one row per chat thread (default). messages: one row per message, newest first. dates: one row per date bucket.",
     ),
     current_user=Depends(get_current_user),
 ):
     """Get user's chat history with pagination (sessions or individual messages)."""
     offset = (page - 1) * limit
     mode = (list_mode or "sessions").strip().lower()
-    if mode not in ("sessions", "messages"):
+    if mode not in ("sessions", "messages", "dates"):
         mode = "sessions"
+
+    if mode == "dates":
+        # Date pagination is usually consumed by mobile as 5 dates per page.
+        effective_limit = 5 if limit == 20 else max(1, min(int(limit), 50))
+        offset = (page - 1) * effective_limit
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                    SELECT COUNT(*)
+                    FROM (
+                        SELECT DATE(cm.timestamp) AS day_key
+                        FROM chat_messages cm
+                        INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                        WHERE cs.user_id = %s
+                          AND EXISTS (
+                              SELECT 1 FROM chat_messages mu
+                              WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                          )
+                        GROUP BY DATE(cm.timestamp)
+                    ) t
+                """,
+                (current_user.userid,),
+            )
+            total_count_row = cur.fetchone()
+            total_count = total_count_row[0] if total_count_row else 0
+
+            cur = execute(
+                conn,
+                """
+                    SELECT
+                        DATE(cm.timestamp) AS day_key,
+                        MAX(cm.timestamp) AS last_activity_at,
+                        COUNT(*) AS message_count,
+                        ARRAY_AGG(DISTINCT cm.session_id) AS session_ids
+                    FROM chat_messages cm
+                    INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                    WHERE cs.user_id = %s
+                      AND EXISTS (
+                          SELECT 1 FROM chat_messages mu
+                          WHERE mu.session_id = cs.session_id AND mu.sender = 'user'
+                      )
+                    GROUP BY DATE(cm.timestamp)
+                    ORDER BY day_key DESC
+                    LIMIT %s OFFSET %s
+                """,
+                (current_user.userid, effective_limit, offset),
+            )
+            day_rows = cur.fetchall() or []
+
+            date_items = []
+            for row in day_rows:
+                day_key = str(row[0]) if row and row[0] is not None else None
+                date_items.append(
+                    {
+                        "date_key": day_key,
+                        "date_label": day_key,
+                        "last_activity_at": row[1],
+                        "message_count": int(row[2] or 0),
+                        "session_ids": row[3] or [],
+                    }
+                )
+
+        return {
+            "list_mode": "dates",
+            "dates": date_items,
+            "pagination": {
+                "page": page,
+                "limit": effective_limit,
+                "total": total_count,
+                "has_more": offset + effective_limit < total_count,
+            },
+        }
 
     if mode == "messages":
         with get_conn() as conn:
@@ -613,7 +685,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         cur = execute(
             conn,
             """
-                SELECT message_id, sender, content, timestamp, terms, glossary, images, message_type, gate_metadata, parallel_llm_usage
+                SELECT message_id, sender, content, timestamp, completed_at, terms, glossary, images, message_type, gate_metadata, parallel_llm_usage
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -638,32 +710,33 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             "sender": msg[1],
             "content": msg[2],
             "timestamp": msg[3],
+            "completed_at": msg[4],
             "native_name": native_name,
         }
-        if msg[4]:  # terms
+        if msg[5]:  # terms
             try:
-                message_data["terms"] = json.loads(msg[4])
+                message_data["terms"] = json.loads(msg[5])
             except:
                 message_data["terms"] = []
         else:
             message_data["terms"] = []
-        if msg[5]:  # glossary
+        if msg[6]:  # glossary
             try:
-                message_data["glossary"] = json.loads(msg[5])
+                message_data["glossary"] = json.loads(msg[6])
             except:
                 message_data["glossary"] = []
         else:
             message_data["glossary"] = []
-        if len(msg) > 6 and msg[6]:  # images
+        if len(msg) > 7 and msg[7]:  # images
             try:
-                message_data["images"] = json.loads(msg[6])
+                message_data["images"] = json.loads(msg[7])
             except:
                 message_data["images"] = []
         else:
             message_data["images"] = []
-        mt = msg[7] if len(msg) > 7 else None
-        gm = msg[8] if len(msg) > 8 else None
-        plu = msg[9] if len(msg) > 9 else None
+        mt = msg[8] if len(msg) > 8 else None
+        gm = msg[9] if len(msg) > 9 else None
+        plu = msg[10] if len(msg) > 10 else None
         message_data["message_type"] = mt
         if gm:
             try:
@@ -1083,39 +1156,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 d1_chart=d1_chart,
                 query_context=query_context,
             )
-        # Several unrelated topics in one message → clarify first (overrides READY from router)
-        if (
-            looks_like_many_questions(combined_question)
-            and clarification_count < max_clarifications
-            and not partnership_mode
-            and intent.get("status") == "READY"
-        ):
-            print("📎 MULTI_TOPIC_BUNDLE (/ask): Re-routing via LLM-forced CLARIFY")
-            if instant_chat_active:
-                intent = await intent_router.classify_instant_intent(
-                    combined_question,
-                    history,
-                    clarification_count=clarification_count,
-                    max_clarifications=max_clarifications,
-                    language=language,
-                    force_ready=False,
-                    query_context=query_context,
-                    force_clarify=True,
-                )
-            else:
-                intent = await intent_router.classify_intent(
-                    combined_question,
-                    [],
-                    user_facts,
-                    clarification_count=clarification_count,
-                    language=language,
-                    force_ready=False,
-                    d1_chart=d1_chart,
-                    query_context=query_context,
-                    force_clarify=True,
-                )
-            intent["chart_insights"] = None
-
         chart_insights = intent.get('chart_insights', [])
         print(f"📊 Got {len(chart_insights)} chart insights from intent router")
         
@@ -2038,50 +2078,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
             MAX_CLARIFICATIONS = max_clarifications
             
-            # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap
-            # Do NOT apply when the message bundles several topics (Hindi often uses "." not "?") — user should clarify first.
+            # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap.
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
             if (
                 any(kw in question.lower() for kw in timing_keywords)
                 and intent.get('status') == 'CLARIFY'
-                and not looks_like_many_questions(combined_question)
             ):
                 print(f"🛡️ FAIL-SAFE TRIGGERED: Forcing LIFESPAN_EVENT_TIMING for timing question")
                 intent['status'] = 'READY'
                 intent['mode'] = 'LIFESPAN_EVENT_TIMING'
                 intent['needs_transits'] = True
-
-            # Several unrelated topics in one message → clarify first (overrides READY)
-            if (
-                looks_like_many_questions(combined_question)
-                and clarification_count < MAX_CLARIFICATIONS
-                and not partnership_mode
-                and intent.get("status") == "READY"
-            ):
-                print("📎 MULTI_TOPIC_BUNDLE: Re-routing via LLM-forced CLARIFY")
-                if is_instant_chat:
-                    intent = await intent_router.classify_instant_intent(
-                        combined_question,
-                        history,
-                        clarification_count=clarification_count,
-                        max_clarifications=max_clarifications,
-                        language=language,
-                        force_ready=False,
-                        query_context=query_context,
-                        force_clarify=True,
-                    )
-                else:
-                    intent = await intent_router.classify_intent(
-                        combined_question,
-                        history,
-                        user_facts,
-                        clarification_count=clarification_count,
-                        language=language,
-                        force_ready=False,
-                        query_context=query_context,
-                        force_clarify=True,
-                    )
-                intent["chart_insights"] = None
 
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
             if intent.get('mode') == 'LIFESPAN_EVENT_TIMING' and intent.get('status') == 'READY':

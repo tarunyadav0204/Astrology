@@ -45,20 +45,11 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
     useEffect(() => {
         if (hasChartInsights && !hasScrolled.current && chartContainerRef.current && scrollViewRef?.current) {
             setTimeout(() => {
-                chartContainerRef.current?.measureLayout(
-                    scrollViewRef.current,
-                    (x, y, width, height) => {
-                        const node = scrollViewRef.current;
-                        const targetY = Math.max(0, y - 100);
-                        if (node?.scrollToOffset) {
-                            node.scrollToOffset({ offset: targetY, animated: true });
-                        } else {
-                            node?.scrollTo?.({ y: targetY, animated: true });
-                        }
-                        hasScrolled.current = true;
-                    },
-                    () => {}
-                );
+                const node = scrollViewRef.current;
+                if (node?.scrollToEnd) {
+                    node.scrollToEnd({ animated: true });
+                    hasScrolled.current = true;
+                }
             }, 300);
         }
     }, [hasChartInsights]);

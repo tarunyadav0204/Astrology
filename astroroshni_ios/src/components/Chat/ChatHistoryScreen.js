@@ -66,7 +66,6 @@ export default function ChatHistoryScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [favorites, setFavorites] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -74,7 +73,6 @@ export default function ChatHistoryScreen({ navigation }) {
 
   useEffect(() => {
     loadChatHistory();
-    loadFavorites();
 
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -87,11 +85,14 @@ export default function ChatHistoryScreen({ navigation }) {
     filterHistoryRows();
   }, [searchQuery, historyRows]);
 
-  const loadFavorites = async () => {
-    try {
-      const saved = await storage.getFavorites();
-      setFavorites(saved || []);
-    } catch (error) {}
+  const getDateKey = (timestamp) => {
+    if (!timestamp) return 'unknown';
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return 'unknown';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
 
   const loadChatHistory = async (pageNum = 1, append = false) => {
@@ -101,9 +102,8 @@ export default function ChatHistoryScreen({ navigation }) {
         navigation.replace('Login');
         return;
       }
-      
       const response = await fetch(
-        `${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=20&list_mode=messages`,
+        `${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=5&list_mode=dates`,
         {
           method: 'GET',
           headers: {
@@ -112,43 +112,39 @@ export default function ChatHistoryScreen({ navigation }) {
           },
         }
       );
-
-      if (response.ok) {
-        const data = await response.json();
-        let rows = Array.isArray(data.messages) ? data.messages : [];
-        if (
-          rows.length === 0 &&
-          Array.isArray(data.sessions) &&
-          data.sessions.length > 0
-        ) {
-          rows = data.sessions.map((s) => ({
-            message_id: `legacy-session-${s.session_id}`,
-            session_id: s.session_id,
-            sender: 'user',
-            preview: s.preview || '',
-            timestamp: s.last_activity_at || s.created_at,
-            session_created_at: s.created_at,
-            session_last_activity_at: s.last_activity_at || s.created_at,
-            native_name: s.native_name,
-          }));
-        }
-
-        if (append) {
-          setHistoryRows((prev) => {
-            const seen = new Set(prev.map((r) => `${r.session_id}:${r.message_id}`));
-            const next = rows.filter((r) => !seen.has(`${r.session_id}:${r.message_id}`));
-            return [...prev, ...next];
-          });
-        } else {
-          setHistoryRows(rows);
-          setPage(1);
-        }
-
-        setHasMore(data.pagination?.has_more || false);
-      } else if (response.status === 401) {
+      if (response.status === 401) {
         await storage.removeAuthToken();
         navigation.replace('Login');
+        return;
       }
+      if (!response.ok) return;
+      const data = await response.json();
+      let rows = Array.isArray(data.dates) ? data.dates : [];
+      // Backward compatibility: old backend returns sessions, not date buckets.
+      if (rows.length === 0 && Array.isArray(data.sessions) && data.sessions.length > 0) {
+        rows = data.sessions.map((s) => {
+          const ts = s.last_activity_at || s.created_at;
+          const dk = getDateKey(ts);
+          return {
+            date_key: dk,
+            date_label: dk,
+            last_activity_at: ts,
+            message_count: Number(s.main_question_count || 1),
+            session_ids: s.session_id ? [s.session_id] : [],
+          };
+        });
+      }
+      if (append) {
+        setHistoryRows((prev) => {
+          const seen = new Set(prev.map((r) => r.date_key));
+          const next = rows.filter((r) => !seen.has(r.date_key));
+          return [...prev, ...next];
+        });
+      } else {
+        setHistoryRows(rows);
+        setPage(1);
+      }
+      setHasMore(Boolean(data.pagination?.has_more));
     } catch (error) {
 
     } finally {
@@ -167,13 +163,10 @@ export default function ChatHistoryScreen({ navigation }) {
       setFilteredRows(historyRows);
       return;
     }
-    setFilteredRows(
-      historyRows.filter(
-        (row) =>
-          (row.preview || '').toLowerCase().includes(q) ||
-          (row.native_name || '').toLowerCase().includes(q)
-      )
+    const matchedRows = historyRows.filter((row) =>
+      (row.date_label || row.date_key || '').toLowerCase().includes(q)
     );
+    setFilteredRows(matchedRows);
   };
 
   const onRefresh = () => {
@@ -192,46 +185,62 @@ export default function ChatHistoryScreen({ navigation }) {
     }
   };
 
-  const viewChatSession = async (session) => {
+  const viewChatSession = async (dayItem) => {
     try {
       const authToken = await storage.getAuthToken();
-      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${session.session_id}`)}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      
-      if (response.ok) {
-        const sessionData = await response.json();
-        // Map API response; native_name comes from DB (session + each message)
-        const mappedMessages = (sessionData.messages || []).map(msg => ({
-          messageId: msg.message_id,
-          role: msg.sender,
-          content: msg.content,
-          timestamp: msg.timestamp,
-          id: `${msg.message_id}_${msg.timestamp}`,
-          native_name: msg.native_name ?? sessionData.native_name ?? session.native_name ?? null,
-          terms: msg.terms,
-          glossary: msg.glossary,
-          images: msg.images,
-        }));
-        
-        navigation.navigate('ChatView', {
-          session: { ...session, native_name: sessionData.native_name ?? session.native_name, messages: mappedMessages }
-        });
-      } else {
-        Alert.alert('Error', 'Failed to load chat messages');
+      const sessionIds = Array.from(new Set((dayItem?.session_ids || []).filter(Boolean)));
+      const responses = await Promise.all(
+        sessionIds.map((sid) =>
+          fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${sid}`)}`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${authToken}` },
+          })
+        )
+      );
+
+      const okResponses = responses.filter((r) => r.ok);
+      const sessions = await Promise.all(okResponses.map((r) => r.json()));
+      const mappedMessages = sessions
+        .flatMap((sessionData) =>
+          (sessionData.messages || []).map((msg, idx) => ({
+            messageId: msg.message_id ?? msg.messageId,
+            role:
+              msg.sender === 'ai' || msg.sender === 'assistant'
+                ? 'assistant'
+                : msg.sender === 'user'
+                  ? 'user'
+                  : msg.sender,
+            content: msg.content,
+            timestamp: msg.completed_at || msg.timestamp,
+            id: `${msg.message_id ?? msg.messageId ?? idx}_${msg.completed_at || msg.timestamp}`,
+            native_name: msg.native_name ?? sessionData.native_name ?? null,
+            terms: msg.terms,
+            glossary: msg.glossary,
+            images: msg.images,
+            message_type: msg.message_type,
+            intent_gate: msg.intent_gate,
+            gate_metadata: msg.gate_metadata,
+          }))
+        )
+        .filter((msg) => getDateKey(msg.timestamp) === dayItem.date_key)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      if (!mappedMessages.length) {
+        Alert.alert('No messages', 'No chats found for this day.');
+        return;
       }
+
+      navigation.navigate('ChatView', {
+        session: {
+          session_id: `day_${dayItem.date_key}`,
+          created_at: dayItem.date_key,
+          native_name: null,
+          messages: mappedMessages,
+        },
+      });
     } catch (error) {
       Alert.alert('Error', 'Failed to load chat messages');
     }
-  };
-
-  const toggleFavorite = async (sessionId) => {
-    const newFavorites = favorites.includes(sessionId)
-      ? favorites.filter(id => id !== sessionId)
-      : [...favorites, sessionId];
-    setFavorites(newFavorites);
-    await storage.setFavorites(newFavorites);
   };
 
   const getRelativeTime = (date) => {
@@ -250,10 +259,16 @@ export default function ChatHistoryScreen({ navigation }) {
   };
 
   const HistoryMessageCard = React.memo(({ item, index }) => {
-    const isFavorite = favorites.includes(item.session_id);
     const cardAnim = useRef(new Animated.Value(0)).current;
-    const isUser = item.sender === 'user';
-    const senderLabel = isUser ? 'You' : item.sender === 'assistant' || item.sender === 'ai' ? 'Assistant' : (item.sender || 'Message');
+    const calendarDate = item?.date_key ? new Date(`${item.date_key}T00:00:00`) : null;
+    const calendarMonth =
+      calendarDate && !isNaN(calendarDate.getTime())
+        ? calendarDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+        : '--';
+    const calendarDay =
+      calendarDate && !isNaN(calendarDate.getTime())
+        ? String(calendarDate.getDate())
+        : '--';
 
     useEffect(() => {
       Animated.spring(cardAnim, {
@@ -264,13 +279,6 @@ export default function ChatHistoryScreen({ navigation }) {
         useNativeDriver: true,
       }).start();
     }, []);
-
-    const sessionStub = {
-      session_id: item.session_id,
-      native_name: item.native_name,
-      created_at: item.session_created_at,
-      last_activity_at: item.session_last_activity_at,
-    };
 
     return (
       <Animated.View
@@ -291,7 +299,7 @@ export default function ChatHistoryScreen({ navigation }) {
       >
         <TouchableOpacity
           style={[styles.sessionCard, { elevation: getCardElevation(8) }]}
-          onPress={() => viewChatSession(sessionStub)}
+          onPress={() => viewChatSession(item)}
           activeOpacity={0.9}
         >
           <LinearGradient
@@ -303,53 +311,39 @@ export default function ChatHistoryScreen({ navigation }) {
             <View style={styles.sessionHeader}>
               <View style={styles.sessionIconContainer}>
                 <LinearGradient
-                  colors={isUser ? ['#3b82f6', '#60a5fa'] : ['#ff6b35', '#ff8c5a']}
+                  colors={['#ff6b35', '#ff8c5a']}
                   style={[styles.sessionIconGradient, styles.messageSenderIcon]}
                 >
-                  <Text style={styles.sessionIcon}>{isUser ? '👤' : '✨'}</Text>
+                  <Text style={styles.calendarMonth}>{calendarMonth}</Text>
+                  <Text style={styles.calendarDay}>{calendarDay}</Text>
                 </LinearGradient>
               </View>
               <View style={styles.sessionInfo}>
                 <View style={styles.sessionTitleRow}>
                   <View style={styles.messageTitleLeft}>
                     <Text style={[styles.senderPill, { color: colors.text, borderColor: colors.textSecondary }]}>
-                      {senderLabel}
+                      Day
                     </Text>
-                    {item.native_name ? (
-                      <Text style={[styles.nativeName, { color: colors.text }]} numberOfLines={1}>
-                        {item.native_name}
-                      </Text>
-                    ) : null}
+                    <Text style={[styles.nativeName, { color: colors.text }]} numberOfLines={1}>
+                      {item.date_label}
+                    </Text>
                   </View>
                   <Text style={[styles.sessionDate, { color: colors.textSecondary }]}>
-                    {getRelativeTime(item.timestamp || item.session_last_activity_at || item.session_created_at)}
+                    {(item.message_count || 0)} message{(item.message_count || 0) === 1 ? '' : 's'}
                   </Text>
                 </View>
               </View>
             </View>
 
             <Text style={[styles.sessionPreview, { color: colors.textSecondary }]} numberOfLines={3}>
-              {item.preview || '—'}
+              Open to view all chats for this day
             </Text>
 
             <View style={styles.sessionFooter}>
               <Text style={[styles.sessionTime, { color: colors.textSecondary }]}>
-                {item.timestamp
-                  ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : ''}
+                Tap to view day timeline
               </Text>
-              <View style={styles.sessionActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => toggleFavorite(item.session_id)}
-                >
-                  <Icon
-                    name={isFavorite ? 'star' : 'star-outline'}
-                    size={20}
-                    color={isFavorite ? '#ffd700' : 'rgba(255, 255, 255, 0.6)'}
-                  />
-                </TouchableOpacity>
-              </View>
+              <View style={styles.sessionActions} />
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -359,7 +353,7 @@ export default function ChatHistoryScreen({ navigation }) {
 
   const renderHistoryRow = React.useCallback(({ item, index }) => (
     <HistoryMessageCard item={item} index={index} />
-  ), [favorites]);
+  ), []);
 
   const renderEmptyState = () => (
     <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
@@ -373,7 +367,7 @@ export default function ChatHistoryScreen({ navigation }) {
       </View>
       <Text style={styles.emptyTitle}>No Chat History</Text>
       <Text style={styles.emptyText}>
-        {searchQuery ? 'No messages match your search' : 'Start a conversation to see your messages here'}
+        {searchQuery ? 'No days match your search' : 'Start a conversation to see your day-wise history here'}
       </Text>
       {!searchQuery && (
         <TouchableOpacity
@@ -414,7 +408,7 @@ export default function ChatHistoryScreen({ navigation }) {
               <Icon name="search" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search messages..."
+                placeholder="Search chats..."
                 placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -436,11 +430,7 @@ export default function ChatHistoryScreen({ navigation }) {
             <FlatList
               data={filteredRows}
               renderItem={renderHistoryRow}
-              keyExtractor={(item, index) =>
-                item.session_id != null && item.message_id != null
-                  ? `${item.session_id}-${item.message_id}`
-                  : `msg-${index}`
-              }
+              keyExtractor={(item, index) => item.date_key || `day-${index}`}
               contentContainerStyle={[styles.listContainer, { paddingBottom: loadingMore ? 200 : 100 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={
@@ -464,7 +454,7 @@ export default function ChatHistoryScreen({ navigation }) {
                       <View style={styles.loadingMore}>
                         <SkeletonCard />
                         <SkeletonCard />
-                        <Text style={styles.loadingMoreText}>Loading more messages...</Text>
+                        <Text style={styles.loadingMoreText}>Loading more days...</Text>
                       </View>
                     ) : (
                       <TouchableOpacity 
@@ -605,6 +595,20 @@ const styles = StyleSheet.create({
   },
   sessionIcon: {
     fontSize: 24,
+  },
+  calendarMonth: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.3,
+    lineHeight: 11,
+    marginTop: 2,
+  },
+  calendarDay: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#fff',
+    lineHeight: 16,
   },
   sessionInfo: {
     flex: 1,

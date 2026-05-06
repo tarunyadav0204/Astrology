@@ -30,31 +30,13 @@ export default function ChatViewScreen({ route, navigation }) {
     setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
   };
   
-  // Debug logging
-  useEffect(() => {
-    console.log('📅 TIMESTAMP DEBUG:');
-    console.log('Session created_at:', session.created_at);
-    console.log('Session created_at type:', typeof session.created_at);
-    
-    const firstMsg = messages.find(m => m.sender === 'user');
-    if (firstMsg) {
-      console.log('First user message timestamp:', firstMsg.timestamp);
-      console.log('First user message timestamp type:', typeof firstMsg.timestamp);
-      
-      const date = new Date(firstMsg.timestamp);
-      console.log('Parsed Date object:', date);
-      console.log('Date.toString():', date.toString());
-      console.log('Date.toISOString():', date.toISOString());
-      console.log('Date.toLocaleString():', date.toLocaleString());
-      console.log('Date.toLocaleTimeString():', date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
-      console.log('Device timezone offset (minutes):', new Date().getTimezoneOffset());
-    }
-    
-    console.log('All messages:', JSON.stringify(messages, null, 2));
-  }, []);
-  
-  // Count conversation pairs (question + answer = 1 conversation)
-  const conversationCount = Math.floor(messages.filter(m => m.sender === 'user').length);
+  // One conversation = one final assistant answer (clarification turns are excluded).
+  const isUserMessage = (msg) => (msg?.sender || msg?.role) === 'user';
+  const isAssistantMessage = (msg) => (msg?.sender || msg?.role) === 'assistant';
+  const answerCount = messages.filter(
+    (msg) => isAssistantMessage(msg) && msg?.message_type === 'answer'
+  ).length;
+  const conversationCount = answerCount > 0 ? answerCount : messages.filter(isUserMessage).length;
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -142,7 +124,7 @@ export default function ChatViewScreen({ route, navigation }) {
   };
 
   const continueConversation = () => {
-    navigation.navigate('Home');
+    navigation.navigate('Home', { startChat: true });
   };
 
   return (
@@ -223,7 +205,7 @@ export default function ChatViewScreen({ route, navigation }) {
                 <Icon name="calendar-outline" size={16} color={colors.textSecondary} />
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {(() => {
-                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const firstMsg = messages.find(isUserMessage);
                     const timestamp = firstMsg?.timestamp || session.created_at;
                     // Backend sends UTC time without 'Z', so append it
                     const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
@@ -240,21 +222,16 @@ export default function ChatViewScreen({ route, navigation }) {
                 <Icon name="time-outline" size={16} color={colors.textSecondary} />
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {(() => {
-                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const firstMsg = messages.find(isUserMessage);
                     const timestamp = firstMsg?.timestamp || session.created_at;
-                    console.log('🕐 Raw timestamp from backend:', timestamp);
                     // Backend sends UTC time without 'Z', so append it
                     const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
-                    console.log('🕐 Converted to UTC format:', utcTimestamp);
                     const date = new Date(utcTimestamp);
-                    console.log('🕐 Parsed Date (local):', date.toString());
-                    const timeStr = date.toLocaleTimeString('en-US', { 
+                    return date.toLocaleTimeString('en-US', { 
                       hour: '2-digit', 
                       minute: '2-digit',
                       hour12: true
                     });
-                    console.log('🕐 Final formatted time:', timeStr);
-                    return timeStr;
                   })()}
                 </Text>
               </View>

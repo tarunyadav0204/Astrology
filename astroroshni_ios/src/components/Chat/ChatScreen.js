@@ -785,13 +785,7 @@ export default function ChatScreen({ navigation, route }) {
             // Set flag to auto-scroll when content renders
             setTimeout(() => {
               if (messages.length > 0) {
-                lastMessageRef.current?.measureLayout(
-                  scrollViewRef.current,
-                  (x, y) => {
-                    scrollViewRef.current?.scrollTo({ y: y, animated: false });
-                  },
-                  () => {}
-                );
+                scrollViewRef.current?.scrollToEnd({ animated: false });
               }
             }, 50);
             
@@ -885,13 +879,7 @@ export default function ChatScreen({ navigation, route }) {
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
               setTimeout(() => {
                 if (storedMessages.length > 0) {
-                  lastMessageRef.current?.measureLayout(
-                    scrollViewRef.current,
-                    (x, y) => {
-                      scrollViewRef.current?.scrollTo({ y: y, animated: false });
-                    },
-                    () => {}
-                  );
+                  scrollViewRef.current?.scrollToEnd({ animated: false });
                 }
               }, 50);
             }
@@ -1480,13 +1468,7 @@ export default function ChatScreen({ navigation, route }) {
       // Set flag to scroll when content renders
       setTimeout(() => {
         if (messages.length > 0) {
-          lastMessageRef.current?.measureLayout(
-            scrollViewRef.current,
-            (x, y) => {
-              scrollViewRef.current?.scrollTo({ y: y, animated: false });
-            },
-            () => {}
-          );
+          scrollViewRef.current?.scrollToEnd({ animated: false });
         }
       }, 50);
       

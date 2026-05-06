@@ -262,6 +262,8 @@ def test_build_answer_mode_contract_for_event_prediction_is_investigative():
     assert "question-led yes bias" in contract["avoid_drift"]
     assert "timing_policy" in contract["primary_evidence"]
     assert "forward_event_dasha_scan" in contract["primary_evidence"]
+    assert "horizon_dasha_segments" in contract["primary_evidence"]
+    assert "next 3 years" in contract["answer_skeleton"]
     assert "Support vs obstruction vs uncertainty" in contract["answer_skeleton"]
 
 
@@ -331,6 +333,7 @@ def test_normalized_event_prediction_exposes_current_dasha_chain():
             "topic_signals": {},
             "transit_pressure": {},
             "forward_event_dasha_scan": {"periods": []},
+            "horizon_dasha_segments": {"segments": []},
         },
         current_transits_formatted={},
         current_dashas_context={
@@ -344,6 +347,7 @@ def test_normalized_event_prediction_exposes_current_dasha_chain():
         target_chart_context=None,
     )
     assert (norm.get("current_timing") or {}).get("current_dasha_chain") == "Saturn > Mercury > Jupiter"
+    assert "horizon_dasha_segments" in norm
 
 
 def test_authoritative_active_dasha_context_uses_dasha_calculator_chain():

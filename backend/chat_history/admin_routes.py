@@ -14,6 +14,22 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 logger = logging.getLogger(__name__)
 
 
+def _build_ilike_pattern(raw_query: str) -> str:
+    """
+    Convert user-entered wildcard query to SQL ILIKE pattern.
+    Supports:
+    - * => %
+    - ? => _
+    If no wildcard is provided, default to contains-match.
+    """
+    q = str(raw_query or "").strip()
+    if not q:
+        return "%"
+    if "*" in q or "?" in q:
+        return q.replace("*", "%").replace("?", "_")
+    return f"%{q}%"
+
+
 def _normalize_date_range(
     start_date: Optional[str], end_date: Optional[str]
 ) -> Tuple[Optional[str], Optional[str]]:
@@ -554,7 +570,7 @@ async def get_all_chat_history_messages(
         search_clause = ""
         search_params: Tuple[Any, ...] = ()
         if search:
-            pat = f"%{search}%"
+            pat = _build_ilike_pattern(search)
             search_clause = """
                 AND (
                     COALESCE(u.name, '') ILIKE %s
@@ -675,7 +691,7 @@ async def get_admin_chat_users(
         search_clause = ""
         params: Tuple[Any, ...] = ()
         if search:
-            pat = f"%{search}%"
+            pat = _build_ilike_pattern(search)
             search_clause = """
                 AND (
                     COALESCE(u.name, '') ILIKE %s
@@ -725,7 +741,7 @@ async def get_admin_chat_users(
                 LEFT JOIN chat_messages cm ON cm.session_id = cs.session_id
                 WHERE {base_where}
                 {search_clause}
-                GROUP BY cs.user_id, user_name, user_phone
+                GROUP BY cs.user_id, COALESCE(u.name, 'Unknown User'), COALESCE(u.phone, '')
                 ORDER BY MAX(cm.timestamp) DESC NULLS LAST
                 LIMIT %s OFFSET %s
                 """,
@@ -797,13 +813,55 @@ async def get_admin_chat_user_thread(
             cur = execute(
                 conn,
                 """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'chat_messages'
+                """,
+                (),
+            )
+            msg_cols = {r[0] for r in (cur.fetchall() or [])}
+            has_llm_input_tokens = "llm_input_tokens" in msg_cols
+            has_llm_output_tokens = "llm_output_tokens" in msg_cols
+            has_llm_cached_input_tokens = "llm_cached_input_tokens" in msg_cols
+            has_llm_non_cached_input_tokens = "llm_non_cached_input_tokens" in msg_cols
+            has_llm_prompt_chars = "llm_prompt_chars" in msg_cols
+            has_llm_response_chars = "llm_response_chars" in msg_cols
+            has_parallel_llm_usage = "parallel_llm_usage" in msg_cols
+            select_llm_input_tokens = "cm.llm_input_tokens" if has_llm_input_tokens else "CAST(NULL AS INTEGER)"
+            select_llm_output_tokens = "cm.llm_output_tokens" if has_llm_output_tokens else "CAST(NULL AS INTEGER)"
+            select_llm_cached_input_tokens = (
+                "cm.llm_cached_input_tokens" if has_llm_cached_input_tokens else "CAST(NULL AS INTEGER)"
+            )
+            select_llm_non_cached_input_tokens = (
+                "cm.llm_non_cached_input_tokens" if has_llm_non_cached_input_tokens else "CAST(NULL AS INTEGER)"
+            )
+            select_llm_prompt_chars = "cm.llm_prompt_chars" if has_llm_prompt_chars else "CAST(NULL AS INTEGER)"
+            select_llm_response_chars = (
+                "cm.llm_response_chars" if has_llm_response_chars else "CAST(NULL AS INTEGER)"
+            )
+            select_parallel_llm_usage = (
+                "cm.parallel_llm_usage" if has_parallel_llm_usage else "CAST(NULL AS TEXT)"
+            )
+
+            cur = execute(
+                conn,
+                f"""
                 SELECT
                     cm.message_id,
                     cm.session_id,
                     cm.sender,
                     cm.content,
                     cm.timestamp,
-                    bc.name AS native_name_raw
+                    bc.name AS native_name_raw,
+                    cs.chat_llm_provider,
+                    cs.chat_llm_model,
+                    {select_llm_input_tokens},
+                    {select_llm_output_tokens},
+                    {select_llm_cached_input_tokens},
+                    {select_llm_non_cached_input_tokens},
+                    {select_llm_prompt_chars},
+                    {select_llm_response_chars},
+                    {select_parallel_llm_usage}
                 FROM chat_messages cm
                 INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
@@ -818,6 +876,13 @@ async def get_admin_chat_user_thread(
         if not user_row and total == 0:
             raise HTTPException(status_code=404, detail="User not found")
 
+        fx = _usd_to_inr_rate()
+        model_counts: Dict[Tuple[str, str], int] = {}
+        total_inr = 0.0
+        total_input_non_cached_inr = 0.0
+        total_input_cached_inr = 0.0
+        total_cache_setup_inr = 0.0
+        total_output_inr = 0.0
         messages: List[Dict[str, Any]] = []
         for row in rows:
             native_name = None
@@ -827,6 +892,57 @@ async def get_admin_chat_user_thread(
                     native_name = enc.decrypt(raw_native)
                 except Exception:
                     native_name = raw_native
+
+            provider = (row[6] or "").strip() if len(row) > 6 and row[6] else ""
+            model = (row[7] or "").strip() if len(row) > 7 and row[7] else ""
+            if provider or model:
+                key = (provider, model)
+                model_counts[key] = model_counts.get(key, 0) + 1
+
+            sender_key = str(row[2] or "").strip().lower()
+            llm_input_tokens = _row_optional_int(row[8]) if len(row) > 8 else None
+            llm_output_tokens = _row_optional_int(row[9]) if len(row) > 9 else None
+            llm_cached_input_tokens = _row_optional_int(row[10]) if len(row) > 10 else None
+            llm_non_cached_input_tokens = _row_optional_int(row[11]) if len(row) > 11 else None
+            llm_prompt_chars = _row_optional_int(row[12]) if len(row) > 12 else None
+            llm_response_chars = _row_optional_int(row[13]) if len(row) > 13 else None
+            parallel_llm_usage = _parse_parallel_llm_usage(row[14]) if len(row) > 14 else None
+            cache_setup_tokens = _parallel_cache_setup_tokens(parallel_llm_usage) or None
+
+            input_non_cached_cost_inr = 0.0
+            input_cached_cost_inr = 0.0
+            cache_setup_cost_inr = 0.0
+            output_cost_inr = 0.0
+            cost_inr = 0.0
+            if sender_key == "assistant":
+                rates = _resolve_model_rate(model or None, int(llm_input_tokens or 0))
+                input_t = int(llm_input_tokens or 0)
+                output_t = int(llm_output_tokens or 0)
+                cached_t = int(llm_cached_input_tokens or 0)
+                non_cached_t = int(llm_non_cached_input_tokens or 0)
+                if non_cached_t <= 0 and input_t > 0:
+                    non_cached_t = max(input_t - cached_t, 0)
+
+                stage_costs = _parallel_stage_cost_breakdown_inr(parallel_llm_usage, model or None, fx)
+                if stage_costs is not None:
+                    input_non_cached_cost_inr = float(stage_costs["input_non_cached_cost_inr"])
+                    input_cached_cost_inr = float(stage_costs["input_cached_cost_inr"])
+                    cache_setup_cost_inr = float(stage_costs["cache_setup_cost_inr"])
+                    output_cost_inr = float(stage_costs["output_cost_inr"])
+                else:
+                    input_non_cached_cost_inr = ((non_cached_t if input_t > 0 else 0) / 1_000_000.0) * float(rates["input"]) * fx
+                    input_cached_cost_inr = ((cached_t if input_t > 0 else 0) / 1_000_000.0) * float(rates.get("cached_input") or rates["input"]) * fx
+                    output_tokens_for_cost = output_t if output_t > 0 else _approx_tokens(row[3])
+                    output_cost_inr = (output_tokens_for_cost / 1_000_000.0) * float(rates["output"]) * fx
+                    if cache_setup_tokens and cache_setup_tokens > 0:
+                        cache_setup_cost_inr = (cache_setup_tokens / 1_000_000.0) * float(rates["input"]) * fx
+
+                cost_inr = input_non_cached_cost_inr + input_cached_cost_inr + cache_setup_cost_inr + output_cost_inr
+                total_input_non_cached_inr += input_non_cached_cost_inr
+                total_input_cached_inr += input_cached_cost_inr
+                total_cache_setup_inr += cache_setup_cost_inr
+                total_output_inr += output_cost_inr
+                total_inr += cost_inr
             messages.append(
                 {
                     "message_id": row[0],
@@ -835,18 +951,31 @@ async def get_admin_chat_user_thread(
                     "content": row[3],
                     "timestamp": _timestamp_to_ist_iso(row[4]),
                     "native_name": native_name,
-                    "llm_input_tokens": None,
-                    "llm_output_tokens": None,
-                    "llm_cached_input_tokens": None,
-                    "llm_non_cached_input_tokens": None,
-                    "llm_prompt_chars": None,
-                    "llm_response_chars": None,
-                    "parallel_llm_usage": None,
-                    "llm_cache_setup_input_tokens": None,
-                    "cost_estimate": None,
+                    "llm_input_tokens": llm_input_tokens if sender_key == "assistant" else None,
+                    "llm_output_tokens": llm_output_tokens if sender_key == "assistant" else None,
+                    "llm_cached_input_tokens": llm_cached_input_tokens if sender_key == "assistant" else None,
+                    "llm_non_cached_input_tokens": llm_non_cached_input_tokens if sender_key == "assistant" else None,
+                    "llm_prompt_chars": llm_prompt_chars if sender_key == "assistant" else None,
+                    "llm_response_chars": llm_response_chars if sender_key == "assistant" else None,
+                    "parallel_llm_usage": parallel_llm_usage if sender_key == "assistant" else None,
+                    "llm_cache_setup_input_tokens": cache_setup_tokens if sender_key == "assistant" else None,
+                    "cost_estimate": {
+                        "tokens_estimate": int(llm_output_tokens or _approx_tokens(row[3])),
+                        "cache_setup_input_tokens": int(cache_setup_tokens or 0),
+                        "input_cost_non_cached_inr_estimate": round(float(input_non_cached_cost_inr), 6),
+                        "input_cost_cached_inr_estimate": round(float(input_cached_cost_inr), 6),
+                        "cache_setup_cost_inr_estimate": round(float(cache_setup_cost_inr), 6),
+                        "output_cost_inr_estimate": round(float(output_cost_inr), 6),
+                        "cost_inr_estimate": round(float(cost_inr), 6),
+                    } if sender_key == "assistant" else None,
                 }
             )
 
+        dominant_provider = ""
+        dominant_model = ""
+        if model_counts:
+            (dominant_provider, dominant_model), _ = max(model_counts.items(), key=lambda kv: kv[1])
+        summary_rates = _resolve_model_rate(dominant_model or None, 0)
         total_pages = (total + limit - 1) // limit if limit else 0
         return {
             "view_mode": "user_thread",
@@ -854,10 +983,23 @@ async def get_admin_chat_user_thread(
             "user_name": (user_row[0] if user_row else "Unknown User"),
             "user_phone": (user_row[1] if user_row else ""),
             "native_name": None,
-            "chat_llm_provider": None,
-            "chat_llm_model": None,
+            "chat_llm_provider": dominant_provider or None,
+            "chat_llm_model": dominant_model or ("multiple" if len(model_counts) > 1 else None),
             "messages": messages,
-            "cost_summary": None,
+            "cost_summary": {
+                "currency": "INR",
+                "usd_to_inr_rate": fx,
+                "input_usd_per_1m": float(summary_rates["input"]),
+                "cached_input_usd_per_1m": float(summary_rates.get("cached_input") or summary_rates["input"]),
+                "output_usd_per_1m": float(summary_rates["output"]),
+                "pricing_tier": summary_rates.get("tier"),
+                "input_cost_non_cached_inr_estimate": round(total_input_non_cached_inr, 6),
+                "input_cost_cached_inr_estimate": round(total_input_cached_inr, 6),
+                "cache_setup_cost_inr_estimate": round(total_cache_setup_inr, 6),
+                "output_cost_inr_estimate": round(total_output_inr, 6),
+                "total_cost_inr_estimate": round(total_inr, 6),
+                "note": "Estimated from assistant rows on this page. Model/rates shown use the dominant model in this page; values can vary across sessions.",
+            },
             "pagination": {
                 "page": page,
                 "limit": limit,
