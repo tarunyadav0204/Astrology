@@ -25,6 +25,21 @@ def get_conn():
     return _get_app_conn()
 
 
+def _safe_execute_nudge_ddl(conn, sql: str) -> None:
+    try:
+        execute(conn, sql)
+    except Exception as exc:
+        msg = str(exc or "")
+        if "must be owner of table" in msg:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.warning("Skipping nudge DDL due to table ownership: %s", msg)
+            return
+        raise
+
+
 def _seed_nudge_trigger_definitions(conn) -> None:
     """Insert default rows for configurable triggers (no-op if already present)."""
     try:
@@ -199,7 +214,7 @@ def init_nudge_tables(conn) -> None:
             """,
         )
 
-        execute(
+        _safe_execute_nudge_ddl(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_sent "
             "ON nudge_deliveries(userid, sent_at)",
@@ -235,13 +250,13 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
-        execute(
+        _safe_execute_nudge_ddl(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_admin_send_jobs_created "
             "ON nudge_admin_send_jobs(created_at DESC)",
         )
 
-        execute(
+        _safe_execute_nudge_ddl(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_user_unread "
             "ON nudge_deliveries(userid) WHERE read_at IS NULL",

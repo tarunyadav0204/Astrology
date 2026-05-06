@@ -373,6 +373,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [modeIntroGateTick, setModeIntroGateTick] = useState(0);
   const freeUsedThisSendRef = useRef(false);
   const chatModeIntroShownKeyRef = useRef(null);
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
@@ -3009,7 +3010,13 @@ export default function ChatScreen({ navigation, route }) {
   );
 
   useEffect(() => {
-    if (Date.now() < modeIntroSuppressOpenUntilRef.current) return;
+    const remainingSuppressMs = modeIntroSuppressOpenUntilRef.current - Date.now();
+    if (remainingSuppressMs > 0) {
+      const timer = setTimeout(() => {
+        setModeIntroGateTick((tick) => tick + 1);
+      }, remainingSuppressMs + 10);
+      return () => clearTimeout(timer);
+    }
 
     const shouldShowModeIntro =
       !showGreeting &&
@@ -3024,8 +3031,7 @@ export default function ChatScreen({ navigation, route }) {
 
     if (!shouldShowModeIntro) return;
 
-    const draftMessageId = messages[0]?.id || 'empty';
-    const introKey = `draft:${currentPersonId || birthData?.id || birthData?.name || 'native'}:${draftMessageId}`;
+    const introKey = `draft:${currentPersonId || birthData?.id || birthData?.name || 'native'}:${sessionId || 'no-session'}`;
     if (chatModeIntroShownKeyRef.current === introKey) return;
 
     chatModeIntroShownKeyRef.current = introKey;
@@ -3038,6 +3044,7 @@ export default function ChatScreen({ navigation, route }) {
     isTyping,
     loading,
     messages,
+    modeIntroGateTick,
     partnershipMode,
     sessionId,
     showChatModeIntro,
