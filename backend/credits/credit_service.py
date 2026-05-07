@@ -211,6 +211,46 @@ class CreditService:
                 )
             ''')
 
+            execute(conn, '''
+                CREATE TABLE IF NOT EXISTS play_onetime_token_map (
+                    id BIGSERIAL PRIMARY KEY,
+                    userid INTEGER NOT NULL,
+                    purchase_token TEXT NOT NULL UNIQUE,
+                    product_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # RTDN idempotency log for one-time product purchase events.
+            execute(conn, '''
+                CREATE TABLE IF NOT EXISTS play_onetime_event_log (
+                    id BIGSERIAL PRIMARY KEY,
+                    event_id TEXT NOT NULL UNIQUE,
+                    purchase_token TEXT,
+                    product_id TEXT,
+                    notification_type INTEGER,
+                    event_time_millis BIGINT,
+                    payload_json TEXT,
+                    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Hard guard against double-credit race conditions for Google Play credits.
+            # PostgreSQL supports partial unique indexes with IF NOT EXISTS.
+            try:
+                execute(
+                    conn,
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_gp_unique_ref
+                    ON credit_transactions(userid, source, reference_id)
+                    WHERE source = 'google_play' AND reference_id IS NOT NULL
+                    """,
+                )
+                conn.commit()
+            except Exception:
+                pass
+
             # Backfill: users who have ever paid for a chat question should not get "first question free"
             try:
                 execute(conn, """
@@ -547,6 +587,114 @@ class CreditService:
                     conn,
                     """
                     INSERT INTO play_subscription_event_log (
+                        event_id, purchase_token, product_id, notification_type, event_time_millis, payload_json, processed_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (event_id) DO NOTHING
+                    """,
+                    (
+                        eid,
+                        (purchase_token or "").strip() or None,
+                        (product_id or "").strip() or None,
+                        int(notification_type) if notification_type is not None else None,
+                        int(event_time_millis) if event_time_millis is not None else None,
+                        payload_json,
+                    ),
+                )
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def has_processed_play_onetime_event(self, event_id: str) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        if not eid:
+            return False
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT 1 FROM play_onetime_event_log WHERE event_id = ? LIMIT 1",
+                    (eid,),
+                )
+                return bool(cur.fetchone())
+        except Exception:
+            return False
+
+    def upsert_play_onetime_token(self, userid: int, purchase_token: str, product_id: Optional[str] = None) -> bool:
+        """Persist one-time purchase token -> userid mapping for RTDN processing."""
+        from db import get_conn, execute
+        token = (purchase_token or "").strip()
+        if not token:
+            return False
+        try:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO play_onetime_token_map (userid, purchase_token, product_id, created_at, last_seen_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (purchase_token) DO UPDATE
+                      SET userid = EXCLUDED.userid,
+                          product_id = EXCLUDED.product_id,
+                          last_seen_at = CURRENT_TIMESTAMP
+                    """,
+                    (userid, token, (product_id or "").strip() or None),
+                )
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def get_user_id_by_play_onetime_purchase_token(self, purchase_token: str) -> Optional[int]:
+        """Resolve userid from one-time purchase token map. Returns None when unknown."""
+        from db import get_conn, execute
+        token = (purchase_token or "").strip()
+        if not token:
+            return None
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT userid
+                    FROM play_onetime_token_map
+                    WHERE purchase_token = ?
+                    LIMIT 1
+                    """,
+                    (token,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                try:
+                    return int(row[0])
+                except (TypeError, ValueError):
+                    return None
+        except Exception:
+            return None
+
+    def log_play_onetime_event(
+        self,
+        *,
+        event_id: str,
+        purchase_token: Optional[str],
+        product_id: Optional[str],
+        notification_type: Optional[int],
+        event_time_millis: Optional[int],
+        payload_json: Optional[str],
+    ) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        if not eid:
+            return False
+        try:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO play_onetime_event_log (
                         event_id, purchase_token, product_id, notification_type, event_time_millis, payload_json, processed_at
                     )
                     VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)

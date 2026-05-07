@@ -229,9 +229,15 @@ const CreditScreen = ({ navigation }) => {
     );
     pulseLoop.start();
     
-    // Refresh credits and subscription when screen comes into focus. On Android, sync with Google Play first so we reflect upgrades/cancels/renewals.
+    // Refresh credits + history when screen comes into focus.
+    // On Android, sync one-time purchases/subscriptions with Google Play first so missed callbacks recover.
     const unsubscribe = navigation.addListener('focus', () => {
       fetchBalance();
+      if (Platform.OS === 'android' && iapReady && productIds.length > 0 && RNIap) {
+        syncOneTimePurchasesWithPlay().then(fetchHistory).catch(() => fetchHistory());
+      } else {
+        fetchHistory();
+      }
       if (Platform.OS === 'android' && iapReady && subscriptionProductIds.length > 0 && RNIap) {
         syncSubscriptionWithPlay().then(fetchSubscriptionDetails).catch(() => fetchSubscriptionDetails());
       } else {
@@ -243,7 +249,7 @@ const CreditScreen = ({ navigation }) => {
       pulseLoop.stop();
       unsubscribe();
     };
-  }, [navigation, iapReady, subscriptionProductIds]);
+  }, [navigation, iapReady, productIds, subscriptionProductIds]);
 
   // Fetch Google Play products from backend (Android only)
   useEffect(() => {
@@ -417,6 +423,37 @@ const CreditScreen = ({ navigation }) => {
     }
   };
 
+  /** On Android: recover missed one-time credit purchases from Play and re-verify on backend. */
+  const syncOneTimePurchasesWithPlay = async () => {
+    if (Platform.OS !== 'android' || !RNIap || productIds.length === 0) return;
+    try {
+      let creditPurchases = [];
+      const available = await RNIap.getAvailablePurchases().catch(() => []);
+      creditPurchases = (available || []).filter(
+        (p) => p.productId && productIds.includes(p.productId)
+      );
+      if (creditPurchases.length === 0 && typeof RNIap.getPurchaseHistory === 'function') {
+        const history = await RNIap.getPurchaseHistory().catch(() => []);
+        creditPurchases = (history || []).filter(
+          (p) => p.productId && productIds.includes(p.productId)
+        );
+      }
+      for (const p of creditPurchases) {
+        const token = p.purchaseToken ?? p.purchaseTokenAndroid;
+        const productId = p.productId ?? p.productIds?.[0];
+        const orderId = p.transactionId ?? p.transactionIdAndroid ?? p.purchaseToken;
+        if (!token || !productId || !orderId) continue;
+        try {
+          await handleGooglePlayPurchaseSuccess(token, productId, orderId);
+        } catch (_) {
+          // Keep iterating so one failed purchase does not block recovery of others.
+        }
+      }
+    } catch (e) {
+      console.warn('One-time purchase sync with Play failed:', e?.message);
+    }
+  };
+
   /** Force-clear subscription status and refetch (e.g. after user cancelled on Play and app still shows subscribed). */
   const handleRefreshSubscriptionStatus = async () => {
     if (refreshSubscriptionStatusLoading) return;
@@ -508,6 +545,9 @@ const CreditScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    if (Platform.OS === 'android' && iapReady && productIds.length > 0 && RNIap) {
+      await syncOneTimePurchasesWithPlay();
+    }
     await fetchBalance();
     await fetchHistory();
     if (Platform.OS === 'android' && iapReady && subscriptionProductIds.length > 0 && RNIap) {

@@ -318,26 +318,13 @@ const AdminChatHistory = () => {
   const displayedMessages = useMemo(() => {
     const base = Array.isArray(selectedSession?.messages) ? selectedSession.messages : [];
     if (!base.length) return base;
-    // For merged user-thread view, show newer dates first but keep natural in-day flow.
+    // For merged user-thread view, show newest messages first (today backward).
     if (selectedSession?.view_mode === 'user_thread') {
-      const groups = new Map();
-      base.forEach((m) => {
-        const d = parseUtcTimestamp(m?.timestamp);
-        const key = d
-          ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-          : 'unknown';
-        const arr = groups.get(key) || [];
-        arr.push(m);
-        groups.set(key, arr);
+      return base.slice().sort((a, b) => {
+        const ta = parseUtcTimestamp(a?.timestamp)?.getTime() || 0;
+        const tb = parseUtcTimestamp(b?.timestamp)?.getTime() || 0;
+        return tb - ta;
       });
-      const sortedKeys = Array.from(groups.keys()).sort((a, b) => String(b).localeCompare(String(a)));
-      return sortedKeys.flatMap((k) =>
-        (groups.get(k) || []).slice().sort((a, b) => {
-          const ta = parseUtcTimestamp(a?.timestamp)?.getTime() || 0;
-          const tb = parseUtcTimestamp(b?.timestamp)?.getTime() || 0;
-          return ta - tb;
-        })
-      );
     }
     return base;
   }, [selectedSession]);

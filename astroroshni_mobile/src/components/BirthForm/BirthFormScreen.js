@@ -17,7 +17,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +35,15 @@ export default function BirthFormScreen({ navigation, route }) {
   useAnalytics('BirthFormScreen');
   const { t } = useTranslation();
   const { theme, colors, getCardElevation } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const pickerSheetGradient =
+    theme === 'dark'
+      ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+      : ['rgba(249, 115, 22, 0.22)', 'rgba(249, 115, 22, 0.1)'];
+  const pickerSheetHeaderBorder =
+    theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(249, 115, 22, 0.28)';
+
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
   const chartGatePrefill = route?.params?.chartGatePrefill;
@@ -803,25 +812,32 @@ export default function BirthFormScreen({ navigation, route }) {
             {/* Date Picker */}
             {Platform.OS === 'ios' ? (
               <Modal visible={showDatePicker} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                  <View style={styles.pickerContainer}>
-                    <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.pickerGradient}>
-                      <View style={styles.pickerHeader}>
+                <View style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(28, 25, 23, 0.45)' }]}>
+                  <View style={[styles.pickerContainer, { borderTopColor: colors.primary, borderTopWidth: 3 }]}>
+                    <LinearGradient
+                      colors={pickerSheetGradient}
+                      style={[styles.pickerGradient, { paddingBottom: Math.max(20, insets.bottom + 8) }]}
+                    >
+                      <View style={[styles.pickerHeader, { borderBottomColor: pickerSheetHeaderBorder }]}>
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                          <Text style={styles.pickerButton}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
+                          <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
                         value={formData.date}
                         mode="date"
                         display="spinner"
+                        themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                        accentColor={colors.primary}
+                        textColor={colors.text}
                         onChange={(event, selectedDate) => {
                           if (selectedDate) handleInputChange('date', selectedDate);
                         }}
                         maximumDate={new Date()}
+                        minimumDate={new Date(1900, 0, 1)}
                         style={styles.picker}
                       />
                     </LinearGradient>
@@ -833,10 +849,12 @@ export default function BirthFormScreen({ navigation, route }) {
                 <DateTimePicker
                   value={formData.date}
                   mode="date"
-                  display="default"
+                  display="spinner"
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(false);
-                    if (selectedDate) handleInputChange('date', selectedDate);
+                    if (event?.type === 'set' && selectedDate) {
+                      handleInputChange('date', selectedDate);
+                    }
                   }}
                   maximumDate={new Date()}
                   minimumDate={new Date(1900, 0, 1)}
@@ -847,12 +865,15 @@ export default function BirthFormScreen({ navigation, route }) {
             {/* Time Picker */}
             {Platform.OS === 'ios' ? (
               <Modal visible={showTimePicker} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                  <View style={styles.pickerContainer}>
-                    <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.pickerGradient}>
-                      <View style={styles.pickerHeader}>
+                <View style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(28, 25, 23, 0.45)' }]}>
+                  <View style={[styles.pickerContainer, { borderTopColor: colors.primary, borderTopWidth: 3 }]}>
+                    <LinearGradient
+                      colors={pickerSheetGradient}
+                      style={[styles.pickerGradient, { paddingBottom: Math.max(20, insets.bottom + 8) }]}
+                    >
+                      <View style={[styles.pickerHeader, { borderBottomColor: pickerSheetHeaderBorder }]}>
                         <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                          <Text style={styles.pickerButton}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
+                          <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => {
                           const hours = tempPeriod === 'PM' ? (tempHour === 12 ? 12 : tempHour + 12) : (tempHour === 12 ? 0 : tempHour);
@@ -861,7 +882,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           handleInputChange('time', newTime);
                           setShowTimePicker(false);
                         }}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={styles.customPickerRow}>
@@ -869,7 +890,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           selectedValue={tempHour}
                           onValueChange={setTempHour}
                           style={styles.customPicker}
-                          itemStyle={styles.pickerItem}
+                          itemStyle={[styles.pickerItem, { color: colors.text }]}
                         >
                           {[...Array(12)].map((_, i) => (
                             <Picker.Item key={i + 1} label={String(i + 1)} value={i + 1} />
@@ -879,7 +900,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           selectedValue={tempMinute}
                           onValueChange={setTempMinute}
                           style={styles.customPicker}
-                          itemStyle={styles.pickerItem}
+                          itemStyle={[styles.pickerItem, { color: colors.text }]}
                         >
                           {[...Array(60)].map((_, i) => (
                             <Picker.Item key={i} label={String(i).padStart(2, '0')} value={i} />
@@ -889,7 +910,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           selectedValue={tempPeriod}
                           onValueChange={setTempPeriod}
                           style={styles.customPicker}
-                          itemStyle={styles.pickerItem}
+                          itemStyle={[styles.pickerItem, { color: colors.text }]}
                         >
                           <Picker.Item label="AM" value="AM" />
                           <Picker.Item label="PM" value="PM" />
@@ -1246,7 +1267,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
   pickerContainer: {

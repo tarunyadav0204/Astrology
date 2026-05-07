@@ -3026,12 +3026,14 @@ export default function ChatScreen({ navigation, route }) {
       !loading &&
       !isTyping &&
       !activeWaitSideMessage &&
-      !showChatModeIntro &&
-      !sessionId;
+      !showChatModeIntro;
 
     if (!shouldShowModeIntro) return;
 
-    const introKey = `draft:${currentPersonId || birthData?.id || birthData?.name || 'native'}:${sessionId || 'no-session'}`;
+    // Keep the intro keyed to the active chat entry, not the transient session id.
+    // Session restoration can happen before the sheet opens, and gating on sessionId
+    // suppresses the default prompt entirely on real user entries.
+    const introKey = `chat-entry:${currentPersonId || birthData?.id || birthData?.name || 'native'}`;
     if (chatModeIntroShownKeyRef.current === introKey) return;
 
     chatModeIntroShownKeyRef.current = introKey;

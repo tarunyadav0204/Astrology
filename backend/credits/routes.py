@@ -442,6 +442,97 @@ class GooglePlaySubscriptionVerifyRequest(BaseModel):
     product_id: str  # subscription_vip_silver, subscription_vip_gold, subscription_vip_platinum (tier-based; price set in Play Console)
 
 
+def _credit_verified_google_play_purchase(
+    *,
+    userid: int,
+    user_phone: Optional[str],
+    user_name: Optional[str],
+    purchase_token: str,
+    product_id: str,
+    order_id_hint: Optional[str] = None,
+    price_amount_micros: Optional[int] = None,
+    price_currency: Optional[str] = None,
+    localized_price: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Verify one-time Play purchase, then credit user idempotently by order_id."""
+    amount = _credits_from_product_id(product_id)
+    if amount is None:
+        raise HTTPException(status_code=400, detail=f"Unknown or invalid product_id (expected credits_N): {product_id}")
+    token = (purchase_token or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="purchase_token is required")
+
+    try:
+        purchase = _verify_google_play_purchase(PACKAGE_NAME, product_id, token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {str(e)}")
+
+    purchase_state = purchase.get("purchaseState")
+    if purchase_state != 0:  # 0 = Purchased
+        raise HTTPException(status_code=400, detail="Purchase not in completed state")
+
+    order_id = (purchase.get("orderId") or order_id_hint or "").strip()
+    if not order_id:
+        raise HTTPException(status_code=400, detail="order_id is required")
+
+    # Keep purchase token ownership map fresh so RTDN can resolve user by token.
+    try:
+        credit_service.upsert_play_onetime_token(userid, token, product_id)
+    except Exception:
+        pass
+
+    if credit_service.has_transaction_with_reference(userid, GOOGLE_PLAY_SOURCE, order_id):
+        return {"success": True, "message": "Already credited", "credits_added": 0, "order_id": order_id}
+
+    purchase_metadata = json.dumps({
+        "purchase_token": purchase.get("purchaseToken") or token,
+        "purchase_time_millis": purchase.get("purchaseTimeMillis"),
+        "product_id": product_id,
+        "order_id": order_id,
+        "price_amount_micros": price_amount_micros,
+        "price_currency": price_currency,
+        "localized_price": localized_price,
+    })
+
+    ok = credit_service.add_credits(
+        userid,
+        amount,
+        GOOGLE_PLAY_SOURCE,
+        reference_id=order_id,
+        description=f"Google Play: {product_id}",
+        metadata=purchase_metadata,
+    )
+    if not ok:
+        logger.error(
+            "Google Play: verify OK with Play but add_credits failed user=%s order_id=%s product=%s amount=%s",
+            userid,
+            order_id,
+            product_id,
+            amount,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Purchase verified with Google Play but credits could not be saved. Please contact support with your order id.",
+        )
+
+    publish_activity(
+        "credits_purchased",
+        user_id=userid,
+        user_phone=user_phone,
+        user_name=user_name,
+        resource_type="order",
+        resource_id=order_id,
+        metadata={
+            "credits_added": amount,
+            "product_id": product_id,
+            "order_id": order_id,
+        },
+    )
+    return {"success": True, "message": "Credits added", "credits_added": amount, "order_id": order_id}
+
+
 @router.get("/google-play/products")
 async def get_google_play_products(current_user: User = Depends(get_current_user)):
     """List credit products from Google Play (active in-app products with id convention credits_N)."""
@@ -464,81 +555,18 @@ async def verify_google_play_purchase(
     request: GooglePlayVerifyRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Verify a Google Play in-app purchase and grant credits. Idempotent by order_id. Product ID must follow credits_N convention."""
-    product_id = request.product_id.strip()
-    amount = _credits_from_product_id(product_id)
-    if amount is None:
-        raise HTTPException(status_code=400, detail=f"Unknown or invalid product_id (expected credits_N): {product_id}")
-    order_id = (request.order_id or "").strip()
-    if not order_id:
-        raise HTTPException(status_code=400, detail="order_id is required")
-    if not request.purchase_token.strip():
-        raise HTTPException(status_code=400, detail="purchase_token is required")
-
-    if credit_service.has_transaction_with_reference(current_user.userid, GOOGLE_PLAY_SOURCE, order_id):
-        return {"success": True, "message": "Already credited", "credits_added": 0}
-
-    try:
-        purchase = _verify_google_play_purchase(
-            PACKAGE_NAME, product_id, request.purchase_token.strip()
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {str(e)}")
-
-    purchase_state = purchase.get("purchaseState")
-    if purchase_state != 0:  # 0 = Purchased
-        raise HTTPException(status_code=400, detail="Purchase not in completed state")
-    # Optional: check consumptionState if you use consumables (1 = consumed, 0 = yet to consume)
-    # Acknowledge if required (some products require acknowledgement)
-    # service.purchases().products().acknowledge(...)
-
-    # Store receipt details for customer support / disputes (order_id already in reference_id)
-    purchase_metadata = json.dumps({
-        "purchase_token": purchase.get("purchaseToken") or request.purchase_token.strip(),
-        "purchase_time_millis": purchase.get("purchaseTimeMillis"),
-        "product_id": product_id,
-        "order_id": order_id,
-        "price_amount_micros": request.price_amount_micros,
-        "price_currency": request.price_currency,
-        "localized_price": request.localized_price,
-    })
-
-    ok = credit_service.add_credits(
-        current_user.userid,
-        amount,
-        GOOGLE_PLAY_SOURCE,
-        reference_id=order_id,
-        description=f"Google Play: {product_id}",
-        metadata=purchase_metadata,
-    )
-    if not ok:
-        logger.error(
-            "Google Play: verify OK with Play but add_credits failed user=%s order_id=%s product=%s amount=%s",
-            current_user.userid,
-            order_id,
-            product_id,
-            amount,
-        )
-        raise HTTPException(
-            status_code=500,
-            detail="Purchase verified with Google Play but credits could not be saved. Please contact support with your order id.",
-        )
-    publish_activity(
-        "credits_purchased",
-        user_id=current_user.userid,
+    """Verify a Google Play one-time purchase and grant credits idempotently by order_id."""
+    return _credit_verified_google_play_purchase(
+        userid=current_user.userid,
         user_phone=current_user.phone,
         user_name=current_user.name,
-        resource_type="order",
-        resource_id=order_id,
-        metadata={
-            "credits_added": amount,
-            "product_id": product_id,
-            "order_id": order_id,
-        },
+        purchase_token=request.purchase_token,
+        product_id=(request.product_id or "").strip(),
+        order_id_hint=(request.order_id or "").strip(),
+        price_amount_micros=request.price_amount_micros,
+        price_currency=request.price_currency,
+        localized_price=request.localized_price,
     )
-    return {"success": True, "message": "Credits added", "credits_added": amount}
 
 
 @router.post("/google-play/subscription/verify")
@@ -683,57 +711,110 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
         return {"success": True, "test": True}
 
     sub_notif = payload.get("subscriptionNotification")
-    if not isinstance(sub_notif, dict):
-        logger.info("RTDN push: non-subscription message ignored (message_id=%s)", message_id or "n/a")
-        return {"success": True, "ignored": "non_subscription_event"}
+    if isinstance(sub_notif, dict):
+        purchase_token = str(sub_notif.get("purchaseToken") or "").strip()
+        product_id = str(sub_notif.get("subscriptionId") or "").strip()
+        notification_type = sub_notif.get("notificationType")
+        event_time_millis = payload.get("eventTimeMillis")
 
-    purchase_token = str(sub_notif.get("purchaseToken") or "").strip()
-    product_id = str(sub_notif.get("subscriptionId") or "").strip()
-    notification_type = sub_notif.get("notificationType")
-    event_time_millis = payload.get("eventTimeMillis")
+        if not purchase_token or not product_id:
+            logger.warning("RTDN push: missing token/product (message_id=%s)", message_id or "n/a")
+            return {"success": True, "ignored": "missing_token_or_product"}
 
-    if not purchase_token or not product_id:
-        logger.warning("RTDN push: missing token/product (message_id=%s)", message_id or "n/a")
-        return {"success": True, "ignored": "missing_token_or_product"}
-
-    # Idempotency key (stable enough for at-least-once delivery).
-    event_id = "|".join(
-        [
-            purchase_token,
-            product_id,
-            str(notification_type or ""),
-            str(event_time_millis or ""),
-            message_id or "",
-        ]
-    )
-    if credit_service.has_processed_play_subscription_event(event_id):
-        return {"success": True, "duplicate": True}
-
-    userid = credit_service.get_user_id_by_play_purchase_token(purchase_token)
-    if userid is None:
-        logger.warning(
-            "RTDN push: unknown purchase token; ignoring (product=%s message_id=%s)",
-            product_id,
-            message_id or "n/a",
+        event_id = "|".join(
+            [
+                "sub",
+                purchase_token,
+                product_id,
+                str(notification_type or ""),
+                str(event_time_millis or ""),
+                message_id or "",
+            ]
         )
-        return {"success": True, "ignored": "unknown_purchase_token"}
+        if credit_service.has_processed_play_subscription_event(event_id):
+            return {"success": True, "duplicate": True}
 
-    # Accept any payment state: for cancellation/expiry transitions we still need updated end_date.
-    _sync_subscription_from_play(
-        userid=userid,
-        product_id=product_id,
-        purchase_token=purchase_token,
-        accept_any_payment_state=True,
-    )
-    credit_service.log_play_subscription_event(
-        event_id=event_id,
-        purchase_token=purchase_token,
-        product_id=product_id,
-        notification_type=int(notification_type) if notification_type is not None else None,
-        event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
-        payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
-    )
-    return {"success": True}
+        userid = credit_service.get_user_id_by_play_purchase_token(purchase_token)
+        if userid is None:
+            logger.warning(
+                "RTDN push: unknown subscription token; ignoring (product=%s message_id=%s)",
+                product_id,
+                message_id or "n/a",
+            )
+            return {"success": True, "ignored": "unknown_purchase_token"}
+
+        _sync_subscription_from_play(
+            userid=userid,
+            product_id=product_id,
+            purchase_token=purchase_token,
+            accept_any_payment_state=True,
+        )
+        credit_service.log_play_subscription_event(
+            event_id=event_id,
+            purchase_token=purchase_token,
+            product_id=product_id,
+            notification_type=int(notification_type) if notification_type is not None else None,
+            event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
+            payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+        )
+        return {"success": True}
+
+    onetime_notif = payload.get("oneTimeProductNotification")
+    if isinstance(onetime_notif, dict):
+        purchase_token = str(onetime_notif.get("purchaseToken") or "").strip()
+        product_id = str(
+            onetime_notif.get("sku")
+            or onetime_notif.get("productId")
+            or ""
+        ).strip()
+        notification_type = onetime_notif.get("notificationType")
+        event_time_millis = payload.get("eventTimeMillis")
+        if not purchase_token or not product_id:
+            logger.warning("RTDN push: one-time event missing token/product (message_id=%s)", message_id or "n/a")
+            return {"success": True, "ignored": "missing_token_or_product"}
+
+        event_id = "|".join(
+            [
+                "one",
+                purchase_token,
+                product_id,
+                str(notification_type or ""),
+                str(event_time_millis or ""),
+                message_id or "",
+            ]
+        )
+        if credit_service.has_processed_play_onetime_event(event_id):
+            return {"success": True, "duplicate": True}
+
+        userid = credit_service.get_user_id_by_play_onetime_purchase_token(purchase_token)
+        if userid is None:
+            logger.warning(
+                "RTDN push: unknown one-time token; ignoring (product=%s message_id=%s)",
+                product_id,
+                message_id or "n/a",
+            )
+            return {"success": True, "ignored": "unknown_purchase_token"}
+
+        _credit_verified_google_play_purchase(
+            userid=userid,
+            user_phone=None,
+            user_name=None,
+            purchase_token=purchase_token,
+            product_id=product_id,
+            order_id_hint=None,
+        )
+        credit_service.log_play_onetime_event(
+            event_id=event_id,
+            purchase_token=purchase_token,
+            product_id=product_id,
+            notification_type=int(notification_type) if notification_type is not None else None,
+            event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
+            payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+        )
+        return {"success": True}
+
+    logger.info("RTDN push: unsupported event type ignored (message_id=%s)", message_id or "n/a")
+    return {"success": True, "ignored": "unsupported_event"}
 
 
 @router.post("/google-play/subscription/clear")
