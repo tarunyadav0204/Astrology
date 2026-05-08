@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
   debugText: {
     fontSize: 10,
     color: COLORS.textSecondary,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    ...(Platform.OS === 'ios' ? { fontFamily: 'Courier' } : {}),
   },
   clearDebug: {
     color: COLORS.primary,

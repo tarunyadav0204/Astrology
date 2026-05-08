@@ -1,11 +1,16 @@
 import logging
 import os
+import json
+import re
+import hashlib
 
 import google.generativeai as genai
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from auth import get_current_user, User
 from utils.admin_settings import speech_chat_enabled_for_user
+from utils.admin_settings import get_gemini_analysis_model
 
 
 router = APIRouter(prefix="/speech", tags=["speech"])
@@ -15,6 +20,8 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 # Inline audio must stay under Gemini's ~20 MB per-request limit (we cap uploads at 12 MB).
 # Use a model with reliable audio grounding; gemini-3-flash-preview has produced unrelated Q&A text in STT.
 DEFAULT_TRANSCRIPTION_MODEL = "models/gemini-2.5-flash"
+VOICE_GUIDE_MODEL_ENV = "GEMINI_SPEECH_GUIDE_MODEL"
+_VOICE_GUIDE_CACHE: dict[str, dict] = {}
 
 
 def _response_text(response) -> str:
@@ -29,6 +36,242 @@ def _response_text(response) -> str:
                 if text:
                     parts.append(text)
         return "\n".join(parts).strip()
+
+
+def _extract_json_object(text: str) -> dict | None:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+        return value if isinstance(value, dict) else None
+    except Exception:
+        pass
+    match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+    if not match:
+        return None
+    try:
+        value = json.loads(match.group(0))
+        return value if isinstance(value, dict) else None
+    except Exception:
+        return None
+
+
+def _normalize_guide_lines(value, max_items: int = 4) -> list[str]:
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, list):
+        items = [item for item in value if isinstance(item, str)]
+    else:
+        items = []
+    cleaned = []
+    for item in items:
+        text = " ".join(str(item or "").split()).strip()
+        if text:
+            cleaned.append(text)
+        if len(cleaned) >= max_items:
+            break
+    return cleaned
+
+
+def _fallback_voice_guide(scene: str, *, language: str, user_name: str = "", chart_name: str = "", question: str = "", follow_ups: list[str] | None = None) -> dict:
+    lang = "hi" if (language or "").lower().startswith("hi") else "en"
+    follow_ups = [str(item or "").strip() for item in (follow_ups or []) if str(item or "").strip()]
+
+    if scene == "greeting":
+        if lang == "hi":
+            line = (
+                f"नमस्ते {user_name}, मैं तारा हूँ। "
+                f"{chart_name} की कुंडली मेरे सामने है। आप क्या जानना चाहते हैं?"
+                if user_name and chart_name
+                else f"नमस्ते, मैं तारा हूँ। {chart_name} की कुंडली तैयार है। आप क्या जानना चाहते हैं?"
+                if chart_name
+                else "नमस्ते, मैं तारा हूँ। आप क्या जानना चाहते हैं?"
+            )
+        else:
+            line = (
+                f"Hello {user_name}, I’m Tara. I have {chart_name}'s chart ready. What would you like to know?"
+                if user_name and chart_name
+                else f"Hello, I’m Tara. I have {chart_name}'s chart ready. What would you like to know?"
+                if chart_name
+                else "Hello, I’m Tara. What would you like to know?"
+            )
+        return {"scene": scene, "lines": [line]}
+
+    if scene == "processing":
+        if lang == "hi":
+            return {
+                "scene": scene,
+                "lines": [
+                    "ठीक है, मैं आपके सवाल के लिए सही योग और समय देख रही हूँ।",
+                    "मैं अभी दशा, गोचर और संबंधित भावों को साथ में मिलाकर देख रही हूँ।",
+                    "मैं जल्दबाज़ी नहीं कर रही, ताकि आपको साफ़ और काम की बात मिले।",
+                    "बस एक क्षण और, मैं उत्तर को ठीक से बाँध रही हूँ।",
+                ],
+            }
+        return {
+            "scene": scene,
+            "lines": [
+                "Okay, I’m checking the strongest chart factors behind that question.",
+                "I’m comparing the active dashas, transits, and the houses tied to your topic.",
+                "I’m taking a moment to make this specific, not just generic.",
+                "Almost there. I’m pulling the cleanest answer together for you.",
+            ],
+        }
+
+    if lang == "hi":
+        if follow_ups:
+            return {"scene": scene, "lines": [f"अगर आप चाहें, तो अगला सवाल {follow_ups[0]} पर रख सकते हैं।"]}
+        return {"scene": scene, "lines": ["अगर आप चाहें, तो अब एक फॉलो-अप सवाल पूछ सकते हैं।"]}
+    if follow_ups:
+        return {"scene": scene, "lines": [f"If you want, we can go next into {follow_ups[0]}."]}
+    return {"scene": scene, "lines": ["If you want, you can ask me a follow-up next."]}
+
+
+class VoiceGuideRequest(BaseModel):
+    scene: str
+    language: str = "english"
+    user_name: str | None = None
+    chart_name: str | None = None
+    question: str | None = None
+    follow_ups: list[str] | None = None
+    hands_free: bool = True
+
+
+async def _generate_voice_guide_lines(
+    *,
+    scene: str,
+    language: str,
+    user_name: str = "",
+    chart_name: str = "",
+    question: str = "",
+    follow_ups: list[str] | None = None,
+    hands_free: bool = True,
+) -> dict:
+    follow_ups = [str(item or "").strip() for item in (follow_ups or []) if str(item or "").strip()]
+    normalized_scene = (scene or "").strip().lower()
+    normalized_lang = "hi" if (language or "").lower().startswith("hi") else "en"
+
+    payload_key = hashlib.sha1(
+        json.dumps(
+            {
+                "scene": normalized_scene,
+                "language": normalized_lang,
+                "user_name": user_name,
+                "chart_name": chart_name,
+                "question": question,
+                "follow_ups": follow_ups[:3],
+                "hands_free": bool(hands_free),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    cached = _VOICE_GUIDE_CACHE.get(payload_key)
+    if cached:
+        return cached
+
+    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        return _fallback_voice_guide(
+            normalized_scene,
+            language=normalized_lang,
+            user_name=user_name,
+            chart_name=chart_name,
+            question=question,
+            follow_ups=follow_ups,
+        )
+
+    genai.configure(api_key=api_key)
+    model_name = (os.getenv(VOICE_GUIDE_MODEL_ENV) or get_gemini_analysis_model()).strip()
+    model = genai.GenerativeModel(model_name)
+
+    scene_instruction = {
+        "greeting": (
+            "Generate exactly 1 warm opening line from Tara. "
+            "She already has the chart open and is inviting the user to ask."
+        ),
+        "processing": (
+            "Generate exactly 4 short spoken lines Tara can say while she is analyzing the chart. "
+            "Line 1 should acknowledge the user's question directly. "
+            "Lines 2 to 4 should describe what she is checking in a natural way. "
+            "No astrology verdicts yet, only process narration."
+        ),
+        "closing": (
+            "Generate exactly 1 short follow-up invitation line after Tara has answered. "
+            "If follow-up suggestions are provided, lightly steer toward one of them."
+        ),
+    }.get(normalized_scene, "Generate short helpful spoken lines for Tara.")
+
+    language_instruction = (
+        "Write in natural spoken Hindi in Devanagari. Sound warm, calm, and human. "
+        "Do not mix in English unless it is unavoidable."
+        if normalized_lang == "hi"
+        else "Write in natural spoken English. Sound warm, calm, and human."
+    )
+
+    prompt = f"""You are writing short spoken transition lines for Tara, the voice guide in an astrology app.
+
+Return ONLY valid JSON in this shape:
+{{
+  "lines": ["line 1", "line 2"]
+}}
+
+Rules:
+- No markdown, no commentary, no extra keys.
+- Every line must feel spoken aloud, not written.
+- Keep each line under 20 words.
+- Do not repeat the same phrase across lines.
+- Do not sound robotic, corporate, or overly dramatic.
+- Do not invent astrology conclusions when scene=processing.
+- Use first person as Tara naturally would.
+
+{language_instruction}
+{scene_instruction}
+
+Context:
+- Scene: {normalized_scene}
+- User name: {user_name or "[not provided]"}
+- Chart name: {chart_name or "[not provided]"}
+- User question: {question or "[not provided]"}
+- Follow-ups: {json.dumps(follow_ups[:3], ensure_ascii=False)}
+- Hands free: {"yes" if hands_free else "no"}
+"""
+
+    try:
+        response = await model.generate_content_async(prompt)
+        data = _extract_json_object(_response_text(response)) or {}
+        lines = _normalize_guide_lines(data.get("lines"))
+        if not lines:
+          return _fallback_voice_guide(
+              normalized_scene,
+              language=normalized_lang,
+              user_name=user_name,
+              chart_name=chart_name,
+              question=question,
+              follow_ups=follow_ups,
+          )
+        result = {"scene": normalized_scene, "lines": lines}
+        _VOICE_GUIDE_CACHE[payload_key] = result
+        if len(_VOICE_GUIDE_CACHE) > 128:
+            _VOICE_GUIDE_CACHE.pop(next(iter(_VOICE_GUIDE_CACHE)))
+        logger.info(
+            "SPEECH guide scene=%s lang=%s lines=%s",
+            normalized_scene,
+            normalized_lang,
+            len(lines),
+        )
+        return result
+    except Exception as exc:
+        logger.exception("SPEECH guide generation failed scene=%s", normalized_scene)
+        return _fallback_voice_guide(
+            normalized_scene,
+            language=normalized_lang,
+            user_name=user_name,
+            chart_name=chart_name,
+            question=question,
+            follow_ups=follow_ups,
+        )
 
 
 def _audio_suffix(filename: str | None, content_type: str | None) -> str:
@@ -274,3 +517,27 @@ async def transcribe_speech(
             exc,
         )
         raise HTTPException(status_code=502, detail=f"Speech transcription failed: {exc}") from exc
+
+
+@router.post("/guide-lines")
+async def speech_guide_lines(
+    request: VoiceGuideRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if not speech_chat_enabled_for_user(current_user.userid):
+        raise HTTPException(status_code=403, detail="Speech input is disabled")
+
+    scene = (request.scene or "").strip().lower()
+    if scene not in {"greeting", "processing", "closing"}:
+        raise HTTPException(status_code=400, detail="Invalid speech guide scene")
+
+    result = await _generate_voice_guide_lines(
+        scene=scene,
+        language=request.language or "english",
+        user_name=(request.user_name or "").strip(),
+        chart_name=(request.chart_name or "").strip(),
+        question=(request.question or "").strip(),
+        follow_ups=request.follow_ups or [],
+        hands_free=bool(request.hands_free),
+    )
+    return result

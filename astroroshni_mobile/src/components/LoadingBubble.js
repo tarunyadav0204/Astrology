@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 2,
         lineHeight: 40,
-        fontVariant: ['tabular-nums'],
+        ...(Platform.OS === 'ios' ? { fontVariant: ['tabular-nums'] } : {}),
         textShadowColor: 'rgba(255, 255, 255, 0.35)',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,

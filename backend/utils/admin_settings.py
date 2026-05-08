@@ -295,6 +295,8 @@ PODCAST_PROVIDER_NOTEBOOK_LM = "notebook_lm"
 
 SPEECH_TTS_PROVIDER_LOCAL = "local"
 SPEECH_TTS_PROVIDER_GOOGLE = "google"
+DEFAULT_SPEECH_TTS_VOICE_EN = "en-IN-Neural2-A"
+DEFAULT_SPEECH_TTS_VOICE_HI = "hi-IN-Neural2-A"
 
 
 def get_podcast_provider() -> str:
@@ -315,3 +317,16 @@ def get_speech_tts_provider() -> str:
     if value == SPEECH_TTS_PROVIDER_GOOGLE:
         return SPEECH_TTS_PROVIDER_GOOGLE
     return SPEECH_TTS_PROVIDER_LOCAL
+
+
+def get_speech_tts_voice(lang: str = "en") -> str:
+    """
+    Default Google TTS voice for speech chat by language.
+    English uses `speech_tts_voice_en`, Hindi uses `speech_tts_voice_hi`.
+    """
+    normalized_lang = (lang or "en").strip().lower()
+    if normalized_lang.startswith("hi"):
+        value = (get_setting("speech_tts_voice_hi") or "").strip()
+        return value or DEFAULT_SPEECH_TTS_VOICE_HI
+    value = (get_setting("speech_tts_voice_en") or "").strip()
+    return value or DEFAULT_SPEECH_TTS_VOICE_EN

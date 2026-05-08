@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { COLORS } from '../../utils/constants';
 
 // Helper functions for actionable advice
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
     lineHeight: 16,
-    fontFamily: 'monospace',
+    ...(Platform.OS === 'ios' ? { fontFamily: 'Courier' } : {}),
   },
   phaseCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { chatAPI, pricingAPI } from '../../services/api';
+import { chatAPI, pricingAPI, speechAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { buildQueryContext } from '../../utils/queryContext';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
@@ -57,6 +57,13 @@ const logSpeechDebug = async (label, payload = {}) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const isSpeechUnavailableMessage = (message) => {
+  const value = String(message || '').toLowerCase();
+  return value.includes('speech recognition is not available')
+    || value.includes('use the test question button below')
+    || value.includes('expo go cannot access the native speech recognizer')
+    || value.includes('needs a development build');
+};
 
 /** i18n keys for short spoken handoff after listening → thinking (rotate to avoid repetition). */
 const THINKING_HANDOFF_KEYS = [
@@ -68,6 +75,17 @@ const THINKING_HANDOFF_DEFAULTS = [
   'Got it. Give me a moment.',
   'Okay, I’m looking at that now.',
   'I have what I need. Let me read that for you.',
+];
+const SPEECH_CHAT_TTS_PROVIDER = 'google';
+const DEV_SPEECH_TEST_QUESTIONS = [
+  'When will I buy a house?',
+  'When will I get a new job?',
+  'What is my marriage timing over the next two years?',
+];
+const DEV_SPEECH_TEST_QUESTIONS_HI = [
+  'मैं घर कब खरीदूँगा?',
+  'मुझे नई नौकरी कब मिलेगी?',
+  'अगले दो सालों में मेरी शादी का समय क्या है?',
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -204,17 +222,35 @@ const getMouthFrameFromPlaybackTimeline = (timeline, positionMs, durationMs = 0)
   const nextStartRaw = Number(timeline[currentIndex + 1]?.start_ms);
   const nextStart = Number.isFinite(nextStartRaw)
     ? nextStartRaw
-    : Math.max(currentStart + 260, Number(durationMs) || currentStart + 260);
-  const estimatedWordMs = clamp(Number(current?.estimated_word_ms) || 160, 100, 320);
-  const activeEnd = Math.min(nextStart, currentStart + estimatedWordMs);
-
-  if (now >= activeEnd) return 0;
-
-  const activeSpan = Math.max(1, activeEnd - currentStart);
+    : Math.max(
+        currentStart + clamp(Number(current?.estimated_word_ms) || 180, 120, 340),
+        Number(durationMs) || currentStart + 260
+      );
+  const activeSpan = Math.max(120, nextStart - currentStart);
   const progress = clamp((now - currentStart) / activeSpan, 0, 0.999);
   const pattern = buildFramePattern(Number(current?.intensity) || 1);
   const patternIndex = Math.min(pattern.length - 1, Math.floor(progress * pattern.length));
   return pattern[patternIndex];
+};
+
+const getMouthFrameFromAudioProgress = (speechText, positionMs, durationMs) => {
+  const frames = buildMouthTimeline(speechText);
+  if (!frames.length) return 0;
+
+  const totalFrameMs = frames.reduce((sum, item) => sum + Math.max(1, Number(item?.duration) || 0), 0);
+  const totalAudioMs = Math.max(1, Number(durationMs) || 0);
+  const scaledNow = clamp((Math.max(0, Number(positionMs) || 0) / totalAudioMs) * totalFrameMs, 0, totalFrameMs - 1);
+
+  let cursor = 0;
+  for (const item of frames) {
+    const duration = Math.max(1, Number(item?.duration) || 0);
+    if (scaledNow < cursor + duration) {
+      return Number(item?.frame) || 0;
+    }
+    cursor += duration;
+  }
+
+  return Number(frames[frames.length - 1]?.frame) || 0;
 };
 
 const TARA_BASE = require('../../assets/tara/base_head_body.png');
@@ -225,7 +261,7 @@ const TARA_MOUTH_SMALL = require('../../assets/tara/mouth_small_open.png');
 const TARA_MOUTH_MEDIUM = require('../../assets/tara/mouth_medium_open.png');
 const TARA_MOUTH_WIDE = require('../../assets/tara/mouth_wide_open.png');
 
-function TaraSpeakingAvatar({ status, isDark, speechText, speechActive, speechTimeline, speechPositionMs, speechDurationMs }) {
+function TaraSpeakingAvatar({ status, isDark, speechText, speechActive, speechTimeline, speechPositionMs, speechDurationMs, speechAudioStarted }) {
   const [blinkClosed, setBlinkClosed] = useState(false);
   const [mouthFrame, setMouthFrame] = useState(0);
   const bobAnim = useRef(new Animated.Value(0)).current;
@@ -256,59 +292,30 @@ function TaraSpeakingAvatar({ status, isDark, speechText, speechActive, speechTi
   }, []);
 
   useEffect(() => {
-    if (speechActive && Array.isArray(speechTimeline) && speechTimeline.length) {
+    const hasPlaybackTimeline = Array.isArray(speechTimeline) && speechTimeline.length > 0;
+
+    if (speechActive && hasPlaybackTimeline) {
+      if (!speechAudioStarted) {
+        setMouthFrame(0);
+        return undefined;
+      }
+
       setMouthFrame(
         getMouthFrameFromPlaybackTimeline(speechTimeline, speechPositionMs, speechDurationMs)
       );
       return undefined;
     }
 
-    if (!speechActive || !String(speechText || '').trim()) {
-      setMouthFrame(0);
+    if (speechActive && speechAudioStarted && Number(speechDurationMs) > 0) {
+      setMouthFrame(
+        getMouthFrameFromAudioProgress(speechText, speechPositionMs, speechDurationMs)
+      );
       return undefined;
     }
 
-    const timeline = buildMouthTimeline(speechText);
-    let eventIndex = 0;
-    let timeoutId = null;
-    let fallbackIntervalId = null;
-    let cancelled = false;
-
-    const fallbackFrames = [1, 0, 2, 1, 0, 1, 3, 1, 0];
-    let fallbackIndex = 0;
-
-    const startFallback = () => {
-      if (cancelled || fallbackIntervalId) return;
-      fallbackIntervalId = setInterval(() => {
-        const nextFrame = fallbackFrames[fallbackIndex % fallbackFrames.length];
-        fallbackIndex += 1;
-        setMouthFrame(nextFrame);
-      }, 190);
-    };
-
-    const step = () => {
-      if (cancelled) return;
-
-      const next = timeline[eventIndex];
-      if (!next) {
-        startFallback();
-        return;
-      }
-
-      setMouthFrame(next.frame);
-      eventIndex += 1;
-      timeoutId = setTimeout(step, next.duration);
-    };
-
-    step();
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      if (fallbackIntervalId) clearInterval(fallbackIntervalId);
-      setMouthFrame(0);
-    };
-  }, [speechActive, speechText, speechTimeline, speechPositionMs, speechDurationMs]);
+    setMouthFrame(0);
+    return undefined;
+  }, [speechActive, speechText, speechTimeline, speechPositionMs, speechDurationMs, speechAudioStarted]);
 
   useEffect(() => {
     bobAnim.stopAnimation();
@@ -365,12 +372,14 @@ export default function SpeechChatScreen({ navigation, route }) {
     timeline: [],
     positionMs: 0,
     durationMs: 0,
+    audioStarted: false,
   });
   const mountedRef = useRef(true);
   const scrollRef = useRef(null);
   const handsFreeRestartRef = useRef(false);
   const greetedRef = useRef(false);
   const thinkingLeadInIndexRef = useRef(0);
+  const devQuestionIndexRef = useRef(0);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const cardPulseAnim = useRef(new Animated.Value(0)).current;
   const sparkleAnims = useRef(
@@ -399,7 +408,8 @@ export default function SpeechChatScreen({ navigation, route }) {
     };
 
     loadContext();
-    getTextToSpeech().setSpeechProvider('local');
+    // Speech chat lip sync depends on timed backend audio, so prefer Google TTS here.
+    getTextToSpeech().setSpeechProvider(SPEECH_CHAT_TTS_PROVIDER);
 
     let cancelledPricing = false;
     (async () => {
@@ -414,10 +424,15 @@ export default function SpeechChatScreen({ navigation, route }) {
             : ic != null && !Number.isNaN(ic) && ic > 0
               ? ic
               : 1;
-        const nextSpeechProvider =
-          String(res?.data?.features?.speech_tts_provider || '').trim().toLowerCase() === 'google'
-            ? 'google'
-            : 'local';
+        const configuredSpeechTtsProvider =
+          String(res?.data?.features?.speech_tts_provider || '').trim().toLowerCase() || null;
+        const nextSpeechProvider = SPEECH_CHAT_TTS_PROVIDER;
+        console.log('[SpeechChat] pricing/features resolved', {
+          speechChatCost: val,
+          configuredSpeechTtsProvider,
+          speechTtsProvider: nextSpeechProvider,
+          rawFeatures: res?.data?.features || null,
+        });
         getTextToSpeech().setSpeechProvider(nextSpeechProvider);
         if (!cancelledPricing && mountedRef.current) {
           setSpeechChatCost(val);
@@ -425,10 +440,10 @@ export default function SpeechChatScreen({ navigation, route }) {
           setSpeechTtsReady(true);
         }
       } catch {
-        getTextToSpeech().setSpeechProvider('local');
+        getTextToSpeech().setSpeechProvider(SPEECH_CHAT_TTS_PROVIDER);
         if (!cancelledPricing && mountedRef.current) {
           setSpeechChatCost(1);
-          setSpeechTtsProvider('local');
+          setSpeechTtsProvider(SPEECH_CHAT_TTS_PROVIDER);
           setSpeechTtsReady(true);
         }
       }
@@ -444,7 +459,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         // ignore teardown errors
       }
       handsFreeRestartRef.current = false;
-      setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0 });
+      setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
       getTextToSpeech().stop();
     };
   }, []);
@@ -536,7 +551,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       greetedRef.current = true;
       const chartName = String(birthData?.name || '').trim();
       const trimmedUserName = String(userName || '').trim();
-      const greeting = trimmedUserName
+      const fallbackGreeting = trimmedUserName
         ? t('speechChat.greetingWithUser', {
             userName: trimmedUserName,
             chartName,
@@ -548,6 +563,8 @@ export default function SpeechChatScreen({ navigation, route }) {
             defaultValue:
               `Hello, I'm Tara, your voice guide on AstroRoshni. Thanks for sharing ${chartName}'s chart. How can I help you? Do you have a question for me?`,
           });
+      const guideLines = await getGuideLines('greeting');
+      const greeting = guideLines[0] || fallbackGreeting;
 
       setStatus('speaking');
       await speakWithAvatar(greeting, {
@@ -632,7 +649,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     setCurrentTranscript('');
     setFollowUps([]);
     handsFreeRestartRef.current = false;
-    setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0 });
+    setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
     await getTextToSpeech().stop();
 
     const permissionGranted = await ensureMicrophonePermission();
@@ -649,10 +666,12 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
 
     if (!available) {
-      throw new Error(t(
-        'speechChat.nativeUnavailable',
-        'Speech recognition is not available on this device right now.'
-      ));
+      throw new Error(
+        t(
+          'speechChat.devNativeUnavailable',
+          'Speech recognition is not available in this emulator/build right now. Use the test question button below to simulate a speech turn.'
+        )
+      );
     }
 
     await logSpeechDebug('startListening.request', {
@@ -675,9 +694,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         }
         setCurrentTranscript(finalTranscript);
         setStatus('thinking');
-        await speakThinkingHandoff();
-        if (!mountedRef.current) return;
-        await askInstant(finalTranscript);
+        await runQuestionTurn(finalTranscript);
       })
       .catch(async (error) => {
         await logSpeechDebug('startListening.error', {
@@ -731,6 +748,28 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
+  const getGuideLines = async (scene, extra = {}) => {
+    try {
+      const response = await speechAPI.getGuideLines({
+        scene,
+        language,
+        userName: userName || null,
+        chartName: birthData?.name || null,
+        handsFree: handsFreeEnabled,
+        ...extra,
+      });
+      return Array.isArray(response?.data?.lines)
+        ? response.data.lines.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+    } catch (error) {
+      console.log('[SpeechChat] guide lines fallback', {
+        scene,
+        message: error?.message || String(error),
+      });
+      return [];
+    }
+  };
+
   const speakWithAvatar = async (
     text,
     {
@@ -748,17 +787,30 @@ export default function SpeechChatScreen({ navigation, route }) {
       timeline: [],
       positionMs: 0,
       durationMs: 0,
+      audioStarted: false,
+    });
+    console.log('[SpeechChat] speakWithAvatar', {
+      provider: getTextToSpeech().getSpeechProvider?.() || 'unknown',
+      language,
+      textLength: spoken.length,
+      preview: spoken.slice(0, 80),
     });
     try {
       await getTextToSpeech().speak(spoken, {
         ...ttsOptions,
         onTimeline: (timeline) => {
           if (!mountedRef.current) return;
+          console.log('[SpeechChat] received playback timeline', {
+            count: Array.isArray(timeline) ? timeline.length : 0,
+            first: Array.isArray(timeline) && timeline.length ? timeline[0] : null,
+            last: Array.isArray(timeline) && timeline.length ? timeline[timeline.length - 1] : null,
+          });
           setAvatarSpeech((prev) => ({
             ...prev,
             timeline: Array.isArray(timeline) ? timeline : [],
             positionMs: 0,
             durationMs: 0,
+            audioStarted: false,
           }));
         },
         onProgress: (positionMs, durationMs) => {
@@ -767,24 +819,28 @@ export default function SpeechChatScreen({ navigation, route }) {
             ...prev,
             positionMs: Number(positionMs) || 0,
             durationMs: Number(durationMs) || 0,
+            audioStarted:
+              prev.audioStarted
+              || Number(positionMs) > 0
+              || Number(durationMs) > 0,
           }));
         },
         onDone: () => {
           if (mountedRef.current) {
-            setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0 });
+            setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
           }
           if (onDone) onDone();
         },
         onError: (e) => {
           if (mountedRef.current) {
-            setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0 });
+            setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
           }
           if (onError) onError(e);
         },
       });
     } catch (error) {
       if (mountedRef.current) {
-        setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0 });
+        setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
       }
       if (onError) onError(error);
     }
@@ -801,6 +857,19 @@ export default function SpeechChatScreen({ navigation, route }) {
     } catch {
       // ignore short transition TTS failures
     }
+  };
+
+  const playAvatarLine = async (text, options = {}) => {
+    const spoken = String(text || '').trim();
+    if (!spoken) return false;
+    return new Promise((resolve) => {
+      speakWithAvatar(spoken, {
+        language,
+        ...options,
+        onDone: () => resolve(true),
+        onError: () => resolve(false),
+      });
+    });
   };
 
   const askInstant = async (question) => {
@@ -840,11 +909,10 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
     const askData = askResponse?.data || {};
     if (askData.status === 'completed') {
-      await handleCompletedAnswer(question, askData);
-      return;
+      return askData;
     }
     if (!askData.message_id) throw new Error(t('speechChat.askError', 'Could not send your question.'));
-    await pollForAnswer(question, askData.message_id);
+    return await pollForAnswer(question, askData.message_id);
   };
 
   const pollForAnswer = async (question, messageId) => {
@@ -854,8 +922,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       const response = await chatAPI.getMessageStatus(messageId);
       const data = response?.data || {};
       if (data.status === 'completed') {
-        await handleCompletedAnswer(question, data);
-        return;
+        return data;
       }
       if (data.status === 'failed') {
         throw new Error(data.error_message || t('speechChat.answerError', 'Answer failed. Please try again.'));
@@ -866,12 +933,16 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const handleCompletedAnswer = async (question, data) => {
     const answer = String(data.content || '').trim();
-    const spokenAnswer = handsFreeEnabled
-      ? answer
-      : `${answer} ${t('speechChat.afterAnswerPrompt', "If you'd like, ask me another question.")}`.trim();
     const nextFollowUps = Array.isArray(data.follow_up_questions)
       ? data.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
       : [];
+    const closingLines = await getGuideLines('closing', {
+      question,
+      followUps: nextFollowUps,
+    });
+    const closingLine = closingLines[0]
+      || t('speechChat.afterAnswerPrompt', "If you'd like, ask me another question.");
+    const spokenAnswer = `${answer} ${closingLine}`.trim();
     setFollowUps(nextFollowUps);
     setTurns((prev) => [...prev, { question, answer, followUps: nextFollowUps }]);
     setCurrentTranscript('');
@@ -895,6 +966,50 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
   };
 
+  const runQuestionTurn = async (question) => {
+    const spokenQuestion = String(question || '').trim();
+    if (!spokenQuestion) return;
+
+    const answerPromise = askInstant(spokenQuestion);
+    let answerSettled = false;
+    let answerError = null;
+
+    answerPromise
+      .then(() => {
+        answerSettled = true;
+      })
+      .catch((error) => {
+        answerSettled = true;
+        answerError = error;
+      });
+
+    const guideLines = await getGuideLines('processing', { question: spokenQuestion });
+    if (!answerSettled) {
+      if (guideLines.length) {
+        const extendedLines = guideLines.length > 2
+          ? [...guideLines, guideLines[guideLines.length - 2], guideLines[guideLines.length - 1]]
+          : guideLines;
+        for (let index = 0; index < extendedLines.length; index += 1) {
+          if (!mountedRef.current || answerSettled) break;
+          await playAvatarLine(extendedLines[index]);
+          if (!mountedRef.current || answerSettled) break;
+          await wait(index === 0 ? 140 : index < guideLines.length ? 220 : 320);
+        }
+      } else {
+        await speakThinkingHandoff();
+      }
+    }
+
+    try {
+      const finalData = await answerPromise;
+      if (!mountedRef.current || !finalData) return;
+      await handleCompletedAnswer(spokenQuestion, finalData);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      throw answerError || error;
+    }
+  };
+
   const askFollowUp = async (question) => {
     if (status !== 'idle') return;
     setCurrentTranscript(question);
@@ -903,10 +1018,40 @@ export default function SpeechChatScreen({ navigation, route }) {
     try {
       await getTextToSpeech().stop();
       setStatus('thinking');
-      await speakThinkingHandoff();
-      if (!mountedRef.current) return;
-      await askInstant(question);
+      await runQuestionTurn(question);
     } catch (error) {
+      setErrorText(error?.message || t('speechChat.answerError', 'Answer failed. Please try again.'));
+      setStatus('idle');
+    }
+  };
+
+  const runDevSampleQuestion = async () => {
+    if (!birthData) {
+      Alert.alert(
+        t('speechChat.profileRequired', 'Birth chart required'),
+        t('speechChat.profileRequiredBody', 'Please select or create a birth chart before using speech chat.')
+      );
+      return;
+    }
+
+    const sampleQuestions =
+      String(language || '').toLowerCase().startsWith('hi')
+        ? DEV_SPEECH_TEST_QUESTIONS_HI
+        : DEV_SPEECH_TEST_QUESTIONS;
+    const question = sampleQuestions[devQuestionIndexRef.current % sampleQuestions.length];
+    devQuestionIndexRef.current += 1;
+
+    try {
+      handsFreeRestartRef.current = false;
+      setErrorText('');
+      setCurrentTranscript(question);
+      setFollowUps([]);
+      setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
+      await getTextToSpeech().stop();
+      setStatus('thinking');
+      await runQuestionTurn(question);
+    } catch (error) {
+      if (!mountedRef.current) return;
       setErrorText(error?.message || t('speechChat.answerError', 'Answer failed. Please try again.'));
       setStatus('idle');
     }
@@ -924,6 +1069,10 @@ export default function SpeechChatScreen({ navigation, route }) {
         await startListening();
       }
     } catch (error) {
+      if (isSpeechUnavailableMessage(error?.message)) {
+        await runDevSampleQuestion();
+        return;
+      }
       setErrorText(error?.message || t('speechChat.genericError', 'Something went wrong. Please try again.'));
       setStatus('idle');
     }
@@ -1127,6 +1276,26 @@ export default function SpeechChatScreen({ navigation, route }) {
         ) : null}
 
         {errorText ? <Text style={[styles.errorText, { color: colors.error }]}>{errorText}</Text> : null}
+        <View style={styles.devToolsRow}>
+          <TouchableOpacity
+            type="button"
+            activeOpacity={0.85}
+            onPress={runDevSampleQuestion}
+            disabled={busy}
+            style={[
+              styles.devSampleButton,
+              {
+                borderColor: screenPalette.border,
+                backgroundColor: busy ? 'rgba(255,255,255,0.45)' : 'rgba(249,115,22,0.08)',
+              },
+            ]}
+          >
+            <Ionicons name="flask-outline" size={16} color={screenPalette.primary} />
+            <Text style={[styles.devSampleButtonText, { color: screenPalette.primary }]}>
+              {busy ? 'Testing…' : 'Run test question'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         </View>
 
         <LinearGradient
@@ -1212,6 +1381,7 @@ export default function SpeechChatScreen({ navigation, route }) {
                 speechTimeline={avatarSpeech.timeline}
                 speechPositionMs={avatarSpeech.positionMs}
                 speechDurationMs={avatarSpeech.durationMs}
+                speechAudioStarted={avatarSpeech.audioStarted}
               />
             </View>
 
@@ -1412,6 +1582,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 8,
     flexShrink: 0,
+  },
+  devToolsRow: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  devSampleButton: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  devSampleButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   controlsShell: {
     marginHorizontal: -18,

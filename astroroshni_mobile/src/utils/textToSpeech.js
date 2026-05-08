@@ -17,6 +17,10 @@ let speechProvider = 'local';
 
 const SPEECH_PROVIDER_LOCAL = 'local';
 const SPEECH_PROVIDER_GOOGLE = 'google';
+const markHandledError = (error) => {
+  if (error && typeof error === 'object') error.__ttsHandled = true;
+  return error;
+};
 
 const stopLoadedAudio = async () => {
   if (currentSound) {
@@ -144,27 +148,35 @@ const speakLocally = async (text, { language = 'english', voiceName, onDone, onE
     speechLanguage,
   });
 
-  Speech.speak(text, {
-    language: speechLanguage,
-    voice: voice?.identifier,
-    rate: lang === 'hi' ? 0.92 : 0.95,
-    pitch: lang === 'hi' ? 1.02 : 1.06,
-    onDone: () => {
-      if (onDone) onDone();
-    },
-    onStopped: () => {
-      if (onDone) onDone();
-    },
-    onError: (e) => {
-      console.error('[TTS] system speech error', e);
-      if (onError) onError(e);
-    },
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const finish = (cb, value, shouldReject = false) => {
+      if (finished) return;
+      finished = true;
+      if (cb) cb(value);
+      if (shouldReject) reject(value);
+      else resolve(value);
+    };
+
+    Speech.speak(text, {
+      language: speechLanguage,
+      voice: voice?.identifier,
+      rate: lang === 'hi' ? 0.92 : 0.95,
+      pitch: lang === 'hi' ? 1.02 : 1.06,
+      onDone: () => finish(onDone),
+      onStopped: () => finish(onDone),
+      onError: (e) => {
+        console.error('[TTS] system speech error', e);
+        finish(onError, markHandledError(e), true);
+      },
+    });
   });
 };
 
 export const textToSpeech = {
   setSpeechProvider(provider) {
     speechProvider = normalizeSpeechProvider(provider);
+    console.log('[TTS] setSpeechProvider', { provider: speechProvider });
   },
 
   getSpeechProvider() {
@@ -174,29 +186,33 @@ export const textToSpeech = {
   async speak(text, { language = 'english', voiceName, onDone, onError, onTimeline, onProgress } = {}) {
     try {
       if (!text || !text.trim()) return;
+      console.log('[TTS] speak() called', {
+        provider: speechProvider,
+        language,
+        voiceName: voiceName || null,
+        textLength: String(text).trim().length,
+        preview: String(text).trim().slice(0, 80),
+      });
 
       if (speechProvider === SPEECH_PROVIDER_GOOGLE) {
-        try {
-          await textToSpeech.playServerTts(text, {
-            language,
-            voiceName,
-            onDone,
-            onTimeline,
-            onProgress,
-            suppressErrorCallback: true,
-          });
-          return;
-        } catch (googleError) {
-          console.warn('[TTS] Google speech failed, falling back to local speech', googleError?.message || googleError);
-        }
+        await textToSpeech.playServerTts(text, {
+          language,
+          voiceName,
+          onDone,
+          onError,
+          onTimeline,
+          onProgress,
+        });
+        return;
       }
 
       await Speech.stop();
       await stopLoadedAudio();
+      console.log('[TTS] using local device speech');
       await speakLocally(text, { language, voiceName, onDone, onError });
     } catch (e) {
       console.error('[TTS] speak error', e);
-      if (onError) onError(e);
+      if (!e?.__ttsHandled && onError) onError(e);
     }
   },
 
@@ -222,8 +238,18 @@ export const textToSpeech = {
       if (!base64Audio || typeof base64Audio !== 'string') {
         throw new Error('Google TTS: missing audio from server');
       }
+      console.log('[TTS] Google TTS response', {
+        timingModeUsed: Boolean(response?.data?.timing_mode_used),
+        timelineCount: Array.isArray(response?.data?.timeline) ? response.data.timeline.length : 0,
+        timepointCount: Array.isArray(response?.data?.timepoints) ? response.data.timepoints.length : 0,
+        audioChars: base64Audio.length,
+      });
       const responseTimeline = Array.isArray(response?.data?.timeline) ? response.data.timeline : [];
       if (responseTimeline.length && onTimeline) {
+        console.log('[TTS] delivering timeline to UI', {
+          first: responseTimeline[0] || null,
+          last: responseTimeline[responseTimeline.length - 1] || null,
+        });
         onTimeline(responseTimeline);
       }
 
@@ -242,29 +268,88 @@ export const textToSpeech = {
         interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
       });
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: speechTempUri },
-        { progressUpdateIntervalMillis: 80 }
-      );
-      currentSound = sound;
-      speechCallbacks = { onDone, onError, onProgress };
-      await sound.setVolumeAsync(1.0);
+      await new Promise(async (resolve, reject) => {
+        let settled = false;
+        let startedLogged = false;
+        let progressPollId = null;
+        const finish = async (cb, value, shouldReject = false) => {
+          if (settled) return;
+          settled = true;
+          if (progressPollId) {
+            clearInterval(progressPollId);
+            progressPollId = null;
+          }
+          try {
+            if (cb) cb(value);
+          } finally {
+            if (shouldReject) reject(value);
+            else resolve(value);
+          }
+        };
 
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status?.isLoaded && speechCallbacks?.onProgress && status.positionMillis != null) {
-          speechCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
-        }
-        if (status?.didJustFinish) {
-          const done = speechCallbacks?.onDone;
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: speechTempUri },
+          { progressUpdateIntervalMillis: 80 }
+        );
+        currentSound = sound;
+        speechCallbacks = { onDone, onError, onProgress };
+        await sound.setVolumeAsync(1.0);
+        console.log('[TTS] Google audio prepared', { uri: speechTempUri });
+
+        progressPollId = setInterval(() => {
+          sound.getStatusAsync()
+            .then((status) => {
+              if (!status?.isLoaded) return;
+              if (speechCallbacks?.onProgress && status.positionMillis != null) {
+                speechCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
+              }
+            })
+            .catch(() => {
+              // Ignore transient polling failures; status updates may still arrive normally.
+            });
+        }, 80);
+
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status?.isLoaded && speechCallbacks?.onProgress && status.positionMillis != null) {
+            speechCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
+          }
+          if (
+            !startedLogged &&
+            status?.isLoaded &&
+            status.positionMillis != null &&
+            status.positionMillis > 120
+          ) {
+            startedLogged = true;
+            console.log('[TTS] Google playback started', {
+              positionMillis: status.positionMillis,
+              durationMillis: status.durationMillis ?? 0,
+            });
+          }
+          if (status?.didJustFinish) {
+            const done = speechCallbacks?.onDone;
+            console.log('[TTS] Google playback finished');
+            speechCallbacks = null;
+            sound.unloadAsync().catch(() => {});
+            currentSound = null;
+            cleanupSpeechPlayback();
+            finish(done);
+          }
+        });
+
+        try {
+          await sound.playAsync();
+        } catch (playError) {
           speechCallbacks = null;
-          sound.unloadAsync().catch(() => {});
+          try {
+            await sound.unloadAsync();
+          } catch {
+            // ignore
+          }
           currentSound = null;
           cleanupSpeechPlayback();
-          if (done) done();
+          finish(onError, markHandledError(playError), true);
         }
       });
-
-      await sound.playAsync();
     } catch (e) {
       console.error('[TTS] playServerTts error', e);
       if (currentSound) {
@@ -276,7 +361,7 @@ export const textToSpeech = {
         currentSound = null;
       }
       cleanupSpeechPlayback();
-      if (!suppressErrorCallback && onError) onError(e);
+      if (!suppressErrorCallback && !e?.__ttsHandled && onError) onError(e);
       throw e;
     }
   },

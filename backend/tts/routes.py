@@ -4,6 +4,7 @@ import base64
 import os
 import re
 import html
+import hashlib
 from google.cloud import texttospeech
 from google.cloud import texttospeech_v1beta1 as texttospeech_beta
 import logging
@@ -20,7 +21,11 @@ from tts.podcast_cache import get_cached_audio, put_cached_audio
 from tts import notebook_lm_podcast
 from activity.publisher import publish_activity
 from utils.env_json import parse_json_from_env
-from utils.admin_settings import get_podcast_provider, PODCAST_PROVIDER_NOTEBOOK_LM
+from utils.admin_settings import (
+  get_podcast_provider,
+  get_speech_tts_voice,
+  PODCAST_PROVIDER_NOTEBOOK_LM,
+)
 
 credit_service = CreditService()
 
@@ -70,19 +75,16 @@ TTS_CREDENTIALS_ENV_ALT = "GOOGLE_SERVICE_ACCOUNT_KEY"
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["tts"])
+_SPOKEN_TTS_CACHE: dict[str, str] = {}
 
 
 def _build_voice_and_config(lang: str, voice_name: str | None = None):
   lang = (lang or "en").lower()
-  if voice_name:
-    parts = voice_name.split("-")
+  resolved_voice_name = voice_name or get_speech_tts_voice(lang)
+  if resolved_voice_name:
+    parts = resolved_voice_name.split("-")
     language_code = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else ("hi-IN" if lang.startswith("hi") else "en-IN")
-    voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
-  else:
-    if lang.startswith("hi"):
-      voice = texttospeech.VoiceSelectionParams(language_code="hi-IN", name="hi-IN-Neural2-C")
-    else:
-      voice = texttospeech.VoiceSelectionParams(language_code="en-IN", name="en-IN-Neural2-A")
+    voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=resolved_voice_name)
   audio_config = texttospeech.AudioConfig(
     audio_encoding=texttospeech.AudioEncoding.MP3,
     speaking_rate=0.95,
@@ -92,20 +94,26 @@ def _build_voice_and_config(lang: str, voice_name: str | None = None):
 
 def _build_beta_voice_and_config(lang: str, voice_name: str | None = None):
   lang = (lang or "en").lower()
-  if voice_name:
-    parts = voice_name.split("-")
+  resolved_voice_name = voice_name or get_speech_tts_voice(lang)
+  if resolved_voice_name:
+    parts = resolved_voice_name.split("-")
     language_code = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else ("hi-IN" if lang.startswith("hi") else "en-IN")
-    voice = texttospeech_beta.VoiceSelectionParams(language_code=language_code, name=voice_name)
-  else:
-    if lang.startswith("hi"):
-      voice = texttospeech_beta.VoiceSelectionParams(language_code="hi-IN", name="hi-IN-Neural2-C")
-    else:
-      voice = texttospeech_beta.VoiceSelectionParams(language_code="en-IN", name="en-IN-Neural2-A")
+    voice = texttospeech_beta.VoiceSelectionParams(language_code=language_code, name=resolved_voice_name)
   audio_config = texttospeech_beta.AudioConfig(
     audio_encoding=texttospeech_beta.AudioEncoding.MP3,
     speaking_rate=0.95,
   )
   return voice, audio_config
+
+
+def _voice_supports_word_mark_timepoints(voice_name: str | None) -> bool:
+  name = str(voice_name or "").lower().strip()
+  if not name:
+    return True
+  # Premium voice families sound worse with per-word SSML marks in speech chat.
+  if "chirp" in name or "studio" in name:
+    return False
+  return True
 
 
 def _podcast_voices(lang: str) -> tuple[str, str, str]:
@@ -185,6 +193,108 @@ def _apply_pronunciation_plain(text: str) -> str:
   for term, alias in _PRONUNCIATION_ALIASES:
     text = text.replace(term, alias)
   return text
+
+
+def _strip_followups_block(text: str) -> str:
+  raw = str(text or "")
+  raw = re.sub(
+    r"###FOLLOW_UPS_START###.*?###FOLLOW_UPS_END###",
+    " ",
+    raw,
+    flags=re.DOTALL | re.IGNORECASE,
+  )
+  return raw
+
+
+def _fallback_spoken_tts_text(text: str, lang: str) -> str:
+  """Cheap cleanup so even fallback TTS sounds less like a report being read aloud."""
+  raw = _strip_followups_block(text)
+  raw = re.sub(r"<[^>]+>", " ", raw)
+  raw = re.sub(r"\*\*(.*?)\*\*", r"\1", raw)
+  raw = re.sub(r"\*(.*?)\*", r"\1", raw)
+  raw = re.sub(r"^#+\s*", "", raw, flags=re.MULTILINE)
+  raw = re.sub(r"[-–—]{2,}", ". ", raw)
+  raw = re.sub(r"\n+", " ", raw)
+  raw = re.sub(r"\s{2,}", " ", raw).strip()
+  if not raw:
+    return ""
+
+  spoken = raw
+  spoken = re.sub(r"\s*:\s*", ": ", spoken)
+  spoken = re.sub(r"\s*;\s*", ". [PAUSE:short] ", spoken)
+  spoken = re.sub(r"\s*,\s*", ", [PAUSE:short] ", spoken)
+  spoken = re.sub(r"([.?!।])\s+", r"\1 [PAUSE:medium] ", spoken)
+  spoken = re.sub(r"\s{2,}", " ", spoken).strip()
+  return spoken
+
+
+def _prepare_spoken_tts_text(text: str, lang: str) -> str:
+  """
+  Rewrite answer text into a more naturally speakable single-speaker script with pause cues.
+  Falls back to deterministic cleanup when Gemini or credentials are unavailable.
+  """
+  normalized_lang = "hi" if str(lang or "en").lower().startswith("hi") else "en"
+  base_text = _fallback_spoken_tts_text(text, normalized_lang)
+  if not base_text:
+    return ""
+
+  cache_key = hashlib.sha1(f"{normalized_lang}::{base_text}".encode("utf-8")).hexdigest()
+  cached = _SPOKEN_TTS_CACHE.get(cache_key)
+  if cached:
+    return cached
+
+  try:
+    import google.generativeai as genai
+    from utils.admin_settings import get_gemini_analysis_model
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+      return base_text
+
+    genai.configure(api_key=api_key)
+    model_name = os.getenv("GEMINI_SPEECH_TTS_MODEL") or os.getenv("GEMINI_PODCAST_MODEL") or get_gemini_analysis_model()
+    model = genai.GenerativeModel(model_name)
+
+    language_instruction = (
+      "Write the ENTIRE response in natural spoken Hindi (Devanagari), warm and conversational, "
+      "like a trusted guide speaking aloud. Avoid stiff bookish phrasing."
+      if normalized_lang == "hi"
+      else "Write in natural spoken English, warm and conversational, like a trusted guide speaking aloud."
+    )
+
+    prompt = f"""Rewrite the following assistant answer so it sounds natural when spoken aloud by ONE person.
+
+Rules:
+- Preserve the exact meaning, facts, timing, names, and recommendations. Do not add or remove facts.
+- Make it sound spoken, not read from a report.
+- Prefer shorter spoken sentences and natural transitions.
+- Insert pause cues where helpful: [PAUSE:short], [PAUSE:medium], [PAUSE:long].
+- Use pause cues sparingly but deliberately so the voice can breathe.
+- Do NOT add speaker labels, markdown, bullets, JSON, or explanations.
+- Return only the rewritten script.
+
+{language_instruction}
+
+Original answer:
+{base_text}
+"""
+
+    response = model.generate_content(prompt)
+    shaped = str(getattr(response, "text", "") or "").strip()
+    if not shaped:
+      return base_text
+    shaped = _strip_followups_block(shaped)
+    shaped = re.sub(r"\s{2,}", " ", shaped).strip()
+    if not shaped:
+      return base_text
+    _SPOKEN_TTS_CACHE[cache_key] = shaped
+    if len(_SPOKEN_TTS_CACHE) > 128:
+      _SPOKEN_TTS_CACHE.pop(next(iter(_SPOKEN_TTS_CACHE)))
+    logger.info("TTS: prepared spoken script via Gemini (lang=%s, in_chars=%s, out_chars=%s)", normalized_lang, len(base_text), len(shaped))
+    return shaped
+  except Exception as e:
+    logger.warning("TTS: spoken script shaping fallback due to error: %s", e)
+    return base_text
 
 
 def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
@@ -376,6 +486,36 @@ _SINGLE_WORD_ALIAS_MAP = {
   for term, alias in _PRONUNCIATION_ALIASES
   if " " not in term.strip()
 }
+_MARKED_SSML_PREFIX = '<speak><prosody rate="100%" pitch="+0.15st">'
+_MARKED_SSML_SUFFIX = '</prosody></speak>'
+_SPOKEN_WORD_PATTERN = r"[A-Za-z0-9\u00c0-\u024f\u0900-\u097f]+(?:['’][A-Za-z0-9\u00c0-\u024f\u0900-\u097f]+)?"
+_SPOKEN_TOKEN_RE = re.compile(
+  rf"\[PAUSE:(?:short|medium|long)\]|{_SPOKEN_WORD_PATTERN}|[^\sA-Za-z0-9\u00c0-\u024f\u0900-\u097f]+|\s+",
+  flags=re.IGNORECASE,
+)
+
+
+def _pause_tag_to_ssml(token: str) -> str:
+  value = str(token or "").lower()
+  if value == "[pause:short]":
+    return '<break time="260ms"/>'
+  if value == "[pause:medium]":
+    return '<break time="620ms"/>'
+  return '<break time="960ms"/>'
+
+
+def _iter_spoken_tokens(text: str):
+  for match in _SPOKEN_TOKEN_RE.finditer(str(text or "")):
+    token = match.group(0)
+    if not token:
+      continue
+    lowered = token.lower()
+    if lowered in ("[pause:short]", "[pause:medium]", "[pause:long]"):
+      yield ("pause", lowered)
+    elif re.fullmatch(_SPOKEN_WORD_PATTERN, token, flags=re.IGNORECASE):
+      yield ("word", token)
+    else:
+      yield ("separator", token)
 
 
 def _estimate_syllables(word: str) -> int:
@@ -419,37 +559,70 @@ def _word_token_to_ssml(token: str) -> str:
   return escaped_token
 
 
-def _build_marked_ssml_and_timeline(text: str) -> tuple[str | None, list[dict]]:
+def _wrap_marked_ssml(content_parts: list[str]) -> str:
+  return _MARKED_SSML_PREFIX + "".join(content_parts) + _MARKED_SSML_SUFFIX
+
+
+def _build_marked_ssml_chunks_and_timeline(text: str) -> list[dict]:
   raw = _strip_literal_punctuation_words(text or "").strip()
   if not raw:
-    return None, []
+    return []
 
-  prefix = '<speak><prosody rate="100%" pitch="+0.15st">'
-  suffix = '</prosody></speak>'
+  chunks: list[dict] = []
   content_parts: list[str] = []
   timeline: list[dict] = []
   word_index = 0
 
-  for match in re.finditer(r"\w+|[^\w]+", raw, flags=re.UNICODE):
-    token = match.group(0)
-    if re.search(r"\w", token, flags=re.UNICODE):
+  def flush_chunk() -> None:
+    nonlocal content_parts, timeline
+    if not content_parts or not timeline:
+      content_parts = []
+      timeline = []
+      return
+    chunks.append({
+      "ssml": _wrap_marked_ssml(content_parts),
+      "timeline_template": timeline,
+    })
+    content_parts = []
+    timeline = []
+
+  for token_type, token in _iter_spoken_tokens(raw):
+    if token_type == "word":
       mark_name = f"w{word_index}"
-      content_parts.append(f'<mark name="{mark_name}"/>{_word_token_to_ssml(token)}')
-      timeline.append({
+      rendered = f'<mark name="{mark_name}"/>{_word_token_to_ssml(token)}'
+      row = {
         "mark_name": mark_name,
         "word_index": word_index,
         "word": token,
         "intensity": _word_intensity(token),
         "estimated_word_ms": _estimated_word_ms(token),
-      })
+      }
+      candidate_parts = content_parts + [rendered]
+      candidate_timeline = timeline + [row]
+      if timeline and len(_wrap_marked_ssml(candidate_parts).encode("utf-8")) > (_TTS_INPUT_MAX_BYTES - _TTS_TIMING_SAFETY_BYTES):
+        flush_chunk()
+      content_parts.append(rendered)
+      timeline.append(row)
       word_index += 1
+    elif token_type == "pause":
+      rendered = _pause_tag_to_ssml(token)
+      candidate_parts = content_parts + [rendered]
+      if timeline and len(_wrap_marked_ssml(candidate_parts).encode("utf-8")) > (_TTS_INPUT_MAX_BYTES - _TTS_TIMING_SAFETY_BYTES):
+        flush_chunk()
+      content_parts.append(rendered)
     else:
-      content_parts.append(html.escape(token, quote=False))
+      rendered = html.escape(token, quote=False)
+      candidate_parts = content_parts + [rendered]
+      if timeline and len(_wrap_marked_ssml(candidate_parts).encode("utf-8")) > (_TTS_INPUT_MAX_BYTES - _TTS_TIMING_SAFETY_BYTES):
+        flush_chunk()
+      content_parts.append(rendered)
 
-  ssml = prefix + "".join(content_parts) + suffix
-  if len(ssml.encode("utf-8")) > (_TTS_INPUT_MAX_BYTES - _TTS_TIMING_SAFETY_BYTES):
-    return None, []
-  return ssml, timeline
+  flush_chunk()
+  return chunks
+
+
+def _strip_mark_tags(ssml: str) -> str:
+  return re.sub(r'<mark name="[^"]+"\s*/>', "", ssml or "")
 
 
 async def _synthesize_ssml(client, voice, audio_config, ssml: str) -> bytes:
@@ -495,7 +668,7 @@ async def _synthesize_ssml_with_timepoints(client, voice, audio_config, ssml: st
   return response.audio_content, list(getattr(response, "timepoints", []) or [])
 
 
-def _merge_mark_timeline(timepoints: list, timeline_template: list[dict]) -> list[dict]:
+def _merge_mark_timeline(timepoints: list, timeline_template: list[dict], offset_ms: int = 0) -> list[dict]:
   if not timepoints or not timeline_template:
     return []
 
@@ -519,9 +692,18 @@ def _merge_mark_timeline(timepoints: list, timeline_template: list[dict]) -> lis
       continue
     merged.append({
       **row,
-      "start_ms": int(round(marks[mark_name] * 1000)),
+      "start_ms": offset_ms + int(round(marks[mark_name] * 1000)),
     })
   return merged
+
+
+def _estimate_timeline_end_ms(merged_timeline: list[dict]) -> int:
+  if not merged_timeline:
+    return 0
+  last = merged_timeline[-1]
+  last_start = int(last.get("start_ms") or 0)
+  last_word_ms = int(last.get("estimated_word_ms") or 180)
+  return last_start + max(140, min(last_word_ms + 80, 420))
 
 
 def _get_tts_credentials_only():
@@ -579,7 +761,7 @@ def _get_google_credentials():
 @router.get("/voices")
 async def list_voices():
   """
-  Return available Indian voices (en-IN, hi-IN) from Google TTS.
+  Return available Google TTS voices so admin can audition/select speech-chat voices.
   """
   try:
     creds = _get_google_credentials()
@@ -591,16 +773,13 @@ async def list_voices():
 
   voices = []
   for v in response.voices:
-    # Filter to Indian English and Hindi
-    if not any(code.startswith(("en-IN", "hi-IN")) for code in v.language_codes):
-      continue
     voices.append({
       "name": v.name,
       "language_codes": list(v.language_codes),
       "ssml_gender": texttospeech.SsmlVoiceGender(v.ssml_gender).name if isinstance(v.ssml_gender, int) else str(v.ssml_gender),
       "natural_sample_rate_hertz": v.natural_sample_rate_hertz,
     })
-
+  voices.sort(key=lambda item: (item["name"], ",".join(item["language_codes"])))
   return {"voices": voices}
 
 
@@ -628,37 +807,70 @@ async def synthesize(
     logger.exception("TTS: Error initializing TextToSpeechClient")
     raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
-  voice, audio_config = _build_voice_and_config(lang or "en", voice_name)
+  resolved_voice_name = voice_name or get_speech_tts_voice(lang or "en")
+  voice, audio_config = _build_voice_and_config(lang or "en", resolved_voice_name)
   try:
     timing_mode_used = False
+    timing_disabled_reason: str | None = None
     timepoints_payload: list[dict] = []
     timeline_payload: list[dict] = []
+    spoken_text = _prepare_spoken_tts_text(text, lang or "en")
+    allow_word_mark_timing = _voice_supports_word_mark_timepoints(resolved_voice_name)
+    logger.info(
+      "TTS: synthesize request prepared spoken text (lang=%s, include_timepoints=%s, src_chars=%s, spoken_chars=%s, voice=%s, allow_word_mark_timing=%s)",
+      lang,
+      include_timepoints,
+      len(str(text or "")),
+      len(spoken_text),
+      resolved_voice_name,
+      allow_word_mark_timing,
+    )
 
-    if include_timepoints:
-      ssml, timeline_template = _build_marked_ssml_and_timeline(text)
-      if ssml and timeline_template:
+    if include_timepoints and allow_word_mark_timing:
+      marked_chunks = _build_marked_ssml_chunks_and_timeline(spoken_text)
+      if marked_chunks:
         beta_client = texttospeech_beta.TextToSpeechClient(credentials=creds)
-        beta_voice, beta_audio_config = _build_beta_voice_and_config(lang or "en", voice_name)
-        audio_bytes, timepoints = await _synthesize_ssml_with_timepoints(
-          beta_client,
-          beta_voice,
-          beta_audio_config,
-          ssml,
-        )
-        timing_mode_used = True
-        timepoints_payload = [
-          {
-            "mark_name": getattr(tp, "mark_name", None) or getattr(tp, "markName", None),
-            "time_seconds": float(getattr(tp, "time_seconds", None) or getattr(tp, "timeSeconds", 0.0) or 0.0),
-          }
-          for tp in timepoints
-          if (getattr(tp, "mark_name", None) or getattr(tp, "markName", None)) is not None
-        ]
-        timeline_payload = _merge_mark_timeline(timepoints, timeline_template)
+        beta_voice, beta_audio_config = _build_beta_voice_and_config(lang or "en", resolved_voice_name)
+        audio_parts: list[bytes] = []
+        offset_ms = 0
+        for chunk_index, chunk in enumerate(marked_chunks):
+          chunk_audio, timepoints = await _synthesize_ssml_with_timepoints(
+            beta_client,
+            beta_voice,
+            beta_audio_config,
+            chunk["ssml"],
+          )
+          audio_parts.append(chunk_audio)
+          chunk_timepoints_payload = [
+            {
+              "mark_name": getattr(tp, "mark_name", None) or getattr(tp, "markName", None),
+              "time_seconds": float(getattr(tp, "time_seconds", None) or getattr(tp, "timeSeconds", 0.0) or 0.0),
+              "chunk_index": chunk_index,
+            }
+            for tp in timepoints
+            if (getattr(tp, "mark_name", None) or getattr(tp, "markName", None)) is not None
+          ]
+          timepoints_payload.extend(chunk_timepoints_payload)
+          chunk_timeline = _merge_mark_timeline(timepoints, chunk["timeline_template"], offset_ms=offset_ms)
+          timeline_payload.extend(chunk_timeline)
+          offset_ms = _estimate_timeline_end_ms(chunk_timeline) if chunk_timeline else offset_ms
+        audio_bytes = b"".join(audio_parts)
+        timing_mode_used = bool(timeline_payload)
       else:
-        audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, text)
+        audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, spoken_text)
     else:
-      audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, text)
+      if include_timepoints and not allow_word_mark_timing:
+        timing_disabled_reason = "voice_family_prefers_smooth_audio"
+      marked_chunks = _build_marked_ssml_chunks_and_timeline(spoken_text)
+      if marked_chunks:
+        audio_parts = []
+        for chunk in marked_chunks:
+          audio_parts.append(
+            await _synthesize_ssml(client, voice, audio_config, _strip_mark_tags(chunk["ssml"]))
+          )
+        audio_bytes = b"".join(audio_parts)
+      else:
+        audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, spoken_text)
   except Exception as e:
     logger.exception("TTS: synthesize_speech failed")
     raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {e}")
@@ -669,6 +881,8 @@ async def synthesize(
     response["timing_mode_used"] = timing_mode_used
     response["timepoints"] = timepoints_payload
     response["timeline"] = timeline_payload
+    if timing_disabled_reason:
+      response["timing_disabled_reason"] = timing_disabled_reason
   return JSONResponse(response)
 
 

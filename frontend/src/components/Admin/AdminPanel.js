@@ -141,6 +141,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [speechChatUserAllowlist, setSpeechChatUserAllowlist] = useState('');
   const [speechTtsProvider, setSpeechTtsProvider] = useState('local');
+  const [speechTtsVoiceEn, setSpeechTtsVoiceEn] = useState('en-IN-Neural2-A');
+  const [speechTtsVoiceHi, setSpeechTtsVoiceHi] = useState('hi-IN-Neural2-A');
+  const [speechVoiceOptions, setSpeechVoiceOptions] = useState([]);
   const [speechChatSaving, setSpeechChatSaving] = useState(false);
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
   const [chatLlmProviderPremium, setChatLlmProviderPremium] = useState('');
@@ -255,6 +258,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       // Credit ledger will be loaded by AdminCreditLedger component
     } else if (activeTab === 'settings') {
       fetchAdminSettings();
+      fetchSpeechVoiceOptions();
       fetchAllowedDevices();
     } else if (activeTab === 'notifications') {
       fetchUsersForNotifications();
@@ -340,6 +344,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setSpeechChatEnabled(Boolean(data.speech_chat_enabled));
       setSpeechChatUserAllowlist(data.speech_chat_user_allowlist || '');
       setSpeechTtsProvider(data.speech_tts_provider === 'google' ? 'google' : 'local');
+      setSpeechTtsVoiceEn(data.speech_tts_voice_en || 'en-IN-Neural2-A');
+      setSpeechTtsVoiceHi(data.speech_tts_voice_hi || 'hi-IN-Neural2-A');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
       setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
@@ -352,6 +358,31 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } catch (error) {
       console.error('Error fetching admin settings:', error);
     }
+  };
+
+  const fetchSpeechVoiceOptions = async () => {
+    try {
+      const response = await fetch('/api/tts/voices', {
+        headers: getAdminAuthHeaders(),
+      });
+      const data = await response.json();
+      setSpeechVoiceOptions(Array.isArray(data?.voices) ? data.voices : []);
+    } catch (error) {
+      console.error('Error fetching speech voice options:', error);
+      setSpeechVoiceOptions([]);
+    }
+  };
+
+  const englishSpeechVoiceOptions = speechVoiceOptions.filter((voice) =>
+    Array.isArray(voice?.language_codes) && voice.language_codes.some((code) => String(code || '').toLowerCase().startsWith('en'))
+  );
+  const hindiSpeechVoiceOptions = speechVoiceOptions.filter((voice) =>
+    Array.isArray(voice?.language_codes) && voice.language_codes.some((code) => String(code || '').toLowerCase().startsWith('hi'))
+  );
+  const speechVoiceLabel = (voice) => {
+    const langs = Array.isArray(voice?.language_codes) ? voice.language_codes.join(', ') : '';
+    const gender = voice?.ssml_gender ? ` · ${voice.ssml_gender}` : '';
+    return `${voice?.name || 'Unknown'}${langs ? ` · ${langs}` : ''}${gender}`;
   };
 
   const fetchBlogPosts = async () => {
@@ -610,7 +641,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setSpeechChatSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [enabledRes, allowlistRes, providerRes] = await Promise.all([
+      const [enabledRes, allowlistRes, providerRes, voiceEnRes, voiceHiRes] = await Promise.all([
         fetch('/api/admin/settings/speech_chat_enabled', {
           method: 'PUT',
           headers,
@@ -638,14 +669,34 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Speech chat TTS provider: local device TTS or backend Google TTS.',
           }),
         }),
+        fetch('/api/admin/settings/speech_tts_voice_en', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'speech_tts_voice_en',
+            value: speechTtsVoiceEn,
+            description: 'Default Google TTS voice for English speech chat.',
+          }),
+        }),
+        fetch('/api/admin/settings/speech_tts_voice_hi', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'speech_tts_voice_hi',
+            value: speechTtsVoiceHi,
+            description: 'Default Google TTS voice for Hindi speech chat.',
+          }),
+        }),
       ]);
-      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok) {
+      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok || !voiceEnRes.ok || !voiceHiRes.ok) {
         const enabledErr = await enabledRes.json().catch(() => ({}));
         const allowlistErr = await allowlistRes.json().catch(() => ({}));
         const providerErr = await providerRes.json().catch(() => ({}));
+        const voiceEnErr = await voiceEnRes.json().catch(() => ({}));
+        const voiceHiErr = await voiceHiRes.json().catch(() => ({}));
         alert(
           'Failed to save speech chat settings: ' +
-            (enabledErr.detail || allowlistErr.detail || providerErr.detail || 'check console')
+            (enabledErr.detail || allowlistErr.detail || providerErr.detail || voiceEnErr.detail || voiceHiErr.detail || 'check console')
         );
         return;
       }
@@ -4073,6 +4124,40 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 >
                   <option value="local">Local phone TTS</option>
                   <option value="google">Google TTS</option>
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>English Google voice</strong>
+                  <p>Default voice for English speech chat when Google TTS is selected.</p>
+                </div>
+                <select
+                  value={speechTtsVoiceEn}
+                  onChange={(e) => setSpeechTtsVoiceEn(e.target.value)}
+                  style={{ minWidth: '320px', maxWidth: '100%' }}
+                >
+                  {englishSpeechVoiceOptions.map((voice) => (
+                    <option key={`speech-en-${voice.name}`} value={voice.name}>
+                      {speechVoiceLabel(voice)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Hindi Google voice</strong>
+                  <p>Default voice for Hindi speech chat when Google TTS is selected.</p>
+                </div>
+                <select
+                  value={speechTtsVoiceHi}
+                  onChange={(e) => setSpeechTtsVoiceHi(e.target.value)}
+                  style={{ minWidth: '320px', maxWidth: '100%' }}
+                >
+                  {hindiSpeechVoiceOptions.map((voice) => (
+                    <option key={`speech-hi-${voice.name}`} value={voice.name}>
+                      {speechVoiceLabel(voice)}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>

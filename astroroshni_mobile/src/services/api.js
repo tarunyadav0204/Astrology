@@ -292,6 +292,24 @@ export const speechAPI = {
       timeout: API_TIMEOUT,
     });
   },
+  getGuideLines: ({
+    scene,
+    language = 'english',
+    userName = null,
+    chartName = null,
+    question = null,
+    followUps = [],
+    handsFree = true,
+  }) =>
+    api.post(getEndpoint('/speech/guide-lines'), {
+      scene,
+      language,
+      user_name: userName,
+      chart_name: chartName,
+      question,
+      follow_ups: followUps,
+      hands_free: handsFree,
+    }),
 };
 
 export const wealthAPI = {
