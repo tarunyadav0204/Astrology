@@ -1705,6 +1705,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_instant_model,
             get_event_timeline_model,
             get_podcast_provider,
+            get_speech_tts_provider,
             get_chat_llm_provider,
             get_openai_chat_model,
             get_openai_premium_model,
@@ -1743,6 +1744,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "deepseek_chat_model": get_deepseek_chat_model(),
             "deepseek_premium_model": get_deepseek_premium_model(),
             "podcast_provider": get_podcast_provider(),
+            "speech_tts_provider": get_speech_tts_provider(),
             "instant_chat_enabled": is_instant_chat_enabled(),
             "instant_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_instant_chat_user_allowlist())

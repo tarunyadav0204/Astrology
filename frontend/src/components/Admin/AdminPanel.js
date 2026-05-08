@@ -140,6 +140,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [speechChatUserAllowlist, setSpeechChatUserAllowlist] = useState('');
+  const [speechTtsProvider, setSpeechTtsProvider] = useState('local');
   const [speechChatSaving, setSpeechChatSaving] = useState(false);
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
   const [chatLlmProviderPremium, setChatLlmProviderPremium] = useState('');
@@ -338,6 +339,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
       setSpeechChatEnabled(Boolean(data.speech_chat_enabled));
       setSpeechChatUserAllowlist(data.speech_chat_user_allowlist || '');
+      setSpeechTtsProvider(data.speech_tts_provider === 'google' ? 'google' : 'local');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
       setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
@@ -608,7 +610,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setSpeechChatSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [enabledRes, allowlistRes] = await Promise.all([
+      const [enabledRes, allowlistRes, providerRes] = await Promise.all([
         fetch('/api/admin/settings/speech_chat_enabled', {
           method: 'PUT',
           headers,
@@ -627,13 +629,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Optional CSV user allowlist for speech chat. Empty = all users when enabled.',
           }),
         }),
+        fetch('/api/admin/settings/speech_tts_provider', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'speech_tts_provider',
+            value: speechTtsProvider,
+            description: 'Speech chat TTS provider: local device TTS or backend Google TTS.',
+          }),
+        }),
       ]);
-      if (!enabledRes.ok || !allowlistRes.ok) {
+      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok) {
         const enabledErr = await enabledRes.json().catch(() => ({}));
         const allowlistErr = await allowlistRes.json().catch(() => ({}));
+        const providerErr = await providerRes.json().catch(() => ({}));
         alert(
           'Failed to save speech chat settings: ' +
-            (enabledErr.detail || allowlistErr.detail || 'check console')
+            (enabledErr.detail || allowlistErr.detail || providerErr.detail || 'check console')
         );
         return;
       }
@@ -4045,6 +4057,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   rows={3}
                   style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
                 />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Speech output provider</strong>
+                  <p>
+                    Choose whether speech chat answers use local phone TTS or backend Google TTS.
+                    Google TTS is required for the timed lip-sync path.
+                  </p>
+                </div>
+                <select
+                  value={speechTtsProvider}
+                  onChange={(e) => setSpeechTtsProvider(e.target.value)}
+                  style={{ minWidth: '220px' }}
+                >
+                  <option value="local">Local phone TTS</option>
+                  <option value="google">Google TTS</option>
+                </select>
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button

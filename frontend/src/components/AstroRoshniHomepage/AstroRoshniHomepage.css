@@ -2899,7 +2899,22 @@
 .main-footer {
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   color: white;
-  padding: 50px 0 25px;
+  /* Above investor-homepage ::before star pattern (z-index: 1) */
+  position: relative;
+  z-index: 2;
+  padding: 48px 0 clamp(4.5rem, 10vw, 6rem);
+}
+
+/* Override global `.footer-content` grid (other pages) — single column, readable measure */
+.main-footer .footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 0;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .footer-links {
@@ -2907,6 +2922,10 @@
   flex-direction: column;
   gap: 15px;
   margin-bottom: 20px;
+}
+
+.main-footer .footer-links {
+  margin-bottom: 1.5rem;
 }
 
 .footer-links-row {
@@ -2933,6 +2952,71 @@
   padding-top: 25px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.8);
+}
+
+.footer-bottom p {
+  margin: 0 0 10px;
+}
+
+.footer-bottom p:last-child {
+  margin-bottom: 0;
+}
+
+/* Marketing homepage footers only: full-width rule, aligned copy block, room above fixed chat CTA */
+.main-footer .footer-bottom {
+  width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+  border-top: 1px solid rgba(255, 255, 255, 0.38);
+  padding-top: 1.75rem;
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main-footer .footer-bottom > p {
+  width: 100%;
+  max-width: 40rem;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+  line-height: 1.55;
+}
+
+.main-footer .footer-bottom > p:first-child {
+  margin-bottom: 1.125rem;
+}
+
+.main-footer .footer-bottom > p:last-child {
+  margin-bottom: 0;
+}
+
+.footer-company-note {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.main-footer .footer-company-note {
+  max-width: 40rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.footer-company-link {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer-company-link:hover {
+  color: #fff;
+  opacity: 0.9;
 }
 
 

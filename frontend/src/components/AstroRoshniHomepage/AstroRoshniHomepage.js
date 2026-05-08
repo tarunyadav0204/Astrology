@@ -2256,7 +2256,21 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
             <div className="footer-bottom">
-              <p>© 2025 AstroRoshni.com. All rights reserved.</p>
+              <p>© 2026 AstroRoshni.com. All rights reserved.</p>
+              <p className="footer-company-note">
+                AstroRoshni is a brand of Apeiron Logic LLP, which develops this site and the
+                AstroRoshni apps. LLPIN ACU-9370.{' '}
+                <a
+                  href="#about"
+                  className="footer-company-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate('/about');
+                  }}
+                >
+                  About the company
+                </a>
+              </p>
             </div>
           </div>
         </div>

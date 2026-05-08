@@ -166,6 +166,51 @@
   line-height: 1.6;
 }
 
+/* Company */
+.company-section {
+  padding: 60px 0;
+  background: #fff;
+  border-top: 1px solid #e9ecef;
+}
+
+.company-card {
+  max-width: 880px;
+  margin: 0 auto;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 20px;
+  padding: 40px 48px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.company-title {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.company-card p {
+  color: #495057;
+  line-height: 1.7;
+  font-size: 1.05rem;
+  margin: 0 0 16px;
+}
+
+.company-card p:last-child {
+  margin-bottom: 0;
+}
+
+.company-llpin {
+  margin-top: 8px;
+  color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  .company-card {
+    padding: 28px 22px;
+  }
+}
+
 /* Trust Card */
 .trust-transparency {
   padding-bottom: 100px;

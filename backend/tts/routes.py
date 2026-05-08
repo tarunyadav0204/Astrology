@@ -5,6 +5,7 @@ import os
 import re
 import html
 from google.cloud import texttospeech
+from google.cloud import texttospeech_v1beta1 as texttospeech_beta
 import logging
 import asyncio
 from functools import partial
@@ -84,6 +85,24 @@ def _build_voice_and_config(lang: str, voice_name: str | None = None):
       voice = texttospeech.VoiceSelectionParams(language_code="en-IN", name="en-IN-Neural2-A")
   audio_config = texttospeech.AudioConfig(
     audio_encoding=texttospeech.AudioEncoding.MP3,
+    speaking_rate=0.95,
+  )
+  return voice, audio_config
+
+
+def _build_beta_voice_and_config(lang: str, voice_name: str | None = None):
+  lang = (lang or "en").lower()
+  if voice_name:
+    parts = voice_name.split("-")
+    language_code = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else ("hi-IN" if lang.startswith("hi") else "en-IN")
+    voice = texttospeech_beta.VoiceSelectionParams(language_code=language_code, name=voice_name)
+  else:
+    if lang.startswith("hi"):
+      voice = texttospeech_beta.VoiceSelectionParams(language_code="hi-IN", name="hi-IN-Neural2-C")
+    else:
+      voice = texttospeech_beta.VoiceSelectionParams(language_code="en-IN", name="en-IN-Neural2-A")
+  audio_config = texttospeech_beta.AudioConfig(
+    audio_encoding=texttospeech_beta.AudioEncoding.MP3,
     speaking_rate=0.95,
   )
   return voice, audio_config
@@ -351,6 +370,86 @@ async def _chunk_and_synthesize(client, voice, audio_config, text: str) -> bytes
 
 # Max input size for Google TTS (SSML or text) is 5000 bytes
 _TTS_INPUT_MAX_BYTES = 5000
+_TTS_TIMING_SAFETY_BYTES = 400
+_SINGLE_WORD_ALIAS_MAP = {
+  term.lower(): alias
+  for term, alias in _PRONUNCIATION_ALIASES
+  if " " not in term.strip()
+}
+
+
+def _estimate_syllables(word: str) -> int:
+  cleaned = re.sub(r"[^a-z0-9\u00c0-\u024f\u0900-\u097f]", "", (word or "").lower())
+  if not cleaned:
+    return 1
+  matches = re.findall(r"[aeiouy\u0904-\u094c\u0962\u0963]+", cleaned)
+  return max(1, min(len(matches) or 1, 5))
+
+
+def _word_intensity(word: str) -> int:
+  syllables = _estimate_syllables(word)
+  letters = len(re.sub(r"[^\w]", "", word or "", flags=re.UNICODE)) or len(word or "")
+  if syllables >= 3 or letters >= 7 or re.search(r"\d", word or ""):
+    return 3
+  if syllables >= 2 or letters >= 4:
+    return 2
+  return 1
+
+
+def _estimated_word_ms(word: str) -> int:
+  syllables = _estimate_syllables(word)
+  letters = len(re.sub(r"[^\w]", "", word or "", flags=re.UNICODE)) or len(word or "")
+  strong = syllables >= 3 or letters >= 7 or re.search(r"\d", word or "")
+  medium = (not strong) and (syllables >= 2 or letters >= 4)
+  return max(
+    120,
+    min(
+      300,
+      110 + letters * 14 + syllables * 34 + (32 if strong else 18 if medium else 0),
+    ),
+  )
+
+
+def _word_token_to_ssml(token: str) -> str:
+  alias = _SINGLE_WORD_ALIAS_MAP.get((token or "").lower().strip())
+  escaped_token = html.escape(token, quote=False)
+  if alias:
+    safe_alias = html.escape(alias, quote=True)
+    return f'<sub alias="{safe_alias}">{escaped_token}</sub>'
+  return escaped_token
+
+
+def _build_marked_ssml_and_timeline(text: str) -> tuple[str | None, list[dict]]:
+  raw = _strip_literal_punctuation_words(text or "").strip()
+  if not raw:
+    return None, []
+
+  prefix = '<speak><prosody rate="100%" pitch="+0.15st">'
+  suffix = '</prosody></speak>'
+  content_parts: list[str] = []
+  timeline: list[dict] = []
+  word_index = 0
+
+  for match in re.finditer(r"\w+|[^\w]+", raw, flags=re.UNICODE):
+    token = match.group(0)
+    if re.search(r"\w", token, flags=re.UNICODE):
+      mark_name = f"w{word_index}"
+      content_parts.append(f'<mark name="{mark_name}"/>{_word_token_to_ssml(token)}')
+      timeline.append({
+        "mark_name": mark_name,
+        "word_index": word_index,
+        "word": token,
+        "intensity": _word_intensity(token),
+        "estimated_word_ms": _estimated_word_ms(token),
+      })
+      word_index += 1
+    else:
+      content_parts.append(html.escape(token, quote=False))
+
+  ssml = prefix + "".join(content_parts) + suffix
+  if len(ssml.encode("utf-8")) > (_TTS_INPUT_MAX_BYTES - _TTS_TIMING_SAFETY_BYTES):
+    return None, []
+  return ssml, timeline
 
 
 async def _synthesize_ssml(client, voice, audio_config, ssml: str) -> bytes:
@@ -373,6 +472,56 @@ async def _synthesize_ssml(client, voice, audio_config, ssml: str) -> bytes:
     ),
   )
   return response.audio_content
+
+
+async def _synthesize_ssml_with_timepoints(client, voice, audio_config, ssml: str) -> tuple[bytes, list]:
+  synthesis_input = texttospeech_beta.SynthesisInput(ssml=ssml)
+  request = texttospeech_beta.SynthesizeSpeechRequest(
+    input=synthesis_input,
+    voice=voice,
+    audio_config=audio_config,
+    enable_time_pointing=[
+      texttospeech_beta.SynthesizeSpeechRequest.TimepointType.SSML_MARK,
+    ],
+  )
+  loop = asyncio.get_running_loop()
+  response = await loop.run_in_executor(
+    None,
+    partial(
+      client.synthesize_speech,
+      request=request,
+    ),
+  )
+  return response.audio_content, list(getattr(response, "timepoints", []) or [])
+
+
+def _merge_mark_timeline(timepoints: list, timeline_template: list[dict]) -> list[dict]:
+  if not timepoints or not timeline_template:
+    return []
+
+  marks = {}
+  for tp in timepoints:
+    mark_name = getattr(tp, "mark_name", None) or getattr(tp, "markName", None)
+    seconds = getattr(tp, "time_seconds", None)
+    if seconds is None:
+      seconds = getattr(tp, "timeSeconds", None)
+    if mark_name is None or seconds is None:
+      continue
+    try:
+      marks[str(mark_name)] = float(seconds)
+    except (TypeError, ValueError):
+      continue
+
+  merged = []
+  for row in timeline_template:
+    mark_name = row.get("mark_name")
+    if mark_name not in marks:
+      continue
+    merged.append({
+      **row,
+      "start_ms": int(round(marks[mark_name] * 1000)),
+    })
+  return merged
 
 
 def _get_tts_credentials_only():
@@ -456,7 +605,12 @@ async def list_voices():
 
 
 @router.post("/synthesize")
-async def synthesize(text: str, lang: str = "en", voice_name: str | None = None):
+async def synthesize(
+  text: str,
+  lang: str = "en",
+  voice_name: str | None = None,
+  include_timepoints: bool = Query(default=False),
+):
   """
   Google Cloud Text-to-Speech with Indian voices.
   - lang='en' -> en-IN Neural voice
@@ -476,13 +630,46 @@ async def synthesize(text: str, lang: str = "en", voice_name: str | None = None)
 
   voice, audio_config = _build_voice_and_config(lang or "en", voice_name)
   try:
-    audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, text)
+    timing_mode_used = False
+    timepoints_payload: list[dict] = []
+    timeline_payload: list[dict] = []
+
+    if include_timepoints:
+      ssml, timeline_template = _build_marked_ssml_and_timeline(text)
+      if ssml and timeline_template:
+        beta_client = texttospeech_beta.TextToSpeechClient(credentials=creds)
+        beta_voice, beta_audio_config = _build_beta_voice_and_config(lang or "en", voice_name)
+        audio_bytes, timepoints = await _synthesize_ssml_with_timepoints(
+          beta_client,
+          beta_voice,
+          beta_audio_config,
+          ssml,
+        )
+        timing_mode_used = True
+        timepoints_payload = [
+          {
+            "mark_name": getattr(tp, "mark_name", None) or getattr(tp, "markName", None),
+            "time_seconds": float(getattr(tp, "time_seconds", None) or getattr(tp, "timeSeconds", 0.0) or 0.0),
+          }
+          for tp in timepoints
+          if (getattr(tp, "mark_name", None) or getattr(tp, "markName", None)) is not None
+        ]
+        timeline_payload = _merge_mark_timeline(timepoints, timeline_template)
+      else:
+        audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, text)
+    else:
+      audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, text)
   except Exception as e:
     logger.exception("TTS: synthesize_speech failed")
     raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {e}")
 
   audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
-  return JSONResponse({"audio": audio_b64})
+  response = {"audio": audio_b64}
+  if include_timepoints:
+    response["timing_mode_used"] = timing_mode_used
+    response["timepoints"] = timepoints_payload
+    response["timeline"] = timeline_payload
+  return JSONResponse(response)
 
 
 class PodcastRequest(BaseModel):
@@ -809,4 +996,3 @@ async def podcast_stream(
   if not audio_bytes:
     raise HTTPException(status_code=404, detail="Podcast audio not in cache")
   return Response(content=audio_bytes, media_type="audio/mpeg")
-

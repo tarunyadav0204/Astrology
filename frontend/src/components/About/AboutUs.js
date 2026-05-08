@@ -129,6 +129,25 @@ const AboutUs = ({ user, onLogout, onLogin }) => {
         </div>
       </section>
 
+      {/* Company & brand */}
+      <section className="company-section">
+        <div className="container">
+          <div className="company-card">
+            <h2 className="section-title company-title">Company</h2>
+            <p>
+              Apeiron Logic LLP specializes in advanced Vedic AI astrology, offering data-driven
+              insights through automated divisional chart analysis (D1-D60), personalized karma
+              tracking, and professional financial and career reports. The company owns the
+              AstroRoshni brand and develops and maintains the AstroRoshni mobile application and
+              the astroroshni.com website.
+            </p>
+            <p className="company-llpin">
+              <strong>LLPIN</strong> — ACU-9370
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Trust & Transparency Section */}
       <section className="trust-transparency">
         <div className="container">

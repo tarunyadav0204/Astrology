@@ -245,9 +245,9 @@ export const chatAPI = {
     feature: 'event_timeline', 
     description: 'Cosmic Timeline Analysis' 
   }),
-  tts: (text, lang = 'en', voiceName) =>
+  tts: (text, lang = 'en', voiceName, includeTimepoints = false) =>
     api.post(getEndpoint('/tts/synthesize'), null, {
-      params: { text, lang, voice_name: voiceName },
+      params: { text, lang, voice_name: voiceName, include_timepoints: includeTimepoints },
     }),
   getTtsVoices: () =>
     api.get(getEndpoint('/tts/voices')),

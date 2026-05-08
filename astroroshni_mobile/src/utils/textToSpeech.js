@@ -5,6 +5,7 @@ import { chatAPI } from '../services/api';
 
 let currentSound = null;
 let speechTempUri = null;
+let speechCallbacks = null;
 /** Callbacks for the currently loaded podcast (onPause, onResume, onStop). Cleared when stop or done. */
 let podcastCallbacks = null;
 /** Temp file path for current podcast; cleared when playback ends or stops so we can delete it. */
@@ -12,6 +13,10 @@ let podcastTempUri = null;
 /** Guards seek: only one setPositionAsync at a time; pending seek applied after in-flight seek completes. */
 let seekPromise = null;
 let pendingSeekMillis = null;
+let speechProvider = 'local';
+
+const SPEECH_PROVIDER_LOCAL = 'local';
+const SPEECH_PROVIDER_GOOGLE = 'google';
 
 const stopLoadedAudio = async () => {
   if (currentSound) {
@@ -23,9 +28,15 @@ const stopLoadedAudio = async () => {
     }
     currentSound = null;
   }
+  speechCallbacks = null;
+  podcastCallbacks = null;
   if (speechTempUri) {
     FileSystem.deleteAsync(speechTempUri, { idempotent: true }).catch(() => {});
     speechTempUri = null;
+  }
+  if (podcastTempUri) {
+    FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+    podcastTempUri = null;
   }
 };
 
@@ -104,52 +115,181 @@ const pickSystemVoice = async (lang, requestedVoiceName) => {
   }
 };
 
+const normalizeSpeechProvider = (provider) => (
+  String(provider || '').trim().toLowerCase() === SPEECH_PROVIDER_GOOGLE
+    ? SPEECH_PROVIDER_GOOGLE
+    : SPEECH_PROVIDER_LOCAL
+);
+
+const playbackLangCode = (language) => (
+  language?.toLowerCase?.().startsWith?.('hi') ? 'hi' : 'en'
+);
+
+const cleanupSpeechPlayback = () => {
+  speechCallbacks = null;
+  if (speechTempUri) {
+    FileSystem.deleteAsync(speechTempUri, { idempotent: true }).catch(() => {});
+    speechTempUri = null;
+  }
+};
+
+const speakLocally = async (text, { language = 'english', voiceName, onDone, onError } = {}) => {
+  const lang = playbackLangCode(language);
+  const voice = await pickSystemVoice(lang, voiceName);
+  const speechLanguage = voice?.language || (lang === 'hi' ? 'hi-IN' : 'en-IN');
+  console.log('[TTS] Using system speech voice', {
+    lang,
+    voiceIdentifier: voice?.identifier || null,
+    voiceName: voice?.name || null,
+    speechLanguage,
+  });
+
+  Speech.speak(text, {
+    language: speechLanguage,
+    voice: voice?.identifier,
+    rate: lang === 'hi' ? 0.92 : 0.95,
+    pitch: lang === 'hi' ? 1.02 : 1.06,
+    onDone: () => {
+      if (onDone) onDone();
+    },
+    onStopped: () => {
+      if (onDone) onDone();
+    },
+    onError: (e) => {
+      console.error('[TTS] system speech error', e);
+      if (onError) onError(e);
+    },
+  });
+};
+
 export const textToSpeech = {
-  async speak(text, { language = 'english', voiceName, onDone, onError } = {}) {
+  setSpeechProvider(provider) {
+    speechProvider = normalizeSpeechProvider(provider);
+  },
+
+  getSpeechProvider() {
+    return speechProvider;
+  },
+
+  async speak(text, { language = 'english', voiceName, onDone, onError, onTimeline, onProgress } = {}) {
     try {
       if (!text || !text.trim()) return;
 
+      if (speechProvider === SPEECH_PROVIDER_GOOGLE) {
+        try {
+          await textToSpeech.playServerTts(text, {
+            language,
+            voiceName,
+            onDone,
+            onTimeline,
+            onProgress,
+            suppressErrorCallback: true,
+          });
+          return;
+        } catch (googleError) {
+          console.warn('[TTS] Google speech failed, falling back to local speech', googleError?.message || googleError);
+        }
+      }
+
       await Speech.stop();
       await stopLoadedAudio();
-      const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
-      const voice = await pickSystemVoice(lang, voiceName);
-      const speechLanguage = voice?.language || (lang === 'hi' ? 'hi-IN' : 'en-IN');
-      console.log('[TTS] Using system speech voice', {
-        lang,
-        voiceIdentifier: voice?.identifier || null,
-        voiceName: voice?.name || null,
-        speechLanguage,
-      });
-
-      Speech.speak(text, {
-        language: speechLanguage,
-        voice: voice?.identifier,
-        rate: lang === 'hi' ? 0.92 : 0.95,
-        pitch: lang === 'hi' ? 1.02 : 1.06,
-        onDone: () => {
-          if (onDone) onDone();
-        },
-        onStopped: () => {
-          if (onDone) onDone();
-        },
-        onError: (e) => {
-          console.error('[TTS] system speech error', e);
-          if (onError) onError(e);
-        },
-      });
+      await speakLocally(text, { language, voiceName, onDone, onError });
     } catch (e) {
       console.error('[TTS] speak error', e);
       if (onError) onError(e);
     }
   },
 
+  async playServerTts(
+    text,
+    { language = 'english', voiceName, onDone, onError, onTimeline, onProgress, suppressErrorCallback = false } = {}
+  ) {
+    try {
+      if (!text || !text.trim()) return;
+
+      await Speech.stop();
+      await stopLoadedAudio();
+
+      const lang = playbackLangCode(language);
+      console.log('[TTS] Requesting backend Google TTS', {
+        lang,
+        voiceName: voiceName || null,
+        length: String(text).trim().length,
+      });
+
+      const response = await chatAPI.tts(text, lang, voiceName, true);
+      const base64Audio = response?.data?.audio;
+      if (!base64Audio || typeof base64Audio !== 'string') {
+        throw new Error('Google TTS: missing audio from server');
+      }
+      const responseTimeline = Array.isArray(response?.data?.timeline) ? response.data.timeline : [];
+      if (responseTimeline.length && onTimeline) {
+        onTimeline(responseTimeline);
+      }
+
+      speechTempUri = `${FileSystem.cacheDirectory}speech_${Date.now()}.mp3`;
+      await FileSystem.writeAsStringAsync(speechTempUri, base64Audio, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        allowsRecordingIOS: false,
+        playThroughEarpieceAndroid: false,
+        shouldDuckAndroid: false,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: speechTempUri },
+        { progressUpdateIntervalMillis: 80 }
+      );
+      currentSound = sound;
+      speechCallbacks = { onDone, onError, onProgress };
+      await sound.setVolumeAsync(1.0);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status?.isLoaded && speechCallbacks?.onProgress && status.positionMillis != null) {
+          speechCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
+        }
+        if (status?.didJustFinish) {
+          const done = speechCallbacks?.onDone;
+          speechCallbacks = null;
+          sound.unloadAsync().catch(() => {});
+          currentSound = null;
+          cleanupSpeechPlayback();
+          if (done) done();
+        }
+      });
+
+      await sound.playAsync();
+    } catch (e) {
+      console.error('[TTS] playServerTts error', e);
+      if (currentSound) {
+        try {
+          await currentSound.unloadAsync();
+        } catch {
+          // ignore
+        }
+        currentSound = null;
+      }
+      cleanupSpeechPlayback();
+      if (!suppressErrorCallback && onError) onError(e);
+      throw e;
+    }
+  },
+
   async stop() {
+    const done = speechCallbacks?.onDone;
     try {
       await Speech.stop();
     } catch {
       // ignore
     }
     await stopLoadedAudio();
+    if (done) done();
   },
 
   async isSpeaking() {
@@ -172,6 +312,7 @@ export const textToSpeech = {
           // ignore
         }
         currentSound = null;
+        speechCallbacks = null;
         podcastCallbacks = null;
         if (podcastTempUri) {
           FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
@@ -346,6 +487,7 @@ export const textToSpeech = {
           // ignore
         }
         currentSound = null;
+        speechCallbacks = null;
         podcastCallbacks = null;
         if (podcastTempUri) {
           FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});

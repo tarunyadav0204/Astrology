@@ -1504,6 +1504,7 @@ async def get_analysis_pricing():
     from utils.admin_settings import (
         is_instant_chat_enabled,
         is_speech_chat_enabled,
+        get_speech_tts_provider,
         get_chat_static_suggestions,
     )
     pricing, pricing_original = _get_pricing_with_originals()
@@ -1513,6 +1514,7 @@ async def get_analysis_pricing():
         "features": {
             "instant_chat_enabled": is_instant_chat_enabled(),
             "speech_chat_enabled": is_speech_chat_enabled(),
+            "speech_tts_provider": get_speech_tts_provider(),
             "chat_static_suggestions": get_chat_static_suggestions(),
         },
     }
@@ -1554,6 +1556,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
     from utils.admin_settings import (
         instant_chat_enabled_for_user,
         speech_chat_enabled_for_user,
+        get_speech_tts_provider,
         get_chat_static_suggestions,
     )
     pricing = {}
@@ -1652,6 +1655,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         "features": {
             "instant_chat_enabled": instant_chat_enabled_for_user(current_user.userid),
             "speech_chat_enabled": speech_chat_enabled_for_user(current_user.userid),
+            "speech_tts_provider": get_speech_tts_provider(),
             "chat_static_suggestions": get_chat_static_suggestions(),
         },
     }

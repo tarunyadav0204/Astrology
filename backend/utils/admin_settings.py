@@ -293,6 +293,9 @@ def get_chat_static_suggestions() -> list[str]:
 PODCAST_PROVIDER_TTS = "tts"
 PODCAST_PROVIDER_NOTEBOOK_LM = "notebook_lm"
 
+SPEECH_TTS_PROVIDER_LOCAL = "local"
+SPEECH_TTS_PROVIDER_GOOGLE = "google"
+
 
 def get_podcast_provider() -> str:
     """Which podcast pipeline to use: 'tts' (Gemini script + Google TTS) or 'notebook_lm' (Discovery Engine Podcast API)."""
@@ -300,3 +303,15 @@ def get_podcast_provider() -> str:
     if value and value.strip() in (PODCAST_PROVIDER_TTS, PODCAST_PROVIDER_NOTEBOOK_LM):
         return value.strip()
     return PODCAST_PROVIDER_TTS
+
+
+def get_speech_tts_provider() -> str:
+    """
+    Which TTS provider should speech chat use:
+    - 'local' => device-native TTS
+    - 'google' => backend Google Cloud TTS audio
+    """
+    value = (get_setting("speech_tts_provider") or "").strip().lower()
+    if value == SPEECH_TTS_PROVIDER_GOOGLE:
+        return SPEECH_TTS_PROVIDER_GOOGLE
+    return SPEECH_TTS_PROVIDER_LOCAL

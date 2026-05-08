@@ -12,6 +12,8 @@ const noop = () => {};
 const noopAsync = () => Promise.resolve();
 
 const noopTts = {
+  setSpeechProvider: noop,
+  getSpeechProvider: () => 'local',
   speak: noopAsync,
   stop: noopAsync,
   isSpeaking: () => Promise.resolve(false),
