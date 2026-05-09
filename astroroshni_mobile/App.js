@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
+import * as Device from 'expo-device';
 
 import i18n from './src/locales/i18n';
 
@@ -76,6 +77,63 @@ import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 
 const Stack = createStackNavigator();
 const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
+const MIUI_BRAND_RE = /xiaomi|redmi|poco/i;
+const isMiuiFontBugDevice =
+  Platform.OS === 'android' &&
+  (
+    MIUI_BRAND_RE.test(String(Device.brand || '')) ||
+    MIUI_BRAND_RE.test(String(Device.manufacturer || ''))
+  );
+
+const normalizeMiuiFontWeight = (value) => {
+  if (value == null) return value;
+  if (value === 'normal' || value === '400' || value === 400) return 'normal';
+  if (value === 'bold' || value === '700' || value === 700) return 'bold';
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return numeric >= 600 ? 'bold' : 'normal';
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return value;
+  if (normalized === 'semibold' || normalized === 'medium' || normalized === '500') return 'normal';
+  if (normalized === 'extrabold' || normalized === 'ultrabold' || normalized === '800' || normalized === '900') return 'bold';
+  return value;
+};
+
+const sanitizeMiuiTextStyle = (style) => {
+  if (!style || !isMiuiFontBugDevice) return style;
+  if (Array.isArray(style)) return style.map(sanitizeMiuiTextStyle);
+  if (typeof style !== 'object') return style;
+
+  const nextStyle = { ...style };
+  if ('fontWeight' in nextStyle) {
+    nextStyle.fontWeight = normalizeMiuiFontWeight(nextStyle.fontWeight);
+  }
+  if ('fontVariant' in nextStyle) {
+    delete nextStyle.fontVariant;
+  }
+  return nextStyle;
+};
+
+if (isMiuiFontBugDevice && !global.__ASTROROSHNI_MIUI_TEXT_PATCHED__) {
+  const originalCreateElement = React.createElement;
+  React.createElement = function patchedCreateElement(type, props, ...children) {
+    if (type === Text && props?.style) {
+      return originalCreateElement(
+        type,
+        {
+          ...props,
+          style: sanitizeMiuiTextStyle(props.style),
+        },
+        ...children
+      );
+    }
+    return originalCreateElement(type, props, ...children);
+  };
+  global.__ASTROROSHNI_MIUI_TEXT_PATCHED__ = true;
+}
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);

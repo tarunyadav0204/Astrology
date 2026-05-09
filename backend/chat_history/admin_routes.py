@@ -866,7 +866,7 @@ async def get_admin_chat_user_thread(
                 INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
                 WHERE cs.user_id = %s
-                ORDER BY cm.timestamp ASC NULLS LAST, cm.message_id ASC
+                ORDER BY cm.timestamp DESC NULLS LAST, cm.message_id DESC
                 LIMIT %s OFFSET %s
                 """,
                 (user_id, limit, offset),

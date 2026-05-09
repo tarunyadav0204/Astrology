@@ -57,14 +57,6 @@ const logSpeechDebug = async (label, payload = {}) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const isSpeechUnavailableMessage = (message) => {
-  const value = String(message || '').toLowerCase();
-  return value.includes('speech recognition is not available')
-    || value.includes('use the test question button below')
-    || value.includes('expo go cannot access the native speech recognizer')
-    || value.includes('needs a development build');
-};
-
 /** i18n keys for short spoken handoff after listening → thinking (rotate to avoid repetition). */
 const THINKING_HANDOFF_KEYS = [
   'speechChat.thinkingHandoff1',
@@ -77,16 +69,6 @@ const THINKING_HANDOFF_DEFAULTS = [
   'I have what I need. Let me read that for you.',
 ];
 const SPEECH_CHAT_TTS_PROVIDER = 'google';
-const DEV_SPEECH_TEST_QUESTIONS = [
-  'When will I buy a house?',
-  'When will I get a new job?',
-  'What is my marriage timing over the next two years?',
-];
-const DEV_SPEECH_TEST_QUESTIONS_HI = [
-  'मैं घर कब खरीदूँगा?',
-  'मुझे नई नौकरी कब मिलेगी?',
-  'अगले दो सालों में मेरी शादी का समय क्या है?',
-];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -379,7 +361,6 @@ export default function SpeechChatScreen({ navigation, route }) {
   const handsFreeRestartRef = useRef(false);
   const greetedRef = useRef(false);
   const thinkingLeadInIndexRef = useRef(0);
-  const devQuestionIndexRef = useRef(0);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const cardPulseAnim = useRef(new Animated.Value(0)).current;
   const sparkleAnims = useRef(
@@ -669,7 +650,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       throw new Error(
         t(
           'speechChat.devNativeUnavailable',
-          'Speech recognition is not available in this emulator/build right now. Use the test question button below to simulate a speech turn.'
+          'Speech recognition is not available in this emulator/build right now.'
         )
       );
     }
@@ -770,6 +751,14 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
+  const releaseSpeechRecognizer = () => {
+    try {
+      speechRecognition.cancelListening();
+    } catch {
+      // Ignore cleanup failures; recognizer may already be inactive.
+    }
+  };
+
   const speakWithAvatar = async (
     text,
     {
@@ -849,6 +838,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   /** Brief natural line when recognition is done so the jump to “thinking” is not silent. */
   const speakThinkingHandoff = async () => {
     if (!mountedRef.current) return;
+    releaseSpeechRecognizer();
     const i = thinkingLeadInIndexRef.current % THINKING_HANDOFF_KEYS.length;
     thinkingLeadInIndexRef.current += 1;
     const phrase = t(THINKING_HANDOFF_KEYS[i], THINKING_HANDOFF_DEFAULTS[i]);
@@ -932,6 +922,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const handleCompletedAnswer = async (question, data) => {
+    releaseSpeechRecognizer();
     const answer = String(data.content || '').trim();
     const nextFollowUps = Array.isArray(data.follow_up_questions)
       ? data.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
@@ -1025,38 +1016,6 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
-  const runDevSampleQuestion = async () => {
-    if (!birthData) {
-      Alert.alert(
-        t('speechChat.profileRequired', 'Birth chart required'),
-        t('speechChat.profileRequiredBody', 'Please select or create a birth chart before using speech chat.')
-      );
-      return;
-    }
-
-    const sampleQuestions =
-      String(language || '').toLowerCase().startsWith('hi')
-        ? DEV_SPEECH_TEST_QUESTIONS_HI
-        : DEV_SPEECH_TEST_QUESTIONS;
-    const question = sampleQuestions[devQuestionIndexRef.current % sampleQuestions.length];
-    devQuestionIndexRef.current += 1;
-
-    try {
-      handsFreeRestartRef.current = false;
-      setErrorText('');
-      setCurrentTranscript(question);
-      setFollowUps([]);
-      setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
-      await getTextToSpeech().stop();
-      setStatus('thinking');
-      await runQuestionTurn(question);
-    } catch (error) {
-      if (!mountedRef.current) return;
-      setErrorText(error?.message || t('speechChat.answerError', 'Answer failed. Please try again.'));
-      setStatus('idle');
-    }
-  };
-
   const handleMicPress = async () => {
     try {
       if (status === 'listening') {
@@ -1069,10 +1028,6 @@ export default function SpeechChatScreen({ navigation, route }) {
         await startListening();
       }
     } catch (error) {
-      if (isSpeechUnavailableMessage(error?.message)) {
-        await runDevSampleQuestion();
-        return;
-      }
       setErrorText(error?.message || t('speechChat.genericError', 'Something went wrong. Please try again.'));
       setStatus('idle');
     }
@@ -1276,26 +1231,6 @@ export default function SpeechChatScreen({ navigation, route }) {
         ) : null}
 
         {errorText ? <Text style={[styles.errorText, { color: colors.error }]}>{errorText}</Text> : null}
-        <View style={styles.devToolsRow}>
-          <TouchableOpacity
-            type="button"
-            activeOpacity={0.85}
-            onPress={runDevSampleQuestion}
-            disabled={busy}
-            style={[
-              styles.devSampleButton,
-              {
-                borderColor: screenPalette.border,
-                backgroundColor: busy ? 'rgba(255,255,255,0.45)' : 'rgba(249,115,22,0.08)',
-              },
-            ]}
-          >
-            <Ionicons name="flask-outline" size={16} color={screenPalette.primary} />
-            <Text style={[styles.devSampleButtonText, { color: screenPalette.primary }]}>
-              {busy ? 'Testing…' : 'Run test question'}
-            </Text>
-          </TouchableOpacity>
-        </View>
         </View>
 
         <LinearGradient
@@ -1582,25 +1517,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 8,
     flexShrink: 0,
-  },
-  devToolsRow: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  devSampleButton: {
-    minHeight: 42,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  devSampleButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   controlsShell: {
     marginHorizontal: -18,

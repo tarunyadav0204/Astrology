@@ -25,6 +25,8 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
   private var speechRecognizer: SpeechRecognizer? = null
   private var pendingPromise: Promise? = null
   private var currentLocale: String = Locale.getDefault().toLanguageTag()
+  private var latestTranscript: String = ""
+  private var manualStopRequested: Boolean = false
   private val mainHandler = Handler(Looper.getMainLooper())
 
   override fun getName(): String = "SpeechRecognition"
@@ -56,6 +58,8 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       }
 
       currentLocale = normalizeLocale(locale)
+      latestTranscript = ""
+      manualStopRequested = false
       pendingPromise = promise
       mainHandler.post {
         try {
@@ -92,10 +96,12 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
   fun stopListening() {
     mainHandler.post {
       try {
+        manualStopRequested = true
         speechRecognizer?.stopListening()
       } catch (e: Exception) {
         val promise = pendingPromise
         pendingPromise = null
+        manualStopRequested = false
         promise?.reject("stop_failed", e.message ?: "Could not stop speech recognition", e)
       }
     }
@@ -105,6 +111,8 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
   fun cancelListening() {
     pendingPromise?.reject("cancelled", "Speech recognition cancelled")
     pendingPromise = null
+    latestTranscript = ""
+    manualStopRequested = false
     mainHandler.post {
       try {
         speechRecognizer?.cancel()
@@ -137,6 +145,7 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       ?.firstOrNull()
       ?.trim()
       ?: return
+    latestTranscript = partial
     // RN 0.81 / New Arch: prefer emitDeviceEvent over getJSModule(RCTDeviceEventEmitter).
     if (reactContext.hasActiveReactInstance()) {
       reactContext.emitDeviceEvent("SpeechRecognitionPartial", partial)
@@ -148,24 +157,70 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
       ?.firstOrNull()
       ?.trim()
-      ?: ""
+      ?.takeIf { it.isNotBlank() }
+      ?: latestTranscript.trim()
     val promise = pendingPromise
     pendingPromise = null
+    latestTranscript = ""
+    manualStopRequested = false
     if (transcript.isBlank()) {
       promise?.reject("no_speech", "No speech detected")
     } else {
       promise?.resolve(transcript)
     }
+    mainHandler.post {
+      try {
+        speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+      } catch (e: Exception) {
+        // ignore cleanup failures
+      }
+      speechRecognizer = null
+    }
   }
 
   override fun onError(error: Int) {
+    val transcriptFallback = latestTranscript.trim()
     val promise = pendingPromise
     pendingPromise = null
+    val shouldUseTranscriptFallback =
+      transcriptFallback.isNotBlank() && (
+        manualStopRequested ||
+          error == SpeechRecognizer.ERROR_NO_MATCH ||
+          error == SpeechRecognizer.ERROR_CLIENT ||
+          error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+      )
+    latestTranscript = ""
+    manualStopRequested = false
+    if (shouldUseTranscriptFallback) {
+      promise?.resolve(transcriptFallback)
+      mainHandler.post {
+        try {
+          speechRecognizer?.cancel()
+          speechRecognizer?.destroy()
+        } catch (e: Exception) {
+          // ignore cleanup failures
+        }
+        speechRecognizer = null
+      }
+      return
+    }
     promise?.reject(errorCode(error), errorMessage(error))
+    mainHandler.post {
+      try {
+        speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+      } catch (e: Exception) {
+        // ignore cleanup failures
+      }
+      speechRecognizer = null
+    }
   }
 
   override fun invalidate() {
     pendingPromise = null
+    latestTranscript = ""
+    manualStopRequested = false
     mainHandler.post {
       try {
         speechRecognizer?.destroy()
