@@ -15,6 +15,7 @@ import {
   ScrollView,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Device from 'expo-device';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -69,6 +70,18 @@ const THINKING_HANDOFF_DEFAULTS = [
   'I have what I need. Let me read that for you.',
 ];
 const SPEECH_CHAT_TTS_PROVIDER = 'google';
+const DEV_EMULATOR_AUTO_QUESTIONS = {
+  english: [
+    'What does this birth chart say about my career in the next six months?',
+    'What is the most important relationship pattern in this chart?',
+    'What should I focus on right now according to this chart?',
+  ],
+  hindi: [
+    'Agle chhe mahino mein career ke baare mein is kundli se kya pata chalta hai?',
+    'Is kundli mein sambandhon ka sabse mahatvapurn pattern kya hai?',
+    'Abhi ke samay mein mujhe kis cheez par dhyan dena chahiye?',
+  ],
+};
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -125,68 +138,136 @@ const punctuationPauseMs = (token) => {
   return 0;
 };
 
-const buildMouthTimeline = (text) => {
+const buildVisemePatternForWord = (word) => {
+  const normalized = String(word || '')
+    .toLowerCase()
+    .replace(/[^a-z\u0900-\u097f]/g, '');
+
+  if (!normalized) return ['rest'];
+
+  const pattern = [];
+  let index = 0;
+
+  const consume = (length, viseme) => {
+    pattern.push(viseme);
+    index += length;
+  };
+
+  while (index < normalized.length) {
+    const slice = normalized.slice(index);
+
+    if (slice.startsWith('tion') || slice.startsWith('sion')) {
+      consume(4, 'sh_ch_j_zh');
+      continue;
+    }
+    if (slice.startsWith('tch') || slice.startsWith('ch') || slice.startsWith('sh') || slice.startsWith('zh')) {
+      consume(slice.startsWith('tch') ? 3 : 2, 'sh_ch_j_zh');
+      continue;
+    }
+    if (slice.startsWith('th')) {
+      consume(2, 'th');
+      continue;
+    }
+    if (slice.startsWith('ee') || slice.startsWith('ea') || slice.startsWith('ei') || slice.startsWith('ie')) {
+      consume(2, 'ee_i');
+      continue;
+    }
+    if (slice.startsWith('oo') || slice.startsWith('ew') || slice.startsWith('ue')) {
+      consume(2, 'oo');
+      continue;
+    }
+    if (slice.startsWith('ow') || slice.startsWith('ou') || slice.startsWith('aw') || slice.startsWith('au')) {
+      consume(2, 'o_aw');
+      continue;
+    }
+    if (slice.startsWith('ph')) {
+      consume(2, 'f_v');
+      continue;
+    }
+
+    const char = slice[0];
+    if ('bmp'.includes(char)) {
+      consume(1, 'rest');
+    } else if (char === 'a') {
+      consume(1, 'a');
+    } else if ('o'.includes(char)) {
+      consume(1, 'ah_oh');
+    } else if ('e'.includes(char)) {
+      consume(1, 'ae_eh');
+    } else if ('iuy'.includes(char)) {
+      consume(1, 'ee_i');
+    } else if (char === 'f' || char === 'v') {
+      consume(1, 'f_v');
+    } else if ('tdn'.includes(char)) {
+      consume(1, 't_d_n_l');
+    } else if (char === 'l') {
+      consume(1, 'l');
+    } else if (char === 's' || char === 'z' || char === 'x') {
+      consume(1, 's_z');
+    } else if (char === 'j' || char === 'g' || char === 'c') {
+      consume(1, 'sh_ch_j_zh');
+    } else if (char === 'w') {
+      consume(1, 'w');
+    } else if (char === 'r') {
+      consume(1, 'r');
+    } else {
+      consume(1, 'rest');
+    }
+  }
+
+  const compact = pattern.filter((item, idx) => idx === 0 || item !== pattern[idx - 1]);
+  return compact.length ? compact : ['rest'];
+};
+
+const buildVisemeTimeline = (text) => {
   const tokens = splitSpeechTokens(text);
-  if (!tokens.length) return [{ frame: 0, duration: 180 }];
+  if (!tokens.length) return [{ viseme: 'rest', duration: 180 }];
 
   const timeline = [];
 
   tokens.forEach((token, index) => {
     const pauseMs = punctuationPauseMs(token);
     if (pauseMs > 0) {
-      timeline.push({ frame: 0, duration: pauseMs });
+      timeline.push({ viseme: 'rest', duration: pauseMs });
       return;
     }
 
     const word = String(token || '');
     const syllables = estimateSyllables(word);
     const letters = word.replace(/[^0-9\p{L}]/gu, '').length || word.length || 1;
-    const strongWord = syllables >= 3 || letters >= 7 || /\d/.test(word);
-    const mediumWord = !strongWord && (syllables >= 2 || letters >= 4);
-
-    const pattern = strongWord
-      ? [1, 2, 1, 3, 2, 1, 0]
-      : mediumWord
-        ? [1, 2, 1, 0]
-        : [1, 0];
+    const pattern = buildVisemePatternForWord(word);
 
     const totalWordMs = clamp(
-      110 + letters * 14 + syllables * 34 + (strongWord ? 32 : mediumWord ? 18 : 0),
+      110 + letters * 14 + syllables * 34 + (pattern.length >= 4 ? 32 : pattern.length >= 2 ? 18 : 0),
       170,
       420
     );
 
-    const weights = pattern.map((frame) => {
-      if (frame === 3) return 1.18;
-      if (frame === 2) return 1.02;
-      if (frame === 1) return 0.92;
-      return 0.72;
+    const weights = pattern.map((viseme) => {
+      if (viseme === 'rest') return 0.7;
+      if (viseme === 'a' || viseme === 'ah_oh') return 1.14;
+      if (viseme === 'o_aw' || viseme === 'oo' || viseme === 'w' || viseme === 'r') return 0.98;
+      return 0.9;
     });
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
 
-    pattern.forEach((frame, frameIndex) => {
+    pattern.forEach((viseme, frameIndex) => {
       const duration = Math.round((totalWordMs * weights[frameIndex]) / totalWeight);
-      timeline.push({ frame, duration });
+      timeline.push({ viseme, duration });
     });
 
     const nextToken = tokens[index + 1];
     if (!punctuationPauseMs(nextToken)) {
-      timeline.push({ frame: 0, duration: clamp(55 + syllables * 10, 60, 120) });
+      timeline.push({ viseme: 'rest', duration: clamp(55 + syllables * 10, 60, 120) });
     }
   });
 
-  timeline.push({ frame: 0, duration: 180 });
+  timeline.push({ viseme: 'rest', duration: 180 });
   return timeline;
 };
 
-const buildFramePattern = (intensity) => {
-  if (intensity >= 3) return [1, 2, 3, 2, 1, 0];
-  if (intensity >= 2) return [1, 2, 1, 0];
-  return [1, 0];
-};
-
-const getMouthFrameFromPlaybackTimeline = (timeline, positionMs, durationMs = 0) => {
-  if (!Array.isArray(timeline) || !timeline.length) return 0;
+const getVisemeFromPlaybackTimeline = (timeline, positionMs, durationMs = 0) => {
+  if (!Array.isArray(timeline) || !timeline.length) return 'rest';
   const now = Math.max(0, Number(positionMs) || 0);
 
   let currentIndex = -1;
@@ -197,7 +278,7 @@ const getMouthFrameFromPlaybackTimeline = (timeline, positionMs, durationMs = 0)
     else break;
   }
 
-  if (currentIndex < 0) return 0;
+  if (currentIndex < 0) return 'rest';
 
   const current = timeline[currentIndex];
   const currentStart = Number(current?.start_ms) || 0;
@@ -210,14 +291,14 @@ const getMouthFrameFromPlaybackTimeline = (timeline, positionMs, durationMs = 0)
       );
   const activeSpan = Math.max(120, nextStart - currentStart);
   const progress = clamp((now - currentStart) / activeSpan, 0, 0.999);
-  const pattern = buildFramePattern(Number(current?.intensity) || 1);
+  const pattern = buildVisemePatternForWord(current?.word);
   const patternIndex = Math.min(pattern.length - 1, Math.floor(progress * pattern.length));
   return pattern[patternIndex];
 };
 
-const getMouthFrameFromAudioProgress = (speechText, positionMs, durationMs) => {
-  const frames = buildMouthTimeline(speechText);
-  if (!frames.length) return 0;
+const getVisemeFromAudioProgress = (speechText, positionMs, durationMs) => {
+  const frames = buildVisemeTimeline(speechText);
+  if (!frames.length) return 'rest';
 
   const totalFrameMs = frames.reduce((sum, item) => sum + Math.max(1, Number(item?.duration) || 0), 0);
   const totalAudioMs = Math.max(1, Number(durationMs) || 0);
@@ -227,25 +308,43 @@ const getMouthFrameFromAudioProgress = (speechText, positionMs, durationMs) => {
   for (const item of frames) {
     const duration = Math.max(1, Number(item?.duration) || 0);
     if (scaledNow < cursor + duration) {
-      return Number(item?.frame) || 0;
+      return item?.viseme || 'rest';
     }
     cursor += duration;
   }
 
-  return Number(frames[frames.length - 1]?.frame) || 0;
+  return frames[frames.length - 1]?.viseme || 'rest';
 };
 
 const TARA_BASE = require('../../assets/tara/base_head_body.png');
 const TARA_EYES_OPEN = require('../../assets/tara/eyes_open.png');
 const TARA_EYES_CLOSED = require('../../assets/tara/eyes_closed.png');
 const TARA_MOUTH_CLOSED = require('../../assets/tara/mouth_closed.png');
-const TARA_MOUTH_SMALL = require('../../assets/tara/mouth_small_open.png');
-const TARA_MOUTH_MEDIUM = require('../../assets/tara/mouth_medium_open.png');
-const TARA_MOUTH_WIDE = require('../../assets/tara/mouth_wide_open.png');
+const TARA_MOUTH_SMALL_OPEN = require('../../assets/tara/mouth_small_open.png');
+const TARA_MOUTH_MEDIUM_OPEN = require('../../assets/tara/mouth_medium_open.png');
+const TARA_MOUTH_WIDE_OPEN = require('../../assets/tara/mouth_wide_open.png');
+const TARA_VISEME_SOURCES = {
+  rest: TARA_MOUTH_CLOSED,
+  a: TARA_MOUTH_WIDE_OPEN,
+  ah_oh: TARA_MOUTH_WIDE_OPEN,
+  ae_eh: TARA_MOUTH_MEDIUM_OPEN,
+  e: TARA_MOUTH_MEDIUM_OPEN,
+  ee_i: TARA_MOUTH_SMALL_OPEN,
+  o_aw: TARA_MOUTH_SMALL_OPEN,
+  oo: TARA_MOUTH_SMALL_OPEN,
+  f_v: TARA_MOUTH_SMALL_OPEN,
+  t_d_n_l: TARA_MOUTH_MEDIUM_OPEN,
+  s_z: TARA_MOUTH_SMALL_OPEN,
+  sh_ch_j_zh: TARA_MOUTH_SMALL_OPEN,
+  l: TARA_MOUTH_MEDIUM_OPEN,
+  w: TARA_MOUTH_SMALL_OPEN,
+  r: TARA_MOUTH_SMALL_OPEN,
+  th: TARA_MOUTH_SMALL_OPEN,
+};
 
 function TaraSpeakingAvatar({ status, isDark, speechText, speechActive, speechTimeline, speechPositionMs, speechDurationMs, speechAudioStarted }) {
   const [blinkClosed, setBlinkClosed] = useState(false);
-  const [mouthFrame, setMouthFrame] = useState(0);
+  const [visemeKey, setVisemeKey] = useState('rest');
   const bobAnim = useRef(new Animated.Value(0)).current;
   const blinkTimerRef = useRef(null);
 
@@ -278,24 +377,24 @@ function TaraSpeakingAvatar({ status, isDark, speechText, speechActive, speechTi
 
     if (speechActive && hasPlaybackTimeline) {
       if (!speechAudioStarted) {
-        setMouthFrame(0);
+        setVisemeKey('rest');
         return undefined;
       }
 
-      setMouthFrame(
-        getMouthFrameFromPlaybackTimeline(speechTimeline, speechPositionMs, speechDurationMs)
+      setVisemeKey(
+        getVisemeFromPlaybackTimeline(speechTimeline, speechPositionMs, speechDurationMs)
       );
       return undefined;
     }
 
     if (speechActive && speechAudioStarted && Number(speechDurationMs) > 0) {
-      setMouthFrame(
-        getMouthFrameFromAudioProgress(speechText, speechPositionMs, speechDurationMs)
+      setVisemeKey(
+        getVisemeFromAudioProgress(speechText, speechPositionMs, speechDurationMs)
       );
       return undefined;
     }
 
-    setMouthFrame(0);
+    setVisemeKey('rest');
     return undefined;
   }, [speechActive, speechText, speechTimeline, speechPositionMs, speechDurationMs, speechAudioStarted]);
 
@@ -308,14 +407,7 @@ function TaraSpeakingAvatar({ status, isDark, speechText, speechActive, speechTi
     inputRange: [0, 1],
     outputRange: [0, status === 'speaking' ? -3 : -1.5],
   });
-  const mouthSource =
-    mouthFrame >= 3
-      ? TARA_MOUTH_WIDE
-      : mouthFrame >= 2
-        ? TARA_MOUTH_MEDIUM
-        : mouthFrame >= 1
-          ? TARA_MOUTH_SMALL
-        : TARA_MOUTH_CLOSED;
+  const mouthSource = TARA_VISEME_SOURCES[visemeKey] || TARA_VISEME_SOURCES.rest;
 
   return (
     <Animated.View style={[styles.avatarWrap, { transform: [{ translateY }] }]}>
@@ -366,6 +458,9 @@ export default function SpeechChatScreen({ navigation, route }) {
   const sparkleAnims = useRef(
     Array.from({ length: 8 }, () => new Animated.Value(0))
   ).current;
+  const devAutoQuestionIndexRef = useRef(0);
+
+  const isDevEmulator = __DEV__ && Device.isDevice === false;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1016,15 +1111,37 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
+  const maybeRunDevEmulatorQuestion = async () => {
+    if (!isDevEmulator) return false;
+
+    const languageKey = normalizeLanguageCode(language) === 'hindi' ? 'hindi' : 'english';
+    const questions = DEV_EMULATOR_AUTO_QUESTIONS[languageKey] || DEV_EMULATOR_AUTO_QUESTIONS.english;
+    const nextQuestion = questions[devAutoQuestionIndexRef.current % questions.length];
+    devAutoQuestionIndexRef.current += 1;
+
+    if (!nextQuestion) return false;
+
+    setCurrentTranscript(nextQuestion);
+    setFollowUps([]);
+    setErrorText('');
+    handsFreeRestartRef.current = false;
+    await getTextToSpeech().stop();
+    setStatus('thinking');
+    await runQuestionTurn(nextQuestion);
+    return true;
+  };
+
   const handleMicPress = async () => {
     try {
       if (status === 'listening') {
         await stopListening();
       } else if (status === 'idle') {
+        if (await maybeRunDevEmulatorQuestion()) return;
         await startListening();
       } else if (status === 'speaking') {
         handsFreeRestartRef.current = false;
         await getTextToSpeech().stop();
+        if (await maybeRunDevEmulatorQuestion()) return;
         await startListening();
       }
     } catch (error) {

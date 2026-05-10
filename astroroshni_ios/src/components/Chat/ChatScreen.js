@@ -1598,10 +1598,40 @@ export default function ChatScreen({ navigation, route }) {
 
   const saveMessageToHistory = async (message, sessionId) => {
     // This is handled by the backend when processing messages
-    // No need to save manually in mobile app
+    // No need to save manually on mobile
     return;
   };
 
+  /** Replace local thread with server state (e.g. stale poll for deleted assistant message_id). */
+  const syncSessionFromServer = async (targetSessionId) => {
+    if (!targetSessionId) return false;
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const res = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${targetSessionId}`)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const msgs = (data.messages || []).map((m) => ({
+        messageId: m.message_id,
+        role: m.sender,
+        content: m.content || '',
+        timestamp: m.timestamp,
+        id: `${m.message_id}_${m.timestamp}`,
+        native_name: m.native_name ?? data.native_name ?? null,
+        terms: m.terms,
+        glossary: m.glossary,
+        images: m.images,
+      }));
+      if (!msgs.length) return false;
+      setSessionId(targetSessionId);
+      setMessagesWithStorage(msgs);
+      setShowGreeting(false);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
 
   const getLoadingMessages = (messageText) => {
     const lowerCaseMessage = messageText.toLowerCase();
@@ -1831,23 +1861,9 @@ export default function ChatScreen({ navigation, route }) {
         
       } catch (error) {
         console.error('❌ Polling error:', error);
-        // Log to backend for admin error list (non-timeout polling failures)
-        if (error.name !== 'AbortError') {
-          try {
-            const { chatErrorAPI } = require('../../services/api');
-            await chatErrorAPI.logError(
-              error.name || 'PollingError',
-              error.message || 'Poll failed',
-              userQuestion || `messageId: ${messageId}`,
-              error.stack
-            );
-          } catch (logErr) {
-            console.error('Failed to log polling error:', logErr);
-          }
-        }
         // Show user-friendly error message based on error type
         let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
-        
+
         // Handle specific error types
         if (error.name === 'AbortError') {
           // console.log(`⏰ [POLL TIMEOUT] Fetch timeout for messageId: ${messageId}, pollCount: ${pollCount}`);
@@ -1878,12 +1894,62 @@ export default function ChatScreen({ navigation, route }) {
           }
           return;
         }
-        
-        setMessagesWithStorage(prev => prev.map(msg => 
-          msg.messageId === messageId 
-            ? { ...msg, content: userMessage, isTyping: false }
-            : msg
-        ));
+
+        const errText = String(error.message || '');
+        const isPollMessageMissing =
+          /HTTP\s*404/i.test(errText) && /Message not found/i.test(errText);
+
+        const sid = currentSessionId || sessionId;
+        const recovered = await syncSessionFromServer(sid);
+
+        if (recovered) {
+          setLoading(false);
+          setIsTyping(false);
+          await removePendingMessage(messageId);
+          return;
+        }
+
+        if (error.name !== 'AbortError') {
+          try {
+            const { chatErrorAPI } = require('../../services/api');
+            const errorType = isPollMessageMissing ? 'poll_message_missing' : (error.name || 'PollingError');
+            const questionHint =
+              (userQuestion && String(userQuestion).trim()) ||
+              `assistant_message_id=${messageId}`;
+            await chatErrorAPI.logError(
+              errorType,
+              error.message || 'Poll failed',
+              questionHint,
+              error.stack || null
+            );
+          } catch (logErr) {
+            console.error('Failed to log polling error:', logErr);
+          }
+        }
+
+        if (isPollMessageMissing) {
+          userMessage =
+            'This reply is no longer available on the server (your chat was resynced). If something is missing, send your question again.';
+        }
+
+        setMessagesWithStorage((prev) => {
+          const processingMsg = prev.find((m) => m.messageId === messageId);
+          const userMsg = processingMsg?.userMessageId
+            ? prev.find((m) => m.id === processingMsg.userMessageId)
+            : null;
+          const fq = (userMsg?.content || userQuestion || '').trim();
+          return prev.map((msg) =>
+            msg.messageId === messageId
+              ? {
+                  ...msg,
+                  content: userMessage,
+                  isTyping: false,
+                  showSendRetryButton: Boolean(fq),
+                  failedQuestion: fq || msg.failedQuestion,
+                }
+              : msg
+          );
+        });
         setLoading(false);
         setIsTyping(false);
         await removePendingMessage(messageId);

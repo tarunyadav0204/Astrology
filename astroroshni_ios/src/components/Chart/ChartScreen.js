@@ -81,6 +81,7 @@ export default function ChartScreen({ navigation, route }) {
     { id: 'shodamsa', name: t('chartTypes.shodamsa.name'), icon: '🚗', description: t('chartTypes.shodamsa.description') },
     { id: 'vimsamsa', name: t('chartTypes.vimsamsa.name'), icon: '🙏', description: t('chartTypes.vimsamsa.description') },
     { id: 'chaturvimsamsa', name: t('chartTypes.chaturvimsamsa.name'), icon: '📚', description: t('chartTypes.chaturvimsamsa.description') },
+    { id: 'saptavimshamsa', name: t('chartTypes.saptavimshamsa.name'), icon: '⭐', description: t('chartTypes.saptavimshamsa.description') },
     { id: 'trimsamsa', name: t('chartTypes.trimsamsa.name'), icon: '⚠️', description: t('chartTypes.trimsamsa.description') },
     { id: 'khavedamsa', name: t('chartTypes.khavedamsa.name'), icon: '🍀', description: t('chartTypes.khavedamsa.description') },
     { id: 'akshavedamsa', name: t('chartTypes.akshavedamsa.name'), icon: '🎭', description: t('chartTypes.akshavedamsa.description') },
@@ -399,6 +400,7 @@ export default function ChartScreen({ navigation, route }) {
                                            chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :
                                            chartTypes[currentChartIndex].id === 'vimsamsa' ? 20 :
                                            chartTypes[currentChartIndex].id === 'chaturvimsamsa' ? 24 :
+                                           chartTypes[currentChartIndex].id === 'saptavimshamsa' ? 27 :
                                            chartTypes[currentChartIndex].id === 'trimsamsa' ? 30 :
                                            chartTypes[currentChartIndex].id === 'khavedamsa' ? 40 :
                                            chartTypes[currentChartIndex].id === 'akshavedamsa' ? 45 :

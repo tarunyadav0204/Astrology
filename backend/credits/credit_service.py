@@ -1,5 +1,6 @@
 import json
 import os
+import hashlib
 from datetime import datetime, date, timedelta
 from typing import Optional, Dict, List, Any
 
@@ -133,6 +134,20 @@ class CreditService:
                 conn.commit()
             except Exception:
                 pass
+
+            # Global guardrail: one free standard-chat question per normalized birth hash
+            # across all accounts (prevents multi-account abuse on same chart data).
+            execute(
+                conn,
+                '''
+                CREATE TABLE IF NOT EXISTS free_chat_birth_hash_usage (
+                    id BIGSERIAL PRIMARY KEY,
+                    birth_hash TEXT NOT NULL UNIQUE,
+                    first_userid INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                '''
+            )
         
         # Credit transactions table
             execute(conn, '''
@@ -766,6 +781,39 @@ class CreditService:
             row = None
         return bool(row and row[0])
 
+    @staticmethod
+    def create_free_question_birth_hash(birth_details: Optional[Dict[str, Any]]) -> Optional[str]:
+        """
+        Normalize and hash core birth fields used by chat.
+        Keep aligned with chat session hash shape: date_time_lat_long.
+        """
+        if not isinstance(birth_details, dict):
+            return None
+        date_v = str(birth_details.get("date") or "").strip()
+        time_v = str(birth_details.get("time") or "").strip()
+        lat_v = birth_details.get("latitude")
+        lon_v = birth_details.get("longitude")
+        if not date_v or not time_v:
+            return None
+        birth_string = f"{date_v}_{time_v}_{lat_v}_{lon_v}"
+        return hashlib.sha256(birth_string.encode()).hexdigest()
+
+    def get_free_chat_birth_hash_used(self, birth_hash: Optional[str]) -> bool:
+        """True if any account has already consumed free question for this birth hash."""
+        if not birth_hash:
+            return False
+        from db import get_conn, execute
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT 1 FROM free_chat_birth_hash_usage WHERE birth_hash = ? LIMIT 1",
+                    (birth_hash,),
+                )
+                return cur.fetchone() is not None
+        except Exception:
+            return False
+
     def user_has_registered_push_token(self, userid: int) -> bool:
         """True if the user has at least one Expo push token (app enabled notifications enough to register)."""
         from db import get_conn, execute
@@ -824,14 +872,29 @@ class CreditService:
             return False
         return self.notification_opt_in_satisfied_for_free_question(userid)
 
+    def is_free_standard_chat_question_available_for_birth_hash(
+        self, userid: int, birth_hash: Optional[str]
+    ) -> bool:
+        """
+        Free question is available only when:
+        - user has not consumed their one-time free question,
+        - notifications requirement is met,
+        - and this birth hash has not consumed free question globally.
+        """
+        if not self.is_free_standard_chat_question_available(userid):
+            return False
+        if not birth_hash:
+            return False
+        return not self.get_free_chat_birth_hash_used(birth_hash)
+
     def free_question_pending_notification_opt_in(self, userid: int) -> bool:
         """True when the user still has their free question unused but has not met the notification requirement."""
         if self.get_free_chat_question_used(userid):
             return False
         return not self.notification_opt_in_satisfied_for_free_question(userid)
 
-    def mark_free_chat_question_used(self, userid: int) -> None:
-        """Mark that the user has used their one free standard chat question. Idempotent."""
+    def mark_free_chat_question_used(self, userid: int, birth_hash: Optional[str] = None) -> None:
+        """Mark free question used for user and optionally for global birth-hash gate. Idempotent."""
         from db import get_conn, execute
         try:
             with get_conn() as conn:
@@ -843,6 +906,16 @@ class CreditService:
                 if (cursor.rowcount or 0) == 0:
                     # No row yet: insert one with 0 credits and flag set (user still has 0 balance)
                     self._upsert_user_credits(conn, userid, 0, free_used=1)
+                if birth_hash:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO free_chat_birth_hash_usage (birth_hash, first_userid, created_at)
+                        VALUES (?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT (birth_hash) DO NOTHING
+                        """,
+                        (birth_hash, userid),
+                    )
                 conn.commit()
         except Exception:
             return

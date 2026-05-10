@@ -866,7 +866,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     is_standard_chat = not partnership_mode and not premium_analysis and not instant_chat_active
-    free_available = credit_service.is_free_standard_chat_question_available(current_user.userid)
+    free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
+    free_available = credit_service.is_free_standard_chat_question_available_for_birth_hash(
+        current_user.userid,
+        free_birth_hash,
+    )
     using_free_question = is_standard_chat and free_available
     chat_key = (
         'partnership_analysis_cost'
@@ -2522,7 +2526,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     success = True
                     print(f"⏭️ Instant conversational ack for user {user_id} — no credits charged")
                 elif using_free_question:
-                    credit_service.mark_free_chat_question_used(user_id)
+                    free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
+                    credit_service.mark_free_chat_question_used(user_id, birth_hash=free_birth_hash)
                     if is_instant_chat:
                         analysis_type = "Speech chat" if speech_chat_billing else "Instant Chat"
                     else:

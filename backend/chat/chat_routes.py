@@ -129,7 +129,16 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     user_balance = credit_service.get_user_credits(current_user.userid)
     # First question free: standard chat only (not partnership, not premium); requires notification opt-in
     is_standard_chat = not request.partnership_mode and not request.premium_analysis
-    free_available = credit_service.is_free_standard_chat_question_available(current_user.userid)
+    free_birth_hash = credit_service.create_free_question_birth_hash({
+        "date": request.date,
+        "time": request.time,
+        "latitude": request.latitude,
+        "longitude": request.longitude,
+    })
+    free_available = credit_service.is_free_standard_chat_question_available_for_birth_hash(
+        current_user.userid,
+        free_birth_hash,
+    )
     using_free_question = is_standard_chat and free_available
     chat_key = (
         'partnership_analysis_cost'
@@ -434,7 +443,15 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     
                     if should_deduct:
                         if using_free_question:
-                            credit_service.mark_free_chat_question_used(current_user.userid)
+                            free_birth_hash = credit_service.create_free_question_birth_hash({
+                                "date": request.date,
+                                "time": request.time,
+                                "latitude": request.latitude,
+                                "longitude": request.longitude,
+                            })
+                            credit_service.mark_free_chat_question_used(
+                                current_user.userid, birth_hash=free_birth_hash
+                            )
                             print(f"🆓 FREE QUESTION USED for user {current_user.userid} (no credits deducted)")
                         else:
                             print(f"💰 DEDUCTING CREDITS: {effective_cost} credits for user {current_user.userid}")

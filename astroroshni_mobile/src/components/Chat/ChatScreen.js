@@ -2701,23 +2701,9 @@ export default function ChatScreen({ navigation, route }) {
         
       } catch (error) {
         console.error('❌ Polling error:', error);
-        // Log to backend for admin error list (non-timeout polling failures)
-        if (error.name !== 'AbortError') {
-          try {
-            const { chatErrorAPI } = require('../../services/api');
-            await chatErrorAPI.logError(
-              error.name || 'PollingError',
-              error.message || 'Poll failed',
-              userQuestion || `messageId: ${messageId}`,
-              error.stack
-            );
-          } catch (logErr) {
-            console.error('Failed to log polling error:', logErr);
-          }
-        }
         // Show user-friendly error message based on error type
         let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
-        
+
         // Handle specific error types
         if (error.name === 'AbortError') {
           // console.log(`⏰ [POLL TIMEOUT] Fetch timeout for messageId: ${messageId}, pollCount: ${pollCount}`);
@@ -2749,23 +2735,78 @@ export default function ChatScreen({ navigation, route }) {
           return;
         }
 
-        const recoveredFromServer = await reconcileSessionFromServer(currentSessionId || sessionId, {
-          expectedMessageId: messageId,
-          preferNonEmpty: true,
-          openChat: true,
-        });
+        const errText = String(error.message || '');
+        const isPollMessageMissing =
+          /HTTP\s*404/i.test(errText) && /Message not found/i.test(errText);
+
+        // Stale poll: status row gone — do not require the missing assistant id (that made reconcile always fail).
+        let recoveredFromServer = false;
+        if (isPollMessageMissing) {
+          recoveredFromServer = await reconcileSessionFromServer(currentSessionId || sessionId, {
+            force: true,
+            openChat: true,
+          });
+        } else {
+          recoveredFromServer = await reconcileSessionFromServer(currentSessionId || sessionId, {
+            expectedMessageId: messageId,
+            preferNonEmpty: true,
+            openChat: true,
+          });
+          if (!recoveredFromServer) {
+            recoveredFromServer = await reconcileSessionFromServer(currentSessionId || sessionId, {
+              force: true,
+              openChat: true,
+            });
+          }
+        }
+
         if (recoveredFromServer) {
           setLoading(false);
           setIsTyping(false);
           await removePendingMessage(messageId);
           return;
         }
-        
-        setMessagesWithStorage(prev => prev.map(msg => 
-          msg.messageId === messageId 
-            ? { ...msg, content: userMessage, isTyping: false }
-            : msg
-        ));
+
+        // Only log if we could not resync from server (keeps admin Errors tab signal-heavy).
+        try {
+          const { chatErrorAPI } = require('../../services/api');
+          const errorType = isPollMessageMissing ? 'poll_message_missing' : (error.name || 'PollingError');
+          const questionHint =
+            (userQuestion && String(userQuestion).trim()) ||
+            `assistant_message_id=${messageId}`;
+          await chatErrorAPI.logError(
+            errorType,
+            error.message || 'Poll failed',
+            questionHint,
+            error.stack || null
+          );
+        } catch (logErr) {
+          console.error('Failed to log polling error:', logErr);
+        }
+
+        if (isPollMessageMissing) {
+          userMessage =
+            'This reply is no longer available on the server (your chat was resynced). If something is missing, send your question again.';
+        }
+
+        setMessagesWithStorage((prev) => {
+          const processingMsg = prev.find((m) => m.messageId === messageId);
+          const userMsg = processingMsg?.userMessageId
+            ? prev.find((m) => m.id === processingMsg.userMessageId)
+            : null;
+          const fq = (userMsg?.content || userQuestion || '').trim();
+          return prev.map((msg) =>
+            msg.messageId === messageId
+              ? {
+                  ...msg,
+                  content: userMessage,
+                  isTyping: false,
+                  showSendRetryButton: Boolean(fq),
+                  failedQuestion: fq || msg.failedQuestion,
+                }
+              : msg
+          );
+        });
         setLoading(false);
         setIsTyping(false);
         await removePendingMessage(messageId);
