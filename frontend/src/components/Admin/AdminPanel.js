@@ -1845,7 +1845,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       <div className="admin-tabs">
         <button 
           className={`tab ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
+          onClick={() => {
+            setActiveTab('users');
+            setActiveSubTab('management');
+          }}
         >
           Users
         </button>
@@ -1886,7 +1889,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           className={`tab ${activeTab === 'credits' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('credits');
-            setActiveSubTab('management');
+            setActiveSubTab('ledger');
           }}
         >
           Credits
@@ -1936,6 +1939,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       {activeTab === 'credits' && (
         <div className="admin-subtabs">
           <button 
+            className={`subtab ${activeSubTab === 'ledger' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('ledger')}
+          >
+            Ledger
+          </button>
+          <button 
             className={`subtab ${activeSubTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('dashboard')}
           >
@@ -1946,12 +1955,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('management')}
           >
             Management
-          </button>
-          <button 
-            className={`subtab ${activeSubTab === 'ledger' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('ledger')}
-          >
-            Ledger
           </button>
           <button 
             className={`subtab ${activeSubTab === 'userCredits' ? 'active' : ''}`}

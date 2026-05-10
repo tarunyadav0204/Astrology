@@ -2,7 +2,7 @@
 
 DROP TABLE IF EXISTS "users" CASCADE;
 CREATE TABLE "users" (
-    "userid" INTEGER,
+    "userid" SERIAL,
     "phone" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "role" TEXT DEFAULT 'user',
@@ -623,9 +623,12 @@ CREATE TABLE "birth_charts" (
     "relation" TEXT DEFAULT 'other',
     "is_rectified" INTEGER DEFAULT 0,
     "calibration_year" INTEGER,
+    "birth_hash" TEXT,
     PRIMARY KEY ("id"),
     FOREIGN KEY ("userid") REFERENCES "users" ("userid")
 );
+
+CREATE INDEX IF NOT EXISTS idx_birth_charts_policy_hash ON birth_charts (birth_hash);
 
 DROP TABLE IF EXISTS "credit_requests" CASCADE;
 CREATE TABLE "credit_requests" (

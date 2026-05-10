@@ -620,6 +620,12 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
+        from utils.birth_hash import birth_hash_from_parts
+
+        chart_birth_hash = birth_hash_from_parts(
+            birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
+        )
+
         new_chart_id = None
         try:
             with get_conn() as conn:
@@ -638,6 +644,13 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
                 dup = cur.fetchone()
                 if dup:
                     new_chart_id = dup[0]
+                    if chart_birth_hash:
+                        execute(
+                            conn,
+                            "UPDATE birth_charts SET birth_hash = COALESCE(birth_hash, %s) WHERE id = %s",
+                            (chart_birth_hash, new_chart_id),
+                        )
+                        conn.commit()
                     print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (exact native match)")
                 else:
                     print(f"🔍 [CHART_DEBUG] About to insert chart for user {current_user.userid}:")
@@ -649,9 +662,9 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
                         conn,
                         """
                         INSERT INTO birth_charts
-                            (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                            (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
                         VALUES
-                            (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                         """,
                         (
@@ -665,6 +678,7 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
                             enc_place,
                             birth_data.gender,
                             birth_data.relation or "other",
+                            chart_birth_hash,
                         ),
                     )
                     row = cur.fetchone()

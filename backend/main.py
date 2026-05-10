@@ -1364,11 +1364,16 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
                 enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
                 enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
 
+            from utils.birth_hash import birth_hash_from_parts
+
+            reg_birth_hash = birth_hash_from_parts(
+                birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
+            )
             execute(conn, '''
-                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self', ?)
             ''', (user[0], enc_name, enc_date, enc_time, enc_lat, enc_lon,
-                birth_data.timezone, enc_place, birth_data.gender or ''))
+                birth_data.timezone, enc_place, birth_data.gender or '', reg_birth_hash))
 
             cur = execute(conn, "SELECT id FROM birth_charts WHERE userid = %s AND relation = 'self' ORDER BY created_at DESC LIMIT 1", (user[0],))
             row = cur.fetchone()
@@ -2172,6 +2177,12 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
             else:
                 enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
                 enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
+
+            from utils.birth_hash import birth_hash_from_parts
+
+            self_chart_birth_hash = birth_hash_from_parts(
+                birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
+            )
         
         # If chart_id provided, update that specific chart
             if chart_id:
@@ -2197,7 +2208,7 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                     conn,
                     """
                         UPDATE birth_charts
-                        SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s, relation='self'
+                        SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s, relation='self', birth_hash=%s
                         WHERE id=%s AND userid=%s
                     """,
                     (
@@ -2209,6 +2220,7 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                         birth_data.timezone,
                         enc_place,
                         birth_data.gender or '',
+                        self_chart_birth_hash,
                         chart_id,
                         current_user.userid,
                     ),
@@ -2228,8 +2240,8 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                 cur = execute(
                     conn,
                     """
-                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """,
                     (
@@ -2243,6 +2255,7 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                         enc_place,
                         birth_data.gender or '',
                         'self',
+                        self_chart_birth_hash,
                     ),
                 )
                 birth_chart_id = cur.fetchone()[0]
@@ -4736,8 +4749,8 @@ async def share_chart_for_investigation(chart_id: int, current_user: User = Depe
                 execute(
                     conn,
                     """
-                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                        SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared'
+                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
+                        SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared', birth_hash
                         FROM birth_charts WHERE id = %s
                     """,
                     (admin_uid, chart_id),

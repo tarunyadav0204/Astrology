@@ -194,6 +194,30 @@ const AdminChatHistory = () => {
     }) + ' IST';
   };
 
+  const messageSortTime = (msg) => parseUtcTimestamp(msg?.timestamp)?.getTime() || 0;
+
+  /**
+   * User-thread pane: show newest *turns* first, but within each turn keep chronological order
+   * (user question, then assistant reply) so answers never appear above their question.
+   */
+  const orderUserThreadMessagesNewestTurnsFirst = (messages) => {
+    const sorted = messages.slice().sort((a, b) => messageSortTime(a) - messageSortTime(b));
+    const turns = [];
+    let turn = [];
+    for (const m of sorted) {
+      if (m?.sender === 'user' && turn.length > 0) {
+        turns.push(turn);
+        turn = [m];
+      } else {
+        turn.push(m);
+      }
+    }
+    if (turn.length) turns.push(turn);
+    const turnEndTime = (t) => (t.length ? Math.max(...t.map(messageSortTime)) : 0);
+    turns.sort((a, b) => turnEndTime(b) - turnEndTime(a));
+    return turns.flat();
+  };
+
   const formatTimeIST = (dateStr) => {
     const d = parseUtcTimestamp(dateStr);
     if (!d) return '—';
@@ -318,13 +342,9 @@ const AdminChatHistory = () => {
   const displayedMessages = useMemo(() => {
     const base = Array.isArray(selectedSession?.messages) ? selectedSession.messages : [];
     if (!base.length) return base;
-    // For merged user-thread view, show newest messages first (today backward).
+    // User-thread: newest Q&A turns first; within each turn, user then assistant (chronological).
     if (selectedSession?.view_mode === 'user_thread') {
-      return base.slice().sort((a, b) => {
-        const ta = parseUtcTimestamp(a?.timestamp)?.getTime() || 0;
-        const tb = parseUtcTimestamp(b?.timestamp)?.getTime() || 0;
-        return tb - ta;
-      });
+      return orderUserThreadMessagesNewestTurnsFirst(base);
     }
     return base;
   }, [selectedSession]);
@@ -866,8 +886,8 @@ const AdminChatHistory = () => {
                 </span>
                 <p className="session-detail-empty-title">Select a user</p>
                 <p className="session-detail-empty-text">
-                  Choose a user on the left to open their full timeline (user + assistant) sorted by
-                  time. Assistant replies use the full width for easier reading.
+                  Choose a user on the left to open their full timeline: newest exchanges first, with
+                  each question above its answer. Assistant replies use the full width for easier reading.
                 </p>
               </div>
             </div>

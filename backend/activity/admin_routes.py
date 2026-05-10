@@ -270,6 +270,39 @@ async def get_activity(
         ORDER BY LOWER(TRIM(COALESCE(user_name, ''))), COALESCE(user_phone, '')
         LIMIT 5000
     """
+    # Rolling distinct users at ref time (UTC), same filters + dedup as distinct_users — full table scan, not LIMIT 500.
+    window_query = f"""
+        WITH base AS (
+            SELECT user_id, user_phone, created_at
+            FROM {table}
+            WHERE {where_clause}
+        ),
+        keyed AS (
+            SELECT
+                created_at,
+                CASE
+                    WHEN user_id IS NOT NULL AND user_id != 0
+                        THEN CONCAT('id:', CAST(user_id AS STRING))
+                    WHEN REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '') != ''
+                        THEN CONCAT(
+                            'ph:',
+                            REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '')
+                        )
+                    ELSE NULL
+                END AS dedup_key
+            FROM base
+        ),
+        f AS (
+            SELECT created_at, dedup_key FROM keyed WHERE dedup_key IS NOT NULL
+        )
+        SELECT
+            (SELECT COUNT(DISTINCT dedup_key) FROM f WHERE created_at >= TIMESTAMP_SUB(@ref_ts, INTERVAL 5 MINUTE)) AS uniq_5m,
+            (SELECT COUNT(DISTINCT dedup_key) FROM f WHERE created_at >= TIMESTAMP_SUB(@ref_ts, INTERVAL 15 MINUTE)) AS uniq_15m,
+            (SELECT COUNT(DISTINCT dedup_key) FROM f WHERE created_at >= TIMESTAMP_SUB(@ref_ts, INTERVAL 30 MINUTE)) AS uniq_30m,
+            (SELECT COUNT(DISTINCT dedup_key) FROM f WHERE created_at >= TIMESTAMP_SUB(@ref_ts, INTERVAL 60 MINUTE)) AS uniq_60m,
+            (SELECT COUNT(DISTINCT dedup_key) FROM f WHERE created_at >= TIMESTAMP_SUB(@ref_ts, INTERVAL 1 DAY)) AS uniq_1d
+    """
+    unique_users_by_window: Optional[Dict[str, Any]] = None
     try:
         from google.cloud import bigquery
         from google.oauth2 import service_account
@@ -321,6 +354,35 @@ async def get_activity(
 
         distinct_job_config = bigquery.QueryJobConfig(query_parameters=filter_params)
         distinct_rows = list(client.query(distinct_query, job_config=distinct_job_config))
+
+        # Anchor rolling windows: "now" in UTC when range includes today; else end of to_date UTC (historical drill-down).
+        if to_date >= today:
+            ref_dt = datetime.now(timezone.utc)
+        else:
+            d_end = date.fromisoformat(to_date)
+            ref_dt = datetime(
+                d_end.year, d_end.month, d_end.day, 23, 59, 59, 999999, tzinfo=timezone.utc
+            )
+        window_params = list(filter_params) + [
+            bigquery.ScalarQueryParameter("ref_ts", "TIMESTAMP", ref_dt),
+        ]
+        try:
+            window_job = bigquery.QueryJobConfig(query_parameters=window_params)
+            window_rows = list(client.query(window_query, job_config=window_job))
+            if window_rows:
+                wd = dict(window_rows[0])
+                unique_users_by_window = {
+                    "reference_at": ref_dt.isoformat().replace("+00:00", "Z"),
+                    "windows": [
+                        {"label": "5 min", "ms": 5 * 60 * 1000, "count": int(wd.get("uniq_5m") or 0)},
+                        {"label": "15 min", "ms": 15 * 60 * 1000, "count": int(wd.get("uniq_15m") or 0)},
+                        {"label": "30 min", "ms": 30 * 60 * 1000, "count": int(wd.get("uniq_30m") or 0)},
+                        {"label": "1 hour", "ms": 60 * 60 * 1000, "count": int(wd.get("uniq_60m") or 0)},
+                        {"label": "1 day", "ms": 24 * 60 * 60 * 1000, "count": int(wd.get("uniq_1d") or 0)},
+                    ],
+                }
+        except Exception as win_e:
+            logger.warning("Activity window stats query failed: %s", win_e)
     except Exception as e:
         logger.exception("BigQuery activity query failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Activity query failed: {e}")
@@ -361,12 +423,15 @@ async def get_activity(
         })
     _enrich_activity_user_ids(distinct_out)
 
-    return {
+    payload: Dict[str, Any] = {
         "activity": out,
         "count": len(out),
         "distinct_users": distinct_out,
         "distinct_user_count": len(distinct_out),
     }
+    if unique_users_by_window is not None:
+        payload["unique_users_by_window"] = unique_users_by_window
+    return payload
 
 
 def fetch_activity_rows_for_user(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminActivity.css';
 
@@ -41,11 +41,19 @@ function parseActivityUserId(row) {
   return n;
 }
 
+/** Digits-only phone key — matches BigQuery activity distinct_users / window_stats (`ph:` prefix). */
+function digitsPhoneKey(phone) {
+  const s = String(phone || '').trim();
+  if (!s) return '';
+  const digits = s.replace(/\D/g, '');
+  return digits || s;
+}
+
 function activityUserKey(row) {
   const uid = parseActivityUserId(row);
   if (uid != null) return `id:${uid}`;
-  const phone = String(row?.user_phone || '').trim();
-  if (phone) return `phone:${phone}`;
+  const dig = digitsPhoneKey(row?.user_phone);
+  if (dig) return `ph:${dig}`;
   return null;
 }
 
@@ -64,6 +72,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
   const [onlyErrors, setOnlyErrors] = useState(false);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [uniqueUsersByWindow, setUniqueUsersByWindow] = useState(null);
 
   const fetchActivity = useCallback(async () => {
     setLoading(true);
@@ -74,7 +83,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
         date_to: dateTo,
         sort_by: sortBy,
         order: sortOrder,
-        limit: '500',
+        limit: '2000',
         offset: '0',
       });
       if (filterUserName.trim()) params.set('user_name', filterUserName.trim());
@@ -95,6 +104,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
       const data = await res.json();
       setActivity(data.activity || []);
       setDistinctUsers(data.distinct_users || []);
+      setUniqueUsersByWindow(data.unique_users_by_window || null);
       setDistinctUserCount(
         typeof data.distinct_user_count === 'number'
           ? data.distinct_user_count
@@ -104,6 +114,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
       setError(e.message || 'Failed to load activity');
       setActivity([]);
       setDistinctUsers([]);
+      setUniqueUsersByWindow(null);
       setDistinctUserCount(0);
     } finally {
       setLoading(false);
@@ -114,17 +125,30 @@ export default function AdminActivity({ onOpenUserProfile }) {
     fetchActivity();
   }, [fetchActivity]);
 
-  const uniqueUserWindowStats = UNIQUE_USER_WINDOWS.map((windowDef) => {
-    const cutoff = Date.now() - windowDef.ms;
-    const users = new Set();
-    activity.forEach((row) => {
-      const createdMs = new Date(row?.created_at).getTime();
-      if (!Number.isFinite(createdMs) || createdMs < cutoff) return;
-      const userKey = activityUserKey(row);
-      if (userKey) users.add(userKey);
+  const uniqueUserWindowStats = useMemo(() => {
+    const server = uniqueUsersByWindow?.windows;
+    if (Array.isArray(server) && server.length > 0) {
+      const byLabel = Object.fromEntries(server.map((w) => [w.label, Number(w.count) || 0]));
+      return UNIQUE_USER_WINDOWS.map((def) => ({
+        ...def,
+        count: byLabel[def.label] ?? 0,
+      }));
+    }
+    // Legacy fallback (sample-biased): only rows in the paginated activity table.
+    const refMs = Date.now();
+    return UNIQUE_USER_WINDOWS.map((windowDef) => {
+      const cutoff = refMs - windowDef.ms;
+      const users = new Set();
+      activity.forEach((row) => {
+        const createdMs = new Date(row?.created_at).getTime();
+        if (!Number.isFinite(createdMs) || createdMs < cutoff) return;
+        const userKey = activityUserKey(row);
+        if (userKey) users.add(userKey);
+      });
+      return { ...windowDef, count: users.size };
     });
-    return { ...windowDef, count: users.size };
-  });
+  }, [uniqueUsersByWindow, activity]);
+
   const maxUniqueWindowCount = Math.max(1, ...uniqueUserWindowStats.map((item) => item.count));
 
   const handleSort = (col) => {
@@ -270,7 +294,11 @@ export default function AdminActivity({ onOpenUserProfile }) {
           <div className="admin-activity-unique-chart-card">
             <div className="admin-activity-unique-chart-header">
               <h3>Unique users by recent window</h3>
-              <span>Rolling from current time</span>
+              <span className="admin-activity-unique-chart-sub">
+                {uniqueUsersByWindow?.reference_at
+                  ? `Counts from full filtered BigQuery set, anchored at ${new Date(uniqueUsersByWindow.reference_at).toUTCString()} (UTC). Historical ranges use end of “To date”.`
+                  : 'Estimated from loaded table rows only (upgrade backend for exact counts).'}
+              </span>
             </div>
             <div className="admin-activity-unique-chart">
               <div className="admin-activity-unique-y-axis">

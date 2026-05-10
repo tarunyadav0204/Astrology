@@ -1,6 +1,5 @@
 import json
 import os
-import hashlib
 from datetime import datetime, date, timedelta
 from typing import Optional, Dict, List, Any
 
@@ -148,7 +147,24 @@ class CreditService:
                 )
                 '''
             )
-        
+
+            try:
+                execute(
+                    conn,
+                    "ALTER TABLE birth_charts ADD COLUMN IF NOT EXISTS birth_hash TEXT",
+                )
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_birth_charts_policy_hash ON birth_charts (birth_hash)",
+                )
+                conn.commit()
+            except Exception:
+                pass
+
         # Credit transactions table
             execute(conn, '''
                 CREATE TABLE IF NOT EXISTS credit_transactions (
@@ -784,19 +800,11 @@ class CreditService:
     @staticmethod
     def create_free_question_birth_hash(birth_details: Optional[Dict[str, Any]]) -> Optional[str]:
         """
-        Normalize and hash core birth fields used by chat.
-        Keep aligned with chat session hash shape: date_time_lat_long.
+        Canonical hash for free-question policy (aligned with birth_charts.birth_hash).
         """
-        if not isinstance(birth_details, dict):
-            return None
-        date_v = str(birth_details.get("date") or "").strip()
-        time_v = str(birth_details.get("time") or "").strip()
-        lat_v = birth_details.get("latitude")
-        lon_v = birth_details.get("longitude")
-        if not date_v or not time_v:
-            return None
-        birth_string = f"{date_v}_{time_v}_{lat_v}_{lon_v}"
-        return hashlib.sha256(birth_string.encode()).hexdigest()
+        from utils.birth_hash import birth_hash_from_birth_details_dict
+
+        return birth_hash_from_birth_details_dict(birth_details)
 
     def get_free_chat_birth_hash_used(self, birth_hash: Optional[str]) -> bool:
         """True if any account has already consumed free question for this birth hash."""
@@ -808,6 +816,34 @@ class CreditService:
                 cur = execute(
                     conn,
                     "SELECT 1 FROM free_chat_birth_hash_usage WHERE birth_hash = ? LIMIT 1",
+                    (birth_hash,),
+                )
+                return cur.fetchone() is not None
+        except Exception:
+            return False
+
+    def prior_paid_chat_usage_exists_for_birth_hash(self, birth_hash: Optional[str]) -> bool:
+        """
+        True if any user message exists for a chat session tied to a birth chart with this hash.
+        Catches legacy accounts that used only paid credits (never wrote free_chat_birth_hash_usage).
+        Requires birth_charts.birth_hash populated (new rows + backfill).
+        """
+        if not birth_hash:
+            return False
+        from db import get_conn, execute
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT 1
+                    FROM chat_messages m
+                    INNER JOIN chat_sessions s ON s.session_id = m.session_id
+                    INNER JOIN birth_charts bc ON bc.id = s.birth_chart_id
+                    WHERE bc.birth_hash = ?
+                      AND m.sender = 'user'
+                    LIMIT 1
+                    """,
                     (birth_hash,),
                 )
                 return cur.fetchone() is not None
@@ -885,7 +921,11 @@ class CreditService:
             return False
         if not birth_hash:
             return False
-        return not self.get_free_chat_birth_hash_used(birth_hash)
+        if self.get_free_chat_birth_hash_used(birth_hash):
+            return False
+        if self.prior_paid_chat_usage_exists_for_birth_hash(birth_hash):
+            return False
+        return True
 
     def free_question_pending_notification_opt_in(self, userid: int) -> bool:
         """True when the user still has their free question unused but has not met the notification requirement."""
