@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 import uuid
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -1440,57 +1441,157 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
     }
 
 
-def delete_user_data(userid: int):
+def _delete_user_optional_savepoint(conn, savepoint: str, steps: list) -> None:
+    """Run DELETE steps under a savepoint; on any failure roll back to savepoint and continue."""
+    cur = conn.cursor()
+    cur.execute(f"SAVEPOINT {savepoint}")
+    try:
+        for sql, params in steps:
+            cur.execute(sql, params)
+        cur.execute(f"RELEASE SAVEPOINT {savepoint}")
+    except Exception as exc:
+        logger.warning("delete_user_data: optional block %s skipped: %s", savepoint, exc)
+        cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+
+
+def _hard_delete_user_tx(conn, userid: int) -> None:
     """
-    Permanently delete (or strongly anonymize) all data linked to a given user id.
-    This is intended for account & data deletion requests.
+    Delete all rows tied to userid in an order that respects foreign keys.
+    Must run inside a single transaction (caller commits).
+    """
+    session_subquery = "SELECT session_id FROM chat_sessions WHERE user_id = %s"
+
+    execute(conn, "DELETE FROM event_timeline_jobs WHERE user_id = %s", (userid,))
+    execute(conn, "DELETE FROM podcast_history WHERE userid = %s", (userid,))
+    execute(conn, "DELETE FROM device_tokens WHERE userid = %s", (userid,))
+    execute(conn, "DELETE FROM nudge_deliveries WHERE userid = %s", (userid,))
+    execute(conn, "DELETE FROM admin_allowed_devices WHERE userid = %s", (userid,))
+
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_user_facts",
+        [
+            (
+                "DELETE FROM user_facts WHERE birth_chart_id IN (SELECT id FROM birth_charts WHERE userid = %s)",
+                (userid,),
+            ),
+        ],
+    )
+
+    execute(
+        conn,
+        f"DELETE FROM conversation_state WHERE session_id IN ({session_subquery})",
+        (userid,),
+    )
+
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_wait_side",
+        [
+            (
+                "DELETE FROM chat_wait_conversation_messages WHERE conversation_id IN "
+                "(SELECT conversation_id FROM chat_wait_conversations WHERE user_id = %s)",
+                (userid,),
+            ),
+            ("DELETE FROM chat_wait_conversations WHERE user_id = %s", (userid,)),
+        ],
+    )
+
+    execute(
+        conn,
+        f"""
+            DELETE FROM chat_messages
+            WHERE session_id IN ({session_subquery})
+        """,
+        (userid,),
+    )
+    execute(conn, "DELETE FROM chat_sessions WHERE user_id = %s", (userid,))
+
+    execute(conn, "DELETE FROM credit_transactions WHERE userid = %s", (userid,))
+    execute(conn, "DELETE FROM user_credits WHERE userid = %s", (userid,))
+
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_credit_req",
+        [("DELETE FROM credit_requests WHERE userid = %s", (userid,))],
+    )
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_promo_usage",
+        [("DELETE FROM promo_code_usage WHERE userid = %s", (userid,))],
+    )
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_user_settings",
+        [("DELETE FROM user_settings WHERE user_id = %s", (userid,))],
+    )
+
+    execute(conn, "DELETE FROM user_subscriptions WHERE userid = %s", (userid,))
+    execute(conn, "DELETE FROM birth_charts WHERE userid = %s", (userid,))
+    execute(conn, "DELETE FROM users WHERE userid = %s", (userid,))
+
+
+def _anonymize_user_account(userid: int) -> None:
+    """
+    If hard-delete cannot complete (e.g. unexpected FK), revoke login and scrub PII
+    so the account is effectively gone from the user's perspective.
     """
     with get_conn() as conn:
-        # 1) Chat history (sessions and messages)
+        cur = execute(conn, "SELECT phone FROM users WHERE userid = %s", (userid,))
+        row = cur.fetchone()
+        if not row:
+            return
+        old_phone = (row[0] or "").strip()
+        if old_phone:
+            _delete_user_optional_savepoint(
+                conn,
+                "sp_del_pw_reset",
+                [("DELETE FROM password_reset_codes WHERE phone = %s", (old_phone,))],
+            )
+        rnd = secrets.token_hex(10)
+        new_phone = f"deleted_{userid}_{rnd}"
+        if len(new_phone) > 48:
+            new_phone = new_phone[:48]
+        dead_pw = hash_password(secrets.token_urlsafe(32))
         execute(
             conn,
             """
-                DELETE FROM chat_messages
-                WHERE session_id IN (
-                  SELECT session_id FROM chat_sessions WHERE user_id = %s
-                )
+            UPDATE users
+            SET phone = %s,
+                name = 'Deleted',
+                email = NULL,
+                password = %s,
+                gender = NULL,
+                signup_client = NULL,
+                role = 'deleted'
+            WHERE userid = %s
             """,
-            (userid,),
+            (new_phone, dead_pw, userid),
         )
-        execute(conn, "DELETE FROM chat_sessions WHERE user_id = %s", (userid,))
-
-        # 2) Credits & transactions
-        execute(conn, "DELETE FROM credit_transactions WHERE userid = %s", (userid,))
-        execute(conn, "DELETE FROM user_credits WHERE userid = %s", (userid,))
-
-        # 3) Credit requests (user as requester)
-        try:
-            execute(conn, "DELETE FROM credit_requests WHERE userid = %s", (userid,))
-        except Exception:
-            pass
-
-        # 4) Promo code usage (user as redeemer)
-        try:
-            execute(conn, "DELETE FROM promo_code_usage WHERE userid = %s", (userid,))
-        except Exception:
-            pass
-
-        # 5) User settings
-        try:
-            execute(conn, "DELETE FROM user_settings WHERE user_id = %s", (userid,))
-        except Exception:
-            pass
-
-        # 6) Subscriptions
-        execute(conn, "DELETE FROM user_subscriptions WHERE userid = %s", (userid,))
-
-        # 7) Birth charts
-        execute(conn, "DELETE FROM birth_charts WHERE userid = %s", (userid,))
-
-        # 8) Finally, delete the user record itself
-        execute(conn, "DELETE FROM users WHERE userid = %s", (userid,))
-
+        _delete_user_optional_savepoint(
+            conn,
+            "sp_anon_tokens",
+            [("DELETE FROM device_tokens WHERE userid = %s", (userid,))],
+        )
         conn.commit()
+
+
+def delete_user_data(userid: int) -> None:
+    """
+    Permanently delete all data linked to a given user id.
+    On any failure, fall back to anonymizing the user so they cannot sign in again.
+    """
+    with get_conn() as conn:
+        try:
+            _hard_delete_user_tx(conn, userid)
+            conn.commit()
+        except Exception:
+            logger.exception("Hard delete failed for userid=%s; rolling back and anonymizing", userid)
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            _anonymize_user_account(userid)
 
 
 @app.delete("/api/admin/users/{userid}")

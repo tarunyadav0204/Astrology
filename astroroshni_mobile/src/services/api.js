@@ -630,6 +630,16 @@ export const creditAPI = {
       product_id: productId,
       order_id: orderId,
     }),
+  /** INR credit packs via Razorpay (same packs as web: 50, 100, 250, 500, 999). Requires checkout UI (e.g. WebView or react-native-razorpay). */
+  getRazorpayCatalog: () => api.get(getEndpoint('/credits/razorpay/catalog')),
+  createRazorpayOrder: (credits) =>
+    api.post(getEndpoint('/credits/razorpay/create-order'), { credits }),
+  verifyRazorpayPayment: ({ razorpay_order_id, razorpay_payment_id, razorpay_signature }) =>
+    api.post(getEndpoint('/credits/razorpay/verify'), {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    }),
 };
 
 export const panchangAPI = {

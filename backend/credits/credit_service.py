@@ -824,9 +824,14 @@ class CreditService:
 
     def prior_paid_chat_usage_exists_for_birth_hash(self, birth_hash: Optional[str]) -> bool:
         """
-        True if any user message exists for a chat session tied to a birth chart with this hash.
-        Catches legacy accounts that used only paid credits (never wrote free_chat_birth_hash_usage).
-        Requires birth_charts.birth_hash populated (new rows + backfill).
+        True if this birth hash already had a *real* assistant reply (not clarification-only).
+
+        chat-v2 persists the user row in ``chat_messages`` before intent routing, so a turn that
+        ends in ``message_type = 'clarification'`` still has ``sender = 'user'``. Counting bare
+        user rows would incorrectly block the free question on the user's *next* message (reply to
+        clarification). We only treat history as "prior usage" when there is a completed assistant
+        message after some user message with a non-clarification ``message_type`` (NULL/legacy
+        rows count as a normal answer).
         """
         if not birth_hash:
             return False
@@ -837,11 +842,16 @@ class CreditService:
                     conn,
                     """
                     SELECT 1
-                    FROM chat_messages m
-                    INNER JOIN chat_sessions s ON s.session_id = m.session_id
+                    FROM chat_messages mu
+                    INNER JOIN chat_sessions s ON s.session_id = mu.session_id
                     INNER JOIN birth_charts bc ON bc.id = s.birth_chart_id
+                    INNER JOIN chat_messages ma ON ma.session_id = s.session_id
+                      AND ma.sender = 'assistant'
+                      AND ma.message_id > mu.message_id
+                      AND ma.status = 'completed'
+                      AND COALESCE(NULLIF(TRIM(ma.message_type), ''), 'answer') NOT IN ('clarification', 'native_gate')
                     WHERE bc.birth_hash = ?
-                      AND m.sender = 'user'
+                      AND mu.sender = 'user'
                     LIMIT 1
                     """,
                     (birth_hash,),

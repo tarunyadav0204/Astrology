@@ -35,7 +35,6 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
 
 const { width, height } = Dimensions.get('window');
-
 export default function ChartScreen({ navigation, route }) {
   const { t } = useTranslation();
   useAnalytics('ChartScreen');
@@ -62,8 +61,12 @@ export default function ChartScreen({ navigation, route }) {
   const [isSharing, setIsSharing] = useState(false);
   const [houseInsight, setHouseInsight] = useState(null);
   const [houseInsightLoading, setHouseInsightLoading] = useState(false);
+  const [showChartInsights, setShowChartInsights] = useState(false);
+  const [chartInsightsLoading, setChartInsightsLoading] = useState(false);
+  const [chartInsightsData, setChartInsightsData] = useState(null);
   const drawerAnim = useRef(new Animated.Value(height)).current;
   const houseInsightRequestKeyRef = useRef(null);
+  const chartInsightsRequestKeyRef = useRef(null);
 
   // Animation for smooth chart transitions
   const chartTranslateX = useRef(new Animated.Value(0)).current;
@@ -272,6 +275,117 @@ export default function ChartScreen({ navigation, route }) {
     };
     return significances[houseNum];
   };
+
+  const buildChartInsightsCards = useCallback((items) => {
+    const normalized = (items || []).map((item) => ({
+      ...item,
+      houseTitle: getHouseSignificance(item.houseNum).title,
+      supportScore: Number(item?.raw?.support_count || 0),
+      stressScore: Number(item?.raw?.stress_count || 0),
+      activationScore: Number(item?.raw?.activation_count || 0),
+    }));
+
+    const signature = normalized
+      .slice()
+      .sort((a, b) => (
+        (b.supportScore + b.stressScore + b.activationScore) -
+        (a.supportScore + a.stressScore + a.activationScore)
+      ))
+      .filter((item) => item.interpretation)
+      .slice(0, 3)
+      .map((item) => ({
+        houseNum: item.houseNum,
+        title: item.houseTitle,
+        text: item.interpretation,
+      }));
+
+    const supported = normalized
+      .slice()
+      .sort((a, b) => {
+        const bNet = b.supportScore - b.stressScore;
+        const aNet = a.supportScore - a.stressScore;
+        if (bNet !== aNet) return bNet - aNet;
+        return b.supportScore - a.supportScore;
+      })
+      .filter((item) => item.support_factors?.length > 0 && item.supportScore >= item.stressScore)
+      .slice(0, 3)
+      .map((item) => ({
+        houseNum: item.houseNum,
+        title: item.houseTitle,
+        reasons: item.support_factors.slice(0, 2).map((reason) => reason.label),
+      }));
+
+    const pressured = normalized
+      .slice()
+      .sort((a, b) => {
+        if (b.stressScore !== a.stressScore) return b.stressScore - a.stressScore;
+        return b.supportScore - a.supportScore;
+      })
+      .filter((item) => item.stress_factors?.length > 0)
+      .slice(0, 3)
+      .map((item) => ({
+        houseNum: item.houseNum,
+        title: item.houseTitle,
+        reasons: item.stress_factors.slice(0, 2).map((reason) => reason.label),
+      }));
+
+    const activeNow = normalized
+      .slice()
+      .sort((a, b) => b.activationScore - a.activationScore)
+      .filter((item) => item.activation_factors?.length > 0)
+      .slice(0, 3)
+      .map((item) => ({
+        houseNum: item.houseNum,
+        title: item.houseTitle,
+        reasons: item.activation_factors.slice(0, 2).map((reason) => reason.label),
+      }));
+
+    return { signature, supported, pressured, activeNow };
+  }, [getHouseSignificance]);
+
+  const openChartInsights = useCallback(async () => {
+    const currentChart = chartTypes[currentChartIndex]?.id || 'lagna';
+    const formattedBirth = buildBirthPayload(birthData);
+    const transitDate = new Date().toISOString().split('T')[0];
+    const requestKey = JSON.stringify({
+      birthId: birthData?.id || birthData?.name || '',
+      date: formattedBirth?.date || '',
+      time: formattedBirth?.time || '',
+      lat: formattedBirth?.latitude || '',
+      lon: formattedBirth?.longitude || '',
+      chart: currentChart,
+      transitDate,
+    });
+
+    setShowChartInsights(true);
+
+    if (chartInsightsRequestKeyRef.current === requestKey && chartInsightsData) {
+      return;
+    }
+
+    try {
+      setChartInsightsLoading(true);
+      chartInsightsRequestKeyRef.current = requestKey;
+      const responses = await Promise.all(
+        Array.from({ length: 12 }, (_, idx) => (
+          chartAPI.getHouseInsight(formattedBirth, idx + 1, currentChart, transitDate)
+        ))
+      );
+
+      const houseItems = responses.map((response, idx) => ({
+        ...(response?.data || {}),
+        houseNum: idx + 1,
+      }));
+
+      setChartInsightsData(buildChartInsightsCards(houseItems));
+    } catch (error) {
+      console.log('[ChartScreen] chart insights load failed', error?.message || String(error));
+      setChartInsightsData(null);
+      chartInsightsRequestKeyRef.current = null;
+    } finally {
+      setChartInsightsLoading(false);
+    }
+  }, [birthData, buildBirthPayload, buildChartInsightsCards, chartInsightsData, chartTypes, currentChartIndex]);
 
   const openHouseDrawer = (houseData) => {
     setSelectedHouse(houseData);
@@ -601,6 +715,7 @@ export default function ChartScreen({ navigation, route }) {
                                   }}
                                   navigation={navigation}
                                   onHousePress={openHouseDrawer}
+                                  onOpenInsights={openChartInsights}
                                   division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
                                            chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
                                            chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
@@ -1011,6 +1126,124 @@ export default function ChartScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
+
+        <Modal
+          visible={showChartInsights}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowChartInsights(false)}
+        >
+          <View style={styles.drawerOverlay}>
+            <Pressable
+              style={[StyleSheet.absoluteFill, styles.drawerBackdrop]}
+              onPress={() => setShowChartInsights(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close', 'Close')}
+            />
+            <View
+              style={[
+                styles.drawerContent,
+                {
+                  backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+                },
+              ]}
+            >
+              <View style={styles.drawerHandle} />
+              <View style={styles.drawerInner}>
+                <ScrollView
+                  style={styles.drawerScroll}
+                  contentContainerStyle={styles.drawerScrollContent}
+                  showsVerticalScrollIndicator
+                >
+                  <View style={styles.drawerHeader}>
+                    <View style={[styles.houseNumberBadge, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="sparkles-outline" size={20} color="#fff" />
+                    </View>
+                    <View style={styles.houseTitleContainer}>
+                      <Text style={[styles.houseTitle, { color: colors.text }]}>Chart Insights</Text>
+                      <Text style={[styles.houseSign, { color: colors.primary }]}>
+                        {chartTypes[currentChartIndex]?.name}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {chartInsightsLoading ? (
+                    <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.06)' }]}>
+                      <Text style={[styles.sectionDesc, { color: colors.text }]}>
+                        Building chart-wide support, pressure, and timing view...
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.06)' }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Chart Signature</Text>
+                        {chartInsightsData?.signature?.length > 0 ? (
+                          chartInsightsData.signature.map((item) => (
+                            <View
+                              key={`signature-${item.houseNum}`}
+                              style={styles.chartInsightRow}
+                            >
+                              <Text style={[styles.chartInsightTitle, { color: colors.text }]}>{item.title}</Text>
+                              <Text style={[styles.chartInsightBody, { color: colors.textSecondary }]}>{item.text}</Text>
+                            </View>
+                          ))
+                        ) : (
+                          <Text style={[styles.emptySectionText, { color: colors.textTertiary }]}>No chart signature available yet.</Text>
+                        )}
+                      </View>
+
+                      {[
+                        { key: 'supported', title: 'Supported', rows: chartInsightsData?.supported || [] },
+                        { key: 'pressured', title: 'Pressured', rows: chartInsightsData?.pressured || [] },
+                        { key: 'activeNow', title: 'Active Now', rows: chartInsightsData?.activeNow || [] },
+                      ].map((section) => (
+                        <View key={section.key} style={styles.drawerSection}>
+                          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
+                          {section.rows.length > 0 ? (
+                            section.rows.map((item) => (
+                              <View
+                                key={`${section.key}-${item.houseNum}`}
+                                style={styles.chartInsightRow}
+                              >
+                                <Text style={[styles.chartInsightTitle, { color: colors.text }]}>{item.title}</Text>
+                                {item.reasons.map((reason, idx) => (
+                                  <Text key={`${section.key}-${item.houseNum}-${idx}`} style={[styles.chartInsightBody, { color: colors.textSecondary }]}>
+                                    • {reason}
+                                  </Text>
+                                ))}
+                              </View>
+                            ))
+                          ) : (
+                            <Text style={[styles.emptySectionText, { color: colors.textTertiary }]}>Nothing notable here right now.</Text>
+                          )}
+                        </View>
+                      ))}
+                    </>
+                  )}
+
+                  <View style={{ height: 40 }} />
+                </ScrollView>
+
+                <View style={[styles.drawerActions, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
+                  borderTopWidth: 1,
+                  borderTopColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                  paddingTop: 16,
+                  paddingHorizontal: 24,
+                  paddingBottom: Platform.OS === 'ios' ? 30 : 20
+                }]}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                    onPress={() => setShowChartInsights(false)}
+                  >
+                    <Ionicons name="close-outline" size={20} color="white" />
+                    <Text style={styles.actionButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </GestureHandlerRootView>
   );
@@ -1043,7 +1276,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   nativeChip: {
-    marginTop: 4,
+    marginTop: 6,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
@@ -1337,6 +1570,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 10,
     fontStyle: 'italic',
+  },
+  chartInsightRow: {
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(148, 163, 184, 0.2)',
+  },
+  chartInsightTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  chartInsightBody: {
+    fontSize: 13,
+    lineHeight: 19,
   },
   reasonRow: {
     flexDirection: 'row',
