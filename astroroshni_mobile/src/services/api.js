@@ -437,6 +437,29 @@ export const chartAPI = {
         throw error;
       });
   },
+  calculateAshtakavarga: (birthData, chartType = 'lagna', transitDate = new Date().toISOString().split('T')[0]) => {
+    return api.post(getEndpoint('/calculate-ashtakavarga'), {
+      birth_data: birthData,
+      chart_type: chartType,
+      transit_date: transitDate,
+    }).then((response) => response)
+      .catch((error) => {
+        console.error('calculateAshtakavarga error:', error?.response?.data || error);
+        throw error;
+      });
+  },
+  getHouseInsight: (birthData, houseNum, chartId = 'lagna', transitDate = new Date().toISOString().split('T')[0]) => {
+    return api.post(getEndpoint('/chart-house-insight'), {
+      birth_data: birthData,
+      house_num: houseNum,
+      chart_id: chartId,
+      transit_date: transitDate,
+    }).then((response) => response)
+      .catch((error) => {
+        console.error('getHouseInsight error:', error?.response?.data || error);
+        throw error;
+      });
+  },
   getSadeSatiPeriods: (birthData) => {
     const transitDate = new Date().toISOString().split('T')[0];
     return api.post(getEndpoint('/transits/sade-sati-periods'), { birth_data: birthData, transit_date: transitDate })

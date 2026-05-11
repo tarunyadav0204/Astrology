@@ -7,12 +7,20 @@ import asyncio
 import os
 import time
 import re
+import logging
 import google.generativeai as genai  # type: ignore[import-not-found]
 from google.generativeai import caching as genai_caching  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.event_timeline_context_prune import prune_for_event_timeline
 from ai.llm_roundtrip_log import log_llm_roundtrip
 from utils.admin_settings import is_debug_logging_enabled
+from utils.user_facing_errors import user_facing_message_from_any
+
+logger = logging.getLogger(__name__)
+
+
+def _user_timeline_error(value: Any) -> str:
+    return user_facing_message_from_any(value)
 
 # Shared instruction block for Event Timeline (yearly + monthly deep): disambiguate which life channel
 # a house activation targets (any house H), using karaka + afflicter flavour + topic-appropriate vargas.
@@ -259,7 +267,7 @@ class EventPredictor:
                 return {
                     "year": year,
                     "status": "error",
-                    "error": (
+                    "error": _user_timeline_error(
                         ai_response.get("error")
                         or "Timeline model returned empty or incomplete JSON (e.g. {})."
                     ),
@@ -294,7 +302,13 @@ class EventPredictor:
             print(f"   - Error message: {str(e)}")
             import traceback
             traceback.print_exc()
-            return {"year": year, "status": "error", "error": str(e), "macro_trends": [], "monthly_predictions": []}
+            return {
+                "year": year,
+                "status": "error",
+                "error": _user_timeline_error(e),
+                "macro_trends": [],
+                "monthly_predictions": [],
+            }
 
     async def _predict_yearly_events_parallel_cached(
         self,
@@ -328,12 +342,13 @@ class EventPredictor:
         except Exception as e:
             msg = f"Failed to create Gemini context cache: {type(e).__name__}: {e}"
             print(f"❌ {msg}")
+            logger.exception("Gemini yearly context cache create failed")
             if require_cache:
                 return {
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": msg,
+                    "error": _user_timeline_error(e),
                 }
             print("⚠️ EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE is disabled; falling back to single-call yearly.")
             prompt = self._create_prediction_prompt(raw_data, year, age)
@@ -373,26 +388,30 @@ class EventPredictor:
                 try:
                     quarter_idx, res = await task
                 except Exception as e:
+                    logger.exception("Yearly timeline quarter task failed")
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Quarter Q{quarter_idx} failed: {type(e).__name__}: {e}",
+                        "error": _user_timeline_error(e),
                     }
 
                 if isinstance(res, Exception):
+                    logger.error("Yearly timeline quarter returned exception result: %s", res)
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Quarter Q{quarter_idx} failed: {type(res).__name__}: {res}",
+                        "error": _user_timeline_error(res),
                     }
                 if not isinstance(res, dict) or res.get("_timeline_invalid"):
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Quarter Q{quarter_idx} returned invalid timeline JSON.",
+                        "error": _user_timeline_error(
+                            f"Quarter Q{quarter_idx} returned invalid timeline JSON."
+                        ),
                     }
 
                 quarter_usage = res.get("_llm_usage") if isinstance(res, dict) else None
@@ -535,7 +554,9 @@ class EventPredictor:
                 "macro_trends": [],
                 "monthly_predictions": [],
                 "_timeline_invalid": True,
-                "error": f"Merged quarterly output has {len(monthly_predictions)} months; expected 12.",
+                "error": _user_timeline_error(
+                    f"Merged quarterly output has {len(monthly_predictions)} months; expected 12."
+                ),
             }
 
         ids = []
@@ -545,7 +566,9 @@ class EventPredictor:
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": "Merged quarterly output contains non-object month entries.",
+                    "error": _user_timeline_error(
+                        "Merged quarterly output contains non-object month entries."
+                    ),
                 }
             ids.append(m.get("month_id"))
             events = m.get("events")
@@ -554,14 +577,18 @@ class EventPredictor:
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": f"Month {m.get('month_id')} has no events in merged quarterly output.",
+                    "error": _user_timeline_error(
+                        f"Month {m.get('month_id')} has no events in merged quarterly output."
+                    ),
                 }
             if len(events) < 6:
                 return {
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": f"Month {m.get('month_id')} has {len(events)} events; minimum 6 required.",
+                    "error": _user_timeline_error(
+                        f"Month {m.get('month_id')} has {len(events)} events; minimum 6 required."
+                    ),
                 }
             for ev_idx, ev in enumerate(events, start=1):
                 if not isinstance(ev, dict):
@@ -569,7 +596,9 @@ class EventPredictor:
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Month {m.get('month_id')} contains non-object event entry.",
+                        "error": _user_timeline_error(
+                            f"Month {m.get('month_id')} contains non-object event entry."
+                        ),
                     }
                 pred = _clean_prediction_text(ev.get("prediction"))
                 has_technical_noise = bool(
@@ -586,13 +615,20 @@ class EventPredictor:
                     if len(pred_preview) > 180:
                         pred_preview = pred_preview[:180] + "..."
                     reason = "empty prediction" if not pred else "technical/jargon prediction"
+                    logger.warning(
+                        "Quarter merge invalid event: month=%s ev_idx=%s type=%s reason=%s preview=%s",
+                        m.get("month_id"),
+                        ev_idx,
+                        event_type,
+                        reason,
+                        pred_preview or "<empty>",
+                    )
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": (
-                            f"Month {m.get('month_id')} event #{ev_idx} ({event_type}) invalid: {reason}. "
-                            f"Raw prediction preview: {pred_preview or '<empty>'}"
+                        "error": _user_timeline_error(
+                            f"Month {m.get('month_id')} event #{ev_idx} ({event_type}) invalid: {reason}."
                         ),
                     }
                 ev["prediction"] = pred
@@ -605,7 +641,9 @@ class EventPredictor:
                 "macro_trends": [],
                 "monthly_predictions": [],
                 "_timeline_invalid": True,
-                "error": f"Merged quarterly output has invalid month_ids: {ids}.",
+                "error": _user_timeline_error(
+                    f"Merged quarterly output has invalid month_ids: {ids}."
+                ),
             }
 
         monthly_predictions.sort(key=lambda x: int(x.get("month_id", 0)))
@@ -641,7 +679,7 @@ class EventPredictor:
                 return {
                     "year": year,
                     "status": "error",
-                    "error": (
+                    "error": _user_timeline_error(
                         ai_response.get("error")
                         or "Monthly deep model returned empty or incomplete JSON."
                     ),
@@ -676,7 +714,13 @@ class EventPredictor:
             print(f"\n❌ ERROR IN predict_monthly_deep: {e}")
             import traceback
             traceback.print_exc()
-            return {"year": year, "status": "error", "error": str(e), "macro_trends": [], "monthly_predictions": []}
+            return {
+                "year": year,
+                "status": "error",
+                "error": _user_timeline_error(e),
+                "macro_trends": [],
+                "monthly_predictions": [],
+            }
 
     async def _predict_monthly_deep_parallel_cached(
         self,
@@ -711,12 +755,13 @@ class EventPredictor:
         except Exception as e:
             msg = f"Failed to create Gemini context cache for monthly deep: {type(e).__name__}: {e}"
             print(f"❌ {msg}")
+            logger.exception("Gemini monthly deep context cache create failed")
             if require_cache:
                 return {
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": msg,
+                    "error": _user_timeline_error(e),
                 }
             prompt = self._create_monthly_deep_prompt(raw_data, year, month, age, transit_facts, dasha_facts)
             return await self._get_ai_prediction_async(prompt)
@@ -758,18 +803,21 @@ class EventPredictor:
                 try:
                     shard_id, res = await task
                 except Exception as e:
+                    logger.exception("Monthly deep shard task failed")
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Monthly shard failed: {type(e).__name__}: {e}",
+                        "error": _user_timeline_error(e),
                     }
                 if not isinstance(res, dict) or res.get("_timeline_invalid"):
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Monthly shard {shard_id} returned invalid JSON.",
+                        "error": _user_timeline_error(
+                            f"Monthly shard {shard_id} returned invalid JSON."
+                        ),
                     }
                 shard_usage = res.get("_llm_usage")
                 if isinstance(shard_usage, dict):
@@ -891,7 +939,9 @@ Constraints:
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": f"Monthly shard {shard_id or '<unknown>'} missing from merge results.",
+                    "error": _user_timeline_error(
+                        f"Monthly shard {shard_id or '<unknown>'} missing from merge results."
+                    ),
                 }
             res = shard_results_by_id.get(shard_id) or {}
             shard_event_counts[shard_id] = 0
@@ -908,7 +958,9 @@ Constraints:
                     "macro_trends": [],
                     "monthly_predictions": [],
                     "_timeline_invalid": True,
-                    "error": f"Monthly shard returned wrong month_id {m.get('month_id')} (expected {month}).",
+                    "error": _user_timeline_error(
+                        f"Monthly shard returned wrong month_id {m.get('month_id')} (expected {month})."
+                    ),
                 }
             for fa in m.get("focus_areas") or []:
                 f = _clean_text(fa)
@@ -928,14 +980,21 @@ Constraints:
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": "Monthly shard contains event with empty prediction.",
+                        "error": _user_timeline_error(
+                            "Monthly shard contains event with empty prediction."
+                        ),
                     }
                 if re.search(r"(\[BHAVA-DISAMBIG:|\b(BHAVA|Karaka|Varga|Threads=|Afflicter)\b|\b\d{1,2}L\b)", pred, re.I):
+                    logger.warning(
+                        "Monthly merge rejected technical prediction text: %s", pred[:400]
+                    )
                     return {
                         "macro_trends": [],
                         "monthly_predictions": [],
                         "_timeline_invalid": True,
-                        "error": f"Monthly shard contains technical prediction text: {pred[:120]}",
+                        "error": _user_timeline_error(
+                            "Monthly shard contains technical prediction text."
+                        ),
                     }
                 key = f"{_clean_text(ev.get('type')).lower()}|{pred.lower()}"
                 if key in seen_keys:
@@ -951,14 +1010,18 @@ Constraints:
                 "macro_trends": [],
                 "monthly_predictions": [],
                 "_timeline_invalid": True,
-                "error": f"Monthly shards returned no usable events: {', '.join(empty_shards)}",
+                "error": _user_timeline_error(
+                    f"Monthly shards returned no usable events: {', '.join(empty_shards)}"
+                ),
             }
         if len(events) < 20:
             return {
                 "macro_trends": [],
                 "monthly_predictions": [],
                 "_timeline_invalid": True,
-                "error": f"Merged monthly deep has {len(events)} events; minimum 20 required.",
+                "error": _user_timeline_error(
+                    f"Merged monthly deep has {len(events)} events; minimum 20 required."
+                ),
             }
 
         # Keep strongest and near-term items first if model produced too many.
@@ -1162,7 +1225,7 @@ Now return a single JSON object with this structure:
             }
             return facts
         except Exception as e:
-            return {"error": str(e), "transit_houses": {}}
+            return {"error": _user_timeline_error(e), "transit_houses": {}}
 
     def _get_dasha_facts_for_month(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
         """Compute interval-based Vimshottari facts for the selected month."""
@@ -1229,7 +1292,7 @@ Now return a single JSON object with this structure:
                 "changes": daily_changes,
             }
         except Exception as e:
-            return {"error": str(e)}
+            return {"error": _user_timeline_error(e)}
 
     def _infer_event_domain(self, event: Dict[str, Any]) -> str:
         blob = " ".join(
@@ -2221,6 +2284,10 @@ Plain-language style for `prediction`:
                 "total_tokens": reported_total_tokens,
             }
             print("\n✅ TIMELINE LLM call completed - Returning parsed response")
+            if isinstance(parsed_response, dict) and parsed_response.get("_timeline_invalid"):
+                err = parsed_response.get("error")
+                if err:
+                    parsed_response["error"] = _user_timeline_error(err)
             return parsed_response
 
         except json.JSONDecodeError as je:
@@ -2243,7 +2310,7 @@ Plain-language style for `prediction`:
                 "macro_trends": [],
                 "monthly_predictions": [],
                 "_timeline_invalid": True,
-                "error": f"Timeline JSON parse error: {je}",
+                "error": _user_timeline_error(je),
             }
         except Exception as e:
             if debug_logging:
@@ -2268,5 +2335,5 @@ Plain-language style for `prediction`:
                 "macro_trends": [],
                 "monthly_predictions": [],
                 "_timeline_invalid": True,
-                "error": f"Timeline LLM request failed: {type(e).__name__}: {e}",
+                "error": _user_timeline_error(e),
             }

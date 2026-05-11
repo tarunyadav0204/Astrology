@@ -1,7 +1,7 @@
 """Chart calculation routes"""
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import traceback
 import time
@@ -17,6 +17,7 @@ from calculators.gandanta_calculator import GandantaCalculator
 from calculators.yogi_calculator import YogiCalculator
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
+from charts.house_insight_service import build_house_insight
 from encryption_utils import EncryptionManager
 from db import get_conn, execute
 
@@ -47,6 +48,13 @@ class BirthData(BaseModel):
             return "UTC+0"  # UTC default instead of IST
 
 router = APIRouter()
+
+
+class HouseInsightRequest(BaseModel):
+    birth_data: Dict[str, Any]
+    house_num: int
+    chart_id: str = "lagna"
+    transit_date: Optional[str] = None
 
 def get_divisional_sign(sign, degree_in_sign, division):
     """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
@@ -235,6 +243,27 @@ async def calculate_chart_only(request: dict, current_user: User = Depends(get_c
         end_time = time.time()
         print(f"❌ Chart calculation error after {end_time - start_time:.3f}s: {str(e)}")
         import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/chart-house-insight")
+async def chart_house_insight(request: HouseInsightRequest, current_user: User = Depends(get_current_user)):
+    """Build a calculator-backed insight payload for a selected house."""
+    try:
+        if request.house_num < 1 or request.house_num > 12:
+            raise HTTPException(status_code=400, detail="house_num must be between 1 and 12")
+
+        return build_house_insight(
+            birth_data=request.birth_data,
+            house_num=request.house_num,
+            chart_id=request.chart_id,
+            transit_date=request.transit_date,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ chart_house_insight failed: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 

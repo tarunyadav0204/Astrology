@@ -22,6 +22,7 @@ import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule }
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { trackEvent } from '../utils/analytics';
+import { userFacingTimelineError } from '../utils/timelineUserErrors';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -255,13 +256,16 @@ export default function MonthlyDeepScreen() {
           return;
         }
         revealEmptyStateActions();
-        Alert.alert(
-          t('monthlyDeepScreen.stoppedTitle', 'Could not finish loading'),
-          message ||
-            t(
+        const raw = message != null ? String(message).trim() : '';
+        const safeBody = raw
+          ? userFacingTimelineError(raw)
+          : t(
               'monthlyDeepScreen.stoppedBody',
               'The analysis may still be running. Use “Load saved”, or wait and open this screen again.'
-            ),
+            );
+        Alert.alert(
+          t('monthlyDeepScreen.stoppedTitle', 'Could not finish loading'),
+          safeBody,
           [
             {
               text: t('eventScreen.tryLoadSaved', 'Load saved'),

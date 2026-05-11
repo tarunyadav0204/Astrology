@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict
+import logging
 import sys
 import os
 import json
@@ -22,8 +23,11 @@ from ai.intent_router import IntentRouter
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.event_predictor_ai import EventPredictor
+from utils.user_facing_errors import user_facing_message_from_any
 from calculators.ashtakavarga import AshtakavargaCalculator
 from shared.dasha_calculator import DashaCalculator
+
+logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
     name: Optional[str] = None
@@ -1025,10 +1029,8 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Monthly Event Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Monthly event job start failed")
+        raise HTTPException(status_code=500, detail=user_facing_message_from_any(e))
 
 @router.get("/monthly-events/status/{job_id}")
 async def get_event_timeline_status(job_id: str, current_user: User = Depends(get_current_user)):
@@ -1065,7 +1067,7 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
         except Exception:
             pass
     elif status == "failed":
-        response["error"] = error_message or "Analysis failed"
+        response["error"] = user_facing_message_from_any(error_message or "Analysis failed")
     elif status in ["pending", "processing"]:
         response["message"] = "Analyzing planetary positions..."
         if started_at:
@@ -1102,7 +1104,7 @@ async def stream_event_timeline_status(job_id: str, current_user: User = Depends
                 payload["data"] = json.loads(result_data)
                 payload["completed_at"] = str(completed_at) if completed_at else None
             elif status == "failed":
-                payload["error"] = error_message or "Analysis failed"
+                payload["error"] = user_facing_message_from_any(error_message or "Analysis failed")
             elif status in ("pending", "processing"):
                 payload["message"] = "Analyzing planetary positions..."
                 if started_at:
@@ -1156,10 +1158,15 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
         if birth_chart_id is not None:
             birth_chart_id = int(birth_chart_id)
         
-        print(f"🔍 Checking cache for user {current_user.userid}, birth_chart_id {birth_chart_id}, year {target_year}")
-        
+        logger.debug(
+            "monthly-events cache lookup user=%s birth_chart_id=%s year=%s",
+            current_user.userid,
+            birth_chart_id,
+            target_year,
+        )
+
         if not birth_chart_id:
-            print(f"⚠️ No birth_chart_id provided for cache lookup")
+            logger.warning("monthly-events cache: no birth_chart_id")
             return {"cached": False}
         
         with get_conn() as conn:
@@ -1170,7 +1177,11 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
                 (birth_chart_id, current_user.userid),
             )
             if not cur.fetchone():
-                print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
+                logger.warning(
+                    "monthly-events cache: chart %s not found for user %s",
+                    birth_chart_id,
+                    current_user.userid,
+                )
                 return {"cached": False}
 
             # Find most recent completed job for this user/birth_chart/year (and month if monthly deep)
@@ -1204,20 +1215,27 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
             result = cur.fetchone()
         
         if result and result[0]:
-            print(f"✅ Found cached timeline: job_id={result[2]}, cached_at={result[1]}")
+            logger.debug(
+                "monthly-events cache hit job_id=%s cached_at=%s",
+                result[2],
+                result[1],
+            )
             return {
                 "cached": True,
                 "data": json.loads(result[0]),
                 "cached_at": result[1]
             }
-        
-        print(f"❌ No cached timeline found")
+
+        logger.debug(
+            "monthly-events cache miss user=%s birth_chart_id=%s year=%s",
+            current_user.userid,
+            birth_chart_id,
+            target_year,
+        )
         return {"cached": False}
-        
+
     except Exception as e:
-        print(f"❌ Error fetching cached timeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("monthly-events cache lookup failed: %s", e)
         return {"cached": False}
 
 
@@ -1425,14 +1443,13 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
             raise Exception(predictions.get('error', 'Prediction failed'))
         
     except Exception as e:
-        print(f"\n❌ BACKGROUND TASK ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("process_event_timeline failed job_id=%s", job_id)
+        friendly = user_facing_message_from_any(e)
         with get_conn() as conn:
             execute(
                 conn,
                 "UPDATE event_timeline_jobs SET status = %s, error_message = %s, completed_at = %s WHERE job_id = %s",
-                ('failed', str(e), datetime.now(), job_id),
+                ('failed', friendly, datetime.now(), job_id),
             )
             conn.commit()
     finally:

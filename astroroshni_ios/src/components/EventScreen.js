@@ -25,6 +25,7 @@ import MonthlyAccordion from './MonthlyAccordion';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
+import { userFacingTimelineError } from '../utils/timelineUserErrors';
 
 const { width } = Dimensions.get('window');
 
@@ -236,7 +237,9 @@ export default function EventScreen({ route }) {
             }
           } else if (status === 'failed') {
             clearInterval(pollInterval);
-            throw new Error(statusResponse.data.error || 'Analysis failed');
+            throw new Error(
+              userFacingTimelineError(statusResponse.data.error || 'Analysis failed')
+            );
           }
         } catch (pollError) {
           clearInterval(pollInterval);
@@ -293,7 +296,8 @@ export default function EventScreen({ route }) {
         errorMessage = 'Cannot connect to server. Check your internet connection.';
         Alert.alert('Network Error', errorMessage);
       } else {
-        Alert.alert('Error', errorMessage + '\n\nDetails: ' + (error.response?.data?.detail || error.message));
+        const raw = error.response?.data?.detail || error.message || '';
+        Alert.alert('Error', userFacingTimelineError(raw));
       }
       
       setAnalysisStarted(false);

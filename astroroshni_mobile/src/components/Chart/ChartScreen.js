@@ -60,7 +60,10 @@ export default function ChartScreen({ navigation, route }) {
   // House Drawer State
   const [selectedHouse, setSelectedHouse] = useState(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [houseInsight, setHouseInsight] = useState(null);
+  const [houseInsightLoading, setHouseInsightLoading] = useState(false);
   const drawerAnim = useRef(new Animated.Value(height)).current;
+  const houseInsightRequestKeyRef = useRef(null);
 
   // Animation for smooth chart transitions
   const chartTranslateX = useRef(new Animated.Value(0)).current;
@@ -169,6 +172,89 @@ export default function ChartScreen({ navigation, route }) {
     return lords[rashiIndex];
   };
 
+  const classifySavStrength = (points) => {
+    if (typeof points !== 'number') return 'moderate';
+    if (points >= 30) return 'strong';
+    if (points <= 25) return 'weak';
+    return 'moderate';
+  };
+
+  const classifyBavStrength = (points) => {
+    if (typeof points !== 'number') return 'moderate';
+    if (points >= 5) return 'strong';
+    if (points <= 3) return 'weak';
+    return 'moderate';
+  };
+
+  const buildAshtakavargaSummary = useCallback((oraclePayload, houseNum, rashiIndex) => {
+    if (!oraclePayload || !houseNum || rashiIndex == null) return null;
+
+    const chartAshtakavarga = oraclePayload?.chart_ashtakavarga || {};
+    const individualCharts = oraclePayload?.ashtakavarga?.individual_charts || {};
+    const savHouse = chartAshtakavarga?.[String(houseNum)];
+    const savPoints = typeof savHouse?.bindus === 'number' ? savHouse.bindus : null;
+    if (savPoints == null) return null;
+
+    const summary = {
+      sav: {
+        house_points: savPoints,
+        classification: classifySavStrength(savPoints),
+        max_points: Object.values(chartAshtakavarga)
+          .map((entry) => (typeof entry?.bindus === 'number' ? entry.bindus : null))
+          .filter((value) => value != null)
+          .reduce((acc, value) => (acc == null || value > acc ? value : acc), null),
+        min_points: Object.values(chartAshtakavarga)
+          .map((entry) => (typeof entry?.bindus === 'number' ? entry.bindus : null))
+          .filter((value) => value != null)
+          .reduce((acc, value) => (acc == null || value < acc ? value : acc), null),
+      },
+    };
+
+    const lord = getHouseLord(rashiIndex);
+    const planetChart = individualCharts?.[lord];
+    if (!planetChart?.bindus) {
+      return summary;
+    }
+
+    const signBindusEntries = Object.entries(planetChart.bindus)
+      .map(([sign, value]) => [Number(sign), typeof value === 'number' ? value : Number(value)])
+      .filter(([sign, value]) => Number.isInteger(sign) && !Number.isNaN(value));
+
+    const housePoints = signBindusEntries.find(([sign]) => sign === rashiIndex)?.[1];
+    if (housePoints == null) {
+      return summary;
+    }
+
+    const signToHouseMap = Object.entries(chartAshtakavarga).reduce((acc, [houseKey, entry]) => {
+      if (typeof entry?.sign === 'number') {
+        acc[entry.sign] = Number(houseKey);
+      }
+      return acc;
+    }, {});
+
+    const pointValues = signBindusEntries.map(([, value]) => value);
+    const maxBav = pointValues.length ? Math.max(...pointValues) : null;
+    const minBav = pointValues.length ? Math.min(...pointValues) : null;
+
+    summary.lord_bav = {
+      planet: lord,
+      house_points: housePoints,
+      classification: classifyBavStrength(housePoints),
+      max_points: maxBav,
+      min_points: minBav,
+      strongest_houses: signBindusEntries
+        .filter(([, value]) => value === maxBav)
+        .map(([sign]) => signToHouseMap[sign])
+        .filter((value) => Number.isInteger(value)),
+      weakest_houses: signBindusEntries
+        .filter(([, value]) => value === minBav)
+        .map(([sign]) => signToHouseMap[sign])
+        .filter((value) => Number.isInteger(value)),
+    };
+
+    return summary;
+  }, []);
+
   const getHouseSignificance = (houseNum) => {
     const significances = {
       1: { title: t('houses.1.title', '1st House: Self & Appearance'), desc: t('houses.1.desc', 'Represents your personality, physical body, and general path in life.') },
@@ -210,6 +296,111 @@ export default function ChartScreen({ navigation, route }) {
     }
     return getGrahaDrishtiToHouseSign(cd, selectedHouse.rashiIndex);
   }, [selectedHouse]);
+
+  const buildBirthPayload = useCallback((data) => ({
+    ...data,
+    date: typeof data?.date === 'string' ? data.date.split('T')[0] : data?.date,
+    time: typeof data?.time === 'string' ? data.time.split('T')[1]?.slice(0, 5) || data.time : data?.time,
+    latitude: parseFloat(data?.latitude),
+    longitude: parseFloat(data?.longitude),
+  }), []);
+
+  useEffect(() => {
+    if (!selectedHouse?.chartData) {
+      setHouseInsight(null);
+      setHouseInsightLoading(false);
+      houseInsightRequestKeyRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    const currentChart = chartTypes[currentChartIndex]?.id || 'lagna';
+    const ashtakavargaChartType = currentChart === 'transit' ? 'transit' : currentChart === 'lagna' ? 'lagna' : null;
+
+    const loadInsight = async () => {
+      try {
+        const formattedBirth = buildBirthPayload(birthData);
+        const transitDate = new Date().toISOString().split('T')[0];
+        const requestKey = JSON.stringify({
+          birthId: birthData?.id || birthData?.name || '',
+          date: formattedBirth?.date || '',
+          time: formattedBirth?.time || '',
+          lat: formattedBirth?.latitude || '',
+          lon: formattedBirth?.longitude || '',
+          chart: currentChart,
+          house: selectedHouse.houseNum,
+          transitDate,
+        });
+
+        if (houseInsightRequestKeyRef.current === requestKey) {
+          return;
+        }
+
+        houseInsightRequestKeyRef.current = requestKey;
+        setHouseInsightLoading(true);
+        const requests = [
+          chartAPI.getHouseInsight(
+            formattedBirth,
+            selectedHouse.houseNum,
+            currentChart,
+            transitDate,
+          ),
+        ];
+
+        if (ashtakavargaChartType) {
+          requests.push(
+            chartAPI.calculateAshtakavarga(
+              formattedBirth,
+              ashtakavargaChartType,
+              transitDate,
+            )
+          );
+        }
+
+        const [insightResponse, ashtakavargaResponse] = await Promise.all(requests);
+
+        if (!cancelled) {
+          const insightData = insightResponse?.data || null;
+          if (insightData && ashtakavargaResponse?.data) {
+            const oracleSummary = buildAshtakavargaSummary(
+              ashtakavargaResponse.data,
+              selectedHouse.houseNum,
+              selectedHouse.rashiIndex,
+            );
+            insightData.raw = {
+              ...(insightData.raw || {}),
+              ashtakavarga: oracleSummary,
+            };
+          }
+          setHouseInsight(insightData);
+        }
+      } catch (error) {
+        console.log('[ChartScreen] house insight load failed', error?.message || String(error));
+        if (!cancelled) setHouseInsight(null);
+        houseInsightRequestKeyRef.current = null;
+      } finally {
+        if (!cancelled) setHouseInsightLoading(false);
+      }
+    };
+
+    loadInsight();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedHouse?.houseNum,
+    selectedHouse?.signName,
+    selectedHouse?.rashiIndex,
+    birthData?.id,
+    birthData?.name,
+    birthData?.date,
+    birthData?.time,
+    birthData?.latitude,
+    birthData?.longitude,
+    currentChartIndex,
+    buildBirthPayload,
+    buildAshtakavargaSummary,
+  ]);
   
   const handleShare = async () => {
     try {
@@ -539,24 +730,175 @@ export default function ChartScreen({ navigation, route }) {
                       </Text>
                     </View>
 
+                    {houseInsight && (
+                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.06)' }]}>
+                        <View style={styles.insightHeaderRow}>
+                          <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>Chart reading</Text>
+                          <View
+                            style={[
+                              styles.verdictBadge,
+                              houseInsight.verdict.key === 'strong' && styles.verdictBadgeStrong,
+                              houseInsight.verdict.key === 'mixed' && styles.verdictBadgeMixed,
+                              houseInsight.verdict.key === 'active' && styles.verdictBadgeActive,
+                              houseInsight.verdict.key === 'quiet' && styles.verdictBadgeQuiet,
+                              { borderColor: colors.primary + '35' },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.verdictBadgeText,
+                                { color: theme === 'dark' ? '#fff7ed' : '#7c2d12' },
+                              ]}
+                            >
+                              {houseInsight.verdict.label}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={[styles.sectionDesc, { color: colors.text, marginTop: 12 }]}>
+                          {houseInsight.interpretation}
+                        </Text>
+
+                        {houseInsightLoading && (
+                          <Text style={[styles.insightLoadingText, { color: colors.textSecondary }]}>
+                            Checking chart support, pressure, and timing...
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {houseInsight?.support_factors?.length > 0 && (
+                      <View style={styles.drawerSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>What supports this house</Text>
+                        {houseInsight.support_factors.map((item, idx) => (
+                          <View key={`${selectedHouse.houseNum}-reason-${idx}`} style={styles.reasonRow}>
+                            <View style={[styles.reasonDot, { backgroundColor: '#22c55e' }]} />
+                            <Text style={[styles.reasonText, { color: colors.text }]}>{item.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {houseInsight?.stress_factors?.length > 0 && (
+                      <View style={styles.drawerSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>What adds pressure</Text>
+                        {houseInsight.stress_factors.map((item, idx) => (
+                          <View key={`${selectedHouse.houseNum}-stress-${idx}`} style={styles.reasonRow}>
+                            <View style={[styles.reasonDot, { backgroundColor: '#ef4444' }]} />
+                            <Text style={[styles.reasonText, { color: colors.text }]}>{item.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {houseInsight?.activation_factors?.length > 0 && (
+                      <View style={styles.drawerSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>What is activating it now</Text>
+                        {houseInsight.activation_factors.map((item, idx) => (
+                          <View key={`${selectedHouse.houseNum}-activation-${idx}`} style={styles.reasonRow}>
+                            <View style={[styles.reasonDot, { backgroundColor: colors.primary }]} />
+                            <Text style={[styles.reasonText, { color: colors.text }]}>{item.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {houseInsight?.raw?.ashtakavarga?.sav && (
+                      <View style={styles.drawerSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Ashtakavarga</Text>
+                        <View style={styles.ashtakavargaGrid}>
+                          <View style={[styles.ashtakavargaCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)' }]}>
+                            <Text style={[styles.ashtakavargaLabel, { color: colors.textSecondary }]}>SAV</Text>
+                            <Text style={[styles.ashtakavargaValue, { color: colors.text }]}>
+                              {houseInsight.raw.ashtakavarga.sav?.house_points ?? '-'}
+                            </Text>
+                            <Text style={[styles.ashtakavargaMeta, { color: colors.textSecondary }]}>
+                              {houseInsight.raw.ashtakavarga.sav?.classification || 'moderate'}
+                            </Text>
+                          </View>
+
+                          {houseInsight.raw.ashtakavarga.lord_bav && (
+                            <View style={[styles.ashtakavargaCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)' }]}>
+                              <Text style={[styles.ashtakavargaLabel, { color: colors.textSecondary }]}>
+                                {houseInsight.raw.ashtakavarga.lord_bav.planet} BAV
+                              </Text>
+                              <Text style={[styles.ashtakavargaValue, { color: colors.text }]}>
+                                {houseInsight.raw.ashtakavarga.lord_bav.house_points ?? '-'}
+                              </Text>
+                              <Text style={[styles.ashtakavargaMeta, { color: colors.textSecondary }]}>
+                                {houseInsight.raw.ashtakavarga.lord_bav.classification || 'moderate'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <Text style={[styles.ashtakavargaExplain, { color: colors.textSecondary }]}>
+                          SAV shows the house’s total support. BAV shows how strongly the house lord contributes to this house.
+                        </Text>
+
+                        {houseInsight.raw.ashtakavarga.lord_bav?.strongest_houses?.length > 0 && (
+                          <Text style={[styles.ashtakavargaDetail, { color: colors.text }]}>
+                            Strongest {houseInsight.raw.ashtakavarga.lord_bav.planet} BAV houses: {houseInsight.raw.ashtakavarga.lord_bav.strongest_houses.join(', ')}
+                          </Text>
+                        )}
+
+                        {houseInsight.raw.ashtakavarga.lord_bav?.weakest_houses?.length > 0 && (
+                          <Text style={[styles.ashtakavargaDetail, { color: colors.text }]}>
+                            Weakest {houseInsight.raw.ashtakavarga.lord_bav.planet} BAV houses: {houseInsight.raw.ashtakavarga.lord_bav.weakest_houses.join(', ')}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
                     {/* Occupant Planets */}
                     <View style={styles.drawerSection}>
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Occupant Planets</Text>
                       {selectedHouse.planets && selectedHouse.planets.length > 0 ? (
-                        selectedHouse.planets.map((planet, idx) => (
+                        selectedHouse.planets.map((planet, idx) => {
+                          const roles = houseInsight?.raw?.occupant_roles?.[planet.name] || [];
+                          const showRetrograde = planet.retrograde && planet.name !== 'Rahu' && planet.name !== 'Ketu';
+                          return (
                           <View key={idx} style={styles.planetRow}>
                             <View style={[styles.planetIconContainer, { backgroundColor: colors.primary + '15' }]}>
                               <Text style={[styles.planetEmoji, { color: colors.primary, fontWeight: 'bold' }]}>{planet.symbol}</Text>
                             </View>
                             <View style={styles.planetInfo}>
-                              <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
+                              <View style={styles.planetNameRow}>
+                                <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
+                                {showRetrograde && (
+                                  <View
+                                    style={[
+                                      styles.retrogradeChip,
+                                      { backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.12)' },
+                                    ]}
+                                  >
+                                    <Text style={[styles.retrogradeChipText, { color: colors.text }]}>Retrograde</Text>
+                                  </View>
+                                )}
+                                {roles.map((role) => (
+                                  <View
+                                    key={`${planet.name}-${role}`}
+                                    style={[
+                                      styles.occupantRoleChip,
+                                      {
+                                        backgroundColor: role === 'Yogi lord'
+                                          ? (theme === 'dark' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(34, 197, 94, 0.12)')
+                                          : (theme === 'dark' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.10)'),
+                                      },
+                                    ]}
+                                  >
+                                    <Text style={[styles.occupantRoleChipText, { color: colors.text }]}>{role}</Text>
+                                  </View>
+                                ))}
+                              </View>
                               <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
                                 {(planet.formattedDegreeFull || planet.formattedDegree)} in {planet.nakshatra}
                                 {planet.pada != null ? ` · Pada ${planet.pada}` : ''}
                               </Text>
                             </View>
                           </View>
-                        ))
+                          );
+                        })
                       ) : (
                         <Text style={[styles.emptySectionText, { color: colors.textTertiary }]}>No planets occupy this house.</Text>
                       )}
@@ -600,6 +942,15 @@ export default function ChartScreen({ navigation, route }) {
                         </Text>
                       </View>
                     </View>
+
+                    {houseInsight?.relatedChart && currentChartIndex === 0 && (
+                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(37, 99, 235, 0.05)' }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Related chart</Text>
+                        <Text style={[styles.sectionDesc, { color: colors.text }]}>
+                          {houseInsight.relatedChart.name} is often used to validate this house theme more deeply.
+                        </Text>
+                      </View>
+                    )}
                     
                     {/* Extra padding for scroll */}
                     <View style={{ height: 40 }} />
@@ -638,6 +989,22 @@ export default function ChartScreen({ navigation, route }) {
                       <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
                       <Text style={[styles.actionButtonText, { color: colors.text }]}>Ask</Text>
                     </TouchableOpacity>
+
+                    {houseInsight?.relatedChart && currentChartIndex === 0 && (
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: theme === 'dark' ? 'rgba(59,130,246,0.2)' : 'rgba(37,99,235,0.12)' }]}
+                        onPress={() => {
+                          const relatedIndex = chartTypes.findIndex((chart) => chart.id === houseInsight.relatedChart.id);
+                          closeHouseDrawer();
+                          if (relatedIndex >= 0) {
+                            changeChart(relatedIndex);
+                          }
+                        }}
+                      >
+                        <Ionicons name="layers-outline" size={20} color={colors.text} />
+                        <Text style={[styles.actionButtonText, { color: colors.text }]}>Open {houseInsight.relatedChart.id.toUpperCase()}</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
@@ -935,10 +1302,106 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  insightHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  verdictBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verdictBadgeStrong: {
+    backgroundColor: 'rgba(34, 197, 94, 0.22)',
+  },
+  verdictBadgeMixed: {
+    backgroundColor: 'rgba(245, 158, 11, 0.24)',
+  },
+  verdictBadgeActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.22)',
+  },
+  verdictBadgeQuiet: {
+    backgroundColor: 'rgba(100, 116, 139, 0.22)',
+  },
+  verdictBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  insightLoadingText: {
+    fontSize: 12,
+    marginTop: 10,
+    fontStyle: 'italic',
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 10,
+  },
+  reasonDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    marginTop: 7,
+    marginRight: 10,
+  },
+  reasonText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  ashtakavargaGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  ashtakavargaCard: {
+    flex: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  ashtakavargaLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  ashtakavargaValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  ashtakavargaMeta: {
+    fontSize: 12,
+    marginTop: 4,
+    textTransform: 'capitalize',
+  },
+  ashtakavargaExplain: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 12,
+  },
+  ashtakavargaDetail: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+  },
   planetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
+  },
+  planetNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   planetInfo: {
     flex: 1,
@@ -957,6 +1420,24 @@ const styles = StyleSheet.create({
   },
   planetName: {
     fontSize: 15,
+    fontWeight: '700',
+  },
+  retrogradeChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  retrogradeChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  occupantRoleChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  occupantRoleChipText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   planetDetails: {
@@ -988,9 +1469,11 @@ const styles = StyleSheet.create({
   drawerActions: {
     flexDirection: 'row',
     gap: 12,
+    flexWrap: 'wrap',
   },
   actionButton: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: 120,
     flexDirection: 'row',
     height: 50,
     borderRadius: 25,

@@ -196,12 +196,33 @@ const AdminChatHistory = () => {
 
   const messageSortTime = (msg) => parseUtcTimestamp(msg?.timestamp)?.getTime() || 0;
 
+  /** When timestamps tie (e.g. same IST minute), order user before assistant; then by message_id. */
+  const senderChronologicalRank = (sender) => {
+    const k = String(sender || '').toLowerCase();
+    if (k === 'user') return 0;
+    if (k === 'assistant') return 1;
+    return 2;
+  };
+
+  const compareMessagesChronological = (a, b) => {
+    const ta = messageSortTime(a);
+    const tb = messageSortTime(b);
+    if (ta !== tb) return ta - tb;
+    const sr = senderChronologicalRank(a?.sender) - senderChronologicalRank(b?.sender);
+    if (sr !== 0) return sr;
+    const ma = Number(a?.message_id) || 0;
+    const mb = Number(b?.message_id) || 0;
+    return ma - mb;
+  };
+
   /**
    * User-thread pane: show newest *turns* first, but within each turn keep chronological order
    * (user question, then assistant reply) so answers never appear above their question.
+   * API returns rows with ORDER BY timestamp DESC, message_id DESC; equal display timestamps must not
+   * preserve that order when sorting ascending — tie-break user before assistant, then message_id.
    */
   const orderUserThreadMessagesNewestTurnsFirst = (messages) => {
-    const sorted = messages.slice().sort((a, b) => messageSortTime(a) - messageSortTime(b));
+    const sorted = messages.slice().sort(compareMessagesChronological);
     const turns = [];
     let turn = [];
     for (const m of sorted) {
@@ -214,7 +235,12 @@ const AdminChatHistory = () => {
     }
     if (turn.length) turns.push(turn);
     const turnEndTime = (t) => (t.length ? Math.max(...t.map(messageSortTime)) : 0);
-    turns.sort((a, b) => turnEndTime(b) - turnEndTime(a));
+    const turnMaxMessageId = (t) => (t.length ? Math.max(...t.map((m) => Number(m?.message_id) || 0)) : 0);
+    turns.sort((a, b) => {
+      const te = turnEndTime(b) - turnEndTime(a);
+      if (te !== 0) return te;
+      return turnMaxMessageId(b) - turnMaxMessageId(a);
+    });
     return turns.flat();
   };
 

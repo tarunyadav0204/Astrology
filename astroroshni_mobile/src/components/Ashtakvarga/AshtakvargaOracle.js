@@ -1097,24 +1097,37 @@ export default function AshtakvargaOracle({ navigation }) {
     const individualCharts = oracleData?.ashtakavarga?.individual_charts || {};
     const savHouses = oracleData?.chart_ashtakavarga || {};
     const planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
-    const rows = SIGN_SHORT_NAMES.map((sign, index) => ({
-      sign: `${sign} (${index + 1})`,
-      values: planets.map((planet) => individualCharts?.[planet]?.bindus?.[index] ?? 0),
-      sav: savHouses?.[(index + 1).toString()]?.bindus ?? 0,
-    }));
+    const rows = Array.from({ length: 12 }, (_, index) => {
+      const houseNum = index + 1;
+      const houseData = savHouses?.[String(houseNum)];
+      const signIndex =
+        typeof houseData?.sign === 'number'
+          ? houseData.sign
+          : Number.isFinite(Number(houseData?.sign))
+            ? Number(houseData.sign)
+            : index;
+      const signLabel = SIGN_SHORT_NAMES[signIndex] || SIGN_SHORT_NAMES[index];
+
+      return {
+        houseNum,
+        sign: `${signLabel} (H${houseNum})`,
+        values: planets.map((planet) => individualCharts?.[planet]?.bindus?.[signIndex] ?? 0),
+        sav: houseData?.bindus ?? 0,
+      };
+    });
 
     return (
       <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
         <View style={styles.titleContainer}>
           <Text style={[styles.mapTitle, { color: colors.text }]}>SAV + BAV Matrix</Text>
-          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>See every sign’s Bhinnashtakvarga values together with the Sarvashtakvarga total.</Text>
+          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>See each house, its occupying sign, and the corresponding Bhinnashtakvarga values together with the Sarvashtakvarga total.</Text>
         </View>
 
         <View style={[styles.matrixCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.2)' }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View>
               <View style={[styles.matrixRow, styles.matrixHeaderRow, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}>
-                <Text style={[styles.matrixHeaderCell, styles.matrixSignCell, { color: colors.text }]}>Sign</Text>
+                <Text style={[styles.matrixHeaderCell, styles.matrixSignCell, { color: colors.text }]}>House</Text>
                 {planets.map((planet) => (
                   <Text key={planet} style={[styles.matrixHeaderCell, { color: colors.text }]}>{planet.slice(0, 2)}</Text>
                 ))}

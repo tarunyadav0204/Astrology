@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
 import { trackEvent } from '../utils/analytics';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { userFacingTimelineError } from '../utils/timelineUserErrors';
 
 const { width } = Dimensions.get('window');
 
@@ -371,13 +372,16 @@ export default function EventScreen({ route }) {
           );
           return;
         }
-        Alert.alert(
-          t('eventScreen.timelineStoppedTitle', 'Could not finish loading'),
-          message ||
-            t(
+        const raw = message != null ? String(message).trim() : '';
+        const safeBody = raw
+          ? userFacingTimelineError(raw)
+          : t(
               'eventScreen.timelineStoppedBody',
               'The analysis may still be running. Wait a minute, then tap your year again, or open this screen again to load saved results without spending credits again.'
-            ),
+            );
+        Alert.alert(
+          t('eventScreen.timelineStoppedTitle', 'Could not finish loading'),
+          safeBody,
           [
             {
               text: t('eventScreen.tryLoadSaved', 'Load saved'),
