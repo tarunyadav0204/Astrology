@@ -128,3 +128,23 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.admin-event-timeline-history__pdf-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #c2410c;
+  background: #fff7ed;
+  color: #9a3412;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.admin-event-timeline-history__pdf-btn:hover:not(:disabled) {
+  background: #ffedd5;
+}
+
+.admin-event-timeline-history__pdf-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

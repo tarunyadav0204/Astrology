@@ -1196,6 +1196,73 @@ async def get_event_timeline_history(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching event timeline history: {str(e)}")
 
+
+@router.get("/admin/event-timeline/job/{job_id}/result")
+async def get_event_timeline_job_result(
+    job_id: str,
+    current_user: dict = Depends(require_admin),
+):
+    """Return stored timeline JSON for a job (admin). Used for PDF export / support."""
+    try:
+        from encryption_utils import EncryptionManager
+
+        jid = (job_id or "").strip()
+        if not jid:
+            raise HTTPException(status_code=400, detail="job_id required")
+
+        enc = EncryptionManager()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT etj.status, etj.result_data, etj.selected_year, etj.selected_month,
+                       bc.name AS native_name_raw
+                FROM event_timeline_jobs etj
+                LEFT JOIN birth_charts bc ON bc.id = etj.birth_chart_id
+                WHERE etj.job_id = %s
+                """,
+                (jid,),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Job not found")
+        status, result_raw, selected_year, selected_month, native_raw = row
+        if (status or "").lower() != "completed":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job is not completed (status={status or 'unknown'})",
+            )
+        if not result_raw:
+            raise HTTPException(status_code=400, detail="No result data stored for this job")
+
+        native_name = None
+        if native_raw:
+            try:
+                native_name = enc.decrypt(native_raw)
+            except Exception:
+                native_name = native_raw
+
+        try:
+            monthly_data = json.loads(result_raw)
+        except Exception as e:
+            logger.exception("event timeline job result JSON parse failed job_id=%s", jid)
+            raise HTTPException(status_code=500, detail=f"Invalid stored JSON: {e}") from e
+
+        return {
+            "job_id": jid,
+            "status": status,
+            "selected_year": selected_year,
+            "selected_month": selected_month,
+            "native_name": native_name,
+            "monthly_data": monthly_data,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_event_timeline_job_result failed")
+        raise HTTPException(status_code=500, detail=f"Error loading job result: {str(e)}")
+
+
 @router.get("/admin/chat/session/{session_id}")
 async def get_session_details(
     session_id: str,

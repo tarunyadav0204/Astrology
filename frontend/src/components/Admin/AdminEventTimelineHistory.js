@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
+import { downloadEventTimelinePdf } from '../../utils/eventTimelinePdf';
 import './AdminEventTimelineHistory.css';
 
 const AdminEventTimelineHistory = () => {
@@ -7,6 +8,7 @@ const AdminEventTimelineHistory = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [pdfJobId, setPdfJobId] = useState(null);
   const [error, setError] = useState('');
   const [userNameFilter, setUserNameFilter] = useState('');
   const [startDateFilter, setStartDateFilter] = useState('');
@@ -48,6 +50,43 @@ const AdminEventTimelineHistory = () => {
     }
   };
 
+  const handleDownloadPdf = async (row) => {
+    if (!row?.job_id || (row.status || '').toLowerCase() !== 'completed') return;
+    setPdfJobId(row.job_id);
+    setError('');
+    try {
+      const response = await fetch(`/api/admin/event-timeline/job/${encodeURIComponent(row.job_id)}/result`, {
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || `Load failed (${response.status})`);
+      }
+      const year = Number(data.selected_year) || new Date().getFullYear();
+      const monthlyData = data.monthly_data;
+      if (!monthlyData || typeof monthlyData !== 'object') {
+        throw new Error('No timeline payload in response');
+      }
+      const logoSrc =
+        typeof window !== 'undefined' && window.location?.origin
+          ? `${window.location.origin}/images/astroroshni-icon.png`
+          : null;
+      const native = data.native_name || row.native_name || '';
+      const fileNameBase = `event_timeline_${year}_${native || 'user'}_${String(row.job_id).slice(0, 8)}`;
+      await downloadEventTimelinePdf({
+        year,
+        nativeName: native,
+        monthlyData,
+        fileNameBase,
+        logoSrc,
+      });
+    } catch (e) {
+      setError(e?.message || 'PDF download failed');
+    } finally {
+      setPdfJobId(null);
+    }
+  };
+
   useEffect(() => {
     fetchRows(1);
   }, []);
@@ -71,7 +110,7 @@ const AdminEventTimelineHistory = () => {
   return (
     <div className="admin-event-timeline-history">
       <div className="admin-event-timeline-history__header">
-        <h2>Yearly Event Timeline Usage</h2>
+        <h2>Event timeline usage</h2>
         <button
           type="button"
           className="admin-event-timeline-history__refresh"
@@ -132,13 +171,14 @@ const AdminEventTimelineHistory = () => {
               <th>Output</th>
               <th>Total</th>
               <th>Cost (INR)</th>
+              <th>PDF</th>
             </tr>
           </thead>
           <tbody>
             {!loading && items.length === 0 ? (
               <tr>
-                <td colSpan={13} className="admin-event-timeline-history__empty">
-                  No yearly timeline runs found.
+                <td colSpan={14} className="admin-event-timeline-history__empty">
+                  No timeline runs match the current filters.
                 </td>
               </tr>
             ) : (
@@ -176,6 +216,24 @@ const AdminEventTimelineHistory = () => {
                     <div className="admin-event-timeline-history__sub">
                       Out: {Number(row.cost_summary?.output_cost_inr_estimate || 0).toFixed(4)}
                     </div>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="admin-event-timeline-history__pdf-btn"
+                      disabled={
+                        pdfJobId === row.job_id ||
+                        (row.status || '').toLowerCase() !== 'completed'
+                      }
+                      title={
+                        (row.status || '').toLowerCase() !== 'completed'
+                          ? 'Only completed jobs have a PDF'
+                          : 'Download PDF (same layout as app export)'
+                      }
+                      onClick={() => handleDownloadPdf(row)}
+                    >
+                      {pdfJobId === row.job_id ? '…' : 'PDF'}
+                    </button>
                   </td>
                 </tr>
               ))

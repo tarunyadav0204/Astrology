@@ -592,7 +592,40 @@ export default function EventScreen({ route }) {
           fetchMonthlyGuide(selectedYear);
         }
       } catch (error) {
-        fetchMonthlyGuide(selectedYear);
+        // Do not auto-start paid generation on cache failure — user may have 0 credits but a saved result.
+        const recovered = await tryLoadCachedYearlyTimeline(selectedYear);
+        if (!recovered) {
+          console.warn('[EventScreen] loadCachedData failed', error?.message || error);
+          const startPaidGenerationIfAllowed = async () => {
+            try {
+              await fetchBalance();
+              const freshBalance = await creditAPI.getBalance();
+              const actualCredits = freshBalance.data.balance;
+              if (actualCredits < creditCost) {
+                Alert.alert(
+                  'Insufficient Credits',
+                  `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`,
+                  [
+                    { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+                    { text: 'OK' },
+                  ]
+                );
+                return;
+              }
+              fetchMonthlyGuide(selectedYear);
+            } catch (e) {
+              Alert.alert('Error', e?.message || 'Could not verify credits. Please try again.');
+            }
+          };
+          Alert.alert(
+            'Could not load',
+            'We could not reach the server to check for a saved timeline. Go back and try again (no credits) if you already paid, or start a new analysis if you have credits.',
+            [
+              { text: 'Go back', style: 'cancel', onPress: () => setAnalysisStarted(false) },
+              { text: 'Generate new report', onPress: () => { startPaidGenerationIfAllowed(); } },
+            ]
+          );
+        }
       }
     };
     
@@ -618,7 +651,7 @@ export default function EventScreen({ route }) {
         timelineTimeoutRef.current = null;
       }
     };
-  }, [selectedYear, analysisStarted]);
+  }, [selectedYear, analysisStarted, tryLoadCachedYearlyTimeline, creditCost, fetchMonthlyGuide, fetchBalance, navigation]);
 
   const onRefresh = useCallback(() => {
     // Prevent accidental regeneration - do nothing on pull-to-refresh
