@@ -232,7 +232,7 @@ async def get_activity(
     """
     distinct_query = f"""
         WITH base AS (
-            SELECT user_id, user_name, user_phone, duration_ms
+            SELECT user_id, user_name, user_phone, duration_ms, created_at
             FROM {table}
             WHERE {where_clause}
         ),
@@ -242,6 +242,7 @@ async def get_activity(
                 user_name,
                 user_phone,
                 duration_ms,
+                created_at,
                 CASE
                     WHEN user_id IS NOT NULL AND user_id != 0
                         THEN CONCAT('id:', CAST(user_id AS STRING))
@@ -260,14 +261,15 @@ async def get_activity(
                 ANY_VALUE(user_name) AS user_name,
                 ANY_VALUE(user_phone) AS user_phone,
                 COUNT(*) AS api_calls,
-                SUM(COALESCE(duration_ms, 0)) AS total_duration_ms
+                SUM(COALESCE(duration_ms, 0)) AS total_duration_ms,
+                MAX(created_at) AS last_activity_at
             FROM keyed
             WHERE dedup_key IS NOT NULL
             GROUP BY dedup_key
         )
-        SELECT user_id, user_name, user_phone, api_calls, total_duration_ms
+        SELECT user_id, user_name, user_phone, api_calls, total_duration_ms, last_activity_at
         FROM grouped
-        ORDER BY LOWER(TRIM(COALESCE(user_name, ''))), COALESCE(user_phone, '')
+        ORDER BY last_activity_at DESC
         LIMIT 5000
     """
     # Rolling distinct users at ref time (UTC), same filters + dedup as distinct_users — full table scan, not LIMIT 500.
@@ -420,6 +422,7 @@ async def get_activity(
             "user_phone": _serialize(d.get("user_phone")),
             "api_calls": int(d.get("api_calls") or 0),
             "total_duration_ms": round(total_dur, 2),
+            "last_activity_at": _serialize(d.get("last_activity_at")),
         })
     _enrich_activity_user_ids(distinct_out)
 

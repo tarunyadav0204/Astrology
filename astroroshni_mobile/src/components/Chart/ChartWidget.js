@@ -25,7 +25,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation, onHousePress, onOpenInsights }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -454,11 +454,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               </TouchableOpacity>
             </View>
             <View style={styles.infoButtonContainer}>
-              {typeof onOpenInsights === 'function' && (
-                <TouchableOpacity onPress={onOpenInsights} style={styles.infoButton}>
-                  <Ionicons name="sparkles-outline" size={18} color="#fff" />
-                </TouchableOpacity>
-              )}
               <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
                 <Ionicons name="information-circle-outline" size={20} color="#fff" />
               </TouchableOpacity>
@@ -590,7 +585,7 @@ const styles = StyleSheet.create({
   floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
   floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10, flexDirection: 'row', gap: 8 },
+  infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
   infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },

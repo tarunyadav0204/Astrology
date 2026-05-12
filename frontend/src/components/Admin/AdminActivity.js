@@ -57,6 +57,28 @@ function activityUserKey(row) {
   return null;
 }
 
+/** Relative past time for “Last visible” (English). */
+function formatRelativeTimeAgo(isoOrDate) {
+  const t = new Date(isoOrDate);
+  const ms = Date.now() - t.getTime();
+  if (!Number.isFinite(ms)) return null;
+  if (ms < 0) return 'just now';
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return sec <= 1 ? 'just now' : `${sec} seconds ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day} day${day === 1 ? '' : 's'} ago`;
+  const week = Math.floor(day / 7);
+  if (week < 5) return `${week} week${week === 1 ? '' : 's'} ago`;
+  const month = Math.floor(day / 30);
+  if (month < 12) return `${month} month${month === 1 ? '' : 's'} ago`;
+  const year = Math.floor(day / 365);
+  return `${year} year${year === 1 ? '' : 's'} ago`;
+}
+
 export default function AdminActivity({ onOpenUserProfile }) {
   const [activity, setActivity] = useState([]);
   const [distinctUsers, setDistinctUsers] = useState([]);
@@ -210,7 +232,11 @@ export default function AdminActivity({ onOpenUserProfile }) {
         The username filter matches logged display name and also resolves <strong>name or email</strong> from the users database (so rows with empty logged name but matching user id/phone still appear).
         Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
         <strong>Only errors</strong> includes unhandled server exceptions (<code>api_error</code>) and any
-        <code>api_request</code> with an HTTP status outside 2xx (4xx/5xx). The <strong>Users in date range</strong>{' '}
+        <code>api_request</code> with an HTTP status outside 2xx (4xx/5xx).{' '}
+        <strong>Error Type / Error Message / Stack Trace</strong> are only stored for{' '}
+        <code>api_error</code> rows (exceptions that bubble out of the route before FastAPI turns them into an HTTP response).
+        Typical route failures still log as <code>api_request</code> with a non-2xx <strong>Status</strong>; those columns stay empty — use Status, Metadata (request snapshot on many errors), and server logs.
+        The <strong>Users in date range</strong>{' '}
         table lists distinct users (name and phone) who had any matching activity between the selected dates
         (same filters as below).
         <strong> Total API time</strong> is the sum of request <code>duration_ms</code> (server processing
@@ -343,6 +369,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
               <table className="admin-activity-table admin-activity-distinct-table">
                 <thead>
                   <tr>
+                    <th className="admin-activity-th">Last visible</th>
                     <th className="admin-activity-th">Name</th>
                     <th className="admin-activity-th">Phone</th>
                     <th className="admin-activity-th">User ID</th>
@@ -353,7 +380,7 @@ export default function AdminActivity({ onOpenUserProfile }) {
                 <tbody>
                   {distinctUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="admin-activity-empty">
+                      <td colSpan={6} className="admin-activity-empty">
                         No users with activity for the selected date range and filters.
                       </td>
                     </tr>
@@ -365,6 +392,26 @@ export default function AdminActivity({ onOpenUserProfile }) {
                           onOpenUserProfile(uid);
                         }
                       };
+                      const lastVisible = row.last_activity_at;
+                      let lastVisibleDisplay = '—';
+                      let lastVisibleTitle = '';
+                      if (lastVisible != null && String(lastVisible).trim() !== '') {
+                        const parsed = new Date(lastVisible);
+                        const rel = formatRelativeTimeAgo(lastVisible);
+                        if (rel) {
+                          lastVisibleDisplay = rel;
+                          try {
+                            lastVisibleTitle = Number.isFinite(parsed.getTime())
+                              ? parsed.toLocaleString()
+                              : String(lastVisible);
+                          } catch (_) {
+                            lastVisibleTitle = String(lastVisible);
+                          }
+                        } else {
+                          lastVisibleDisplay = String(lastVisible);
+                          lastVisibleTitle = lastVisibleDisplay;
+                        }
+                      }
                       return (
                       <tr
                         key={`${row.user_id ?? ''}-${row.user_phone ?? ''}-${idx}`}
@@ -372,6 +419,9 @@ export default function AdminActivity({ onOpenUserProfile }) {
                         onClick={uid != null ? openProfile : undefined}
                         title={uid != null ? 'Open user profile (today’s date range)' : 'No user ID — open profile from User management after lookup'}
                       >
+                        <td className="admin-activity-td" title={lastVisibleTitle || undefined}>
+                          {lastVisibleDisplay}
+                        </td>
                         <td className="admin-activity-td" title={row.user_name || ''}>
                           {row.user_name != null && String(row.user_name).trim() !== ''
                             ? String(row.user_name)

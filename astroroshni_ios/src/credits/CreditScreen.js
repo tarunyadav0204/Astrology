@@ -311,9 +311,15 @@ const CreditScreen = ({ navigation }) => {
       </View>
       <View style={styles.transactionDetails}>
         <View style={styles.transactionHeader}>
-          <Text style={[styles.transactionDescription, { color: colors.text }]}>
-            {item.description || item.source}
-          </Text>
+          <View style={styles.transactionDescriptionWrap}>
+            <Text
+              style={[styles.transactionDescription, { color: colors.text }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {item.description || item.source}
+            </Text>
+          </View>
           <Text style={[styles.transactionAmount, { color: item.type === 'earned' ? colors.success : colors.primary }]}>
             {item.type === 'earned' ? '+' : '-'}{Math.abs(item.amount)}
           </Text>
@@ -322,7 +328,10 @@ const CreditScreen = ({ navigation }) => {
           <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
             {new Date(item.date).toLocaleDateString()}
           </Text>
-          <Text style={[styles.transactionBalance, { color: colors.textTertiary }]}>
+          <Text
+            style={[styles.transactionBalance, { color: colors.textTertiary }]}
+            numberOfLines={1}
+          >
             Balance: {item.balance_after}
           </Text>
         </View>
@@ -812,32 +821,47 @@ const styles = StyleSheet.create({
   },
   transactionDetails: {
     flex: 1,
+    minWidth: 0,
   },
   transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 4,
+    gap: 10,
+  },
+  transactionDescriptionWrap: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 4,
   },
   transactionDescription: {
     fontSize: 16,
     fontWeight: '600',
-    flex: 1,
   },
   transactionAmount: {
     fontSize: 16,
     fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+    minWidth: 44,
   },
   transactionFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
   transactionDate: {
     fontSize: 14,
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
   },
   transactionBalance: {
     fontSize: 14,
+    flexShrink: 0,
+    textAlign: 'right',
   },
   transactionDivider: {
     height: 1,
