@@ -2065,10 +2065,10 @@ async def send_reset_code(request: SendResetCode):
         )
         conn.commit()
     
-    # Debug: Print environment variables
-    print(f"Twilio SID: {os.getenv('TWILIO_ACCOUNT_SID')[:10] if os.getenv('TWILIO_ACCOUNT_SID') else 'None'}...")
-    print(f"Twilio Token: {os.getenv('TWILIO_AUTH_TOKEN')[:10] if os.getenv('TWILIO_AUTH_TOKEN') else 'None'}...")
-    print(f"Twilio Phone: {os.getenv('TWILIO_PHONE_NUMBER')}")
+    # Debug: Print SMS provider config
+    print(f"SMS Provider: {(os.getenv('SMS_PROVIDER') or 'auto')}")
+    print(f"MSG91 configured: {bool((os.getenv('MSG91_AUTH_KEY') or '').strip() and (os.getenv('MSG91_TEMPLATE_ID') or '').strip())}")
+    print(f"Twilio configured: {bool(os.getenv('TWILIO_ACCOUNT_SID') and os.getenv('TWILIO_AUTH_TOKEN') and os.getenv('TWILIO_PHONE_NUMBER'))}")
     
     # Send SMS with code
     from sms_service import sms_service
