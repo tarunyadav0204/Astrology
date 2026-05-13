@@ -44,6 +44,7 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
   const [openReasons, setOpenReasons] = useState({});
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -64,7 +65,13 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
   const events = Array.isArray(data.events) ? data.events : [];
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+        isDark ? styles.cardDarkFlat : styles.cardLightElevated,
+      ]}
+    >
       {/* Header row toggles expand; chips scroll is outside TouchableOpacity so horizontal pan works */}
       <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7}>
         <View style={styles.headerRow}>
@@ -152,7 +159,14 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
                           const reasoning = typeof item === 'object' && item !== null ? item.reasoning : null;
                           
                           return (
-                            <View key={idx} style={[styles.manifestationCard, { backgroundColor: colors.surface, borderLeftColor: colors.accent }]}>
+                            <View
+                              key={idx}
+                              style={[
+                                styles.manifestationCard,
+                                { backgroundColor: colors.surface, borderLeftColor: colors.accent },
+                                isDark ? styles.manifestationCardDarkFlat : styles.manifestationCardLightElevated,
+                              ]}
+                            >
                               <View style={styles.manifestationHeader}>
                                 <View style={[styles.scenarioNumber, { backgroundColor: colors.accent }]}>
                                   <Text style={[styles.scenarioNumberText, { color: colors.background }]}>{idx + 1}</Text>
@@ -194,7 +208,14 @@ export default function MonthlyAccordion({ data, onChatPress, onDiveDeepPress, d
             </TouchableOpacity>
           )}
           {onChatPress ? (
-            <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary }]} onPress={onChatPress}>
+            <TouchableOpacity
+              style={[
+                styles.chatButton,
+                { backgroundColor: colors.primary },
+                isDark ? styles.chatButtonDarkFlat : styles.chatButtonLightElevated,
+              ]}
+              onPress={onChatPress}
+            >
               <Ionicons name="chatbubbles-outline" size={18} color="white" />
               <Text style={styles.chatButtonText}>{t('monthlyAccordion.askQuestions', 'Ask Questions')}</Text>
             </TouchableOpacity>
@@ -220,7 +241,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    elevation: 2
+  },
+  cardDarkFlat: {
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  cardLightElevated: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   headerRow: {
     flexDirection: 'row',
@@ -289,6 +320,12 @@ const styles = StyleSheet.create({
     borderRadius: 10, 
     padding: 12, 
     borderLeftWidth: 3,
+  },
+  manifestationCardDarkFlat: {
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  manifestationCardLightElevated: {
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -321,7 +358,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     gap: 8,
-    elevation: 2
+  },
+  chatButtonDarkFlat: {
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  chatButtonLightElevated: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
   },
   chatButtonText: { color: 'white', fontWeight: '700', fontSize: 15, letterSpacing: 0.3 }
 });

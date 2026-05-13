@@ -378,6 +378,7 @@ export default function ChatScreen({ navigation, route }) {
   const chatModeIntroShownKeyRef = useRef(null);
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
   const modeIntroSuppressOpenUntilRef = useRef(0);
+  const chatModeHydratedRef = useRef(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -581,6 +582,122 @@ export default function ChatScreen({ navigation, route }) {
     if (!normalized) return;
     messageTierByIdRef.current[messageId] = normalized;
   };
+
+  const sortMessagesForDisplay = (messageList) => {
+    const input = Array.isArray(messageList) ? messageList : [];
+    return [...input].sort((a, b) => {
+      const aTime = new Date(a?.timestamp || a?.processingStartedAt || 0).getTime();
+      const bTime = new Date(b?.timestamp || b?.processingStartedAt || 0).getTime();
+      const safeATime = Number.isFinite(aTime) ? aTime : 0;
+      const safeBTime = Number.isFinite(bTime) ? bTime : 0;
+      if (safeATime !== safeBTime) return safeATime - safeBTime;
+
+      const aOrder = a?.role === 'user' ? 0 : (a?.isTyping ? 2 : 1);
+      const bOrder = b?.role === 'user' ? 0 : (b?.isTyping ? 2 : 1);
+      if (aOrder !== bOrder) return aOrder - bOrder;
+
+      const aId = String(a?.id || a?.messageId || '');
+      const bId = String(b?.id || b?.messageId || '');
+      return aId.localeCompare(bId);
+    });
+  };
+
+  const getModeStoragePersonId = (personIdOverride = null) => (
+    personIdOverride ||
+    currentPersonId ||
+    (birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null)
+  );
+
+  const getSelectedChatModeKey = () => {
+    if (isPremiumAnalysis) return 'premium';
+    if (instantChatEnabled && isInstantAnalysis) return 'instant';
+    return 'standard';
+  };
+
+  const saveSelectedChatMode = async (modeKey, personIdOverride = null) => {
+    const personId = getModeStoragePersonId(personIdOverride);
+    if (!personId) return;
+    try {
+      await AsyncStorage.setItem(`chatSelectedMode_${personId}`, String(modeKey || 'standard'));
+    } catch (error) {
+      console.error('Error saving selected chat mode:', error);
+    }
+  };
+
+  const loadSelectedChatMode = async (personIdOverride = null) => {
+    const personId = getModeStoragePersonId(personIdOverride);
+    if (!personId) return null;
+    try {
+      const storedMode = await AsyncStorage.getItem(`chatSelectedMode_${personId}`);
+      return storedMode ? String(storedMode).trim().toLowerCase() : null;
+    } catch (error) {
+      console.error('Error loading selected chat mode:', error);
+      return null;
+    }
+  };
+
+  const applyChatModeFromTier = (tier) => {
+    const normalized = String(tier || '').trim().toLowerCase();
+    if (normalized === 'premium') {
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(true);
+      return;
+    }
+    if (normalized === 'instant' && instantChatEnabled) {
+      setIsInstantAnalysis(true);
+      setIsPremiumAnalysis(false);
+      return;
+    }
+    setIsInstantAnalysis(false);
+    setIsPremiumAnalysis(false);
+  };
+
+  const restoreChatModeFromMessages = (messageList) => {
+    const lastTier = [...(messageList || [])]
+      .reverse()
+      .map((msg) => String(
+        msg?.chatTier ||
+        msg?.modeKey ||
+        msg?.threadMode ||
+        ''
+      ).trim().toLowerCase())
+      .find(Boolean);
+    if (!lastTier) return false;
+    applyChatModeFromTier(lastTier);
+    chatModeHydratedRef.current = true;
+    return true;
+  };
+
+  const restoreSelectedChatModeFromStorage = async (personIdOverride = null) => {
+    const storedMode = await loadSelectedChatMode(personIdOverride);
+    if (!storedMode) {
+      chatModeHydratedRef.current = true;
+      return false;
+    }
+    applyChatModeFromTier(storedMode);
+    chatModeHydratedRef.current = true;
+    return true;
+  };
+
+  const hydrateSelectedChatMode = async (messageList = [], personIdOverride = null) => {
+    const restoredFromStorage = await restoreSelectedChatModeFromStorage(personIdOverride);
+    if (restoredFromStorage) return true;
+    return restoreChatModeFromMessages(messageList);
+  };
+
+  useEffect(() => {
+    if (partnershipMode || isMundane || !birthData || !chatModeHydratedRef.current) return;
+    const modeKey = getSelectedChatModeKey();
+    saveSelectedChatMode(modeKey);
+  }, [
+    birthData,
+    currentPersonId,
+    instantChatEnabled,
+    isInstantAnalysis,
+    isMundane,
+    isPremiumAnalysis,
+    partnershipMode,
+  ]);
   
   // Calibration state
   const [calibrationEvent, setCalibrationEvent] = useState(null);
@@ -1168,8 +1285,6 @@ export default function ChatScreen({ navigation, route }) {
           setOtherRelationText('');
           setNativeSearchQuery('');
         }
-        setIsInstantAnalysis(false);
-        setIsPremiumAnalysis(false);
         setShowModeSelector(false);
         return true;
       }
@@ -1248,6 +1363,7 @@ export default function ChatScreen({ navigation, route }) {
       
       // Only update if person ID actually changed
       if (currentPersonId !== personId) {
+        chatModeHydratedRef.current = false;
         
         // Set person ID first to avoid null issues
         setCurrentPersonId(personId);
@@ -1269,8 +1385,9 @@ export default function ChatScreen({ navigation, route }) {
         }
         
         // Load messages from storage immediately
-        loadMessagesFromStorage(personId).then(storedMessages => {
+        loadMessagesFromStorage(personId).then(async storedMessages => {
           if (storedMessages.length > 0) {
+            await hydrateSelectedChatMode(storedMessages, personId);
             setMessages(storedMessages);
             // Keep Home as the default view; history is restored only after the user opens chat.
             
@@ -1283,18 +1400,15 @@ export default function ChatScreen({ navigation, route }) {
             
             // Check for processing messages and resume polling.
             // This prevents a stuck "Analyzing..." state after app/background refresh.
-            const processingMessage = storedMessages.find(
-              msg => msg.isTyping && msg.messageId && !pendingMessages.has(msg.messageId)
-            );
-            if (processingMessage) {
-              setLoading(true);
-              setIsTyping(true);
-              setTimeout(() => {
-                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
-                pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
-              }, 100);
+            const hasResumedPending = resumePendingProcessingMessage(storedMessages, sessionId);
+            if (hasResumedPending) {
+              setShowGreeting(false);
+            }
+            if (!hasResumedPending && shouldKeepChatOpen) {
+              setShowGreeting(false);
             }
           } else {
+            await hydrateSelectedChatMode([], personId);
             if (!shouldKeepChatOpen && !partnershipPrefillInProgressRef.current && !partnershipMode) {
               setShowGreeting(true);
             }
@@ -1338,7 +1452,7 @@ export default function ChatScreen({ navigation, route }) {
   const saveMessagesToStorage = async (messages, personId = currentPersonId) => {
     if (!personId) return;
     try {
-      await AsyncStorage.setItem(`chatMessages_${personId}`, JSON.stringify(messages));
+      await AsyncStorage.setItem(`chatMessages_${personId}`, JSON.stringify(sortMessagesForDisplay(messages)));
     } catch (error) {
       console.error('Error saving messages:', error);
     }
@@ -1351,7 +1465,7 @@ export default function ChatScreen({ navigation, route }) {
       const stored = await AsyncStorage.getItem(`chatMessages_${personId}`);
       if (stored) {
         const messages = JSON.parse(stored);
-        return messages;
+        return sortMessagesForDisplay(messages);
       }
     } catch (error) {
       console.error('Error loading messages from storage:', error);
@@ -1362,7 +1476,8 @@ export default function ChatScreen({ navigation, route }) {
   // Override setMessages to also save to storage
   const setMessagesWithStorage = (messagesOrUpdater) => {
     setMessages(prev => {
-      const newMessages = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
+      const newMessagesRaw = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
+      const newMessages = sortMessagesForDisplay(newMessagesRaw);
       // Get current person ID from birthData if currentPersonId is null
       const personId = currentPersonId || (birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null);
       // Save to storage
@@ -1378,8 +1493,9 @@ export default function ChatScreen({ navigation, route }) {
     const unsubscribe = navigation.addListener('focus', () => {
       const shouldStayOnGreeting = forceGreeting || route.params?.resetToGreeting || suppressAutoOpenChatRef.current;
       if (currentPersonId) {
-        loadMessagesFromStorage(currentPersonId).then(storedMessages => {
+        loadMessagesFromStorage(currentPersonId).then(async storedMessages => {
           if (storedMessages.length > 0) {
+            await hydrateSelectedChatMode(storedMessages, currentPersonId);
             // Only update messages if we don't have any current messages to avoid overwriting
             const prevLength = messages.length;
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
@@ -1394,18 +1510,19 @@ export default function ChatScreen({ navigation, route }) {
               }, 50);
             }
             
-            // Only resume polling if not already polling.
-            if (!loading && !isTyping) {
-              const processingMessage = storedMessages.find(
-                msg => msg.isTyping && msg.messageId && !pendingMessages.has(msg.messageId)
-              );
-              if (processingMessage) {
-                setLoading(true);
-                setIsTyping(true);
-                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
-                pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
-              }
+            const hasPendingProcessing = storedMessages.some(
+              (msg) => msg?.isTyping && msg?.messageId
+            );
+            if (hasPendingProcessing) {
+              setShowGreeting(false);
             }
+
+            // Only resume polling if not already polling.
+            if (!loading && !isTyping && hasPendingProcessing) {
+              resumePendingProcessingMessage(storedMessages, sessionId);
+            }
+          } else {
+            await hydrateSelectedChatMode([], currentPersonId);
           }
         });
         if (!partnershipMode && !shouldStayOnGreeting && !loading && !isTyping) {
@@ -2042,9 +2159,11 @@ export default function ChatScreen({ navigation, route }) {
         setIsMundane(false);
         setMundaneContext(null);
       }
-      setIsInstantAnalysis(false);
-      setIsPremiumAnalysis(false);
       setShowModeSelector(false);
+
+      if (!partnershipMode && !isMundane) {
+        await restoreSelectedChatModeFromStorage(currentPersonId);
+      }
       
       // Set flag to scroll when content renders
       setTimeout(() => {
@@ -2081,19 +2200,11 @@ export default function ChatScreen({ navigation, route }) {
           };
         }
         
-        // If no stored messages, show welcome. If stored messages exist, prepend welcome if it's not already there
+        // Only show a welcome message for truly empty threads.
+        // If stored messages already exist, restore them as-is instead of injecting a fresh
+        // welcome row that later sinks to the bottom on timestamp-based sorting.
         if (storedMessages.length === 0) {
           setMessagesWithStorage([welcomeMessage]);
-        } else {
-          // Check if first message is already a welcome message
-          const firstMessage = storedMessages[0];
-          if (!firstMessage.content.includes('Welcome')) {
-            setMessagesWithStorage([welcomeMessage, ...storedMessages]);
-          } else {
-            // Replace old welcome with new personalized one
-            const updatedMessages = [welcomeMessage, ...storedMessages.slice(1)];
-            setMessagesWithStorage(updatedMessages);
-          }
         }
       }, 100);
     }
@@ -2128,23 +2239,61 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const mapSessionMessagesToClient = (sessionData) => {
-    return (sessionData?.messages || []).map((m) => ({
-      messageId: m.message_id,
-      role: m.sender,
-      content: m.content || '',
-      timestamp: m.timestamp,
-      id: `${m.message_id}_${m.timestamp}`,
-      native_name: m.native_name ?? sessionData?.native_name ?? null,
-      terms: m.terms || [],
-      glossary: m.glossary || {},
-      images: m.images || [],
-      message_type: m.message_type,
-      intent_gate: m.intent_gate,
-      gate_metadata: m.gate_metadata,
-      isTyping: false,
-      showRestartButton: false,
-      showSendRetryButton: false,
-    }));
+    const localByMessageId = new Map(
+      (messages || [])
+        .filter((msg) => msg?.messageId)
+        .map((msg) => [String(msg.messageId), msg])
+    );
+    return (sessionData?.messages || []).map((m) => {
+      const local = localByMessageId.get(String(m.message_id)) || null;
+      const serverStatus = String(m.status || '').trim().toLowerCase();
+      const isProcessing = serverStatus === 'processing';
+      const restoredTier = String(local?.chatTier || '').trim().toLowerCase();
+      const fallbackWaitSeconds = restoredTier === 'premium'
+        ? premiumChatCountdownSeconds
+        : standardChatCountdownSeconds;
+      return {
+        messageId: m.message_id,
+        role: m.sender,
+        content: m.content || '',
+        timestamp: m.timestamp,
+        id: `${m.message_id}_${m.timestamp}`,
+        native_name: m.native_name ?? sessionData?.native_name ?? null,
+        terms: m.terms || [],
+        glossary: m.glossary || {},
+        images: m.images || [],
+        message_type: m.message_type,
+        intent_gate: m.intent_gate,
+        gate_metadata: m.gate_metadata,
+        follow_up_questions: m.follow_up_questions || [],
+        waitConversation: isProcessing
+          ? normalizeWaitConversation(m.wait_conversation) || local?.waitConversation
+          : local?.waitConversation,
+        isTyping: isProcessing,
+        processingStartedAt: m.started_at || local?.processingStartedAt || m.timestamp,
+        expectedWaitSeconds: Number(local?.expectedWaitSeconds) > 0
+          ? Number(local.expectedWaitSeconds)
+          : fallbackWaitSeconds,
+        chatTier: restoredTier || local?.chatTier,
+        threadMode: restoredTier || local?.threadMode || local?.chatTier,
+        userMessageId: local?.userMessageId,
+        chartInsights: Array.isArray(local?.chartInsights) ? local.chartInsights : [],
+        failedQuestion: local?.failedQuestion,
+        clientRequestId: local?.clientRequestId,
+        showRestartButton: false,
+        showSendRetryButton: false,
+      };
+    }).sort((a, b) => {
+      const aTime = new Date(a?.timestamp || a?.processingStartedAt || 0).getTime();
+      const bTime = new Date(b?.timestamp || b?.processingStartedAt || 0).getTime();
+      const safeATime = Number.isFinite(aTime) ? aTime : 0;
+      const safeBTime = Number.isFinite(bTime) ? bTime : 0;
+      if (safeATime !== safeBTime) return safeATime - safeBTime;
+      const aOrder = a?.role === 'user' ? 0 : (a?.isTyping ? 2 : 1);
+      const bOrder = b?.role === 'user' ? 0 : (b?.isTyping ? 2 : 1);
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return String(a?.id || a?.messageId || '').localeCompare(String(b?.id || b?.messageId || ''));
+    });
   };
 
   const fetchSessionMessagesFromServer = async (targetSessionId) => {
@@ -2160,6 +2309,30 @@ export default function ChatScreen({ navigation, route }) {
       console.error('Error fetching chat session from server:', error?.response?.data || error?.message || error);
       return null;
     }
+  };
+
+  const resumePendingProcessingMessage = (messageList, activeSessionId) => {
+    const processingMessage = [...(messageList || [])]
+      .reverse()
+      .find((msg) => msg?.isTyping && msg?.messageId);
+    if (!processingMessage) return false;
+    if (pendingMessages.has(processingMessage.messageId)) return true;
+    setShowGreeting(false);
+    setLoading(true);
+    setIsTyping(true);
+    const userMessage = [...(messageList || [])]
+      .reverse()
+      .find((msg) => msg?.role === 'user');
+    setTimeout(() => {
+      pollForResponse(
+        processingMessage.messageId,
+        null,
+        activeSessionId || sessionId,
+        userMessage?.content || '',
+        true
+      );
+    }, 100);
+    return true;
   };
 
   const reconcileSessionFromServer = async (targetSessionId, options = {}) => {
@@ -2192,7 +2365,8 @@ export default function ChatScreen({ navigation, route }) {
 
     setSessionId(payload.sessionId);
     setMessagesWithStorage(serverMessages);
-    if (openChat) {
+    const resumedPending = resumePendingProcessingMessage(serverMessages, payload.sessionId);
+    if (openChat || resumedPending) {
       setShowGreeting(false);
     }
     return true;
@@ -2571,6 +2745,7 @@ export default function ChatScreen({ navigation, route }) {
                       glossary: status.glossary || {},
                       message_type: status.message_type || 'answer',
                       chatTier: resolvedChatTier || msg.chatTier,
+                      threadMode: resolvedChatTier || msg.threadMode || msg.chatTier,
                       summary_image: status.summary_image || null,
                       follow_up_questions: status.follow_up_questions || [],
                       native_name: chartName,
@@ -2641,6 +2816,15 @@ export default function ChatScreen({ navigation, route }) {
         // Still processing - continue polling
         if (status.status === 'processing') {
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
+          setMessagesWithStorage(prev => prev.map(msg =>
+            msg.messageId === messageId || msg.id === processingMessageId
+              ? {
+                  ...msg,
+                  messageId: msg.messageId || messageId,
+                  processingStartedAt: status.started_at || msg.processingStartedAt || msg.timestamp,
+                }
+              : msg
+          ));
           const waitConversation = normalizeWaitConversation(status.wait_conversation);
           if (waitConversation) {
             setMessagesWithStorage(prev => prev.map(msg =>
@@ -2648,6 +2832,7 @@ export default function ChatScreen({ navigation, route }) {
                 ? {
                     ...msg,
                     messageId: msg.messageId || messageId,
+                    processingStartedAt: status.started_at || msg.processingStartedAt || msg.timestamp,
                     waitConversation,
                   }
                 : msg
@@ -2662,6 +2847,7 @@ export default function ChatScreen({ navigation, route }) {
                 ? {
                     ...msg,
                     messageId: msg.messageId || messageId,
+                    processingStartedAt: status.started_at || msg.processingStartedAt || msg.timestamp,
                     engagementUpdates: mergeEngagementUpdates(msg.engagementUpdates, status.engagement_updates),
                   }
                 : msg
@@ -2821,7 +3007,13 @@ export default function ChatScreen({ navigation, route }) {
     // Update message to show restarting
     setMessagesWithStorage(prev => prev.map(msg => 
       msg.messageId === messageId 
-        ? { ...msg, content: '🔄 Checking for response...', isTyping: true, showRestartButton: false }
+        ? {
+            ...msg,
+            content: '🔄 Checking for response...',
+            isTyping: true,
+            showRestartButton: false,
+            processingStartedAt: msg.processingStartedAt || msg.timestamp,
+          }
         : msg
     ));
     setLoading(true);
@@ -2847,6 +3039,7 @@ export default function ChatScreen({ navigation, route }) {
         // When using first question free, send as standard so backend applies free-question logic
         const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
         const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+        const requestedTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
         
         // Prepend relationship info to question for better backend context/logging
         const finalQuestion = (partnershipMode && partnershipRelation)
@@ -2860,7 +3053,7 @@ export default function ChatScreen({ navigation, route }) {
           language: language || 'english',
           response_style: 'detailed',
           premium_analysis: useFreeQuestion ? false : (useInstantChat ? false : isPremiumAnalysis),
-          chat_tier: useInstantChat ? 'instant' : 'standard',
+          chat_tier: requestedTier,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
             name: nativeChart.name,
@@ -2944,7 +3137,10 @@ export default function ChatScreen({ navigation, route }) {
 
         const result = await response.json();
         const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights, chat_tier } = result;
-        const serverTier = String(chat_tier || (useInstantChat ? 'instant' : 'standard')).trim().toLowerCase();
+        const rawServerTier = String(chat_tier || '').trim().toLowerCase();
+        const serverTier = String(
+          rawServerTier || requestedTier || (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'))
+        ).trim().toLowerCase();
 
         console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
         console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
@@ -2980,6 +3176,7 @@ export default function ChatScreen({ navigation, route }) {
                     content: result.content || '',
                     isTyping: false,
                     chatTier: serverTier || msg.chatTier,
+                    threadMode: serverTier || msg.threadMode || msg.chatTier,
                     message_type: result.message_type,
                     terms: [],
                     glossary: {},
@@ -3095,7 +3292,6 @@ export default function ChatScreen({ navigation, route }) {
   ]);
 
   const getChatModeKey = () => {
-    if (!partnershipMode && !isMundane && freeQuestionAvailable) return 'standard';
     if (isPremiumAnalysis) return 'premium';
     if (instantChatEnabled && isInstantAnalysis) return 'instant';
     return 'standard';
@@ -3339,19 +3535,25 @@ export default function ChatScreen({ navigation, route }) {
     // Add user message immediately (include chart name for badge)
     const userMessageId = Date.now().toString();
     const chartName = partnershipMode ? nativeChart?.name : birthData?.name;
+    const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+    const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
+    const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+    const outgoingTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
     const userMessage = {
       id: userMessageId,
       content: messageText,
       role: 'user',
       timestamp: new Date().toISOString(),
       native_name: chartName || null,
+      chatTier: outgoingTier,
+      threadMode: outgoingTier,
     };
     
     // Track chat message sent event
     trackAstrologyEvent.chatMessageSent('user_question');
     trackEvent('chat_message_sent', {
       source: 'chat_screen',
-      mode: isMundane ? 'mundane' : (partnershipMode ? 'partnership' : 'standard'),
+      mode: isMundane ? 'mundane' : (partnershipMode ? 'partnership' : outgoingTier),
       message_length: messageText?.length || 0,
     });
     
@@ -3361,10 +3563,6 @@ export default function ChatScreen({ navigation, route }) {
     });
 
     const loadingMessages = getLoadingMessages(messageText);
-    const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
-    const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
-    const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
-    const outgoingTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
     const expectedWaitSeconds = isProModelFlow ? premiumChatCountdownSeconds : standardChatCountdownSeconds;
 
     // Add processing message immediately
@@ -3377,7 +3575,9 @@ export default function ChatScreen({ navigation, route }) {
       timestamp: new Date().toISOString(),
       isTyping: true,
       chatTier: outgoingTier,
+      threadMode: outgoingTier,
       expectedWaitSeconds,
+      processingStartedAt: new Date().toISOString(),
       userMessageId: userMessageId,
       clientRequestId,
       failedQuestion: messageText,
@@ -3822,8 +4022,6 @@ export default function ChatScreen({ navigation, route }) {
                     setOtherRelationText('');
                     setNativeSearchQuery('');
                   }
-                  setIsInstantAnalysis(false);
-                  setIsPremiumAnalysis(false);
                   setShowModeSelector(false);
                 }}
               >
@@ -4183,6 +4381,7 @@ export default function ChatScreen({ navigation, route }) {
                       chartData={chartData}
                       scrollViewRef={scrollViewRef}
                       expectedWaitSeconds={item.expectedWaitSeconds}
+                      startedAt={item.processingStartedAt || item.timestamp}
                     />
                     {renderEngagementUpdates(item.engagementUpdates)}
                   </View>
@@ -4263,7 +4462,7 @@ export default function ChatScreen({ navigation, route }) {
               contentContainerStyle={styles.suggestionsContent}
               keyboardShouldPersistTaps="handled"
             >
-              {suggestions.slice(0, 3).map((item, index) => (
+              {suggestions.map((item, index) => (
                 <TouchableOpacity
                   key={index}
                   style={styles.suggestionChip}
@@ -4288,40 +4487,60 @@ export default function ChatScreen({ navigation, route }) {
           <View style={styles.unifiedInputContainer}>
             {!partnershipMode && !isMundane && birthData && (
               <View style={styles.chatInputScopeRow}>
-                <Text
-                  style={[styles.chatInputScopeHint, { color: colors.textSecondary, flex: 1 }]}
-                  maxFontSizeMultiplier={1.35}
-                  numberOfLines={2}
-                >
-                  {t('chat.inputScopeAskAbout', 'Ask about')}{' '}
+                <View style={styles.chatInputScopeTextWrap}>
                   <Text
-                    style={[styles.chatInputScopeName, { color: colors.text }]}
-                    accessibilityLabel={
-                      inputScopeNativeTrimmed.length > 7
-                        ? inputScopeNativeTrimmed
-                        : undefined
-                    }
+                    style={[styles.chatInputScopeHint, { color: colors.textSecondary }]}
+                    maxFontSizeMultiplier={1.35}
+                    numberOfLines={2}
                   >
-                    {inputScopeNativeTrimmed
-                      ? inputScopeNativeShown
-                      : t('chat.yourChart', 'your chart')}
+                    {t('chat.inputScopeAskAbout', 'Ask about')}{' '}
+                    <Text
+                      style={[styles.chatInputScopeName, { color: colors.text }]}
+                      accessibilityLabel={
+                        inputScopeNativeTrimmed.length > 7
+                          ? inputScopeNativeTrimmed
+                          : undefined
+                      }
+                    >
+                      {inputScopeNativeTrimmed
+                        ? inputScopeNativeShown
+                        : t('chat.yourChart', 'your chart')}
+                    </Text>
                   </Text>
-                  {' · '}
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    keepChatOpenAfterNativeSelectRef.current = true;
+                    navigation.navigate('SelectNative', {
+                      returnTo: 'Home',
+                      returnParams: { returnToChat: true },
+                    });
+                  }}
+                  style={[
+                    styles.chatInputScopeChangeChip,
+                    {
+                      borderColor: theme === 'dark' ? 'rgba(251, 146, 60, 0.34)' : 'rgba(249, 115, 22, 0.22)',
+                      backgroundColor: theme === 'dark' ? 'rgba(251, 146, 60, 0.12)' : 'rgba(249, 115, 22, 0.08)',
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
+                >
+                  <Ionicons
+                    name="swap-horizontal-outline"
+                    size={13}
+                    color={theme === 'dark' ? colors.text : colors.textSecondary}
+                    style={{ marginRight: 4 }}
+                  />
                   <Text
-                    onPress={() => {
-                      keepChatOpenAfterNativeSelectRef.current = true;
-                      navigation.navigate('SelectNative', {
-                        returnTo: 'Home',
-                        returnParams: { returnToChat: true },
-                      });
-                    }}
-                    style={[styles.chatInputScopeLink, { color: colors.primary }]}
-                    accessibilityRole="link"
-                    accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
+                    style={[
+                      styles.chatInputScopeChangeChipText,
+                      { color: theme === 'dark' ? colors.text : colors.textSecondary },
+                    ]}
                   >
                     {t('chat.inputScopeSelectChart', 'Change chart')}
                   </Text>
-                </Text>
+                </TouchableOpacity>
                 {!loading && messages.length > 0 && (
                   <TouchableOpacity
                     onPress={() => setShowTopicIdeas((v) => !v)}
@@ -6529,6 +6748,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     gap: 8,
   },
+  chatInputScopeTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
   chatInputScopeHint: {
     fontSize: 12,
     lineHeight: 16,
@@ -6549,9 +6772,17 @@ const styles = StyleSheet.create({
   chatInputScopeName: {
     fontWeight: '700',
   },
-  chatInputScopeLink: {
+  chatInputScopeChangeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  chatInputScopeChangeChipText: {
     fontWeight: '700',
-    textDecorationLine: 'underline',
+    fontSize: 12,
   },
   inputBarGradient: {
     flexDirection: 'row',

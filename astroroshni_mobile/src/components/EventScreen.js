@@ -75,6 +75,8 @@ const resolveBirthChartId = (data) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
+const YEARLY_TIMELINE_PENDING_KEY = 'eventScreenYearlyPendingJob';
+
 export default function EventScreen({ route }) {
   useAnalytics('EventScreen');
   const navigation = useNavigation();
@@ -164,6 +166,65 @@ export default function EventScreen({ route }) {
     { icon: '🌌', text: 'Navigating the cosmos...' },
     { icon: '✅', text: 'Finalizing your predictions...' }
   ];
+
+  const getYearlyPendingPayload = useCallback((jobId, year, birthChartId, startedAt = new Date().toISOString()) => ({
+    jobId,
+    year: Number(year),
+    birthChartId: Number(birthChartId),
+    startedAt,
+  }), []);
+
+  const saveYearlyPendingJob = useCallback(async (payload) => {
+    try {
+      await AsyncStorage.setItem(YEARLY_TIMELINE_PENDING_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('[EventScreen] save pending yearly job', error?.message || error);
+    }
+  }, []);
+
+  const loadYearlyPendingJob = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(YEARLY_TIMELINE_PENDING_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.warn('[EventScreen] load pending yearly job', error?.message || error);
+      return null;
+    }
+  }, []);
+
+  const clearYearlyPendingJob = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(YEARLY_TIMELINE_PENDING_KEY);
+    } catch (error) {
+      console.warn('[EventScreen] clear pending yearly job', error?.message || error);
+    }
+  }, []);
+
+  const startYearlyLoadingUi = useCallback((startedAtInput = new Date().toISOString()) => {
+    const startedAtMs = new Date(startedAtInput || Date.now()).getTime();
+    const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
+    const elapsedMs = Math.max(0, Date.now() - safeStartedAt);
+    const initialMessageIndex = Math.floor(elapsedMs / 3000) % loadingMessages.length;
+    setAnalysisStarted(true);
+    setLoadingMonthly(true);
+    setLoadingMessageIndex(initialMessageIndex);
+    setLoadingProgress(elapsedMs <= 100000 ? (elapsedMs / 100000) * 90 : -1);
+
+    loadingIntervalRef.current = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 3000);
+
+    let elapsed = elapsedMs;
+    progressIntervalRef.current = setInterval(() => {
+      elapsed += 100;
+      if (elapsed <= 100000) {
+        setLoadingProgress((elapsed / 100000) * 90);
+      } else {
+        setLoadingProgress(-1);
+      }
+    }, 100);
+  }, [loadingMessages.length]);
 
   // Get birth data from storage
   const getBirthDetails = async () => {
@@ -257,6 +318,7 @@ export default function EventScreen({ route }) {
         });
         if (res.data?.cached && res.data?.data) {
           setMonthlyData(res.data.data);
+          await clearYearlyPendingJob();
           trackEvent('yearly_timeline_delivered', {
             year: Number(y),
             source: 'event_screen',
@@ -270,8 +332,215 @@ export default function EventScreen({ route }) {
       }
       return false;
     },
-    [fetchBalance]
+    [clearYearlyPendingJob, fetchBalance]
   );
+
+  const attachYearlyTimelinePolling = useCallback((jobId, year, startedAt = new Date().toISOString()) => {
+    let outcomeHandled = false;
+    const takeOutcome = () => {
+      if (outcomeHandled) return false;
+      outcomeHandled = true;
+      return true;
+    };
+
+    const finishSuccess = async (data, mode = 'poll_completed') => {
+      if (!takeOutcome()) return;
+      stopEventTimelineJob();
+      setMonthlyData(data);
+      await clearYearlyPendingJob();
+      trackEvent('yearly_timeline_delivered', {
+        year: Number(year),
+        source: 'event_screen',
+        mode,
+      });
+      fetchBalance();
+    };
+
+    const onPollFailure = async (message) => {
+      if (!takeOutcome()) return;
+      stopEventTimelineJob({ resetAnalysisStarted: false });
+      await clearYearlyPendingJob();
+      const recovered = await tryLoadCachedYearlyTimeline(year);
+      if (recovered) {
+        Alert.alert(
+          t('eventScreen.timelineRecoveredTitle', 'Timeline ready'),
+          t(
+            'eventScreen.timelineRecoveredBody',
+            'Loaded your saved timeline from the server.'
+          )
+        );
+        return;
+      }
+      const raw = message != null ? String(message).trim() : '';
+      const safeBody = raw
+        ? userFacingTimelineError(raw)
+        : t(
+            'eventScreen.timelineStoppedBody',
+            'The analysis may still be running. Wait a minute, then tap your year again, or open this screen again to load saved results without spending credits again.'
+          );
+      Alert.alert(
+        t('eventScreen.timelineStoppedTitle', 'Could not finish loading'),
+        safeBody,
+        [
+          {
+            text: t('eventScreen.tryLoadSaved', 'Load saved'),
+            onPress: async () => {
+              const ok = await tryLoadCachedYearlyTimeline(year);
+              if (!ok) {
+                Alert.alert(
+                  t('eventScreen.noSavedYetTitle', 'No saved result yet'),
+                  t(
+                    'eventScreen.noSavedYetBody',
+                    'Try again in a little while if the analysis is still running.'
+                  )
+                );
+              }
+            },
+          },
+          { text: t('common.ok', 'OK'), style: 'cancel' },
+        ]
+      );
+      setAnalysisStarted(false);
+    };
+
+    timelinePollRef.current = setInterval(async () => {
+      try {
+        const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
+        const status = statusResponse.data.status;
+        const partialData = statusResponse.data?.partial_data;
+
+        if (partialData && Array.isArray(partialData.monthly_predictions)) {
+          setMonthlyData((prev) => ({
+            ...(prev || {}),
+            macro_trends: partialData.macro_trends || prev?.macro_trends || [],
+            monthly_predictions: partialData.monthly_predictions || [],
+          }));
+          setTimelineProgress({
+            monthsReady: Number(statusResponse.data?.months_ready || partialData.monthly_predictions.length || 0),
+            totalMonths: 12,
+            completedQuarters: Number(
+              statusResponse.data?.completed_quarters || partialData.completed_quarters || 0
+            ),
+          });
+        }
+
+        if (status === 'completed' && statusResponse.data.data) {
+          await finishSuccess(statusResponse.data.data);
+        } else if (status === 'failed') {
+          await onPollFailure(statusResponse.data.error || 'Analysis failed');
+        }
+      } catch (pollError) {
+        await onPollFailure(
+          pollError?.response?.data?.detail ||
+            pollError?.message ||
+            'Connection error while checking status.'
+        );
+      }
+    }, TIMELINE_POLL_MS);
+
+    const elapsedMs = Math.max(0, Date.now() - new Date(startedAt || Date.now()).getTime());
+    const remainingMs = Math.max(5000, TIMELINE_MAX_WAIT_MS - elapsedMs);
+    timelineTimeoutRef.current = setTimeout(async () => {
+      if (timelinePollRef.current) {
+        clearInterval(timelinePollRef.current);
+        timelinePollRef.current = null;
+      }
+      timelineTimeoutRef.current = null;
+      if (outcomeHandled) return;
+      try {
+        const last = await chatAPI.getMonthlyEventsStatus(jobId);
+        if (last.data?.status === 'completed' && last.data?.data) {
+          await finishSuccess(last.data.data);
+          return;
+        }
+      } catch (e) {
+        console.warn('[EventScreen] final status check', e?.message || e);
+      }
+      const recovered = await tryLoadCachedYearlyTimeline(year);
+      if (recovered) {
+        if (!takeOutcome()) return;
+        stopEventTimelineJob();
+        await clearYearlyPendingJob();
+        Alert.alert(
+          t('eventScreen.timelineRecoveredTitle', 'Timeline ready'),
+          t(
+            'eventScreen.timelineLongRunBody',
+            'Your analysis finished — loaded from saved results.'
+          )
+        );
+        return;
+      }
+      if (!takeOutcome()) return;
+      stopEventTimelineJob();
+      await clearYearlyPendingJob();
+      setAnalysisStarted(false);
+      Alert.alert(
+        t('eventScreen.timelineTimeoutTitle', 'Still working or interrupted'),
+        t(
+          'eventScreen.timelineTimeoutBody',
+          'We stopped waiting after 15 minutes. If you were charged, your result is usually saved—tap “Load saved”. Otherwise try generating again.'
+        ),
+        [
+          {
+            text: t('eventScreen.tryLoadSaved', 'Load saved'),
+            onPress: async () => {
+              const ok = await tryLoadCachedYearlyTimeline(year);
+              if (!ok) {
+                Alert.alert(
+                  t('eventScreen.noSavedYetTitle', 'No saved result yet'),
+                  t(
+                    'eventScreen.noSavedYetBody',
+                    'Try again in a little while if the analysis is still running.'
+                  )
+                );
+              }
+            },
+          },
+          { text: t('common.ok', 'OK'), style: 'cancel' },
+        ]
+      );
+    }, remainingMs);
+  }, [
+    TIMELINE_MAX_WAIT_MS,
+    TIMELINE_POLL_MS,
+    clearYearlyPendingJob,
+    fetchBalance,
+    stopEventTimelineJob,
+    t,
+    tryLoadCachedYearlyTimeline,
+  ]);
+
+  const resumePendingYearlyJob = useCallback(async (pending, options = {}) => {
+    const { preservePartialData = true } = options;
+    const birthChartId = resolveBirthChartId(birthData);
+    if (
+      !pending ||
+      !pending.jobId ||
+      !birthChartId ||
+      Number(pending.birthChartId) !== Number(birthChartId)
+    ) {
+      return false;
+    }
+    stopEventTimelineJob();
+    if (!preservePartialData) {
+      setMonthlyData(null);
+      setTimelineProgress({ monthsReady: 0, totalMonths: 12, completedQuarters: 0 });
+    }
+    setSelectedYear(Number(pending.year) || selectedYear);
+    startYearlyLoadingUi(pending.startedAt);
+    attachYearlyTimelinePolling(
+      pending.jobId,
+      Number(pending.year) || selectedYear,
+      pending.startedAt
+    );
+    return true;
+  }, [
+    attachYearlyTimelinePolling,
+    birthData,
+    selectedYear,
+    startYearlyLoadingUi,
+    stopEventTimelineJob,
+  ]);
 
   // Fetch Monthly Guide (AI Powered) with Polling
   const fetchMonthlyGuide = useCallback(async (year) => {
@@ -280,29 +549,15 @@ export default function EventScreen({ route }) {
       source: 'event_screen',
     });
     stopEventTimelineJob();
-    setLoadingMonthly(true);
     setMonthlyData(null);
     setTimelineProgress({ monthsReady: 0, totalMonths: 12, completedQuarters: 0 });
-    setLoadingMessageIndex(0);
-
-    loadingIntervalRef.current = setInterval(() => {
-      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
-    }, 3000);
-
-    setLoadingProgress(0);
-    let elapsed = 0;
-    progressIntervalRef.current = setInterval(() => {
-      elapsed += 100;
-      if (elapsed <= 100000) {
-        setLoadingProgress((elapsed / 100000) * 90);
-      } else {
-        setLoadingProgress(-1);
-      }
-    }, 100);
+    const startedAt = new Date().toISOString();
+    startYearlyLoadingUi(startedAt);
 
     try {
       const birthData = await getBirthDetails();
       if (!birthData) {
+        await clearYearlyPendingJob();
         stopEventTimelineJob({ resetAnalysisStarted: true });
         return;
       }
@@ -312,6 +567,7 @@ export default function EventScreen({ route }) {
           'Error',
           'Birth chart ID not found. Please re-select your birth chart from Select Native screen.'
         );
+        await clearYearlyPendingJob();
         stopEventTimelineJob({ resetAnalysisStarted: true });
         return;
       }
@@ -324,6 +580,7 @@ export default function EventScreen({ route }) {
 
       if (startResponse.data?.data && !startResponse.data?.job_id) {
         setMonthlyData(startResponse.data.data);
+        await clearYearlyPendingJob();
         trackEvent('yearly_timeline_delivered', {
           year: Number(year),
           source: 'event_screen',
@@ -338,165 +595,8 @@ export default function EventScreen({ route }) {
       if (!jobId) {
         throw new Error('No job_id received from server.');
       }
-
-      let outcomeHandled = false;
-      const takeOutcome = () => {
-        if (outcomeHandled) return false;
-        outcomeHandled = true;
-        return true;
-      };
-
-      const finishSuccess = (data) => {
-        if (!takeOutcome()) return;
-        stopEventTimelineJob();
-        setMonthlyData(data);
-        trackEvent('yearly_timeline_delivered', {
-          year: Number(year),
-          source: 'event_screen',
-          mode: 'poll_completed',
-        });
-        fetchBalance();
-      };
-
-      const onPollFailure = async (message) => {
-        if (!takeOutcome()) return;
-        stopEventTimelineJob({ resetAnalysisStarted: false });
-        const recovered = await tryLoadCachedYearlyTimeline(year);
-        if (recovered) {
-          Alert.alert(
-            t('eventScreen.timelineRecoveredTitle', 'Timeline ready'),
-            t(
-              'eventScreen.timelineRecoveredBody',
-              'Loaded your saved timeline from the server.'
-            )
-          );
-          return;
-        }
-        const raw = message != null ? String(message).trim() : '';
-        const safeBody = raw
-          ? userFacingTimelineError(raw)
-          : t(
-              'eventScreen.timelineStoppedBody',
-              'The analysis may still be running. Wait a minute, then tap your year again, or open this screen again to load saved results without spending credits again.'
-            );
-        Alert.alert(
-          t('eventScreen.timelineStoppedTitle', 'Could not finish loading'),
-          safeBody,
-          [
-            {
-              text: t('eventScreen.tryLoadSaved', 'Load saved'),
-              onPress: async () => {
-                const ok = await tryLoadCachedYearlyTimeline(year);
-                if (!ok) {
-                  Alert.alert(
-                    t('eventScreen.noSavedYetTitle', 'No saved result yet'),
-                    t(
-                      'eventScreen.noSavedYetBody',
-                      'Try again in a little while if the analysis is still running.'
-                    )
-                  );
-                }
-              },
-            },
-            { text: t('common.ok', 'OK'), style: 'cancel' },
-          ]
-        );
-        setAnalysisStarted(false);
-      };
-
-      timelinePollRef.current = setInterval(async () => {
-        try {
-          const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
-          const status = statusResponse.data.status;
-          const partialData = statusResponse.data?.partial_data;
-
-          if (partialData && Array.isArray(partialData.monthly_predictions)) {
-            setMonthlyData((prev) => ({
-              ...(prev || {}),
-              macro_trends: partialData.macro_trends || prev?.macro_trends || [],
-              monthly_predictions: partialData.monthly_predictions || [],
-            }));
-            setTimelineProgress({
-              monthsReady: Number(statusResponse.data?.months_ready || partialData.monthly_predictions.length || 0),
-              totalMonths: 12,
-              completedQuarters: Number(
-                statusResponse.data?.completed_quarters || partialData.completed_quarters || 0
-              ),
-            });
-          }
-
-          if (status === 'completed' && statusResponse.data.data) {
-            finishSuccess(statusResponse.data.data);
-          } else if (status === 'failed') {
-            await onPollFailure(statusResponse.data.error || 'Analysis failed');
-          }
-        } catch (pollError) {
-          await onPollFailure(
-            pollError?.response?.data?.detail ||
-              pollError?.message ||
-              'Connection error while checking status.'
-          );
-        }
-      }, TIMELINE_POLL_MS);
-
-      timelineTimeoutRef.current = setTimeout(async () => {
-        if (timelinePollRef.current) {
-          clearInterval(timelinePollRef.current);
-          timelinePollRef.current = null;
-        }
-        timelineTimeoutRef.current = null;
-        if (outcomeHandled) return;
-        try {
-          const last = await chatAPI.getMonthlyEventsStatus(jobId);
-          if (last.data?.status === 'completed' && last.data?.data) {
-            finishSuccess(last.data.data);
-            return;
-          }
-        } catch (e) {
-          console.warn('[EventScreen] final status check', e?.message || e);
-        }
-        const recovered = await tryLoadCachedYearlyTimeline(year);
-        if (recovered) {
-          if (!takeOutcome()) return;
-          stopEventTimelineJob();
-          Alert.alert(
-            t('eventScreen.timelineRecoveredTitle', 'Timeline ready'),
-            t(
-              'eventScreen.timelineLongRunBody',
-              'Your analysis finished — loaded from saved results.'
-            )
-          );
-          return;
-        }
-        if (!takeOutcome()) return;
-        stopEventTimelineJob();
-        setAnalysisStarted(false);
-        Alert.alert(
-          t('eventScreen.timelineTimeoutTitle', 'Still working or interrupted'),
-          t(
-            'eventScreen.timelineTimeoutBody',
-            'We stopped waiting after 15 minutes. If you were charged, your result is usually saved—tap “Load saved”. Otherwise try generating again.'
-          ),
-          [
-            {
-              text: t('eventScreen.tryLoadSaved', 'Load saved'),
-              onPress: async () => {
-                const ok = await tryLoadCachedYearlyTimeline(year);
-                if (!ok) {
-                  Alert.alert(
-                    t('eventScreen.noSavedYetTitle', 'No saved result yet'),
-                    t(
-                      'eventScreen.noSavedYetBody',
-                      'Try again in a little while if the analysis is still running.'
-                    )
-                  );
-                }
-              },
-            },
-            { text: t('common.ok', 'OK'), style: 'cancel' },
-          ]
-        );
-      }, TIMELINE_MAX_WAIT_MS);
+      await saveYearlyPendingJob(getYearlyPendingPayload(jobId, year, birthData.id, startedAt));
+      attachYearlyTimelinePolling(jobId, year, startedAt);
     } catch (error) {
       console.error('❌ EventScreen Error Details:', {
         message: error.message,
@@ -537,27 +637,38 @@ export default function EventScreen({ route }) {
         Alert.alert('Error', errorMessage + '\n\nDetails: ' + (error.response?.data?.detail || error.message));
       }
       
+      await clearYearlyPendingJob();
       stopEventTimelineJob({ resetAnalysisStarted: true });
     }
   }, [
+    attachYearlyTimelinePolling,
+    clearYearlyPendingJob,
     fetchBalance,
-    loadingMessages.length,
+    getYearlyPendingPayload,
     navigation,
+    startYearlyLoadingUi,
     stopEventTimelineJob,
-    tryLoadCachedYearlyTimeline,
     t,
+    saveYearlyPendingJob,
   ]);
 
   // Check for cached data when analysis starts or year changes
   useEffect(() => {
     const loadCachedData = async () => {
       if (!analysisStarted) return;
+      if (loadingMonthly) return;
       
       if (monthlyData) return;
       
       try {
         const birthData = await getBirthDetails();
         if (!birthData) return;
+
+        const pending = await loadYearlyPendingJob();
+        const resumedPending = await resumePendingYearlyJob(pending, { preservePartialData: true });
+        if (resumedPending) {
+          return;
+        }
         
         // console.log('🔍 Checking cache with:', { 
         //   birth_chart_id: birthData.id, 
@@ -632,7 +743,20 @@ export default function EventScreen({ route }) {
     if (analysisStarted) {
       loadCachedData();
     }
-    
+  }, [
+    selectedYear,
+    analysisStarted,
+    loadingMonthly,
+    loadYearlyPendingJob,
+    resumePendingYearlyJob,
+    tryLoadCachedYearlyTimeline,
+    creditCost,
+    fetchMonthlyGuide,
+    fetchBalance,
+    navigation,
+  ]);
+
+  useEffect(() => {
     return () => {
       if (loadingIntervalRef.current) {
         clearInterval(loadingIntervalRef.current);
@@ -651,7 +775,7 @@ export default function EventScreen({ route }) {
         timelineTimeoutRef.current = null;
       }
     };
-  }, [selectedYear, analysisStarted, tryLoadCachedYearlyTimeline, creditCost, fetchMonthlyGuide, fetchBalance, navigation]);
+  }, []);
 
   const onRefresh = useCallback(() => {
     // Prevent accidental regeneration - do nothing on pull-to-refresh
@@ -735,6 +859,28 @@ export default function EventScreen({ route }) {
       cancelled = true;
     };
   }, [birthData, startYear, deviceYear]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      (async () => {
+        const pending = await loadYearlyPendingJob();
+        if (monthlyData?.monthly_predictions?.length || loadingMonthly) {
+          return;
+        }
+        const resumed = await resumePendingYearlyJob(pending, { preservePartialData: true });
+        if (resumed) {
+          setReadingMode('yearly');
+        }
+      })();
+    });
+    return unsubscribe;
+  }, [
+    loadYearlyPendingJob,
+    loadingMonthly,
+    monthlyData,
+    navigation,
+    resumePendingYearlyJob,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -895,6 +1041,13 @@ export default function EventScreen({ route }) {
       const birthData = await getBirthDetails();
       if (!birthData || !birthData.id) {
         Alert.alert('Error', 'Birth chart not found. Please select a birth chart.');
+        return;
+      }
+
+      const pending = await loadYearlyPendingJob();
+      const resumedPending = await resumePendingYearlyJob(pending, { preservePartialData: false });
+      if (resumedPending) {
+        setReadingMode('yearly');
         return;
       }
       

@@ -242,6 +242,9 @@ def build_parashari_agent_payload(
         sp = merged_chart_context.get("special_points")
         if isinstance(sp, dict) and sp:
             out["special_points"] = copy.deepcopy(sp)
+        bb = merged_chart_context.get("bhavat_bhavam")
+        if isinstance(bb, dict) and bb:
+            out["bhavat_bhavam"] = copy.deepcopy(bb)
     return out
 
 

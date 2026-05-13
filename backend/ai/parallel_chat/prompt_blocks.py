@@ -154,7 +154,7 @@ def build_parashari_branch_static(intent_category: str) -> str:
         PERSONAL_CONSULTATION_RULES,
         "\n# TASK (PARASHARI BRANCH ONLY)\n",
         "Analyze using ONLY Parashari + divisional + dasha + transit logic from the JSON (no Ashtakavarga tables here).",
-        "Use `planetary_analysis` / `d1_graha`-style graha rows for **`av` (avastha)** and strength (`sc`) on planets that matter for the question—especially Yogakaraka and house lords; flag **Mrit/Dead** or extreme weakness as delivery risk per [P-7].",
+        "Use `planetary_analysis` / `d1_graha`-style graha rows for **`av` (avastha)** and strength (`sc`) on planets that matter for the question—especially Yogakaraka and house lords. Treat **Mrit** as a weakening modifier, not an automatic denial; foreground it only when dignity / `sc` / combustion / affliction also support a weak-delivery reading per [P-7].",
         "If **D7 / Saptamsa** appears in `divisional_charts` (or equivalent), marriage/partnership/children answers MUST include a real D7 interpretation—see [P-8].",
         "For marriage/spouse timing questions, explicitly separate **Promise -> Timing -> Manifestation -> Continuity**. Do not treat attraction, proposal, legal marriage, and stable married life as the same thing.",
         "For career/profession/field questions, explicitly separate **Aptitude -> Field Selection -> Work Function -> Status/Visibility -> Timing of Entry/Change**. Do not answer 'what career will I pick?' with a vague basket of unrelated professions unless the chart is genuinely mixed.",
@@ -322,7 +322,7 @@ def build_parashari_branch_static_agent(intent_category: str) -> str:
         "core_d1, d1_graha, vim_dasha, div_d9, div_intent, parashari_day, transit_win, dasha_win, panch_maitri, sniper_pts). "
         "`div_intent` carries other intent-listed divisionals (D3–D60, Karkamsa, Swamsa); D1 and D9 are not repeated there because `core_d1` and `div_d9` already provide them. "
         "**If `div_intent` includes D7 (Saptamsa), you MUST analyze it** for marriage/children/partnership threads—do not ignore it. "
-        "`d1_graha` → **`G`**: use **`av`** / **`sc`** for outcome delivery (Yogakaraka, 7th lord, etc.); never skip critical **Mrit/Dead**-style states per [P-7]. "
+        "`d1_graha` → **`G`**: use **`av`** / **`sc`** for outcome delivery (Yogakaraka, 7th lord, etc.). Do not skip critical **Mrit**-style states, but do not treat them as self-sufficient failure signals without supporting weakness elsewhere per [P-7]. "
         "`px` is the derived Parashari reasoning spine: `px.src` = time authority (`current` / `window` / `day`), `px.hs` = priority houses for the topic, `px.dv` = divisional availability flags, `px.dx` = divisional evidence spine, `px.D` = active dasha lord summaries, `px.HI` = which active dasha levels rule/occupy/aspect the target houses, `px.TR` = compact transit pressure on those houses. `px.career` and `px.relationship` are dedicated compact topic blocks. Use `px` to stay concrete rather than inferring these links from scratch.",
         health_agent_line,
         "Each raw agent value is compact JSON with `a` = agent id; see `context_agents/SCHEMA.md` for field meanings (P, G, D, C, etc.).",

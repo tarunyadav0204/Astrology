@@ -2346,38 +2346,55 @@ class ChatContextBuilder:
         
         question_lower = user_question.lower()
         
-        # Relative detection patterns
-        relative_patterns = {
-            'spouse': {'keywords': ['husband', 'wife', 'spouse', 'partner'], 'house': 7},
-            'father': {'keywords': ['father', 'dad', 'papa'], 'house': 9},
-            'mother': {'keywords': ['mother', 'mom', 'mama'], 'house': 4},
-            'children': {'keywords': ['child', 'son', 'daughter', 'kids'], 'house': 5},
-            'siblings': {'keywords': ['brother', 'sister', 'sibling'], 'house': 3},
-            'elder_sibling': {'keywords': ['elder brother', 'elder sister'], 'house': 11}
-        }
+        # Relative detection patterns.
+        # Order matters: more specific patterns must come before broader ones
+        # (e.g. "girlfriend" should map to lover, not friend).
+        relative_patterns = [
+            {'name': 'second_spouse', 'keywords': ['second husband', 'second wife', 'next husband', 'next wife', 'remarriage partner', 'second marriage partner'], 'house': 9, 'label': 'second spouse / remarriage partner'},
+            {'name': 'fiance', 'keywords': ['fiance', 'fiancée', 'fiancee', 'betrothed'], 'house': 7, 'label': 'fiance / formal partner'},
+            {'name': 'lover', 'keywords': ['boyfriend', 'girlfriend', 'lover', 'romantic interest', 'beloved', 'dating partner', 'crush'], 'house': 5, 'label': 'lover / romantic interest'},
+            {'name': 'ex_spouse', 'keywords': ['ex husband', 'ex wife', 'ex-husband', 'ex-wife', 'former husband', 'former wife', 'ex spouse'], 'house': 7, 'label': 'ex-spouse'},
+            {'name': 'stepmother', 'keywords': ['step mother', 'stepmom', 'step-mother'], 'house': 3, 'label': 'stepmother'},
+            {'name': 'stepfather', 'keywords': ['step father', 'stepdad', 'step-father'], 'house': 10, 'label': 'stepfather'},
+            {'name': 'elder_sibling', 'keywords': ['elder brother', 'elder sister', 'older brother', 'older sister'], 'house': 11, 'label': 'elder sibling'},
+            {'name': 'younger_sibling', 'keywords': ['younger brother', 'younger sister'], 'house': 3, 'label': 'younger sibling'},
+            {'name': 'first_child', 'keywords': ['first child', 'first son', 'first daughter'], 'house': 5, 'label': 'first child'},
+            {'name': 'second_child', 'keywords': ['second child', 'second son', 'second daughter'], 'house': 9, 'label': 'second child'},
+            {'name': 'third_child', 'keywords': ['third child', 'third son', 'third daughter'], 'house': 1, 'label': 'third child'},
+            {'name': 'colleague', 'keywords': ['colleague', 'coworker', 'co-worker', 'teammate', 'peer'], 'house': 6, 'label': 'colleague / peer'},
+            {'name': 'friend', 'keywords': ['best friend', 'close friend', 'friend', 'buddy'], 'house': 11, 'label': 'friend'},
+            {'name': 'spouse', 'keywords': ['husband', 'wife', 'spouse', 'partner', 'life partner'], 'house': 7, 'label': 'spouse / life partner'},
+            {'name': 'father', 'keywords': ['father', 'dad', 'papa'], 'house': 9, 'label': 'father'},
+            {'name': 'mother', 'keywords': ['mother', 'mom', 'mama'], 'house': 4, 'label': 'mother'},
+            {'name': 'children', 'keywords': ['child', 'son', 'daughter', 'kids'], 'house': 5, 'label': 'children'},
+            {'name': 'siblings', 'keywords': ['brother', 'sister', 'sibling'], 'house': 3, 'label': 'siblings'}
+        ]
         
         # Topic detection patterns
-        topic_patterns = {
-            'career': {'keywords': ['job', 'career', 'business', 'work', 'profession'], 'house_offset': 9},  # 10th from relative
-            'health': {'keywords': ['health', 'illness', 'disease', 'medical'], 'house_offset': 5},  # 6th from relative
-            'wealth': {'keywords': ['money', 'wealth', 'income', 'finance'], 'house_offset': 1},  # 2nd from relative
-            'marriage': {'keywords': ['marriage', 'wedding', 'relationship'], 'house_offset': 6},  # 7th from relative
-            'children': {'keywords': ['children', 'pregnancy', 'kids'], 'house_offset': 4}  # 5th from relative
-        }
+        topic_patterns = [
+            {'name': 'career', 'keywords': ['job', 'career', 'business', 'work', 'profession', 'promotion', 'status'], 'topic_house': 10},
+            {'name': 'health', 'keywords': ['health', 'illness', 'disease', 'medical', 'hospital', 'surgery'], 'topic_house': 6},
+            {'name': 'wealth', 'keywords': ['money', 'wealth', 'income', 'finance', 'salary', 'earnings'], 'topic_house': 2},
+            {'name': 'marriage', 'keywords': ['marriage', 'wedding', 'relationship', 'partner', 'spouse'], 'topic_house': 7},
+            {'name': 'children', 'keywords': ['children', 'pregnancy', 'kids', 'child', 'son', 'daughter'], 'topic_house': 5},
+            {'name': 'home', 'keywords': ['home', 'house', 'property', 'residence', 'real estate'], 'topic_house': 4},
+            {'name': 'travel', 'keywords': ['travel', 'foreign', 'abroad', 'visa', 'long distance'], 'topic_house': 9},
+            {'name': 'loss_or_separation', 'keywords': ['loss', 'separation', 'distance', 'isolation'], 'topic_house': 12}
+        ]
         
         detected_relative = None
         detected_topic = None
         
         # Detect relative
-        for relative, data in relative_patterns.items():
+        for data in relative_patterns:
             if any(keyword in question_lower for keyword in data['keywords']):
-                detected_relative = {'name': relative, 'house': data['house']}
+                detected_relative = {'name': data['name'], 'house': data['house'], 'label': data['label']}
                 break
         
         # Detect topic
-        for topic, data in topic_patterns.items():
+        for data in topic_patterns:
             if any(keyword in question_lower for keyword in data['keywords']):
-                detected_topic = {'name': topic, 'house_offset': data['house_offset']}
+                detected_topic = {'name': data['name'], 'topic_house': data['topic_house']}
                 break
         
         if not detected_relative or not detected_topic:
@@ -2385,18 +2402,23 @@ class ChatContextBuilder:
         
         # Calculate Bhavat Bhavam house
         relative_house = detected_relative['house']
-        topic_offset = detected_topic['house_offset']
-        bhavat_bhavam_house = ((relative_house + topic_offset - 2) % 12) + 1
+        topic_house = detected_topic['topic_house']
+        bhavat_bhavam_house = ((relative_house + topic_house - 2) % 12) + 1
         
         return {
             'detected': True,
             'relative': detected_relative['name'],
+            'relative_label': detected_relative['label'],
             'relative_house': relative_house,
             'topic': detected_topic['name'],
-            'topic_offset': topic_offset,
+            'topic_house_from_relative': topic_house,
             'bhavat_bhavam_house': bhavat_bhavam_house,
-            'analysis_instruction': f"Analyze {detected_topic['name']} of {detected_relative['name']} by examining the {bhavat_bhavam_house}th house (which is the {topic_offset}th house from the {relative_house}th house)",
-            'example': f"Question about {detected_relative['name']}'s {detected_topic['name']} → Look at {bhavat_bhavam_house}th house"
+            'analysis_instruction': (
+                f"Analyze {detected_topic['name']} of {detected_relative['label']} by rotating the chart: "
+                f"treat the {relative_house}th house as temporary Lagna, then examine the {topic_house}th house from there, "
+                f"which becomes the natal {bhavat_bhavam_house}th house."
+            ),
+            'example': f"Question about {detected_relative['label']}'s {detected_topic['name']} → Look at natal {bhavat_bhavam_house}th house"
         }
     
     def _analyze_dasha_conflicts(self, vimshottari_dasha: Dict, yogini_dasha: Dict) -> Dict:

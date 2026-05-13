@@ -63,6 +63,7 @@ export default function AdminSupportInbox() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState(null);
   const [sending, setSending] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -111,6 +112,7 @@ export default function AdminSupportInbox() {
     setDetailLoading(true);
     setErr('');
     setReplyText('');
+    setAttachmentFile(null);
     try {
       const res = await fetch(`/api/admin/support/tickets/${id}`, {
         headers: getAdminAuthHeaders(),
@@ -139,26 +141,60 @@ export default function AdminSupportInbox() {
   const sendReply = async () => {
     if (!selectedId) return;
     const body = sanitizeSupportBody(replyText);
-    if (!body) {
-      setErr('Enter a non-empty message.');
+    if (!body && !attachmentFile) {
+      setErr('Enter a message or attach a PDF.');
       return;
     }
     setSending(true);
     setErr('');
     try {
-      const res = await fetch(`/api/admin/support/tickets/${selectedId}/messages`, {
-        method: 'POST',
-        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: body }),
-      });
+      let res;
+      if (attachmentFile) {
+        const form = new FormData();
+        form.append('message', body || '');
+        form.append('attachment', attachmentFile);
+        res = await fetch(`/api/admin/support/tickets/${selectedId}/messages`, {
+          method: 'POST',
+          headers: { ...getAdminAuthHeaders() },
+          body: form,
+        });
+      } else {
+        res = await fetch(`/api/admin/support/tickets/${selectedId}/messages`, {
+          method: 'POST',
+          headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: body }),
+        });
+      }
       if (!res.ok) throw new Error(await parseError(res));
       setReplyText('');
+      setAttachmentFile(null);
       await loadDetail(selectedId);
       await loadList();
     } catch (e) {
       setErr(e.message || 'Send failed');
     } finally {
       setSending(false);
+    }
+  };
+
+  const downloadAttachment = async (attachment) => {
+    if (!attachment?.id) return;
+    try {
+      const res = await fetch(`/api/support/attachments/${attachment.id}/download`, {
+        headers: getAdminAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(await parseError(res));
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = attachment.filename || 'attachment.pdf';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setErr(e.message || 'Download failed');
     }
   };
 
@@ -493,6 +529,40 @@ export default function AdminSupportInbox() {
                       <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: compact ? 15 : 14 }}>
                         {m.body}
                       </div>
+                      {Array.isArray(m.attachments) && m.attachments.length > 0 ? (
+                        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                          {m.attachments.map((att) => (
+                            <div
+                              key={att.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 10,
+                                padding: compact ? '8px 10px' : '8px 12px',
+                                borderRadius: 8,
+                                background: '#ffffff',
+                                border: '1px solid #d7dee7',
+                              }}
+                            >
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#223' }}>{att.filename}</div>
+                                <div style={{ fontSize: 12, color: '#667' }}>
+                                  PDF · {Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="create-btn"
+                                onClick={() => downloadAttachment(att)}
+                                style={{ whiteSpace: 'nowrap' }}
+                              >
+                                Download
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -515,6 +585,22 @@ export default function AdminSupportInbox() {
                   }}
                   placeholder="Plain text only"
                 />
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: compact ? 14 : 13 }}>
+                    Attach PDF (optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                    style={{ display: 'block', width: '100%' }}
+                  />
+                  {attachmentFile ? (
+                    <div style={{ marginTop: 6, fontSize: 12, color: '#555' }}>
+                      Selected: {attachmentFile.name}
+                    </div>
+                  ) : null}
+                </div>
                 <div style={{ marginTop: compact ? 8 : 12 }}>
                   <button
                     type="button"

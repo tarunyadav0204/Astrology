@@ -703,7 +703,8 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         cur = execute(
             conn,
             """
-                SELECT message_id, sender, content, timestamp, completed_at, terms, glossary, images, message_type, gate_metadata, parallel_llm_usage
+                SELECT message_id, sender, content, timestamp, completed_at, terms, glossary, images,
+                       message_type, gate_metadata, parallel_llm_usage, status, started_at, follow_up_questions
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -755,7 +756,12 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         mt = msg[8] if len(msg) > 8 else None
         gm = msg[9] if len(msg) > 9 else None
         plu = msg[10] if len(msg) > 10 else None
+        status = msg[11] if len(msg) > 11 else None
+        started_at = msg[12] if len(msg) > 12 else None
+        follow_up_questions = msg[13] if len(msg) > 13 else None
         message_data["message_type"] = mt
+        message_data["status"] = status
+        message_data["started_at"] = started_at
         if gm:
             try:
                 meta = json.loads(gm)
@@ -766,6 +772,23 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["gate_metadata"] = None
         else:
             message_data["gate_metadata"] = None
+        if follow_up_questions:
+            try:
+                message_data["follow_up_questions"] = json.loads(follow_up_questions)
+            except Exception:
+                message_data["follow_up_questions"] = []
+        else:
+            message_data["follow_up_questions"] = []
+        if status == "processing":
+            with get_conn() as wait_conn:
+                wait_side_payload = _fetch_wait_side_payload(wait_conn, msg[0])
+                wait_conn.commit()
+            if wait_side_payload:
+                message_data["wait_conversation"] = {
+                    "enabled": True,
+                    "status": wait_side_payload.get("status"),
+                    "messages": wait_side_payload.get("messages") or [],
+                }
         conversation.append(message_data)
 
     return {

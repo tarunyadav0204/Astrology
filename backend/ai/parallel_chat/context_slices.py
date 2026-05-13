@@ -54,6 +54,7 @@ _PARASHARI_KEYS: Set[str] = {
     "extracted_context",
     "current_date_info",
     "response_format",
+    "bhavat_bhavam",
 }
 
 
@@ -76,6 +77,7 @@ _SHARED_KERNEL_KEYS: Set[str] = {
     "requested_dasha_summary",
     "period_dasha_activations",
     "unified_dasha_timeline",
+    "bhavat_bhavam",
 }
 
 
@@ -97,6 +99,7 @@ _PARALLEL_KERNEL_LITE_KEYS: Set[str] = {
     "response_format",
     "current_dashas",
     "requested_dasha_summary",
+    "bhavat_bhavam",
 }
 
 

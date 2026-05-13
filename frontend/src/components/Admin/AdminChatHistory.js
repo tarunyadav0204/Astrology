@@ -1,10 +1,335 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { jsPDF } from 'jspdf';
 import { getAdminAuthHeaders } from '../../services/adminService';
 import { formatChatMessageHtml as formatMessageContent } from '../../utils/markdown';
+import { extractChatSectionDrafts } from '../../utils/chatPdfSections';
 import './AdminChatHistory.css';
 
 const USER_PAGE_SIZE = 10;
 const SESSION_MESSAGE_PAGE_SIZE = 20;
+
+/** Labels that often sit on a single newline after "Astrological Analysis" — force block boundaries. */
+const PDF_SUBSECTION_BREAK_LABELS = [
+  'Triple Perspective (Sudarshana):',
+  'Ashtakavarga (SAV & BAV):',
+  'The Parashari View:',
+  'The Planetary View:',
+  'The Jaimini View:',
+  'KP Stellar Perspective:',
+  'Nadi Interpretation:',
+  'Divisional Chart Analysis:',
+  'Parashari View:',
+  'Jaimini View:',
+  'Nadi View:',
+  'KP View:',
+  'Timing Synthesis:',
+];
+
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Model replies often glue bullets and subheads on one line (e.g. "end.- Next Insight"
+ * or "The Parashari View- text"). Break those apart before parseBodyIntoFlow.
+ */
+function preprocessPdfSectionBody(title, text) {
+  let t = String(text ?? '').replace(/\r\n/g, '\n');
+  if (!t.trim()) return t;
+
+  const tl = String(title || '');
+
+  // Common Key Insights pattern: period then hyphen then next titled phrase
+  t = t.replace(/\.\s*-\s+(?=[A-Z0-9])/g, '.\n\n- ');
+  t = t.replace(/\.\s+-\s+(?=[A-Z0-9])/g, '.\n\n- ');
+  // "word - Capitalized" insight separators (not single-letter words)
+  t = t.replace(/([a-z]{2,})\s+-\s+(?=[A-Z][a-z]{3,})/g, '$1\n\n- ');
+
+  // Inline numbered steps: " ... 1. Verb" / " ... 2. Verb"
+  t = t.replace(/(\s)([1-9]\d?\.\s+[A-Z])/g, '$1\n\n$2');
+
+  // Long final paragraphs: new thought after semicolon + capital
+  t = t.replace(/;\s+(?=[A-Z])/g, ';\n\n');
+
+  // Subsection / label lines embedded without newlines (skip repeating own card title)
+  const embeddedHeads = [
+    'Triple Perspective (Sudarshana)',
+    'Ashtakavarga (SAV & BAV)',
+    'The Parashari View',
+    'The Planetary View',
+    'The Jaimini View',
+    'KP Stellar Perspective',
+    'Nadi Interpretation',
+    'Timing Synthesis',
+    'Divisional Chart Analysis',
+    'Nakshatra Insights',
+    'Timing & Guidance',
+  ].sort((a, b) => b.length - a.length);
+
+  for (const h of embeddedHeads) {
+    if (tl && h.toLowerCase() === tl.toLowerCase()) continue;
+    const esc = escapeRegex(h);
+    t = t.replace(new RegExp(`([^\\n])\\s*(${esc})\\s*[:.\-]`, 'gi'), '$1\n\n$2');
+  }
+
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Match secondary chunks after split when strict "Label:" regex fails (dash titles, etc.). */
+const PDF_SECONDARY_RELAXED = [
+  { re: /^The Planetary View\s*[:.\-]\s*/i, title: 'The Planetary View' },
+  { re: /^The Parashari View\s*[:.\-]\s*/i, title: 'The Parashari View' },
+  { re: /^Parashari View\s*[:.\-]\s*/i, title: 'Parashari View' },
+  { re: /^Ashtakavarga\s*\(SAV\s*&\s*BAV\)\s*[:.\-]?\s*/i, title: 'Ashtakavarga (SAV & BAV)' },
+  { re: /^The Jaimini View\s*[:.\-]\s*/i, title: 'The Jaimini View' },
+  { re: /^Jaimini View\s*[:.\-]\s*/i, title: 'Jaimini View' },
+  { re: /^KP Stellar Perspective\s*[:.\-]\s*/i, title: 'KP Stellar Perspective' },
+  { re: /^KP View\s*[:.\-]\s*/i, title: 'KP View' },
+  { re: /^Nadi Interpretation\s*[:.\-]\s*/i, title: 'Nadi Interpretation' },
+  { re: /^Nadi View\s*[:.\-]\s*/i, title: 'Nadi View' },
+  { re: /^Timing Synthesis\s*[:.\-]\s*/i, title: 'Timing Synthesis' },
+  { re: /^Triple Perspective\s*\(Sudarshana\)\s*[:.\-]?\s*/i, title: 'Triple Perspective (Sudarshana)' },
+  { re: /^Divisional Chart Analysis\s*[:.\-]\s*/i, title: 'Divisional Chart Analysis' },
+];
+
+const AST_ANALYSIS_SUB_SPLIT =
+  /(?=The Parashari View\s*[:.\-]|The Planetary View\s*[:.\-]|The Jaimini View\s*[:.\-]|Ashtakavarga\s*\(SAV\s*&\s*BAV\)|KP Stellar Perspective\s*[:.\-]|Nadi Interpretation\s*[:.\-]|Timing Synthesis\s*[:.\-]|Triple Perspective\s*\(Sudarshana\)\s*[:.\-]|Divisional Chart Analysis\s*[:.\-])/i;
+
+/** Inline subsection titles inside one card (styled in drawPdfBodyFlow). */
+const PDF_SUBHEADING_INLINE =
+  /^(The Parashari View|The Planetary View|The Jaimini View|Ashtakavarga\s*\(SAV\s*&\s*BAV\)|KP Stellar Perspective|Nadi Interpretation|Timing Synthesis|Triple Perspective\s*\(Sudarshana\)|Divisional Chart Analysis)\s*[:.\-]\s*(.+)$/i;
+
+function isStandalonePdfSubheadingLine(t) {
+  return /^(The Parashari View|The Planetary View|The Jaimini View|Ashtakavarga\s*\(SAV\s*&\s*BAV\)|KP Stellar Perspective|Nadi Interpretation|Timing Synthesis|Triple Perspective\s*\(Sudarshana\)|Divisional Chart Analysis)\s*[:.\-]?\s*$/i.test(
+    t,
+  );
+}
+
+/**
+ * Turn plain section text into flow blocks so jsPDF height matches content
+ * (avoids one giant splitTextToSize on strings with many newlines).
+ */
+function parseBodyIntoFlow(text) {
+  const raw = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+  if (!raw) return [{ type: 'p', text: '—' }];
+
+  const flow = [];
+  let ul = [];
+  let ol = [];
+  let paraLines = [];
+
+  const flushUl = () => {
+    if (ul.length) {
+      flow.push({ type: 'ul', items: ul.slice() });
+      ul = [];
+    }
+  };
+  const flushOl = () => {
+    if (ol.length) {
+      flow.push({ type: 'ol', items: ol.slice() });
+      ol = [];
+    }
+  };
+  const flushPara = () => {
+    flushUl();
+    flushOl();
+    if (paraLines.length) {
+      flow.push({ type: 'p', text: paraLines.join('\n') });
+      paraLines = [];
+    }
+  };
+
+  const lines = raw.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) {
+      flushPara();
+      continue;
+    }
+    const bullet = /^[•\-]\s+(.+)$/.exec(t);
+    const astList = /^\*\s+(.+)$/.exec(t);
+    const num = /^(\d{1,3})[.)]\s+(.+)$/.exec(t);
+    if (bullet) {
+      flushPara();
+      flushOl();
+      ul.push(bullet[1].trim());
+    } else if (astList && !t.startsWith('**')) {
+      flushPara();
+      flushOl();
+      ul.push(astList[1].trim());
+    } else if (num) {
+      flushPara();
+      flushUl();
+      ol.push(num[2].trim());
+    } else {
+      const inlineSh = t.match(PDF_SUBHEADING_INLINE);
+      if (inlineSh) {
+        flushPara();
+        flushUl();
+        flushOl();
+        flow.push({ type: 'subheading', text: inlineSh[1].trim() });
+        const rest = (inlineSh[2] || '').trim();
+        if (rest) paraLines.push(rest);
+      } else if (isStandalonePdfSubheadingLine(t)) {
+        flushPara();
+        flushUl();
+        flushOl();
+        flow.push({ type: 'subheading', text: t.replace(/\s*[:.\-]\s*$/i, '').trim() });
+      } else {
+        flushUl();
+        flushOl();
+        paraLines.push(t);
+      }
+    }
+  }
+  flushPara();
+  return flow.length ? flow : [{ type: 'p', text: raw }];
+}
+
+function attachBodyFlowToPdfSections(sections) {
+  sections.forEach((s) => {
+    if (s.kind === 'bullet_group' && Array.isArray(s.items)) {
+      s.bodyFlow = [{ type: 'ul', items: s.items.slice() }];
+      return;
+    }
+    if (s.text != null && s.kind !== 'heading') {
+      s.bodyFlow = parseBodyIntoFlow(s.text);
+    }
+  });
+  return sections;
+}
+
+function measurePdfBodyFlow(doc, flow, innerTextW, bodyLineMm) {
+  const badgeW = 4.5;
+  const listTextW = Math.max(20, innerTextW - badgeW - 5);
+  const paraGap = 2.5;
+  let h = 0;
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  (flow || []).forEach((b) => {
+    if (b.type === 'p') {
+      const lines = doc.splitTextToSize(String(b.text || '—').replace(/\r/g, ''), innerTextW);
+      h += Math.max(lines.length, 1) * bodyLineMm + paraGap;
+    } else if (b.type === 'ul' || b.type === 'ol') {
+      (b.items || []).forEach((item) => {
+        const lines = doc.splitTextToSize(String(item || '—'), listTextW);
+        h += Math.max(lines.length, 1) * bodyLineMm + 2;
+      });
+      h += 2;
+    }
+  });
+  return h;
+}
+
+/** Split flow at subheadings so each segment can be its own PDF card (subheading is first line inside the new card). */
+function partitionBodyFlowAtSubheadings(flow) {
+  const f = Array.isArray(flow) ? flow : [];
+  if (!f.some((b) => b.type === 'subheading')) {
+    return [{ subTitle: null, blocks: f.slice() }];
+  }
+  const parts = [];
+  let pending = null;
+  let buf = [];
+  const flush = () => {
+    if (!buf.length && pending === null) return;
+    /* Never emit a segment with no blocks (e.g. two subheadings back-to-back). That produced a
+     * tiny "header-only" card and the real body started in the next partition / page. */
+    if (buf.length) {
+      parts.push({ subTitle: pending, blocks: buf.slice() });
+    }
+    buf = [];
+  };
+  f.forEach((b) => {
+    if (b.type === 'subheading') {
+      flush();
+      pending = b.text;
+    } else {
+      buf.push(b);
+    }
+  });
+  flush();
+  return parts.length ? parts : [{ subTitle: null, blocks: f.slice() }];
+}
+
+function measurePdfSubTitleBlock(doc, subTitle, innerTextW) {
+  if (!subTitle) return 0;
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  const lines = doc.splitTextToSize(String(subTitle), innerTextW);
+  doc.setFont(undefined, 'normal');
+  return Math.max(lines.length, 1) * 5.8 + 3;
+}
+
+/**
+ * @returns {number} baseline Y after last drawn line (mm)
+ */
+function drawPdfBodyFlow(doc, flow, opts) {
+  const {
+    textX, innerTextW, bodyLineMm, startY, badge, listTextX, listTextW,
+  } = opts;
+  let ty = startY;
+  const paraGap = 2.5;
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(44, 62, 80);
+  (flow || []).forEach((b) => {
+    if (b.type === 'p') {
+      const lines = doc.splitTextToSize(String(b.text || '—').replace(/\r/g, ''), innerTextW);
+      lines.forEach((ln) => {
+        doc.text(ln, textX, ty);
+        ty += bodyLineMm;
+      });
+      ty += paraGap;
+    } else if (b.type === 'ul') {
+      (b.items || []).forEach((item) => {
+        const lines = doc.splitTextToSize(String(item || '—'), listTextW);
+        const rowStart = ty;
+        doc.setFillColor(255, 107, 53);
+        doc.rect(textX - 0.5, rowStart - 3.5, badge, badge, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'bold');
+        doc.text('-', textX - 0.5 + (badge - doc.getTextWidth('-')) / 2, rowStart + 0.5);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(44, 62, 80);
+        lines.forEach((ln) => {
+          doc.text(ln, listTextX, ty);
+          ty += bodyLineMm;
+        });
+        ty += 2;
+      });
+      ty += 2;
+    } else if (b.type === 'ol') {
+      let n = 1;
+      (b.items || []).forEach((item) => {
+        const lines = doc.splitTextToSize(String(item || '—'), listTextW);
+        const rowStart = ty;
+        doc.setFillColor(255, 107, 53);
+        doc.rect(textX - 0.5, rowStart - 3.5, badge, badge, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, 'bold');
+        const ns = String(n);
+        doc.text(ns, textX - 0.5 + (badge - doc.getTextWidth(ns)) / 2, rowStart + 0.5);
+        n += 1;
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(44, 62, 80);
+        lines.forEach((ln) => {
+          doc.text(ln, listTextX, ty);
+          ty += bodyLineMm;
+        });
+        ty += 2;
+      });
+      ty += 2;
+    }
+  });
+  return ty;
+}
 
 const AdminChatHistory = () => {
   const [userRows, setUserRows] = useState([]);
@@ -25,6 +350,7 @@ const AdminChatHistory = () => {
     messageId: null,
     payload: null,
   });
+  const [pdfMessageId, setPdfMessageId] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(sessionQuery.trim()), 400);
@@ -215,18 +541,36 @@ const AdminChatHistory = () => {
     return ma - mb;
   };
 
+  const isAssistantClarification = (msg) =>
+    String(msg?.sender || '').toLowerCase() === 'assistant' &&
+    String(msg?.message_type || '').toLowerCase() === 'clarification';
+
+  const isAssistantAnswer = (msg) =>
+    String(msg?.sender || '').toLowerCase() === 'assistant' &&
+    String(msg?.message_type || '').toLowerCase() !== 'clarification';
+
   /**
-   * User-thread pane: show newest *turns* first, but within each turn keep chronological order
-   * (user question, then assistant reply) so answers never appear above their question.
-   * API returns rows with ORDER BY timestamp DESC, message_id DESC; equal display timestamps must not
-   * preserve that order when sorting ascending — tie-break user before assistant, then message_id.
+   * User-thread pane: show newest *conversation blocks* first, but preserve chronological order
+   * inside each block.
+   *
+   * A clarification exchange must remain inside the same block:
+   * user question -> assistant clarification -> user clarification answer -> assistant answer
+   *
+   * So we only start a new block on a user message when the immediately previous message is not
+   * an assistant clarification.
    */
-  const orderUserThreadMessagesNewestTurnsFirst = (messages) => {
+  const buildUserThreadBlocksNewestFirst = (messages) => {
     const sorted = messages.slice().sort(compareMessagesChronological);
     const turns = [];
     let turn = [];
     for (const m of sorted) {
-      if (m?.sender === 'user' && turn.length > 0) {
+      const prev = turn.length > 0 ? turn[turn.length - 1] : null;
+      const startsNewTurn =
+        String(m?.sender || '').toLowerCase() === 'user' &&
+        turn.length > 0 &&
+        !isAssistantClarification(prev);
+
+      if (startsNewTurn) {
         turns.push(turn);
         turn = [m];
       } else {
@@ -241,7 +585,671 @@ const AdminChatHistory = () => {
       if (te !== 0) return te;
       return turnMaxMessageId(b) - turnMaxMessageId(a);
     });
-    return turns.flat();
+    return turns;
+  };
+
+  const orderUserThreadMessagesNewestTurnsFirst = (messages) =>
+    buildUserThreadBlocksNewestFirst(messages).flat();
+
+  const htmlToPlainText = (raw) => {
+    const html = formatMessageContent(raw || '');
+    if (typeof window !== 'undefined' && window.DOMParser) {
+      const doc = new window.DOMParser().parseFromString(html, 'text/html');
+      return (doc.body?.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+    return String(raw || '').trim();
+  };
+
+  const PDF_SECTION_LABELS = [
+    'Quick Answer:',
+    'Executive Summary:',
+    'Daily Outlook:',
+    'Key Insights:',
+    'Astrological Analysis:',
+    'Nakshatra Insights:',
+    'Timing & Guidance:',
+    'Timing Through The Day:',
+    'Guidance for the Day:',
+    'Main Day Triggers:',
+    'What To Use:',
+    'What To Watch:',
+    'Final Thoughts:',
+    'Final Verdict:',
+    'The Parashari View:',
+    'The Planetary View:',
+    'Ashtakavarga (SAV & BAV):',
+    'The Jaimini View:',
+    'KP Stellar Perspective:',
+    'Nadi Interpretation:',
+    'Timing Synthesis:',
+    'Triple Perspective (Sudarshana):',
+    'Divisional Chart Analysis:',
+  ];
+
+  const normalizePdfSourceText = (raw) => {
+    let plain = htmlToPlainText(raw) || '—';
+    plain = plain
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/^[\s\uFEFF]*#{1,6}\s*/gm, '')
+      .replace(/\s+:\s+/g, ': ')
+      .replace(/([a-z])([A-Z][a-z]+:)/g, '$1\n\n$2');
+    const labelsSorted = [...PDF_SECTION_LABELS].sort((a, b) => b.length - a.length);
+    for (const label of labelsSorted) {
+      const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      plain = plain.replace(new RegExp(`([^\\n])(${esc})`, 'gi'), '$1\n\n$2');
+    }
+    const subSorted = [...PDF_SUBSECTION_BREAK_LABELS].sort((a, b) => b.length - a.length);
+    for (const label of subSorted) {
+      const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      plain = plain.replace(new RegExp(`\\n\\s*(${esc})`, 'gi'), '\n\n$1');
+    }
+    plain = plain
+      .replace(/The Parashari View\s*-\s*/gi, 'The Parashari View:\n\n')
+      .replace(/The Planetary View\s*-\s*/gi, 'The Planetary View:\n\n')
+      .replace(/The Jaimini View\s*-\s*/gi, 'The Jaimini View:\n\n')
+      .replace(/KP Stellar Perspective\s*-\s*/gi, 'KP Stellar Perspective:\n\n')
+      .replace(/Nadi Interpretation\s*-\s*/gi, 'Nadi Interpretation:\n\n')
+      .replace(/Timing Synthesis\s*-\s*/gi, 'Timing Synthesis:\n\n')
+      .replace(/Divisional Chart Analysis\s*-\s*/gi, 'Divisional Chart Analysis:\n\n');
+    plain = plain
+      .replace(/(\n\s*){4,}/g, '\n\n\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return plain || '—';
+  };
+
+  const PDF_SECTION_PATTERNS = [
+    { test: /^Quick Answer:\s*/i, kind: 'quick_card', title: 'Quick Answer' },
+    { test: /^Executive Summary:\s*/i, kind: 'quick_card', title: 'Executive Summary' },
+    { test: /^Daily Outlook:\s*/i, kind: 'quick_card', title: 'Daily Outlook' },
+    { test: /^Final Thoughts:\s*/i, kind: 'final_card', title: 'Final Thoughts' },
+    { test: /^Final Verdict:\s*/i, kind: 'final_card', title: 'Final Verdict' },
+    { test: /^The Parashari View:\s*/i, kind: 'section_secondary', title: 'The Parashari View' },
+    { test: /^The Planetary View:\s*/i, kind: 'section_secondary', title: 'The Planetary View' },
+    { test: /^Parashari View:\s*/i, kind: 'section_secondary', title: 'Parashari View' },
+    { test: /^Ashtakavarga \(SAV & BAV\):\s*/i, kind: 'section_secondary', title: 'Ashtakavarga (SAV & BAV)' },
+    { test: /^The Jaimini View:\s*/i, kind: 'section_secondary', title: 'The Jaimini View' },
+    { test: /^Jaimini View:\s*/i, kind: 'section_secondary', title: 'Jaimini View' },
+    { test: /^KP Stellar Perspective:\s*/i, kind: 'section_secondary', title: 'KP Stellar Perspective' },
+    { test: /^KP View:\s*/i, kind: 'section_secondary', title: 'KP View' },
+    { test: /^Nadi Interpretation:\s*/i, kind: 'section_secondary', title: 'Nadi Interpretation' },
+    { test: /^Nadi View:\s*/i, kind: 'section_secondary', title: 'Nadi View' },
+    { test: /^Timing Synthesis:\s*/i, kind: 'section_secondary', title: 'Timing Synthesis' },
+    { test: /^Triple Perspective \(Sudarshana\):\s*/i, kind: 'section_secondary', title: 'Triple Perspective (Sudarshana)' },
+    { test: /^Divisional Chart Analysis:\s*/i, kind: 'section_secondary', title: 'Divisional Chart Analysis' },
+    { test: /^Key Insights:\s*/i, kind: 'section_primary', title: 'Key Insights' },
+    { test: /^Astrological Analysis:\s*/i, kind: 'section_primary', title: 'Astrological Analysis' },
+    { test: /^Nakshatra Insights:\s*/i, kind: 'section_primary', title: 'Nakshatra Insights' },
+    { test: /^Timing & Guidance:\s*/i, kind: 'section_primary', title: 'Timing & Guidance' },
+    { test: /^Timing Through The Day:\s*/i, kind: 'section_primary', title: 'Timing Through The Day' },
+    { test: /^Guidance for the Day:\s*/i, kind: 'section_primary', title: 'Guidance for the Day' },
+    { test: /^Main Day Triggers:\s*/i, kind: 'section_primary', title: 'Main Day Triggers' },
+    { test: /^What To Use:\s*/i, kind: 'section_primary', title: 'What To Use' },
+    { test: /^What To Watch:\s*/i, kind: 'section_primary', title: 'What To Watch' },
+  ];
+
+  const mergeAdjacentBullets = (sections) => {
+    const out = [];
+    sections.forEach((s) => {
+      if (s.kind === 'bullet' && out.length && out[out.length - 1].kind === 'bullet_group') {
+        out[out.length - 1].items.push(s.text);
+      } else if (s.kind === 'bullet') {
+        out.push({ kind: 'bullet_group', items: [s.text] });
+      } else {
+        out.push(s);
+      }
+    });
+    return out;
+  };
+
+  /** When a titled section has no body (label-only block after \\n\\n split), fold the next block in. */
+  const mergeEmptyTitledSectionForward = (sections) => {
+    const out = [];
+    for (let i = 0; i < sections.length; i++) {
+      const s = sections[i];
+      const next = sections[i + 1];
+      const isTitled =
+        s &&
+        (s.kind === 'section_primary' ||
+          s.kind === 'section_secondary' ||
+          s.kind === 'quick_card' ||
+          s.kind === 'final_card') &&
+        s.title;
+      if (
+        isTitled &&
+        !String(s.text ?? '').trim() &&
+        next &&
+        (next.kind === 'paragraph' || next.kind === 'bullet_group' || next.kind === 'bullet')
+      ) {
+        if (next.kind === 'bullet_group' && Array.isArray(next.items)) {
+          s.text = next.items.map((t) => `• ${String(t || '').trim()}`).join('\n');
+        } else if (next.kind === 'bullet') {
+          s.text = `• ${String(next.text || '').trim()}`;
+        } else {
+          s.text = next.text;
+        }
+        out.push(s);
+        i += 1;
+      } else {
+        out.push(s);
+      }
+    }
+    return out;
+  };
+
+  const expandAstrologicalAnalysisSection = (sections) => {
+    const opensSecondary = (piece) =>
+      PDF_SECONDARY_RELAXED.some((def) => def.re.test(piece)) ||
+      PDF_SECTION_PATTERNS.some((def) => def.kind === 'section_secondary' && def.test.test(piece));
+    const pushSecondaryFromPiece = (piece) => {
+      for (const def of PDF_SECONDARY_RELAXED) {
+        if (def.re.test(piece)) {
+          return {
+            kind: 'section_secondary',
+            title: def.title,
+            text: piece.replace(def.re, '').trim(),
+          };
+        }
+      }
+      for (const def of PDF_SECTION_PATTERNS) {
+        if (def.kind !== 'section_secondary') continue;
+        if (def.test.test(piece)) {
+          return {
+            kind: 'section_secondary',
+            title: def.title,
+            text: piece.replace(def.test, '').trim(),
+          };
+        }
+      }
+      return null;
+    };
+
+    const out = [];
+    sections.forEach((sec) => {
+      if (sec.kind !== 'section_primary' || sec.title !== 'Astrological Analysis' || !sec.text) {
+        out.push(sec);
+        return;
+      }
+      if (sec.text.search(AST_ANALYSIS_SUB_SPLIT) < 0) {
+        out.push(sec);
+        return;
+      }
+      const parts = sec.text.split(AST_ANALYSIS_SUB_SPLIT).map((p) => p.trim());
+      const nonempty = parts.filter(Boolean);
+      if (nonempty.length < 2) {
+        out.push(sec);
+        return;
+      }
+      let startIdx = 0;
+      let astroPrimary = null;
+      if (parts[0] && !opensSecondary(parts[0])) {
+        astroPrimary = { kind: 'section_primary', title: 'Astrological Analysis', text: parts[0] };
+        out.push(astroPrimary);
+        startIdx = 1;
+      }
+      for (let j = startIdx; j < parts.length; j++) {
+        const piece = parts[j];
+        if (!piece) continue;
+        const secondary = pushSecondaryFromPiece(piece);
+        if (secondary) {
+          astroPrimary = null;
+          out.push(secondary);
+        } else if (astroPrimary) {
+          astroPrimary.text = [astroPrimary.text, piece].filter(Boolean).join('\n\n');
+        } else {
+          out.push({ kind: 'paragraph', text: piece });
+        }
+      }
+    });
+    return out;
+  };
+
+  const extractPdfSectionsFromMessage = (raw) => {
+    const fromDrafts = extractChatSectionDrafts(raw);
+    const merged = mergeAdjacentBullets(fromDrafts);
+    let base = mergeEmptyTitledSectionForward(merged);
+    base.forEach((s) => {
+      if (s.text != null && s.kind !== 'heading') {
+        s.text = preprocessPdfSectionBody(s.title, s.text);
+      }
+    });
+    const expanded = expandAstrologicalAnalysisSection(base);
+    const out = mergeEmptyTitledSectionForward(expanded.length ? expanded : fromDrafts);
+    return attachBodyFlowToPdfSections(out.length ? out : fromDrafts);
+  };
+
+  const downloadConversationPdf = async (messages, session, messageId) => {
+    if (!Array.isArray(messages) || messages.length === 0) return;
+    setPdfMessageId(messageId || 'thread');
+    try {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - 2 * margin;
+      let yPosition = margin;
+
+      const conversationMessages = messages.map((msg) => {
+        const senderKey = String(msg?.sender || '').toLowerCase();
+        return {
+          role: senderKey === 'user' ? 'user' : 'assistant',
+          content: String(msg?.content || ''),
+          message_type: msg?.message_type || null,
+          timestamp: msg?.timestamp || null,
+        };
+      });
+
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('AstroRoshni - Astrology Chat', margin, yPosition);
+      yPosition += 10;
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yPosition);
+      if (session?.user_name) {
+        yPosition += 6;
+        doc.text(`For: ${session.user_name}`, margin, yPosition);
+      }
+      if (session?.native_name) {
+        yPosition += 6;
+        doc.text(`Chart: ${session.native_name}`, margin, yPosition);
+      }
+      yPosition += 15;
+
+      const bodyLineMm = 5.3;
+      const titleLinePrimaryMm = 6.2;
+      const titleLineSecondaryMm = 5.6;
+      const titleLineQuickMm = 6;
+      const accentStripMm = 1.5;
+      const cardSidePadMm = 5;
+      const cardTopPadMm = 5.5;
+      const cardBottomPadMm = 5;
+      const titleBodyGapMm = 3.5;
+      const cardW = maxWidth - 4;
+      const firstBaselineExtraMm = 4;
+      const innerTextW = Math.max(40, cardW - accentStripMm - cardSidePadMm * 2);
+
+      const CARD_STACK_GAP_MM = 4;
+
+      const measurePartitionedBody = (sec, mainTitleExtraMm) => {
+        const parts = partitionBodyFlowAtSubheadings(sec.bodyFlow || []);
+        let sum = 0;
+        parts.forEach((part, idx) => {
+          const bh = measurePdfBodyFlow(doc, part.blocks, innerTextW, bodyLineMm);
+          if (idx === 0) {
+            sum +=
+              cardTopPadMm + firstBaselineExtraMm + (mainTitleExtraMm || 0) + bh + cardBottomPadMm;
+          } else {
+            /* Gap sits *between* shells (page background), not inside the next fill — otherwise
+             * continuation cards visually merge with the previous one and the subtitle reads
+             * as a footer of the same card. */
+            sum += CARD_STACK_GAP_MM;
+            sum +=
+              cardTopPadMm +
+              firstBaselineExtraMm +
+              measurePdfSubTitleBlock(doc, part.subTitle, innerTextW) +
+              bh +
+              cardBottomPadMm;
+          }
+        });
+        return sum + 2;
+      };
+
+      const measureSectionHeight = (sec) => {
+        const vPad = cardTopPadMm + firstBaselineExtraMm + cardBottomPadMm;
+        if (sec.kind === 'heading') {
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          const lines = doc.splitTextToSize(String(sec.text || '—'), innerTextW);
+          return vPad + Math.max(lines.length, 1) * titleLinePrimaryMm + 2;
+        }
+        if (sec.kind === 'bullet_group') {
+          return measurePartitionedBody(sec, 0);
+        }
+        const titled =
+          (sec.kind === 'quick_card' || sec.kind === 'final_card' || sec.kind === 'section_primary' || sec.kind === 'section_secondary') &&
+          sec.title;
+        if (!titled) {
+          return measurePartitionedBody(sec, 0);
+        }
+        let titleSize = 12;
+        let titleLineMm = titleLinePrimaryMm;
+        if (sec.kind === 'section_secondary') {
+          titleSize = 11;
+          titleLineMm = titleLineSecondaryMm;
+        } else if (sec.kind === 'quick_card' || sec.kind === 'final_card') {
+          titleSize = 11;
+          titleLineMm = titleLineQuickMm;
+        }
+        doc.setFontSize(titleSize);
+        doc.setFont(undefined, 'bold');
+        const titleLines = doc.splitTextToSize(String(sec.title || ''), innerTextW);
+        const titleGapAfter =
+          sec.kind === 'quick_card' || sec.kind === 'final_card' ? titleBodyGapMm - 1 : titleBodyGapMm;
+        const mainTitleExtraMm = titleLines.length * titleLineMm + titleGapAfter;
+        return measurePartitionedBody(sec, mainTitleExtraMm);
+      };
+
+      const lineHeightMm = bodyLineMm;
+
+      const ensureVerticalSpace = (neededMm) => {
+        if (yPosition + neededMm > pageHeight - 18) {
+          doc.addPage();
+          yPosition = margin;
+        }
+      };
+
+      const drawSectionCard = (sec) => {
+        const h = measureSectionHeight(sec);
+        ensureVerticalSpace(h + 6);
+        const x0 = margin + 2;
+        const stackTop = yPosition;
+        const textX = x0 + accentStripMm + cardSidePadMm;
+        const badge = 4.5;
+        const listTextX = textX + badge + 4.5;
+        const listTextW = Math.max(20, innerTextW - badge - 5);
+
+        const paintShellAt = (shellTop, shellH, bgRgb, accentRgb) => {
+          doc.setFillColor(bgRgb[0], bgRgb[1], bgRgb[2]);
+          doc.rect(x0, shellTop, cardW, shellH, 'F');
+          doc.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+          doc.rect(x0, shellTop, accentStripMm, shellH, 'F');
+          doc.setDrawColor(237, 233, 228);
+          doc.setLineWidth(0.2);
+          doc.rect(x0, shellTop, cardW, shellH, 'S');
+        };
+
+        const drawPartitionedBody = (bgRgb, accentRgb, drawMainTitle) => {
+          const parts = partitionBodyFlowAtSubheadings(sec.bodyFlow || []);
+          const heights = parts.map((part, idx) => {
+            const bh = measurePdfBodyFlow(doc, part.blocks, innerTextW, bodyLineMm);
+            if (idx === 0) {
+              const extra = drawMainTitle ? drawMainTitle.titleBlockMm : 0;
+              return cardTopPadMm + firstBaselineExtraMm + extra + bh + cardBottomPadMm;
+            }
+            return (
+              cardTopPadMm +
+              firstBaselineExtraMm +
+              measurePdfSubTitleBlock(doc, part.subTitle, innerTextW) +
+              bh +
+              cardBottomPadMm
+            );
+          });
+          const footerSafeMm = 18;
+          let runTop = stackTop;
+          parts.forEach((part, idx) => {
+            const hI = heights[idx];
+            if (idx > 0) runTop += CARD_STACK_GAP_MM;
+            if (runTop + hI > pageHeight - footerSafeMm) {
+              doc.addPage();
+              runTop = margin;
+            }
+            paintShellAt(runTop, hI, bgRgb, accentRgb);
+            let ty = runTop + cardTopPadMm + firstBaselineExtraMm;
+            if (idx === 0 && drawMainTitle) {
+              ty = drawMainTitle.drawAt(textX, ty);
+            } else if (idx > 0) {
+              doc.setFontSize(10);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(234, 88, 12);
+              doc.splitTextToSize(String(part.subTitle || ''), innerTextW).forEach((ln) => {
+                doc.text(ln, textX, ty);
+                ty += 5.8;
+              });
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(44, 62, 80);
+              ty += 1;
+            }
+            drawPdfBodyFlow(doc, part.blocks, {
+              textX,
+              innerTextW,
+              bodyLineMm,
+              startY: ty,
+              badge,
+              listTextX,
+              listTextW,
+            });
+            runTop += hI;
+          });
+          yPosition = runTop + 8;
+          doc.setTextColor(0, 0, 0);
+        };
+
+        if (sec.kind === 'heading') {
+          paintShellAt(stackTop, h, [255, 250, 246], [255, 107, 53]);
+          let ty = stackTop + cardTopPadMm + firstBaselineExtraMm;
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(255, 107, 53);
+          const titleLines = doc.splitTextToSize(String(sec.text || ''), innerTextW);
+          titleLines.forEach((ln) => {
+            doc.text(ln, textX, ty);
+            ty += titleLinePrimaryMm;
+          });
+          yPosition = stackTop + h + 6;
+          doc.setTextColor(0, 0, 0);
+          return;
+        }
+
+        if (sec.kind === 'bullet_group') {
+          drawPartitionedBody([255, 252, 248], [255, 107, 53], null);
+          return;
+        }
+
+        if (sec.kind === 'quick_card') {
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          const tLines = doc.splitTextToSize(String(sec.title || 'Quick Answer'), innerTextW);
+          const titleBlockMm = tLines.length * titleLineQuickMm + (titleBodyGapMm - 1);
+          drawPartitionedBody([255, 251, 235], [255, 193, 7], {
+            titleBlockMm,
+            drawAt: (tx, ty0) => {
+              doc.setFontSize(11);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(234, 88, 12);
+              let ty = ty0;
+              tLines.forEach((ln) => {
+                doc.text(ln, tx, ty);
+                ty += titleLineQuickMm;
+              });
+              ty += titleBodyGapMm - 1;
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(44, 62, 80);
+              return ty;
+            },
+          });
+          return;
+        }
+
+        if (sec.kind === 'final_card') {
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          const tLines = doc.splitTextToSize(String(sec.title || 'Final Thoughts'), innerTextW);
+          const titleBlockMm = tLines.length * titleLineQuickMm + (titleBodyGapMm - 1);
+          drawPartitionedBody([241, 248, 255], [59, 130, 246], {
+            titleBlockMm,
+            drawAt: (tx, ty0) => {
+              doc.setFontSize(11);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(30, 64, 175);
+              let ty = ty0;
+              tLines.forEach((ln) => {
+                doc.text(ln, tx, ty);
+                ty += titleLineQuickMm;
+              });
+              ty += titleBodyGapMm - 1;
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(44, 62, 80);
+              return ty;
+            },
+          });
+          return;
+        }
+
+        if (sec.kind === 'section_primary') {
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          const tLines = doc.splitTextToSize(String(sec.title || 'Section'), innerTextW);
+          const titleBlockMm = tLines.length * titleLinePrimaryMm + titleBodyGapMm;
+          drawPartitionedBody([255, 250, 246], [255, 107, 53], {
+            titleBlockMm,
+            drawAt: (tx, ty0) => {
+              doc.setFontSize(12);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(255, 107, 53);
+              let ty = ty0;
+              tLines.forEach((ln) => {
+                doc.text(ln, tx, ty);
+                ty += titleLinePrimaryMm;
+              });
+              ty += titleBodyGapMm;
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(44, 62, 80);
+              return ty;
+            },
+          });
+          return;
+        }
+
+        if (sec.kind === 'section_secondary') {
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          const tLines = doc.splitTextToSize(String(sec.title || ''), innerTextW);
+          const titleBlockMm = tLines.length * titleLineSecondaryMm + titleBodyGapMm;
+          drawPartitionedBody([252, 251, 249], [251, 146, 60], {
+            titleBlockMm,
+            drawAt: (tx, ty0) => {
+              doc.setFontSize(11);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(194, 65, 12);
+              let ty = ty0;
+              tLines.forEach((ln) => {
+                doc.text(ln, tx, ty);
+                ty += titleLineSecondaryMm;
+              });
+              ty += titleBodyGapMm;
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(44, 62, 80);
+              return ty;
+            },
+          });
+          return;
+        }
+
+        /* paragraph */
+        drawPartitionedBody([255, 255, 255], [230, 230, 230], null);
+      };
+
+      const drawSimpleBubble = (msg, roleLabel, content) => {
+        const lines = doc.splitTextToSize(content || '—', maxWidth - 20);
+        const metaHeight = msg.timestamp ? 18 : 12;
+        const bubbleHeight = Math.max(20, lines.length * lineHeightMm + 15 + metaHeight);
+
+        ensureVerticalSpace(bubbleHeight + 10);
+
+        if (msg.role === 'user') {
+          doc.setFillColor(255, 255, 255);
+          doc.rect(margin, yPosition - 5, maxWidth, bubbleHeight, 'F');
+          doc.setDrawColor(255, 107, 53);
+          doc.setLineWidth(2);
+          doc.line(margin, yPosition - 5, margin, yPosition - 5 + bubbleHeight);
+        } else {
+          doc.setFillColor(245, 245, 245);
+          doc.rect(margin, yPosition - 5, maxWidth, bubbleHeight, 'F');
+        }
+
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(msg.role === 'user' ? 51 : 0, msg.role === 'user' ? 51 : 0, msg.role === 'user' ? 51 : 0);
+        doc.text(`${roleLabel}:`, margin + 5, yPosition + 5);
+        yPosition += 12;
+
+        if (msg.timestamp) {
+          doc.setFontSize(8);
+          doc.setFont(undefined, 'normal');
+          doc.setTextColor(120, 120, 120);
+          doc.text(formatDate(msg.timestamp), margin + 5, yPosition);
+          yPosition += 6;
+        }
+
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+
+        for (const line of lines) {
+          ensureVerticalSpace(lineHeightMm + 2);
+          doc.text(line, margin + 5, yPosition);
+          yPosition += lineHeightMm;
+        }
+
+        yPosition += 15;
+      };
+
+      for (const msg of conversationMessages) {
+        const roleLabel = msg.role === 'user'
+          ? 'You'
+          : (String(msg.message_type || '').toLowerCase() === 'clarification' ? 'AstroRoshni Clarification' : 'AstroRoshni');
+
+        const plainContent = normalizePdfSourceText(msg.content)
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/\s+\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
+        const isAssistantAnswer =
+          msg.role === 'assistant' && String(msg.message_type || '').toLowerCase() !== 'clarification';
+
+        if (isAssistantAnswer) {
+          const sections = extractPdfSectionsFromMessage(msg.content);
+
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${roleLabel}:`, margin + 5, yPosition + 5);
+          yPosition += 12;
+
+          if (msg.timestamp) {
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(120, 120, 120);
+            doc.text(formatDate(msg.timestamp), margin + 5, yPosition);
+            yPosition += 8;
+            doc.setTextColor(0, 0, 0);
+          } else {
+            yPosition += 2;
+          }
+
+          sections.forEach((sec) => drawSectionCard(sec));
+          yPosition += 6;
+          continue;
+        }
+
+        drawSimpleBubble(msg, roleLabel, plainContent);
+      }
+
+      const primaryQuestion =
+        messages.find((m) => String(m?.sender || '').toLowerCase() === 'user')?.content || 'chat';
+      const safeStem = htmlToPlainText(primaryQuestion)
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 48) || 'chat';
+
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - 40, pageHeight - 10);
+      }
+
+      doc.save(`astroroshni_chat_${safeStem}.pdf`);
+    } finally {
+      setPdfMessageId(null);
+    }
   };
 
   const formatTimeIST = (dateStr) => {
@@ -365,15 +1373,32 @@ const AdminChatHistory = () => {
   }, [selectedSession]);
 
   const msgCount = selectedSession?.pagination?.total ?? selectedSession?.messages?.length ?? 0;
-  const displayedMessages = useMemo(() => {
+  const displayedBlocks = useMemo(() => {
     const base = Array.isArray(selectedSession?.messages) ? selectedSession.messages : [];
-    if (!base.length) return base;
-    // User-thread: newest Q&A turns first; within each turn, user then assistant (chronological).
+    if (!base.length) return [];
     if (selectedSession?.view_mode === 'user_thread') {
-      return orderUserThreadMessagesNewestTurnsFirst(base);
+      return buildUserThreadBlocksNewestFirst(base);
     }
-    return base;
+    return [base];
   }, [selectedSession]);
+
+  const displayedMessages = useMemo(() => displayedBlocks.flat(), [displayedBlocks]);
+
+  const exportableAssistantMessageIds = useMemo(() => {
+    const map = new Map();
+    displayedBlocks.forEach((block) => {
+      const exportAnchor = [...block].reverse().find(isAssistantAnswer);
+      if (exportAnchor?.message_id) {
+        map.set(Number(exportAnchor.message_id), block);
+      }
+    });
+    return map;
+  }, [displayedBlocks]);
+
+  const latestExportBlock = useMemo(() => {
+    if (!displayedBlocks.length) return null;
+    return displayedBlocks.find((block) => block.some(isAssistantAnswer)) || null;
+  }, [displayedBlocks]);
 
   return (
     <>
@@ -542,6 +1567,17 @@ const AdminChatHistory = () => {
                         USD/INR {Number(selectedSession.cost_summary.usd_to_inr_rate).toFixed(2)}
                       </span>
                     )}
+                    {selectedSession?.view_mode === 'user_thread' && latestExportBlock && (
+                      <button
+                        type="button"
+                        className="message-branch-btn"
+                        onClick={() => downloadConversationPdf(latestExportBlock, selectedSession, 'latest-thread')}
+                        disabled={pdfMessageId === 'latest-thread'}
+                        title="Download the latest visible question-answer flow as PDF"
+                      >
+                        {pdfMessageId === 'latest-thread' ? 'Generating PDF…' : 'Download Latest PDF'}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <button
@@ -618,6 +1654,10 @@ const AdminChatHistory = () => {
                       : message.sender === 'assistant'
                         ? 'assistant'
                         : 'assistant';
+                  const exportBlock = Number.isFinite(Number(message.message_id))
+                    ? exportableAssistantMessageIds.get(Number(message.message_id))
+                    : null;
+                  const showPdfButton = role === 'assistant' && Array.isArray(exportBlock) && exportBlock.length > 0;
                   const isInstantUsage = message.parallel_llm_usage?.kind === 'instant_chat_usage';
                   const answerModelLabel =
                     role === 'assistant' ? formatLlmLabel(selectedSession || {}) : null;
@@ -645,6 +1685,17 @@ const AdminChatHistory = () => {
                           title="Open specialist branch outputs"
                         >
                           Branch analysis
+                        </button>
+                      )}
+                      {showPdfButton && (
+                        <button
+                          type="button"
+                          className="message-branch-btn"
+                          onClick={() => downloadConversationPdf(exportBlock, selectedSession, message.message_id)}
+                          title="Download this question-answer flow as PDF"
+                          disabled={pdfMessageId === message.message_id}
+                        >
+                          {pdfMessageId === message.message_id ? 'Generating PDF…' : 'Download PDF'}
                         </button>
                       )}
                       {answerModelLabel && (

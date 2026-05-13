@@ -10,14 +10,19 @@ import {
   Platform,
   StatusBar,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { supportAPI } from '../../services/api';
 import { sanitizeSupportBody, sanitizeSupportSubject } from '../../utils/supportText';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 
 function formatApiError(e, t) {
   const d = e.response?.data?.detail;
@@ -47,6 +52,7 @@ export default function SupportScreen({ navigation }) {
   const [ticketMeta, setTicketMeta] = useState(null);
   const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState('');
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState(null);
 
   const loadTickets = useCallback(async () => {
     setError('');
@@ -171,6 +177,44 @@ export default function SupportScreen({ navigation }) {
     }
   };
 
+  const downloadAttachment = async (attachment) => {
+    if (!attachment?.id) return;
+    setDownloadingAttachmentId(attachment.id);
+    try {
+      const token = (await AsyncStorage.getItem('authToken')) || '';
+      if (!token) {
+        throw new Error('Please log in again to download this file.');
+      }
+      const filename = attachment.filename || `support_attachment_${attachment.id}.pdf`;
+      const targetPath = `${FileSystem.cacheDirectory}${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const url = `${API_BASE_URL}${getEndpoint(`/support/attachments/${attachment.id}/download`)}`;
+      const { status, uri } = await FileSystem.downloadAsync(url, targetPath, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-AstroRoshni-Authorization': `Bearer ${token}`,
+          Accept: 'application/pdf',
+        },
+      });
+      if (status < 200 || status >= 300) {
+        throw new Error('Download failed');
+      }
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Downloaded', 'PDF downloaded successfully.');
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: attachment.mime_type || 'application/pdf',
+        dialogTitle: filename,
+        UTI: 'com.adobe.pdf',
+      });
+    } catch (e) {
+      Alert.alert('Download failed', e?.message || 'Could not download the attachment.');
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  };
+
   const bg = theme === 'dark' ? '#020617' : colors.background;
   const cardBg = theme === 'dark' ? 'rgba(15,23,42,0.95)' : colors.surface;
   const borderCol = colors.border;
@@ -285,7 +329,36 @@ export default function SupportScreen({ navigation }) {
               <Text style={[styles.bubbleMeta, { color: colors.textSecondary }]}>
                 {m.author_role === 'admin' ? t('support.roleAdmin') : t('support.roleYou')} · {m.created_at || ''}
               </Text>
-              <Text style={[styles.bubbleBody, { color: colors.text }]}>{m.body}</Text>
+              {m.body ? <Text style={[styles.bubbleBody, { color: colors.text }]}>{m.body}</Text> : null}
+              {Array.isArray(m.attachments) && m.attachments.length > 0 ? (
+                <View style={styles.attachmentList}>
+                  {m.attachments.map((att) => {
+                    const isDownloading = downloadingAttachmentId === att.id;
+                    return (
+                      <TouchableOpacity
+                        key={att.id}
+                        style={[styles.attachmentCard, { borderColor: borderCol, backgroundColor: cardBg }]}
+                        onPress={() => downloadAttachment(att)}
+                        disabled={isDownloading}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.attachmentName, { color: colors.text }]} numberOfLines={1}>
+                            {att.filename}
+                          </Text>
+                          <Text style={[styles.attachmentMeta, { color: colors.textSecondary }]}>
+                            PDF · {Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB
+                          </Text>
+                        </View>
+                        {isDownloading ? (
+                          <ActivityIndicator size="small" color="#f97316" />
+                        ) : (
+                          <Ionicons name="download-outline" size={20} color={colors.text} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
             </View>
           ))}
           {ticketMeta.status !== 'closed' ? (
@@ -412,4 +485,16 @@ const styles = StyleSheet.create({
   bubble: { borderRadius: 10, padding: 12, marginBottom: 10 },
   bubbleMeta: { fontSize: 11, marginBottom: 6 },
   bubbleBody: { fontSize: 15, lineHeight: 22 },
+  attachmentList: { marginTop: 10, gap: 8 },
+  attachmentCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  attachmentName: { fontSize: 14, fontWeight: '600' },
+  attachmentMeta: { fontSize: 12, marginTop: 2 },
 });

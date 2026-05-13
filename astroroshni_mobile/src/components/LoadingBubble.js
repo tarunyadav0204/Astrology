@@ -5,7 +5,13 @@ import NorthIndianChart from './Chart/NorthIndianChart';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSeconds = 80 }) => {
+const LoadingBubble = ({
+    chartInsights,
+    chartData,
+    scrollViewRef,
+    expectedWaitSeconds = 80,
+    startedAt = null,
+}) => {
     const { t } = useTranslation();
     const { theme, colors } = useTheme();
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -23,8 +29,19 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef, expectedWaitSe
     const hasChartData = chartData && (chartData.planets || chartData.houses);
 
     useEffect(() => {
-        setRemainingSeconds(Math.max(0, Number(expectedWaitSeconds) || 0));
-    }, [expectedWaitSeconds]);
+        const total = Math.max(0, Number(expectedWaitSeconds) || 0);
+        if (!startedAt) {
+            setRemainingSeconds(total);
+            return;
+        }
+        const startedMillis = new Date(startedAt).getTime();
+        if (!Number.isFinite(startedMillis)) {
+            setRemainingSeconds(total);
+            return;
+        }
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedMillis) / 1000));
+        setRemainingSeconds(Math.max(0, total - elapsedSeconds));
+    }, [expectedWaitSeconds, startedAt]);
 
     useEffect(() => {
         if (!remainingSeconds) return;

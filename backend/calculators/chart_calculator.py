@@ -382,7 +382,7 @@ class ChartCalculator(BaseCalculator):
         is_odd_sign = (sign + 1) % 2 != 0
         
         if 0 <= degree < 6:
-            return "Bal (Infant - 25% Strength)" if is_odd_sign else "Mrit (Dead - 0% Strength)"
+            return "Bal (Infant - 25% Strength)" if is_odd_sign else "Mrit (Very Weak Baladi Avastha)"
         elif 6 <= degree < 12:
             return "Kumar (Teen - 50% Strength)" if is_odd_sign else "Vriddha (Old - Minimal Strength)"
         elif 12 <= degree < 18:
@@ -390,6 +390,6 @@ class ChartCalculator(BaseCalculator):
         elif 18 <= degree < 24:
             return "Vriddha (Old - Minimal Strength)" if is_odd_sign else "Kumar (Teen - 50% Strength)"
         elif 24 <= degree < 30:
-            return "Mrit (Dead - 0% Strength)" if is_odd_sign else "Bal (Infant - 25% Strength)"
+            return "Mrit (Very Weak Baladi Avastha)" if is_odd_sign else "Bal (Infant - 25% Strength)"
         
         return "Unknown"

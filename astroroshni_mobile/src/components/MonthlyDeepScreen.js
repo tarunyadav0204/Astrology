@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { chatAPI, creditAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
@@ -25,6 +26,7 @@ import { trackEvent } from '../utils/analytics';
 import { userFacingTimelineError } from '../utils/timelineUserErrors';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHLY_DEEP_PENDING_KEY = 'monthlyDeepScreenPendingJob';
 
 function getMonthName(monthId) {
   return MONTH_NAMES[monthId - 1] || `Month ${monthId}`;
@@ -47,7 +49,9 @@ export default function MonthlyDeepScreen() {
   const [generating, setGenerating] = useState(false);
   const [creditCost, setCreditCost] = useState(100);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const loadingIntervalRef = useRef(null);
+  const progressIntervalRef = useRef(null);
   const deepPollRef = useRef(null);
   const deepTimeoutRef = useRef(null);
   const TIMELINE_POLL_MS = 3000;
@@ -56,6 +60,63 @@ export default function MonthlyDeepScreen() {
   const [showGenerateButton, setShowGenerateButton] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const isMountedRef = useRef(true);
+  const initLoadKeyRef = useRef(null);
+  const creditsModalInFlightRef = useRef(false);
+
+  const loadingMessages = [
+    { icon: '🌟', text: t('monthlyDeepScreen.loadingAnalyzing', 'Analyzing this month in depth...') },
+    { icon: '🔮', text: t('monthlyDeepScreen.loadingMapping', 'Mapping every trigger and manifestation...') },
+    { icon: '✨', text: t('monthlyDeepScreen.loadingExamining', 'Examining all house activations...') },
+  ];
+
+  const savePendingDeepMonthJob = useCallback(async (payload) => {
+    try {
+      await AsyncStorage.setItem(MONTHLY_DEEP_PENDING_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('[MonthlyDeepScreen] save pending job', error?.message || error);
+    }
+  }, []);
+
+  const loadPendingDeepMonthJob = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(MONTHLY_DEEP_PENDING_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.warn('[MonthlyDeepScreen] load pending job', error?.message || error);
+      return null;
+    }
+  }, []);
+
+  const clearPendingDeepMonthJob = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(MONTHLY_DEEP_PENDING_KEY);
+    } catch (error) {
+      console.warn('[MonthlyDeepScreen] clear pending job', error?.message || error);
+    }
+  }, []);
+
+  const startMonthlyLoadingUi = useCallback((startedAtInput = new Date().toISOString()) => {
+    const startedAtMs = new Date(startedAtInput || Date.now()).getTime();
+    const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
+    const elapsedMs = Math.max(0, Date.now() - safeStartedAt);
+    const initialMessageIndex = Math.floor(elapsedMs / 3000) % loadingMessages.length;
+    setGenerating(true);
+    setLoadingMessageIndex(initialMessageIndex);
+    setLoadingProgress(elapsedMs <= 100000 ? (elapsedMs / 100000) * 90 : -1);
+    loadingIntervalRef.current = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 3000);
+    let elapsed = elapsedMs;
+    progressIntervalRef.current = setInterval(() => {
+      elapsed += 100;
+      if (elapsed <= 100000) {
+        setLoadingProgress((elapsed / 100000) * 90);
+      } else {
+        setLoadingProgress(-1);
+      }
+    }, 100);
+  }, [loadingMessages.length]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -77,6 +138,10 @@ export default function MonthlyDeepScreen() {
       if (loadingIntervalRef.current) {
         clearInterval(loadingIntervalRef.current);
         loadingIntervalRef.current = null;
+      }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
     };
   }, []);
@@ -103,6 +168,10 @@ export default function MonthlyDeepScreen() {
       clearInterval(loadingIntervalRef.current);
       loadingIntervalRef.current = null;
     }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
     setGenerating(false);
   }, []);
 
@@ -126,6 +195,9 @@ export default function MonthlyDeepScreen() {
       if (res.data?.cached && res.data?.data) {
         if (isMountedRef.current) {
           setMonthlyData(res.data.data);
+          setShowMonthlyCreditsModal(false);
+          setShowGenerateButton(false);
+          await clearPendingDeepMonthJob();
           trackEvent('monthly_timeline_delivered', {
             year: Number(year),
             month: Number(month),
@@ -140,9 +212,214 @@ export default function MonthlyDeepScreen() {
       console.warn('[MonthlyDeepScreen] cache recovery', e?.message || e);
     }
     return false;
-  }, [year, month, fetchBalance, getBirthDetails]);
+  }, [clearPendingDeepMonthJob, year, month, fetchBalance, getBirthDetails]);
+
+  const attachDeepMonthPolling = useCallback((jobId, startedAt = new Date().toISOString()) => {
+    let outcomeHandled = false;
+    const takeOutcome = () => {
+      if (outcomeHandled) return false;
+      outcomeHandled = true;
+      return true;
+    };
+
+    const finishSuccess = async (data, mode = 'poll_completed') => {
+      if (!takeOutcome()) return;
+      stopDeepMonthJob();
+      setMonthlyData(data);
+      await clearPendingDeepMonthJob();
+      trackEvent('monthly_timeline_delivered', {
+        year: Number(year),
+        month: Number(month),
+        source: 'monthly_deep_screen',
+        mode,
+      });
+      fetchBalance();
+    };
+
+    const onPollFailure = async (message) => {
+      if (!takeOutcome()) return;
+      stopDeepMonthJob();
+      await clearPendingDeepMonthJob();
+      const recovered = await tryLoadCachedDeepMonth();
+      if (recovered) {
+        Alert.alert(
+          t('monthlyDeepScreen.recoveredTitle', 'Deep dive ready'),
+          t(
+            'monthlyDeepScreen.recoveredBody',
+            'Loaded your saved analysis from the server.'
+          )
+        );
+        return;
+      }
+      revealEmptyStateActions();
+      const raw = message != null ? String(message).trim() : '';
+      const safeBody = raw
+        ? userFacingTimelineError(raw)
+        : t(
+            'monthlyDeepScreen.stoppedBody',
+            'The analysis may still be running. Use “Load saved”, or wait and open this screen again.'
+          );
+      Alert.alert(
+        t('monthlyDeepScreen.stoppedTitle', 'Could not finish loading'),
+        safeBody,
+        [
+          {
+            text: t('eventScreen.tryLoadSaved', 'Load saved'),
+            onPress: async () => {
+              const ok = await tryLoadCachedDeepMonth();
+              if (!ok) {
+                Alert.alert(
+                  t('eventScreen.noSavedYetTitle', 'No saved result yet'),
+                  t(
+                    'eventScreen.noSavedYetBody',
+                    'Try again in a little while if the analysis is still running.'
+                  )
+                );
+              }
+            },
+          },
+          {
+            text: t('common.tryAgain', 'Try again'),
+            onPress: () => {
+              revealEmptyStateActions();
+            },
+          },
+          { text: t('common.ok', 'OK'), style: 'cancel' },
+        ]
+      );
+    };
+
+    deepPollRef.current = setInterval(async () => {
+      try {
+        const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
+        const status = statusResponse.data.status;
+        if (status === 'completed' && statusResponse.data.data) {
+          await finishSuccess(statusResponse.data.data);
+        } else if (status === 'failed') {
+          await onPollFailure(statusResponse.data.error || 'Analysis failed');
+        }
+      } catch (e) {
+        await onPollFailure(
+          e?.response?.data?.detail ||
+            e?.message ||
+            'Connection error while checking status.'
+        );
+      }
+    }, TIMELINE_POLL_MS);
+
+    const elapsedMs = Math.max(0, Date.now() - new Date(startedAt || Date.now()).getTime());
+    const remainingMs = Math.max(5000, TIMELINE_MAX_WAIT_MS - elapsedMs);
+    deepTimeoutRef.current = setTimeout(async () => {
+      if (deepPollRef.current) {
+        clearInterval(deepPollRef.current);
+        deepPollRef.current = null;
+      }
+      deepTimeoutRef.current = null;
+      if (outcomeHandled) return;
+      try {
+        const last = await chatAPI.getMonthlyEventsStatus(jobId);
+        if (last.data?.status === 'completed' && last.data?.data) {
+          await finishSuccess(last.data.data);
+          return;
+        }
+      } catch (e) {
+        console.warn('[MonthlyDeepScreen] final status check', e?.message || e);
+      }
+      const recovered = await tryLoadCachedDeepMonth();
+      if (recovered) {
+        if (!takeOutcome()) return;
+        stopDeepMonthJob();
+        await clearPendingDeepMonthJob();
+        Alert.alert(
+          t('monthlyDeepScreen.recoveredTitle', 'Deep dive ready'),
+          t(
+            'monthlyDeepScreen.longRunBody',
+            'Your analysis finished — loaded from saved results.'
+          )
+        );
+        return;
+      }
+      if (!takeOutcome()) return;
+      stopDeepMonthJob();
+      await clearPendingDeepMonthJob();
+      revealEmptyStateActions();
+      Alert.alert(
+        t('monthlyDeepScreen.timeoutTitle', 'Still working or interrupted'),
+        t(
+          'monthlyDeepScreen.timeoutBody',
+          'We stopped waiting after 15 minutes. If you were charged, your result is usually saved — tap “Load saved”. Otherwise tap “Try again” to run the credit step and generate again.'
+        ),
+        [
+          {
+            text: t('eventScreen.tryLoadSaved', 'Load saved'),
+            onPress: async () => {
+              const ok = await tryLoadCachedDeepMonth();
+              if (!ok) {
+                Alert.alert(
+                  t('eventScreen.noSavedYetTitle', 'No saved result yet'),
+                  t(
+                    'eventScreen.noSavedYetBody',
+                    'Try again in a little while if the analysis is still running.'
+                  )
+                );
+              }
+            },
+          },
+          {
+            text: t('common.tryAgain', 'Try again'),
+            onPress: () => {
+              revealEmptyStateActions();
+            },
+          },
+          { text: t('common.ok', 'OK'), style: 'cancel' },
+        ]
+      );
+    }, remainingMs);
+  }, [
+    TIMELINE_MAX_WAIT_MS,
+    TIMELINE_POLL_MS,
+    clearPendingDeepMonthJob,
+    fetchBalance,
+    month,
+    revealEmptyStateActions,
+    stopDeepMonthJob,
+    t,
+    tryLoadCachedDeepMonth,
+    year,
+  ]);
+
+  const resumePendingDeepMonthJob = useCallback(async (pending, birthDataOverride = null) => {
+    const activeBirthData = birthDataOverride || birthData;
+    if (
+      !pending ||
+      !pending.jobId ||
+      !activeBirthData?.id ||
+      Number(pending.birthChartId) !== Number(activeBirthData.id) ||
+      Number(pending.year) !== Number(year) ||
+      Number(pending.month) !== Number(month)
+    ) {
+      return false;
+    }
+    stopDeepMonthJob();
+    setShowMonthlyCreditsModal(false);
+    setShowGenerateButton(false);
+    startMonthlyLoadingUi(pending.startedAt);
+    attachDeepMonthPolling(pending.jobId, pending.startedAt);
+    return true;
+  }, [
+    attachDeepMonthPolling,
+    birthData,
+    month,
+    startMonthlyLoadingUi,
+    stopDeepMonthJob,
+    year,
+  ]);
 
   const openCreditsModal = useCallback(async () => {
+    if (creditsModalInFlightRef.current || showMonthlyCreditsModal) {
+      return true;
+    }
+    creditsModalInFlightRef.current = true;
     try {
       await fetchBalance();
       const balanceRes = await creditAPI.getBalance();
@@ -171,8 +448,10 @@ export default function MonthlyDeepScreen() {
         setShowGenerateButton(true);
       }
       return false;
+    } finally {
+      creditsModalInFlightRef.current = false;
     }
-  }, [fetchBalance, creditCost, creditAPI, navigation]);
+  }, [fetchBalance, creditCost, navigation, showMonthlyCreditsModal]);
 
   useEffect(() => {
     pricingAPI.getPricing().then((res) => {
@@ -180,12 +459,6 @@ export default function MonthlyDeepScreen() {
       if (cost != null) setCreditCost(Number(cost));
     }).catch(() => {});
   }, []);
-
-  const loadingMessages = [
-    { icon: '🌟', text: t('monthlyDeepScreen.loadingAnalyzing', 'Analyzing this month in depth...') },
-    { icon: '🔮', text: t('monthlyDeepScreen.loadingMapping', 'Mapping every trigger and manifestation...') },
-    { icon: '✨', text: t('monthlyDeepScreen.loadingExamining', 'Examining all house activations...') },
-  ];
 
   const fetchDeepMonth = useCallback(async () => {
     if (!birthData?.id || year == null || month == null) return;
@@ -195,10 +468,8 @@ export default function MonthlyDeepScreen() {
       source: 'monthly_deep_screen',
     });
     stopDeepMonthJob();
-    setGenerating(true);
-    loadingIntervalRef.current = setInterval(() => {
-      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
-    }, 3000);
+    const startedAt = new Date().toISOString();
+    startMonthlyLoadingUi(startedAt);
     try {
       const startResponse = await chatAPI.getMonthlyEvents({
         ...birthData,
@@ -208,6 +479,7 @@ export default function MonthlyDeepScreen() {
       });
       if (startResponse.data?.data && !startResponse.data?.job_id) {
         setMonthlyData(startResponse.data.data);
+        await clearPendingDeepMonthJob();
         trackEvent('monthly_timeline_delivered', {
           year: Number(year),
           month: Number(month),
@@ -220,162 +492,16 @@ export default function MonthlyDeepScreen() {
       }
       const jobId = startResponse.data?.job_id;
       if (!jobId) throw new Error('No job_id received.');
-
-      let outcomeHandled = false;
-      const takeOutcome = () => {
-        if (outcomeHandled) return false;
-        outcomeHandled = true;
-        return true;
-      };
-
-      const finishSuccess = (data) => {
-        if (!takeOutcome()) return;
-        stopDeepMonthJob();
-        setMonthlyData(data);
-        trackEvent('monthly_timeline_delivered', {
-          year: Number(year),
-          month: Number(month),
-          source: 'monthly_deep_screen',
-          mode: 'poll_completed',
-        });
-        fetchBalance();
-      };
-
-      const onPollFailure = async (message) => {
-        if (!takeOutcome()) return;
-        stopDeepMonthJob();
-        const recovered = await tryLoadCachedDeepMonth();
-        if (recovered) {
-          Alert.alert(
-            t('monthlyDeepScreen.recoveredTitle', 'Deep dive ready'),
-            t(
-              'monthlyDeepScreen.recoveredBody',
-              'Loaded your saved analysis from the server.'
-            )
-          );
-          return;
-        }
-        revealEmptyStateActions();
-        const raw = message != null ? String(message).trim() : '';
-        const safeBody = raw
-          ? userFacingTimelineError(raw)
-          : t(
-              'monthlyDeepScreen.stoppedBody',
-              'The analysis may still be running. Use “Load saved”, or wait and open this screen again.'
-            );
-        Alert.alert(
-          t('monthlyDeepScreen.stoppedTitle', 'Could not finish loading'),
-          safeBody,
-          [
-            {
-              text: t('eventScreen.tryLoadSaved', 'Load saved'),
-              onPress: async () => {
-                const ok = await tryLoadCachedDeepMonth();
-                if (!ok) {
-                  Alert.alert(
-                    t('eventScreen.noSavedYetTitle', 'No saved result yet'),
-                    t(
-                      'eventScreen.noSavedYetBody',
-                      'Try again in a little while if the analysis is still running.'
-                    )
-                  );
-                }
-              },
-            },
-            {
-              text: t('common.tryAgain', 'Try again'),
-              onPress: () => {
-                openCreditsModal();
-              },
-            },
-            { text: t('common.ok', 'OK'), style: 'cancel' },
-          ]
-        );
-      };
-
-      deepPollRef.current = setInterval(async () => {
-        try {
-          const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
-          const status = statusResponse.data.status;
-          if (status === 'completed' && statusResponse.data.data) {
-            finishSuccess(statusResponse.data.data);
-          } else if (status === 'failed') {
-            await onPollFailure(statusResponse.data.error || 'Analysis failed');
-          }
-        } catch (e) {
-          await onPollFailure(
-            e?.response?.data?.detail ||
-              e?.message ||
-              'Connection error while checking status.'
-          );
-        }
-      }, TIMELINE_POLL_MS);
-
-      deepTimeoutRef.current = setTimeout(async () => {
-        if (deepPollRef.current) {
-          clearInterval(deepPollRef.current);
-          deepPollRef.current = null;
-        }
-        deepTimeoutRef.current = null;
-        if (outcomeHandled) return;
-        try {
-          const last = await chatAPI.getMonthlyEventsStatus(jobId);
-          if (last.data?.status === 'completed' && last.data?.data) {
-            finishSuccess(last.data.data);
-            return;
-          }
-        } catch (e) {
-          console.warn('[MonthlyDeepScreen] final status check', e?.message || e);
-        }
-        const recovered = await tryLoadCachedDeepMonth();
-        if (recovered) {
-          if (!takeOutcome()) return;
-          stopDeepMonthJob();
-          Alert.alert(
-            t('monthlyDeepScreen.recoveredTitle', 'Deep dive ready'),
-            t(
-              'monthlyDeepScreen.longRunBody',
-              'Your analysis finished — loaded from saved results.'
-            )
-          );
-          return;
-        }
-        if (!takeOutcome()) return;
-        stopDeepMonthJob();
-        revealEmptyStateActions();
-        Alert.alert(
-          t('monthlyDeepScreen.timeoutTitle', 'Still working or interrupted'),
-          t(
-            'monthlyDeepScreen.timeoutBody',
-            'We stopped waiting after 15 minutes. If you were charged, your result is usually saved — tap “Load saved”. Otherwise tap “Try again” to run the credit step and generate again.'
-          ),
-          [
-            {
-              text: t('eventScreen.tryLoadSaved', 'Load saved'),
-              onPress: async () => {
-                const ok = await tryLoadCachedDeepMonth();
-                if (!ok) {
-                  Alert.alert(
-                    t('eventScreen.noSavedYetTitle', 'No saved result yet'),
-                    t(
-                      'eventScreen.noSavedYetBody',
-                      'Try again in a little while if the analysis is still running.'
-                    )
-                  );
-                }
-              },
-            },
-            {
-              text: t('common.tryAgain', 'Try again'),
-              onPress: () => {
-                openCreditsModal();
-              },
-            },
-            { text: t('common.ok', 'OK'), style: 'cancel' },
-          ]
-        );
-      }, TIMELINE_MAX_WAIT_MS);
+      await savePendingDeepMonthJob({
+        jobId,
+        birthChartId: Number(birthData.id),
+        year: Number(year),
+        month: Number(month),
+        startedAt,
+      });
+      attachDeepMonthPolling(jobId, startedAt);
     } catch (e) {
+      await clearPendingDeepMonthJob();
       stopDeepMonthJob();
       revealEmptyStateActions();
       if (e.response?.status === 402) {
@@ -389,16 +515,15 @@ export default function MonthlyDeepScreen() {
     }
   }, [
     birthData,
+    clearPendingDeepMonthJob,
     year,
     month,
-    fetchBalance,
-    navigation,
-    loadingMessages.length,
-    stopDeepMonthJob,
-    tryLoadCachedDeepMonth,
-    revealEmptyStateActions,
+    attachDeepMonthPolling,
     openCreditsModal,
-    t,
+    revealEmptyStateActions,
+    savePendingDeepMonthJob,
+    startMonthlyLoadingUi,
+    stopDeepMonthJob,
   ]);
 
   useEffect(() => {
@@ -415,17 +540,31 @@ export default function MonthlyDeepScreen() {
         setLoading(false);
         return;
       }
+      const initKey = `${bd.id || 'nochart'}:${year}:${month}`;
+      if (initLoadKeyRef.current === initKey) {
+        setLoading(false);
+        return;
+      }
+      initLoadKeyRef.current = initKey;
       try {
-        const cacheRes = await chatAPI.getCachedMonthlyEvents({
-          ...bd,
-          selectedYear: year,
-          selectedMonth: month,
-          birth_chart_id: bd.id,
-        });
-        if (mounted && cacheRes.data?.cached && cacheRes.data?.data) {
-          setMonthlyData(cacheRes.data.data);
-          setShowMonthlyCreditsModal(false);
-          setShowGenerateButton(false);
+        const pending = await loadPendingDeepMonthJob();
+        const resumedPending = await resumePendingDeepMonthJob(
+          pending && pending.birthChartId
+            ? { ...pending, birthChartId: pending.birthChartId }
+            : pending,
+          bd,
+        );
+        if (resumedPending) {
+          setLoading(false);
+          return;
+        }
+
+        const recovered = await tryLoadCachedDeepMonth();
+        if (recovered) {
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
         } else {
           // Not cached: open credits modal immediately (user decides before generation).
           setMonthlyData(null);
@@ -434,11 +573,34 @@ export default function MonthlyDeepScreen() {
         }
       } catch (e) {
         console.error('Cache check failed:', e);
+        initLoadKeyRef.current = null;
       }
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [year, month, getBirthDetails, navigation, route.params]);
+  }, [year, month, getBirthDetails, loadPendingDeepMonthJob, navigation, resumePendingDeepMonthJob, route.params, tryLoadCachedDeepMonth]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      (async () => {
+        const pending = await loadPendingDeepMonthJob();
+        if (monthlyData?.monthly_predictions?.length || generating) {
+          return;
+        }
+        await resumePendingDeepMonthJob(pending);
+      })();
+    });
+    return unsubscribe;
+  }, [
+    birthData,
+    generating,
+    loadPendingDeepMonthJob,
+    month,
+    monthlyData,
+    navigation,
+    resumePendingDeepMonthJob,
+    year,
+  ]);
 
   const handleGenerate = async () => {
     await openCreditsModal();
@@ -549,6 +711,20 @@ export default function MonthlyDeepScreen() {
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
             <Text style={[styles.loadingText, { color: colors.text }]}>{loadingMessages[loadingMessageIndex].text}</Text>
+            {loadingProgress >= 0 ? (
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBarTrack, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
+                  <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.primary }]} />
+                </View>
+                <Text style={[styles.progressPercentText, { color: colors.primary }]}>
+                  {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : t('eventScreen.almostThere', 'Almost there...')}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.takingLongerText, { color: colors.textSecondary }]}>
+                {t('eventScreen.takingLonger', 'Taking longer than usual...')}
+              </Text>
+            )}
           </View>
         ) : singleMonth ? (
           <ScrollView
@@ -635,6 +811,17 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 },
   loadingIcon: { fontSize: 32 },
   loadingText: { fontSize: 16 },
+  progressBarContainer: { width: '100%', marginTop: 20, alignItems: 'center' },
+  progressBarTrack: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  progressBarFill: { height: '100%', borderRadius: 4 },
+  progressPercentText: { marginTop: 10, fontSize: 13, fontWeight: '700' },
+  takingLongerText: { marginTop: 12, fontSize: 13, textAlign: 'center' },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 32 },
   emptyContainer: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },

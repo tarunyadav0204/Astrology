@@ -6,10 +6,13 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 from datetime import date
+from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
@@ -30,6 +33,8 @@ VALID_STATUSES = frozenset({"open", "pending_user", "resolved", "closed"})
 USER_SOURCES = frozenset({"web", "ios", "android"})
 
 _TICKETS_TABLE_READY = False
+SUPPORT_ATTACHMENT_DIR = Path(os.getenv("SUPPORT_ATTACHMENT_DIR") or Path(__file__).resolve().parent / "storage" / "support_attachments")
+SUPPORT_ATTACHMENT_MAX_BYTES = int(os.getenv("SUPPORT_ATTACHMENT_MAX_BYTES") or str(15 * 1024 * 1024))
 
 
 def _ensure_tables(conn) -> None:
@@ -85,6 +90,31 @@ def _ensure_tables(conn) -> None:
         ON support_messages (ticket_id, created_at)
         """,
     )
+    execute(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS support_message_attachments (
+            id SERIAL PRIMARY KEY,
+            ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+            message_id INTEGER NOT NULL REFERENCES support_messages(id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            storage_path TEXT NOT NULL,
+            size_bytes BIGINT NOT NULL DEFAULT 0,
+            uploaded_by_role TEXT NOT NULL,
+            uploaded_by_userid INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+    )
+    execute(
+        conn,
+        """
+        CREATE INDEX IF NOT EXISTS idx_support_attachments_ticket_message
+        ON support_message_attachments (ticket_id, message_id, created_at)
+        """,
+    )
+    SUPPORT_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
     conn.commit()
     _TICKETS_TABLE_READY = True
 
@@ -279,6 +309,71 @@ def _notify_ticket_owner_support_reply(owner_userid: int, ticket_id: int, reply_
         logger.exception("Support reply notify failed for user %s ticket %s: %s", owner_userid, ticket_id, e)
 
 
+def _sanitize_attachment_filename(name: str) -> str:
+    raw = os.path.basename((name or "").strip()) or "attachment.pdf"
+    safe = "".join(ch if ch.isalnum() or ch in ("-", "_", ".", " ") else "_" for ch in raw).strip()
+    if not safe.lower().endswith(".pdf"):
+        safe = f"{safe}.pdf"
+    return safe[:180] or "attachment.pdf"
+
+
+def _attachment_download_path(attachment_id: int) -> str:
+    return f"{PUBLIC_WEB_BASE_URL}/api/support/attachments/{attachment_id}/download"
+
+
+async def _store_pdf_attachment(upload: UploadFile) -> Tuple[str, str, int]:
+    filename = _sanitize_attachment_filename(upload.filename or "attachment.pdf")
+    mime_type = (upload.content_type or "").strip().lower()
+    if mime_type and mime_type not in ("application/pdf", "application/x-pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF attachments are allowed.")
+    blob = await upload.read()
+    if not blob:
+        raise HTTPException(status_code=400, detail="Attachment is empty.")
+    if len(blob) > SUPPORT_ATTACHMENT_MAX_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"PDF is too large. Max allowed size is {SUPPORT_ATTACHMENT_MAX_BYTES // (1024 * 1024)} MB.",
+        )
+    if not blob.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Only valid PDF files are allowed.")
+
+    ext = ".pdf"
+    stored_name = f"{secrets.token_hex(16)}{ext}"
+    stored_path = SUPPORT_ATTACHMENT_DIR / stored_name
+    stored_path.write_bytes(blob)
+    return filename, str(stored_path), len(blob)
+
+
+def _fetch_ticket_attachment_rows(conn, ticket_id: int) -> dict:
+    cur = execute(
+        conn,
+        """
+        SELECT id, message_id, filename, mime_type, size_bytes, uploaded_by_role, uploaded_by_userid, created_at
+        FROM support_message_attachments
+        WHERE ticket_id = %s
+        ORDER BY created_at ASC, id ASC
+        """,
+        (ticket_id,),
+    )
+    rows = cur.fetchall() or []
+    out = {}
+    for r in rows:
+        msg_id = int(r[1])
+        out.setdefault(msg_id, []).append(
+            {
+                "id": r[0],
+                "filename": r[2],
+                "mime_type": r[3],
+                "size_bytes": int(r[4] or 0),
+                "uploaded_by_role": r[5],
+                "uploaded_by_userid": r[6],
+                "created_at": r[7].isoformat() if r[7] else None,
+                "download_url": _attachment_download_path(int(r[0])),
+            }
+        )
+    return out
+
+
 def _rate_limit_new_tickets(conn, userid: int, max_per_hour: int = 5) -> None:
     cur = execute(
         conn,
@@ -449,6 +544,7 @@ async def get_ticket_detail(ticket_id: int, current_user: User = Depends(get_cur
             (ticket_id,),
         )
         msgs = cur2.fetchall() or []
+        attachment_map = _fetch_ticket_attachment_rows(conn, ticket_id)
     messages_out = [
         {
             "id": m[0],
@@ -456,6 +552,7 @@ async def get_ticket_detail(ticket_id: int, current_user: User = Depends(get_cur
             "author_userid": m[2],
             "body": m[3],
             "created_at": m[4].isoformat() if m[4] else None,
+            "attachments": attachment_map.get(int(m[0]), []),
         }
         for m in msgs
     ]
@@ -540,6 +637,46 @@ async def post_user_message(
         message,
     )
     return {"message": "Sent"}
+
+
+@router.get("/attachments/{attachment_id}/download")
+async def download_support_attachment(
+    attachment_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    with get_conn() as conn:
+        _ensure_tables(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT
+                sma.id,
+                sma.filename,
+                sma.mime_type,
+                sma.storage_path,
+                st.userid
+            FROM support_message_attachments sma
+            INNER JOIN support_tickets st ON st.id = sma.ticket_id
+            WHERE sma.id = %s
+            """,
+            (attachment_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        owner_userid = int(row[4])
+        if current_user.role != "admin" and owner_userid != current_user.userid:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    file_path = Path(row[3])
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Attachment file missing")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=row[2] or "application/pdf",
+        filename=row[1] or "attachment.pdf",
+    )
 
 
 # --- Admin ---
@@ -634,6 +771,7 @@ async def admin_get_ticket(ticket_id: int, current_user: User = Depends(_require
             (ticket_id,),
         )
         msgs = cur2.fetchall() or []
+        attachment_map = _fetch_ticket_attachment_rows(conn, ticket_id)
     return {
         "ticket": {
             "id": t[0],
@@ -654,6 +792,7 @@ async def admin_get_ticket(ticket_id: int, current_user: User = Depends(_require
                 "author_userid": m[2],
                 "body": m[3],
                 "created_at": m[4].isoformat() if m[4] else None,
+                "attachments": attachment_map.get(int(m[0]), []),
             }
             for m in msgs
         ],
@@ -662,15 +801,31 @@ async def admin_get_ticket(ticket_id: int, current_user: User = Depends(_require
 
 @admin_router.post("/tickets/{ticket_id}/messages")
 async def admin_post_message(
-    ticket_id: int, body: AdminReplyBody, current_user: User = Depends(_require_admin)
+    ticket_id: int, request: Request, current_user: User = Depends(_require_admin)
 ):
-    message = sanitize_support_body(body.message)
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
+    content_type = (request.headers.get("content-type") or "").lower()
+    upload: Optional[UploadFile] = None
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        message = sanitize_support_body(str(form.get("message") or ""))
+        maybe_upload = form.get("attachment")
+        if maybe_upload is not None and hasattr(maybe_upload, "filename") and hasattr(maybe_upload, "read"):
+            upload = maybe_upload
+    else:
+        payload = AdminReplyBody(**(await request.json()))
+        message = sanitize_support_body(payload.message)
+
+    if not message and upload is None:
+        raise HTTPException(status_code=400, detail="Reply message or PDF attachment is required.")
 
     owner_userid: int
     owner_email: Optional[str] = None
     ticket_subject = ""
+    stored_filename: Optional[str] = None
+    stored_path: Optional[str] = None
+    stored_size = 0
+    if upload is not None:
+        stored_filename, stored_path, stored_size = await _store_pdf_attachment(upload)
     with get_conn() as conn:
         _ensure_tables(conn)
         cur = execute(
@@ -690,14 +845,41 @@ async def admin_post_message(
         ticket_subject = (row[2] or "").strip()
         raw_em = (row[3] or "").strip()
         owner_email = raw_em if raw_em else None
-        execute(
+        message_body = message or ""
+        insert_cur = execute(
             conn,
             """
             INSERT INTO support_messages (ticket_id, author_role, author_userid, body)
             VALUES (%s, 'admin', %s, %s)
+            RETURNING id
             """,
-            (ticket_id, current_user.userid, message),
+            (ticket_id, current_user.userid, message_body),
         )
+        inserted = insert_cur.fetchone()
+        if not inserted:
+            raise HTTPException(status_code=500, detail="Failed to save support reply")
+        message_id = int(inserted[0])
+        if stored_filename and stored_path:
+            execute(
+                conn,
+                """
+                INSERT INTO support_message_attachments (
+                    ticket_id, message_id, filename, mime_type, storage_path, size_bytes,
+                    uploaded_by_role, uploaded_by_userid
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'admin', %s)
+                """,
+                (
+                    ticket_id,
+                    message_id,
+                    stored_filename,
+                    "application/pdf",
+                    stored_path,
+                    stored_size,
+                    current_user.userid,
+                ),
+            )
+        preview_text = message or (f"PDF attached: {stored_filename}" if stored_filename else "")
         execute(
             conn,
             """
@@ -707,17 +889,22 @@ async def admin_post_message(
                 last_message_preview = %s
             WHERE id = %s
             """,
-            (_preview(message), ticket_id),
+            (_preview(preview_text), ticket_id),
         )
         conn.commit()
 
-    _notify_ticket_owner_support_reply(owner_userid, ticket_id, _preview(message))
+    push_preview = message or (f"Support attached {stored_filename}" if stored_filename else "Support replied")
+    email_body = message or "Support has attached a PDF to your ticket."
+    if stored_filename:
+        email_body = f"{email_body}\n\nAttached PDF: {stored_filename}"
+
+    _notify_ticket_owner_support_reply(owner_userid, ticket_id, _preview(push_preview))
     _notify_ticket_owner_email(
         owner_email,
         ticket_id,
         ticket_subject,
         "Support has replied to your ticket.",
-        message,
+        email_body,
     )
     return {"message": "Reply sent"}
 
