@@ -34,7 +34,8 @@ bash deploy.sh
 - **Skip pip when safe**: **`[skip-pip]`** in the commit message is ignored if `requirements.txt` changed or it is the first deploy.
 - **Manual deploy**: Actions → **Deploy to GCP** → **Run workflow** → enable **Force backend pip** if you need a fresh venv install without editing `requirements.txt`.
 - **systemd service** keeps backend running
-- **Logs** stored in `logs/` directory
+- **Logs** in `logs/`: `backend.log` (append), `restart.log`, `crash-snapshots.log` (last 500 lines before watchdog restart), `monitor.log`
+- Watchdog probes **`/api/keepalive`** (lightweight); deploy still verifies **`/api/health`** (includes DB)
 
 ## Services
 
@@ -50,7 +51,13 @@ sudo systemctl status astrology-app
 # View logs
 tail -f logs/backend.log
 tail -f logs/frontend.log
+tail -f logs/restart.log
+tail -f logs/crash-snapshots.log   # captured before each watchdog restart
 
 # Manual restart
 sudo systemctl restart astrology-app
+
+# Sentry (optional): add to backend/.env on the server
+# SENTRY_DSN=...  SENTRY_ENVIRONMENT=production
+# Errors include a host snapshot (RAM/CPU/disk) at event time — not continuous infra metrics.
 ```

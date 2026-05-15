@@ -282,7 +282,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       } else {
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
-        navigation.navigate('Home');
+        navigation.navigate('Home', { resetToGreeting: true });
       }
     } catch (error) {
       let errorMessage = '❌ Unable to select profile. Please try again.';

@@ -153,6 +153,10 @@
   background: linear-gradient(135deg, #1877f2, #166fe5);
 }
 
+.contact-page-social-links a:nth-child(4) {
+  background: linear-gradient(135deg, #0a66c2, #004182);
+}
+
 @media (max-width: 640px) {
   .contact-page-shell {
     padding: 96px 12px 32px;

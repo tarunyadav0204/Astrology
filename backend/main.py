@@ -284,10 +284,25 @@ def _send_otp_email(to_email: str, code: str) -> bool:
 
 def log_shutdown(reason):
     logger.critical(f"SERVER SHUTDOWN: {reason}")
+    mem_mb = None
+    conn_count = None
     try:
-        logger.critical(f"Memory: {psutil.Process().memory_info().rss / 1024 / 1024:.2f}MB")
-        logger.critical(f"Connections: {len(psutil.Process().connections())}")
-    except:
+        mem_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        logger.critical(f"Memory: {mem_mb:.2f}MB")
+        conn_count = len(psutil.Process().connections())
+        logger.critical(f"Connections: {conn_count}")
+    except Exception:
+        pass
+    try:
+        from utils.instrument_sentry import capture_message
+
+        capture_message(
+            f"SERVER SHUTDOWN: {reason}",
+            level="fatal",
+            memory_mb=mem_mb,
+            connections=conn_count,
+        )
+    except Exception:
         pass
 
 def signal_handler(signum, frame):
@@ -325,6 +340,13 @@ except ImportError:
     import subprocess
     subprocess.check_call(["pip", "install", "psutil"])
     import psutil
+
+try:
+    from utils.instrument_sentry import init_sentry
+
+    init_sentry()
+except Exception as _sentry_boot_err:
+    print(f"WARNING: Sentry bootstrap skipped: {_sentry_boot_err}")
 
 
 # App version gating – defaults from environment, but can be overridden from admin settings.
@@ -6494,16 +6516,20 @@ if __name__ == "__main__":
         # Get port from environment for GCP deployment
         port = int(os.getenv('PORT', 8001))
         
-        uvicorn.run(
-            app, 
-            host="0.0.0.0", 
+        # No limit_max_requests: recycling every N requests caused ~3h watchdog restarts
+        # when traffic hit the old cap (2000). Set UVICORN_LIMIT_MAX_REQUESTS to re-enable.
+        uvicorn_kwargs = dict(
+            host="0.0.0.0",
             port=port,
             timeout_keep_alive=300,
             timeout_graceful_shutdown=60,
-            access_log=False,  # Disable for performance in production
-            limit_max_requests=2000,
-            limit_concurrency=500  # Higher for load balancer
+            access_log=False,
+            limit_concurrency=500,
         )
+        _max_req = os.getenv("UVICORN_LIMIT_MAX_REQUESTS")
+        if _max_req:
+            uvicorn_kwargs["limit_max_requests"] = int(_max_req)
+        uvicorn.run(app, **uvicorn_kwargs)
     except Exception as e:
         log_shutdown(f"Exception: {str(e)}")
         raise

@@ -53,6 +53,9 @@ const ContactPage = () => {
               <a href="https://facebook.com/astroroshniai" target="_blank" rel="noopener noreferrer">
                 📘 Facebook
               </a>
+              <a href="https://www.linkedin.com/company/astroroshni" target="_blank" rel="noopener noreferrer">
+                💼 LinkedIn
+              </a>
             </div>
           </div>
         </div>

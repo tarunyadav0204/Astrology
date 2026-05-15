@@ -67,6 +67,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
+import { attachSentryNavigation } from './src/services/instrumentSentry';
 import {
   clearFatalRuntimeError,
   installRuntimeGuard,
@@ -506,7 +507,12 @@ export default function App() {
           <ErrorProvider>
             <CreditProvider>
               <ErrorBoundary>
-              <NavigationContainer ref={navigationRef}>
+              <NavigationContainer
+                ref={(nav) => {
+                  navigationRef.current = nav;
+                  attachSentryNavigation(nav);
+                }}
+              >
               <GlobalErrorHandler />
               <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator

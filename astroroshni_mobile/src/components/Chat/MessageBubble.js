@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../../utils/pdfGenerator';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { chatAPI } from '../../services/api';
@@ -70,25 +71,38 @@ function MessageBubble({
   const [showImageModal, setShowImageModal] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const skeletonAnim = useRef(new Animated.Value(0)).current;
+  const skeletonLoopRef = useRef(null);
+  const entryAnimRef = useRef(null);
+  const typingAnimRef = useRef(null);
+  const mountedRef = useRef(true);
   /** After seek, ignore progress updates briefly so we don't overwrite with stale position. */
   const lastSeekedAtRef = useRef(0);
   /** Set when user closes the modal while "Generating..." so we don't reopen or auto-play when the request completes. */
   const userDismissedGeneratingRef = useRef(false);
   useFocusEffect(
     React.useCallback(() => {
+      mountedRef.current = true;
       return () => {
+        mountedRef.current = false;
         userDismissedGeneratingRef.current = true;
         getTextToSpeech().stopPodcast();
         setIsPlayingPodcast(false);
         setIsPausedPodcast(false);
         setShowPodcastPlayerModal(false);
+        skeletonLoopRef.current && stopAnimationLoop(skeletonLoopRef.current);
+        typingAnimRef.current?.stop?.();
+        entryAnimRef.current?.stop?.();
+        stopAnimatedValue(skeletonAnim, 0);
+        stopAnimatedValue(fadeAnim);
+        stopAnimatedValue(slideAnim);
       };
     }, [])
   );
 
   useEffect(() => {
     if (message.summary_image && isImageLoading) {
-      Animated.loop(
+      skeletonLoopRef.current && stopAnimationLoop(skeletonLoopRef.current);
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(skeletonAnim, {
             toValue: 1,
@@ -101,9 +115,20 @@ function MessageBubble({
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      skeletonLoopRef.current = loop;
+      loop.start();
+    } else {
+      skeletonLoopRef.current && stopAnimationLoop(skeletonLoopRef.current);
+      skeletonLoopRef.current = null;
+      stopAnimatedValue(skeletonAnim, 0);
     }
-  }, [message.summary_image, isImageLoading]);
+    return () => {
+      skeletonLoopRef.current && stopAnimationLoop(skeletonLoopRef.current);
+      skeletonLoopRef.current = null;
+      stopAnimatedValue(skeletonAnim, 0);
+    };
+  }, [message.summary_image, isImageLoading, skeletonAnim]);
 
   // Animated loader for typing indicator
   const dot1Anim = useRef(new Animated.Value(0)).current;
@@ -111,38 +136,45 @@ function MessageBubble({
   const dot3Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let animationRef = null;
-    
-    if (message.isTyping) {
-      const animateLoader = () => {
-        animationRef = Animated.sequence([
-          Animated.timing(dot1Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot2Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot3Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot1Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot2Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot3Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
-        ]);
-        animationRef.start((finished) => {
-          if (finished && message.isTyping) {
-            animateLoader();
-          }
-        });
-      };
-      animateLoader();
+    if (!message.isTyping) {
+      typingAnimRef.current?.stop?.();
+      typingAnimRef.current = null;
+      stopAnimatedValue(dot1Anim, 0.3);
+      stopAnimatedValue(dot2Anim, 0.3);
+      stopAnimatedValue(dot3Anim, 0.3);
+      return undefined;
     }
-    
-    return () => {
-      if (animationRef) {
-        animationRef.stop();
-      }
+
+    const animateLoader = () => {
+      if (!mountedRef.current || !message.isTyping) return;
+      const seq = Animated.sequence([
+        Animated.timing(dot1Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(dot2Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(dot3Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(dot1Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        Animated.timing(dot2Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        Animated.timing(dot3Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+      ]);
+      typingAnimRef.current = seq;
+      seq.start(({ finished }) => {
+        if (finished && mountedRef.current && message.isTyping) {
+          animateLoader();
+        }
+      });
     };
-  }, [message.isTyping]);
+    animateLoader();
 
-
+    return () => {
+      typingAnimRef.current?.stop?.();
+      typingAnimRef.current = null;
+      stopAnimatedValue(dot1Anim, 0.3);
+      stopAnimatedValue(dot2Anim, 0.3);
+      stopAnimatedValue(dot3Anim, 0.3);
+    };
+  }, [message.isTyping, dot1Anim, dot2Anim, dot3Anim]);
 
   useEffect(() => {
-    Animated.parallel([
+    const parallel = Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 600,
@@ -153,8 +185,16 @@ function MessageBubble({
         duration: 500,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, []);
+    ]);
+    entryAnimRef.current = parallel;
+    parallel.start();
+    return () => {
+      entryAnimRef.current?.stop?.();
+      entryAnimRef.current = null;
+      stopAnimatedValue(fadeAnim, 1);
+      stopAnimatedValue(slideAnim, 0);
+    };
+  }, [fadeAnim, slideAnim]);
   const getCleanMessageText = () => {
     const raw = message.content;
     const s = typeof raw === 'string' ? raw : raw != null ? String(raw) : '';

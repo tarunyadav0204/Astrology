@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Sentry from '@sentry/react-native';
 import { useTheme } from '../context/ThemeContext';
 import { recordRuntimeIssue } from '../services/runtimeGuard';
 
@@ -20,6 +21,12 @@ class InnerErrorBoundary extends React.Component {
       source: 'react_error_boundary',
       metadata: info,
     }).catch(() => {});
+
+    try {
+      Sentry.captureException(error, { contexts: { react: { componentStack: info?.componentStack } } });
+    } catch (_) {
+      /* never let Sentry break the error UI */
+    }
 
     if (__DEV__) {
       console.error('[ErrorBoundary] Caught error:', error, info);

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import * as Sentry from '@sentry/react-native';
 import { setGlobalErrorHandler } from '../services/api';
 import { useError } from '../context/ErrorContext';
 import { replaceWithLogin } from '../navigation/replaceWithLogin';
@@ -24,6 +25,23 @@ export default function GlobalErrorHandler() {
         case 'network':
         case 'timeout':
         case 'server':
+          try {
+            Sentry.addBreadcrumb({
+              category: 'ui',
+              type: 'default',
+              level: 'error',
+              message: `global_error_overlay:${error.type}`,
+              data: { type: error.type, detail: error.message },
+            });
+            if (error.type === 'network' || error.type === 'timeout') {
+              Sentry.captureMessage(`global_overlay_${error.type}`, {
+                level: 'info',
+                tags: { overlay: error.type },
+              });
+            }
+          } catch (_) {
+            /* never let Sentry block the overlay */
+          }
           showError(error);
           break;
 

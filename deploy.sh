@@ -184,8 +184,12 @@ if [ "${restart_backend}" = "true" ]; then
 
   export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-/home/tarun_yadav/play-billing-key.json}"
 
-  echo "Starting backend..."
-  nohup python main.py > "${APP_ROOT}/logs/backend.log" 2>&1 &
+  echo "Starting backend (appending to logs/backend.log)..."
+  {
+    echo ""
+    echo "========== Deploy backend start $(date -u '+%Y-%m-%d %H:%M:%S UTC') commit=${NEW_HEAD} =========="
+  } >> "${APP_ROOT}/logs/backend.log"
+  nohup python main.py >> "${APP_ROOT}/logs/backend.log" 2>&1 &
   BACKEND_PID=$!
   echo "Backend PID: $BACKEND_PID"
   sleep 2
@@ -282,7 +286,11 @@ fi
 # --- Phase 5: auto-restart monitor (backend watchdog) ---
 echo "🔄 Starting auto-restart monitor..."
 cd "${APP_ROOT}"
-nohup ./restart_server.sh > logs/monitor.log 2>&1 &
+{
+  echo ""
+  echo "========== Monitor started $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+} >> logs/monitor.log
+nohup ./restart_server.sh >> logs/monitor.log 2>&1 &
 MONITOR_PID=$!
 echo "✅ Auto-restart monitor started with PID: $MONITOR_PID"
 deploy_timing "restart monitor started"
@@ -291,4 +299,5 @@ TOTAL=$(( $(date +%s) - DEPLOY_T0 ))
 echo "🎉 Deployment completed successfully! (total wall time: ${TOTAL}s)"
 echo "📊 Backend: http://localhost:8001"
 echo "🌐 Frontend: http://localhost:3001"
-echo "🔄 Monitor: PID $MONITOR_PID (logs/monitor.log)"
+echo "🔄 Monitor: PID $MONITOR_PID (logs/monitor.log, probe /api/keepalive)"
+echo "📋 Logs: logs/backend.log (append), logs/restart.log, logs/crash-snapshots.log (on watchdog restart)"

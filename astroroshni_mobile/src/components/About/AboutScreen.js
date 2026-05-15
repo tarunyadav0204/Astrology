@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusBar, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusBar, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
+import * as Sentry from '@sentry/react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { isSentryInitialized } from '../../services/instrumentSentry';
 
 export default function AboutScreen({ navigation }) {
   const { theme, colors } = useTheme();
@@ -29,6 +31,27 @@ export default function AboutScreen({ navigation }) {
     } catch (e) {
       // ignore
     }
+  };
+
+  const sendTestSentryIssue = async () => {
+    if (!isSentryInitialized()) {
+      Alert.alert('Sentry', 'SDK not initialized (missing DSN in this build).');
+      return;
+    }
+    try {
+      Sentry.captureException(new Error('AstroRoshni AboutScreen Sentry test (dev-only)'));
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      await Sentry.flush(2000);
+    } catch (_) {
+      /* ignore */
+    }
+    Alert.alert(
+      'Sentry',
+      'Test error queued. Open Sentry → Issues (filter: unresolved). It can take 10–30 seconds.'
+    );
   };
 
   return (
@@ -96,6 +119,22 @@ export default function AboutScreen({ navigation }) {
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
+
+        {__DEV__ ? (
+          <View style={[styles.card, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.9)' : colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Developer</Text>
+            <Text style={[styles.description, { color: colors.textSecondary, marginBottom: 12 }]}>
+              Sends one test error to Sentry so you can confirm the Issues tab. Remove this block before shipping if you prefer.
+            </Text>
+            <TouchableOpacity
+              style={[styles.rowItem, { backgroundColor: theme === 'dark' ? 'rgba(248,113,113,0.12)' : '#fef2f2', borderRadius: 12, paddingHorizontal: 12 }]}
+              onPress={sendTestSentryIssue}
+            >
+              <Text style={[styles.rowText, { color: colors.text, fontWeight: '600' }]}>Send test Sentry issue</Text>
+              <Ionicons name="bug-outline" size={20} color="#dc2626" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={{ height: 32 }} />
       </ScrollView>

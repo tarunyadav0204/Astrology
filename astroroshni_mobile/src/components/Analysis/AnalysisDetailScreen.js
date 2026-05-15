@@ -24,6 +24,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
+import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
   const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
@@ -50,6 +51,71 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const [glowAnim] = useState(new Animated.Value(0));
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
   const lastTrackedResultRef = useRef(null);
+  const loadingLoopsRef = useRef([]);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadingLoopsRef.current.forEach((loop) => stopAnimationLoop(loop));
+      loadingLoopsRef.current = [];
+      stopAnimatedValue(rotateAnim, 0);
+      stopAnimatedValue(pulseAnim, 1);
+      stopAnimatedValue(glowAnim, 0);
+    };
+  }, [rotateAnim, pulseAnim, glowAnim]);
+
+  const stopLoadingAnimations = () => {
+    loadingLoopsRef.current.forEach((loop) => stopAnimationLoop(loop));
+    loadingLoopsRef.current = [];
+    stopAnimatedValue(rotateAnim, 0);
+    stopAnimatedValue(pulseAnim, 1);
+    stopAnimatedValue(glowAnim, 0);
+  };
+
+  const startLoadingAnimations = () => {
+    stopLoadingAnimations();
+    const rotateLoop = Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    );
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loadingLoopsRef.current = [rotateLoop, pulseLoop, glowLoop];
+    rotateLoop.start();
+    pulseLoop.start();
+    glowLoop.start();
+  };
 
   useEffect(() => {
     checkBirthData();
@@ -182,45 +248,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }
 
     setLoading(true);
-    
-    // Start loading animations
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 3000,
-        useNativeDriver: true,
-      })
-    ).start();
-    
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-    
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
+    startLoadingAnimations();
     
     const loadingMessages = [
       '🔮 Analyzing your birth chart...',
@@ -729,10 +757,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       setLoading(false);
       setLoadingMessage('');
       clearInterval(messageInterval);
-      // Stop animations
-      rotateAnim.stopAnimation();
-      pulseAnim.stopAnimation();
-      glowAnim.stopAnimation();
+      stopLoadingAnimations();
     }
   };
 

@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import NorthIndianChart from './Chart/NorthIndianChart';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { stopAnimatedValue, stopAnimationLoop } from '../utils/safeAnimated';
 
 const LoadingBubble = ({
     chartInsights,
@@ -21,6 +22,8 @@ const LoadingBubble = ({
     const shimmerAnim = useRef(new Animated.Value(0)).current;
     const chartContainerRef = useRef(null);
     const hasScrolled = useRef(false);
+    const mountedRef = useRef(true);
+    const insightFadeHandleRef = useRef(null);
     const [remainingSeconds, setRemainingSeconds] = useState(Math.max(0, Number(expectedWaitSeconds) || 0));
     const [zodiacIndex, setZodiacIndex] = useState(0);
     const zodiacSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
@@ -60,20 +63,35 @@ const LoadingBubble = ({
     }, [remainingSeconds, zodiacSymbols.length]);
 
     useEffect(() => {
-        if (hasChartInsights && !hasScrolled.current && chartContainerRef.current && scrollViewRef?.current) {
-            setTimeout(() => {
-                const node = scrollViewRef.current;
-                if (node?.scrollToEnd) {
-                    node.scrollToEnd({ animated: true });
-                    hasScrolled.current = true;
-                }
-            }, 300);
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!hasChartInsights || hasScrolled.current || !chartContainerRef.current || !scrollViewRef?.current) {
+            return undefined;
         }
-    }, [hasChartInsights]);
+        const scrollTimer = setTimeout(() => {
+            if (!mountedRef.current) return;
+            const node = scrollViewRef.current;
+            if (node?.scrollToEnd) {
+                node.scrollToEnd({ animated: true });
+                hasScrolled.current = true;
+            }
+        }, 300);
+        return () => clearTimeout(scrollTimer);
+    }, [hasChartInsights, scrollViewRef]);
 
     useEffect(() => {
         const loops = [];
         let interval;
+        const stopInsightFade = () => {
+            insightFadeHandleRef.current?.cancel?.();
+            insightFadeHandleRef.current = null;
+        };
+
         if (hasChartInsights) {
             const glowLoop = Animated.loop(
                 Animated.sequence([
@@ -93,21 +111,27 @@ const LoadingBubble = ({
             );
             glowLoop.start();
             loops.push(glowLoop);
-            
-            // Rotate insights slowly; keep a stable min height so the scroll view content
-            // size does not jump (iOS ScrollView would "bounce" as the user reads).
+
             interval = setInterval(() => {
-                Animated.timing(fadeAnim, {
+                if (!mountedRef.current) return;
+                stopInsightFade();
+                const fadeOut = Animated.timing(fadeAnim, {
                     toValue: 0,
                     duration: 500,
                     useNativeDriver: true,
-                }).start(() => {
+                });
+                fadeOut.start(({ finished }) => {
+                    if (!mountedRef.current || !finished) return;
                     setCurrentIndex((prevIndex) => (prevIndex + 1) % chartInsights.length);
-                    Animated.timing(fadeAnim, {
+                    const fadeIn = Animated.timing(fadeAnim, {
                         toValue: 1,
                         duration: 500,
                         useNativeDriver: true,
-                    }).start();
+                    });
+                    insightFadeHandleRef.current = {
+                        cancel: () => stopAnimatedValue(fadeAnim, 1),
+                    };
+                    fadeIn.start();
                 });
             }, 15000);
         } else {
@@ -129,7 +153,7 @@ const LoadingBubble = ({
             );
             pulseLoop.start();
             loops.push(pulseLoop);
-            
+
             const shimmerLoop = Animated.loop(
                 Animated.timing(shimmerAnim, {
                     toValue: 1,
@@ -143,7 +167,12 @@ const LoadingBubble = ({
         }
         return () => {
             if (interval) clearInterval(interval);
-            loops.forEach((loop) => loop?.stop?.());
+            stopInsightFade();
+            loops.forEach((loop) => stopAnimationLoop(loop));
+            stopAnimatedValue(glowAnim, 0);
+            stopAnimatedValue(pulseAnim, 1);
+            stopAnimatedValue(shimmerAnim, 0);
+            stopAnimatedValue(fadeAnim, 1);
         };
     }, [hasChartInsights, chartInsights]);
 
@@ -191,7 +220,7 @@ const LoadingBubble = ({
                     <Text style={[styles.chartTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
                     <View style={styles.timerCard}>
                         <View style={styles.timerTopRow}>
-                            <Text style={styles.timerTitle}>Preparing Your Reading</Text>
+                            <Text style={styles.timerTitle}>Estimated Time Remaining</Text>
                         </View>
                         <View style={styles.timerCountdownWrap}>
                             {showZodiacLoop ? (
@@ -258,7 +287,7 @@ const LoadingBubble = ({
                 <Text style={[styles.welcomeTitle, { color: theme === 'dark' ? '#ffd700' : '#ff6b35' }]}>AstroRoshni</Text>
                 <View style={styles.timerCard}>
                     <View style={styles.timerTopRow}>
-                        <Text style={styles.timerTitle}>Preparing Your Reading</Text>
+                        <Text style={styles.timerTitle}>Estimated Time Remaining</Text>
                     </View>
                     <View style={styles.timerCountdownWrap}>
                         {showZodiacLoop ? (

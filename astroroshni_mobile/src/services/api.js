@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS } from '../utils/constants';
 import { buildQueryContext } from '../utils/queryContext';
 import { Alert } from 'react-native';
@@ -173,6 +174,26 @@ api.interceptors.response.use(
     // Showing the global overlay there confuses users (e.g. duplicate key → 500 before we fixed it).
     const status = error.response?.status;
     if (status === 502 || status === 503 || status === 504) {
+      const base = error.config?.baseURL || '';
+      const path = error.config?.url || '';
+      const method = (error.config?.method || 'GET').toUpperCase();
+      const fullUrl = `${base}${path}`.replace(/([^:])\/{2,}/g, '$1/');
+      try {
+        Sentry.addBreadcrumb({
+          category: 'http',
+          type: 'http',
+          level: 'error',
+          message: `Gateway ${status} ${method} ${fullUrl}`,
+          data: { status, method, url: fullUrl },
+        });
+        Sentry.captureMessage(`api_gateway_${status}`, {
+          level: 'warning',
+          tags: { http_status: String(status), http_method: method },
+          extra: { url: fullUrl },
+        });
+      } catch (_) {
+        /* never let Sentry affect axios error handling */
+      }
       if (errorHandlerCallback) {
         errorHandlerCallback({
           type: 'server',

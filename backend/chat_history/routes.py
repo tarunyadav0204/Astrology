@@ -38,6 +38,23 @@ def coerce_chat_birth_details(bd):
     return out
 
 
+def _birth_chart_id_from_birth_details(bd) -> int | None:
+    """Integer birth chart id from client birth_details, if present (mobile sends `id`)."""
+    if not bd or not isinstance(bd, dict):
+        return None
+    for key in ("id", "birth_chart_id", "chart_id", "birthChartId"):
+        v = bd.get(key)
+        if v is None or v == "":
+            continue
+        try:
+            n = int(v)
+            if n > 0:
+                return n
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def _merge_with_original_question_if_present(
     original_question: str | None,
     followup_text: str,
@@ -793,6 +810,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 
     return {
         "session_id": session_id,
+        "birth_chart_id": session_row[1] if len(session_row) > 1 else None,
         "native_name": native_name,
         "chat_llm_provider": sess_llm_provider,
         "chat_llm_model": sess_llm_model,
@@ -935,11 +953,28 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         )
 
     with get_conn() as conn:
-        # Verify session belongs to user
-        cur = execute(conn, "SELECT user_id FROM chat_sessions WHERE session_id = %s", (session_id,))
+        # Verify session belongs to user and load chart binding for transcript vs chart hardening.
+        cur = execute(
+            conn,
+            "SELECT user_id, birth_chart_id FROM chat_sessions WHERE session_id = %s",
+            (session_id,),
+        )
         session = cur.fetchone()
         if not session or session[0] != current_user.userid:
             raise HTTPException(status_code=404, detail="Session not found")
+        session_birth_chart_id = session[1] if len(session) > 1 else None
+
+        # Reject stale client: session thread is for one chart; birth_details must not claim another.
+        if session_birth_chart_id is not None:
+            requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
+            if requested_chart_id is not None and int(session_birth_chart_id) != int(requested_chart_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "CHART_SESSION_MISMATCH: birth_details chart id does not match this chat session. "
+                        "Create a new session for the selected chart."
+                    ),
+                )
 
         # Idempotency: if this client_request_id was already processed for this session,
         # return the existing assistant/user message IDs instead of creating duplicates.

@@ -33,7 +33,18 @@ const NorthIndianChart = ({
   // Animation refs
   const drawAnim = useRef(new Animated.Value(0)).current;
   const lastDataRef = useRef(null);
+  const drawAnimHandleRef = useRef(null);
+  const mountedRef = useRef(true);
   const [isAnimating, setIsAnimating] = useState(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      drawAnimHandleRef.current?.stop?.();
+      drawAnim.stopAnimation();
+    };
+  }, [drawAnim]);
 
   useEffect(() => {
     if (!chartData) return;
@@ -51,20 +62,24 @@ const NorthIndianChart = ({
     }
     lastDataRef.current = dataString;
     
-    const runAnimation = () => {
-      drawAnim.setValue(0);
-      setIsAnimating(true);
+    drawAnimHandleRef.current?.stop?.();
+    drawAnim.setValue(0);
+    if (!mountedRef.current) return;
+    setIsAnimating(true);
 
-      Animated.timing(drawAnim, {
-        toValue: 1,
-        duration: 800,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start(() => setIsAnimating(false));
-    };
-
-    runAnimation();
-  }, [chartData, chartType, rotatedAscendant]);
+    const anim = Animated.timing(drawAnim, {
+      toValue: 1,
+      duration: 800,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    drawAnimHandleRef.current = anim;
+    anim.start(({ finished }) => {
+      if (mountedRef.current && finished) {
+        setIsAnimating(false);
+      }
+    });
+  }, [chartData, chartType, rotatedAscendant, drawAnim]);
 
   const handlePlanetPress = (planet) => {
     const tooltipText = `${planet.name}: ${planet.formattedDegree} in ${planet.nakshatra} · Pada ${planet.pada}`;

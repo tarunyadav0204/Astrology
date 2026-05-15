@@ -53,6 +53,7 @@ import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
+import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -329,6 +330,20 @@ const RELATIONSHIP_PRESETS = [
   { label: 'Other...' }
 ];
 
+/** AsyncStorage / session-list key: prefer server chart id so two profiles never share one thread. */
+function chatPersonStorageKey(birth) {
+  if (!birth) return null;
+  const id = birth.id ?? birth.birth_chart_id;
+  if (id != null && String(id).trim() !== '') {
+    return `chart_${String(id)}`;
+  }
+  const lat = birth.latitude ?? birth.lat;
+  const lon = birth.longitude ?? birth.lon ?? birth.lng;
+  const d = birth.date ?? '';
+  const tm = birth.time ?? '';
+  return `${d}_${tm}_${lat}_${lon}`;
+}
+
 export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
@@ -382,52 +397,72 @@ export default function ChatScreen({ navigation, route }) {
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const mountedRef = useRef(true);
+  const premiumGlowLoopRef = useRef(null);
+  const badgeFadeHandleRef = useRef(null);
 
   useEffect(() => {
-    let glowLoop;
-    if (isPremiumAnalysis) {
-      glowLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      glowLoop.start();
-      
-      // Show badge
-      setShowPremiumBadge(true);
-      Animated.timing(badgeFadeAnim, {
-        toValue: 1,
+    premiumGlowLoopRef.current && stopAnimationLoop(premiumGlowLoopRef.current);
+    premiumGlowLoopRef.current = null;
+    badgeFadeHandleRef.current?.stop?.();
+    badgeFadeHandleRef.current = null;
+
+    if (!isPremiumAnalysis) {
+      setShowPremiumBadge(false);
+      stopAnimatedValue(glowAnim, 0);
+      stopAnimatedValue(badgeFadeAnim, 0);
+      return undefined;
+    }
+
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    premiumGlowLoopRef.current = glowLoop;
+    glowLoop.start();
+
+    setShowPremiumBadge(true);
+    const fadeIn = Animated.timing(badgeFadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    });
+    badgeFadeHandleRef.current = fadeIn;
+    fadeIn.start();
+
+    const timer = setTimeout(() => {
+      if (!mountedRef.current) return;
+      const fadeOut = Animated.timing(badgeFadeAnim, {
+        toValue: 0,
         duration: 300,
         useNativeDriver: true,
-      }).start();
-      
-      // Hide after 3 seconds
-      const timer = setTimeout(() => {
-        Animated.timing(badgeFadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => setShowPremiumBadge(false));
-      }, 3000);
-      
-      return () => {
-        glowLoop?.stop?.();
-        clearTimeout(timer);
-      };
-    } else {
-      setShowPremiumBadge(false);
-      glowLoop?.stop?.();
-    }
-  }, [isPremiumAnalysis]);
+      });
+      badgeFadeHandleRef.current = fadeOut;
+      fadeOut.start(({ finished }) => {
+        if (finished && mountedRef.current) setShowPremiumBadge(false);
+      });
+    }, 3000);
+
+    return () => {
+      clearTimeout(timer);
+      premiumGlowLoopRef.current && stopAnimationLoop(premiumGlowLoopRef.current);
+      premiumGlowLoopRef.current = null;
+      badgeFadeHandleRef.current?.stop?.();
+      badgeFadeHandleRef.current = null;
+      stopAnimatedValue(glowAnim, 0);
+      stopAnimatedValue(badgeFadeAnim, 0);
+    };
+  }, [isPremiumAnalysis, glowAnim, badgeFadeAnim]);
 
   useEffect(() => {
     if (!instantChatEnabled && isInstantAnalysis) {
@@ -458,33 +493,97 @@ export default function ChatScreen({ navigation, route }) {
   const menuScrollViewRef = useRef(null);
   const menuLogoGlow = useRef(new Animated.Value(0)).current;
   const menuJustClosedAt = useRef(0);
+  const showMenuRef = useRef(false);
+  const drawerAnimHandleRef = useRef(null);
+  const menuLogoGlowLoopRef = useRef(null);
   const hasInstantTypingMessage = messages.some((msg) => msg?.isTyping && msg?.chatTier === 'instant');
 
   useEffect(() => {
-    let animation;
+    showMenuRef.current = showMenu;
+  }, [showMenu]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      drawerAnimHandleRef.current?.stop?.();
+      premiumGlowLoopRef.current && stopAnimationLoop(premiumGlowLoopRef.current);
+      menuLogoGlowLoopRef.current && stopAnimationLoop(menuLogoGlowLoopRef.current);
+      badgeFadeHandleRef.current?.stop?.();
+      stopAnimatedValue(drawerAnim, 300);
+      stopAnimatedValue(menuLogoGlow, 0);
+      stopAnimatedValue(glowAnim, 0);
+      stopAnimatedValue(badgeFadeAnim, 0);
+    };
+  }, [drawerAnim, menuLogoGlow, glowAnim, badgeFadeAnim]);
+
+  const closeMenuDrawer = (onClosed) => {
+    drawerAnimHandleRef.current?.stop?.();
+    const anim = Animated.timing(drawerAnim, {
+      toValue: 300,
+      duration: 250,
+      useNativeDriver: true,
+    });
+    drawerAnimHandleRef.current = anim;
+    anim.start(({ finished }) => {
+      if (!mountedRef.current) return;
+      menuJustClosedAt.current = Date.now();
+      setShowMenu(false);
+      if (finished && onClosed) onClosed();
+    });
+  };
+
+  const openMenuDrawer = () => {
+    if (Date.now() - menuJustClosedAt.current < 400) return;
+    drawerAnimHandleRef.current?.stop?.();
+    stopAnimatedValue(drawerAnim, 300);
+    setShowMenu(true);
+    const anim = Animated.spring(drawerAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    });
+    drawerAnimHandleRef.current = anim;
+    anim.start(({ finished }) => {
+      if (!mountedRef.current || !finished) return;
+      setTimeout(() => {
+        if (mountedRef.current) {
+          menuScrollViewRef.current?.scrollTo({ y: 0, animated: false });
+        }
+      }, 100);
+    });
+  };
+
+  useEffect(() => {
+    menuLogoGlowLoopRef.current && stopAnimationLoop(menuLogoGlowLoopRef.current);
+    menuLogoGlowLoopRef.current = null;
     if (showMenu) {
-      animation = Animated.loop(
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(menuLogoGlow, {
             toValue: 1,
             duration: 1500,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(menuLogoGlow, {
             toValue: 0,
             duration: 1500,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ])
       );
-      animation.start();
+      menuLogoGlowLoopRef.current = loop;
+      loop.start();
     } else {
-      menuLogoGlow.setValue(0);
+      stopAnimatedValue(menuLogoGlow, 0);
     }
     return () => {
-      animation?.stop();
+      menuLogoGlowLoopRef.current && stopAnimationLoop(menuLogoGlowLoopRef.current);
+      menuLogoGlowLoopRef.current = null;
+      stopAnimatedValue(menuLogoGlow, 0);
     };
-  }, [showMenu]);
+  }, [showMenu, menuLogoGlow]);
 
   useEffect(() => {
     if (!hasInstantTypingMessage) {
@@ -533,6 +632,8 @@ export default function ChatScreen({ navigation, route }) {
   };
   const instantScrollRetryRef = useRef([]);
   const messageTierByIdRef = useRef({});
+  /** assistant message_id → monotonic generation; stale poll chains bail before applying UI or scheduling follow-ups. */
+  const statusPollGenerationRef = useRef(new Map());
   const suppressAutoOpenChatRef = useRef(false);
   const keepChatOpenAfterNativeSelectRef = useRef(false);
   const startFreshSessionAfterNativeSelectRef = useRef(false);
@@ -602,11 +703,11 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
 
-  const getModeStoragePersonId = (personIdOverride = null) => (
-    personIdOverride ||
-    currentPersonId ||
-    (birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null)
-  );
+  const getModeStoragePersonId = (personIdOverride = null) => {
+    if (personIdOverride) return personIdOverride;
+    if (birthData) return chatPersonStorageKey(birthData);
+    return currentPersonId;
+  };
 
   const getSelectedChatModeKey = () => {
     if (isPremiumAnalysis) return 'premium';
@@ -861,8 +962,16 @@ export default function ChatScreen({ navigation, route }) {
         }
         setKeyboardBottomInset(0);
         setIsKeyboardVisible(false);
+        drawerAnimHandleRef.current?.stop?.();
+        menuLogoGlowLoopRef.current && stopAnimationLoop(menuLogoGlowLoopRef.current);
+        menuLogoGlowLoopRef.current = null;
+        stopAnimatedValue(drawerAnim, 300);
+        stopAnimatedValue(menuLogoGlow, 0);
+        if (showMenuRef.current) {
+          setShowMenu(false);
+        }
       };
-    }, [])
+    }, [drawerAnim, menuLogoGlow])
   );
 
   useFocusEffect(
@@ -888,7 +997,9 @@ export default function ChatScreen({ navigation, route }) {
 
   // Pending message management (like web app)
   const addPendingMessage = async (messageId) => {
-    const key = `pendingChatMessages_${currentPersonId}`;
+    const pid = chatPersonStorageKey(birthData) || currentPersonId;
+    if (!pid) return;
+    const key = `pendingChatMessages_${pid}`;
     const stored = await AsyncStorage.getItem(key);
     const pendingIds = stored ? JSON.parse(stored) : [];
     if (!pendingIds.includes(messageId)) {
@@ -899,7 +1010,9 @@ export default function ChatScreen({ navigation, route }) {
   };
   
   const removePendingMessage = async (messageId) => {
-    const key = `pendingChatMessages_${currentPersonId}`;
+    const pid = chatPersonStorageKey(birthData) || currentPersonId;
+    if (!pid) return;
+    const key = `pendingChatMessages_${pid}`;
     const stored = await AsyncStorage.getItem(key);
     if (stored) {
       const pendingIds = JSON.parse(stored).filter(id => id !== messageId);
@@ -912,8 +1025,10 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
   
-  const checkPendingResponses = async (personId = currentPersonId) => {
-    const stored = await AsyncStorage.getItem(`pendingChatMessages_${personId}`);
+  const checkPendingResponses = async (personId = null) => {
+    const pid = personId || chatPersonStorageKey(birthData) || currentPersonId;
+    if (!pid) return;
+    const stored = await AsyncStorage.getItem(`pendingChatMessages_${pid}`);
     if (stored) {
       const pendingIds = JSON.parse(stored);
       pendingIds.forEach(messageId => {
@@ -1348,24 +1463,24 @@ export default function ChatScreen({ navigation, route }) {
     if (birthData) {
       const shouldKeepChatOpen = keepChatOpenAfterNativeSelectRef.current;
       const shouldStartFreshSession = startFreshSessionAfterNativeSelectRef.current;
-      // Create unique person ID from birth data
-      const personId = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
-      
+      const personId = chatPersonStorageKey(birthData);
+      const switchedFromAnotherNative = Boolean(currentPersonId) && currentPersonId !== personId;
+
       // Check if person changed
-      if (currentPersonId && currentPersonId !== personId) {
-        // Different person selected - clear current state
+      if (switchedFromAnotherNative) {
+        // Different chart selected — clear thread + server session so the next send starts clean
+        // (avoids answers that still use the previous session's history / facts context).
         setMessages([]);
         setSessionId(null);
         if (!shouldKeepChatOpen && !partnershipPrefillInProgressRef.current && !partnershipMode) {
           setShowGreeting(true);
         }
       }
-      
+
       // Only update if person ID actually changed
       if (currentPersonId !== personId) {
         chatModeHydratedRef.current = false;
-        
-        // Set person ID first to avoid null issues
+
         setCurrentPersonId(personId);
         
         // Load chart data for the new person
@@ -1374,10 +1489,12 @@ export default function ChatScreen({ navigation, route }) {
         loadDashaData(birthData);
 
         if (shouldStartFreshSession) {
+          const welcomeMessage = buildFreshWelcomeMessage(birthData?.name || null);
           setMessages([]);
           setSessionId(null);
           setLoading(false);
           setIsTyping(false);
+          setMessagesWithStorage([welcomeMessage]);
           setShowGreeting(false);
           keepChatOpenAfterNativeSelectRef.current = false;
           startFreshSessionAfterNativeSelectRef.current = false;
@@ -1400,7 +1517,9 @@ export default function ChatScreen({ navigation, route }) {
             
             // Check for processing messages and resume polling.
             // This prevents a stuck "Analyzing..." state after app/background refresh.
-            const hasResumedPending = resumePendingProcessingMessage(storedMessages, sessionId);
+            const hasResumedPending = switchedFromAnotherNative
+              ? false
+              : resumePendingProcessingMessage(storedMessages, sessionId);
             if (hasResumedPending) {
               setShowGreeting(false);
             }
@@ -1432,11 +1551,11 @@ export default function ChatScreen({ navigation, route }) {
           checkPendingResponses(personId);
         }, 200);
 
-        // Reconcile with the server in the background so completed answers recover
-        // even if the local cache was left in an error or processing state.
-        if (!partnershipMode && !partnershipPrefillInProgressRef.current) {
+        // Reconcile with the server in the background (same chart only). After switching native,
+        // do not pull another chart's session_id into this screen — that caused wrong history/facts.
+        if (!partnershipMode && !partnershipPrefillInProgressRef.current && !switchedFromAnotherNative) {
           setTimeout(() => {
-            loadChatHistory();
+            loadChatHistory(personId);
           }, 300);
         }
       } else if (shouldKeepChatOpen) {
@@ -1479,7 +1598,7 @@ export default function ChatScreen({ navigation, route }) {
       const newMessagesRaw = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
       const newMessages = sortMessagesForDisplay(newMessagesRaw);
       // Get current person ID from birthData if currentPersonId is null
-      const personId = currentPersonId || (birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null);
+      const personId = currentPersonId || chatPersonStorageKey(birthData);
       // Save to storage
       if (personId) {
         saveMessagesToStorage(newMessages, personId);
@@ -2238,6 +2357,26 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
+  const buildFreshWelcomeMessage = (nativeNameOverride = null) => {
+    const nativeName = nativeNameOverride || birthData?.name || 'there';
+    if (isMundaneRef.current) {
+      return {
+        id: Date.now().toString(),
+        content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
+        role: 'assistant',
+        isWelcome: true,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    return {
+      id: Date.now().toString(),
+      content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+      role: 'assistant',
+      isWelcome: true,
+      timestamp: new Date().toISOString(),
+    };
+  };
+
   const mapSessionMessagesToClient = (sessionData) => {
     const localByMessageId = new Map(
       (messages || [])
@@ -2303,6 +2442,7 @@ export default function ChatScreen({ navigation, route }) {
       const data = response?.data || response;
       return {
         sessionId: targetSessionId,
+        birthChartId: data?.birth_chart_id ?? null,
         messages: mapSessionMessagesToClient(data),
       };
     } catch (error) {
@@ -2345,6 +2485,19 @@ export default function ChatScreen({ navigation, route }) {
     const payload = await fetchSessionMessagesFromServer(targetSessionId);
     if (!payload) return false;
 
+    const activeBirthChartId = birthData?.id ?? birthData?.birth_chart_id ?? null;
+    const payloadBirthChartId = payload?.birthChartId ?? null;
+    if (
+      activeBirthChartId != null &&
+      payloadBirthChartId != null &&
+      String(activeBirthChartId) !== String(payloadBirthChartId)
+    ) {
+      console.warn(
+        `[Chat] Ignoring restored session ${targetSessionId} due to chart mismatch (active=${activeBirthChartId}, session=${payloadBirthChartId})`
+      );
+      return false;
+    }
+
     const serverMessages = payload.messages || [];
     if (!serverMessages.length) return false;
 
@@ -2372,9 +2525,9 @@ export default function ChatScreen({ navigation, route }) {
     return true;
   };
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = async (explicitPersonId = null) => {
     if (!birthData) return false;
-    const personId = currentPersonId || `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+    const personId = explicitPersonId || chatPersonStorageKey(birthData);
     try {
       const storedSessionsRaw = await AsyncStorage.getItem(`chatSessions_${personId}`);
       const storedSessionIds = storedSessionsRaw ? JSON.parse(storedSessionsRaw) : [];
@@ -2437,10 +2590,10 @@ export default function ChatScreen({ navigation, route }) {
         
         if (!isMundane) {
           // Track session for personal chat only
-          const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
-          const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
+          const sessionKey = chatPersonStorageKey(birthData);
+          const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${sessionKey}`) || '[]');
           personSessions.push(newSessionId);
-          await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
+          await AsyncStorage.setItem(`chatSessions_${sessionKey}`, JSON.stringify(personSessions));
         }
         
         return newSessionId;
@@ -2668,39 +2821,93 @@ export default function ChatScreen({ navigation, route }) {
     if (!messageId) {
       return;
     }
-    
-    const maxPolls = 120; // 4 minutes max
+
+    const mid = String(messageId);
+    const nextGen = (statusPollGenerationRef.current.get(mid) || 0) + 1;
+    statusPollGenerationRef.current.set(mid, nextGen);
+    const myGen = nextGen;
+    const isPollActive = () => statusPollGenerationRef.current.get(mid) === myGen;
+    const finishPoll = () => {
+      if (statusPollGenerationRef.current.get(mid) === myGen) {
+        statusPollGenerationRef.current.delete(mid);
+      }
+    };
+
+    const processingMessage = messages.find(
+      (msg) => msg.messageId === messageId || msg.id === processingMessageId
+    );
+    const rememberedTier =
+      messageTierByIdRef.current[messageId] ||
+      (processingMessageId ? messageTierByIdRef.current[processingMessageId] : '') ||
+      '';
+    const fallbackTier = String(processingMessage?.chatTier || rememberedTier || '').trim().toLowerCase();
+    const expectedWaitSeconds = Number(processingMessage?.expectedWaitSeconds) > 0
+      ? Number(processingMessage.expectedWaitSeconds)
+      : fallbackTier === 'premium'
+        ? premiumChatCountdownSeconds
+        : standardChatCountdownSeconds;
+    const countdownBudgetSeconds = Number.isFinite(expectedWaitSeconds) && expectedWaitSeconds > 0
+      ? expectedWaitSeconds
+      : 110;
+    const graceSeconds = 30;
+    const maxProcessingMs = Math.max((countdownBudgetSeconds + graceSeconds) * 1000, 90 * 1000);
+    const initialStartedAtMs = new Date(
+      processingMessage?.processingStartedAt ||
+      processingMessage?.timestamp ||
+      Date.now()
+    ).getTime();
+    let effectiveStartedAtMs = Number.isFinite(initialStartedAtMs) ? initialStartedAtMs : Date.now();
     let pollCount = 0;
+
+    const updateEffectiveStartedAt = (candidate) => {
+      const candidateMs = new Date(candidate || 0).getTime();
+      if (!Number.isFinite(candidateMs) || candidateMs <= 0) return;
+      effectiveStartedAtMs = Math.min(effectiveStartedAtMs, candidateMs);
+    };
+
+    const shouldKeepPolling = () => (Date.now() - effectiveStartedAtMs) < maxProcessingMs;
     
     // Add to pending messages if not resuming
     if (!isResume) {
       await addPendingMessage(messageId);
     }
+    if (!isPollActive()) {
+      return;
+    }
     
     const poll = async () => {
+      if (!isPollActive()) {
+        return;
+      }
       const pollStartTime = new Date().toISOString();
       // console.log(`🔍 [POLL START] messageId: ${messageId}, pollCount: ${pollCount}, time: ${pollStartTime}`);
       
       try {
         const token = await AsyncStorage.getItem('authToken');
+        if (!isPollActive()) {
+          return;
+        }
         const url = `${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`;
         
         // console.log(`🌐 [FETCH START] URL: ${url}, time: ${new Date().toISOString()}`);
         
-        // Add timeout to prevent long-hanging requests
+        let timeoutId = null;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          // console.log(`⏰ [FETCH TIMEOUT] Aborting request for messageId: ${messageId} after 5 seconds`);
-          controller.abort();
-        }, 5000); // 5 second timeout
-        
-        const response = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${token}` },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        // console.log(`📡 [FETCH END] Response received for messageId: ${messageId}, status: ${response.status}, time: ${new Date().toISOString()}`);
+        try {
+          timeoutId = setTimeout(() => {
+            // console.log(`⏰ [FETCH TIMEOUT] Aborting request for messageId: ${messageId} after 5 seconds`);
+            controller.abort();
+          }, 5000); // 5 second timeout
+
+          const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            signal: controller.signal
+          });
+
+          if (!isPollActive()) {
+            return;
+          }
+          // console.log(`📡 [FETCH END] Response received for messageId: ${messageId}, status: ${response.status}, time: ${new Date().toISOString()}`);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -2797,7 +3004,7 @@ export default function ChatScreen({ navigation, route }) {
           };
 
           showFinalMessage();
-          
+          finishPoll();
           return;
         }
         
@@ -2810,12 +3017,14 @@ export default function ChatScreen({ navigation, route }) {
           setLoading(false);
           setIsTyping(false);
           await removePendingMessage(messageId);
+          finishPoll();
           return;
         }
         
         // Still processing - continue polling
         if (status.status === 'processing') {
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
+          updateEffectiveStartedAt(status.started_at);
           setMessagesWithStorage(prev => prev.map(msg =>
             msg.messageId === messageId || msg.id === processingMessageId
               ? {
@@ -2858,16 +3067,16 @@ export default function ChatScreen({ navigation, route }) {
           }
           
           pollCount++;
-          if (pollCount < maxPolls) {
+          if (shouldKeepPolling()) {
             // Use InteractionManager to ensure polling isn't blocked by UI updates
             const nextPollTime = new Date(Date.now() + 1500).toISOString();
             console.log(`⏰ [POLL SCHEDULE] Next poll for messageId: ${messageId} scheduled at: ${nextPollTime}`);
             setTimeout(() => {
-              // console.log(`🔄 [POLL RETRY] messageId: ${messageId}, pollCount: ${pollCount}`);
+              if (!isPollActive()) return;
               poll();
             }, 1500);
           } else {
-            // console.log(`⏰ [POLL TIMEOUT] messageId: ${messageId} reached max polls (${maxPolls})`);
+            // console.log(`⏰ [POLL TIMEOUT] messageId: ${messageId} exceeded wait budget (${countdownBudgetSeconds}s + ${graceSeconds}s)`);
             // Timeout - show restart option
             setMessagesWithStorage(prev => prev.map(msg => 
               msg.messageId === messageId 
@@ -2882,11 +3091,23 @@ export default function ChatScreen({ navigation, route }) {
             setLoading(false);
             setIsTyping(false);
             // Keep in pending messages for later resume
+            finishPoll();
+          }
+        }
+        } finally {
+          if (timeoutId != null) {
+            clearTimeout(timeoutId);
           }
         }
         
       } catch (error) {
-        console.error('❌ Polling error:', error);
+        if (error?.name === 'AbortError') {
+          if (__DEV__) {
+            console.warn(`[poll] ${messageId} fetch aborted (timeout or superseded), will retry if budget allows`);
+          }
+        } else {
+          console.error('❌ Polling error:', error);
+        }
         // Show user-friendly error message based on error type
         let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
 
@@ -2895,15 +3116,15 @@ export default function ChatScreen({ navigation, route }) {
           // console.log(`⏰ [POLL TIMEOUT] Fetch timeout for messageId: ${messageId}, pollCount: ${pollCount}`);
           // Don't show error for timeout, just continue polling
           pollCount++;
-          if (pollCount < maxPolls) {
+          if (shouldKeepPolling()) {
             const nextPollTime = new Date(Date.now() + 1000).toISOString();
             // console.log(`🔄 [POLL RETRY AFTER TIMEOUT] Next poll for messageId: ${messageId} scheduled at: ${nextPollTime}`);
             setTimeout(() => {
-              // console.log(`🔄 [POLL RETRY] messageId: ${messageId}, pollCount: ${pollCount}`);
+              if (!isPollActive()) return;
               poll();
             }, 1000);
           } else {
-            // console.log(`⏰ [POLL MAX TIMEOUT] messageId: ${messageId} reached max polls (${maxPolls})`);
+            // console.log(`⏰ [POLL MAX TIMEOUT] messageId: ${messageId} exceeded wait budget (${countdownBudgetSeconds}s + ${graceSeconds}s)`);
             // Show timeout message
             setMessagesWithStorage(prev => prev.map(msg => 
               msg.messageId === messageId 
@@ -2917,6 +3138,7 @@ export default function ChatScreen({ navigation, route }) {
             ));
             setLoading(false);
             setIsTyping(false);
+            finishPoll();
           }
           return;
         }
@@ -2950,6 +3172,7 @@ export default function ChatScreen({ navigation, route }) {
           setLoading(false);
           setIsTyping(false);
           await removePendingMessage(messageId);
+          finishPoll();
           return;
         }
 
@@ -2996,6 +3219,7 @@ export default function ChatScreen({ navigation, route }) {
         setLoading(false);
         setIsTyping(false);
         await removePendingMessage(messageId);
+        finishPoll();
       }
     };
     
@@ -3056,6 +3280,7 @@ export default function ChatScreen({ navigation, route }) {
           chat_tier: requestedTier,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
+            id: nativeChart.id ?? nativeChart.birth_chart_id ?? null,
             name: nativeChart.name,
             date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
             time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
@@ -3064,6 +3289,7 @@ export default function ChatScreen({ navigation, route }) {
             place: nativeChart.place || '',
             gender: nativeChart.gender || ''
           } : {
+            id: birthData.id ?? birthData.birth_chart_id ?? null,
             name: birthData.name,
             date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
             time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
@@ -3124,6 +3350,21 @@ export default function ChatScreen({ navigation, route }) {
             !isMundane;
           if (sessionTurnLimit) {
             console.warn('🔄 Session turn limit — starting a new chat session and retrying once');
+            setSessionId(null);
+            const newSessionId = await createSession();
+            if (newSessionId) {
+              setSessionId(newSessionId);
+              activeSessionId = newSessionId;
+              return attemptSend(2);
+            }
+          }
+          const sessionChartMismatch =
+            response.status === 409 &&
+            /CHART_SESSION_MISMATCH/i.test(errorText) &&
+            attempt === 1 &&
+            !isMundane;
+          if (sessionChartMismatch) {
+            console.warn('🔄 Chart/session mismatch — creating a fresh session for the selected chart and retrying once');
             setSessionId(null);
             const newSessionId = await createSession();
             if (newSessionId) {
@@ -4152,20 +4393,7 @@ export default function ChatScreen({ navigation, route }) {
               
               <TouchableOpacity
                 style={styles.menuButton}
-                onPress={() => {
-                  if (Date.now() - menuJustClosedAt.current < 400) return;
-                  setShowMenu(true);
-                  Animated.spring(drawerAnim, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    tension: 65,
-                    friction: 11,
-                  }).start(() => {
-                    setTimeout(() => {
-                      menuScrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                    }, 100);
-                  });
-                }}
+                onPress={openMenuDrawer}
               >
                 <Ionicons name="menu" size={20} color={colors.text} />
               </TouchableOpacity>
@@ -5054,28 +5282,14 @@ export default function ChatScreen({ navigation, route }) {
           transparent
           animationType="fade"
           onRequestClose={() => {
-            Animated.timing(drawerAnim, {
-              toValue: 300,
-              duration: 250,
-              useNativeDriver: true,
-            }).start(() => {
-              menuJustClosedAt.current = Date.now();
-              setShowMenu(false);
-            });
+            closeMenuDrawer();
           }}
         >
           <TouchableOpacity 
             style={styles.drawerOverlay} 
             activeOpacity={1}
             onPress={() => {
-              Animated.timing(drawerAnim, {
-                toValue: 300,
-                duration: 250,
-                useNativeDriver: true,
-              }).start(() => {
-                menuJustClosedAt.current = Date.now();
-                setShowMenu(false);
-              });
+              closeMenuDrawer();
             }}
           >
             <Animated.View 
@@ -5090,20 +5304,12 @@ export default function ChatScreen({ navigation, route }) {
               >
                 <View style={styles.drawerHeader}>
                   <Animated.View style={[styles.logoContainer, {
-                    shadowOpacity: menuLogoGlow.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.6, 1],
-                    }),
-                    shadowRadius: menuLogoGlow.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [12, 20],
-                    }),
                     transform: [{
                       scale: menuLogoGlow.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [1, 1.05],
-                      })
-                    }]
+                        outputRange: [1, 1.08],
+                      }),
+                    }],
                   }]}>
                     <Image 
                       source={require('../../../assets/logo.png')}
@@ -5125,14 +5331,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Profile');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('Profile'); });
                     }}
                   >
                     <LinearGradient
@@ -5157,12 +5356,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
+                      closeMenuDrawer(() => {
                         if (!showGreeting) {
                           keepChatOpenAfterNativeSelectRef.current = true;
                         }
@@ -5195,14 +5389,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('BirthForm');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('BirthForm'); });
                     }}
                   >
                     <LinearGradient
@@ -5227,14 +5414,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Chart', { birthData });
-                      });
+                      closeMenuDrawer(() => navigation.navigate('Chart', { birthData }));
                     }}
                   >
                     <LinearGradient
@@ -5259,14 +5439,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        setShowDashaBrowser(true);
-                      });
+                      closeMenuDrawer(() => { setShowDashaBrowser(true); });
                     }}
                   >
                     <LinearGradient
@@ -5291,14 +5464,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('AshtakvargaOracle');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('AshtakvargaOracle'); });
                     }}
                   >
                     <LinearGradient
@@ -5322,14 +5488,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Shadbala', { birthData });
-                      });
+                      closeMenuDrawer(() => navigation.navigate('Shadbala', { birthData }));
                     }}
                   >
                     <LinearGradient
@@ -5355,14 +5514,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('KotaChakra', { birthChartId: birthData?.id });
-                      });
+                      closeMenuDrawer(() => navigation.navigate('KotaChakra', { birthChartId: birthData?.id }));
                     }}
                   >
                     <LinearGradient
@@ -5387,14 +5539,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Yogas');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('Yogas'); });
                     }}
                   >
                     <LinearGradient
@@ -5419,14 +5564,9 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
+                      closeMenuDrawer(() => {
                         if (birthData) {
-                            navigation.navigate('KPSystem', { birthDetails: birthData });
+                          navigation.navigate('KPSystem', { birthDetails: birthData });
                         }
                       });
                     }}
@@ -5453,14 +5593,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('AnalysisHub');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('AnalysisHub'); });
                     }}
                   >
                     <LinearGradient
@@ -5485,14 +5618,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('KarmaAnalysis', { chartId: birthData?.id });
-                      });
+                      closeMenuDrawer(() => navigation.navigate('KarmaAnalysis', { chartId: birthData?.id }));
                     }}
                   >
                     <LinearGradient
@@ -5517,14 +5643,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Numerology');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('Numerology'); });
                     }}
                   >
                     <LinearGradient
@@ -5549,14 +5668,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('ChatHistory');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('ChatHistory'); });
                     }}
                   >
                     <LinearGradient
@@ -5582,15 +5694,7 @@ export default function ChatScreen({ navigation, route }) {
                     <TouchableOpacity
                       style={getMenuOptionStyle()}
                       onPress={() => {
-                        Animated.timing(drawerAnim, {
-                          toValue: 300,
-                          duration: 250,
-                          useNativeDriver: true,
-                        }).start(() => {
-                          menuJustClosedAt.current = Date.now();
-                          setShowMenu(false);
-                          confirmStartNewChat();
-                        });
+                        closeMenuDrawer(() => { confirmStartNewChat(); });
                       }}
                     >
                       <LinearGradient
@@ -5616,14 +5720,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('PodcastHistory');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('PodcastHistory'); });
                     }}
                   >
                     <LinearGradient
@@ -5651,23 +5748,12 @@ export default function ChatScreen({ navigation, route }) {
                       onPress={() => {
                         if (!partnershipMode) {
                           openPartnershipModal(partnershipCost);
-                          Animated.timing(drawerAnim, {
-                            toValue: 300,
-                            duration: 250,
-                            useNativeDriver: true,
-                          }).start(() => setShowMenu(false));
+                          closeMenuDrawer();
                         } else {
                           setPartnershipMode(false);
                           setNativeChart(null);
                           setPartnerChart(null);
-                          Animated.timing(drawerAnim, {
-                            toValue: 300,
-                            duration: 250,
-                            useNativeDriver: true,
-                          }).start(() => {
-                            menuJustClosedAt.current = Date.now();
-                            setShowMenu(false);
-                          });
+                          closeMenuDrawer();
                         }
                       }}
                     >
@@ -5696,14 +5782,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('BlogList');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('BlogList'); });
                     }}
                   >
                     <LinearGradient
@@ -5728,14 +5807,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Credits');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('Credits'); });
                     }}
                   >
                     <LinearGradient
@@ -5760,14 +5832,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        navigation.navigate('Support');
-                      });
+                      closeMenuDrawer(() => { navigation.navigate('Support'); });
                     }}
                   >
                     <LinearGradient
@@ -5792,14 +5857,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={[getMenuOptionStyle(), styles.menuOptionLast]}
                     onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        logout();
-                      });
+                      closeMenuDrawer(() => { logout(); });
                     }}
                   >
                     <LinearGradient
