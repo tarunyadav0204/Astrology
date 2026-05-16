@@ -1,3 +1,33 @@
+/** Web routes that work without sign-in (no redirect on expired session). */
+export const PUBLIC_APP_PATH_PREFIXES = [
+  '/panchang',
+  '/monthly-panchang',
+  '/muhurat-finder',
+  '/festivals',
+  '/nakshatras',
+  '/nakshatra',
+  '/horoscope',
+  '/karma-analysis',
+  '/blog',
+  '/contact',
+  '/about',
+  '/policy',
+  '/calendar-2026',
+  '/beginners-guide',
+  '/advanced-courses',
+  '/myths-vs-reality',
+  '/lesson',
+  '/kundli-matching',
+  '/tools/ashtakavarga',
+];
+
+export const isPublicAppPath = (pathname) => {
+  if (!pathname || pathname === '/') return true;
+  return PUBLIC_APP_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+};
+
 export const APP_CONFIG = {
   api: {
     dev: 'http://localhost:8001',

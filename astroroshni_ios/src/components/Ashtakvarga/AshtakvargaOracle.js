@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AshtakvargaChart from './AshtakvargaChart';
 import DateNavigator from '../Common/DateNavigator';
 import { useTheme } from '../../context/ThemeContext';
+import { IS_ASTROLOGY_ONLY } from '../../config/appVariant';
 
 const { width, height } = Dimensions.get('window');
 
@@ -467,8 +468,9 @@ export default function AshtakvargaOracle({ navigation }) {
           </ScrollView>
         </View>
 
+        {!IS_ASTROLOGY_ONLY && (
         <View style={styles.lifePredictionsContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.lifePredictionsButton, loadingLifePredictions && styles.loadingButton]}
             onPress={generateLifePredictions}
             disabled={loadingLifePredictions}
@@ -516,6 +518,7 @@ export default function AshtakvargaOracle({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+        )}
       </ScrollView>
     );
   };

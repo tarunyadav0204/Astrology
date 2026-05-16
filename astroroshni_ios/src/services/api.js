@@ -3,6 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT } from '../utils/constants';
 import { Alert } from 'react-native';
 
+// Same JWT as Authorization; some CDNs strip Authorization on iOS — backend accepts this too.
+const AUTH_FALLBACK_HEADER = 'X-AstroRoshni-Authorization';
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT, // 5 minutes timeout
@@ -13,12 +16,40 @@ const api = axios.create({
   }
 });
 
-// Add auth token to requests
-api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('authToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+function applyBearerToAxiosConfig(config, value) {
+  const h = config.headers;
+  if (h && typeof h.set === 'function') {
+    h.set('Authorization', value);
+    h.set(AUTH_FALLBACK_HEADER, value);
+  } else {
+    config.headers = config.headers || {};
+    config.headers.Authorization = value;
+    config.headers[AUTH_FALLBACK_HEADER] = value;
   }
+  const common = config.headers && config.headers.common;
+  if (common && typeof common === 'object' && typeof common.set === 'function') {
+    common.set('Authorization', value);
+    common.set(AUTH_FALLBACK_HEADER, value);
+  } else if (common && typeof common === 'object') {
+    common.Authorization = value;
+    common[AUTH_FALLBACK_HEADER] = value;
+  }
+}
+
+api.interceptors.request.use(async (config) => {
+  const raw = await AsyncStorage.getItem('authToken');
+  const token = raw && String(raw).trim();
+
+  if (!token) {
+    delete api.defaults.headers.common.Authorization;
+    delete api.defaults.headers.common[AUTH_FALLBACK_HEADER];
+    return config;
+  }
+
+  const value = `Bearer ${token}`;
+  api.defaults.headers.common.Authorization = value;
+  api.defaults.headers.common[AUTH_FALLBACK_HEADER] = value;
+  applyBearerToAxiosConfig(config, value);
   return config;
 });
 
@@ -416,7 +447,34 @@ export const marriageAPI = {
 };
 
 export const pricingAPI = {
-  getAnalysisPricing: () => api.get(getEndpoint('/analysis-pricing')),
+  /** Base pricing (unauthenticated). */
+  getAnalysisPricing: () => api.get(getEndpoint('/credits/settings/analysis-pricing')),
+  /** User pricing with subscription discount (authenticated). */
+  getMyPricing: () => api.get(getEndpoint('/credits/settings/my-pricing')),
+  /**
+   * Best available pricing: my-pricing when logged in, else analysis-pricing.
+   */
+  async getPricing() {
+    try {
+      return await api.get(getEndpoint('/credits/settings/my-pricing'));
+    } catch (e) {
+      if (e.response?.status === 401 || !e.response) {
+        return api.get(getEndpoint('/credits/settings/analysis-pricing'));
+      }
+      throw e;
+    }
+  },
+};
+
+export const blogAPI = {
+  getPosts: (status = 'published', category = null, limit = 10, offset = 0) => {
+    let url = `/blog/posts?status=${status}&limit=${limit}&offset=${offset}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    return api.get(getEndpoint(url));
+  },
+  getPostById: (id) => api.get(getEndpoint(`/blog/posts/${id}`)),
+  getPostBySlug: (slug) => api.get(getEndpoint(`/blog/posts/slug/${slug}`)),
+  getBlogCategories: () => api.get(getEndpoint('/blog/categories')),
 };
 
 export const lifeEventsAPI = {
@@ -458,5 +516,27 @@ export const supportAPI = {
   createTicket: (payload) => api.post(getEndpoint('/support/tickets'), payload),
   postMessage: (id, message) => api.post(getEndpoint(`/support/tickets/${id}/messages`), { message }),
 };
+
+/** Headers for raw fetch() — includes iOS CDN fallback auth header (matches axios interceptor). */
+export async function getAuthHeaders(extraHeaders = {}) {
+  const raw = await AsyncStorage.getItem('authToken');
+  const token = raw && String(raw).trim();
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...extraHeaders,
+  };
+  if (token) {
+    const bearer = `Bearer ${token}`;
+    headers.Authorization = bearer;
+    headers[AUTH_FALLBACK_HEADER] = bearer;
+  }
+  return headers;
+}
+
+export async function authFetch(url, options = {}) {
+  const headers = await getAuthHeaders(options.headers || {});
+  return fetch(url, { ...options, headers });
+}
 
 export default api;

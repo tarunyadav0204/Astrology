@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
@@ -64,7 +64,7 @@ function FullHamburgerMenuItems({
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/tools/ashtakavarga'); onClose(); }}>⊞ Ashtakavarga</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching'); onClose(); }}>💕 Kundli matching</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/#numerology'); onClose(); }}>🔢 Numerology</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/panchang'); onClose(); }}>🌅 Panchang</button>
+    <Link to="/panchang" className="mobile-menu-item mobile-menu-item--sub" onClick={() => onClose()}>🌅 Panchang</Link>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/muhurat-finder'); onClose(); }}>⏳ Muhurat Finder</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/festivals'); onClose(); }}>🎉 Festivals</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/nakshatras'); onClose(); }}>⭐ Nakshatras</button>
@@ -189,7 +189,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <div className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
                 <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
               </div>
-              <button onClick={() => navigate('/panchang')}>Panchang</button>
+              <Link to="/panchang">Panchang</Link>
               <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
               <button onClick={() => navigate('/festivals')}>Festivals</button>
               <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
@@ -401,7 +401,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <li className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
               <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
             </li>
-            <li><button onClick={() => navigate('/panchang')}>Panchang</button></li>
+            <li><Link to="/panchang">Panchang</Link></li>
             <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
             <li><button onClick={() => navigate('/festivals')}>Festivals</button></li>
             <li><button onClick={() => navigate('/nakshatras')}>Nakshatras</button></li>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,7 @@ import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
-import { chatAPI, pricingAPI } from '../../services/api';
+import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { buildQueryContext } from '../../utils/queryContext';
@@ -116,6 +116,22 @@ const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
 const DEBUG_IN_APP_REVIEW_ONLY = false;
 const CHAT_RENDER_WINDOW_DEFAULT = 80;
 const CHAT_RENDER_WINDOW_STEP = 80;
+
+/** Client wait anchor for countdown + poll budget; ignore stale server started_at (idempotent / old row). */
+function mergeProcessingStartedAt(clientIso, serverIso) {
+  const clientMs = new Date(clientIso || 0).getTime();
+  const serverMs = new Date(serverIso || 0).getTime();
+  if (!Number.isFinite(serverMs) || serverMs <= 0) {
+    return Number.isFinite(clientMs) && clientMs > 0 ? clientIso : serverIso;
+  }
+  if (!Number.isFinite(clientMs) || clientMs <= 0) {
+    return serverIso;
+  }
+  if (serverMs < clientMs - 15_000) {
+    return clientIso;
+  }
+  return serverMs > clientMs ? serverIso : clientIso;
+}
 
 /** Listing with showAllReviews so users land near ratings when we must fall back to the browser/Play app. */
 const ANDROID_PACKAGE_NAME = 'com.astroroshni.mobile';
@@ -354,7 +370,12 @@ export default function ChatScreen({ navigation, route }) {
     freeQuestionAvailable,
     freeQuestionRequiresNotifications,
     fetchBalance,
+    fetchPricing,
     podcastCost,
+    pricing,
+    pricingOriginal,
+    pricingFeatures,
+    chatCountdownSeconds,
   } = useCredits();
   const insets = useSafeAreaInsets();
   
@@ -953,44 +974,49 @@ export default function ChatScreen({ navigation, route }) {
 
   // Stop any ongoing TTS playback when leaving the chat screen
   useFocusEffect(
-    React.useCallback(() => {
-      return () => {
-        try {
-          getTextToSpeech().stop();
-        } catch (e) {
-          // ignore
-        }
-        setKeyboardBottomInset(0);
-        setIsKeyboardVisible(false);
-        drawerAnimHandleRef.current?.stop?.();
-        menuLogoGlowLoopRef.current && stopAnimationLoop(menuLogoGlowLoopRef.current);
-        menuLogoGlowLoopRef.current = null;
-        stopAnimatedValue(drawerAnim, 300);
-        stopAnimatedValue(menuLogoGlow, 0);
-        if (showMenuRef.current) {
-          setShowMenu(false);
-        }
-      };
-    }, [drawerAnim, menuLogoGlow])
+    useMemo(
+      () => () => {
+        return () => {
+          try {
+            getTextToSpeech().stop();
+          } catch (e) {
+            // ignore
+          }
+          setKeyboardBottomInset(0);
+          setIsKeyboardVisible(false);
+          drawerAnimHandleRef.current?.stop?.();
+          menuLogoGlowLoopRef.current && stopAnimationLoop(menuLogoGlowLoopRef.current);
+          menuLogoGlowLoopRef.current = null;
+          stopAnimatedValue(drawerAnim, 300);
+          stopAnimatedValue(menuLogoGlow, 0);
+          if (showMenuRef.current) {
+            setShowMenu(false);
+          }
+        };
+      },
+      [drawerAnim, menuLogoGlow]
+    )
   );
 
   useFocusEffect(
-    React.useCallback(() => {
+    useMemo(() => {
       let cancelled = false;
-      const loadUnread = async () => {
-        try {
-          const { nudgeAPI } = require('../../services/api');
-          const res = await nudgeAPI.getUnreadCount();
-          if (!cancelled) {
-            setNudgeUnreadCount(Number(res.data?.unread_count) || 0);
-          }
-        } catch {
-          if (!cancelled) setNudgeUnreadCount(0);
-        }
-      };
-      loadUnread();
       return () => {
-        cancelled = true;
+        const loadUnread = async () => {
+          try {
+            const { nudgeAPI } = require('../../services/api');
+            const res = await nudgeAPI.getUnreadCount();
+            if (!cancelled) {
+              setNudgeUnreadCount(Number(res.data?.unread_count) || 0);
+            }
+          } catch {
+            if (!cancelled) setNudgeUnreadCount(0);
+          }
+        };
+        loadUnread();
+        return () => {
+          cancelled = true;
+        };
       };
     }, [])
   );
@@ -1060,12 +1086,7 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
   
-  // Load charts when component mounts
-  useEffect(() => {
-    loadSavedCharts();
-  }, []);
-  
-  // Reload charts when picker opens
+  // Reload charts when partnership picker opens (deferred from mount)
   useEffect(() => {
     if (showChartPicker) {
       loadSavedCharts();
@@ -1247,7 +1268,7 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     checkBirthData();
     loadLanguagePreference();
-    fetchChatCost();
+    fetchPricing({ force: false });
     
     // Add focus listener to re-check birth data when returning to screen
     const unsubscribe = navigation.addListener('focus', () => {
@@ -1415,48 +1436,42 @@ export default function ChatScreen({ navigation, route }) {
 
   // Remove problematic back handler that clears messages
 
-  const fetchChatCost = async () => {
-    try {
-      const res = await pricingAPI.getPricing();
-      const data = res?.data || res;
-      const pricing = data?.pricing || {};
-      const orig = data?.pricing_original || {};
-      const features = data?.features || {};
-      const countdown = data?.chat_countdown_seconds || {};
-      // Standard chat (user-discounted when VIP)
-      const chatVal = pricing.chat != null ? Number(pricing.chat) || 1 : 1;
-      const chatOriginal = orig.chat != null ? Number(orig.chat) : null;
-      setChatCost(chatVal);
-      setChatCostOriginal(Number.isNaN(chatOriginal) ? null : chatOriginal);
-      const instantVal = pricing.instant_chat != null ? Number(pricing.instant_chat) || 1 : 1;
-      const instantOriginal = orig.instant_chat != null ? Number(orig.instant_chat) : null;
-      setInstantChatCost(Number.isNaN(instantVal) || instantVal <= 0 ? 1 : instantVal);
-      setInstantChatCostOriginal(Number.isNaN(instantOriginal) ? null : instantOriginal);
-      setInstantChatEnabled(Boolean(features.instant_chat_enabled));
-      setSpeechChatEnabled(Boolean(features.speech_chat_enabled));
-      const adminSuggestions = Array.isArray(features.chat_static_suggestions)
-        ? features.chat_static_suggestions
-          .map((item) => String(item || '').trim())
-          .filter(Boolean)
-        : [];
-      setSuggestions(adminSuggestions.length ? adminSuggestions : DEFAULT_CHAT_SUGGESTIONS);
-      // Premium chat (user-discounted when VIP; same source as standard)
-      const premiumVal = pricing.premium_chat != null ? Number(pricing.premium_chat) : 3;
-      const premiumOriginal = orig.premium_chat != null ? Number(orig.premium_chat) : null;
-      setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
-      setPremiumChatCostOriginal(Number.isNaN(premiumOriginal) ? null : premiumOriginal);
-      const standardCountdownVal = Number(countdown.standard);
-      const premiumCountdownVal = Number(countdown.premium);
-      setStandardChatCountdownSeconds(
-        Number.isNaN(standardCountdownVal) || standardCountdownVal <= 0 ? 110 : standardCountdownVal
-      );
-      setPremiumChatCountdownSeconds(
-        Number.isNaN(premiumCountdownVal) || premiumCountdownVal <= 0 ? 210 : premiumCountdownVal
-      );
-    } catch (error) {
-      console.error('Error fetching chat cost:', error);
+  useEffect(() => {
+    if (!pricing || typeof pricing !== 'object' || Object.keys(pricing).length === 0) {
+      return;
     }
-  };
+    const priceMap = pricing;
+    const origMap = pricingOriginal || {};
+    const features = pricingFeatures || {};
+    const countdown = chatCountdownSeconds || {};
+
+    const chatVal = priceMap.chat != null ? Number(priceMap.chat) || 1 : 1;
+    const chatOriginal = origMap.chat != null ? Number(origMap.chat) : null;
+    setChatCost(chatVal);
+    setChatCostOriginal(Number.isNaN(chatOriginal) ? null : chatOriginal);
+    const instantVal = priceMap.instant_chat != null ? Number(priceMap.instant_chat) || 1 : 1;
+    const instantOriginal = origMap.instant_chat != null ? Number(origMap.instant_chat) : null;
+    setInstantChatCost(Number.isNaN(instantVal) || instantVal <= 0 ? 1 : instantVal);
+    setInstantChatCostOriginal(Number.isNaN(instantOriginal) ? null : instantOriginal);
+    setInstantChatEnabled(Boolean(features.instant_chat_enabled));
+    setSpeechChatEnabled(Boolean(features.speech_chat_enabled));
+    const adminSuggestions = Array.isArray(features.chat_static_suggestions)
+      ? features.chat_static_suggestions.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    setSuggestions(adminSuggestions.length ? adminSuggestions : DEFAULT_CHAT_SUGGESTIONS);
+    const premiumVal = priceMap.premium_chat != null ? Number(priceMap.premium_chat) : 3;
+    const premiumOriginal = origMap.premium_chat != null ? Number(origMap.premium_chat) : null;
+    setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
+    setPremiumChatCostOriginal(Number.isNaN(premiumOriginal) ? null : premiumOriginal);
+    const standardCountdownVal = Number(countdown.standard);
+    const premiumCountdownVal = Number(countdown.premium);
+    setStandardChatCountdownSeconds(
+      Number.isNaN(standardCountdownVal) || standardCountdownVal <= 0 ? 110 : standardCountdownVal
+    );
+    setPremiumChatCountdownSeconds(
+      Number.isNaN(premiumCountdownVal) || premiumCountdownVal <= 0 ? 210 : premiumCountdownVal
+    );
+  }, [chatCountdownSeconds, pricing, pricingFeatures, pricingOriginal]);
 
   useEffect(() => {
     
@@ -1485,8 +1500,10 @@ export default function ChatScreen({ navigation, route }) {
         
         // Load chart data for the new person
         setChartData(null); // Clear cached data
-        loadChartData(birthData);
-        loadDashaData(birthData);
+        if (!showGreeting) {
+          loadChartData(birthData);
+          loadDashaData(birthData);
+        }
 
         if (shouldStartFreshSession) {
           const welcomeMessage = buildFreshWelcomeMessage(birthData?.name || null);
@@ -1565,7 +1582,14 @@ export default function ChatScreen({ navigation, route }) {
       }
     } else {
     }
-  }, [birthData, partnershipMode]);
+  }, [birthData, partnershipMode, showGreeting]);
+
+  // HomeScreen loads chart/dasha on greeting; load here when user opens chat.
+  useEffect(() => {
+    if (!birthData?.id || showGreeting) return;
+    loadChartData(birthData);
+    loadDashaData(birthData);
+  }, [birthData?.id, showGreeting]);
 
   // Save messages to AsyncStorage per person (like web app)
   const saveMessagesToStorage = async (messages, personId = currentPersonId) => {
@@ -2409,7 +2433,10 @@ export default function ChatScreen({ navigation, route }) {
           ? normalizeWaitConversation(m.wait_conversation) || local?.waitConversation
           : local?.waitConversation,
         isTyping: isProcessing,
-        processingStartedAt: m.started_at || local?.processingStartedAt || m.timestamp,
+        processingStartedAt: mergeProcessingStartedAt(
+          local?.processingStartedAt || m.timestamp,
+          m.started_at
+        ),
         expectedWaitSeconds: Number(local?.expectedWaitSeconds) > 0
           ? Number(local.expectedWaitSeconds)
           : fallbackWaitSeconds,
@@ -2849,20 +2876,26 @@ export default function ChatScreen({ navigation, route }) {
     const countdownBudgetSeconds = Number.isFinite(expectedWaitSeconds) && expectedWaitSeconds > 0
       ? expectedWaitSeconds
       : 110;
-    const graceSeconds = 30;
-    const maxProcessingMs = Math.max((countdownBudgetSeconds + graceSeconds) * 1000, 90 * 1000);
+    // Extra slack beyond UI countdown so ~2min analyses are not cut off at 110+30s.
+    const graceSeconds = 60;
+    const maxProcessingMs = Math.max((countdownBudgetSeconds + graceSeconds) * 1000, 120 * 1000);
+    const pollAnchorMs = Date.now();
     const initialStartedAtMs = new Date(
       processingMessage?.processingStartedAt ||
       processingMessage?.timestamp ||
-      Date.now()
+      pollAnchorMs
     ).getTime();
-    let effectiveStartedAtMs = Number.isFinite(initialStartedAtMs) ? initialStartedAtMs : Date.now();
+    // Anchor to this client poll — do not use Math.min with server started_at (stale rows
+    // from idempotent retries / resume made the budget look expired in a few seconds).
+    let effectiveStartedAtMs = Number.isFinite(initialStartedAtMs) ? initialStartedAtMs : pollAnchorMs;
+    effectiveStartedAtMs = Math.max(effectiveStartedAtMs, pollAnchorMs);
     let pollCount = 0;
 
     const updateEffectiveStartedAt = (candidate) => {
       const candidateMs = new Date(candidate || 0).getTime();
       if (!Number.isFinite(candidateMs) || candidateMs <= 0) return;
-      effectiveStartedAtMs = Math.min(effectiveStartedAtMs, candidateMs);
+      if (candidateMs < pollAnchorMs - 15_000) return;
+      effectiveStartedAtMs = Math.max(effectiveStartedAtMs, candidateMs);
     };
 
     const shouldKeepPolling = () => (Date.now() - effectiveStartedAtMs) < maxProcessingMs;
@@ -3030,7 +3063,10 @@ export default function ChatScreen({ navigation, route }) {
               ? {
                   ...msg,
                   messageId: msg.messageId || messageId,
-                  processingStartedAt: status.started_at || msg.processingStartedAt || msg.timestamp,
+                  processingStartedAt: mergeProcessingStartedAt(
+                    msg.processingStartedAt || msg.timestamp,
+                    status.started_at
+                  ),
                 }
               : msg
           ));
@@ -3041,7 +3077,10 @@ export default function ChatScreen({ navigation, route }) {
                 ? {
                     ...msg,
                     messageId: msg.messageId || messageId,
-                    processingStartedAt: status.started_at || msg.processingStartedAt || msg.timestamp,
+                    processingStartedAt: mergeProcessingStartedAt(
+                      msg.processingStartedAt || msg.timestamp,
+                      status.started_at
+                    ),
                     waitConversation,
                   }
                 : msg
@@ -3056,7 +3095,10 @@ export default function ChatScreen({ navigation, route }) {
                 ? {
                     ...msg,
                     messageId: msg.messageId || messageId,
-                    processingStartedAt: status.started_at || msg.processingStartedAt || msg.timestamp,
+                    processingStartedAt: mergeProcessingStartedAt(
+                      msg.processingStartedAt || msg.timestamp,
+                      status.started_at
+                    ),
                     engagementUpdates: mergeEngagementUpdates(msg.engagementUpdates, status.engagement_updates),
                   }
                 : msg
@@ -4605,6 +4647,7 @@ export default function ChatScreen({ navigation, route }) {
                 return (
                   <View ref={isLastMessage ? lastMessageRef : null}>
                     <LoadingBubble
+                      key={`loading-${item.messageId || item.id}`}
                       chartInsights={item.chartInsights}
                       chartData={chartData}
                       scrollViewRef={scrollViewRef}
@@ -5872,8 +5915,16 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🚪</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ff6b60' : '#dc2626' }]}>{t('menu.logout')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 107, 96, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#dc2626' }]}>
+                        {t('menu.logout')}
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={
+                          theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(220, 38, 38, 0.65)'
+                        }
+                      />
                     </LinearGradient>
                   </TouchableOpacity>
                 </GHScrollView>

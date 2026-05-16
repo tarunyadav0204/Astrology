@@ -496,7 +496,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             <QuickActionButton 
               icon="list-outline" 
               label={t('chartScreen.positions', 'Positions')} 
-              onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData(), birthData })}
+              onPress={() => {
+                const cd = getChartData();
+                if (cd?.planets && birthData) {
+                  navigation?.navigate('PlanetaryPositions', { chartData: cd, birthData });
+                }
+              }}
             />
             {currentChartType === 'lagna' ? (
               <QuickActionButton 

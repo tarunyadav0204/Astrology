@@ -12,7 +12,13 @@ import {
 
 const CorePanchangElements = ({ panchangData }) => {
   if (!panchangData) {
-    throw new Error('Panchang data is required');
+    return (
+      <div className="core-panchang-elements">
+        <div className="loading-message">
+          <p>Core panchang details are temporarily unavailable.</p>
+        </div>
+      </div>
+    );
   }
 
   const formatTime = (timeString) => {

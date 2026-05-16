@@ -221,7 +221,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         .replace(/•\s*/g, '• ')
         .trim();
 
-      const shareText = `☀️ AstroRoshni Prediction\n\n${cleanText}\n\nShared from AstroRoshni App`;
+      const shareText = isLabMode
+        ? `📚 AstroRoshni Study — Learn note\n\n${cleanText}\n\nShared from AstroRoshni Study`
+        : `☀️ AstroRoshni\n\n${cleanText}\n\nShared from AstroRoshni App`;
       
       await Share.share({
         message: shareText,
@@ -1162,7 +1164,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               {isLabMode
                 ? t(
                     'chat.labBetaNotice',
-                    '🧪 LAB MODE: This Chart Lab conversation is for learning and research. Treat all interpretations as educational examples, not fortune telling.'
+                    '📚 EDUCATIONAL: Replies explain Vedic chart mechanics using your chart as a worked example—not fortune telling or life predictions.'
                   )
                 : t(
                     'chat.betaNotice',
@@ -1180,7 +1182,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               {isLabMode
                 ? t(
                     'chat.labDisclaimer',
-                    '📚 EDUCATIONAL USE ONLY: Chart Lab is designed to teach astrology using your chart as a case study. It does not provide medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.'
+                    '📚 FOR STUDY ONLY: This app teaches chart reading using your birth chart as a case study. Not medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.'
                   )
                 : t(
                     'chat.disclaimerNotice',

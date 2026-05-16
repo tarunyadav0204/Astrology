@@ -1519,6 +1519,24 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
         ],
     )
 
+    # message_feedback may reference chat_messages without ON DELETE CASCADE in older DBs.
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_message_feedback",
+        [
+            (
+                f"""
+                    DELETE FROM message_feedback
+                    WHERE message_id IN (
+                        SELECT message_id FROM chat_messages
+                        WHERE session_id IN ({session_subquery})
+                    )
+                """,
+                (userid,),
+            ),
+        ],
+    )
+
     execute(
         conn,
         f"""

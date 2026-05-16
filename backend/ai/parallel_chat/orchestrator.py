@@ -1121,13 +1121,14 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     matched_term_ids, matched_glossary = find_terms_in_text(parsed_response["content"], language=language)
 
     summary_image_url = None
-    if analyzer.flux_service and premium_analysis and parsed_response.get("summary_image_prompt"):
-        try:
-            image_result = await analyzer.flux_service.generate_image(parsed_response["summary_image_prompt"])
-            if image_result:
-                summary_image_url = image_result
-        except Exception:
-            pass
+    # Replicate/Flux summary images disabled (same as gemini_chat_analyzer).
+    # if analyzer.flux_service and premium_analysis and parsed_response.get("summary_image_prompt"):
+    #     try:
+    #         image_result = await analyzer.flux_service.generate_image(parsed_response["summary_image_prompt"])
+    #         if image_result:
+    #             summary_image_url = image_result
+    #     except Exception:
+    #         pass
 
     model_name = syn.get("chat_llm_model")
     # Persist summed API usage across all parallel branches + merge (admin + billing visibility).

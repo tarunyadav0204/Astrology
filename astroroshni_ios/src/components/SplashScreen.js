@@ -3,6 +3,7 @@ import { View, StyleSheet, Animated, Image, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
+import { APP_DISPLAY_NAME, APP_TAGLINE } from '../config/appStoreCopy';
 
 const SplashScreen = () => {
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -68,8 +69,8 @@ const SplashScreen = () => {
                 resizeMode="contain"
               />
             </Animated.View>
-            <Text style={styles.title}>AstroRoshni</Text>
-            <Text style={styles.subtitle}>Your Cosmic Guide</Text>
+            <Text style={styles.title}>{APP_DISPLAY_NAME}</Text>
+            <Text style={styles.subtitle}>{APP_TAGLINE}</Text>
           </Animated.View>
         </SafeAreaView>
       </LinearGradient>

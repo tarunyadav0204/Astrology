@@ -22,19 +22,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
   const [user, setUser] = useState(propUser);
 
   useEffect(() => {
-    if (!propUser) {
-      const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
-      if (token && savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch (e) {
-          // Invalid user data
-        }
-      }
-    } else {
-      setUser(propUser);
-    }
+    setUser(propUser ?? null);
   }, [propUser]);
   const [selectedDate, setSelectedDate] = useState(() => {
     const urlParams = new URLSearchParams(urlLocation.search);

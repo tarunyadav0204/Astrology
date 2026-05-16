@@ -1,9 +1,38 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { creditAPI } from './creditService';
 import { pricingAPI } from '../services/api';
 
 const CreditContext = createContext();
+
+/** Shared TTL so Home + Chat do not each hit my-pricing on every focus. */
+const PRICING_TTL_MS = 5 * 60 * 1000;
+
+const normalizePricingPayload = (raw) => {
+  const payload = raw?.data ?? raw ?? {};
+  if (payload?.pricing && typeof payload.pricing === 'object') {
+    return {
+      pricing: payload.pricing,
+      pricingOriginal: payload.pricing_original || {},
+      features: payload.features || {},
+      chatCountdownSeconds: payload.chat_countdown_seconds || {},
+    };
+  }
+  if (payload && typeof payload.career !== 'undefined') {
+    return {
+      pricing: payload,
+      pricingOriginal: {},
+      features: {},
+      chatCountdownSeconds: {},
+    };
+  }
+  return {
+    pricing: {},
+    pricingOriginal: {},
+    features: {},
+    chatCountdownSeconds: {},
+  };
+};
 
 export const CreditProvider = ({ children }) => {
   const [credits, setCredits] = useState(0);
@@ -14,10 +43,78 @@ export const CreditProvider = ({ children }) => {
   const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
   const [subscriptionTierName, setSubscriptionTierName] = useState(null);
   const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
+  const [pricing, setPricing] = useState({});
+  const [pricingOriginal, setPricingOriginal] = useState({});
+  const [pricingFeatures, setPricingFeatures] = useState({});
+  const [chatCountdownSeconds, setChatCountdownSeconds] = useState({ standard: 110, premium: 210 });
+
+  const pricingFetchedAtRef = useRef(0);
+  const pricingInFlightRef = useRef(null);
+
+  const applyPricingPayload = useCallback((raw) => {
+    const normalized = normalizePricingPayload(raw);
+    setPricing(normalized.pricing);
+    setPricingOriginal(normalized.pricingOriginal);
+    setPricingFeatures(normalized.features);
+    setChatCountdownSeconds(normalized.chatCountdownSeconds);
+    if (normalized.pricing.partnership != null) {
+      setPartnershipCost(Number(normalized.pricing.partnership));
+    }
+    if (normalized.pricing.podcast != null) {
+      setPodcastCost(Number(normalized.pricing.podcast));
+    }
+    return normalized;
+  }, []);
+
+  const fetchPricing = useCallback(async ({ force = false } = {}) => {
+    const now = Date.now();
+    if (
+      !force &&
+      pricingFetchedAtRef.current > 0 &&
+      now - pricingFetchedAtRef.current < PRICING_TTL_MS
+    ) {
+      return {
+        pricing,
+        pricingOriginal,
+        features: pricingFeatures,
+        chatCountdownSeconds,
+      };
+    }
+
+    if (pricingInFlightRef.current) {
+      return pricingInFlightRef.current;
+    }
+
+    const run = (async () => {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) {
+          return applyPricingPayload({});
+        }
+        const response = await pricingAPI.getPricing();
+        pricingFetchedAtRef.current = Date.now();
+        return applyPricingPayload(response);
+      } catch (error) {
+        console.error('Error fetching pricing:', error);
+        return {
+          pricing,
+          pricingOriginal,
+          features: pricingFeatures,
+          chatCountdownSeconds,
+        };
+      }
+    })();
+
+    pricingInFlightRef.current = run;
+    try {
+      return await run;
+    } finally {
+      pricingInFlightRef.current = null;
+    }
+  }, [applyPricingPayload]);
 
   const fetchBalance = useCallback(async () => {
     try {
-      // Check if user is authenticated first
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         setCredits(0);
@@ -25,18 +122,19 @@ export const CreditProvider = ({ children }) => {
         setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
-        return;
+        return 0;
       }
-      
+
       setLoading(true);
       const response = await creditAPI.getBalance();
       const data = response?.data;
-      const balance = data?.credits ?? data?.balance ?? 0;
-      setCredits(Number(balance) || 0);
+      const balance = Number(data?.credits ?? data?.balance ?? 0) || 0;
+      setCredits(balance);
       setFreeQuestionAvailable(Boolean(data?.free_question_available));
       setFreeQuestionRequiresNotifications(Boolean(data?.free_question_requires_notifications));
       setSubscriptionTierName(data?.subscription_tier_name ?? null);
       setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
+      return balance;
     } catch (error) {
       console.error('❌ Error fetching credits:', {
         message: error.message,
@@ -45,8 +143,8 @@ export const CreditProvider = ({ children }) => {
         config: {
           url: error.config?.url,
           method: error.config?.method,
-          headers: error.config?.headers
-        }
+          headers: error.config?.headers,
+        },
       });
       if (error.response?.status === 401) {
         setCredits(0);
@@ -54,7 +152,9 @@ export const CreditProvider = ({ children }) => {
         setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
+        return 0;
       }
+      return null;
     } finally {
       setLoading(false);
     }
@@ -64,6 +164,7 @@ export const CreditProvider = ({ children }) => {
     try {
       const response = await creditAPI.redeemPromoCode(code);
       await fetchBalance();
+      await fetchPricing({ force: true });
       return response.data;
     } catch (error) {
       console.error('❌ CreditContext: Redeem error details:', {
@@ -71,10 +172,9 @@ export const CreditProvider = ({ children }) => {
         data: error.response?.data,
         message: error.message,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
       });
-      
-      // Handle different error response formats
+
       let errorData;
       if (error.response?.data) {
         if (typeof error.response.data === 'string') {
@@ -85,7 +185,7 @@ export const CreditProvider = ({ children }) => {
       } else {
         errorData = { message: error.message || 'Failed to redeem code' };
       }
-      
+
       throw errorData;
     }
   };
@@ -100,38 +200,33 @@ export const CreditProvider = ({ children }) => {
     }
   };
 
-  const fetchPricingCosts = async () => {
-    try {
-      const response = await pricingAPI.getPricing();
-      const data = response?.data || response;
-      const pricing = data?.pricing || {};
-      if (pricing.partnership != null) setPartnershipCost(Number(pricing.partnership));
-      if (pricing.podcast != null) setPodcastCost(Number(pricing.podcast));
-    } catch (error) {
-      console.error('Error fetching pricing costs:', error);
-    }
-  };
-
   useEffect(() => {
     fetchBalance();
-    fetchPricingCosts();
-  }, []);
+    fetchPricing({ force: true });
+  }, [fetchBalance, fetchPricing]);
 
   return (
-    <CreditContext.Provider value={{
-      credits,
-      loading,
-      partnershipCost,
-      podcastCost,
-      freeQuestionAvailable,
-      freeQuestionRequiresNotifications,
-      subscriptionTierName,
-      subscriptionDiscountPercent,
-      fetchBalance,
-      redeemCode,
-      spendCredits,
-      refreshCredits: fetchBalance // Expose for manual refresh
-    }}>
+    <CreditContext.Provider
+      value={{
+        credits,
+        loading,
+        partnershipCost,
+        podcastCost,
+        freeQuestionAvailable,
+        freeQuestionRequiresNotifications,
+        subscriptionTierName,
+        subscriptionDiscountPercent,
+        pricing,
+        pricingOriginal,
+        pricingFeatures,
+        chatCountdownSeconds,
+        fetchBalance,
+        fetchPricing,
+        redeemCode,
+        spendCredits,
+        refreshCredits: fetchBalance,
+      }}
+    >
       {children}
     </CreditContext.Provider>
   );

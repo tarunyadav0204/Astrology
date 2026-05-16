@@ -3,7 +3,13 @@ import { MOON_PHASES, PAKSHA_TYPES, SIGN_NAMES } from '../config/panchangConfig'
 
 const LunarInformation = ({ lunarData, panchangData }) => {
   if (!lunarData || !panchangData) {
-    throw new Error('Lunar data and Panchang data are required');
+    return (
+      <div className="lunar-information">
+        <div className="loading-message">
+          <p>Lunar information is temporarily unavailable.</p>
+        </div>
+      </div>
+    );
   }
 
   const getMoonPhaseIcon = (phase) => {

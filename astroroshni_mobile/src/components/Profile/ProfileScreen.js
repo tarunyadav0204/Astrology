@@ -802,7 +802,12 @@ export default function ProfileScreen({ navigation, route }) {
                 );
               }}
             >
-              <Text style={[styles.logoutText, { color: '#ffffff' }]}>
+              <Text
+                style={[
+                  styles.logoutText,
+                  { color: theme === 'dark' ? '#ffffff' : colors.error },
+                ]}
+              >
                 {`🗑️ ${t('profile.deleteAccountAndData', 'Delete Account & Data')}`}
               </Text>
             </TouchableOpacity>
@@ -815,7 +820,12 @@ export default function ProfileScreen({ navigation, route }) {
                 replaceWithLogin(navigation);
               }}
             >
-              <Text style={[styles.logoutText, { color: '#ffffff' }]}>
+              <Text
+                style={[
+                  styles.logoutText,
+                  { color: theme === 'dark' ? '#ffffff' : colors.primary },
+                ]}
+              >
                 {`🚪 ${t('profile.logout', 'Logout')}`}
               </Text>
             </TouchableOpacity>
@@ -976,7 +986,7 @@ const styles = StyleSheet.create({
   settingValue: { fontSize: 14, color: 'rgba(255, 255, 255, 0.6)' },
   settingDivider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', marginHorizontal: 16 },
   logoutButton: { backgroundColor: 'rgba(255, 107, 53, 0.2)', borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.5)', borderRadius: 16, padding: 16, alignItems: 'center', marginTop: 12 },
-  logoutText: { color: '#ff6b35', fontSize: 16, fontWeight: '700' },
+  logoutText: { fontSize: 16, fontWeight: '700' },
   bottomSpacer: { height: 20 },
   connectChartButton: {
     marginTop: 12,

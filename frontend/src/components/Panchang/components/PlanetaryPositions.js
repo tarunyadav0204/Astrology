@@ -3,7 +3,13 @@ import { SIGN_NAMES, PLANET_NAMES } from '../config/panchangConfig';
 
 const PlanetaryPositions = ({ planetaryData }) => {
   if (!planetaryData || !planetaryData.planets) {
-    throw new Error('Planetary data is required');
+    return (
+      <div className="planetary-positions">
+        <div className="loading-message">
+          <p>Planetary positions are temporarily unavailable.</p>
+        </div>
+      </div>
+    );
   }
 
   const getPlanetIcon = (planet) => {

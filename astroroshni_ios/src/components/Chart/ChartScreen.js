@@ -368,7 +368,7 @@ export default function ChartScreen({ navigation, route }) {
                             colors={isClassic ? [colors.background, colors.backgroundSecondary] : (theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0'])}
                             style={[
                               styles.captureGradient,
-                              { paddingBottom: (insets.bottom || 16) + 80 }
+                              { paddingBottom: (insets.bottom || 16) + 96 }
                             ]}
                           >
                             <View style={styles.chartArea}>
@@ -423,7 +423,7 @@ export default function ChartScreen({ navigation, route }) {
               <View style={[styles.bottomNavContainer, { 
                 backgroundColor: isClassic ? colors.backgroundSecondary : (theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)'),
                 borderTopColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'),
-                paddingBottom: insets.bottom || 15
+                paddingBottom: Math.max(insets.bottom, 12),
               }]}>
                 {Platform.OS === 'ios' && !isClassic && (
                   <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
@@ -434,7 +434,7 @@ export default function ChartScreen({ navigation, route }) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.navContent}
                   decelerationRate="fast"
-                  style={isClassic ? { backgroundColor: 'transparent' } : undefined}
+                  style={[styles.bottomNavScroll, isClassic && { backgroundColor: 'transparent' }]}
                 >
                   {chartTypes.map((chart, index) => (
                     <TouchableOpacity
@@ -748,24 +748,32 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
-    borderTopWidth: 1,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
     zIndex: 10000,
     elevation: 20,
+    overflow: 'visible',
+  },
+  bottomNavScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   navContent: {
     paddingHorizontal: 16,
+    paddingVertical: 4,
     alignItems: 'center',
+    flexGrow: 1,
   },
   navPill: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 6,
-    height: 50,
+    minHeight: 52,
     position: 'relative',
+    overflow: 'visible',
   },
   navPillActive: {},
   activeGlow: {

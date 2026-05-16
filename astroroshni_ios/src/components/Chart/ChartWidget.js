@@ -462,7 +462,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 <Ionicons name="compass-outline" size={18} color={isClassic ? colors.text : '#fff'} />
               </TouchableOpacity>
               <TouchableOpacity 
-                onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })} 
+                onPress={() => navigation?.navigate('KotaChakra', {
+                  birthChartId: birthData?.id ?? birthData?.birth_chart_id,
+                })} 
                 style={[styles.floatingButton, isClassic && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               >
                 <Ionicons name="shield-outline" size={18} color={isClassic ? colors.text : '#fff'} />

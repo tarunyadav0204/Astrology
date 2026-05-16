@@ -896,11 +896,15 @@ async def calculate_yogi_points(request: dict, current_user: User = Depends(get_
             "success": True,
             "yogi_points": yogi_points
         }
+    except HTTPException:
+        raise
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid birth date or time: {e}")
     except Exception as e:
         print(f"Error calculating Yogi points: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to calculate Yogi points")
 
 @router.post("/indu-lagna")
 async def calculate_indu_lagna(request: dict, current_user: User = Depends(get_current_user)):

@@ -38,14 +38,14 @@ Daily notification engine: scans astrology triggers and sends nudges (stored + p
 
 ## Scheduling the daily scan
 
-`POST /api/nudge/scan` has **no auth** (so only expose it on a URL that only your scheduler can reach, or add a secret header).
+`POST /api/nudge/scan` requires header **`X-Cron-Secret: <NUDGE_CRON_SECRET>`** (same as other `/api/nudge/cron/*` jobs). The scan runs in a **thread pool** so it does not block keepalive/user traffic.
 
 **Option 1: System cron (server where the backend runs)**
 
-Run once per day (e.g. 9:00 AM server time):
+Run once per day (e.g. 9:00 AM server time). Source `.env` so the secret is available:
 
 ```bash
-0 9 * * * curl -s -X POST "https://astroroshni.com/api/nudge/scan" > /dev/null 2>&1
+0 9 * * * . /path/to/AstrologyApp/backend/.env && curl -sS -X POST "http://127.0.0.1:8001/api/nudge/scan" -H "X-Cron-Secret: $NUDGE_CRON_SECRET" >> /home/you/cron_nudge.log 2>&1
 ```
 
 Add to crontab: `crontab -e` and paste the line. Use your real backend URL.
@@ -54,8 +54,9 @@ Add to crontab: `crontab -e` and paste the line. Use your real backend URL.
 
 Use [cron-job.org](https://cron-job.org), [EasyCron](https://www.easycron.com), or similar:
 
-- **URL:** `https://astroroshni.com/api/nudge/scan`
+- **URL:** `https://astroroshni.com/api/nudge/scan` (prefer `http://127.0.0.1:8001/...` on the server)
 - **Method:** POST
+- **Header:** `X-Cron-Secret: <NUDGE_CRON_SECRET>`
 - **Schedule:** Daily at the desired time (e.g. 9:00 AM in your timezone)
 
 **Option 3: GitHub Actions (if you host elsewhere)**
@@ -91,7 +92,7 @@ Registered keys: `natal_planet_return`, `natal_whole_sign_return`, `vimshottari_
 
 ## API
 
-- `POST /api/nudge/scan` — Run the scan for today (or `?scan_date=YYYY-MM-DD`). Returns `{ date, events_found, users_targeted, delivered, error? }`. No auth; intended for cron.
+- `POST /api/nudge/scan` — Run the scan for today (or `?scan_date=YYYY-MM-DD`). Returns `{ date, events_found, users_targeted, delivered, error? }`. Requires `X-Cron-Secret`; runs off the event loop (thread pool).
 - `POST /api/nudge/device-token` — Register push token (body: `{ token, platform }`). Requires auth.
 - `POST /api/nudge/admin/send` — **Admin only.** Send an arbitrary notification to a user. Body: `{ "user_id": int, "title": str, "body": str }`. Returns `{ ok, sent, tokens_found, message }`. Use from admin UI: select user (by user_id), enter title and body.
 

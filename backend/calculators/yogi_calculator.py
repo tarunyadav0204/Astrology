@@ -6,6 +6,29 @@ from utils.timezone_service import parse_timezone_offset, get_timezone_from_coor
 
 class YogiCalculator(BaseCalculator):
     """Calculate Yogi, Avayogi, Dagdha Rashi and Tithi Shunya Rashi points"""
+
+    @staticmethod
+    def _normalize_birth_datetime(date_str, time_str):
+        """Accept YYYY-MM-DD or ISO datetime from mobile/web clients."""
+        date_raw = str(date_str or "2000-01-01").strip()
+        time_raw = str(time_str or "12:00").strip()
+
+        if "T" in date_raw:
+            date_part, time_part = date_raw.split("T", 1)
+            date_raw = date_part
+            if time_part and (not time_raw or time_raw in ("12:00", "00:00")):
+                time_raw = time_part
+
+        date_only = date_raw.split("T")[0]
+        year, month, day = (int(x) for x in date_only.split("-")[:3])
+
+        time_clean = time_raw.replace("Z", "").split(".")[0]
+        time_parts = time_clean.split(":")
+        hour = float(time_parts[0])
+        minute = float(time_parts[1]) if len(time_parts) > 1 else 0.0
+        second = float(time_parts[2]) if len(time_parts) > 2 else 0.0
+        hour += minute / 60.0 + second / 3600.0
+        return year, month, day, hour
     
     def calculate_yogi_points(self, birth_data):
         """Calculate Yogi points - extracted from main.py calculate_yogi endpoint"""
@@ -27,9 +50,8 @@ class YogiCalculator(BaseCalculator):
             else:
                 timezone = get_timezone_from_coordinates(latitude, longitude)
         
-        time_parts = time_str.split(':')
-        hour = float(time_parts[0]) + float(time_parts[1])/60
-        
+        year, month, day, local_hour = self._normalize_birth_datetime(date_str, time_str)
+
         # Get timezone offset using centralized service
         tz_offset = parse_timezone_offset(
             timezone,
@@ -37,13 +59,8 @@ class YogiCalculator(BaseCalculator):
             longitude
         )
         
-        utc_hour = hour - tz_offset
-        jd = swe.julday(
-            int(date_str.split('-')[0]),
-            int(date_str.split('-')[1]),
-            int(date_str.split('-')[2]),
-            utc_hour
-        )
+        utc_hour = local_hour - tz_offset
+        jd = swe.julday(year, month, day, utc_hour)
         
         # Set Lahiri Ayanamsa
         swe.set_sid_mode(swe.SIDM_LAHIRI)

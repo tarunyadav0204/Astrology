@@ -1,11 +1,17 @@
 import { apiService } from './apiService';
 
+const formatMuhuratError = (label, error) => {
+  const detail = error?.response?.data?.detail;
+  const message = detail || error?.message || 'Unknown error';
+  return new Error(`Failed to get ${label}: ${typeof detail === 'string' ? detail : message}`);
+};
+
 export const muhuratService = {
   async getVivahMuhurat(date, latitude, longitude) {
     try {
       return await apiService.getVivahMuhurat(date, latitude, longitude);
     } catch (error) {
-      throw new Error(`Failed to get marriage muhurat: ${error.message}`);
+      throw formatMuhuratError('marriage muhurat', error);
     }
   },
 
@@ -13,7 +19,7 @@ export const muhuratService = {
     try {
       return await apiService.getPropertyMuhurat(date, latitude, longitude);
     } catch (error) {
-      throw new Error(`Failed to get property muhurat: ${error.message}`);
+      throw formatMuhuratError('property muhurat', error);
     }
   },
 
@@ -21,7 +27,7 @@ export const muhuratService = {
     try {
       return await apiService.getVehicleMuhurat(date, latitude, longitude);
     } catch (error) {
-      throw new Error(`Failed to get vehicle muhurat: ${error.message}`);
+      throw formatMuhuratError('vehicle muhurat', error);
     }
   },
 
@@ -29,7 +35,7 @@ export const muhuratService = {
     try {
       return await apiService.getGrihaPraveshMuhurat(date, latitude, longitude);
     } catch (error) {
-      throw new Error(`Failed to get griha pravesh muhurat: ${error.message}`);
+      throw formatMuhuratError('griha pravesh muhurat', error);
     }
   }
 };

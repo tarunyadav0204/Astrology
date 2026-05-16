@@ -580,6 +580,8 @@ export default function ProfileScreen({ navigation }) {
                 {`⚙️ ${t('profile.settings', 'Settings')}`}
               </Text>
               <View style={[styles.settingsCard, { backgroundColor: isClassic ? colors.cardBackground : (theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'), borderWidth: isClassic ? 1 : 0, borderColor: isClassic ? colors.cardBorder : undefined }]}>
+                {theme !== 'classic' && (
+                  <>
                 <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
                   <View style={styles.settingLeft}>
                     <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color={isClassic ? colors.text : '#ffd700'} />
@@ -591,6 +593,8 @@ export default function ProfileScreen({ navigation }) {
                 </TouchableOpacity>
                 
                 <View style={[styles.settingDivider, { backgroundColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)') }]} />
+                  </>
+                )}
 
                 <TouchableOpacity
                   style={styles.settingItem}

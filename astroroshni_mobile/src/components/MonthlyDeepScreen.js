@@ -14,7 +14,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { chatAPI, creditAPI, pricingAPI } from '../services/api';
+import { chatAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
@@ -58,6 +58,7 @@ export default function MonthlyDeepScreen() {
   const TIMELINE_MAX_WAIT_MS = 15 * 60 * 1000;
   const [showMonthlyCreditsModal, setShowMonthlyCreditsModal] = useState(false);
   const [showGenerateButton, setShowGenerateButton] = useState(false);
+  const [generatePreparing, setGeneratePreparing] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const isMountedRef = useRef(true);
   const initLoadKeyRef = useRef(null);
@@ -421,9 +422,8 @@ export default function MonthlyDeepScreen() {
     }
     creditsModalInFlightRef.current = true;
     try {
-      await fetchBalance();
-      const balanceRes = await creditAPI.getBalance();
-      const actualCredits = balanceRes.data.balance;
+      const refreshedCredits = await fetchBalance();
+      const actualCredits = refreshedCredits ?? credits;
 
       if (actualCredits < creditCost) {
         Alert.alert('Insufficient Credits', `You need ${creditCost} credits. You have ${actualCredits}.`, [
@@ -451,7 +451,7 @@ export default function MonthlyDeepScreen() {
     } finally {
       creditsModalInFlightRef.current = false;
     }
-  }, [fetchBalance, creditCost, navigation, showMonthlyCreditsModal]);
+  }, [credits, fetchBalance, creditCost, navigation, showMonthlyCreditsModal]);
 
   useEffect(() => {
     pricingAPI.getPricing().then((res) => {
@@ -603,7 +603,15 @@ export default function MonthlyDeepScreen() {
   ]);
 
   const handleGenerate = async () => {
-    await openCreditsModal();
+    if (generatePreparing || creditsModalInFlightRef.current) return;
+    setGeneratePreparing(true);
+    try {
+      await openCreditsModal();
+    } finally {
+      if (isMountedRef.current) {
+        setGeneratePreparing(false);
+      }
+    }
   };
 
   const singleMonth = monthlyData?.monthly_predictions?.[0];
@@ -747,10 +755,31 @@ export default function MonthlyDeepScreen() {
               {t('monthlyDeepScreen.emptyDesc', { cost: creditCost })}
             </Text>
             {showGenerateButton && !showMonthlyCreditsModal && (
-              <TouchableOpacity style={[styles.generateButton, { backgroundColor: colors.primary }]} onPress={handleGenerate}>
-                <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
-                  {t('monthlyDeepScreen.generateDeepDive', 'Generate deep dive')}
-                </Text>
+              <TouchableOpacity
+                style={[
+                  styles.generateButton,
+                  { backgroundColor: colors.primary },
+                  generatePreparing && styles.generateButtonDisabled,
+                ]}
+                onPress={handleGenerate}
+                disabled={generatePreparing}
+                activeOpacity={generatePreparing ? 1 : 0.7}
+              >
+                {generatePreparing ? (
+                  <>
+                    <ActivityIndicator
+                      size="small"
+                      color={theme === 'dark' ? colors.background : '#1a1a1a'}
+                    />
+                    <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+                      {t('eventScreen.checking', 'Checking…')}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+                    {t('monthlyDeepScreen.generateDeepDive', 'Generate deep dive')}
+                  </Text>
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -827,6 +856,16 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
   emptyTitle: { fontSize: 20, fontWeight: '700', marginTop: 16, textAlign: 'center' },
   emptyDesc: { fontSize: 14, textAlign: 'center', marginTop: 8, paddingHorizontal: 16 },
-  generateButton: { marginTop: 24, paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12 },
+  generateButton: {
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  generateButtonDisabled: { opacity: 0.85 },
   generateButtonText: { fontSize: 16, fontWeight: '700' },
 });

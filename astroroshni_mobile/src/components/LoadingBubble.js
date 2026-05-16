@@ -24,6 +24,8 @@ const LoadingBubble = ({
     const hasScrolled = useRef(false);
     const mountedRef = useRef(true);
     const insightFadeHandleRef = useRef(null);
+    const mountMsRef = useRef(Date.now());
+    const waitStartMsRef = useRef(null);
     const [remainingSeconds, setRemainingSeconds] = useState(Math.max(0, Number(expectedWaitSeconds) || 0));
     const [zodiacIndex, setZodiacIndex] = useState(0);
     const zodiacSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
@@ -33,16 +35,21 @@ const LoadingBubble = ({
 
     useEffect(() => {
         const total = Math.max(0, Number(expectedWaitSeconds) || 0);
-        if (!startedAt) {
-            setRemainingSeconds(total);
-            return;
+        if (waitStartMsRef.current == null) {
+            const mountMs = mountMsRef.current;
+            let startMs = mountMs;
+            if (startedAt) {
+                const startedMillis = new Date(startedAt).getTime();
+                if (Number.isFinite(startedMillis) && startedMillis > 0 && startedMillis >= mountMs - 20_000) {
+                    startMs = startedMillis;
+                }
+            }
+            waitStartMsRef.current = startMs;
         }
-        const startedMillis = new Date(startedAt).getTime();
-        if (!Number.isFinite(startedMillis)) {
-            setRemainingSeconds(total);
-            return;
-        }
-        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedMillis) / 1000));
+        const elapsedSeconds = Math.max(
+            0,
+            Math.floor((Date.now() - waitStartMsRef.current) / 1000)
+        );
         setRemainingSeconds(Math.max(0, total - elapsedSeconds));
     }, [expectedWaitSeconds, startedAt]);
 

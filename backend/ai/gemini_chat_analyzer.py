@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 from ai.response_parser import ResponseParser
-from ai.flux_image_service import FluxImageService
+# from ai.flux_image_service import FluxImageService  # Re-enable when Flux/Replicate summary images return.
 from utils.query_context import resolve_query_now
 
 # Load environment variables
@@ -112,23 +112,24 @@ class GeminiChatAnalyzer:
         
         genai.configure(api_key=api_key)
         
-        # Initialize Flux image service
-        try:
-            replicate_token = os.getenv('REPLICATE_API_TOKEN')
-            if replicate_token:
-                self.flux_service = FluxImageService()
-                print(f"✅ Flux image service initialized successfully")
-                print(f"   Token present: {bool(replicate_token)}")
-                print(f"   Token length: {len(replicate_token) if replicate_token else 0}")
-            else:
-                self.flux_service = None
-                print(f"⚠️ REPLICATE_API_TOKEN not found in environment")
-                print(f"   Image generation will be disabled")
-        except Exception as e:
-            print(f"⚠️ Flux service initialization failed: {e}")
-            print(f"   Error type: {type(e).__name__}")
-            print(f"   Image generation will be disabled")
-            self.flux_service = None
+        # Flux / Replicate image generation disabled (no summary_image URLs for now).
+        self.flux_service = None
+        # try:
+        #     replicate_token = os.getenv('REPLICATE_API_TOKEN')
+        #     if replicate_token:
+        #         self.flux_service = FluxImageService()
+        #         print(f"✅ Flux image service initialized successfully")
+        #         print(f"   Token present: {bool(replicate_token)}")
+        #         print(f"   Token length: {len(replicate_token) if replicate_token else 0}")
+        #     else:
+        #         self.flux_service = None
+        #         print(f"⚠️ REPLICATE_API_TOKEN not found in environment")
+        #         print(f"   Image generation will be disabled")
+        # except Exception as e:
+        #     print(f"⚠️ Flux service initialization failed: {e}")
+        #     print(f"   Error type: {type(e).__name__}")
+        #     print(f"   Image generation will be disabled")
+        #     self.flux_service = None
         
         from utils.admin_settings import get_gemini_chat_model, get_gemini_premium_model, GEMINI_MODEL_OPTIONS
         
@@ -936,42 +937,42 @@ class GeminiChatAnalyzer:
                 print(f"   Summary image prompt preview: {parsed_response.get('summary_image_prompt', '')[:100]}...")
             print(f"   Content preview: {parsed_response['content'][:200]}...")
 
-            # Generate summary image if prompt exists
+            # Generate summary image if prompt exists (Replicate/Flux disabled — see __init__).
             summary_image_url = None
-            if self.flux_service and premium_analysis and parsed_response.get('summary_image_prompt'):
-                try:
-                    print(f"\n🎨 SUMMARY IMAGE GENERATION:")
-                    print(f"   Premium analysis: {premium_analysis}")
-                    print(f"   Flux service available: {bool(self.flux_service)}")
-                    print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
-                    print(f"   Prompt preview: {parsed_response.get('summary_image_prompt', '')[:150]}...")
-                    
-                    image_result = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
-                    
-                    print(f"\n🔍 IMAGE SERVICE RESPONSE:")
-                    print(f"   Type: {type(image_result)}")
-                    print(f"   Value: {image_result}")
-                    print(f"   Is string: {isinstance(image_result, str)}")
-                    print(f"   Is truthy: {bool(image_result)}")
-                    
-                    if image_result:
-                        summary_image_url = image_result
-                        print(f"   ✅ SUMMARY IMAGE SUCCESS: {summary_image_url}")
-                    else:
-                        print(f"   ❌ SUMMARY IMAGE FAILED: No URL returned")
-                        
-                except Exception as e:
-                    print(f"   ⚠️ SUMMARY IMAGE EXCEPTION:")
-                    print(f"      Error type: {type(e).__name__}")
-                    print(f"      Error message: {str(e)}")
-                    print(f"      Full error: {repr(e)}")
-                    import traceback
-                    print(f"      Stack trace: {traceback.format_exc()}")
-            else:
-                print(f"\n🎨 SUMMARY IMAGE SKIPPED:")
-                print(f"   Premium analysis: {premium_analysis}")
-                print(f"   Flux service available: {bool(self.flux_service)}")
-                print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
+            # if self.flux_service and premium_analysis and parsed_response.get('summary_image_prompt'):
+            #     try:
+            #         print(f"\n🎨 SUMMARY IMAGE GENERATION:")
+            #         print(f"   Premium analysis: {premium_analysis}")
+            #         print(f"   Flux service available: {bool(self.flux_service)}")
+            #         print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
+            #         print(f"   Prompt preview: {parsed_response.get('summary_image_prompt', '')[:150]}...")
+            #
+            #         image_result = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
+            #
+            #         print(f"\n🔍 IMAGE SERVICE RESPONSE:")
+            #         print(f"   Type: {type(image_result)}")
+            #         print(f"   Value: {image_result}")
+            #         print(f"   Is string: {isinstance(image_result, str)}")
+            #         print(f"   Is truthy: {bool(image_result)}")
+            #
+            #         if image_result:
+            #             summary_image_url = image_result
+            #             print(f"   ✅ SUMMARY IMAGE SUCCESS: {summary_image_url}")
+            #         else:
+            #             print(f"   ❌ SUMMARY IMAGE FAILED: No URL returned")
+            #
+            #     except Exception as e:
+            #         print(f"   ⚠️ SUMMARY IMAGE EXCEPTION:")
+            #         print(f"      Error type: {type(e).__name__}")
+            #         print(f"      Error message: {str(e)}")
+            #         print(f"      Full error: {repr(e)}")
+            #         import traceback
+            #         print(f"      Stack trace: {traceback.format_exc()}")
+            # else:
+            print(f"\n🎨 SUMMARY IMAGE SKIPPED:")
+            print(f"   Premium analysis: {premium_analysis}")
+            print(f"   Flux service available: {bool(self.flux_service)}")
+            print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
             response_char_count = len(parsed_response.get("content") or "")
             return {
                 'success': True,

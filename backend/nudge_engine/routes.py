@@ -14,6 +14,7 @@ from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from auth import User, get_current_user
 from db import get_conn, execute
@@ -203,11 +204,14 @@ async def trigger_nudge_scan(
         None,
         description="Date YYYY-MM-DD; default is today",
     ),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
 ):
     """
-    Run the nudge engine for the given date (or today).
-    Intended to be called by a cron job or scheduler.
+    Cron-safe daily nudge scan. Heavy work runs in a thread pool so the API
+    event loop stays responsive (keepalive / user traffic).
+    Requires header: X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
+    _verify_cron_secret(x_cron_secret)
     try:
         target = date.today()
         if scan_date:
@@ -216,7 +220,7 @@ async def trigger_nudge_scan(
         raise HTTPException(status_code=400, detail=f"Invalid date: {e}") from e
 
     try:
-        summary = run_nudge_scan(target)
+        summary = await run_in_threadpool(run_nudge_scan, target)
         return summary
     except Exception as e:
         logger.exception("Nudge scan endpoint failed: %s", e)
@@ -1620,7 +1624,7 @@ async def admin_dispatch_due_broadcast(
     """
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
-    return _dispatch_due_broadcast(limit)
+    return await run_in_threadpool(_dispatch_due_broadcast, limit)
 
 
 @router.post("/cron/broadcast/dispatch-due")
@@ -1633,7 +1637,7 @@ async def cron_dispatch_due_broadcast(
       X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
     _verify_cron_secret(x_cron_secret)
-    return _dispatch_due_broadcast(limit)
+    return await run_in_threadpool(_dispatch_due_broadcast, limit)
 
 
 @router.post("/cron/chat-followup/dispatch-recent")

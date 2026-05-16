@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { APP_CONFIG } from '../config/app.config';
+import { APP_CONFIG, isPublicAppPath } from '../config/app.config';
 
 /**
  * In development, use same-origin `/api/...` (see package.json "proxy") so requests
@@ -66,12 +66,13 @@ const apiClient = axios.create({
 
 
 
-// Request interceptor to add JWT token
+// Request interceptor to add JWT token (only when a saved session exists)
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('API Request:', config.url, 'Token:', token ? 'Present' : 'Missing');
-    if (token) {
+    const savedUser = localStorage.getItem('user');
+    console.log('API Request:', config.url, 'Token:', token && savedUser ? 'Present' : 'Missing');
+    if (token && savedUser) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     // Add headers to help with load balancer debugging
@@ -94,13 +95,17 @@ apiClient.interceptors.response.use(
       throw new Error('Server error. Please try again later.');
     }
     if (error.response?.status === 401 || error.response?.status === 403) {
-      // Clear token and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      
-      // Redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+
+      const pathname = window.location.pathname;
+      // Public tools (e.g. Panchang) must work without login — never send guests to /login
+      if (isPublicAppPath(pathname)) {
+        return Promise.reject(error);
+      }
+
+      if (pathname !== '/' && pathname !== '/login') {
+        window.location.href = '/';
       }
       return Promise.reject(new Error('Session expired. Please login again.'));
     }

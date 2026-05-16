@@ -117,7 +117,7 @@ const SouthIndianChart = ({
   };
 
   const getPlanetsInSign = (signIndex) => {
-    if (!chartData.planets || signIndex === -1) return [];
+    if (!chartData || !chartData.planets || signIndex === -1) return [];
     const planetsInSign = [];
     
     // Add regular planets (exclude InduLagna as it's handled separately)

@@ -19,12 +19,19 @@ import PeriodsModal from './PeriodsModal';
 import PlanetDetailsModal from './PlanetDetailsModal';
 import KotaChakraInfoModal from './KotaChakraInfoModal';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthHeaders } from '../../services/api';
+import { storage } from '../../services/storage';
+
+const parseChartId = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
 
 const KotaChakraScreen = ({ route, navigation }) => {
-  const { birthChartId } = route.params || {};
+  const routeChartId = parseChartId(route.params?.birthChartId ?? route.params?.birth_chart_id);
   const { theme, colors } = useTheme();
   const isClassic = theme === 'classic';
+  const [resolvedChartId, setResolvedChartId] = useState(routeChartId);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [kotaData, setKotaData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,47 +43,58 @@ const KotaChakraScreen = ({ route, navigation }) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
-    if (!birthChartId) {
-      navigation.replace('BirthProfileIntro', { returnTo: 'KotaChakra' });
-      return;
-    }
-  }, [birthChartId, navigation]);
+    let cancelled = false;
+    (async () => {
+      let chartId = routeChartId;
+      if (!chartId) {
+        const details = await storage.getBirthDetails();
+        chartId = parseChartId(details?.id ?? details?.birth_chart_id);
+      }
+      if (!cancelled) {
+        if (!chartId) {
+          navigation.replace('BirthProfileIntro', { returnTo: 'KotaChakra' });
+        } else {
+          setResolvedChartId(chartId);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [routeChartId, navigation]);
 
   useEffect(() => {
-    if (birthChartId) fetchKotaChakra();
-  }, [selectedDate, birthChartId]);
+    if (resolvedChartId) fetchKotaChakra();
+  }, [selectedDate, resolvedChartId]);
 
   const fetchKotaChakra = async () => {
     try {
       setLoading(true);
-      
-      if (!birthChartId) {
+
+      if (!resolvedChartId) {
         Alert.alert('Error', 'Birth chart ID is required');
         return;
       }
-      
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
+
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) {
         Alert.alert('Error', 'Authentication required');
         navigation.navigate('Login');
         return;
       }
-      
+
       const url = `${API_BASE_URL}${getEndpoint('/kota-chakra/calculate')}`;
       console.log('🏰 Fetching Kota Chakra from:', url);
-      console.log('🏰 Birth Chart ID:', birthChartId);
+      console.log('🏰 Birth Chart ID:', resolvedChartId);
       console.log('🏰 Date:', selectedDate.toISOString().split('T')[0]);
-      
+
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
-          birth_chart_id: birthChartId,
-          date: selectedDate.toISOString().split('T')[0]
-        })
+          birth_chart_id: resolvedChartId,
+          date: selectedDate.toISOString().split('T')[0],
+        }),
       });
 
       console.log('🏰 Response status:', response.status);
@@ -85,7 +103,16 @@ const KotaChakraScreen = ({ route, navigation }) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.log('🏰 Error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        let detail = '';
+        try {
+          const errJson = JSON.parse(errorText);
+          detail = errJson.detail || errJson.error || '';
+        } catch (_) {
+          detail = errorText?.slice(0, 120) || '';
+        }
+        throw new Error(
+          detail || `HTTP ${response.status}${response.statusText ? `: ${response.statusText}` : ''}`
+        );
       }
 
       const data = await response.json();
@@ -106,23 +133,22 @@ const KotaChakraScreen = ({ route, navigation }) => {
 
   const fetchPlanetDetails = async (planetName) => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
+      if (!resolvedChartId) return;
+
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) {
         Alert.alert('Error', 'Authentication required');
         return;
       }
-      
+
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/kota-chakra/planet-details')}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
-          birth_chart_id: birthChartId,
+          birth_chart_id: resolvedChartId,
           planet: planetName,
-          date: selectedDate.toISOString().split('T')[0]
-        })
+          date: selectedDate.toISOString().split('T')[0],
+        }),
       });
 
       if (!response.ok) {
@@ -149,27 +175,24 @@ const KotaChakraScreen = ({ route, navigation }) => {
 
   const fetchPeriods = async (type) => {
     try {
-      if (!birthChartId) {
+      if (!resolvedChartId) {
         Alert.alert('Error', 'Birth chart ID is required');
         return;
       }
-      
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
+
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) {
         Alert.alert('Error', 'Authentication required');
         return;
       }
-      
+
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/kota-chakra/periods')}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
-          birth_chart_id: birthChartId,
-          date: selectedDate.toISOString().split('T')[0]
-        })
+          birth_chart_id: resolvedChartId,
+          date: selectedDate.toISOString().split('T')[0],
+        }),
       });
 
       if (!response.ok) {

@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
+import { APP_DISPLAY_NAME, APP_TAGLINE } from '../../config/appStoreCopy';
 
 const { width, height } = Dimensions.get('window');
 
@@ -79,7 +80,7 @@ const WelcomeScreen = ({ navigation }) => {
     { icon: '🧭', title: 'Dasha & Period Viewers', description: 'See how traditional time-period tables are constructed in Vedic chart methods' },
     { icon: '📚', title: 'Concept Library', description: 'Step-by-step explanations of houses, planets, and key chart building blocks' },
     { icon: '⊞', title: 'Ashtakavarga Tables', description: 'Visualize point-based strength grids used in Vedic chart mathematics' },
-    { icon: '🧪', title: 'Chart Lab Mode', description: 'Use your chart as a worked example to practice reading techniques' },
+    { icon: '📚', title: 'Learn Mode', description: 'Ask how to read your chart—houses, dashas, and classical techniques as worked examples' },
   ];
 
   useEffect(() => {
@@ -183,12 +184,12 @@ const WelcomeScreen = ({ navigation }) => {
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            AstroRoshni
+            {APP_DISPLAY_NAME}
           </Animated.Text>
           <View style={styles.titleAccent} />
           <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
-            <Text style={styles.tagline}>Learn Vedic cosmic mathematics</Text>
-            <Text style={styles.subtitle}>Use your birth chart as a case study to understand classical chart diagrams and calculations.</Text>
+            <Text style={styles.tagline}>{APP_TAGLINE}</Text>
+            <Text style={styles.subtitle}>Swiss Ephemeris charts, dashas, and guided lessons—for study and chart literacy, not fortune telling.</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.88}
@@ -196,7 +197,7 @@ const WelcomeScreen = ({ navigation }) => {
             >
               <View style={styles.heroCtaButton}>
                 <Text style={styles.heroCtaText} numberOfLines={1} adjustsFontSizeToFit>
-                  Begin Your Cosmic Journey
+                  Start learning
                 </Text>
                 <Text style={styles.buttonIcon}>✦</Text>
               </View>

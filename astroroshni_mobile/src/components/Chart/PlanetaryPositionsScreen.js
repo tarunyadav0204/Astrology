@@ -16,7 +16,6 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     }
   }, [birthData, navigation]);
 
-  if (!birthData?.name) return null;
   const screenGradient = isDark
     ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
     : [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
@@ -103,6 +102,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     }
   };
 
+  if (!birthData?.name) return null;
+
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
                       'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
   
@@ -136,37 +137,52 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   };
 
   const planetOrder = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
-  
-  const planets = planetOrder
-    .filter(name => chartData.planets[name])
-    .map(name => ({
-      name,
-      ...chartData.planets[name],
-      nakshatra: getNakshatra(chartData.planets[name].longitude),
-      pada: getNakshatraPada(chartData.planets[name].longitude)
-    }));
 
-  // Lagnas data
-  const lagnas = [
-    {
-      name: 'Ascendant (Lagna)',
-      longitude: chartData.ascendant,
-      sign: Math.floor(chartData.ascendant / 30),
-      degree: chartData.ascendant % 30,
-      house: 1,
-      nakshatra: getNakshatra(chartData.ascendant),
-      pada: getNakshatraPada(chartData.ascendant),
-      description: 'Self, Personality, Physical Body'
+  const planetsPayload = chartData && typeof chartData === 'object' ? chartData.planets : null;
+
+  const planets = planetsPayload && typeof planetsPayload === 'object'
+    ? planetOrder
+        .filter((name) => planetsPayload[name])
+        .map((name) => ({
+          name,
+          ...planetsPayload[name],
+          nakshatra: getNakshatra(planetsPayload[name].longitude),
+          pada: getNakshatraPada(planetsPayload[name].longitude),
+        }))
+    : [];
+
+  const ascendantLon = (() => {
+    const asc = chartData?.ascendant;
+    if (typeof asc === 'number' && !Number.isNaN(asc)) return asc;
+    if (asc != null && asc !== '') {
+      const n = parseFloat(String(asc));
+      if (!Number.isNaN(n)) return n;
     }
-  ];
-  
-  if (chartData.planets?.InduLagna) {
+    return null;
+  })();
+
+  // Lagnas data (needs ascendant + chart payload)
+  const lagnas = [];
+  if (ascendantLon != null) {
+    lagnas.push({
+      name: 'Ascendant (Lagna)',
+      longitude: ascendantLon,
+      sign: Math.floor(ascendantLon / 30),
+      degree: ascendantLon % 30,
+      house: 1,
+      nakshatra: getNakshatra(ascendantLon),
+      pada: getNakshatraPada(ascendantLon),
+      description: 'Self, Personality, Physical Body',
+    });
+  }
+
+  if (planetsPayload?.InduLagna) {
     lagnas.push({
       name: 'Indu Lagna',
-      ...chartData.planets.InduLagna,
-      nakshatra: getNakshatra(chartData.planets.InduLagna.longitude),
-      pada: getNakshatraPada(chartData.planets.InduLagna.longitude),
-      description: 'Wealth Indicator'
+      ...planetsPayload.InduLagna,
+      nakshatra: getNakshatra(planetsPayload.InduLagna.longitude),
+      pada: getNakshatraPada(planetsPayload.InduLagna.longitude),
+      description: 'Wealth Indicator',
     });
   }
 
@@ -189,7 +205,10 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
         lagnas.push({
           name: name,
           sign: signId,
-          house: ((signId - Math.floor(chartData.ascendant / 30) + 12) % 12) + 1,
+          house:
+            ascendantLon != null
+              ? ((signId - Math.floor(ascendantLon / 30) + 12) % 12) + 1
+              : 1,
           description: lagnaData.description,
           isJaimini: true
         });
@@ -299,6 +318,15 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   // Render Tab Content
   const renderTabContent = () => {
     if (activeTab === 'planets') {
+      if (!planetsPayload || planets.length === 0) {
+        return (
+          <View style={styles.loadingContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Chart data is still loading or unavailable. Open your chart first, then try again.
+            </Text>
+          </View>
+        );
+      }
       return planets.map((planet) => <PlanetCard key={planet.name} planet={planet} />);
     }
 

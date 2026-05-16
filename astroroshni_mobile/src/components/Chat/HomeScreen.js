@@ -23,7 +23,7 @@ import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, Path, Line, Rect, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
-import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
+import { chartAPI, panchangAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -36,8 +36,52 @@ import { useCredits } from '../../credits/CreditContext';
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOME_CHART_CACHE_PREFIX = 'home_chart_cache:';
+const HOME_PANCHANG_CACHE_PREFIX = 'home_panchang_cache:';
+/** Skip full home astro refresh if same chart+day within this window (focus revisits). */
+const HOME_DATA_TTL_MS = 5 * 60 * 1000;
+const BLOG_FETCH_TTL_MS = 15 * 60 * 1000;
 const MULTI_CHART_TIP_NEVER_KEY = 'home_multi_chart_tip_never';
 const MULTI_CHART_TIP_SNOOZE_KEY = 'home_multi_chart_tip_snooze_until';
+const roundPanchangCoord = (value) => Math.round(parseFloat(value) * 100) / 100;
+
+const getPanchangCoords = (birthData) => {
+  let lat = 28.6139;
+  let lon = 77.2090;
+  if (birthData?.latitude != null && birthData?.longitude != null) {
+    lat = parseFloat(birthData.latitude);
+    lon = parseFloat(birthData.longitude);
+  }
+  return { lat, lon };
+};
+
+const getPanchangCacheKey = (lat, lon, targetDate) =>
+  `${HOME_PANCHANG_CACHE_PREFIX}${roundPanchangCoord(lat)}:${roundPanchangCoord(lon)}:${targetDate}`;
+
+const mergePanchangResponses = (panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse) => {
+  if (!panchangResponse?.data) return null;
+  let combinedPanchangData = panchangResponse.data;
+
+  if (rahuKaalResponse?.data) {
+    combinedPanchangData.rahu_kaal = rahuKaalResponse.data;
+  }
+  if (inauspiciousResponse?.data) {
+    combinedPanchangData.inauspicious_times = inauspiciousResponse.data;
+  }
+  if (dailyPanchangResponse?.data) {
+    const basicPanchang = dailyPanchangResponse.data.basic_panchang;
+    if (basicPanchang) {
+      combinedPanchangData.daily_panchang = {
+        ...dailyPanchangResponse.data,
+        nakshatra: basicPanchang.nakshatra,
+        tithi: basicPanchang.tithi,
+        yoga: basicPanchang.yoga,
+        karana: basicPanchang.karana,
+      };
+    }
+  }
+  return combinedPanchangData;
+};
+
 const ordinalSuffix = (n) => {
   if (n >= 11 && n <= 13) return 'th';
   switch (n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
@@ -101,7 +145,7 @@ export default function HomeScreen({
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';
-  const { freeQuestionAvailable } = useCredits();
+  const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
@@ -113,8 +157,6 @@ export default function HomeScreen({
   const [activeTab, setActiveTab] = useState('ask');
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
-  const [pricing, setPricing] = useState({});
-  const [pricingOriginal, setPricingOriginal] = useState({});
   const [loading, setLoading] = useState(true);
   const [scanLoading, setScanLoading] = useState(false);
   const [physicalTraits, setPhysicalTraits] = useState([]);
@@ -133,6 +175,27 @@ export default function HomeScreen({
   const [isFABCollapsed, setIsFABCollapsed] = useState(false);
   const lastScrollY = useRef(0);
   const fabWidth = useRef(new Animated.Value(1)).current; // 1 for full, 0 for collapsed
+  const lastHomeLoadKeyRef = useRef('');
+  const lastHomeLoadAtRef = useRef(0);
+  const lastPanchangCacheKeyRef = useRef('');
+  const lastBlogFetchAtRef = useRef(0);
+  const homeLoadInFlightRef = useRef(null);
+
+  const getHomeLoadFingerprint = useCallback((nativeData, targetDate) => {
+    const cacheId = nativeData?.id || nativeData?.birth_chart_id || 'none';
+    return `${cacheId}:${targetDate}`;
+  }, []);
+
+  const shouldRefreshHomeData = useCallback((nativeData, targetDate) => {
+    const key = getHomeLoadFingerprint(nativeData, targetDate);
+    if (lastHomeLoadKeyRef.current !== key) return true;
+    return Date.now() - lastHomeLoadAtRef.current >= HOME_DATA_TTL_MS;
+  }, [getHomeLoadFingerprint]);
+
+  const markHomeDataRefreshed = useCallback((nativeData, targetDate) => {
+    lastHomeLoadKeyRef.current = getHomeLoadFingerprint(nativeData, targetDate);
+    lastHomeLoadAtRef.current = Date.now();
+  }, [getHomeLoadFingerprint]);
 
   useEffect(() => {
     if (!infoModalPayload || !infoModalPayload.nonce) return;
@@ -213,13 +276,44 @@ export default function HomeScreen({
   
   useFocusEffect(
     React.useCallback(() => {
+      let cancelled = false;
       const loadData = async () => {
         const nativeData = await loadCurrentNative();
-        await loadHomeData(nativeData);
-        fetchLatestBlogPosts();
+        if (cancelled) return;
+
+        const targetDate = new Date().toISOString().split('T')[0];
+        await fetchPricing({ force: false });
+        if (cancelled) return;
+
+        const needsHomeRefresh = shouldRefreshHomeData(nativeData, targetDate);
+        if (needsHomeRefresh) {
+          if (homeLoadInFlightRef.current) {
+            await homeLoadInFlightRef.current;
+          } else {
+            const run = loadHomeData(nativeData).finally(() => {
+              homeLoadInFlightRef.current = null;
+            });
+            homeLoadInFlightRef.current = run;
+            await run;
+          }
+          if (!cancelled) {
+            markHomeDataRefreshed(nativeData, targetDate);
+          }
+        }
+
+        const now = Date.now();
+        if (now - lastBlogFetchAtRef.current >= BLOG_FETCH_TTL_MS) {
+          await fetchLatestBlogPosts();
+          if (!cancelled) {
+            lastBlogFetchAtRef.current = now;
+          }
+        }
       };
       loadData();
-    }, [])
+      return () => {
+        cancelled = true;
+      };
+    }, [birthData?.id, fetchPricing, markHomeDataRefreshed, shouldRefreshHomeData])
   );
 
   const fetchLatestBlogPosts = async () => {
@@ -359,16 +453,22 @@ export default function HomeScreen({
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
     
     let dailyInterval;
+    const refreshHomeAfterIdle = async () => {
+      const nativeData = await loadCurrentNative();
+      const targetDate = new Date().toISOString().split('T')[0];
+      await fetchPricing({ force: false });
+      await loadHomeData(nativeData);
+      markHomeDataRefreshed(nativeData, targetDate);
+    };
     const midnightTimer = setTimeout(() => {
-      loadHomeData();
-      // Set up daily interval after first midnight update
-      dailyInterval = setInterval(loadHomeData, 24 * 60 * 60 * 1000);
+      refreshHomeAfterIdle();
+      dailyInterval = setInterval(refreshHomeAfterIdle, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
     
     // Update when app becomes active (user returns from background)
     const handleAppStateChange = (nextAppState) => {
       if (nextAppState === 'active') {
-        loadHomeData();
+        refreshHomeAfterIdle();
       }
     };
     
@@ -379,7 +479,7 @@ export default function HomeScreen({
       if (dailyInterval) clearInterval(dailyInterval);
       subscription?.remove();
     };
-  }, []);
+  }, [fetchPricing, markHomeDataRefreshed]);
   
 const loadCurrentNative = async () => {
     try {
@@ -473,20 +573,7 @@ const loadHomeData = async (nativeData = null) => {
         } catch (_) {}
       }
 
-      // Load pricing from same API as deduction (credits/settings/analysis-pricing)
-      try {
-        const pricingResponse = await pricingAPI.getPricing();
-        if (pricingResponse?.data?.pricing) {
-          setPricing(pricingResponse.data.pricing);
-          setPricingOriginal(pricingResponse.data.pricing_original || {});
-        } else if (pricingResponse?.data && typeof pricingResponse.data.career !== 'undefined') {
-          setPricing(pricingResponse.data);
-          setPricingOriginal({});
-        }
-      } catch (pricingError) {
-      }
-      
-      // Load transits with birth data
+      // Load transits, dasha ticker, and transit panel (single transits call)
       if (currentBirthData) {
         try {
           const formattedBirthData = {
@@ -497,101 +584,95 @@ const loadHomeData = async (nativeData = null) => {
             longitude: parseFloat(currentBirthData.longitude) || 0,
             location: currentBirthData.place || 'Unknown'
           };
-          
-          // Fetch Ticker Data (Dasha & Sade Sati)
-          Promise.allSettled([
-            chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
-            // Sade Sati is usually part of a larger analysis, but we can check transit Saturn vs Moon
-            chartAPI.calculateTransits(formattedBirthData, targetDate)
-          ]).then(([dashaRes, transitRes]) => {
-            let tickerUpdate = { loading: false };
-            
-            if (dashaRes && dashaRes.status === 'fulfilled' && dashaRes.value?.data) {
-              const currentMaha = dashaRes.value.data.maha_dashas?.find(d => d.current);
-              if (currentMaha) {
-                tickerUpdate.mahadasha = currentMaha.planet;
-              }
-              if (!dashaRes.value.data.error) {
-                setDashData(dashaRes.value.data);
-              }
-            }
-            
-            if (transitRes && transitRes.status === 'fulfilled' && transitRes.value?.data) {
-              const transits = transitRes.value.data.transits;
-              const birthMoonSign = transitRes.value.data.birth_chart?.planets?.Moon?.sign;
-              const transitSaturnSign = transits?.Saturn?.sign;
-              
-              if (birthMoonSign !== undefined && transitSaturnSign !== undefined) {
-                // Simple Sade Sati logic: Saturn in 12th, 1st, or 2nd from Moon
-                const diff = (transitSaturnSign - birthMoonSign + 12) % 12;
-                if (diff === 11 || diff === 0 || diff === 1) {
-                  tickerUpdate.sadeSati = true;
-                } else {
-                  tickerUpdate.sadeSati = false;
-                }
-              }
-            }
-            
-            setTickerData(prev => ({ ...prev, ...tickerUpdate }));
-          }).catch(err => {
-            setTickerData(prev => ({ ...prev, loading: false }));
-          });
 
-          const transitResponse = await chartAPI.calculateTransits(formattedBirthData, targetDate);
-          if (transitResponse?.data) {
-            setTransitData(transitResponse.data);
+          const [dashaRes, transitRes] = await Promise.allSettled([
+            chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
+            chartAPI.calculateTransits(formattedBirthData, targetDate),
+          ]);
+
+          let tickerUpdate = { loading: false };
+
+          if (dashaRes?.status === 'fulfilled' && dashaRes.value?.data) {
+            const currentMaha = dashaRes.value.data.maha_dashas?.find((d) => d.current);
+            if (currentMaha) {
+              tickerUpdate.mahadasha = currentMaha.planet;
+            }
+            if (!dashaRes.value.data.error) {
+              setDashData(dashaRes.value.data);
+            }
           }
+
+          if (transitRes?.status === 'fulfilled' && transitRes.value?.data) {
+            setTransitData(transitRes.value.data);
+            const transits = transitRes.value.data.transits;
+            const birthMoonSign = transitRes.value.data.birth_chart?.planets?.Moon?.sign;
+            const transitSaturnSign = transits?.Saturn?.sign;
+
+            if (birthMoonSign !== undefined && transitSaturnSign !== undefined) {
+              const diff = (transitSaturnSign - birthMoonSign + 12) % 12;
+              tickerUpdate.sadeSati = diff === 11 || diff === 0 || diff === 1;
+            }
+          }
+
+          setTickerData((prev) => ({ ...prev, ...tickerUpdate }));
         } catch (transitError) {
+          setTickerData((prev) => ({ ...prev, loading: false }));
         }
       }
       
-      // Load panchang for user's location or fallback to Delhi
+      // Panchang is date+location bound — fetch at most once per calendar day per location.
       try {
-        let panchangLat = 28.6139; // Delhi fallback
-        let panchangLon = 77.2090; // Delhi fallback
-        
-        // Use current birth data location if available
-        if (currentBirthData && currentBirthData.latitude && currentBirthData.longitude) {
-          panchangLat = parseFloat(currentBirthData.latitude);
-          panchangLon = parseFloat(currentBirthData.longitude);
-        }
-        
-        const [panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
-          panchangAPI.calculateSunriseSunset(targetDate, panchangLat, panchangLon),
-          panchangAPI.calculateRahuKaal(targetDate, panchangLat, panchangLon),
-          panchangAPI.calculateInauspiciousTimes(targetDate, panchangLat, panchangLon),
-          panchangAPI.calculateDailyPanchang(targetDate, panchangLat, panchangLon)
-        ]);
-        
-        if (panchangResponse && panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {
-          let combinedPanchangData = panchangResponse.value.data;
-          
-          if (rahuKaalResponse && rahuKaalResponse.status === 'fulfilled' && rahuKaalResponse.value?.data) {
-            combinedPanchangData.rahu_kaal = rahuKaalResponse.value.data;
+        const { lat: panchangLat, lon: panchangLon } = getPanchangCoords(currentBirthData);
+        const panchangCacheKey = getPanchangCacheKey(panchangLat, panchangLon, targetDate);
+
+        const applyPanchangPayload = (combinedPanchangData) => {
+          if (!combinedPanchangData) return;
+          setPanchangData(combinedPanchangData);
+          const basicPanchang = combinedPanchangData.daily_panchang;
+          const nakshatraName = basicPanchang?.nakshatra?.name || basicPanchang?.nakshatra;
+          if (nakshatraName) {
+            setTickerData((prev) => ({ ...prev, nakshatra: nakshatraName }));
           }
-          
-          if (inauspiciousResponse && inauspiciousResponse.status === 'fulfilled' && inauspiciousResponse.value?.data) {
-            combinedPanchangData.inauspicious_times = inauspiciousResponse.value.data;
-          }
-          
-          if (dailyPanchangResponse && dailyPanchangResponse.status === 'fulfilled' && dailyPanchangResponse.value?.data) {
-            const basicPanchang = dailyPanchangResponse.value.data.basic_panchang;
-            if (basicPanchang) {
-              combinedPanchangData.daily_panchang = {
-                ...dailyPanchangResponse.value.data,
-                nakshatra: basicPanchang.nakshatra,
-                tithi: basicPanchang.tithi,
-                yoga: basicPanchang.yoga,
-                karana: basicPanchang.karana
-              };
-              const nakshatraName = basicPanchang.nakshatra?.name || basicPanchang.nakshatra;
-              if (nakshatraName) {
-                setTickerData(prev => ({ ...prev, nakshatra: nakshatraName }));
+        };
+
+        let usedCache = lastPanchangCacheKeyRef.current === panchangCacheKey;
+        if (!usedCache) {
+          try {
+            const raw = await AsyncStorage.getItem(panchangCacheKey);
+            if (raw) {
+              const cached = JSON.parse(raw);
+              if (cached) {
+                applyPanchangPayload(cached);
+                lastPanchangCacheKeyRef.current = panchangCacheKey;
+                usedCache = true;
               }
             }
+          } catch (_) {}
+        }
+
+        if (!usedCache) {
+          const [panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
+            panchangAPI.calculateSunriseSunset(targetDate, panchangLat, panchangLon),
+            panchangAPI.calculateRahuKaal(targetDate, panchangLat, panchangLon),
+            panchangAPI.calculateInauspiciousTimes(targetDate, panchangLat, panchangLon),
+            panchangAPI.calculateDailyPanchang(targetDate, panchangLat, panchangLon),
+          ]);
+
+          if (panchangResponse?.status === 'fulfilled' && panchangResponse.value?.data) {
+            const combinedPanchangData = mergePanchangResponses(
+              panchangResponse.value,
+              rahuKaalResponse?.status === 'fulfilled' ? rahuKaalResponse.value : null,
+              inauspiciousResponse?.status === 'fulfilled' ? inauspiciousResponse.value : null,
+              dailyPanchangResponse?.status === 'fulfilled' ? dailyPanchangResponse.value : null,
+            );
+            if (combinedPanchangData) {
+              applyPanchangPayload(combinedPanchangData);
+              lastPanchangCacheKeyRef.current = panchangCacheKey;
+              try {
+                await AsyncStorage.setItem(panchangCacheKey, JSON.stringify(combinedPanchangData));
+              } catch (_) {}
+            }
           }
-          
-          setPanchangData(combinedPanchangData);
         }
       } catch (panchangError) {
       }
@@ -1613,7 +1694,10 @@ const loadHomeData = async (nativeData = null) => {
               
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => chartData && navigation.navigate('PlanetaryPositions', { chartData })}
+                onPress={() =>
+                  chartData?.planets &&
+                  navigation.navigate('PlanetaryPositions', { chartData, birthData: displayData })
+                }
                 activeOpacity={0.8}
               >
                 <View style={[

@@ -71,6 +71,122 @@ function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   };
   return <FloatingChatButton onOpenChat={handleOpenChat} />;
 }
+
+/** Logged-in shell for chart selector, dashboard, and marketing home — only at `/`. */
+function AuthenticatedRootShell({
+  currentView,
+  user,
+  setCurrentView,
+  onLogout,
+  onAdminClick,
+  onLogin,
+  goToDomainHome,
+}) {
+  const location = useLocation();
+  if (location.pathname !== '/') {
+    return null;
+  }
+
+  const isFullBleed =
+    currentView === 'dashboard' ||
+    currentView === 'predictions' ||
+    currentView === 'selector' ||
+    currentView === 'user-home' ||
+    currentView === 'astroroshnihomepage' ||
+    currentView === 'admin';
+
+  return (
+    <div
+      style={{
+        padding: isFullBleed ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'),
+        maxWidth: isFullBleed ? '100vw' : '1200px',
+        margin: isFullBleed ? '0' : '0 auto',
+        minHeight: '100vh',
+        background:
+          currentView === 'dashboard' || currentView === 'predictions'
+            ? 'transparent'
+            : currentView === 'selector' ||
+                currentView === 'user-home' ||
+                currentView === 'astroroshnihomepage' ||
+                currentView === 'admin'
+              ? 'transparent'
+              : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
+        overflowX: 'hidden',
+        width: '100%',
+      }}
+    >
+      {currentView === 'astroroshnihomepage' && (
+        <AstroRoshniHomepage
+          user={user}
+          onLogout={onLogout}
+          onAdminClick={onAdminClick}
+          onLogin={onLogin}
+          setCurrentView={setCurrentView}
+        />
+      )}
+      {currentView === 'admin' && (
+        <AdminPanel
+          user={user}
+          onLogout={onLogout}
+          onAdminClick={() => setCurrentView('astroroshnihomepage')}
+          onLogin={onLogin}
+          showLoginButton={false}
+          onHomeClick={() => setCurrentView('astroroshnihomepage')}
+        />
+      )}
+      {currentView === 'selector' && (
+        <ChartSelector
+          onSelectChart={() => setCurrentView('dashboard')}
+          onCreateNew={() => setCurrentView('form')}
+          onLogout={onLogout}
+          onAdminClick={onAdminClick}
+          onBackToUserHome={() => setCurrentView('user-home')}
+          user={user}
+        />
+      )}
+      {currentView === 'form' && (
+        <BirthFormModal
+          isOpen={true}
+          onClose={() => setCurrentView('dashboard')}
+          onSubmit={() => setCurrentView('dashboard')}
+          title="Enter Birth Details"
+          description="Please provide your birth information to generate your chart"
+        />
+      )}
+      {currentView === 'dashboard' && (
+        <Dashboard
+          onBack={goToDomainHome}
+          onViewAllCharts={goToDomainHome}
+          onNewChart={() => setCurrentView('form')}
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+          onLogout={onLogout}
+          user={user}
+        />
+      )}
+      {currentView === 'predictions' && (
+        <PredictionsPage
+          onBack={() => setCurrentView('selector')}
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+          onLogout={onLogout}
+        />
+      )}
+      <ToastContainer
+        position={APP_CONFIG.ui.toast.position}
+        autoClose={APP_CONFIG.ui.toast.duration}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </div>
+  );
+}
+
 //Harmless touch
 function App() {
   const [user, setUser] = useState(null);
@@ -90,46 +206,47 @@ function App() {
     
     if (token && savedUser) {
       try {
-        // Try to use saved user data first
         const userData = JSON.parse(savedUser);
-        setUser(userData);
-        
-        // Check if user should be redirected based on domain
-        const redirectUrl = getRedirectUrl(userData);
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-          return;
-        }
-        
-        // Check URL parameters for view override
-        const urlParams = new URLSearchParams(window.location.search);
-        const viewParam = urlParams.get('view');
-        
-        if (viewParam === 'dashboard') {
-          setCurrentView('dashboard');
-        } else {
-          // Set appropriate view based on domain configuration
-          const domainConfig = getCurrentDomainConfig();
-          
-          if (domainConfig.userType === 'general') {
-            setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
-          } else {
-            setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+
+        const applyAuthenticatedSession = (activeUser) => {
+          setUser(activeUser);
+          localStorage.setItem('user', JSON.stringify(activeUser));
+
+          const redirectUrl = getRedirectUrl(activeUser);
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
           }
-        }
-        
-        setLoading(false);
-        
-        // Verify token in background
-        authService.getCurrentUser()
-          .catch(() => {
-            // If verification fails, clear auth and redirect to login
+
+          const urlParams = new URLSearchParams(window.location.search);
+          const viewParam = urlParams.get('view');
+          if (viewParam === 'dashboard') {
+            setCurrentView('dashboard');
+          } else {
+            const domainConfig = getCurrentDomainConfig();
+            setCurrentView(
+              domainConfig.userType === 'general' ? 'astroroshnihomepage' : 'selector'
+            );
+          }
+        };
+
+        authService
+          .getCurrentUser()
+          .then((validated) => applyAuthenticatedSession(validated || userData))
+          .catch((err) => {
+            const isNetworkError =
+              err?.name === 'TypeError' ||
+              (typeof err?.message === 'string' && err.message.includes('Network'));
+            if (isNetworkError) {
+              applyAuthenticatedSession(userData);
+              return;
+            }
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             setUser(null);
-          });
+          })
+          .finally(() => setLoading(false));
       } catch {
-        // If saved user data is corrupted, clear everything
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setLoading(false);
@@ -193,18 +310,40 @@ function App() {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
   }
 
-  // Show domain-specific page for non-authenticated users
-  if (!user) {
-    const domainConfig = getCurrentDomainConfig();
-    
-    return (
-      <HelmetProvider>
-        <Router>
-          <AstrologyProvider>
-            <CreditProvider>
-              <AnalyticsTracker user={user} />
+  const domainConfig = getCurrentDomainConfig();
+
+  return (
+    <HelmetProvider>
+      <Router>
+        <AstrologyProvider>
+          <CreditProvider>
+            <AnalyticsTracker user={user} />
           <Routes>
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route
+              path="/panchang"
+              element={
+                <PanchangPage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={!user ? () => setShowLoginModal(true) : undefined}
+                  showLoginButton={!user}
+                />
+              }
+            />
             <Route path="/" element={
+              user ? (
+                <AuthenticatedRootShell
+                  currentView={currentView}
+                  user={user}
+                  setCurrentView={setCurrentView}
+                  onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
+                  onLogin={() => setShowLoginModal(true)}
+                  goToDomainHome={goToDomainHome}
+                />
+              ) : (
               domainConfig.userType === 'general' ? (
                 <>
                   <AstroRoshniHomepage 
@@ -330,6 +469,7 @@ function App() {
                 </>
               ) : (
                 <LandingPage onLogin={handleLogin} onRegister={handleLogin} domainConfig={domainConfig} />
+              )
               )
             } />
             <Route path="/beginners-guide" element={<BeginnersGuide />} />
@@ -463,14 +603,7 @@ function App() {
                 </AuthModalShell>
               </>
             } />
-            <Route path="/panchang" element={
-              <PanchangPage 
-                user={null}
-                onLogin={() => setShowLoginModal(true)}
-                showLoginButton={true}
-              />
-            } />
-            <Route path="/muhurat-finder" element={<MuhuratFinderPage />} />
+            <Route path="/muhurat-finder" element={<MuhuratFinderPage user={user} onLogout={user ? handleLogout : undefined} onAdminClick={user ? handleAdminClick : undefined} />} />
             <Route path="/health-analysis" element={
               <>
                 <AstroRoshniHomepage 
@@ -655,260 +788,54 @@ function App() {
           <Route path="/calendar-2026" element={<Calendar2026 user={null} onLogin={() => setShowLoginModal(true)} />} />
             <Route path="/blog" element={<BlogList />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route
+              path="/progeny-analysis"
+              element={
+                user ? (
+                  <AnalysisDetailPage
+                    analysisType="progeny"
+                    user={user}
+                    onLogout={handleLogout}
+                    onAdminClick={handleAdminClick}
+                  />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route path="/education" element={
+              user ? (
+                <AnalysisDetailPage
+                  analysisType="education"
+                  user={user}
+                  onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
+                />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            } />
+            <Route path="/chat" element={user ? <ChatPage /> : <Navigate to="/" replace />} />
+            <Route path="/speech-chat" element={user ? <SpeechChatPage /> : <Navigate to="/" replace />} />
+            <Route path="/profile" element={user ? <ProfilePage user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />} />
+            <Route path="/admin/blog" element={
+              user && user.role === 'admin' ? (
+                <BlogDashboard />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            } />
+            <Route path="/astroroshni" element={<AstroRoshniPage />} />
           </Routes>
-              <ToastContainer />
-              <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
-            </CreditProvider>
-          </AstrologyProvider>
-        </Router>
-    </HelmetProvider>
-  );
-  }
-
-  return (
-    <HelmetProvider>
-      <Router>
-        <AstrologyProvider>
-          <CreditProvider>
-            <Routes>
-          <Route path="/horoscope/:period" element={<HoroscopePage />} />
-          <Route path="/horoscope" element={<HoroscopePage />} />
-          <Route path="/marriage-analysis" element={
-            <AnalysisDetailPage
-              analysisType="marriage"
-              user={user}
-              onLogout={handleLogout}
-              onAdminClick={handleAdminClick}
-            />
-          } />
-          <Route path="/career-guidance" element={
-            <AnalysisDetailPage
-              analysisType="career"
-              user={user}
-              onLogout={handleLogout}
-              onAdminClick={handleAdminClick}
-            />
-          } />
-          <Route path="/health-analysis" element={
-            <AnalysisDetailPage
-              analysisType="health"
-              user={user}
-              onLogout={handleLogout}
-              onAdminClick={handleAdminClick}
-            />
-          } />
-          <Route path="/progeny-analysis" element={
-            <AnalysisDetailPage
-              analysisType="progeny"
-              user={user}
-              onLogout={handleLogout}
-              onAdminClick={handleAdminClick}
-            />
-          } />
-          <Route path="/panchang" element={
-            <PanchangPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
-            />
-          } />
-          <Route path="/muhurat-finder" element={
-            <MuhuratFinderPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
-            />
-          } />
-          <Route path="/wealth-analysis" element={
-            <AnalysisDetailPage
-              analysisType="wealth"
-              user={user}
-              onLogout={handleLogout}
-              onAdminClick={handleAdminClick}
-            />
-          } />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/speech-chat" element={<SpeechChatPage />} />
-          <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
-          <Route path="/nakshatras" element={<NakshatraListPage />} />
-          <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
-          <Route path="/monthly-panchang" element={
-            <MonthlyPanchangPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
-            />
-          } />
-          <Route path="/festivals" element={
-            <FestivalsPage 
-              user={user} 
-              onLogout={handleLogout} 
-              onAdminClick={handleAdminClick} 
-            />
-          } />
-          <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
-          <Route path="/karma-analysis" element={<KarmaAnalysis />} />
-          <Route
-            path="/kundli-matching"
-            element={
-              <KundliMatchingPage
-                user={user}
-                onLogout={handleLogout}
-                onAdminClick={handleAdminClick}
-                onLogin={() => setShowLoginModal(true)}
-                showLoginButton
-              />
-            }
-          />
-          <Route
-            path="/astrovastu"
-            element={
-              <AstroVastuTool
-                user={user}
-                onLogout={handleLogout}
-                onAdminClick={handleAdminClick}
-                onLogin={() => setShowLoginModal(true)}
-              />
-            }
-          />
-          <Route
-            path="/life-events"
-            element={
-              <EventsTimelinePage
-                user={user}
-                onLogout={handleLogout}
-                onAdminClick={handleAdminClick}
-                onLogin={() => setShowLoginModal(true)}
-              />
-            }
-          />
-          <Route
-            path="/tools/ashtakavarga"
-            element={
-              <AshtakavargaToolPage
-                user={user}
-                onLogout={handleLogout}
-                onAdminClick={handleAdminClick}
-                onLogin={() => setShowLoginModal(true)}
-              />
-            }
-          />
-          <Route path="/policy" element={<PolicyPage />} />
-          <Route path="/account/delete" element={<DeleteAccountPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/education" element={
-            <AnalysisDetailPage
-              analysisType="education"
-              user={user}
-              onLogout={handleLogout}
-              onAdminClick={handleAdminClick}
-            />
-          } />
-          <Route path="/about" element={<AboutUs user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
-          <Route path="/calendar-2026" element={<Calendar2026 user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
-          <Route path="/blog" element={<BlogList />} />
-          <Route path="/blog/:slug" element={<BlogPost />} />
-          <Route path="/admin/blog" element={
-            user && user.role === 'admin' ? (
-              <BlogDashboard />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          } />
-
-          <Route path="/beginners-guide" element={<BeginnersGuide />} />
-          <Route path="/advanced-courses" element={<AdvancedCourses />} />
-          <Route path="/myths-vs-reality" element={<MythsVsReality />} />
-          <Route path="/lesson/:lessonId" element={<LessonPage />} />
-          <Route path="/astroroshni" element={<AstroRoshniPage />} />
-          <Route path="/*" element={
-            <div style={{ 
-              padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
-              maxWidth: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? '100vw' : '1200px', 
-              margin: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? '0' : '0 auto',
-              minHeight: '100vh',
-              background: currentView === 'dashboard' || currentView === 'predictions' ? 'transparent' : 
-                         currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
-              overflowX: 'hidden',
-              width: '100%'
-            }}>
-
-        {currentView === 'astroroshnihomepage' && (
-          <AstroRoshniHomepage 
-            user={user} 
-            onLogout={handleLogout} 
-            onAdminClick={handleAdminClick} 
-            onLogin={() => setShowLoginModal(true)}
-            setCurrentView={setCurrentView}
-          />
-        )}
-        {currentView === 'admin' && (
-          <AdminPanel 
-            user={user} 
-            onLogout={handleLogout} 
-            onAdminClick={() => setCurrentView('astroroshnihomepage')}
-            onLogin={() => setShowLoginModal(true)}
-            showLoginButton={false}
-            onHomeClick={() => setCurrentView('astroroshnihomepage')}
-          />
-        )}
-        {currentView === 'selector' && (
-          <ChartSelector 
-            onSelectChart={() => setCurrentView('dashboard')} 
-            onCreateNew={() => setCurrentView('form')} 
-            onLogout={handleLogout}
-            onAdminClick={handleAdminClick}
-            onBackToUserHome={() => setCurrentView('user-home')}
-            user={user}
-          />
-        )}
-        {currentView === 'form' && (
-          <BirthFormModal
-            isOpen={true}
-            onClose={() => setCurrentView('dashboard')}
-            onSubmit={() => setCurrentView('dashboard')}
-            title="Enter Birth Details"
-            description="Please provide your birth information to generate your chart"
-          />
-        )}
-        {currentView === 'dashboard' && (
-          <Dashboard 
-            onBack={goToDomainHome}
-            onViewAllCharts={goToDomainHome}
-            onNewChart={() => setCurrentView('form')}
-            currentView={currentView} 
-            setCurrentView={setCurrentView} 
-            onLogout={handleLogout}
-            user={user} 
-          />
-        )}
-        {currentView === 'predictions' && (
-          <PredictionsPage onBack={() => setCurrentView('selector')} currentView={currentView} setCurrentView={setCurrentView} onLogout={handleLogout} />
-        )}
-        <ToastContainer
-          position={APP_CONFIG.ui.toast.position}
-          autoClose={APP_CONFIG.ui.toast.duration}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
-
-            </div>
-          } />
-            </Routes>
-            {currentView !== 'dashboard' && (
-              <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
-            )}
+          <ToastContainer />
+          {(!user || currentView !== 'dashboard') && (
+            <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
+          )}
           </CreditProvider>
         </AstrologyProvider>
       </Router>
-      </HelmetProvider>
-    );
+    </HelmetProvider>
+  );
 }
 
 export default App;

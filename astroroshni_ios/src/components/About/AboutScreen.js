@@ -5,6 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { APP_DISPLAY_NAME, APP_SHORT_DESCRIPTION } from '../../config/appStoreCopy';
+import { IS_ASTROLOGY_ONLY } from '../../config/appVariant';
 
 export default function AboutScreen({ navigation }) {
   const { theme, colors } = useTheme();
@@ -32,30 +34,30 @@ export default function AboutScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme === 'dark' ? '#020617' : colors.background }]}>
-      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="#ff6b35" />
+      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={IS_ASTROLOGY_ONLY ? colors.background : '#ff6b35'} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('about.title', 'About AstroRoshni')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('about.title', `About ${APP_DISPLAY_NAME}`)}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.card, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.9)' : colors.surface, borderColor: colors.border }]}>
           <View style={styles.logoRow}>
-            <View style={[styles.logoBadge, { backgroundColor: '#f97316' }]}>
+            <View style={[styles.logoBadge, { backgroundColor: IS_ASTROLOGY_ONLY ? colors.text : '#f97316' }]}>
               <Text style={styles.logoText}>AR</Text>
             </View>
             <View>
-              <Text style={[styles.appName, { color: colors.text }]}>AstroRoshni</Text>
+              <Text style={[styles.appName, { color: colors.text }]}>{APP_DISPLAY_NAME}</Text>
               <Text style={[styles.versionText, { color: colors.textSecondary }]}>{versionLine}</Text>
             </View>
           </View>
           <Text style={[styles.description, { color: colors.textSecondary }]}>
             {t(
               'about.description',
-              'AstroRoshni combines Vedic astrology with intelligent guidance to help you understand your life path, timing, and hidden potentials.'
+              APP_SHORT_DESCRIPTION
             )}
           </Text>
         </View>

@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { chatAPI, creditAPI, pricingAPI } from '../services/api';
+import { chatAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
@@ -76,6 +76,21 @@ const resolveBirthChartId = (data) => {
 };
 
 const YEARLY_TIMELINE_PENDING_KEY = 'eventScreenYearlyPendingJob';
+const CACHED_YEARS_STORAGE_PREFIX = 'eventScreenCachedYears:';
+
+const mergeCachedYearList = (...lists) => {
+  const merged = new Set();
+  lists.flat().forEach((value) => {
+    const year = Number(value);
+    if (Number.isFinite(year)) merged.add(year);
+  });
+  return [...merged].sort((a, b) => a - b);
+};
+
+const CHIP_CACHED = {
+  dark: { bg: '#166534', border: '#22c55e', text: '#ecfdf5' },
+  light: { bg: '#dcfce7', border: '#16a34a', text: '#14532d' },
+};
 
 export default function EventScreen({ route }) {
   useAnalytics('EventScreen');
@@ -83,9 +98,17 @@ export default function EventScreen({ route }) {
   const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
   const { theme, colors } = useTheme();
+  const onPrimaryText = '#ffffff';
+  const cachedChip = CHIP_CACHED[theme] || CHIP_CACHED.dark;
   const bgGradient = theme === 'dark'
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
-    : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientStart];
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
+    : [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
+  const continueGradient = [colors.primary, theme === 'dark' ? '#ea580c' : '#c2410c'];
+  const quickSelectButtonStyle = {
+    backgroundColor: colors.surface,
+    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.24)' : colors.cardBorder,
+    borderWidth: 1.5,
+  };
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const deviceNow = React.useMemo(() => new Date(), []);
   const deviceYear = deviceNow.getFullYear();
@@ -113,6 +136,45 @@ export default function EventScreen({ route }) {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [cachedYears, setCachedYears] = useState([]);
   const [cachedMonths, setCachedMonths] = useState([]);
+  const cachedYearsForChartRef = useRef(null);
+  const cachedYearsLoadPromiseRef = useRef(null);
+
+  const persistCachedYearsLocal = useCallback(async (chartId, years) => {
+    if (!chartId || !Array.isArray(years)) return;
+    try {
+      await AsyncStorage.setItem(
+        `${CACHED_YEARS_STORAGE_PREFIX}${chartId}`,
+        JSON.stringify(mergeCachedYearList(years))
+      );
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[EventScreen] persist cached years', error?.message || error);
+      }
+    }
+  }, []);
+
+  const hydrateCachedYearsFromStorage = useCallback(async (chartId) => {
+    if (!chartId) return null;
+    try {
+      const raw = await AsyncStorage.getItem(`${CACHED_YEARS_STORAGE_PREFIX}${chartId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? mergeCachedYearList(parsed) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const markYearCached = useCallback((year) => {
+    const y = Number(year);
+    if (!Number.isFinite(y)) return;
+    setCachedYears((prev) => {
+      const next = mergeCachedYearList(prev, [y]);
+      const chartId = cachedYearsForChartRef.current;
+      if (chartId) persistCachedYearsLocal(chartId, next);
+      return next;
+    });
+  }, [persistCachedYearsLocal]);
   const yearSliderRef = useRef(null);
   const monthSliderRef = useRef(null);
   const loadingIntervalRef = useRef(null);
@@ -123,6 +185,7 @@ export default function EventScreen({ route }) {
   const TIMELINE_MAX_WAIT_MS = 15 * 60 * 1000;
   const [showEventCreditsModal, setShowEventCreditsModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // 'generate' | 'regenerate' | null
+  const [continueChecking, setContinueChecking] = useState(false);
 
   const loadingMessages = [
     { icon: '🌟', text: 'Analyzing planetary positions...' },
@@ -257,9 +320,17 @@ export default function EventScreen({ route }) {
       }
       setNativeName(birthData.name.substring(0, 7));
       setBirthData(birthData);
+      const chartId = resolveBirthChartId(birthData);
+      if (chartId) {
+        cachedYearsForChartRef.current = chartId;
+        const hydrated = await hydrateCachedYearsFromStorage(chartId);
+        if (hydrated?.length) {
+          setCachedYears(hydrated);
+        }
+      }
     };
     loadBirthData();
-  }, []);
+  }, [hydrateCachedYearsFromStorage, navigation]);
 
   // Fetch credit cost (user-discounted via my-pricing when logged in)
   useEffect(() => {
@@ -318,6 +389,7 @@ export default function EventScreen({ route }) {
         });
         if (res.data?.cached && res.data?.data) {
           setMonthlyData(res.data.data);
+          markYearCached(y);
           await clearYearlyPendingJob();
           trackEvent('yearly_timeline_delivered', {
             year: Number(y),
@@ -332,7 +404,7 @@ export default function EventScreen({ route }) {
       }
       return false;
     },
-    [clearYearlyPendingJob, fetchBalance]
+    [clearYearlyPendingJob, fetchBalance, markYearCached]
   );
 
   const attachYearlyTimelinePolling = useCallback((jobId, year, startedAt = new Date().toISOString()) => {
@@ -347,6 +419,7 @@ export default function EventScreen({ route }) {
       if (!takeOutcome()) return;
       stopEventTimelineJob();
       setMonthlyData(data);
+      markYearCached(year);
       await clearYearlyPendingJob();
       trackEvent('yearly_timeline_delivered', {
         year: Number(year),
@@ -505,6 +578,7 @@ export default function EventScreen({ route }) {
     TIMELINE_POLL_MS,
     clearYearlyPendingJob,
     fetchBalance,
+    markYearCached,
     stopEventTimelineJob,
     t,
     tryLoadCachedYearlyTimeline,
@@ -686,12 +760,12 @@ export default function EventScreen({ route }) {
         
         if (cacheResponse.data?.cached && cacheResponse.data?.data) {
           setMonthlyData(cacheResponse.data.data);
+          markYearCached(selectedYear);
         } else {
           // No cached data - check credits before generating
-          await fetchBalance();
-          const freshBalance = await creditAPI.getBalance();
-          const actualCredits = freshBalance.data.balance;
-          
+          const refreshedCredits = await fetchBalance();
+          const actualCredits = refreshedCredits ?? credits;
+
           if (actualCredits < creditCost) {
             Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
               { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
@@ -709,9 +783,8 @@ export default function EventScreen({ route }) {
           console.warn('[EventScreen] loadCachedData failed', error?.message || error);
           const startPaidGenerationIfAllowed = async () => {
             try {
-              await fetchBalance();
-              const freshBalance = await creditAPI.getBalance();
-              const actualCredits = freshBalance.data.balance;
+              const refreshedCredits = await fetchBalance();
+              const actualCredits = refreshedCredits ?? credits;
               if (actualCredits < creditCost) {
                 Alert.alert(
                   'Insufficient Credits',
@@ -751,8 +824,10 @@ export default function EventScreen({ route }) {
     resumePendingYearlyJob,
     tryLoadCachedYearlyTimeline,
     creditCost,
+    credits,
     fetchMonthlyGuide,
     fetchBalance,
+    markYearCached,
     navigation,
   ]);
 
@@ -805,63 +880,173 @@ export default function EventScreen({ route }) {
   const cachedYearSet = React.useMemo(() => new Set((cachedYears || []).map((y) => Number(y))), [cachedYears]);
   const cachedMonthSet = React.useMemo(() => new Set((cachedMonths || []).map((m) => Number(m))), [cachedMonths]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadCachedYears = async () => {
-      const birthChartId = resolveBirthChartId(birthData);
-      if (!birthChartId) {
-        if (!cancelled) setCachedYears([]);
-        return;
+  const getYearChipStyles = useCallback(
+    (item) => {
+      const isCached = cachedYearSet.has(Number(item));
+      const isSelected = selectedYear === item;
+      return [
+        styles.yearChip,
+        { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder, width: ITEM_WIDTH },
+        isCached && !isSelected && {
+          backgroundColor: cachedChip.bg,
+          borderColor: cachedChip.border,
+        },
+        isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+      ];
+    },
+    [cachedYearSet, cachedChip.bg, cachedChip.border, colors.cardBackground, colors.cardBorder, colors.primary, selectedYear]
+  );
+
+  const getYearChipTextColor = useCallback(
+    (item) => {
+      const isCached = cachedYearSet.has(Number(item));
+      const isSelected = selectedYear === item;
+      if (isSelected) return onPrimaryText;
+      if (isCached) return cachedChip.text;
+      return colors.text;
+    },
+    [cachedYearSet, cachedChip.text, colors.text, onPrimaryText, selectedYear]
+  );
+
+  const getMonthChipStyles = useCallback(
+    (item) => {
+      const isCached = cachedMonthSet.has(Number(item));
+      const isSelected = selectedMonth === item;
+      return [
+        styles.monthChip,
+        { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder, width: ITEM_WIDTH },
+        isCached && !isSelected && {
+          backgroundColor: cachedChip.bg,
+          borderColor: cachedChip.border,
+        },
+        isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+      ];
+    },
+    [
+      cachedMonthSet,
+      cachedChip.bg,
+      cachedChip.border,
+      colors.cardBackground,
+      colors.cardBorder,
+      colors.primary,
+      selectedMonth,
+    ]
+  );
+
+  const getMonthChipTextColor = useCallback(
+    (item) => {
+      const isCached = cachedMonthSet.has(Number(item));
+      const isSelected = selectedMonth === item;
+      if (isSelected) return onPrimaryText;
+      if (isCached) return cachedChip.text;
+      return colors.text;
+    },
+    [cachedMonthSet, cachedChip.text, colors.text, onPrimaryText, selectedMonth]
+  );
+
+  const loadCachedYears = useCallback(async () => {
+    if (cachedYearsLoadPromiseRef.current) {
+      return cachedYearsLoadPromiseRef.current;
+    }
+
+    const run = async () => {
+      const bd = resolveBirthChartId(birthData) ? birthData : await getBirthDetails();
+      const birthChartId = resolveBirthChartId(bd);
+      if (!birthChartId) return;
+
+      if (cachedYearsForChartRef.current !== birthChartId) {
+        cachedYearsForChartRef.current = birthChartId;
+        const hydrated = await hydrateCachedYearsFromStorage(birthChartId);
+        if (hydrated?.length) {
+          setCachedYears(hydrated);
+        }
       }
+
+      let apiYears = [];
       try {
         const res = await chatAPI.getCachedMonthlyEventYears(birthChartId);
-        const yearsFromApi = Array.isArray(res?.data?.years) ? res.data.years : [];
-        if (yearsFromApi.length > 0) {
-          if (!cancelled) setCachedYears(yearsFromApi);
+        const yearsFromApi = Array.isArray(res?.data?.years)
+          ? res.data.years
+          : Array.isArray(res?.years)
+            ? res.years
+            : [];
+        apiYears = mergeCachedYearList(yearsFromApi);
+        if (apiYears.length > 0) {
+          setCachedYears(apiYears);
+          await persistCachedYearsLocal(birthChartId, apiYears);
+          if (__DEV__) {
+            console.log('[EventScreen] cached years from API:', apiYears);
+          }
           return;
         }
-      } catch {
-        // Fallback below will probe cache year-by-year in a bounded window.
+      } catch (e) {
+        if (__DEV__) {
+          console.warn('[EventScreen] cached-years API failed, probing:', e?.message || e);
+        }
       }
 
-      // Fallback for environments where /cached-years is unavailable:
-      // probe a bounded window around current year using existing /cached endpoint.
+      // Fallback: probe /cached for nearby years (batched to avoid flooding the server).
       const probeStart = Math.max(startYear, deviceYear - 15);
       const probeEnd = Math.min(END_YEAR, deviceYear + 15);
-      const probeYears = Array.from({ length: Math.max(0, probeEnd - probeStart + 1) }, (_, i) => probeStart + i);
-
-      if (probeYears.length === 0) {
-        if (!cancelled) setCachedYears([]);
-        return;
-      }
-
-      const checks = await Promise.all(
-        probeYears.map(async (y) => {
-          try {
-            const r = await chatAPI.getCachedMonthlyEvents({
-              ...birthData,
-              selectedYear: y,
-              birth_chart_id: birthChartId,
-            });
-            return r?.data?.cached ? y : null;
-          } catch {
-            return null;
-          }
-        })
+      const probeYears = Array.from(
+        { length: Math.max(0, probeEnd - probeStart + 1) },
+        (_, i) => probeStart + i
       );
+      if (probeYears.length === 0) return;
 
-      if (!cancelled) {
-        setCachedYears(checks.filter((y) => Number.isFinite(y)));
+      const probed = [];
+      const PROBE_BATCH = 6;
+      for (let i = 0; i < probeYears.length; i += PROBE_BATCH) {
+        const batch = probeYears.slice(i, i + PROBE_BATCH);
+        const checks = await Promise.all(
+          batch.map(async (y) => {
+            try {
+              const r = await chatAPI.getCachedMonthlyEvents({
+                ...bd,
+                selectedYear: y,
+                birth_chart_id: birthChartId,
+              });
+              return r?.data?.cached ? y : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        probed.push(...checks.filter((y) => Number.isFinite(y)));
+      }
+
+      if (probed.length > 0) {
+        let mergedForStorage = [];
+        setCachedYears((prev) => {
+          mergedForStorage = mergeCachedYearList(prev, probed, apiYears);
+          return mergedForStorage;
+        });
+        await persistCachedYearsLocal(birthChartId, mergedForStorage);
+        if (__DEV__) {
+          console.log('[EventScreen] cached years from probe:', probed);
+        }
+      } else if (__DEV__) {
+        console.log('[EventScreen] probe found no cached years in window', {
+          probeStart,
+          probeEnd,
+          birthChartId,
+        });
       }
     };
+
+    cachedYearsLoadPromiseRef.current = run().finally(() => {
+      cachedYearsLoadPromiseRef.current = null;
+    });
+    return cachedYearsLoadPromiseRef.current;
+  }, [birthData, deviceYear, hydrateCachedYearsFromStorage, persistCachedYearsLocal, startYear]);
+
+  useEffect(() => {
     loadCachedYears();
-    return () => {
-      cancelled = true;
-    };
-  }, [birthData, startYear, deviceYear]);
+  }, [loadCachedYears]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      loadCachedYears();
       (async () => {
         const pending = await loadYearlyPendingJob();
         if (monthlyData?.monthly_predictions?.length || loadingMonthly) {
@@ -875,6 +1060,7 @@ export default function EventScreen({ route }) {
     });
     return unsubscribe;
   }, [
+    loadCachedYears,
     loadYearlyPendingJob,
     loadingMonthly,
     monthlyData,
@@ -1037,6 +1223,8 @@ export default function EventScreen({ route }) {
   };
 
   const handleContinue = async () => {
+    if (continueChecking) return;
+    setContinueChecking(true);
     try {
       const birthData = await getBirthDetails();
       if (!birthData || !birthData.id) {
@@ -1050,33 +1238,38 @@ export default function EventScreen({ route }) {
         setReadingMode('yearly');
         return;
       }
-      
-      // Check if cached data exists
-      const cacheResponse = await chatAPI.getCachedMonthlyEvents({
-        ...birthData,
-        selectedYear: selectedYear,
-        birth_chart_id: birthData.id
-      });
-      
-      if (cacheResponse.data?.cached) {
-        // Cached data exists - proceed directly
+
+      // Green chip = known cached year — skip network cache probe
+      if (cachedYearSet.has(Number(selectedYear))) {
         setAnalysisStarted(true);
-      } else {
-        // No cache - show credit confirmation modal using shared ConfirmCreditsModal
-        await fetchBalance();
-        const freshBalance = await creditAPI.getBalance();
-        const actualCredits = freshBalance.data.balance;
-        
-        if (actualCredits < creditCost) {
-          Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
-            { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
-          return;
-        }
-        setPendingAction('generate');
-        setShowEventCreditsModal(true);
+        return;
       }
+
+      const [cacheResponse, refreshedCredits] = await Promise.all([
+        chatAPI.getCachedMonthlyEvents({
+          ...birthData,
+          selectedYear: selectedYear,
+          birth_chart_id: birthData.id,
+        }),
+        fetchBalance(),
+      ]);
+
+      if (cacheResponse.data?.cached) {
+        markYearCached(selectedYear);
+        setAnalysisStarted(true);
+        return;
+      }
+
+      const actualCredits = refreshedCredits ?? credits;
+      if (actualCredits < creditCost) {
+        Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
+          { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        return;
+      }
+      setPendingAction('generate');
+      setShowEventCreditsModal(true);
     } catch (error) {
       console.error('❌ Cache Check Error Details:', {
         message: error.message,
@@ -1100,6 +1293,8 @@ export default function EventScreen({ route }) {
       } else {
         Alert.alert('Error', 'Failed to check for existing predictions. Please try again.');
       }
+    } finally {
+      setContinueChecking(false);
     }
   };
 
@@ -1117,13 +1312,23 @@ export default function EventScreen({ route }) {
   };
   const displayMacroTrends = (monthlyData?.macro_trends || []).filter(isDescriptiveTrend);
 
+  const renderCachedYearsLegend = () => (
+    <View style={styles.cachedYearsHintRow}>
+      <View style={[styles.cachedYearsLegendDot, { backgroundColor: cachedChip.border }]} />
+      <Text style={[styles.cachedYearsHintText, { color: colors.textTertiary }]}>
+        {t(
+          'eventScreen.cachedHint',
+          'Already saved — select and open, no extra credits.'
+        )}
+      </Text>
+    </View>
+  );
+
   const handleRegenerateConfirm = async () => {
     setShowRegenerateModal(false);
-    await fetchBalance();
-    
-    const freshBalance = await creditAPI.getBalance();
-    const actualCredits = freshBalance.data.balance;
-    
+    const refreshedCredits = await fetchBalance();
+    const actualCredits = refreshedCredits ?? credits;
+
     if (actualCredits < creditCost) {
       Alert.alert('Insufficient Credits', `You need ${creditCost} credits to regenerate. You have ${actualCredits} credits.`, [
         { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
@@ -1175,7 +1380,7 @@ export default function EventScreen({ route }) {
                 style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.primary }]} 
                 onPress={handleRegenerateConfirm}
               >
-                <Text style={[styles.modalButtonTextConfirm, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>{t('eventScreen.confirm', 'Confirm')}</Text>
+                <Text style={[styles.modalButtonTextConfirm, { color: onPrimaryText }]}>{t('eventScreen.confirm', 'Confirm')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1187,7 +1392,7 @@ export default function EventScreen({ route }) {
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.primary }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
             {analysisStarted ? t('eventScreen.headerPredictions', { year: selectedYear }) : t('eventScreen.headerTitle', 'Major Life Events')}
           </Text>
           {birthData && (
@@ -1223,7 +1428,7 @@ export default function EventScreen({ route }) {
 
       {!analysisStarted ? (
         <View style={[styles.selectionContainer, { backgroundColor: 'transparent' }]}>
-          <Text style={[styles.selectionTitle, { color: colors.primary }]}>🌟 {t('eventScreen.chooseReading', 'Choose your reading')}</Text>
+          <Text style={[styles.selectionTitle, { color: colors.text }]}>🌟 {t('eventScreen.chooseReading', 'Choose your reading')}</Text>
           <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>
             {readingMode === 'yearly'
               ? t('eventScreen.yearlySubtitle', 'You’ll get the year’s vibe with 12 monthly story arcs. Tap any month to go deeper.')
@@ -1238,10 +1443,17 @@ export default function EventScreen({ route }) {
               ]}
               onPress={() => setReadingMode('yearly')}
             >
-              <Text style={[styles.modeToggleText, { color: readingMode === 'yearly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.primary }]}>
+              <Text style={[styles.modeToggleText, { color: readingMode === 'yearly' ? onPrimaryText : colors.text }]}>
                 {t('eventScreen.yearlyOverview', 'Whole Year')}
               </Text>
-              <Text style={[styles.modeToggleSubtext, { color: readingMode === 'yearly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.modeToggleSubtext,
+                  {
+                    color: readingMode === 'yearly' ? 'rgba(255,255,255,0.88)' : colors.textSecondary,
+                  },
+                ]}
+              >
                 {t('eventScreen.yearlyOverviewDesc', '12 monthly chapters')}
               </Text>
             </TouchableOpacity>
@@ -1253,10 +1465,17 @@ export default function EventScreen({ route }) {
               ]}
               onPress={() => setReadingMode('monthly')}
             >
-              <Text style={[styles.modeToggleText, { color: readingMode === 'monthly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.primary }]}>
+              <Text style={[styles.modeToggleText, { color: readingMode === 'monthly' ? onPrimaryText : colors.text }]}>
                 {t('eventScreen.monthlyDeepDive', 'One Month')}
               </Text>
-              <Text style={[styles.modeToggleSubtext, { color: readingMode === 'monthly' ? (theme === 'dark' ? colors.background : '#1a1a1a') : colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.modeToggleSubtext,
+                  {
+                    color: readingMode === 'monthly' ? 'rgba(255,255,255,0.88)' : colors.textSecondary,
+                  },
+                ]}
+              >
                 {t('eventScreen.monthlyDeepDiveDesc', 'Deep detail for your month')}
               </Text>
             </TouchableOpacity>
@@ -1278,23 +1497,10 @@ export default function EventScreen({ route }) {
                   {years.map((item) => (
                     <View key={item} style={{ width: TOTAL_ITEM_SIZE }}>
                       <TouchableOpacity
-                        style={[
-                          styles.yearChip,
-                          { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
-                          cachedYearSet.has(Number(item)) && {
-                            backgroundColor: '#22c55e',
-                            borderColor: '#16a34a',
-                          },
-                          selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
-                          { width: ITEM_WIDTH }
-                        ]}
+                        style={getYearChipStyles(item)}
                         onPress={() => handleYearChange(item)}
                       >
-                        <Text style={[
-                          styles.yearChipText,
-                          { color: cachedYearSet.has(Number(item)) ? '#f0fdf4' : colors.textSecondary },
-                          selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
-                        ]}>
+                        <Text style={[styles.yearChipText, { color: getYearChipTextColor(item) }]}>
                           {item}
                         </Text>
                       </TouchableOpacity>
@@ -1306,21 +1512,19 @@ export default function EventScreen({ route }) {
               {/* Quick Select */}
               <View style={styles.quickSelectContainer}>
                 <TouchableOpacity
-                  style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
+                  style={[styles.quickSelectButton, quickSelectButtonStyle]}
                   onPress={() => handleYearChange(deviceYear)}
                 >
-                  <Text style={[styles.quickSelectText, { color: colors.primary }]}>{t('eventScreen.thisYear', 'This Year')}</Text>
+                  <Text style={[styles.quickSelectText, { color: colors.text }]}>{t('eventScreen.thisYear', 'This Year')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
+                  style={[styles.quickSelectButton, quickSelectButtonStyle]}
                   onPress={() => handleYearChange(deviceYear + 1)}
                 >
-                  <Text style={[styles.quickSelectText, { color: colors.primary }]}>{t('eventScreen.nextYear', 'Next Year')}</Text>
+                  <Text style={[styles.quickSelectText, { color: colors.text }]}>{t('eventScreen.nextYear', 'Next Year')}</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.cachedYearsHint, { color: colors.textSecondary }]}>
-                {'🟢 Green years/months are already cached. You do not need to pay credits again - just select and view.'}
-              </Text>
+              {renderCachedYearsLegend()}
             </>
           ) : (
             <>
@@ -1339,23 +1543,10 @@ export default function EventScreen({ route }) {
                   {years.map((item) => (
                     <View key={item} style={{ width: TOTAL_ITEM_SIZE }}>
                       <TouchableOpacity
-                        style={[
-                          styles.yearChip,
-                          { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
-                          cachedYearSet.has(Number(item)) && {
-                            backgroundColor: '#22c55e',
-                            borderColor: '#16a34a',
-                          },
-                          selectedYear === item && { backgroundColor: colors.primary, borderColor: colors.primary },
-                          { width: ITEM_WIDTH }
-                        ]}
+                        style={getYearChipStyles(item)}
                         onPress={() => handleYearChange(item)}
                       >
-                        <Text style={[
-                          styles.yearChipText,
-                          { color: cachedYearSet.has(Number(item)) ? '#f0fdf4' : colors.textSecondary },
-                          selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
-                        ]}>
+                        <Text style={[styles.yearChipText, { color: getYearChipTextColor(item) }]}>
                           {item}
                         </Text>
                       </TouchableOpacity>
@@ -1363,9 +1554,7 @@ export default function EventScreen({ route }) {
                   ))}
                 </GHScrollView>
               </View>
-              <Text style={[styles.cachedYearsHint, { color: colors.textSecondary }]}>
-                {'🟢 Green years/months are already cached. You do not need to pay credits again - just select and view.'}
-              </Text>
+              {renderCachedYearsLegend()}
               <View style={styles.monthChipsContainer}>
                 <GHScrollView
                   ref={monthSliderRef}
@@ -1378,23 +1567,10 @@ export default function EventScreen({ route }) {
                   {deviceMonths.map((item) => (
                     <View key={item} style={{ width: ITEM_WIDTH + ITEM_GAP }}>
                       <TouchableOpacity
-                        style={[
-                          styles.monthChip,
-                          { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
-                          cachedMonthSet.has(Number(item)) && {
-                            backgroundColor: '#22c55e',
-                            borderColor: '#16a34a',
-                          },
-                          selectedMonth === item && { backgroundColor: colors.primary, borderColor: colors.primary },
-                          { width: ITEM_WIDTH }
-                        ]}
+                        style={getMonthChipStyles(item)}
                         onPress={() => handleMonthChange(item)}
                       >
-                        <Text style={[
-                          styles.monthChipText,
-                          { color: cachedMonthSet.has(Number(item)) ? '#f0fdf4' : colors.textSecondary },
-                          selectedMonth === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
-                        ]}>
+                        <Text style={[styles.monthChipText, { color: getMonthChipTextColor(item) }]}>
                           {getMonthName(item)}
                         </Text>
                       </TouchableOpacity>
@@ -1407,7 +1583,7 @@ export default function EventScreen({ route }) {
 
           {/* What's Included */}
           <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.featuresTitle, { color: colors.primary }]}>{t('eventScreen.whatsIncluded', "What's Included:")}</Text>
+            <Text style={[styles.featuresTitle, { color: colors.text }]}>{t('eventScreen.whatsIncluded', "What's Included:")}</Text>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               <Text style={[styles.featureText, { color: colors.text }]}>
@@ -1436,21 +1612,39 @@ export default function EventScreen({ route }) {
           </View>
 
           {/* Continue Button */}
-          <View style={styles.unlockButtonContainer}>
+          <View
+            style={[
+              styles.unlockButtonContainer,
+              readingMode === 'monthly' && styles.unlockButtonContainerMonthly,
+            ]}
+          >
             <TouchableOpacity
-              style={styles.unlockButton}
+              style={[styles.unlockButton, continueChecking && styles.unlockButtonDisabled]}
               onPress={readingMode === 'yearly' ? handleContinue : handleMonthlyContinue}
+              disabled={continueChecking}
+              activeOpacity={continueChecking ? 1 : 0.7}
             >
               <LinearGradient
-                colors={theme === 'dark' ? ['#4a3a7a', '#6a52a3'] : ['#f5efff', '#eadfff']}
+                colors={continueGradient}
                 style={styles.unlockGradient}
               >
-                <Text style={[styles.unlockButtonText, { color: colors.primary }]}>
-                  {readingMode === 'yearly'
-                    ? t('eventScreen.continue', 'Continue')
-                    : t('eventScreen.generateMonth', 'Generate my month reading')}
-                </Text>
-                <Ionicons name="arrow-forward" size={22} color={colors.primary} />
+                {continueChecking && readingMode === 'yearly' ? (
+                  <>
+                    <ActivityIndicator size="small" color={onPrimaryText} />
+                    <Text style={[styles.unlockButtonText, { color: onPrimaryText }]}>
+                      {t('eventScreen.checking', 'Checking…')}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.unlockButtonText, { color: onPrimaryText }]}>
+                      {readingMode === 'yearly'
+                        ? t('eventScreen.continue', 'Continue')
+                        : t('eventScreen.generateMonth', 'Generate my month reading')}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={22} color={onPrimaryText} />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1463,10 +1657,18 @@ export default function EventScreen({ route }) {
       >
         {/* Macro Trends (The "Vibe") */}
         {displayMacroTrends.length > 0 && (
-          <View style={styles.macroCard}>
+          <View
+            style={[
+              styles.macroCard,
+              {
+                backgroundColor: theme === 'dark' ? 'rgba(44, 30, 78, 0.85)' : colors.cardBackground,
+                borderColor: colors.cardBorder,
+              },
+            ]}
+          >
             <View style={styles.macroHeader}>
               <Ionicons name="planet" size={18} color={colors.primary} />
-              <Text style={[styles.macroTitle, { color: colors.primary }]}>The Vibe of {selectedYear}</Text>
+              <Text style={[styles.macroTitle, { color: colors.text }]}>The Vibe of {selectedYear}</Text>
             </View>
             {displayMacroTrends.map((trend, index) => (
               <View key={index} style={styles.trendRow}>
@@ -1518,7 +1720,7 @@ export default function EventScreen({ route }) {
           </View>
         ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.primary }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Guide')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Guide')}</Text>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
                 <MonthlyAccordion
@@ -1581,13 +1783,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  headerTitle: { 
-    fontSize: 20, 
-    fontWeight: '700', 
-    color: '#FFD700', 
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
     marginBottom: 10,
-    letterSpacing: 0.5
+    letterSpacing: 0.5,
   },
   headerSpacer: { width: 32 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1607,40 +1808,38 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.1)'
   },
   
-  scrollContent: { paddingBottom: 40, backgroundColor: '#0a0a0f' },
+  scrollContent: { paddingBottom: 40 },
   
   section: { marginTop: 24, marginBottom: 24 },
   sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', color: '#FFD700', marginBottom: 6, letterSpacing: 0.3 },
-  sectionSubtitle: { fontSize: 14, color: '#b8b8c8', lineHeight: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 6, letterSpacing: 0.3 },
+  sectionSubtitle: { fontSize: 14, lineHeight: 20 },
   
   macroCard: {
     margin: 20,
     padding: 20,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 184, 107, 0.38)',
-    backgroundColor: 'rgba(44, 30, 78, 0.72)',
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.16,
-    shadowRadius: 6
+    shadowRadius: 6,
   },
   macroHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
-  macroTitle: { fontSize: 18, fontWeight: '700', color: '#FFD700', letterSpacing: 0.3 },
+  macroTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
   trendRow: { flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' },
-  bullet: { color: '#FFD700', marginRight: 10, fontSize: 18, marginTop: 2 },
-  trendText: { color: '#e8e8f0', fontSize: 15, lineHeight: 22, flex: 1 },
+  bullet: { marginRight: 10, fontSize: 18, marginTop: 2 },
+  trendText: { fontSize: 15, lineHeight: 22, flex: 1 },
   
   loadingContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
   loadingIcon: { fontSize: 56, marginTop: 20, marginBottom: 12 },
-  loadingText: { color: '#e8e8f0', marginTop: 16, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 26 },
+  loadingText: { marginTop: 16, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 26 },
   progressBarContainer: { width: '100%', marginTop: 28, alignItems: 'center' },
-  progressBarTrack: { width: '100%', height: 8, backgroundColor: '#1a1a2e', borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.2)' },
-  progressBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 4 },
-  progressPercentText: { color: '#FFD700', fontSize: 15, fontWeight: '700', marginTop: 10 },
-  takingLongerText: { color: '#b8b8c8', fontSize: 14, marginTop: 28, fontStyle: 'italic' },
+  progressBarTrack: { width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', borderWidth: 1 },
+  progressBarFill: { height: '100%', borderRadius: 4 },
+  progressPercentText: { fontSize: 15, fontWeight: '700', marginTop: 10 },
+  takingLongerText: { fontSize: 14, marginTop: 28, fontStyle: 'italic' },
   
   waitingContainer: { 
     flex: 1, 
@@ -1659,23 +1858,20 @@ const styles = StyleSheet.create({
   selectionContainer: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#0a0a0f'
   },
   selectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFD700',
     textAlign: 'center',
     marginTop: 16,
     marginBottom: 8,
-    letterSpacing: 0.5
+    letterSpacing: 0.5,
   },
   selectionSubtitle: {
     fontSize: 14,
-    color: '#b8b8c8',
     textAlign: 'center',
     marginBottom: 18,
-    lineHeight: 22
+    lineHeight: 22,
   },
   modeToggleContainer: {
     flexDirection: 'row',
@@ -1714,7 +1910,6 @@ const styles = StyleSheet.create({
   },
   monthChip: {
     paddingVertical: 12,
-    backgroundColor: '#16162a',
     borderRadius: 12,
     borderWidth: 2,
     alignItems: 'center',
@@ -1724,7 +1919,6 @@ const styles = StyleSheet.create({
   monthChipText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#b8b8c8',
   },
   yearChipsContainer: {
     marginBottom: 16,
@@ -1738,74 +1932,63 @@ const styles = StyleSheet.create({
   },
   yearChip: {
     paddingVertical: 12,
-    backgroundColor: '#16162a',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.2)',
     alignItems: 'center',
-    justifyContent: 'center'
-  },
-  yearChipSelected: {
-    backgroundColor: '#FFD700',
-    borderColor: '#FFD700',
-    elevation: 4,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6
+    justifyContent: 'center',
   },
   yearChipText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#b8b8c8'
-  },
-  yearChipTextSelected: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0a0a0f'
   },
   quickSelectContainer: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 18
   },
-  cachedYearsHint: {
+  cachedYearsHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  cachedYearsLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  cachedYearsHintText: {
     fontSize: 12.5,
     lineHeight: 18,
-    marginBottom: 16,
-    textAlign: 'center',
-    opacity: 0.95,
+    textAlign: 'left',
+    flexShrink: 1,
   },
   quickSelectButton: {
     flex: 1,
     paddingVertical: 10,
-    backgroundColor: '#16162a',
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 215, 0, 0.3)'
   },
   quickSelectText: {
-    color: '#FFD700',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: 0.3
+    letterSpacing: 0.3,
   },
   featuresContainer: {
-    backgroundColor: '#16162a',
     padding: 16,
     paddingRight: 22,
     borderRadius: 14,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.15)'
   },
   featuresTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFD700',
     marginBottom: 12,
-    letterSpacing: 0.3
+    letterSpacing: 0.3,
   },
   featureItem: {
     flexDirection: 'row',
@@ -1815,16 +1998,18 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 14,
-    color: '#e8e8f0',
     lineHeight: 20,
     flex: 1,
     flexShrink: 1,
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
   },
   unlockButtonContainer: {
     marginTop: 'auto',
     paddingTop: 12,
     paddingBottom: 6,
+  },
+  unlockButtonContainerMonthly: {
+    paddingBottom: 28,
   },
   unlockButton: {
     borderRadius: 14,
@@ -1835,7 +2020,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.22,
     shadowRadius: 10,
-    elevation: 4
+    elevation: 4,
+  },
+  unlockButtonDisabled: {
+    opacity: 0.85,
   },
   unlockGradient: {
     paddingVertical: 14,

@@ -322,14 +322,14 @@ export default function App() {
               <ErrorBoundary>
               <NavigationContainer ref={navigationRef}>
               <GlobalErrorHandler />
-              <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
+              <StatusBar barStyle="dark-content" backgroundColor={IS_ASTROLOGY_ONLY ? '#ffffff' : '#ff6b35'} />
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{
             headerStyle: {
-              backgroundColor: '#ff6b35',
+              backgroundColor: IS_ASTROLOGY_ONLY ? '#ffffff' : '#ff6b35',
             },
-            headerTintColor: '#fff',
+            headerTintColor: IS_ASTROLOGY_ONLY ? '#000000' : '#fff',
             headerTitleStyle: {
               fontWeight: 'bold',
             },
@@ -388,6 +388,18 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen 
+            name="Chart" 
+            component={ChartScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AshtakvargaOracle" 
+            component={AshtakvargaOracle}
+            options={{ headerShown: false }}
+          />
+          {!IS_ASTROLOGY_ONLY && (
+            <>
+          <Stack.Screen 
             name="AnalysisHub" 
             component={AnalysisHubScreen}
             options={{ headerShown: false }}
@@ -400,11 +412,6 @@ export default function App() {
           <Stack.Screen 
             name="KarmaAnalysis" 
             component={KarmaAnalysisScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Chart" 
-            component={ChartScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 
@@ -438,20 +445,19 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen 
-            name="AshtakvargaOracle" 
-            component={AshtakvargaOracle}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
             name="Numerology" 
             component={NumerologyScreen}
             options={{ headerShown: false }}
           />
+            </>
+          )}
           <Stack.Screen 
             name="PlanetaryPositions" 
             component={PlanetaryPositionsScreen}
             options={{ headerShown: false }}
           />
+          {!IS_ASTROLOGY_ONLY && (
+            <>
           <Stack.Screen 
             name="FinancialDashboard" 
             component={FinancialDashboard}
@@ -467,6 +473,8 @@ export default function App() {
             component={AllOpportunitiesScreen}
             options={{ headerShown: false }}
           />
+            </>
+          )}
           <Stack.Screen 
             name="KotaChakra" 
             component={KotaChakraScreen}

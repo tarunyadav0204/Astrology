@@ -47,6 +47,9 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
+import { IS_ASTROLOGY_ONLY } from '../../config/appVariant';
+import { APP_DISPLAY_NAME } from '../../config/appStoreCopy';
+import { navigateSafe } from '../../navigation/astrologyOnly';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -184,6 +187,37 @@ export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
+  const isClassic = theme === 'classic';
+  const lightHeaderGradient = isClassic
+    ? [colors.cardBackground, colors.backgroundSecondary]
+    : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)'];
+  const lightHeaderBorder = isClassic ? colors.cardBorder : 'rgba(249, 115, 22, 0.2)';
+  const lightChipBackground = isClassic ? colors.surface : 'rgba(249, 115, 22, 0.25)';
+  const menuDrawerBg = isClassic
+    ? [colors.background, colors.backgroundSecondary, colors.backgroundSecondary]
+    : theme === 'dark'
+      ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']
+      : ['#fefcfb', '#fefcfb', '#fefcfb', '#fefcfb'];
+  const getMenuRowGradient = () => {
+    if (isClassic) return [colors.cardBackground, colors.backgroundSecondary];
+    if (theme === 'dark') {
+      return Platform.OS === 'android'
+        ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)']
+        : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'];
+    }
+    return Platform.OS === 'android'
+      ? ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']
+      : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'];
+  };
+  const getMenuRowBorder = () =>
+    isClassic ? colors.cardBorder : theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)';
+  const menuIconGradient = (accent) => (isClassic ? [colors.text, colors.textSecondary] : accent);
+  const menuLabelColor = isClassic ? colors.text : theme === 'dark' ? '#ffffff' : '#1f2937';
+  const menuMutedColor = isClassic
+    ? colors.textTertiary
+    : theme === 'dark'
+      ? 'rgba(255, 255, 255, 0.6)'
+      : 'rgba(31, 41, 55, 0.6)';
   const {
     credits,
     partnershipCost,
@@ -276,7 +310,7 @@ export default function ChatScreen({ navigation, route }) {
 
   useEffect(() => {
     let animation;
-    if (showMenu) {
+    if (showMenu && !isClassic) {
       animation = Animated.loop(
         Animated.sequence([
           Animated.timing(menuLogoGlow, {
@@ -298,7 +332,7 @@ export default function ChatScreen({ navigation, route }) {
     return () => {
       animation?.stop();
     };
-  }, [showMenu]);
+  }, [showMenu, isClassic]);
 
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -337,6 +371,7 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
   const [showMundaneModal, setShowMundaneModal] = useState(false);
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
+  const [isLearnMode, setIsLearnMode] = useState(IS_ASTROLOGY_ONLY);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Move input into view when keyboard opens (does not change tab bar layout)
@@ -428,7 +463,7 @@ export default function ChatScreen({ navigation, route }) {
   
   // Fetch calibration event when birth data changes
   useEffect(() => {
-    if (birthData?.id && !showGreeting) {
+    if (!IS_ASTROLOGY_ONLY && birthData?.id && !showGreeting) {
       fetchCalibrationEvent();
     }
   }, [birthData?.id, showGreeting]);
@@ -507,15 +542,24 @@ export default function ChatScreen({ navigation, route }) {
     { elevation: getCardElevation(3) }
   ];
 
-  const suggestions = [
-    "What does my birth chart say about my career?",
-    "When is a good time for marriage?",
-    "What are my health vulnerabilities?",
-    "Tell me about my current dasha period",
-    "What do the current transits mean for me?",
-    "Show me significant periods in my life",
-    "What are my strengths and weaknesses?"
+  const studySuggestions = [
+    'How do I read the 4th house using my Moon placement?',
+    'Explain how my Vimshottari dasha table is built',
+    "Walk me through my ascendant lord's house and sign",
+    'What does the 10th house represent in Vedic chart reading?',
+    'How do transits relate to my natal chart structure?',
+    'Teach me the difference between sign, house, and lord',
   ];
+  const predictiveSuggestions = [
+    'What does my birth chart say about my career?',
+    'When is a good time for marriage?',
+    'What are my health vulnerabilities?',
+    'Tell me about my current dasha period',
+    'What do the current transits mean for me?',
+    'Show me significant periods in my life',
+    'What are my strengths and weaknesses?',
+  ];
+  const suggestions = (IS_ASTROLOGY_ONLY || isLearnMode) ? studySuggestions : predictiveSuggestions;
 
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
@@ -661,7 +705,7 @@ export default function ChatScreen({ navigation, route }) {
           }
         }
         setTimeout(() => {
-          handleGreetingOptionSelect({ action: 'question' });
+          handleGreetingOptionSelect({ action: IS_ASTROLOGY_ONLY ? 'learn' : 'question' });
           if (initialMsg) {
             setInputText(initialMsg);
           }
@@ -669,8 +713,8 @@ export default function ChatScreen({ navigation, route }) {
       })();
     }
     
-    // Handle mundane mode param
-    if (route.params?.mode === 'mundane') {
+  // Handle mundane mode param (not available in educational build)
+    if (!IS_ASTROLOGY_ONLY && route.params?.mode === 'mundane') {
       setIsMundane(true);
       setIsPremiumAnalysis(false); // No premium in mundane
       setShowModeSelector(false);
@@ -714,6 +758,7 @@ export default function ChatScreen({ navigation, route }) {
         }
         setIsPremiumAnalysis(false);
         setShowModeSelector(false);
+        setIsLearnMode(IS_ASTROLOGY_ONLY);
         return true;
       }
       return false;
@@ -902,10 +947,13 @@ export default function ChatScreen({ navigation, route }) {
     return unsubscribe;
   }, [currentPersonId, loading, isTyping, showGreeting]);
 
-  // First question free: standard chat only (not partnership, not mundane)
+  // First question free: standard/learn chat only (not partnership, not mundane)
+  const useEducationalChat = IS_ASTROLOGY_ONLY || isLearnMode;
   const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
     ? 0
-    : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost);
+    : (useEducationalChat
+      ? chatCost
+      : (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost));
 
   const openNotificationsForFreeQuestion = async () => {
     try {
@@ -1404,11 +1452,104 @@ export default function ChatScreen({ navigation, route }) {
 
   const confirmMundaneMode = () => {
     setShowMundaneModal(false);
-    navigation.navigate('MundaneHub');
+    navigateSafe(navigation, 'MundaneHub');
+  };
+
+  const enterChatFromHome = async (learnMode = false) => {
+    const educational = IS_ASTROLOGY_ONLY || learnMode;
+    setIsLearnMode(educational);
+    setIsPremiumAnalysis(false);
+    setShowModeSelector(false);
+
+    if (partnershipMode) {
+      setPartnershipMode(false);
+      setNativeChart(null);
+      setPartnerChart(null);
+      setPartnershipRelation('');
+      setIsTypingOtherRelation(false);
+      setOtherRelationText('');
+      setNativeSearchQuery('');
+    }
+    if (isMundane) {
+      setIsMundane(false);
+      setMundaneContext(null);
+    }
+
+    await loadChatHistory();
+    setShowGreeting(false);
+
+    setTimeout(() => {
+      if (messages.length > 0) {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }
+    }, 50);
+
+    setTimeout(async () => {
+      const storedMessages = await loadMessagesFromStorage(currentPersonId);
+      const nativeName = birthData?.name || 'there';
+      let welcomeMessage;
+
+      if (educational) {
+        welcomeMessage = {
+          id: Date.now().toString(),
+          content: t(
+            'chat.learnWelcomeMessage',
+            "📚 Welcome {{name}}!\n\nUse your birth chart as a **practice chart** for studying Vedic astrology—houses, planets, dashas, and classical combinations—with clear worked examples.\n\nThis is for education only: chart literacy and technique, not fortune telling or life predictions.\n\nYou might ask:\n\n• What does my Moon placement illustrate about 4th-house topics?\n• How is my Vimshottari dasha table built?\n• Walk me through my ascendant lord's house and sign\n\nWhat part of your chart would you like to understand first?",
+            { name: nativeName }
+          ),
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+        };
+      } else if (isMundaneRef.current) {
+        welcomeMessage = {
+          id: Date.now().toString(),
+          content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+        };
+      } else {
+        welcomeMessage = {
+          id: Date.now().toString(),
+          content: t(
+            'chat.welcomeMessage',
+            "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?",
+            { name: nativeName }
+          ),
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      if (storedMessages.length === 0) {
+        setMessagesWithStorage([welcomeMessage]);
+      } else {
+        const firstMessage = storedMessages[0];
+        if (!firstMessage.content.includes('Welcome')) {
+          setMessagesWithStorage([welcomeMessage, ...storedMessages]);
+        } else {
+          setMessagesWithStorage([welcomeMessage, ...storedMessages.slice(1)]);
+        }
+      }
+    }, 100);
   };
 
   const handleGreetingOptionSelect = async (option) => {
-    
+    if (IS_ASTROLOGY_ONLY) {
+      if (option.action === 'lab' || option.action === 'learn') {
+        return enterChatFromHome(true);
+      }
+      Alert.alert(
+        'Study edition',
+        'Use the Study tab to explore your chart with guided explanations.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (option.action === 'lab' || option.action === 'learn') {
+      return enterChatFromHome(true);
+    }
+
     if (option.action === 'partnership') {
       openPartnershipModal(option.cost);
     } else if (option.action === 'mundane') {
@@ -1416,24 +1557,24 @@ export default function ChatScreen({ navigation, route }) {
     } else if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
-      navigation.navigate('EventScreen');
+      navigateSafe(navigation, 'EventScreen');
     } else if (option.action === 'ashtakvarga') {
       navigation.navigate('AshtakvargaOracle');
     } else if (option.action === 'muhurat') {
-      navigation.navigate('MuhuratHub');
+      navigateSafe(navigation, 'MuhuratHub');
     } else if (option.action === 'numerology') {
-      navigation.navigate('Numerology');
+      navigateSafe(navigation, 'Numerology');
     } else if (option.action === 'analysis') {
       if (option.type === 'karma') {
-        navigation.navigate('KarmaAnalysis', { chartId: birthData?.id });
+        navigateSafe(navigation, 'KarmaAnalysis', { chartId: birthData?.id });
       } else if (option.type === 'trading') {
-        navigation.navigate('TradingDashboard');
+        navigateSafe(navigation, 'TradingDashboard');
       } else if (option.type === 'financial') {
-        navigation.navigate('FinancialDashboard');
+        navigateSafe(navigation, 'FinancialDashboard');
       } else if (option.type === 'childbirth') {
-        navigation.navigate('ChildbirthPlanner');
+        navigateSafe(navigation, 'ChildbirthPlanner');
       } else {
-        navigation.navigate('AnalysisDetail', { 
+        navigateSafe(navigation, 'AnalysisDetail', {
           analysisType: option.type,
           title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
           cost: option.cost,
@@ -1441,78 +1582,7 @@ export default function ChatScreen({ navigation, route }) {
         });
       }
     } else {
-      
-      // First load any existing chat history
-      await loadChatHistory();
-      
-      // Switch to chat mode immediately
-      setShowGreeting(false);
-      
-      // Reset special modes when starting standard chat
-      if (partnershipMode) {
-        setPartnershipMode(false);
-        setNativeChart(null);
-        setPartnerChart(null);
-        setPartnershipRelation('');
-        setIsTypingOtherRelation(false);
-        setOtherRelationText('');
-        setNativeSearchQuery('');
-      }
-      if (isMundane) {
-        setIsMundane(false);
-        setMundaneContext(null);
-      }
-      setIsPremiumAnalysis(false);
-      setShowModeSelector(false);
-      
-      // Set flag to scroll when content renders
-      setTimeout(() => {
-        if (messages.length > 0) {
-          scrollViewRef.current?.scrollToEnd({ animated: false });
-        }
-      }, 50);
-      
-      // Check if we need to show welcome message
-      setTimeout(async () => {
-        
-        const storedMessages = await loadMessagesFromStorage(currentPersonId);
-        
-        // Always show fresh welcome message when explicitly starting chat
-        const nativeName = birthData?.name || 'there';
-        
-        let welcomeMessage;
-        
-        if (isMundaneRef.current) {
-          welcomeMessage = {
-            id: Date.now().toString(),
-            content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI'm ready to analyze ${mundaneContextRef.current?.event_name || 'the event'} for you using elite mundane astrology techniques.\n\nI have the charts for ${mundaneContextRef.current?.entities?.join(', ') || 'the involved parties'} and the event moment ready. Ask your question below.`,
-            role: 'assistant',
-            timestamp: new Date().toISOString(),
-          };
-        } else {
-          welcomeMessage = {
-            id: Date.now().toString(),
-            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
-            role: 'assistant',
-            timestamp: new Date().toISOString(),
-          };
-        }
-        
-        // If no stored messages, show welcome. If stored messages exist, prepend welcome if it's not already there
-        if (storedMessages.length === 0) {
-          setMessagesWithStorage([welcomeMessage]);
-        } else {
-          // Check if first message is already a welcome message
-          const firstMessage = storedMessages[0];
-          if (!firstMessage.content.includes('Welcome')) {
-            setMessagesWithStorage([welcomeMessage, ...storedMessages]);
-          } else {
-            // Replace old welcome with new personalized one
-            const updatedMessages = [welcomeMessage, ...storedMessages.slice(1)];
-            setMessagesWithStorage(updatedMessages);
-          }
-        }
-      }, 100);
+      return enterChatFromHome(false);
     }
   };
 
@@ -2000,7 +2070,8 @@ export default function ChatScreen({ navigation, route }) {
           question: finalQuestion,
           language: language || 'english',
           response_style: 'detailed',
-          premium_analysis: useFreeQuestion ? false : isPremiumAnalysis,
+          premium_analysis: useEducationalChat ? false : (useFreeQuestion ? false : isPremiumAnalysis),
+          ...(useEducationalChat && { mode: 'lab' }),
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
             name: nativeChart.name,
@@ -2518,7 +2589,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const renderMessage = ({ item }) => (
-    <MessageBubble message={item} language={language} />
+    <MessageBubble message={item} language={language} isLabMode={useEducationalChat} />
   );
 
   const renderSuggestion = ({ item }) => (
@@ -2553,20 +2624,20 @@ export default function ChatScreen({ navigation, route }) {
         {/* Header */}
         <View style={styles.headerContainer}>
           <LinearGradient
-            colors={theme === 'dark' 
+            colors={theme === 'dark'
               ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-              : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
+              : lightHeaderGradient}
             style={[
               styles.header,
               {
-                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)',
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : lightHeaderBorder,
                 elevation: getCardElevation(3),
               }
             ]}
           >
             {!showGreeting && (
               <TouchableOpacity
-                style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
+                style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : lightChipBackground }]}
                 onPress={() => {
                   setShowGreeting(true);
                   if (isMundane) {
@@ -2584,24 +2655,36 @@ export default function ChatScreen({ navigation, route }) {
                   }
                   setIsPremiumAnalysis(false);
                   setShowModeSelector(false);
+                  setIsLearnMode(IS_ASTROLOGY_ONLY);
                 }}
               >
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
               </TouchableOpacity>
             )}
             
-            <View style={styles.headerCenter}>
+            <View style={[styles.headerCenter, showGreeting && styles.headerCenterGreeting]}>
               {showGreeting ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -16 }}>
-                  <View style={styles.headerLogoContainer}>
-                    <Image 
+                <View style={styles.headerBrandRow}>
+                  <View style={[styles.headerLogoContainer, isClassic && styles.headerLogoContainerCompact]}>
+                    <Image
                       source={require('../../../assets/logo.png')}
-                      style={styles.headerLogo}
+                      style={[styles.headerLogo, isClassic && styles.headerLogoCompact]}
                       resizeMode="contain"
                     />
                   </View>
-                  <View>
-                    <Text style={[styles.headerTitle, { color: colors.text, marginBottom: 4 }]}>AstroRoshni</Text>
+                  <View style={styles.headerTitleWrap}>
+                    <Text
+                      style={[
+                        styles.headerTitle,
+                        IS_ASTROLOGY_ONLY && styles.headerTitleCompact,
+                        { color: colors.text },
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.82}
+                    >
+                      {IS_ASTROLOGY_ONLY ? APP_DISPLAY_NAME : 'AstroRoshni'}
+                    </Text>
                   </View>
                 </View>
               ) : isMundane ? (
@@ -2626,16 +2709,25 @@ export default function ChatScreen({ navigation, route }) {
               ) : !partnershipMode ? (
                 <View style={styles.headerNativeChipWrap}>
                   {birthData ? (
-                    <NativeSelectorChip
-                      birthData={birthData}
-                      onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
-                      maxLength={8}
-                      showIcon={false}
-                      style={styles.headerNativeChip}
-                      textStyle={styles.headerNativeChipText}
-                    />
+                    <>
+                      <NativeSelectorChip
+                        birthData={birthData}
+                        onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
+                        maxLength={8}
+                        showIcon={false}
+                        style={styles.headerNativeChip}
+                        textStyle={styles.headerNativeChipText}
+                      />
+                      {useEducationalChat && (
+                        <View style={[styles.learnModeBadge, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+                          <Text style={[styles.learnModeBadgeText, { color: colors.text }]}>Study</Text>
+                        </View>
+                      )}
+                    </>
                   ) : (
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
+                      {useEducationalChat ? 'Chart study' : 'Chat'}
+                    </Text>
                   )}
                 </View>
               ) : (
@@ -2668,19 +2760,29 @@ export default function ChatScreen({ navigation, route }) {
             
             <View style={styles.headerRight}>
               <TouchableOpacity
-                style={[styles.creditButton, isPremiumAnalysis && styles.creditButtonPremium]}
+                style={[
+                  styles.creditButton,
+                  (isClassic || IS_ASTROLOGY_ONLY) && styles.creditButtonCompact,
+                  isPremiumAnalysis && styles.creditButtonPremium,
+                  isClassic && !isPremiumAnalysis && { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+                ]}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <Text style={[styles.creditText, { color: colors.text }]}>
-                  {isPremiumAnalysis ? '⚡' : '💳'} {credits}
-                  {effectiveChatCost === 0 && (
+                <Text
+                  style={[styles.creditText, (isClassic || IS_ASTROLOGY_ONLY) && styles.creditTextCompact, { color: colors.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
+                  {isPremiumAnalysis ? `⚡ ${credits}` : IS_ASTROLOGY_ONLY ? `${credits}` : `💳 ${credits}`}
+                  {effectiveChatCost === 0 && !IS_ASTROLOGY_ONLY && (
                     <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · Free</Text>
                   )}
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={styles.menuButton}
+                style={[styles.menuButton, (isClassic || IS_ASTROLOGY_ONLY) && styles.menuButtonCompact]}
                 onPress={() => {
                   if (Date.now() - menuJustClosedAt.current < 400) return;
                   setShowMenu(true);
@@ -2712,7 +2814,7 @@ export default function ChatScreen({ navigation, route }) {
           />
         ) : (
           <>
-          {partnershipMode && (
+          {!IS_ASTROLOGY_ONLY && partnershipMode && (
             <View style={styles.floatingBadgesContainer}>
               <TouchableOpacity 
                 style={styles.floatingChangeBadge}
@@ -2910,6 +3012,7 @@ export default function ChatScreen({ navigation, route }) {
                       onDelete={handleDeleteMessage}
                       onRestart={restartPolling}
                       onSendRetry={handleSendRetry}
+                      isLabMode={useEducationalChat}
                     />
                     
                     {/* OLD Partnership Chart Selector UI - REMOVED since we have the Card above */}
@@ -2955,7 +3058,11 @@ export default function ChatScreen({ navigation, route }) {
                   onPress={() => setInputText(item)}
                 >
                   <LinearGradient
-                    colors={['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']}
+                    colors={
+                      useEducationalChat || theme === 'classic'
+                        ? [colors.surface, colors.backgroundSecondary]
+                        : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']
+                    }
                     style={styles.suggestionChipGradient}
                   >
                     <Text style={[styles.suggestionChipText, { color: colors.text }]}>{item}</Text>
@@ -3051,6 +3158,7 @@ export default function ChatScreen({ navigation, route }) {
                   partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
                   showModeSelector ? "Type here..." : 
                   isMundane ? "Ask about markets, politics, events..." : 
+                  useEducationalChat ? "Ask how to read your chart…" :
                   "Ask me anything..."
                 }
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
@@ -3060,7 +3168,7 @@ export default function ChatScreen({ navigation, route }) {
                 blurOnSubmit={false}
               />
 
-              {!partnershipMode && !isMundane && (
+              {!partnershipMode && !isMundane && !useEducationalChat && (
                 <TouchableOpacity
                   style={styles.premiumToggleButton}
                   onPress={() => setShowModeSelector(prev => !prev)}
@@ -3104,7 +3212,13 @@ export default function ChatScreen({ navigation, route }) {
                 disabled={loading || !inputText.trim() || credits < effectiveChatCost || (partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
-                  colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
+                  colors={
+                    useEducationalChat || theme === 'classic'
+                      ? [colors.text, colors.textSecondary]
+                      : isPremiumAnalysis
+                        ? ['#ffd700', '#ff6b35']
+                        : ['#ff6b35', '#ff8c5a']
+                  }
                   style={styles.modernSendGradient}
                 >
                   {loading ? (
@@ -3151,7 +3265,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             
-            {showPremiumTooltip && !isPremiumAnalysis && !partnershipMode && !isMundane && (
+            {showPremiumTooltip && !useEducationalChat && !isPremiumAnalysis && !partnershipMode && !isMundane && (
               <View style={styles.premiumTooltip}>
                 <TouchableOpacity 
                   style={styles.tooltipClose}
@@ -3306,34 +3420,48 @@ export default function ChatScreen({ navigation, route }) {
               onStartShouldSetResponder={() => true}
             >
               <LinearGradient
-                colors={theme === 'dark' ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35'] : ['#fefcfb', '#fefcfb', '#fefcfb', '#fefcfb']}
+                colors={menuDrawerBg}
                 style={styles.drawerGradient}
               >
-                <View style={styles.drawerHeader}>
-                  <Animated.View style={[styles.logoContainer, {
-                    shadowOpacity: menuLogoGlow.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.6, 1],
-                    }),
-                    shadowRadius: menuLogoGlow.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [12, 20],
-                    }),
-                    transform: [{
-                      scale: menuLogoGlow.interpolate({
+                <View style={[styles.drawerHeader, isClassic && { borderBottomColor: colors.cardBorder }]}>
+                  {isClassic ? (
+                    <View style={[styles.logoContainer, { backgroundColor: colors.surface, shadowColor: '#000', shadowOpacity: 0.06 }]}>
+                      <Image
+                        source={require('../../../assets/logo.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : (
+                    <Animated.View style={[styles.logoContainer, {
+                      shadowOpacity: menuLogoGlow.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [1, 1.05],
-                      })
-                    }]
-                  }]}>
-                    <Image 
-                      source={require('../../../assets/logo.png')}
-                      style={styles.logoImage}
-                      resizeMode="contain"
-                    />
-                  </Animated.View>
-                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.title')}</Text>
-                  <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
+                        outputRange: [0.6, 1],
+                      }),
+                      shadowRadius: menuLogoGlow.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [12, 20],
+                      }),
+                      transform: [{
+                        scale: menuLogoGlow.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.05],
+                        })
+                      }]
+                    }]}>
+                      <Image
+                        source={require('../../../assets/logo.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                      />
+                    </Animated.View>
+                  )}
+                  <Text style={[styles.drawerTitle, isClassic && styles.drawerTitleClassic, { color: menuLabelColor }]}>
+                    {IS_ASTROLOGY_ONLY ? t('menu.titleStudy', 'Study Menu') : t('menu.title')}
+                  </Text>
+                  <Text style={[styles.drawerSubtitle, { color: isClassic ? colors.textSecondary : theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>
+                    {IS_ASTROLOGY_ONLY ? t('menu.subtitleStudy', 'Reference tools & account') : t('menu.subtitle')}
+                  </Text>
                 </View>
 
                 <GHScrollView 
@@ -3357,21 +3485,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>✨</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.myProfile')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.myProfile')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3389,21 +3515,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>👤</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.selectNative')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.selectNative')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3421,21 +3545,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>➕</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.newNative')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.newNative')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3453,21 +3575,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>📊</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.viewChart')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.viewChart')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3485,21 +3605,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>⏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.dashaBrowser')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.dashaBrowser')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3517,21 +3635,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#9C27B0', '#E91E63']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#9C27B0', '#E91E63'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>⊞</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.ashtakvarga')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.ashtakvarga')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -3548,21 +3664,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#FF6B35', '#FFA500']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#FF6B35', '#FFA500'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>⚖️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.shadbala')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.shadbala')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3576,26 +3690,26 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
-                        navigation.navigate('KotaChakra', { birthChartId: birthData?.id });
+                        navigation.navigate('KotaChakra', {
+                          birthChartId: birthData?.id ?? birthData?.birth_chart_id,
+                        });
                       });
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#795548', '#8D6E63']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#795548', '#8D6E63'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>🏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kotaChakra')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.kotaChakra')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3613,21 +3727,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#8b5cf6', '#6366f1']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#8b5cf6', '#6366f1'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.yogas')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.yogas')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3647,24 +3759,24 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#10b981', '#34d399']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#10b981', '#34d399'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>🔢</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kpSystem')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.kpSystem')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  {!IS_ASTROLOGY_ONLY && (
+                    <>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -3674,26 +3786,24 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
-                        navigation.navigate('AnalysisHub');
+                        navigateSafe(navigation, 'AnalysisHub');
                       });
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.lifeAnalysis')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.lifeAnalysis')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3706,26 +3816,24 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
-                        navigation.navigate('KarmaAnalysis', { chartId: birthData?.id });
+                        navigateSafe(navigation, 'KarmaAnalysis', { chartId: birthData?.id });
                       });
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#667eea', '#764ba2']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#667eea', '#764ba2'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>🕉️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.pastLifeRegression')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.pastLifeRegression')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3738,28 +3846,28 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
-                        navigation.navigate('Numerology');
+                        navigateSafe(navigation, 'Numerology');
                       });
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#667eea', '#764ba2']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#667eea', '#764ba2'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>🔢</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.numerology')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.numerology')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
+                    </>
+                  )}
 
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
@@ -3775,21 +3883,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#667eea', '#764ba2']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#667eea', '#764ba2'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>💬</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.chatHistory')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.chatHistory')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3820,23 +3926,21 @@ export default function ChatScreen({ navigation, route }) {
                       }}
                     >
                       <LinearGradient
-                        colors={partnershipMode 
+                        colors={partnershipMode && !isClassic
                           ? (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'])
-                          : (Platform.OS === 'android' 
-                            ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                            : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
-                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                          : getMenuRowGradient()}
+                        style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
-                            colors={partnershipMode ? ['#9333ea', '#a855f7'] : ['#ff6b35', '#ff8c5a']}
-                            style={styles.menuIconGradient}
+                            colors={menuIconGradient(partnershipMode ? ['#9333ea', '#a855f7'] : ['#ff6b35', '#ff8c5a'])}
+                            style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                           >
                             <Text style={styles.menuEmoji}>👥</Text>
                           </LinearGradient>
                         </View>
                         <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
-                        <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                        <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
@@ -3855,21 +3959,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#6366f1', '#8b5cf6']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#6366f1', '#8b5cf6'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>📚</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.blog')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.blog')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3887,21 +3989,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#ff6b35', '#ff8c5a'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>💳</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.credits')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.credits')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -3919,21 +4019,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={getMenuRowGradient()}
+                      style={[styles.menuGradient, { borderColor: getMenuRowBorder() }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#0ea5e9', '#38bdf8']}
-                          style={styles.menuIconGradient}
+                          colors={menuIconGradient(['#0ea5e9', '#38bdf8'])}
+                          style={[styles.menuIconGradient, isClassic && styles.menuIconGradientClassic]}
                         >
                           <Text style={styles.menuEmoji}>💬</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.support')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: menuLabelColor }]}>{t('menu.support')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={menuMutedColor} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -4306,33 +4404,39 @@ export default function ChatScreen({ navigation, route }) {
         </KeyboardAvoidingView>
       </SafeAreaView>
       
-      <PremiumAnalysisModal
-        visible={showPremiumModal}
-        onClose={() => setShowPremiumModal(false)}
-        premiumCost={premiumChatCost}
-        standardCost={chatCost}
-      />
-      <ConfirmCreditsModal
-        visible={showPartnershipModal}
-        onClose={() => setShowPartnershipModal(false)}
-        onConfirm={confirmPartnershipMode}
-        title="Partnership Mode"
-        description="Partnership mode uses credits per question for comprehensive compatibility analysis between two charts."
-        cost={partnershipModalCost}
-        credits={credits}
-        confirmLabel="Continue"
-      />
-      <ConfirmCreditsModal
-        visible={showMundaneModal}
-        onClose={() => setShowMundaneModal(false)}
-        onConfirm={confirmMundaneMode}
-        title="Global Markets & Events"
-        description="Global Markets & Events analysis uses credits per question for deep mundane astrology of nations, markets, and world events."
-        cost={mundaneModalCost}
-        credits={credits}
-        confirmLabel="Continue"
-      />
-      {renderPartnershipSetupModal()}
+      {!IS_ASTROLOGY_ONLY && (
+        <PremiumAnalysisModal
+          visible={showPremiumModal}
+          onClose={() => setShowPremiumModal(false)}
+          premiumCost={premiumChatCost}
+          standardCost={chatCost}
+        />
+      )}
+      {!IS_ASTROLOGY_ONLY && (
+        <>
+          <ConfirmCreditsModal
+            visible={showPartnershipModal}
+            onClose={() => setShowPartnershipModal(false)}
+            onConfirm={confirmPartnershipMode}
+            title="Partnership Mode"
+            description="Partnership mode uses credits per question for comprehensive compatibility analysis between two charts."
+            cost={partnershipModalCost}
+            credits={credits}
+            confirmLabel="Continue"
+          />
+          <ConfirmCreditsModal
+            visible={showMundaneModal}
+            onClose={() => setShowMundaneModal(false)}
+            onConfirm={confirmMundaneMode}
+            title="Global Markets & Events"
+            description="Global Markets & Events analysis uses credits per question for deep mundane astrology of nations, markets, and world events."
+            cost={mundaneModalCost}
+            credits={credits}
+            confirmLabel="Continue"
+          />
+          {renderPartnershipSetupModal()}
+        </>
+      )}
       </LinearGradient>
     </View>
   );
@@ -4359,9 +4463,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 20,
+    gap: 8,
     borderWidth: 1,
     ...Platform.select({
       ios: {
@@ -4387,11 +4492,32 @@ const styles = StyleSheet.create({
   headerCenter: {
     flex: 1,
     alignItems: 'center',
+    minWidth: 0,
+  },
+  headerCenterGreeting: {
+    alignItems: 'stretch',
+    justifyContent: 'center',
+  },
+  headerBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    paddingRight: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    textAlign: 'center',
+  },
+  headerTitleCompact: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   headerLogoContainer: {
     width: 48,
@@ -4400,18 +4526,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 107, 53, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
     overflow: 'hidden',
+    flexShrink: 0,
     shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 8,
     elevation: 8,
   },
+  headerLogoContainerCompact: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   headerLogo: {
     width: 44,
     height: 44,
     borderRadius: 22,
+  },
+  headerLogoCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -4464,10 +4605,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  learnModeBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  learnModeBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   creditButton: {
     backgroundColor: 'rgba(255, 107, 53, 0.2)',
@@ -4476,6 +4630,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+    maxWidth: 96,
+  },
+  creditButtonCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    maxWidth: 80,
   },
   creditButtonPremium: {
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
@@ -4485,13 +4646,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  creditTextCompact: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
   menuButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    flexShrink: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  menuButtonCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   messagesContainer: {
     flex: 1,
@@ -4981,6 +5153,10 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  drawerTitleClassic: {
+    textShadowColor: 'transparent',
+    textShadowRadius: 0,
+  },
   drawerSubtitle: {
     fontSize: 14,
     textAlign: 'center',
@@ -5052,6 +5228,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  menuIconGradientClassic: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.12)',
   },
   menuEmoji: {
     fontSize: 22,

@@ -161,6 +161,12 @@ const NorthIndianChart = ({
 
   const getPlanetSymbolWithStatus = (planet) => {
     const status = getPlanetStatus(planet);
+    if (!chartData) {
+      let symbol = planet.symbol;
+      if (status === 'exalted') symbol += '↑';
+      if (status === 'debilitated') symbol += '↓';
+      return symbol;
+    }
     const planets = chartData.planets || chartData;
     const planetData = planets[planet.name];
     const isRetrograde = planetData?.retrograde;

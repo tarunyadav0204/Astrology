@@ -14,6 +14,7 @@ import {
   Animated,
   Image,
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,13 +23,16 @@ import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, Path, Line, Rect, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
-import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
+import { chartAPI, panchangAPI, pricingAPI, blogAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import { IS_ASTROLOGY_ONLY } from '../../config/appVariant';
+import { useCredits } from '../../credits/CreditContext';
+import HomeAstrologyToolsSection from './HomeAstrologyToolsSection';
+import HomeStudyLabCtaCard from './HomeStudyLabCtaCard';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -57,13 +61,10 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   console.log('🌐 HomeScreen current language:', i18n.language);
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
-  
-  if (!colors) {
-    return null;
-  }
+  const { subscriptionTierName, credits } = useCredits();
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
-  const [activeTab, setActiveTab] = useState('ask');
+  const [activeTab, setActiveTab] = useState(IS_ASTROLOGY_ONLY ? 'study' : 'ask');
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
   const [pricing, setPricing] = useState({});
@@ -167,7 +168,6 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
 
   const fetchLatestBlogPosts = async () => {
     try {
-      const { blogAPI } = require('../../services/api');
       const response = await blogAPI.getPosts('published', null, 3);
       setLatestBlogPosts(response.data);
     } catch (error) {
@@ -240,11 +240,15 @@ const loadHomeData = async (nativeData = null) => {
       
       // Load pricing first
       try {
-        const pricingResponse = await pricingAPI.getAnalysisPricing();
-        if (pricingResponse?.data) {
-          setPricing(pricingResponse.data);
+        const pricingResponse = await pricingAPI.getPricing();
+        const payload = pricingResponse?.data?.pricing
+          ? pricingResponse.data
+          : pricingResponse?.data;
+        if (payload) {
+          setPricing(payload);
         }
       } catch (pricingError) {
+        // non-fatal
       }
       
       const targetDate = new Date().toISOString().split('T')[0];
@@ -402,12 +406,18 @@ const loadHomeData = async (nativeData = null) => {
         }
         
         if (chartResponse && chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
-          // console.log('🏠 HomeScreen - Received chart data from backend:', JSON.stringify(chartResponse.value.data, null, 2));
-          // console.log('🏠 HomeScreen - Ascendant sign from chart:', chartResponse.value.data?.houses?.[0]?.sign);
           setChartData(chartResponse.value.data);
+        } else if (chartResponse?.status === 'rejected') {
+          const status = chartResponse.reason?.response?.status;
+          if (status === 401 || status === 403) {
+            console.warn('Error loading chart data: auth required or forbidden — sign in again if needed');
+          } else {
+            console.warn('Error loading chart data:', chartResponse.reason?.message || chartResponse.reason);
+          }
         }
       }
     } catch (error) {
+      console.warn('Error loading home data:', error?.message || error);
     } finally {
       setLoading(false);
     }
@@ -500,6 +510,46 @@ const loadHomeData = async (nativeData = null) => {
   const isClassic = theme === 'classic';
   const isLightOrClassic = theme === 'light' || isClassic;
 
+  const hasPremiumToolsAccess =
+    !IS_ASTROLOGY_ONLY || Boolean(subscriptionTierName) || (Number(credits) || 0) > 0;
+
+  const onPremiumToolPress = (action) => {
+    if (!IS_ASTROLOGY_ONLY || hasPremiumToolsAccess) {
+      action();
+      return;
+    }
+    Alert.alert(
+      t('home.premiumTools.title', 'Premium reference tools'),
+      t(
+        'home.premiumTools.message',
+        'Advanced Vedic calculators (charts, dashas, KP, and more) are part of the premium reference tier. Add credits or an active subscription in Credits to unlock.',
+      ),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('home.premiumTools.getAccess', 'Get access'),
+          onPress: () => navigation.navigate('Credits'),
+        },
+      ],
+    );
+  };
+
+  const renderToolLockOverlay = () =>
+    IS_ASTROLOGY_ONLY && !hasPremiumToolsAccess ? (
+      <View
+        style={{
+          ...StyleSheet.absoluteFillObject,
+          borderRadius: 16,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: isClassic ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.35)',
+        }}
+        pointerEvents="none"
+      >
+        <Icon name="lock-closed" size={16} color={colors.textSecondary} />
+      </View>
+    ) : null;
+
   // Empty state when no native: show CTA to add birth profile (→ BirthProfileIntro)
   if (!displayData) {
     return (
@@ -535,7 +585,7 @@ const loadHomeData = async (nativeData = null) => {
                 {t('birthProfileIntro.emptyStateTitle', 'Add your birth profile')}
               </Text>
               <Text style={[styles.emptyStateBody, { color: colors.textSecondary }]}>
-                {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart, personalized insights, and cosmic guidance. You can add or change this anytime.')}
+                {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart and study tools. You can add or change this anytime.')}
               </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Home' })}
@@ -928,7 +978,7 @@ const loadHomeData = async (nativeData = null) => {
         </View>
 
         {/* At-a-Glance Ticker */}
-        <View style={[styles.tickerContainer, tickerCardStyle, useGlass && { overflow: 'hidden' }]}>
+        <View style={[styles.tickerContainer, tickerCardStyle, IS_ASTROLOGY_ONLY && styles.tickerContainerStudy, useGlass && { overflow: 'hidden' }]}>
           {useGlass && <BlurView intensity={48} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
           {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.25)' }]} pointerEvents="none" />}
           <ScrollView 
@@ -1053,9 +1103,36 @@ const loadHomeData = async (nativeData = null) => {
           </>
         )}
 
+        {displayData && IS_ASTROLOGY_ONLY && (
+          <HomeStudyLabCtaCard
+            colors={colors}
+            isClassic={isClassic}
+            theme={theme}
+            onPress={() => {
+              setActiveTab('study');
+              onOptionSelect({ action: 'learn' });
+            }}
+          />
+        )}
 
-
-        </View>
+        {displayData && (
+          <HomeAstrologyToolsSection
+            birthData={birthData}
+            chartData={chartData}
+            dashData={dashData}
+            navigation={navigation}
+            setShowDashaBrowser={setShowDashaBrowser}
+            theme={theme}
+            colors={colors}
+            isClassic={isClassic}
+            useGlass={useGlass}
+            toolCardInnerStyle={toolCardInnerStyle}
+            androidLightCardFixStyle={androidLightCardFixStyle}
+            hasPremiumToolsAccess={hasPremiumToolsAccess}
+            onPremiumToolPress={onPremiumToolPress}
+            renderToolLockOverlay={renderToolLockOverlay}
+          />
+        )}
 
         {/* Blog & Articles Section */}
         {latestBlogPosts.length > 0 && (
@@ -1065,7 +1142,7 @@ const loadHomeData = async (nativeData = null) => {
                 📖 {t('home.sections.blog', 'Blog & Knowledge')}
               </Text>
               <TouchableOpacity onPress={() => navigation.navigate('BlogList')}>
-                <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>See All</Text>
+                <Text style={{ color: isClassic ? colors.text : '#ff6b35', fontWeight: '700', fontSize: 13 }}>See All</Text>
               </TouchableOpacity>
             </View>
             <GHScrollView
@@ -1207,229 +1284,6 @@ const loadHomeData = async (nativeData = null) => {
               </View>
             </TouchableOpacity>
           )}
-
-          {/* Vedic Calculators Section */}
-          <View style={styles.toolsSection}>
-            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '📐 Vedic Calculators')}</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.toolsScrollContent}
-              decelerationRate="fast"
-              snapToInterval={width * 0.3 + 12}
-            >
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('Chart', { birthData })}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Svg width="28" height="28" viewBox="0 0 48 48">
-                      <Rect x="2" y="2" width="44" height="44" fill="none" stroke={isClassic ? '#000' : '#ffffff'} strokeWidth="2" />
-                      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={isClassic ? '#333' : '#ffd700'} strokeWidth="1.5" />
-                      <Line x1="2" y1="2" x2="46" y2="46" stroke={isClassic ? '#666' : '#ff8a65'} strokeWidth="1" />
-                      <Line x1="46" y1="2" x2="2" y2="46" stroke={isClassic ? '#666' : '#ff8a65'} strokeWidth="1" />
-                    </Svg>
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#ff8a65' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.charts', 'Charts')}</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => setShowDashaBrowser(true)}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.15)',
-                    borderColor: 'rgba(139, 92, 246, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="time-outline" size={24} color={isClassic ? colors.text : '#A78BFA'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#A78BFA' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.dashas', 'Dashas')}</Text>
-                  {dashData?.current_dasha && typeof dashData.current_dasha === 'string' && (
-                    <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                      <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{dashData.current_dasha.split(' ')[0]}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('KPSystem', { birthDetails: birthData })}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.15)',
-                    borderColor: 'rgba(16, 185, 129, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="locate-outline" size={24} color={isClassic ? colors.text : '#34D399'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#34D399' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kpSystem', 'KP System')}</Text>
-                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Precise</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('KotaChakra', { birthChartId: birthData?.id })}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="shield-checkmark-outline" size={24} color={isClassic ? colors.text : '#FBBF24'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#FBBF24' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kotaChakra', 'Kota Chakra')}</Text>
-                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Safety</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('Yogas')}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.15)',
-                    borderColor: 'rgba(236, 72, 153, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="diamond-outline" size={24} color={isClassic ? colors.text : '#F472B6'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#F472B6' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.yogas', 'Yogas')}</Text>
-<View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                  <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Fortune</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('AshtakvargaOracle')}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.15)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="grid-outline" size={24} color={isClassic ? colors.text : '#60A5FA'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#60A5FA' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.ashtakvarga', 'Ashtak-\nvarga')}</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => chartData && navigation.navigate('PlanetaryPositions', { chartData })}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(244, 63, 94, 0.1)' : 'rgba(244, 63, 94, 0.15)',
-                    borderColor: 'rgba(244, 63, 94, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="planet-outline" size={24} color={isClassic ? colors.text : '#FB7185'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#FB7185' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.positions', 'Positions')}</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('CosmicRing')}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  useGlass && { overflow: 'hidden' },
-                  isClassic ? toolCardInnerStyle : {
-                    backgroundColor: theme === 'dark' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.15)',
-                    borderColor: 'rgba(56, 189, 248, 0.3)',
-                  }
-                ]}>
-                  {useGlass && <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />}
-                  {useGlass && <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)' }]} pointerEvents="none" />}
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="ellipse-outline" size={24} color={isClassic ? colors.text : '#38BDF8'} />
-                    <View style={[styles.toolIconGlow, isClassic && { opacity: 0 }, { backgroundColor: '#38BDF8' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.cosmicRing', 'Cosmic\nRing')}</Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
 
           {/* Cosmic Weather - Transits & Mini Zodiac */}
           <View style={[styles.planetarySection, isLightOrClassic && { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder, borderWidth: 1 }, useGlass && { overflow: 'hidden' }]}>
@@ -2137,25 +1991,31 @@ const loadHomeData = async (nativeData = null) => {
         {IS_ASTROLOGY_ONLY && (
           <TouchableOpacity 
             style={styles.tabItem} 
-            onPress={() => onOptionSelect({ action: 'lab' })}
+            onPress={() => {
+              setActiveTab('study');
+              onOptionSelect({ action: 'learn' });
+            }}
             activeOpacity={0.7}
           >
             <View style={styles.tabIconContainer}>
               <Icon 
-                name="flask-outline" 
+                name="school-outline" 
                 size={22} 
-                color={activeTab === 'lab' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+                color={activeTab === 'study' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
               />
             </View>
-            <Text style={[styles.tabLabel, { color: activeTab === 'lab' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'lab' ? '600' : '500' }]}>
-              {t('home.tabs.lab', 'Lab')}
+            <Text style={[styles.tabLabel, { color: activeTab === 'study' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'study' ? '600' : '500' }]}>
+              {t('home.tabs.study', 'Study')}
             </Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => navigation.navigate('Chart', { birthData })}
+          onPress={() => {
+            setActiveTab('charts');
+            navigation.navigate('Chart', { birthData });
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
@@ -2176,7 +2036,10 @@ const loadHomeData = async (nativeData = null) => {
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => setShowDashaBrowser(true)}
+          onPress={() => {
+            setActiveTab('dashas');
+            setShowDashaBrowser(true);
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
@@ -2193,7 +2056,10 @@ const loadHomeData = async (nativeData = null) => {
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => navigation.navigate('Profile')}
+          onPress={() => {
+            setActiveTab('you');
+            navigation.navigate('Profile');
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
@@ -4037,6 +3903,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
+  },
+  tickerContainerStudy: {
+    marginBottom: 16,
   },
   tickerContent: {
     paddingVertical: 12,

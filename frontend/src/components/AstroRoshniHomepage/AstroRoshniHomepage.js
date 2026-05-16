@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { APP_CONFIG } from '../../config/app.config';
 import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } from '../../config/domains.config';
@@ -2244,10 +2244,10 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="footer-links">
               <div className="footer-links-row">
                 <a href="https://astrovishnu.com" target="_blank" rel="noopener noreferrer">World's best astrology software</a>
-                <a href="/panchang">Panchang</a>
-                <a href="/muhurat-finder">Muhurat Finder</a>
-                <a href="/nakshatras">Nakshatras</a>
-                <a href="/festivals">Festivals</a>
+                <Link to="/panchang">Panchang</Link>
+                <Link to="/muhurat-finder">Muhurat Finder</Link>
+                <Link to="/nakshatras">Nakshatras</Link>
+                <Link to="/festivals">Festivals</Link>
               </div>
               <div className="footer-links-row">
                 <a href="#about" onClick={(e) => { e.preventDefault(); navigate('/about'); }}>About Us</a>

@@ -885,6 +885,7 @@
     "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
     "thisYear": "This Year",
     "nextYear": "Next Year",
+    "cachedHint": "Already saved — select and open, no extra credits.",
     "noPredictions": "No predictions generated. Please try regenerating.",
     "almostThere": "Almost there..."
   },
