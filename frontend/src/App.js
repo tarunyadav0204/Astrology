@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavig
 import { ToastContainer } from 'react-toastify';
 import { HelmetProvider } from 'react-helmet-async';
 import AnalyticsTracker from './components/Analytics/AnalyticsTracker';
+import RouteSEO from './components/SEO/RouteSEO';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/mobile-fixes.css';
 import BirthForm from './components/BirthForm/BirthForm';
@@ -36,13 +37,13 @@ import NakshatraListPage from './components/Nakshatra/NakshatraListPage';
 import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPage';
 import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
+import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
 import ProfilePage from './components/Profile/ProfilePage';
 import PolicyPage from './components/Policy/PolicyPage';
 import DeleteAccountPage from './components/Policy/DeleteAccountPage';
 import ContactPage from './components/Contact/ContactPage';
 import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
-import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
 import AstroVastuTool from './components/AstroVastu/AstroVastuTool';
 import KundliMatchingPage from './components/MarriageAnalysis/KundliMatchingPage';
 import EventsTimelinePage from './components/Events/EventsTimelinePage';
@@ -318,6 +319,7 @@ function App() {
         <AstrologyProvider>
           <CreditProvider>
             <AnalyticsTracker user={user} />
+            <RouteSEO />
           <Routes>
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route
@@ -742,17 +744,145 @@ function App() {
           } />
           <Route path="/festivals" element={<FestivalsPage />} />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
-          <Route path="/karma-analysis" element={<KarmaAnalysis />} />
+          {/* CRA route: in-app navigation + fallback when static HTML is not served. SEO HTML: build/karma-analysis.html */}
+          <Route
+            path="/karma-analysis"
+            element={
+              <>
+                <KarmaAnalysis
+                  user={user}
+                  onLogout={user ? handleLogout : () => {}}
+                  onAdminClick={user ? handleAdminClick : () => {}}
+                  onLogin={() => setShowLoginModal(true)}
+                  showLoginButton={!user}
+                />
+                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
+                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
+                      Sign in to run your personalised past-life karma analysis.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setAuthView('login')}
+                        style={{
+                          padding: '10px 20px',
+                          border: 'none',
+                          background: authView === 'login' ? '#e91e63' : 'transparent',
+                          color: authView === 'login' ? 'white' : '#e91e63',
+                          borderRadius: '25px 0 0 25px',
+                          cursor: 'pointer',
+                          borderRight: '1px solid #e91e63',
+                        }}
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuthView('register')}
+                        style={{
+                          padding: '10px 20px',
+                          border: 'none',
+                          background: authView === 'register' ? '#e91e63' : 'transparent',
+                          color: authView === 'register' ? 'white' : '#e91e63',
+                          borderRadius: '0 25px 25px 0',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Sign Up
+                      </button>
+                    </div>
+                  </div>
+                  {authView === 'login' ? (
+                    <LoginForm
+                      onLogin={(userData) => {
+                        handleLogin(userData);
+                        setShowLoginModal(false);
+                      }}
+                      onSwitchToRegister={() => setAuthView('register')}
+                    />
+                  ) : (
+                    <RegisterForm
+                      onRegister={(userData) => {
+                        handleLogin(userData);
+                        setShowLoginModal(false);
+                      }}
+                      onSwitchToLogin={() => setAuthView('login')}
+                    />
+                  )}
+                </AuthModalShell>
+              </>
+            }
+          />
           <Route
             path="/kundli-matching"
             element={
-              <KundliMatchingPage
-                user={null}
-                onLogout={() => {}}
-                onAdminClick={() => {}}
-                onLogin={() => setShowLoginModal(true)}
-                showLoginButton
-              />
+              <>
+                <KundliMatchingPage
+                  user={user}
+                  onLogout={user ? handleLogout : () => {}}
+                  onAdminClick={user ? handleAdminClick : () => {}}
+                  onLogin={() => setShowLoginModal(true)}
+                  showLoginButton={!user}
+                />
+                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
+                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
+                      Sign in to use saved charts and run Kundli matching with your account.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setAuthView('login')}
+                        style={{
+                          padding: '10px 20px',
+                          border: 'none',
+                          background: authView === 'login' ? '#e91e63' : 'transparent',
+                          color: authView === 'login' ? 'white' : '#e91e63',
+                          borderRadius: '25px 0 0 25px',
+                          cursor: 'pointer',
+                          borderRight: '1px solid #e91e63'
+                        }}
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuthView('register')}
+                        style={{
+                          padding: '10px 20px',
+                          border: 'none',
+                          background: authView === 'register' ? '#e91e63' : 'transparent',
+                          color: authView === 'register' ? 'white' : '#e91e63',
+                          borderRadius: '0 25px 25px 0',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Sign Up
+                      </button>
+                    </div>
+                  </div>
+                  {authView === 'login' ? (
+                    <LoginForm
+                      onLogin={(userData) => {
+                        handleLogin(userData);
+                        setShowLoginModal(false);
+                      }}
+                      onSwitchToRegister={() => setAuthView('register')}
+                    />
+                  ) : (
+                    <RegisterForm
+                      onRegister={(userData) => {
+                        handleLogin(userData);
+                        setShowLoginModal(false);
+                      }}
+                      onSwitchToLogin={() => setAuthView('login')}
+                    />
+                  )}
+                </AuthModalShell>
+              </>
             }
           />
           <Route

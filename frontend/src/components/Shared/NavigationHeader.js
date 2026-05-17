@@ -47,9 +47,7 @@ function FullHamburgerMenuItems({
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/health-analysis') : onLogin && onLogin()); onClose(); }}>🏥 Your Health</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/wealth-analysis') : onLogin && onLogin()); onClose(); }}>💰 Your Wealth</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/life-events') : onLogin && onLogin()); onClose(); }}>📅 Life events</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/karma-analysis') : onLogin && onLogin()); onClose(); }}>🕉️ Past life analysis</button>
-
-    <div className="mobile-menu-section-label">Explore</div>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/karma-analysis'); onClose(); }}>🕉️ Past life analysis</button>
     <button
       type="button"
       className="mobile-menu-item mobile-menu-item--sub"
@@ -62,8 +60,10 @@ function FullHamburgerMenuItems({
       ✨ Astrology
     </button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/tools/ashtakavarga'); onClose(); }}>⊞ Ashtakavarga</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching'); onClose(); }}>💕 Kundli matching</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } }); onClose(); }}>💕 Kundli matching</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/#numerology'); onClose(); }}>🔢 Numerology</button>
+
+    <div className="mobile-menu-section-label">Explore</div>
     <Link to="/panchang" className="mobile-menu-item mobile-menu-item--sub" onClick={() => onClose()}>🌅 Panchang</Link>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/muhurat-finder'); onClose(); }}>⏳ Muhurat Finder</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/festivals'); onClose(); }}>🎉 Festivals</button>
@@ -193,7 +193,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
               <button onClick={() => navigate('/festivals')}>Festivals</button>
               <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
-              <button type="button" onClick={() => navigate('/kundli-matching')}>Kundli matching</button>
+              <button type="button" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button>
               {onAstrologyClick ? (
                 <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
               ) : (
@@ -257,7 +257,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
             <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
             <button onClick={() => { user ? navigate('/life-events') : onLogin(); setActiveDropdown(null); }}>📅 Life events</button>
-            <button onClick={() => { user ? navigate('/karma-analysis') : onLogin(); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
+            <button type="button" onClick={() => { navigate('/karma-analysis'); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
           </div>
         )}
         
@@ -405,7 +405,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
             <li><button onClick={() => navigate('/festivals')}>Festivals</button></li>
             <li><button onClick={() => navigate('/nakshatras')}>Nakshatras</button></li>
-            <li><button type="button" onClick={() => navigate('/kundli-matching')}>Kundli matching</button></li>
+            <li><button type="button" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button></li>
             <li>
               {onAstrologyClick ? (
                 <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
@@ -438,7 +438,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
           <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
           <button onClick={() => { user ? navigate('/life-events') : onLogin(); setActiveDropdown(null); }}>📅 Life events</button>
-          <button onClick={() => { user ? navigate('/karma-analysis') : onLogin(); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
+          <button type="button" onClick={() => { navigate('/karma-analysis'); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
         </div>
       )}
 

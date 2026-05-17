@@ -5,17 +5,35 @@ import SEOHead from '../SEO/SEOHead';
 import ColorLegend from './ColorLegend';
 import './NakshatraPage.css';
 
+const SITE_ORIGIN = 'https://astroroshni.com';
+
 const NakshatraPage = () => {
   const { nakshatraName, year } = useParams();
   const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
+  const yearFromUrl = parseInt(year, 10);
   const [nakshatraData, setNakshatraData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(parseInt(year) || new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(
+    Number.isFinite(yearFromUrl) ? yearFromUrl : currentYear
+  );
+
+  const canonicalYear =
+    Number.isFinite(yearFromUrl) && yearFromUrl < currentYear ? currentYear : selectedYear;
+  const canonicalUrl = `${SITE_ORIGIN}/nakshatra/${nakshatraName}/${canonicalYear}`;
+
+  // Old year URLs (e.g. /2025) were in sitemap earlier; consolidate to current year for Google.
+  useEffect(() => {
+    if (Number.isFinite(yearFromUrl) && yearFromUrl < currentYear) {
+      navigate(`/nakshatra/${nakshatraName}/${currentYear}`, { replace: true });
+    }
+  }, [yearFromUrl, currentYear, nakshatraName, navigate]);
 
   useEffect(() => {
+    if (Number.isFinite(yearFromUrl) && yearFromUrl < currentYear) return;
     fetchNakshatraData();
-  }, [nakshatraName, selectedYear]);
+  }, [nakshatraName, selectedYear, yearFromUrl, currentYear]);
 
   const fetchNakshatraData = async () => {
     try {
@@ -44,6 +62,11 @@ const NakshatraPage = () => {
   if (loading) {
     return (
       <div className="nakshatra-page">
+        <SEOHead
+          title={`${nakshatraName} Nakshatra ${selectedYear} | AstroRoshni`}
+          description={`${nakshatraName} nakshatra calendar and Vedic insights for ${selectedYear}.`}
+          canonical={canonicalUrl}
+        />
         <div className="loading">Loading {nakshatraName} nakshatra data...</div>
       </div>
     );
@@ -65,15 +88,14 @@ const NakshatraPage = () => {
     );
   }
 
-  const currentYear = new Date().getFullYear();
-
   return (
     <div className="nakshatra-page">
       <NavigationHeader compact={true} />
-      <SEOHead 
+      <SEOHead
         title={nakshatraData.seo?.title}
         description={nakshatraData.seo?.description}
         keywords={nakshatraData.seo?.keywords}
+        canonical={canonicalUrl}
       />
       
       <div className="nakshatra-navigation">

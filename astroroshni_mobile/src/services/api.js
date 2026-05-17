@@ -88,6 +88,22 @@ export const setGlobalErrorHandler = (callback) => {
   errorHandlerCallback = callback;
 };
 
+const shouldSuppressGlobalError = (error) => (
+  error?.config?.suppressGlobalError === true ||
+  error?.config?.metadata?.suppressGlobalError === true
+);
+
+const shouldShowGlobalError = (error) => (
+  !shouldSuppressGlobalError(error) &&
+  (
+    error?.config?.showGlobalError === true ||
+    error?.config?.metadata?.showGlobalError === true
+  )
+);
+
+const GLOBAL_ERROR_CONFIG = { showGlobalError: true };
+const BACKGROUND_REQUEST_CONFIG = { suppressGlobalError: true };
+
 // ---- Transparent client-side caching (charts) ----
 const CHART_ONLY_CACHE_VERSION = 3;
 const CHART_ONLY_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -147,9 +163,11 @@ const normalizeChartOnlyBirthDataKey = (birthData) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const showGlobalError = shouldShowGlobalError(error);
+
     // Network error (no internet or backend down)
     if (!error.response && error.message === 'Network Error') {
-      if (errorHandlerCallback) {
+      if (showGlobalError && errorHandlerCallback) {
         errorHandlerCallback({
           type: 'network',
           message: 'No internet connection. Please check your network and try again.'
@@ -160,7 +178,7 @@ api.interceptors.response.use(
 
     // Backend timeout
     if (error.code === 'ECONNABORTED') {
-      if (errorHandlerCallback) {
+      if (showGlobalError && errorHandlerCallback) {
         errorHandlerCallback({
           type: 'timeout',
           message: 'Request timed out. Please try again.'
@@ -194,7 +212,7 @@ api.interceptors.response.use(
       } catch (_) {
         /* never let Sentry affect axios error handling */
       }
-      if (errorHandlerCallback) {
+      if (showGlobalError && errorHandlerCallback) {
         errorHandlerCallback({
           type: 'server',
           message: 'Server is temporarily unavailable. Please try again later.'
@@ -219,18 +237,18 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (credentials) => api.post(getEndpoint('/login'), credentials, { timeout: AUTH_API_TIMEOUT_MS }),
-  register: (userData) => api.post(getEndpoint('/register'), userData, { timeout: AUTH_API_TIMEOUT_MS }),
-  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, { timeout: AUTH_API_TIMEOUT_MS }),
-  logout: () => api.post(getEndpoint('/logout'), {}, { timeout: AUTH_API_TIMEOUT_MS }),
-  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data, { timeout: AUTH_API_TIMEOUT_MS }),
-  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS }),
-  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS }),
-  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data, { timeout: AUTH_API_TIMEOUT_MS }),
+  login: (credentials) => api.post(getEndpoint('/login'), credentials, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  register: (userData) => api.post(getEndpoint('/register'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  logout: () => api.post(getEndpoint('/logout'), {}, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
   updateSelfBirthChart: (birthData, clearExisting = true, chartId = null) => {
     let params = clearExisting ? '?clear_existing=true' : '?clear_existing=false';
     if (chartId) params += `&chart_id=${chartId}`;
-    return api.put(getEndpoint('/user/self-birth-chart') + params, birthData);
+    return api.put(getEndpoint('/user/self-birth-chart') + params, birthData, GLOBAL_ERROR_CONFIG);
   },
   getSelfBirthChart: () => api.get(getEndpoint('/user/self-birth-chart')),
   getUserStats: () => api.get(getEndpoint('/user/stats')),
@@ -239,13 +257,13 @@ export const authAPI = {
 
 export const chatAPI = {
   sendMessage: (birthData, message, language = 'english') => 
-    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed', query_context: buildQueryContext() }),
+    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed', query_context: buildQueryContext() }, GLOBAL_ERROR_CONFIG),
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
   getSession: (sessionId) => api.get(getEndpoint(`/chat-v2/session/${sessionId}`)),
   createV2Session: (birthChartId) =>
     api.post(getEndpoint('/chat-v2/session'), { birth_chart_id: birthChartId, query_context: buildQueryContext() }),
   askV2: (requestBody) =>
-    api.post(getEndpoint('/chat-v2/ask'), { ...requestBody, query_context: requestBody?.query_context || buildQueryContext() }),
+    api.post(getEndpoint('/chat-v2/ask'), { ...requestBody, query_context: requestBody?.query_context || buildQueryContext() }, GLOBAL_ERROR_CONFIG),
   getMessageStatus: (messageId) =>
     api.get(getEndpoint(`/chat-v2/status/${messageId}`)),
   clearHistory: () => api.delete(getEndpoint('/chat/history')),
@@ -253,7 +271,7 @@ export const chatAPI = {
   saveMessage: (sessionId, sender, content) => 
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
   getEventPeriods: (birthData) => api.post(getEndpoint('/chat/event-periods'), birthData),
-  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData),
+  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData, GLOBAL_ERROR_CONFIG),
   getMonthlyEventsStatus: (jobId) => api.get(getEndpoint(`/chat/monthly-events/status/${jobId}`)),
   getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), birthData),
   getCachedMonthlyEventYears: (birthChartId) =>
@@ -265,7 +283,7 @@ export const chatAPI = {
     amount, 
     feature: 'event_timeline', 
     description: 'Cosmic Timeline Analysis' 
-  }),
+  }, GLOBAL_ERROR_CONFIG),
   tts: (text, lang = 'en', voiceName, includeTimepoints = false) =>
     api.post(getEndpoint('/tts/synthesize'), null, {
       params: { text, lang, voice_name: voiceName, include_timepoints: includeTimepoints },
@@ -369,7 +387,7 @@ export const chartAPI = {
         throw error;
       });
   },
-  calculateChartOnly: (birthData) => {
+  calculateChartOnly: (birthData, config = {}) => {
     const cacheKey = normalizeChartOnlyBirthDataKey(birthData);
     const storageKey = `chart_only_cache:v${CHART_ONLY_CACHE_VERSION}:${cacheKey}`;
 
@@ -397,7 +415,7 @@ export const chartAPI = {
       }
 
       // 2) Network call
-      const response = await api.post(getEndpoint('/calculate-chart-only'), birthData);
+      const response = await api.post(getEndpoint('/calculate-chart-only'), birthData, config);
 
       // 3) Store in caches
       try {
@@ -589,23 +607,23 @@ export const chartAPI = {
   submitPhysicalFeedback: (feedbackData) => 
     api.post(getEndpoint('/physical-feedback'), feedbackData),
 
-  getExistingCharts: (search = '', limit = 10, offset = 0) => {
+  getExistingCharts: (search = '', limit = 10, offset = 0, config = {}) => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     params.append('limit', String(limit));
     params.append('offset', String(offset));
-    return api.get(`${getEndpoint('/birth-charts')}?${params}`);
+    return api.get(`${getEndpoint('/birth-charts')}?${params}`, config);
   },
-  updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),
-  deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`),
-  setChartAsSelf: (id) => api.put(`${getEndpoint('/birth-charts')}/${id}/set-as-self`),
+  updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data, GLOBAL_ERROR_CONFIG),
+  deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`, GLOBAL_ERROR_CONFIG),
+  setChartAsSelf: (id) => api.put(`${getEndpoint('/birth-charts')}/${id}/set-as-self`, undefined, GLOBAL_ERROR_CONFIG),
   searchUsers: (query) => api.get(`${getEndpoint('/users/search')}?query=${encodeURIComponent(query)}`),
-  shareChart: (chartId, targetUserId) => api.post(getEndpoint('/charts/share'), { chart_id: chartId, target_user_id: targetUserId }),
+  shareChart: (chartId, targetUserId) => api.post(getEndpoint('/charts/share'), { chart_id: chartId, target_user_id: targetUserId }, GLOBAL_ERROR_CONFIG),
 };
 
 export const nudgeAPI = {
   registerDeviceToken: (token, platform) =>
-    api.post(getEndpoint('/nudge/device-token'), { token, platform }),
+    api.post(getEndpoint('/nudge/device-token'), { token, platform }, BACKGROUND_REQUEST_CONFIG),
   getInbox: (params = {}) => {
     const sp = new URLSearchParams();
     if (params.limit != null) sp.set('limit', String(params.limit));
@@ -613,7 +631,7 @@ export const nudgeAPI = {
     const q = sp.toString();
     return api.get(getEndpoint(`/nudge/inbox${q ? `?${q}` : ''}`));
   },
-  getUnreadCount: () => api.get(getEndpoint('/nudge/inbox/unread-count')),
+  getUnreadCount: () => api.get(getEndpoint('/nudge/inbox/unread-count'), BACKGROUND_REQUEST_CONFIG),
   /** ids omitted or empty array = mark all read */
   markRead: (body = {}) => api.post(getEndpoint('/nudge/inbox/mark-read'), body),
 };
@@ -624,10 +642,11 @@ export const creditAPI = {
   getHistory: () => api.get(getEndpoint('/credits/history')),
   redeemPromoCode: (code) => 
     api.post(getEndpoint('/credits/redeem'), { code: code.toString() }, {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      ...GLOBAL_ERROR_CONFIG,
     }),
   spendCredits: (amount, feature, description) => 
-    api.post(getEndpoint('/credits/spend'), { amount, feature, description }),
+    api.post(getEndpoint('/credits/spend'), { amount, feature, description }, GLOBAL_ERROR_CONFIG),
   getEventTimelineCost: () => api.get(getEndpoint('/credits/settings/event-timeline-cost')),
   verifyGooglePlayPurchase: (purchaseToken, productId, orderId, pricing = null) =>
     api.post(getEndpoint('/credits/google-play/verify'), {
@@ -635,14 +654,14 @@ export const creditAPI = {
       product_id: productId,
       order_id: orderId,
       ...(pricing || {}),
-    }),
+    }, GLOBAL_ERROR_CONFIG),
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
   syncSubscription: (purchaseToken, productId) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {
       purchase_token: purchaseToken,
       product_id: productId,
-    }),
+    }, GLOBAL_ERROR_CONFIG),
   clearSubscriptionNoPurchase: () =>
     api.post(getEndpoint('/credits/google-play/subscription/clear')),
   verifyGooglePlaySubscription: (purchaseToken, productId, orderId) =>
@@ -650,17 +669,17 @@ export const creditAPI = {
       purchase_token: purchaseToken,
       product_id: productId,
       order_id: orderId,
-    }),
+    }, GLOBAL_ERROR_CONFIG),
   /** INR credit packs via Razorpay (same packs as web: 50, 100, 250, 500, 999). Requires checkout UI (e.g. WebView or react-native-razorpay). */
   getRazorpayCatalog: () => api.get(getEndpoint('/credits/razorpay/catalog')),
   createRazorpayOrder: (credits) =>
-    api.post(getEndpoint('/credits/razorpay/create-order'), { credits }),
+    api.post(getEndpoint('/credits/razorpay/create-order'), { credits }, GLOBAL_ERROR_CONFIG),
   verifyRazorpayPayment: ({ razorpay_order_id, razorpay_payment_id, razorpay_signature }) =>
     api.post(getEndpoint('/credits/razorpay/verify'), {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-    }),
+    }, GLOBAL_ERROR_CONFIG),
 };
 
 export const panchangAPI = {
@@ -797,10 +816,10 @@ export const kpAPI = {
 };
 
 export const blogAPI = {
-  getPosts: (status = 'published', category = null, limit = 10, offset = 0) => {
+  getPosts: (status = 'published', category = null, limit = 10, offset = 0, config = {}) => {
     let url = `/blog/posts?status=${status}&limit=${limit}&offset=${offset}`;
     if (category) url += `&category=${encodeURIComponent(category)}`;
-    return api.get(getEndpoint(url));
+    return api.get(getEndpoint(url), config);
   },
   getPostById: (id) => api.get(getEndpoint(`/blog/posts/${id}`)),
   getPostBySlug: (slug) => api.get(getEndpoint(`/blog/posts/slug/${slug}`)),
@@ -818,7 +837,7 @@ export const activityAPI = {
   sendMobileJourneyBatch: (events = []) =>
     api.post(getEndpoint('/activity/mobile-events'), {
       events: Array.isArray(events) ? events : [],
-    }),
+    }, BACKGROUND_REQUEST_CONFIG),
 };
 
 export default api;

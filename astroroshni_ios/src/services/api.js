@@ -60,13 +60,31 @@ export const setGlobalErrorHandler = (callback) => {
   errorHandlerCallback = callback;
 };
 
+const shouldSuppressGlobalError = (error) => (
+  error?.config?.suppressGlobalError === true ||
+  error?.config?.metadata?.suppressGlobalError === true
+);
+
+const shouldShowGlobalError = (error) => (
+  !shouldSuppressGlobalError(error) &&
+  (
+    error?.config?.showGlobalError === true ||
+    error?.config?.metadata?.showGlobalError === true
+  )
+);
+
+const GLOBAL_ERROR_CONFIG = { showGlobalError: true };
+const BACKGROUND_REQUEST_CONFIG = { suppressGlobalError: true };
+
 // Handle response errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const showGlobalError = shouldShowGlobalError(error);
+
     // Network error (no internet or backend down)
     if (!error.response && error.message === 'Network Error') {
-      if (errorHandlerCallback) {
+      if (showGlobalError && errorHandlerCallback) {
         errorHandlerCallback({
           type: 'network',
           message: 'No internet connection. Please check your network and try again.'
@@ -77,7 +95,7 @@ api.interceptors.response.use(
 
     // Backend timeout
     if (error.code === 'ECONNABORTED') {
-      if (errorHandlerCallback) {
+      if (showGlobalError && errorHandlerCallback) {
         errorHandlerCallback({
           type: 'timeout',
           message: 'Request timed out. Please try again.'
@@ -88,7 +106,7 @@ api.interceptors.response.use(
 
     // Backend down (5xx errors)
     if (error.response?.status >= 500) {
-      if (errorHandlerCallback) {
+      if (showGlobalError && errorHandlerCallback) {
         errorHandlerCallback({
           type: 'server',
           message: 'Server is temporarily unavailable. Please try again later.'
@@ -113,18 +131,18 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (credentials) => api.post(getEndpoint('/login'), credentials),
-  register: (userData) => api.post(getEndpoint('/register'), userData),
-  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData),
-  logout: () => api.post(getEndpoint('/logout')),
-  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data),
-  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data),
-  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data),
-  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data),
+  login: (credentials) => api.post(getEndpoint('/login'), credentials, GLOBAL_ERROR_CONFIG),
+  register: (userData) => api.post(getEndpoint('/register'), userData, GLOBAL_ERROR_CONFIG),
+  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, GLOBAL_ERROR_CONFIG),
+  logout: () => api.post(getEndpoint('/logout'), {}, GLOBAL_ERROR_CONFIG),
+  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data, GLOBAL_ERROR_CONFIG),
+  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data, GLOBAL_ERROR_CONFIG),
+  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data, GLOBAL_ERROR_CONFIG),
+  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data, GLOBAL_ERROR_CONFIG),
   updateSelfBirthChart: (birthData, clearExisting = true, chartId = null) => {
     let params = clearExisting ? '?clear_existing=true' : '?clear_existing=false';
     if (chartId) params += `&chart_id=${chartId}`;
-    return api.put(getEndpoint('/user/self-birth-chart') + params, birthData);
+    return api.put(getEndpoint('/user/self-birth-chart') + params, birthData, GLOBAL_ERROR_CONFIG);
   },
   getSelfBirthChart: () => api.get(getEndpoint('/user/self-birth-chart')),
 
@@ -132,14 +150,14 @@ export const authAPI = {
 
 export const chatAPI = {
   sendMessage: (birthData, message, language = 'english') => 
-    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed' }),
+    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed' }, GLOBAL_ERROR_CONFIG),
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
   clearHistory: () => api.delete(getEndpoint('/chat/history')),
   createSession: () => api.post(getEndpoint('/chat/session')),
   saveMessage: (sessionId, sender, content) => 
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
   getEventPeriods: (birthData) => api.post(getEndpoint('/chat/event-periods'), birthData),
-  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData),
+  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData, GLOBAL_ERROR_CONFIG),
   getMonthlyEventsStatus: (jobId) => api.get(getEndpoint(`/chat/monthly-events/status/${jobId}`)),
   getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), birthData),
   getYogas: (birthData) => api.post(getEndpoint('/chat/ask'), { ...birthData, question: 'yogas', include_context: true }),
@@ -147,7 +165,7 @@ export const chatAPI = {
     amount, 
     feature: 'event_timeline', 
     description: 'Cosmic Timeline Analysis' 
-  }),
+  }, GLOBAL_ERROR_CONFIG),
 };
 
 export const wealthAPI = {
@@ -186,10 +204,10 @@ export const chartAPI = {
         throw error;
       });
   },
-  calculateChartOnly: (birthData) => {
+  calculateChartOnly: (birthData, config = {}) => {
     // console.log('[API] Calling calculateChartOnly');
     const startTime = Date.now();
-    return api.post(getEndpoint('/calculate-chart-only'), birthData)
+    return api.post(getEndpoint('/calculate-chart-only'), birthData, config)
       .then(response => {
         // console.log(`[API] calculateChartOnly completed in ${Date.now() - startTime}ms`);
         return response;
@@ -346,22 +364,22 @@ export const chartAPI = {
   submitPhysicalFeedback: (feedbackData) => 
     api.post(getEndpoint('/physical-feedback'), feedbackData),
 
-  getExistingCharts: (search = '') => {
+  getExistingCharts: (search = '', config = {}) => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     params.append('limit', '50');
-    return api.get(`${getEndpoint('/birth-charts')}?${params}`);
+    return api.get(`${getEndpoint('/birth-charts')}?${params}`, config);
   },
-  updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),
-  deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`),
-  setChartAsSelf: (id) => api.put(`${getEndpoint('/birth-charts')}/${id}/set-as-self`),
+  updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data, GLOBAL_ERROR_CONFIG),
+  deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`, GLOBAL_ERROR_CONFIG),
+  setChartAsSelf: (id) => api.put(`${getEndpoint('/birth-charts')}/${id}/set-as-self`, undefined, GLOBAL_ERROR_CONFIG),
   searchUsers: (query) => api.get(`${getEndpoint('/users/search')}?query=${encodeURIComponent(query)}`),
-  shareChart: (chartId, targetUserId) => api.post(getEndpoint('/charts/share'), { chart_id: chartId, target_user_id: targetUserId }),
+  shareChart: (chartId, targetUserId) => api.post(getEndpoint('/charts/share'), { chart_id: chartId, target_user_id: targetUserId }, GLOBAL_ERROR_CONFIG),
 };
 
 export const nudgeAPI = {
   registerDeviceToken: (token, platform) =>
-    api.post(getEndpoint('/nudge/device-token'), { token, platform }),
+    api.post(getEndpoint('/nudge/device-token'), { token, platform }, BACKGROUND_REQUEST_CONFIG),
 };
 
 export const creditAPI = {
@@ -369,17 +387,18 @@ export const creditAPI = {
   getHistory: () => api.get(getEndpoint('/credits/history')),
   redeemPromoCode: (code) => 
     api.post(getEndpoint('/credits/redeem'), { code: code.toString() }, {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      ...GLOBAL_ERROR_CONFIG,
     }),
   spendCredits: (amount, feature, description) => 
-    api.post(getEndpoint('/credits/spend'), { amount, feature, description }),
+    api.post(getEndpoint('/credits/spend'), { amount, feature, description }, GLOBAL_ERROR_CONFIG),
   getEventTimelineCost: () => api.get(getEndpoint('/credits/settings/event-timeline-cost')),
   verifyGooglePlayPurchase: (purchaseToken, productId, orderId) =>
     api.post(getEndpoint('/credits/google-play/verify'), {
       purchase_token: purchaseToken,
       product_id: productId,
       order_id: orderId,
-    }),
+    }, GLOBAL_ERROR_CONFIG),
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
 };
 
@@ -467,10 +486,10 @@ export const pricingAPI = {
 };
 
 export const blogAPI = {
-  getPosts: (status = 'published', category = null, limit = 10, offset = 0) => {
+  getPosts: (status = 'published', category = null, limit = 10, offset = 0, config = {}) => {
     let url = `/blog/posts?status=${status}&limit=${limit}&offset=${offset}`;
     if (category) url += `&category=${encodeURIComponent(category)}`;
-    return api.get(getEndpoint(url));
+    return api.get(getEndpoint(url), config);
   },
   getPostById: (id) => api.get(getEndpoint(`/blog/posts/${id}`)),
   getPostBySlug: (slug) => api.get(getEndpoint(`/blog/posts/slug/${slug}`)),

@@ -65,7 +65,7 @@ if [ ! -d "frontend/node_modules" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
 fi
 if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ ! -d "frontend/build" ]; then
   needs_frontend_build=true
-elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/'; then
+elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/|^frontend-next/'; then
   needs_frontend_build=true
   if echo "${CHANGED_FILES}" | grep -E -q '^frontend/package(-lock)?\.json$'; then
     needs_frontend_install=true
@@ -243,8 +243,12 @@ if [ "${needs_frontend_build}" = "true" ]; then
   export CI=true
   export GENERATE_SOURCEMAP=false
   export INLINE_RUNTIME_CHUNK=true
+  # SEO: postbuild-seo.mjs writes build/sitemap.xml and prerenders public routes when puppeteer is available
+  SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
+  BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
+  PRERENDER="${PRERENDER:-true}" \
   npm run build
-  deploy_timing "npm run build finished"
+  deploy_timing "npm run build finished (includes frontend-next karma export)"
 else
   echo "⏭️ Frontend unchanged; skipping build"
   deploy_timing "npm build skipped"
@@ -265,6 +269,8 @@ fi
 if [ "${restart_frontend}" = "true" ]; then
   echo "Stopping existing frontend on 3001..."
   fuser -k 3001/tcp 2>/dev/null || true
+  pkill -f "serve-build.mjs" 2>/dev/null || true
+  pkill -f "serve build -l 3001" 2>/dev/null || true
   pkill -f "serve -s build -l 3001" 2>/dev/null || true
   for i in 1 2 3 4 5 6 7 8 9 10; do
     if ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
@@ -275,7 +281,7 @@ if [ "${restart_frontend}" = "true" ]; then
   deploy_timing "frontend port cleared"
 
   cd "${APP_ROOT}/frontend"
-  nohup npx serve -s build -l 3001 > "${APP_ROOT}/logs/frontend.log" 2>&1 &
+  nohup node scripts/serve-build.mjs > "${APP_ROOT}/logs/frontend.log" 2>&1 &
   echo "✅ Frontend started on port 3001"
   deploy_timing "npx serve (frontend static) started"
 else

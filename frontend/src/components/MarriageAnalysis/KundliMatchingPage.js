@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import CreditsModal from '../Credits/CreditsModal';
@@ -15,8 +15,16 @@ const KundliMatchingPage = ({
   showLoginButton = true
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { birthData } = useAstrology();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+
+  useEffect(() => {
+    if (!user && location.state?.openLogin && onLogin) {
+      onLogin();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [user, location.state?.openLogin, onLogin, navigate, location.pathname]);
 
   const handleAdmin = () => {
     if (onAdminClick) onAdminClick();

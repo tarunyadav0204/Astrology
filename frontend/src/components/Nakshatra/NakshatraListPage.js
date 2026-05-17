@@ -69,10 +69,11 @@ const NakshatraListPage = () => {
 
   return (
     <div className="nakshatra-list-page">
-      <SEOHead 
+      <SEOHead
         title="27 Nakshatras - Complete Vedic Astrology Guide"
         description="Explore all 27 nakshatras in Vedic astrology. Learn about nakshatra lords, deities, characteristics, and their significance in your horoscope."
         keywords="nakshatras, vedic astrology, moon signs, nakshatra list, astrology guide"
+        canonical="https://astroroshni.com/nakshatras"
       />
       <NavigationHeader 
         compact={true}

@@ -5,7 +5,7 @@ export const SEO_CONFIG = {
     description: "Professional Vedic Astrology Services - Accurate predictions, birth chart analysis, horoscope matching and expert consultations",
     keywords: "vedic astrology, horoscope, kundli, birth chart, astrology predictions, marriage matching, daily horoscope, astrologer consultation, panchang, muhurat",
     author: "AstroRoshni",
-    themeColor: "#e91e63",
+    themeColor: "#961b48",
     language: "en-IN",
     locale: "en_IN"
   },
@@ -21,7 +21,25 @@ export const SEO_CONFIG = {
     logo: "/images/astroroshni-logo.png",
     ogDefault: "/images/astroroshni-og-image.jpg",
     twitterDefault: "/images/astroroshni-twitter-image.jpg",
-    favicon: "/favicon.ico"
+    favicon: "/favicon.ico",
+    homeLifePathBanner: "/images/homepage-life-path-banner.png",
+  },
+
+  /** Google Play listing — homepage life-path banner CTA */
+  mobileApp: {
+    name: "AstroRoshni: AI Kundli & Chat",
+    playStoreUrl:
+      "https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share",
+    homeBanner: {
+      width: 1200,
+      height: 656,
+      alt:
+        "Discover your life path with AstroRoshni — AI Vedic astrology app for Kundli, daily horoscope, marriage matching, and live chat with an AI astrologer on Google Play",
+      title:
+        "Download AstroRoshni on Google Play — AI Kundli, horoscope, and Vedic astrology chat",
+      caption:
+        "Promotional banner: unlock your destiny with best-in-class Vedic astrology. Get the AstroRoshni Android app for free Kundli, predictions, and AI astrologer chat.",
+    },
   },
   
   pages: {
@@ -83,6 +101,120 @@ export const SEO_CONFIG = {
       title: "Daily Horoscope - Today's Predictions for All Zodiac Signs | AstroRoshni",
       description: "Read your daily horoscope predictions for love, career, health and finance. Accurate daily astrology forecasts for all 12 zodiac signs.",
       keywords: "daily horoscope, today horoscope, zodiac predictions, astrology forecast, daily predictions"
+    },
+
+    kundliMatching: {
+      title: "Kundli Matching (Ashtakoot Guna Milan) — Free Horoscope Match | AstroRoshni",
+      description: "Traditional 36-point Ashtakoot compatibility (Guna Milan) for marriage. Compare two birth charts with detailed Vedic matching scores.",
+      keywords: "kundli matching, ashtakoot, guna milan, horoscope matching, marriage compatibility, vedic matching"
+    },
+
+    monthlyPanchang: {
+      title: "Monthly Panchang — Hindu Calendar by Month | AstroRoshni",
+      description: "View monthly Panchang with tithi, nakshatra, festivals, and auspicious days for any month and location.",
+      keywords: "monthly panchang, hindu calendar month, tithi calendar, vedic calendar"
+    },
+
+    festivals: {
+      title: "Hindu Festivals Calendar — Dates & Significance | AstroRoshni",
+      description: "Upcoming Hindu festivals with dates, significance, and Panchang-based timings for India and worldwide locations.",
+      keywords: "hindu festivals, festival calendar, vrat dates, indian festivals astrology"
+    },
+
+    festivalsMonthly: {
+      title: "Monthly Hindu Festivals — This Month's Celebrations | AstroRoshni",
+      description: "Festivals falling this month with exact dates, tithi, and regional variations.",
+      keywords: "festivals this month, hindu festival dates, monthly festival list"
+    },
+
+    nakshatrasList: {
+      title: "27 Nakshatras — Names, Lords & Characteristics | AstroRoshni",
+      description: "Explore all 27 Nakshatras in Vedic astrology with lords, deities, padas, and yearly calendars.",
+      keywords: "27 nakshatras, nakshatra list, lunar mansions, vedic nakshatra"
+    },
+
+    nakshatraDetail: {
+      title: "Nakshatra Calendar & Predictions | AstroRoshni",
+      description: "Yearly nakshatra calendar with auspicious dates and Vedic insights.",
+      keywords: "nakshatra calendar, nakshatra predictions, vedic astrology"
+    },
+
+    karmaAnalysis: {
+      title: "Past Life Karma Analysis — Vedic Birth Chart Reading | AstroRoshni",
+      description: "Discover past-life themes and karmic patterns from your Vedic chart (D9, D60, 12th house, Rahu–Ketu). Free guide plus personalised karma report on AstroRoshni.",
+      keywords: "past life karma analysis, vedic past life astrology, karmic patterns birth chart, D60 shashtiamsa, past life reading by date of birth, 12th house past life, Rahu Ketu karma, karmic debt astrology"
+    },
+
+    blogList: {
+      title: "AstroRoshni Blog — Vedic Astrology Articles & Guides",
+      description: "Expert articles on Vedic astrology, remedies, Panchang, matching, and life guidance.",
+      keywords: "astrology blog, vedic astrology articles, horoscope blog, jyotish"
+    },
+
+    blogPost: {
+      title: "Blog | AstroRoshni",
+      description: "Vedic astrology articles and guides from AstroRoshni.",
+      keywords: "vedic astrology, astrology article"
+    },
+
+    about: {
+      title: "About AstroRoshni — Authentic Vedic Astrology Platform",
+      description: "Learn about AstroRoshni's mission to deliver accurate Vedic astrology, Kundli, and personalized guidance.",
+      keywords: "about astroroshni, vedic astrology platform, online astrologer"
+    },
+
+    contact: {
+      title: "Contact AstroRoshni — Support & Inquiries",
+      description: "Get in touch with the AstroRoshni team for support, partnerships, or astrology questions.",
+      keywords: "contact astroroshni, astrology support, customer service"
+    },
+
+    policy: {
+      title: "Privacy Policy | AstroRoshni",
+      description: "AstroRoshni privacy policy — how we collect, use, and protect your personal and birth chart data.",
+      keywords: "privacy policy, data protection, astrology app privacy"
+    },
+
+    calendar2026: {
+      title: "Hindu Calendar 2026 — Festivals, Panchang & Muhurat | AstroRoshni",
+      description: "Complete 2026 Hindu calendar with festivals, ekadashi, amavasya, and auspicious muhurat dates.",
+      keywords: "hindu calendar 2026, festival calendar 2026, panchang 2026"
+    },
+
+    beginnersGuide: {
+      title: "Vedic Astrology for Beginners — Free Guide | AstroRoshni",
+      description: "Start learning Vedic astrology: houses, planets, signs, and how to read your birth chart.",
+      keywords: "learn vedic astrology, astrology for beginners, jyotish basics"
+    },
+
+    advancedCourses: {
+      title: "Advanced Vedic Astrology Courses | AstroRoshni",
+      description: "Deep-dive courses on dashas, divisional charts, prediction techniques, and professional Jyotish.",
+      keywords: "advanced astrology course, vedic astrology training, jyotish course"
+    },
+
+    mythsVsReality: {
+      title: "Astrology Myths vs Reality — Facts About Jyotish | AstroRoshni",
+      description: "Separate fact from fiction in Vedic astrology with evidence-based explanations.",
+      keywords: "astrology myths, vedic astrology facts, jyotish science"
+    },
+
+    ashtakavarga: {
+      title: "Ashtakavarga Calculator — Vedic Strength Points | AstroRoshni",
+      description: "Calculate Ashtakavarga bindus for planets and houses to assess chart strength in Vedic astrology.",
+      keywords: "ashtakavarga, bindu, vedic chart strength, shadbala"
+    },
+
+    astroVastu: {
+      title: "Astro-Vastu — Home Direction & Planetary Remedies | AstroRoshni",
+      description: "Combine Vedic astrology with Vastu principles for home layout and directional remedies.",
+      keywords: "astro vastu, vastu shastra, home remedies astrology"
+    },
+
+    progenyAnalysis: {
+      title: "Progeny & Children Analysis — Vedic Astrology | AstroRoshni",
+      description: "Insights on children, conception timing, and parenting themes from your birth chart.",
+      keywords: "progeny astrology, children prediction, saptamsa, fertility astrology"
     }
   },
   
@@ -133,5 +265,55 @@ export const generatePageSEO = (pageKey, customData = {}) => {
     canonical: customData.canonical || `${SEO_CONFIG.site.url}${customData.path || '/'}`,
     ogImage: customData.ogImage || `${SEO_CONFIG.site.url}${SEO_CONFIG.images.ogDefault}`,
     twitterImage: customData.twitterImage || `${SEO_CONFIG.site.url}${SEO_CONFIG.images.twitterDefault}`
+  };
+};
+
+/** JSON-LD for homepage Play Store promo banner (ImageObject + SoftwareApplication). */
+export const buildHomePlayStoreBannerStructuredData = () => {
+  const { site, images, mobileApp } = SEO_CONFIG;
+  const imageUrl = `${site.url}${images.homeLifePathBanner}`;
+  const pageUrl = `${site.url}/`;
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "ImageObject",
+        "@id": `${pageUrl}#homepage-life-path-banner`,
+        contentUrl: imageUrl,
+        url: imageUrl,
+        name: "Discover Your Life Path — AstroRoshni Vedic Astrology",
+        description: mobileApp.homeBanner.caption,
+        width: mobileApp.homeBanner.width,
+        height: mobileApp.homeBanner.height,
+        encodingFormat: "image/png",
+        inLanguage: site.language,
+        isPartOf: { "@type": "WebPage", "@id": pageUrl },
+        mainEntityOfPage: pageUrl,
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": `${pageUrl}#astroroshni-android-app`,
+        name: mobileApp.name,
+        operatingSystem: "Android",
+        applicationCategory: "LifestyleApplication",
+        description:
+          "AI-powered Vedic astrology app: instant Kundli, horoscope, kundali matching, past life karma analysis, and live chat with an AI astrologer.",
+        image: imageUrl,
+        installUrl: mobileApp.playStoreUrl,
+        downloadUrl: mobileApp.playStoreUrl,
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "INR",
+          availability: "https://schema.org/InStock",
+        },
+        publisher: {
+          "@type": "Organization",
+          name: site.name,
+          url: site.url,
+        },
+      },
+    ],
   };
 };

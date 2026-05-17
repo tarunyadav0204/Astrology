@@ -22,9 +22,16 @@
   "scripts": {
     "refresh:browserslist": "npx update-browserslist-db@latest",
     "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node scripts/postbuild-seo.mjs && npm run build:karma-next",
+    "build:karma-next": "cd ../frontend-next && npm install && npm run build && node scripts/copy-to-cra-build.mjs",
+    "serve:build": "node scripts/serve-build.mjs",
+    "build:app": "react-scripts build",
+    "build:seo": "node scripts/postbuild-seo.mjs",
     "build:dev": "NODE_ENV=development react-scripts build",
-    "build:prod": "NODE_ENV=production react-scripts build"
+    "build:prod": "NODE_ENV=production GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=true react-scripts build && node scripts/postbuild-seo.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.2.0"
   },
   "browserslist": {
     "production": [

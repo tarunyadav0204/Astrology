@@ -1,3 +1,5 @@
+@import './styles/brand-colors.css';
+
 * {
   box-sizing: border-box;
 }
@@ -38,12 +40,12 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #e91e63, #ff6f00);
+  background: var(--ar-gradient-rose);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #ff6f00, #e91e63);
+  background: var(--ar-gradient-rose);
 }
 
 /* Tab navigation scrollbar hide */

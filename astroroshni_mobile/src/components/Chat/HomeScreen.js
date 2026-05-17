@@ -319,7 +319,7 @@ export default function HomeScreen({
   const fetchLatestBlogPosts = async () => {
     try {
       const { blogAPI } = require('../../services/api');
-      const response = await blogAPI.getPosts('published', null, 3);
+      const response = await blogAPI.getPosts('published', null, 3, 0, { suppressGlobalError: true });
       setLatestBlogPosts(response.data);
     } catch (error) {
       console.log('Error fetching latest blog posts:', error);

@@ -10,9 +10,7 @@ import { APP_CONFIG, isPublicAppPath } from '../config/app.config';
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL !== undefined && process.env.REACT_APP_API_BASE_URL !== ''
     ? process.env.REACT_APP_API_BASE_URL
-    : process.env.NODE_ENV === 'production'
-      ? APP_CONFIG.api.prod
-      : '';
+    : '';
 
 console.log('Environment:', process.env.NODE_ENV);
 console.log('API Base URL:', API_BASE_URL || '(same-origin /api)');

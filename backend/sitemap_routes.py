@@ -37,107 +37,55 @@ async def generate_sitemap():
         posts = cur.fetchall() or []
     
     today = datetime.now().strftime('%Y-%m-%d')
-    
+    current_year = datetime.now().year
+
     nakshatras = ['ashwini', 'bharani', 'krittika', 'rohini', 'mrigashira', 'ardra', 'punarvasu', 'pushya', 'ashlesha', 'magha', 'purva-phalguni', 'uttara-phalguni', 'hasta', 'chitra', 'swati', 'vishakha', 'anuradha', 'jyeshtha', 'mula', 'purva-ashadha', 'uttara-ashadha', 'shravana', 'dhanishta', 'shatabhisha', 'purva-bhadrapada', 'uttara-bhadrapada', 'revati']
+
+    static_pages = [
+        ('/', 'daily', '1.0'),
+        ('/panchang', 'daily', '0.9'),
+        ('/muhurat-finder', 'daily', '0.8'),
+        ('/monthly-panchang', 'weekly', '0.7'),
+        ('/kundli-matching', 'weekly', '0.9'),
+        ('/festivals', 'weekly', '0.7'),
+        ('/festivals/monthly', 'weekly', '0.7'),
+        ('/nakshatras', 'weekly', '0.8'),
+        ('/karma-analysis', 'weekly', '0.9'),
+        ('/blog', 'daily', '0.9'),
+        ('/about', 'monthly', '0.5'),
+        ('/contact', 'monthly', '0.5'),
+        ('/policy', 'yearly', '0.3'),
+        ('/calendar-2026', 'monthly', '0.7'),
+        ('/tools/ashtakavarga', 'monthly', '0.7'),
+        ('/astrovastu', 'monthly', '0.6'),
+        ('/beginners-guide', 'monthly', '0.6'),
+        ('/advanced-courses', 'monthly', '0.6'),
+        ('/myths-vs-reality', 'monthly', '0.5'),
+        ('/marriage-analysis', 'weekly', '0.9'),
+        ('/career-guidance', 'weekly', '0.9'),
+        ('/health-analysis', 'weekly', '0.8'),
+        ('/wealth-analysis', 'weekly', '0.8'),
+        ('/horoscope/daily', 'daily', '0.8'),
+        ('/horoscope/weekly', 'weekly', '0.7'),
+        ('/horoscope/monthly', 'monthly', '0.7'),
+    ]
     
-    sitemap_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+
+    for path, changefreq, priority in static_pages:
+        loc = f"https://astroroshni.com{path if path != '/' else '/'}"
+        sitemap_xml += f'''
   <url>
-    <loc>https://astroroshni.com/</loc>
+    <loc>{loc}</loc>
     <lastmod>{today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/blog</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/marriage-analysis</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/career-guidance</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/health-analysis</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/wealth-analysis</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/panchang</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/muhurat-finder</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/horoscope/daily</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/horoscope/weekly</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/horoscope/monthly</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/beginners-guide</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/advanced-courses</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/myths-vs-reality</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://astroroshni.com/nakshatras</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <changefreq>{changefreq}</changefreq>
+    <priority>{priority}</priority>
   </url>'''
-    
-    # Add all 27 nakshatras
+
     for nakshatra in nakshatras:
         sitemap_xml += f'''
   <url>
-    <loc>https://astroroshni.com/nakshatra/{nakshatra}/2025</loc>
+    <loc>https://astroroshni.com/nakshatra/{nakshatra}/{current_year}</loc>
     <lastmod>{today}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>

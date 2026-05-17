@@ -168,7 +168,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
 
   const fetchLatestBlogPosts = async () => {
     try {
-      const response = await blogAPI.getPosts('published', null, 3);
+      const response = await blogAPI.getPosts('published', null, 3, 0, { suppressGlobalError: true });
       setLatestBlogPosts(response.data);
     } catch (error) {
       console.log('Error fetching latest blog posts:', error);

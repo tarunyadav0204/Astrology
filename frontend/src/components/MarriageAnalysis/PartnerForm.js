@@ -65,12 +65,20 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
   }, [girlData.place]);
 
   useEffect(() => {
-    // Only load saved charts if user is authenticated
-    const token = localStorage.getItem('token');
-    if (token) {
-      loadSavedCharts();
+    if (!user) {
+      setSavedCharts([]);
+      setShowBoyCharts(false);
+      setShowGirlCharts(false);
+      return;
     }
-  }, []);
+    loadSavedCharts();
+    const pending = sessionStorage.getItem('kundli_pending_chart_select');
+    if (pending === 'boy' || pending === 'girl') {
+      sessionStorage.removeItem('kundli_pending_chart_select');
+      if (pending === 'boy') setShowBoyCharts(true);
+      else setShowGirlCharts(true);
+    }
+  }, [user]);
 
   const loadSavedCharts = async () => {
     const token = localStorage.getItem('token');
@@ -200,6 +208,7 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
                 className="btn-select-chart"
                 onClick={() => {
                   if (!user) {
+                    sessionStorage.setItem('kundli_pending_chart_select', 'boy');
                     onLogin && onLogin();
                   } else {
                     setShowBoyCharts(!showBoyCharts);
@@ -300,6 +309,7 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
                 className="btn-select-chart"
                 onClick={() => {
                   if (!user) {
+                    sessionStorage.setItem('kundli_pending_chart_select', 'girl');
                     onLogin && onLogin();
                   } else {
                     setShowGirlCharts(!showGirlCharts);

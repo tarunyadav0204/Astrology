@@ -52,6 +52,37 @@ server {
         root /path/to/your/repo/frontend/build;
     }
 
+    # Sitemap: static copy from postbuild (build/sitemap.xml) or proxy to API
+    location = /sitemap.xml {
+        root /path/to/your/repo/frontend/build;
+        default_type application/xml;
+        try_files /sitemap.xml @sitemap_api;
+    }
+    location @sitemap_api {
+        proxy_pass http://127.0.0.1:8001/sitemap.xml;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Pre-rendered karma SEO page.
+    # Important: proxy this route to the frontend Node server instead of using try_files.
+    # The custom server serves SEO HTML for /karma-analysis, but /karma-analysis?app=1
+    # must return CRA index.html for sign-in, chart picker, and the interactive app view.
+    location = /karma-analysis {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location = /karma-analysis/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location /api/ {
         proxy_pass http://localhost:8001;
         proxy_http_version 1.1;

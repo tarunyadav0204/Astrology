@@ -3,7 +3,11 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { APP_CONFIG } from '../../config/app.config';
 import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } from '../../config/domains.config';
-import { SEO_CONFIG, generatePageSEO } from '../../config/seo.config';
+import {
+  SEO_CONFIG,
+  generatePageSEO,
+  buildHomePlayStoreBannerStructuredData,
+} from '../../config/seo.config';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { apiService } from '../../services/apiService';
@@ -830,7 +834,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   };
 
   const seoData = generatePageSEO('home');
-
+  const playStoreBanner = SEO_CONFIG.mobileApp.homeBanner;
+  const playStoreUrl = SEO_CONFIG.mobileApp.playStoreUrl;
   return (
     <div className="investor-homepage">
       <Helmet>
@@ -868,6 +873,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         {/* Structured Data - Website */}
         <script type="application/ld+json">
           {JSON.stringify(SEO_CONFIG.structuredData.website)}
+        </script>
+
+        {/* Structured Data - Homepage Play Store banner (ImageObject + Android app) */}
+        <script type="application/ld+json">
+          {JSON.stringify(buildHomePlayStoreBannerStructuredData())}
         </script>
       </Helmet>
       {/* Animated Solar System */}
@@ -951,14 +961,30 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       <section id="astrology" className="life-categories">
         <div className="container">
           <div className="life-categories-header">
-            <span className="life-path-symbol life-path-symbol-1">🌟</span>
-            <span className="life-path-symbol life-path-symbol-2">🌙</span>
-            <span className="life-path-symbol life-path-symbol-3">✨</span>
-            <span className="life-path-symbol life-path-symbol-4">🌙</span>
-            <span className="life-path-symbol life-path-symbol-5">⭐</span>
-            <span className="life-path-symbol life-path-symbol-6">💫</span>
-            <h3>✨ Discover Your Life Path</h3>
-            <p>Unlock the secrets of your destiny with best in class Vedic Astrology</p>
+            <figure className="life-path-banner-wrap">
+              <a
+                href={playStoreUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="life-path-banner-link"
+                aria-label={playStoreBanner.title}
+                title={playStoreBanner.title}
+              >
+                <img
+                  src={SEO_CONFIG.images.homeLifePathBanner}
+                  alt={playStoreBanner.alt}
+                  title={playStoreBanner.title}
+                  className="life-path-banner"
+                  width={playStoreBanner.width}
+                  height={playStoreBanner.height}
+                  decoding="async"
+                  fetchPriority="high"
+                  loading="eager"
+                />
+              </a>
+              <figcaption className="life-path-banner-caption">{playStoreBanner.caption}</figcaption>
+            </figure>
+
             <div className="life-categories-divider"></div>
           </div>
 
@@ -1304,9 +1330,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <span>✨ Powered by Classical Vedic Texts</span>
                 <span>🎯 Instant AI Analysis</span>
                 <span>📚 Authentic Techniques</span>
-              </div>
-            </div>
-          </div>
+              </motion.div>
+            </motion.div>
+          </a>
         </div>
       </section>
       */}
@@ -1314,7 +1340,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Karma Analysis Section */}
       <section className="karma-analysis-section">
         <div className="container">
-          <div className="karma-cosmic-card" onClick={() => window.location.href = '/karma-analysis'}>
+          <div className="karma-cosmic-card" onClick={() => navigate('/karma-analysis')} role="link" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && navigate('/karma-analysis')}>
             <div className="karma-cosmic-glow"></div>
             <div className="karma-cosmic-content">
               <div className="karma-om-symbol">🕉️</div>
@@ -2248,6 +2274,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <Link to="/muhurat-finder">Muhurat Finder</Link>
                 <Link to="/nakshatras">Nakshatras</Link>
                 <Link to="/festivals">Festivals</Link>
+                <Link to="/karma-analysis">Past life karma</Link>
               </div>
               <div className="footer-links-row">
                 <a href="#about" onClick={(e) => { e.preventDefault(); navigate('/about'); }}>About Us</a>
