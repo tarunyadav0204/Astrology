@@ -145,6 +145,12 @@ export const SEO_CONFIG = {
       keywords: "past life karma analysis, vedic past life astrology, karmic patterns birth chart, D60 shashtiamsa, past life reading by date of birth, 12th house past life, Rahu Ketu karma, karmic debt astrology"
     },
 
+    chatAstrologer: {
+      title: "AI Vedic Astrologer Chat — Ask Tara About Your Kundli | AstroRoshni",
+      description: "Chart-aware Vedic astrology chat: single chart, partnership, and mundane modes with dasha, transit, yoga, event periods, voice chat, and podcast summaries.",
+      keywords: "ai astrologer chat, vedic astrology chat online, birth chart questions, ask astrologer online, kundli chat, horoscope chat bot, jyotish ai, partnership astrology chat, dasha prediction chat, online vedic astrologer"
+    },
+
     blogList: {
       title: "AstroRoshni Blog — Vedic Astrology Articles & Guides",
       description: "Expert articles on Vedic astrology, remedies, Panchang, matching, and life guidance.",

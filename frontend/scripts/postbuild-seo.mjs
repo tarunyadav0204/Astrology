@@ -34,6 +34,7 @@ const STATIC_PRERENDER_PATHS = [
   '/nakshatras',
   // /kundli-matching is pre-rendered by frontend-next (do not puppeteer the CRA route)
   // /karma-analysis is pre-rendered by frontend-next (do not puppeteer the CRA route)
+  // /chat is pre-rendered by frontend-next (do not puppeteer the CRA route)
   '/blog',
   '/about',
   '/contact',
@@ -140,7 +141,7 @@ function waitForServer(port, maxAttempts = 40) {
 
 function startStaticServer(port) {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['serve', 'build', '-l', String(port)], {
+    const child = spawn('npx', ['serve', '-s', 'build', '-l', String(port)], {
       cwd: path.resolve(__dirname, '..'),
       stdio: 'ignore',
       shell: true,

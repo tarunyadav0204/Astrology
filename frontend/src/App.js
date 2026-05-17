@@ -945,7 +945,71 @@ function App() {
                 <Navigate to="/" replace />
               )
             } />
-            <Route path="/chat" element={user ? <ChatPage /> : <Navigate to="/" replace />} />
+            {/* CRA route: SEO HTML at build/chat.html; ?app=1 loads this shell */}
+            <Route
+              path="/chat"
+              element={
+                <>
+                  <ChatPage onLogin={() => setShowLoginModal(true)} />
+                  <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
+                    <div style={{ marginBottom: '20px' }}>
+                      <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
+                      <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
+                        Sign in to chat with your saved birth chart and use credits.
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setAuthView('login')}
+                          style={{
+                            padding: '10px 20px',
+                            border: 'none',
+                            background: authView === 'login' ? '#e91e63' : 'transparent',
+                            color: authView === 'login' ? 'white' : '#e91e63',
+                            borderRadius: '25px 0 0 25px',
+                            cursor: 'pointer',
+                            borderRight: '1px solid #e91e63',
+                          }}
+                        >
+                          Sign In
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAuthView('register')}
+                          style={{
+                            padding: '10px 20px',
+                            border: 'none',
+                            background: authView === 'register' ? '#e91e63' : 'transparent',
+                            color: authView === 'register' ? 'white' : '#e91e63',
+                            borderRadius: '0 25px 25px 0',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Sign Up
+                        </button>
+                      </div>
+                    </div>
+                    {authView === 'login' ? (
+                      <LoginForm
+                        onLogin={(userData) => {
+                          handleLogin(userData);
+                          setShowLoginModal(false);
+                        }}
+                        onSwitchToRegister={() => setAuthView('register')}
+                      />
+                    ) : (
+                      <RegisterForm
+                        onRegister={(userData) => {
+                          handleLogin(userData);
+                          setShowLoginModal(false);
+                        }}
+                        onSwitchToLogin={() => setAuthView('login')}
+                      />
+                    )}
+                  </AuthModalShell>
+                </>
+              }
+            />
             <Route path="/speech-chat" element={user ? <SpeechChatPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={user ? <ProfilePage user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />} />
             <Route path="/admin/blog" element={

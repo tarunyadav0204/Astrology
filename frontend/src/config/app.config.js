@@ -18,6 +18,7 @@ export const PUBLIC_APP_PATH_PREFIXES = [
   '/myths-vs-reality',
   '/lesson',
   '/kundli-matching',
+  '/chat',
   '/tools/ashtakavarga',
 ];
 

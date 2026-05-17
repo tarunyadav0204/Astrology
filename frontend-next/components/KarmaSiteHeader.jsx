@@ -20,6 +20,7 @@ export default function KarmaSiteHeader() {
         <nav className="karma-site-nav" aria-label="Main">
           <a href={craHref('/panchang')}>Panchang</a>
           <a href={craHref('/kundli-matching')}>Kundli matching</a>
+          <a href={craHref('/chat')}>AI chat</a>
           <a href={craHref('/nakshatras')}>Nakshatras</a>
           <a href={karmaAppHref()}>Open full app view</a>
           {user ? (

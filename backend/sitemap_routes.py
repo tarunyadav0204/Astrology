@@ -51,6 +51,7 @@ async def generate_sitemap():
         ('/festivals/monthly', 'weekly', '0.7'),
         ('/nakshatras', 'weekly', '0.8'),
         ('/karma-analysis', 'weekly', '0.9'),
+        ('/chat', 'weekly', '0.9'),
         ('/blog', 'daily', '0.9'),
         ('/about', 'monthly', '0.5'),
         ('/contact', 'monthly', '0.5'),

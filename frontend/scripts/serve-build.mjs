@@ -2,6 +2,7 @@
  * Production static server for frontend/build.
  * - /karma-analysis (+ trailing slash) → karma-analysis.html (Next SEO export)
  * - /kundli-matching (+ trailing slash) → kundli-matching.html (Next SEO export)
+ * - /chat (+ trailing slash) → chat.html (Next SEO export)
  * - Everything else → static file, or index.html for SPA routes
  */
 import http from 'http';
@@ -99,6 +100,7 @@ const server = http.createServer(async (req, res) => {
     const nextSeoRoutes = {
       '/karma-analysis': 'karma-analysis.html',
       '/kundli-matching': 'kundli-matching.html',
+      '/chat': 'chat.html',
     };
     const seoFileName = nextSeoRoutes[pathname.replace(/\/$/, '')];
     if (seoFileName) {
@@ -153,4 +155,6 @@ server.listen(PORT, () => {
   console.log('Karma app:  http://localhost:' + PORT + '/karma-analysis?app=1');
   console.log('Kundli SEO: http://localhost:' + PORT + '/kundli-matching');
   console.log('Kundli app: http://localhost:' + PORT + '/kundli-matching?app=1');
+  console.log('Chat SEO:   http://localhost:' + PORT + '/chat');
+  console.log('Chat app:   http://localhost:' + PORT + '/chat?app=1');
 });

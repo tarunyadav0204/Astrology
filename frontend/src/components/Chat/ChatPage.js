@@ -159,7 +159,7 @@ function singleChartProfileDisplay(b) {
 // Enable detailed logging for debugging
 // console.log('ChatPage component loaded - debugging enabled');
 
-const ChatPage = () => {
+const ChatPage = ({ onLogin }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { birthData } = useAstrology();
@@ -190,6 +190,18 @@ const ChatPage = () => {
             return null;
         }
     });
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || '');
+        const shouldOpenLogin = location.state?.openLogin || params.get('login') === '1';
+        if (!headerUser && shouldOpenLogin && onLogin) {
+            onLogin();
+            params.delete('login');
+            const search = params.toString();
+            navigate(`${location.pathname}${search ? `?${search}` : ''}`, { replace: true, state: {} });
+        }
+    }, [headerUser, location.state?.openLogin, location.search, onLogin, navigate, location.pathname]);
+
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
     const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
     const [showPartnerModal, setShowPartnerModal] = useState(false);
@@ -2055,7 +2067,7 @@ const ChatPage = () => {
                     setHeaderUser(null);
                     navigate('/');
                 }}
-                onLogin={() => navigate('/login')}
+                onLogin={() => (onLogin ? onLogin() : navigate('/login'))}
                 showLoginButton={!headerUser}
             />
             <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}`}>

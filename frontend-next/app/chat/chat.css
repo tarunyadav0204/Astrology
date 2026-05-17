@@ -1,0 +1,10 @@
+.chat-mode-subtitle {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #9c27b0;
+}
+
+.chat-topic-list li {
+  margin-bottom: 6px;
+}

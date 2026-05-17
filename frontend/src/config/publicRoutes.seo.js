@@ -29,6 +29,7 @@ export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs =
     '/nakshatras',
     '/kundli-matching',
     '/karma-analysis',
+    '/chat',
     '/blog',
     '/about',
     '/contact',
@@ -85,6 +86,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   },
   { path: '/kundli-matching', pageKey: 'kundliMatching' },
   { path: '/karma-analysis', pageKey: 'karmaAnalysis' },
+  { path: '/chat', pageKey: 'chatAstrologer' },
   { path: '/blog', pageKey: 'blogList' },
   {
     path: '/blog/:slug',
@@ -113,7 +115,6 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   { path: '/life-events', pageKey: 'lifeEvents', noIndex: true },
   { path: '/education', pageKey: 'educationAnalysis', noIndex: true },
   { path: '/progeny-analysis', pageKey: 'progenyAnalysis', noIndex: true },
-  { path: '/chat', noIndex: true },
   { path: '/speech-chat', noIndex: true },
   { path: '/profile', noIndex: true },
   { path: '/admin/blog', noIndex: true },

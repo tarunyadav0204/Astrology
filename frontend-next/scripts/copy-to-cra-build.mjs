@@ -44,7 +44,7 @@ if (fs.existsSync(path.join(OUT, '_next'))) {
   console.log('[next-karma] Copied _next assets to frontend/build/_next');
 }
 
-const routes = ['karma-analysis', 'kundli-matching'];
+const routes = ['karma-analysis', 'kundli-matching', 'chat'];
 for (const route of routes) {
   const html = readRouteHtml(route);
   if (!html) {
@@ -67,6 +67,8 @@ const serveJson = {
     { source: '/karma-analysis/', destination: '/karma-analysis.html' },
     { source: '/kundli-matching', destination: '/kundli-matching.html' },
     { source: '/kundli-matching/', destination: '/kundli-matching.html' },
+    { source: '/chat', destination: '/chat.html' },
+    { source: '/chat/', destination: '/chat.html' },
     { source: '**', destination: '/index.html' },
   ],
 };
