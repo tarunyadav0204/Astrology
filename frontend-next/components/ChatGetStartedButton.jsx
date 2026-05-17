@@ -1,6 +1,6 @@
 'use client';
 
-import { chatAppHref } from '@/lib/navigation';
+import { chatAppHref } from '../lib/navigation';
 
 export default function ChatGetStartedButton({ children = 'Start chatting with your chart' }) {
   const handleClick = () => {

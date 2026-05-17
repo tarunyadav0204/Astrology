@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { authHeaders, getApiBase, loadBirthChart, loadStoredUser } from '@/lib/api';
-import { karmaAppHref } from '@/lib/navigation';
+import { authHeaders, getApiBase, loadBirthChart, loadStoredUser } from '../lib/api';
+import { karmaAppHref } from '../lib/navigation';
 
 function CreditModal({ onClose, onConfirm, credits, cost, title }) {
   return (

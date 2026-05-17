@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { craHref, karmaAppHref } from '@/lib/navigation';
-import { loadStoredUser } from '@/lib/api';
+import { craHref, karmaAppHref } from '../lib/navigation';
+import { loadStoredUser } from '../lib/api';
 
 export default function KarmaSiteHeader() {
   const [user, setUser] = useState(null);

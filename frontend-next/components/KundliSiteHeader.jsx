@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { craHref, kundliAppHref } from '@/lib/navigation';
-import { loadStoredUser } from '@/lib/api';
+import { craHref, kundliAppHref } from '../lib/navigation';
+import { loadStoredUser } from '../lib/api';
 
 export default function KundliSiteHeader() {
   const [user, setUser] = useState(null);

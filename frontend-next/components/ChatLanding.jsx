@@ -1,5 +1,5 @@
-import ChatGetStartedButton from '@/components/ChatGetStartedButton';
-import { chatAppHref, craHref } from '@/lib/navigation';
+import ChatGetStartedButton from './ChatGetStartedButton';
+import { chatAppHref, craHref } from '../lib/navigation';
 import {
   CHAT_CANONICAL,
   CHAT_CAPABILITIES,
@@ -8,7 +8,7 @@ import {
   CHAT_MODES,
   CHAT_SAMPLE_EXCERPT,
   CHAT_TOPIC_AREAS,
-} from '@/lib/chatSeoContent';
+} from '../lib/chatSeoContent';
 
 export default function ChatLanding() {
   return (

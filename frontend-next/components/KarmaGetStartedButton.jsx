@@ -1,6 +1,6 @@
 'use client';
 
-import { karmaAppHref } from '@/lib/navigation';
+import { karmaAppHref } from '../lib/navigation';
 
 export default function KarmaGetStartedButton({ children = 'Get your personalised karma report' }) {
   const handleClick = () => {

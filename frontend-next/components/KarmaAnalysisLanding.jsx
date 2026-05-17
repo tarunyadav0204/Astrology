@@ -1,11 +1,11 @@
-import KarmaGetStartedButton from '@/components/KarmaGetStartedButton';
-import { craHref, karmaAppHref } from '@/lib/navigation';
+import KarmaGetStartedButton from './KarmaGetStartedButton';
+import { craHref, karmaAppHref } from '../lib/navigation';
 import {
   KARMA_CANONICAL,
   KARMA_FAQ,
   KARMA_REPORT_SECTIONS,
   KARMA_SAMPLE_EXCERPT,
-} from '@/lib/karmaSeoContent';
+} from '../lib/karmaSeoContent';
 
 /** Server-rendered SEO landing (Layer 1). */
 export default function KarmaAnalysisLanding() {

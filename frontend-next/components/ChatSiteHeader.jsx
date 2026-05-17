@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { chatAppHref, craHref } from '@/lib/navigation';
-import { loadStoredUser } from '@/lib/api';
+import { chatAppHref, craHref } from '../lib/navigation';
+import { loadStoredUser } from '../lib/api';
 
 export default function ChatSiteHeader() {
   const [user, setUser] = useState(null);

@@ -1,5 +1,5 @@
-import KundliGetStartedButton from '@/components/KundliGetStartedButton';
-import { craHref, kundliAppHref } from '@/lib/navigation';
+import KundliGetStartedButton from './KundliGetStartedButton';
+import { craHref, kundliAppHref } from '../lib/navigation';
 import {
   ASHTAKOOTA_KOOTS,
   KUNDLI_ANALYSIS_STEPS,
@@ -9,7 +9,7 @@ import {
   KUNDLI_REPORT_SECTIONS,
   KUNDLI_SCORE_BANDS,
   KUNDLI_SAMPLE_EXCERPT,
-} from '@/lib/kundliSeoContent';
+} from '../lib/kundliSeoContent';
 
 export default function KundliMatchingLanding() {
   return (

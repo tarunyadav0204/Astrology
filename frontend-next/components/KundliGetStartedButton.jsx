@@ -1,6 +1,6 @@
 'use client';
 
-import { kundliAppHref } from '@/lib/navigation';
+import { kundliAppHref } from '../lib/navigation';
 
 export default function KundliGetStartedButton({ children = 'Get your AI Kundli matching report' }) {
   const handleClick = () => {
