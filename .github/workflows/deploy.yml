@@ -15,8 +15,12 @@ on:
         description: 'Run pip install -r backend/requirements.txt (even if file unchanged)'
         type: boolean
         default: false
+      force_frontend_deploy:
+        description: 'Force frontend rebuild and frontend static server restart only'
+        type: boolean
+        default: false
       force_full_deploy:
-        description: 'Force backend setup, frontend rebuild, and frontend static server restart'
+        description: 'Force full backend + frontend deploy, including API restart'
         type: boolean
         default: false
 
@@ -32,11 +36,14 @@ jobs:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
+        script_stop: true
         script: |
+          set -e
           echo "========== GitHub Actions: deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           cd AstrologyApp
           export FORCE_BACKEND_PIP="${{ github.event.inputs.force_backend_pip == 'true' && 'true' || 'false' }}"
+          export FORCE_FRONTEND_DEPLOY="${{ github.event.inputs.force_frontend_deploy == 'true' && 'true' || 'false' }}"
           export FORCE_FULL_DEPLOY="${{ github.event.inputs.force_full_deploy == 'true' && 'true' || 'false' }}"
           bash deploy.sh
-          echo "========== GitHub Actions: deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') exit code $? =========="
+          echo "========== GitHub Actions: deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           echo "========== (Timestamps above are the runner clock; lines starting with ⏱️ are from deploy.sh on the server.) =========="

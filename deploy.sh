@@ -30,9 +30,14 @@ deploy_timing "deploy script started"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
 FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-false}"
+FORCE_FRONTEND_DEPLOY="${FORCE_FRONTEND_DEPLOY:-false}"
 case "$(printf '%s' "${FORCE_FULL_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) FORCE_FULL_DEPLOY=true ;;
   *) FORCE_FULL_DEPLOY=false ;;
+esac
+case "$(printf '%s' "${FORCE_FRONTEND_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes) FORCE_FRONTEND_DEPLOY=true ;;
+  *) FORCE_FRONTEND_DEPLOY=false ;;
 esac
 
 # Pull latest changes
@@ -67,7 +72,7 @@ needs_frontend_build=false
 if [ ! -d "frontend/node_modules" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
   needs_frontend_install=true
 fi
-if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ ! -d "frontend/build" ]; then
+if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ "${FORCE_FRONTEND_DEPLOY}" = "true" ] || [ ! -d "frontend/build" ]; then
   needs_frontend_build=true
 elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/|^frontend-next/'; then
   needs_frontend_build=true
@@ -112,7 +117,7 @@ if [ "${SKIP_BACKEND_PIP}" = "true" ] && [ "${FORCE_BACKEND_PIP}" != "true" ]; t
   fi
 fi
 
-echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build}"
+echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build}"
 
 # Repo root (deploy.sh is always run from here)
 APP_ROOT="$(pwd)"
@@ -305,7 +310,7 @@ seo_check() {
     exit 1
   fi
 }
-seo_check "/karma-analysis" "Personalized Karma Analysis"
+seo_check "/karma-analysis" "Past Life Karma Analysis"
 seo_check "/kundli-matching" "Kundli Matching"
 seo_check "/chat" "AI Vedic Astrologer Chat"
 deploy_timing "frontend SEO route verification complete"
