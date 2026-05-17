@@ -296,8 +296,31 @@ if [ "${restart_frontend}" = "true" ]; then
 
   cd "${APP_ROOT}/frontend"
   nohup node scripts/serve-build.mjs > "${APP_ROOT}/logs/frontend.log" 2>&1 &
+  FRONTEND_PID=$!
+  echo "Frontend PID: ${FRONTEND_PID}"
+
+  frontend_ready=false
+  for i in $(seq 1 20); do
+    if curl -fsS --max-time 3 http://127.0.0.1:3001/ >/dev/null 2>&1; then
+      frontend_ready=true
+      break
+    fi
+    if ! ps -p "${FRONTEND_PID}" >/dev/null; then
+      echo "❌ Frontend static server exited before it was ready. Check logs:"
+      tail -80 "${APP_ROOT}/logs/frontend.log"
+      exit 1
+    fi
+    sleep 1
+  done
+
+  if [ "${frontend_ready}" != "true" ]; then
+    echo "❌ Frontend static server did not become ready on port 3001"
+    tail -80 "${APP_ROOT}/logs/frontend.log"
+    exit 1
+  fi
+
   echo "✅ Frontend started on port 3001"
-  deploy_timing "npx serve (frontend static) started"
+  deploy_timing "frontend static server started"
 else
   echo "⏭️ Leaving existing frontend server on 3001 running (no new build)"
   deploy_timing "frontend serve unchanged"
