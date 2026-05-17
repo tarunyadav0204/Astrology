@@ -26,9 +26,9 @@ function copyRecursive(src, dest) {
   }
 }
 
-function readKarmaHtml() {
-  const flat = path.join(OUT, 'karma-analysis.html');
-  const nested = path.join(OUT, 'karma-analysis', 'index.html');
+function readRouteHtml(route) {
+  const flat = path.join(OUT, `${route}.html`);
+  const nested = path.join(OUT, route, 'index.html');
   if (fs.existsSync(flat)) return fs.readFileSync(flat, 'utf8');
   if (fs.existsSync(nested)) return fs.readFileSync(nested, 'utf8');
   return null;
@@ -44,29 +44,34 @@ if (fs.existsSync(path.join(OUT, '_next'))) {
   console.log('[next-karma] Copied _next assets to frontend/build/_next');
 }
 
-const html = readKarmaHtml();
-if (!html) {
-  console.error('[next-karma] No karma HTML in out/ — run npm run build in frontend-next');
-  process.exit(1);
+const routes = ['karma-analysis', 'kundli-matching'];
+for (const route of routes) {
+  const html = readRouteHtml(route);
+  if (!html) {
+    console.error(`[next-karma] No ${route} HTML in out/ — run npm run build in frontend-next`);
+    process.exit(1);
+  }
+
+  fs.writeFileSync(path.join(CRA_BUILD, `${route}.html`), html, 'utf8');
+  const routeDir = path.join(CRA_BUILD, route);
+  fs.mkdirSync(routeDir, { recursive: true });
+  fs.writeFileSync(path.join(routeDir, 'index.html'), html, 'utf8');
+  console.log(`[next-karma] Wrote ${route}.html and ${route}/index.html`);
 }
 
-fs.writeFileSync(path.join(CRA_BUILD, 'karma-analysis.html'), html, 'utf8');
-const karmaDir = path.join(CRA_BUILD, 'karma-analysis');
-fs.mkdirSync(karmaDir, { recursive: true });
-fs.writeFileSync(path.join(karmaDir, 'index.html'), html, 'utf8');
-console.log('[next-karma] Wrote karma-analysis.html and karma-analysis/index.html');
-
 // Compatibility only for simple static hosting. Query-aware routing such as
-// /karma-analysis?app=1 requires frontend/scripts/serve-build.mjs.
+// /karma-analysis?app=1 and /kundli-matching?app=1 require frontend/scripts/serve-build.mjs.
 const serveJson = {
   rewrites: [
     { source: '/karma-analysis', destination: '/karma-analysis.html' },
     { source: '/karma-analysis/', destination: '/karma-analysis.html' },
+    { source: '/kundli-matching', destination: '/kundli-matching.html' },
+    { source: '/kundli-matching/', destination: '/kundli-matching.html' },
     { source: '**', destination: '/index.html' },
   ],
 };
 fs.writeFileSync(path.join(CRA_BUILD, 'serve.json'), `${JSON.stringify(serveJson, null, 2)}\n`, 'utf8');
 console.log('[next-karma] Wrote build/serve.json for basic static fallback');
-console.log('[next-karma] Use `cd frontend && npm run serve:build` for /karma-analysis?app=1 support');
+console.log('[next-karma] Use `cd frontend && npm run serve:build` for ?app=1 support');
 
 console.log('[next-karma] Merge complete');

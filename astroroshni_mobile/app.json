@@ -48,6 +48,88 @@
       "permissions": [
         "com.android.vending.BILLING",
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/karma-analysis"
+            },
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/kundli-matching"
+            },
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/marriage-analysis"
+            },
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/blog"
+            },
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/panchang"
+            },
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/muhurat-finder"
+            },
+            {
+              "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/nakshatras"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/karma-analysis"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/kundli-matching"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/marriage-analysis"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/blog"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/panchang"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/muhurat-finder"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/nakshatras"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getStateFromPath } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -77,6 +77,38 @@ import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
+const linking = {
+  prefixes: ['https://astroroshni.com', 'https://www.astroroshni.com', 'astroroshni://'],
+  config: {
+    screens: {
+      Home: '',
+      KarmaAnalysis: 'karma-analysis',
+      RelationshipMatch: 'kundli-matching',
+      BlogList: 'blog',
+      BlogPostDetail: 'blog/:slug',
+      Profile: 'profile',
+      Credits: 'credits',
+      About: 'about',
+      Support: 'contact',
+      MuhuratHub: 'muhurat-finder',
+      UniversalMuhurat: 'muhurat',
+      NakshatraCalendar: 'nakshatras',
+      AnalysisHub: 'analysis',
+    },
+  },
+  getStateFromPath(path, options) {
+    const normalizedPath = `/${String(path || '').split('?')[0].replace(/^\/+|\/+$/g, '')}`;
+    const pathAliases = {
+      '/panchang': '/muhurat',
+      '/monthly-panchang': '/muhurat',
+      '/festivals': '/muhurat',
+      '/festivals/monthly': '/muhurat',
+      '/marriage-analysis': '/kundli-matching',
+      '/policy': '/about',
+    };
+    return getStateFromPath(pathAliases[normalizedPath] || path, options);
+  },
+};
 const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
 const MIUI_BRAND_RE = /xiaomi|redmi|poco/i;
 const isMiuiFontBugDevice =
@@ -508,6 +540,7 @@ export default function App() {
             <CreditProvider>
               <ErrorBoundary>
               <NavigationContainer
+                linking={linking}
                 ref={(nav) => {
                   navigationRef.current = nav;
                   attachSentryNavigation(nav);

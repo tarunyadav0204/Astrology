@@ -12,3 +12,11 @@ export function karmaAppHref({ login = false, hash = '' } = {}) {
   const h = hash ? (hash.startsWith('#') ? hash : `#${hash}`) : '';
   return `/karma-analysis?${params.toString()}${h}`;
 }
+
+/** Interactive Kundli matching tool: CRA shell + login modal + saved charts */
+export function kundliAppHref({ login = false, hash = '' } = {}) {
+  const params = new URLSearchParams({ app: '1' });
+  if (login) params.set('login', '1');
+  const h = hash ? (hash.startsWith('#') ? hash : `#${hash}`) : '';
+  return `/kundli-matching?${params.toString()}${h}`;
+}

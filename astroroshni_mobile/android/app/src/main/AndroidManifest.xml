@@ -29,6 +29,25 @@
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/karma-analysis"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/kundli-matching"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/marriage-analysis"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/blog"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/panchang"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/muhurat-finder"/>
+        <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/nakshatras"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/karma-analysis"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/kundli-matching"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/marriage-analysis"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/blog"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/panchang"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/muhurat-finder"/>
+        <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/nakshatras"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>

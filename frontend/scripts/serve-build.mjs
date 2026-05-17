@@ -1,6 +1,7 @@
 /**
  * Production static server for frontend/build.
  * - /karma-analysis (+ trailing slash) → karma-analysis.html (Next SEO export)
+ * - /kundli-matching (+ trailing slash) → kundli-matching.html (Next SEO export)
  * - Everything else → static file, or index.html for SPA routes
  */
 import http from 'http';
@@ -95,7 +96,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     // SEO HTML by default; ?app=1 → CRA (full nav, login modal, tool)
-    if (pathname === '/karma-analysis' || pathname === '/karma-analysis/') {
+    const nextSeoRoutes = {
+      '/karma-analysis': 'karma-analysis.html',
+      '/kundli-matching': 'kundli-matching.html',
+    };
+    const seoFileName = nextSeoRoutes[pathname.replace(/\/$/, '')];
+    if (seoFileName) {
       const useCraApp = url.searchParams.get('app') === '1';
       if (useCraApp) {
         const indexPath = path.join(BUILD, 'index.html');
@@ -105,9 +111,9 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (!useCraApp) {
-        const karmaFile = path.join(BUILD, 'karma-analysis.html');
-        if (await exists(karmaFile)) {
-          const html = await readFile(karmaFile);
+        const seoFile = path.join(BUILD, seoFileName);
+        if (await exists(seoFile)) {
+          const html = await readFile(seoFile);
           return send(res, 200, html, MIME['.html']);
         }
       }
@@ -145,4 +151,6 @@ server.listen(PORT, () => {
   console.log(`Serving ${BUILD} at http://localhost:${PORT}`);
   console.log('Karma SEO:  http://localhost:' + PORT + '/karma-analysis');
   console.log('Karma app:  http://localhost:' + PORT + '/karma-analysis?app=1');
+  console.log('Kundli SEO: http://localhost:' + PORT + '/kundli-matching');
+  console.log('Kundli app: http://localhost:' + PORT + '/kundli-matching?app=1');
 });

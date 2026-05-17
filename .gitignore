@@ -131,3 +131,5 @@ backend/gcp_key.json
 !package.json
 !package-lock.json
 !astroroshni_mobile/src/locales/*.json
+!frontend/public/.well-known/
+!frontend/public/.well-known/assetlinks.json

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { locationService } from '../../services/locationService';
-import { apiService } from '../../services/apiService';
 import { APP_CONFIG } from '../../config/app.config';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 
 const emptyPartner = () => ({
   name: '',
@@ -25,18 +25,36 @@ const mergePartnerState = (base, initial) => {
   };
 };
 
+const chartToPartnerData = (chart) => {
+  const time = chart.time != null ? String(chart.time) : '';
+  const timeShort =
+    time.length >= 8 && time[5] === ':' && time[7] === ':'
+      ? time.slice(0, 5)
+      : time;
+  return {
+    name: chart.name || '',
+    date: chart.date || '',
+    time: timeShort,
+    place:
+      chart.place ||
+      (chart.latitude != null && chart.longitude != null
+        ? `${chart.latitude}, ${chart.longitude}`
+        : ''),
+    latitude: chart.latitude ?? null,
+    longitude: chart.longitude ?? null,
+    timezone: chart.timezone
+  };
+};
+
 const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
   const [boyData, setBoyData] = useState(() => mergePartnerState(emptyPartner(), initialBoy));
-
   const [girlData, setGirlData] = useState(() => mergePartnerState(emptyPartner(), initialGirl));
 
   const [boySuggestions, setBoySuggestions] = useState([]);
   const [girlSuggestions, setGirlSuggestions] = useState([]);
   const [showBoySuggestions, setShowBoySuggestions] = useState(false);
   const [showGirlSuggestions, setShowGirlSuggestions] = useState(false);
-  const [savedCharts, setSavedCharts] = useState([]);
-  const [showBoyCharts, setShowBoyCharts] = useState(false);
-  const [showGirlCharts, setShowGirlCharts] = useState(false);
+  const [chartPickerTarget, setChartPickerTarget] = useState(null);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -66,54 +84,33 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
 
   useEffect(() => {
     if (!user) {
-      setSavedCharts([]);
-      setShowBoyCharts(false);
-      setShowGirlCharts(false);
+      setChartPickerTarget(null);
       return;
     }
-    loadSavedCharts();
     const pending = sessionStorage.getItem('kundli_pending_chart_select');
     if (pending === 'boy' || pending === 'girl') {
       sessionStorage.removeItem('kundli_pending_chart_select');
-      if (pending === 'boy') setShowBoyCharts(true);
-      else setShowGirlCharts(true);
+      setChartPickerTarget(pending);
     }
   }, [user]);
 
-  const loadSavedCharts = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setSavedCharts([]);
+  const openChartPicker = (partner) => {
+    if (!user) {
+      sessionStorage.setItem('kundli_pending_chart_select', partner);
+      onLogin?.();
       return;
     }
-    
-    try {
-      const response = await apiService.getExistingCharts();
-      setSavedCharts(response.charts || []);
-    } catch (error) {
-      console.error('Failed to load saved charts:', error);
-      setSavedCharts([]);
-    }
+    setChartPickerTarget(partner);
   };
 
-  const selectSavedChart = (chart, partner) => {
-    const chartData = {
-      name: chart.name,
-      date: chart.date,
-      time: chart.time,
-      place: `${chart.latitude}, ${chart.longitude}`,
-      latitude: chart.latitude,
-      longitude: chart.longitude,
-      timezone: chart.timezone
-    };
-    
-    if (partner === 'boy') {
-      setBoyData(chartData);
-      setShowBoyCharts(false);
-    } else {
-      setGirlData(chartData);
-      setShowGirlCharts(false);
+  const handleChartPick = (chart) => {
+    const data = chartToPartnerData(chart);
+    if (chartPickerTarget === 'boy') {
+      setBoyData(data);
+    } else if (chartPickerTarget === 'girl') {
+      setGirlData(data);
     }
+    setChartPickerTarget(null);
   };
 
   const searchPlaces = async (query, partner) => {
@@ -157,11 +154,11 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
 
   const handleInputChange = (e, partner) => {
     const { name, value } = e.target;
-    
+
     if (partner === 'boy') {
       if (name === 'place') {
-        setBoyData(prev => ({ 
-          ...prev, 
+        setBoyData(prev => ({
+          ...prev,
           [name]: value,
           latitude: null,
           longitude: null
@@ -169,17 +166,15 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
       } else {
         setBoyData(prev => ({ ...prev, [name]: value }));
       }
+    } else if (name === 'place') {
+      setGirlData(prev => ({
+        ...prev,
+        [name]: value,
+        latitude: null,
+        longitude: null
+      }));
     } else {
-      if (name === 'place') {
-        setGirlData(prev => ({ 
-          ...prev, 
-          [name]: value,
-          latitude: null,
-          longitude: null
-        }));
-      } else {
-        setGirlData(prev => ({ ...prev, [name]: value }));
-      }
+      setGirlData(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -188,56 +183,50 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
     onSubmit(boyData, girlData);
   };
 
-  const isFormValid = () => {
-    return boyData.name && boyData.date && boyData.time && boyData.latitude && boyData.longitude &&
-           girlData.name && girlData.date && girlData.time && girlData.latitude && girlData.longitude;
-  };
+  const isFormValid = () =>
+    boyData.name &&
+    boyData.date &&
+    boyData.time &&
+    boyData.latitude &&
+    boyData.longitude &&
+    girlData.name &&
+    girlData.date &&
+    girlData.time &&
+    girlData.latitude &&
+    girlData.longitude;
+
+  const pickerTitle =
+    chartPickerTarget === 'boy'
+      ? "Select boy's chart"
+      : chartPickerTarget === 'girl'
+        ? "Select girl's chart"
+        : 'Select Saved Chart';
+
+  const pickerDescription =
+    chartPickerTarget === 'boy'
+      ? "Choose a saved birth chart for the boy's details."
+      : chartPickerTarget === 'girl'
+        ? "Choose a saved birth chart for the girl's details."
+        : 'Choose from your previously saved birth charts';
 
   return (
     <div className="partner-form">
       <h3>👫 Enter Partner Details</h3>
       <p>Please provide birth details for both partners to analyze compatibility</p>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="partners-container">
           <div className="partner-section">
             <div className="partner-header">
               <h4>👨 Boy's Details</h4>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-select-chart"
-                onClick={() => {
-                  if (!user) {
-                    sessionStorage.setItem('kundli_pending_chart_select', 'boy');
-                    onLogin && onLogin();
-                  } else {
-                    setShowBoyCharts(!showBoyCharts);
-                  }
-                }}
+                onClick={() => openChartPicker('boy')}
               >
                 Select Saved Chart
               </button>
             </div>
-            {showBoyCharts && (
-              <div className="saved-charts-dropdown">
-                <h5>Select Boy's Chart:</h5>
-                <div className="charts-list">
-                  {savedCharts.map(chart => (
-                    <div 
-                      key={chart.id} 
-                      className="chart-item"
-                      onClick={() => selectSavedChart(chart, 'boy')}
-                    >
-                      <strong>{chart.name}</strong><br/>
-                      <small>{chart.date} at {chart.time}</small>
-                    </div>
-                  ))}
-                  {savedCharts.length === 0 && (
-                    <div className="no-charts">No saved charts found</div>
-                  )}
-                </div>
-              </div>
-            )}
             <div className="form-group">
               <label>Name</label>
               <input
@@ -249,25 +238,27 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
                 required
               />
             </div>
-            <div className="form-group">
-              <label>Date of Birth</label>
-              <input
-                type="date"
-                name="date"
-                value={boyData.date}
-                onChange={(e) => handleInputChange(e, 'boy')}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Time of Birth</label>
-              <input
-                type="time"
-                name="time"
-                value={boyData.time}
-                onChange={(e) => handleInputChange(e, 'boy')}
-                required
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label>Date of Birth</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={boyData.date}
+                  onChange={(e) => handleInputChange(e, 'boy')}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Time of Birth</label>
+                <input
+                  type="time"
+                  name="time"
+                  value={boyData.time}
+                  onChange={(e) => handleInputChange(e, 'boy')}
+                  required
+                />
+              </div>
             </div>
             <div className="form-group">
               <label>Place of Birth</label>
@@ -304,41 +295,14 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
           <div className="partner-section">
             <div className="partner-header">
               <h4>👩 Girl's Details</h4>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-select-chart"
-                onClick={() => {
-                  if (!user) {
-                    sessionStorage.setItem('kundli_pending_chart_select', 'girl');
-                    onLogin && onLogin();
-                  } else {
-                    setShowGirlCharts(!showGirlCharts);
-                  }
-                }}
+                onClick={() => openChartPicker('girl')}
               >
                 Select Saved Chart
               </button>
             </div>
-            {showGirlCharts && (
-              <div className="saved-charts-dropdown">
-                <h5>Select Girl's Chart:</h5>
-                <div className="charts-list">
-                  {savedCharts.map(chart => (
-                    <div 
-                      key={chart.id} 
-                      className="chart-item"
-                      onClick={() => selectSavedChart(chart, 'girl')}
-                    >
-                      <strong>{chart.name}</strong><br/>
-                      <small>{chart.date} at {chart.time}</small>
-                    </div>
-                  ))}
-                  {savedCharts.length === 0 && (
-                    <div className="no-charts">No saved charts found</div>
-                  )}
-                </div>
-              </div>
-            )}
             <div className="form-group">
               <label>Name</label>
               <input
@@ -350,25 +314,27 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
                 required
               />
             </div>
-            <div className="form-group">
-              <label>Date of Birth</label>
-              <input
-                type="date"
-                name="date"
-                value={girlData.date}
-                onChange={(e) => handleInputChange(e, 'girl')}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Time of Birth</label>
-              <input
-                type="time"
-                name="time"
-                value={girlData.time}
-                onChange={(e) => handleInputChange(e, 'girl')}
-                required
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label>Date of Birth</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={girlData.date}
+                  onChange={(e) => handleInputChange(e, 'girl')}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Time of Birth</label>
+                <input
+                  type="time"
+                  name="time"
+                  value={girlData.time}
+                  onChange={(e) => handleInputChange(e, 'girl')}
+                  required
+                />
+              </div>
             </div>
             <div className="form-group">
               <label>Place of Birth</label>
@@ -404,15 +370,21 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
         </div>
 
         <div className="form-actions">
-          <button 
-            type="submit" 
-            className="btn-analyze"
-            disabled={!isFormValid()}
-          >
+          <button type="submit" className="btn-analyze" disabled={!isFormValid()}>
             Analyze Compatibility
           </button>
         </div>
       </form>
+
+      <BirthFormModal
+        isOpen={chartPickerTarget != null}
+        onClose={() => setChartPickerTarget(null)}
+        onSubmit={() => setChartPickerTarget(null)}
+        onChartPick={handleChartPick}
+        defaultActiveTab="saved"
+        title={pickerTitle}
+        description={pickerDescription}
+      />
     </div>
   );
 };

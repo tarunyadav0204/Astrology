@@ -102,6 +102,12 @@ Technical: Next `metadata` + `@graph` schema (WebPage, BreadcrumbList, WebApplic
 
 After deploy: URL Inspection → Request indexing for `https://astroroshni.com/karma-analysis` → Rich Results Test (FAQ).
 
+## Kundli Matching (`/kundli-matching`) — Next SEO page + CRA tool
+
+Served by **Next.js static export** (`frontend-next/`), merged into `frontend/build/kundli-matching/` on deploy. The public URL contains full server-rendered content about Kundli matching, Ashtakoot Guna Milan, Manglik matching, Navamsa, timing, and AI compatibility reports.
+
+The public `/kundli-matching` URL is owned by Next for SEO. The CRA interactive app still owns the logged-in matching workflow at `/kundli-matching?app=1`, including saved chart selection, free compatibility analysis, and premium AI report unlock.
+
 ---
 
 ## Checklist after deploy

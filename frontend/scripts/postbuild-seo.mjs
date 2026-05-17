@@ -32,7 +32,7 @@ const STATIC_PRERENDER_PATHS = [
   '/festivals',
   '/festivals/monthly',
   '/nakshatras',
-  '/kundli-matching',
+  // /kundli-matching is pre-rendered by frontend-next (do not puppeteer the CRA route)
   // /karma-analysis is pre-rendered by frontend-next (do not puppeteer the CRA route)
   '/blog',
   '/about',

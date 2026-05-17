@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.astroroshni.mobile",
+      "sha256_cert_fingerprints": [
+        "E9:99:50:35:93:C8:88:CC:11:BD:17:D4:41:BE:86:2A:41:C3:C1:D9:D7:60:DA:23:F4:25:E2:4E:A6:FD:51:58"
+      ]
+    }
+  }
+]

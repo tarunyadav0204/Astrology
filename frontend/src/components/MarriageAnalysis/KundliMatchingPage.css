@@ -7,42 +7,435 @@
 }
 
 .kundli-matching-main {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 16px 16px 48px;
+  padding: 16px 20px 48px;
 }
 
 .kundli-matching-hero {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .kundli-matching-back {
-  display: block;
+  display: inline-flex;
+  align-items: center;
   margin-bottom: 12px;
   padding: 6px 0;
   border: none;
   background: none;
   color: #ad1457;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+}
+
+.kundli-matching-back:hover {
+  color: #880e4f;
+  text-decoration: underline;
 }
 
 .kundli-matching-hero h1 {
   margin: 0 0 8px;
-  font-size: 1.75rem;
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
   color: #880e4f;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .kundli-matching-sub {
   margin: 0;
+  max-width: 52ch;
   color: #6d4c41;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .kundli-matching-panel {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.96);
   border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 24px rgba(136, 14, 79, 0.08);
+  padding: clamp(16px, 3vw, 28px);
+  box-shadow: 0 4px 24px rgba(136, 14, 79, 0.1);
+  border: 1px solid rgba(136, 14, 79, 0.08);
+}
+
+/* Partner form — dedicated page layout (base form styles from MarriageAnalysisTab.css) */
+.kundli-matching-page .partner-form {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.kundli-matching-page .partner-form > h3,
+.kundli-matching-page .partner-form > p {
+  display: none;
+}
+
+.kundli-matching-page .partners-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(16px, 3vw, 28px);
+  margin: 0 0 8px;
+}
+
+.kundli-matching-page .partner-section {
+  background: #fff;
+  border: 1px solid rgba(136, 14, 79, 0.12);
+  border-radius: 14px;
+  padding: clamp(16px, 2.5vw, 22px);
+  box-shadow: 0 2px 14px rgba(136, 14, 79, 0.06);
+}
+
+.kundli-matching-page .partner-header {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(136, 14, 79, 0.1);
+}
+
+.kundli-matching-page .partner-header h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #880e4f;
+  font-weight: 700;
+}
+
+.kundli-matching-page .btn-select-chart {
+  background: #fff;
+  color: #ad1457;
+  border: 1px solid rgba(173, 20, 87, 0.35);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kundli-matching-page .btn-select-chart:hover {
+  background: rgba(233, 30, 99, 0.08);
+  border-color: #ad1457;
+}
+
+.kundli-matching-page .form-group {
+  margin-bottom: 16px;
+}
+
+.kundli-matching-page .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5d4037;
+  letter-spacing: 0.01em;
+}
+
+.kundli-matching-page .form-group input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #e8d5dc;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #333;
+  background: #faf7f8;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.kundli-matching-page .form-group input::placeholder {
+  color: #9e8a92;
+}
+
+.kundli-matching-page .form-group input:focus {
+  outline: none;
+  border-color: #ad1457;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(173, 20, 87, 0.12);
+}
+
+.kundli-matching-page .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 0;
+}
+
+.kundli-matching-page .form-row .form-group {
+  margin-bottom: 16px;
+}
+
+.kundli-matching-page .autocomplete-container {
+  position: relative;
+}
+
+.kundli-matching-page .suggestion-list {
+  border-radius: 0 0 10px 10px;
+  border-color: #e8d5dc;
+  box-shadow: 0 8px 20px rgba(136, 14, 79, 0.12);
+}
+
+.kundli-matching-page .saved-charts-dropdown {
+  margin-bottom: 16px;
+  border-radius: 10px;
+}
+
+.kundli-matching-page .form-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(136, 14, 79, 0.1);
+}
+
+.kundli-matching-page .btn-analyze {
+  width: 100%;
+  max-width: 360px;
+  margin: 0;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, #e91e63 0%, #ad1457 100%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(173, 20, 87, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.kundli-matching-page .btn-analyze:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(173, 20, 87, 0.4);
+}
+
+.kundli-matching-page .btn-analyze:disabled {
+  background: #ccc;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+/* Loading / error states on this page */
+.kundli-matching-page .compatibility-loading,
+.kundli-matching-page .compatibility-error {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+/* Results view */
+.kundli-matching-page .compatibility-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.kundli-premium-card {
+  margin-top: 24px;
+  padding: clamp(18px, 3vw, 26px);
+  border-radius: 16px;
+  border: 1px solid rgba(190, 24, 93, 0.18);
+  background: linear-gradient(135deg, #fff7ed 0%, #fdf2f8 100%);
+  box-shadow: 0 4px 20px rgba(136, 14, 79, 0.08);
+}
+
+.kundli-premium-card--unlocked {
+  background: #fff;
+}
+
+.kundli-premium-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.kundli-premium-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #be185d;
+}
+
+.kundli-premium-card h3 {
+  margin: 0;
+  color: #6f1d46;
+  font-size: clamp(1.15rem, 3vw, 1.45rem);
+  line-height: 1.3;
+}
+
+.kundli-premium-card p {
+  color: #4a4035;
+  line-height: 1.6;
+}
+
+.kundli-premium-cost {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #9d174d;
+  border: 1px solid rgba(190, 24, 93, 0.22);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.kundli-premium-list {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: #5d4037;
+  line-height: 1.6;
+}
+
+.kundli-premium-error {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff1f2;
+  border: 1px solid rgba(225, 29, 72, 0.25);
+  color: #be123c;
+  font-size: 14px;
+}
+
+.kundli-premium-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.btn-premium-primary,
+.btn-premium-secondary {
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.btn-premium-primary {
+  background: linear-gradient(135deg, #be185d, #7e22ce);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(190, 24, 93, 0.22);
+}
+
+.btn-premium-secondary {
+  background: #fff;
+  color: #7e22ce;
+  border-color: rgba(126, 34, 206, 0.28);
+}
+
+.btn-premium-primary:disabled,
+.btn-premium-secondary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.kundli-premium-verdict {
+  margin: 14px 0 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fdf2f8;
+  color: #6f1d46;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.kundli-premium-section {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(136, 14, 79, 0.1);
+  background: #fffafc;
+}
+
+.kundli-premium-section h4 {
+  margin: 0 0 10px;
+  color: #880e4f;
+  font-size: 1rem;
+}
+
+.kundli-premium-section ul,
+.kundli-premium-subblock ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: #4a4035;
+  line-height: 1.6;
+}
+
+.kundli-premium-subblock {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(136, 14, 79, 0.1);
+}
+
+.kundli-premium-subblock strong {
+  color: #be185d;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.kundli-premium-final {
+  padding: 16px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid rgba(234, 88, 12, 0.16);
+}
+
+@media (max-width: 900px) {
+  .kundli-matching-page .partners-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .kundli-matching-main {
+    padding: 12px 14px 40px;
+  }
+
+  .kundli-matching-panel {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .kundli-matching-page .partner-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kundli-matching-page .btn-select-chart {
+    width: 100%;
+    text-align: center;
+  }
+
+  .kundli-matching-page .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .kundli-matching-page .btn-analyze {
+    max-width: none;
+  }
+
+  .kundli-matching-page .partners-summary-top {
+    grid-template-columns: 1fr;
+  }
+
+  .kundli-premium-header,
+  .kundli-premium-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kundli-premium-cost,
+  .btn-premium-primary,
+  .btn-premium-secondary {
+    width: 100%;
+    text-align: center;
+  }
 }

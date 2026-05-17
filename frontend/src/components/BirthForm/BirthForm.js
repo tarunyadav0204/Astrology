@@ -1,13 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAstrology } from '../../context/AstrologyContext';
 import { apiService } from '../../services/apiService';
 import { locationService } from '../../services/locationService';
 import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
-import { FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem, TabContainer, TabNavigation, TabButton, TabContent } from './BirthForm.styles';
+import { FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem, LoadMoreButton, TabContainer, TabNavigation, TabButton, TabContent } from './BirthForm.styles';
 
-const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose, defaultActiveTab = 'saved' }) => {
+const SAVED_CHARTS_PAGE_SIZE = 10;
+
+const BirthForm = ({
+  onSubmit,
+  onLogout,
+  onChartPick,
+  pickModeTitle,
+  pickModeDescription,
+  prefilledData,
+  showCloseButton,
+  onClose,
+  defaultActiveTab = 'saved',
+}) => {
+  const isPickMode = Boolean(onChartPick);
   const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
   
   const [formData, setFormData] = useState({
@@ -27,6 +40,11 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
   const [editingChart, setEditingChart] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchDebounce, setSearchDebounce] = useState(null);
+  const [chartsListLoading, setChartsListLoading] = useState(false);
+  const [chartsLoadingMore, setChartsLoadingMore] = useState(false);
+  const [chartsHasMore, setChartsHasMore] = useState(false);
+  const [chartsTotal, setChartsTotal] = useState(0);
+  const chartsOffsetRef = useRef(0);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -45,7 +63,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     // Only load existing charts if user is authenticated
     const token = localStorage.getItem('token');
     if (token) {
-      loadExistingCharts();
+      loadExistingCharts('', { reset: true });
     }
     
     // Pre-populate form if prefilledData is provided (from homepage matching)
@@ -75,36 +93,79 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     }
   }, [birthData, prefilledData]);
 
-  const loadExistingCharts = async (search = '') => {
+  const loadExistingCharts = async (search = '', { reset = true } = {}) => {
     const token = localStorage.getItem('token');
     if (!token) {
       setExistingCharts([]);
+      setChartsHasMore(false);
+      setChartsTotal(0);
+      chartsOffsetRef.current = 0;
       return;
     }
-    
+
+    const nextOffset = reset ? 0 : chartsOffsetRef.current;
+
     try {
-      const response = await apiService.getExistingCharts(search);
-      setExistingCharts(response.charts || []);
+      if (reset) {
+        setChartsListLoading(true);
+      } else {
+        setChartsLoadingMore(true);
+      }
+
+      const response = await apiService.getExistingCharts(
+        search,
+        SAVED_CHARTS_PAGE_SIZE,
+        nextOffset
+      );
+      const charts = response.charts || [];
+
+      if (reset) {
+        setExistingCharts(charts);
+      } else {
+        setExistingCharts((prev) => [...prev, ...charts]);
+      }
+
+      chartsOffsetRef.current = nextOffset + charts.length;
+      setChartsHasMore(Boolean(response.has_more));
+      setChartsTotal(response.total ?? 0);
     } catch (error) {
       console.error('Failed to load existing charts:', error);
-      setExistingCharts([]);
+      if (reset) {
+        setExistingCharts([]);
+        chartsOffsetRef.current = 0;
+        setChartsHasMore(false);
+        setChartsTotal(0);
+      }
+    } finally {
+      setChartsListLoading(false);
+      setChartsLoadingMore(false);
     }
   };
 
   const handleSearchChange = (e) => {
     const query = e.target.value;
     setSearchQuery(query);
-    
+
     if (searchDebounce) clearTimeout(searchDebounce);
-    
+
     const timeout = setTimeout(() => {
-      loadExistingCharts(query);
+      loadExistingCharts(query, { reset: true });
     }, 300);
-    
+
     setSearchDebounce(timeout);
   };
 
+  const handleLoadMoreCharts = () => {
+    if (chartsLoadingMore || chartsListLoading || !chartsHasMore) return;
+    loadExistingCharts(searchQuery, { reset: false });
+  };
+
   const selectExistingChart = async (chart) => {
+    if (onChartPick) {
+      onChartPick(chart);
+      return;
+    }
+
     try {
       const birthData = {
         name: chart.name,
@@ -172,7 +233,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       try {
         await apiService.deleteChart(chartId);
         toast.success('Chart deleted successfully!');
-        loadExistingCharts(searchQuery);
+        loadExistingCharts(searchQuery, { reset: true });
       } catch (error) {
         toast.error('Failed to delete chart');
       }
@@ -336,7 +397,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         });
 
         toast.success('Chart updated successfully!');
-        loadExistingCharts(searchQuery);
+        loadExistingCharts(searchQuery, { reset: true });
 
         // Close modal after successful edit; do not reset form first.
         if (onSubmit) {
@@ -371,7 +432,19 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     }
   };
 
-  const [activeTab, setActiveTab] = useState(() => (defaultActiveTab === 'new' ? 'new' : 'saved'));
+  const [activeTab, setActiveTab] = useState(() => {
+    if (isPickMode) return 'saved';
+    return defaultActiveTab === 'new' ? 'new' : 'saved';
+  });
+
+  const headerTitle = isPickMode
+    ? (pickModeTitle || 'Select Saved Chart')
+    : (activeTab === 'new' ? 'Enter Birth Details' : 'Select Saved Chart');
+  const headerSubtitle = isPickMode
+    ? (pickModeDescription || 'Choose from your previously saved birth charts')
+    : (activeTab === 'new'
+      ? 'Please provide birth information to generate chart'
+      : 'Choose from your previously saved birth charts');
 
   return (
     <TabContainer key="fixed-tabs-v2">
@@ -390,7 +463,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
             fontWeight: '700',
             textAlign: 'center'
           }}>
-            {activeTab === 'new' ? 'Enter Birth Details' : 'Select Saved Chart'}
+            {headerTitle}
           </h2>
           <p style={{
             margin: 0,
@@ -399,7 +472,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
             textAlign: 'center',
             fontWeight: '400'
           }}>
-            {activeTab === 'new' ? 'Please provide birth information to generate chart' : 'Choose from your previously saved birth charts'}
+            {headerSubtitle}
           </p>
           <button
             onClick={onClose}
@@ -434,27 +507,29 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
           </button>
         </div>
       )}
-      <TabNavigation>
-        <TabButton
-          type="button"
-          onClick={() => setActiveTab('new')}
-          active={activeTab === 'new'}
-          isFirst={true}
-        >
-          📝 New Chart
-        </TabButton>
-        <TabButton
-          type="button"
-          onClick={() => setActiveTab('saved')}
-          active={activeTab === 'saved'}
-          isLast={true}
-        >
-          📊 Saved Charts
-        </TabButton>
-      </TabNavigation>
+      {!isPickMode && (
+        <TabNavigation>
+          <TabButton
+            type="button"
+            onClick={() => setActiveTab('new')}
+            active={activeTab === 'new'}
+            isFirst={true}
+          >
+            📝 New Chart
+          </TabButton>
+          <TabButton
+            type="button"
+            onClick={() => setActiveTab('saved')}
+            active={activeTab === 'saved'}
+            isLast={true}
+          >
+            📊 Saved Charts
+          </TabButton>
+        </TabNavigation>
+      )}
 
       {/* Tab Content */}
-      {activeTab === 'new' ? (
+      {!isPickMode && activeTab === 'new' ? (
         <TabContent style={{ height: 'fit-content', overflow: 'visible' }}>
         <FormContainer style={{ flex: 1, overflow: 'visible', height: 'fit-content' }}>
           <div style={{ position: 'relative', zIndex: 3, padding: '0px 24px 16px 24px' }}>
@@ -594,15 +669,20 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         </FormContainer>
         </TabContent>
       ) : (
-        <div style={{ padding: '10px', height: '600px', overflow: 'auto' }}>
+        <div style={{ padding: '10px', height: '600px', display: 'flex', flexDirection: 'column' }}>
           <SearchInput
             type="text"
             placeholder="Search by name..."
             value={searchQuery}
             onChange={handleSearchChange}
-            style={{ marginBottom: '10px' }}
+            style={{ marginBottom: '10px', flexShrink: 0 }}
           />
-          <ChartsList style={{ height: '520px', overflow: 'auto' }}>
+          {chartsListLoading && existingCharts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+              Loading charts...
+            </div>
+          ) : null}
+          <ChartsList style={{ flex: 1, minHeight: 0, height: 'auto' }}>
             {existingCharts.map(chart => (
               <ChartItem key={chart.id}>
                 <div onClick={() => selectExistingChart(chart)} style={{ flex: 1, cursor: 'pointer' }}>
@@ -610,28 +690,43 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
                   {chart.date} at {chart.time}<br/>
                   <small>Created: {new Date(chart.created_at).toLocaleDateString()}</small>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); editChart(chart); setActiveTab('new'); }}
-                    style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); deleteChart(chart.id); }}
-                    style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    Delete
-                  </button>
-                </div>
+                {!isPickMode && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); editChart(chart); setActiveTab('new'); }}
+                      style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); deleteChart(chart.id); }}
+                      style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </ChartItem>
             ))}
-            {existingCharts.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', padding: '1rem' }}>
+            {!chartsListLoading && existingCharts.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#64748b', padding: '1rem' }}>
                 {searchQuery ? 'No charts found' : 'No saved charts'}
               </div>
             )}
           </ChartsList>
+          {chartsHasMore && !chartsListLoading && (
+            <LoadMoreButton
+              type="button"
+              onClick={handleLoadMoreCharts}
+              disabled={chartsLoadingMore}
+            >
+              {chartsLoadingMore
+                ? 'Loading...'
+                : `Load more (${existingCharts.length}/${chartsTotal || '?'})`}
+            </LoadMoreButton>
+          )}
         </div>
       )}
     </TabContainer>

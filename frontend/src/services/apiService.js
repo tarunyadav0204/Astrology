@@ -220,10 +220,11 @@ export const apiService = {
     return response.data;
   },
   
-  getExistingCharts: async (search = '', limit = 50) => {
+  getExistingCharts: async (search = '', limit = 50, offset = 0) => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
-    params.append('limit', limit.toString());
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
     const response = await apiClient.get(`${getEndpoint('/birth-charts')}?${params}`);
     return response.data;
   },

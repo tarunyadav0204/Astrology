@@ -64,9 +64,9 @@ server {
         proxy_set_header Host $host;
     }
 
-    # Pre-rendered karma SEO page.
+    # Pre-rendered Next SEO pages.
     # Important: proxy this route to the frontend Node server instead of using try_files.
-    # The custom server serves SEO HTML for /karma-analysis, but /karma-analysis?app=1
+    # The custom server serves SEO HTML for /karma-analysis and /kundli-matching, but ?app=1
     # must return CRA index.html for sign-in, chart picker, and the interactive app view.
     location = /karma-analysis {
         proxy_pass http://127.0.0.1:3001;
@@ -76,6 +76,20 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
     location = /karma-analysis/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location = /kundli-matching {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location = /kundli-matching/ {
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

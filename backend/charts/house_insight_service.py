@@ -122,6 +122,40 @@ def _normalize_chart_data(chart_data: Dict[str, Any]) -> Dict[str, Any]:
     return chart_data
 
 
+def _normalize_transit_chart_data(chart_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Enrich TransitCalculator output so HouseAnalyzer can read planet house placements."""
+    sign_names = ChartCalculator.SIGN_NAMES
+    houses = chart_data.get("houses") or []
+    if not houses:
+        return chart_data
+
+    ascendant_sign = int(houses[0].get("sign", 0))
+    normalized_houses = []
+    for house in houses:
+        sign = int(house.get("sign", 0))
+        normalized_houses.append({
+            **house,
+            "sign_name": sign_names[sign] if 0 <= sign < 12 else "Unknown",
+        })
+
+    normalized_planets: Dict[str, Any] = {}
+    for planet_name, planet_data in (chart_data.get("planets") or {}).items():
+        sign = int(planet_data.get("sign", int(planet_data.get("longitude", 0) / 30)))
+        house_number = ((sign - ascendant_sign) % 12) + 1
+        normalized_planets[planet_name] = {
+            **planet_data,
+            "sign": sign,
+            "sign_name": sign_names[sign] if 0 <= sign < 12 else "Unknown",
+            "house": house_number,
+        }
+
+    return {
+        **chart_data,
+        "planets": normalized_planets,
+        "houses": normalized_houses,
+    }
+
+
 def _factor(label: str, tone: str, category: str) -> Dict[str, str]:
     return {"label": label, "tone": tone, "category": category}
 
@@ -712,8 +746,8 @@ def _collect_house_factors(
 
     if chart_id != "transit":
         try:
-            transit_chart = TransitCalculator().calculate_transits(
-                birth_data,
+            transit_chart = TransitCalculator({}).calculate_transits(
+                birth_obj,
                 transit_date or datetime.now().strftime("%Y-%m-%d"),
             )
             target_sign = house_sign
@@ -776,10 +810,11 @@ def build_house_insight(
     natal_chart = ChartCalculator({}).calculate_chart(birth_obj)
 
     if chart_id == "transit":
-        chart_data = TransitCalculator().calculate_transits(
-            birth_data,
+        transit_raw = TransitCalculator({}).calculate_transits(
+            birth_obj,
             transit_date or datetime.now().strftime("%Y-%m-%d"),
         )
+        chart_data = _normalize_transit_chart_data(transit_raw)
     else:
         division = CHART_DIVISIONS.get(chart_id)
         if division:

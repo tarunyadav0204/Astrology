@@ -20,11 +20,15 @@ const KundliMatchingPage = ({
   const [showCreditsModal, setShowCreditsModal] = useState(false);
 
   useEffect(() => {
-    if (!user && location.state?.openLogin && onLogin) {
+    const params = new URLSearchParams(location.search || '');
+    const shouldOpenLogin = location.state?.openLogin || params.get('login') === '1';
+    if (!user && shouldOpenLogin && onLogin) {
       onLogin();
-      navigate(location.pathname, { replace: true, state: {} });
+      params.delete('login');
+      const search = params.toString();
+      navigate(`${location.pathname}${search ? `?${search}` : ''}`, { replace: true, state: {} });
     }
-  }, [user, location.state?.openLogin, onLogin, navigate, location.pathname]);
+  }, [user, location.state?.openLogin, location.search, onLogin, navigate, location.pathname]);
 
   const handleAdmin = () => {
     if (onAdminClick) onAdminClick();
