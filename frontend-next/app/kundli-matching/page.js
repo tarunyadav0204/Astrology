@@ -1,6 +1,6 @@
-import KundliSiteHeader from '@/components/KundliSiteHeader';
-import KundliMatchingLanding from '@/components/KundliMatchingLanding';
-import { buildKundliStructuredData } from '@/lib/kundliSeoContent';
+import KundliSiteHeader from '../../components/KundliSiteHeader';
+import KundliMatchingLanding from '../../components/KundliMatchingLanding';
+import { buildKundliStructuredData } from '../../lib/kundliSeoContent';
 
 const KEYWORDS = [
   'kundli matching',

@@ -1,7 +1,7 @@
-import KarmaSiteHeader from '@/components/KarmaSiteHeader';
-import KarmaAnalysisLanding from '@/components/KarmaAnalysisLanding';
-import KarmaTool from '@/components/KarmaTool';
-import { buildKarmaStructuredData } from '@/lib/karmaSeoContent';
+import KarmaSiteHeader from '../../components/KarmaSiteHeader';
+import KarmaAnalysisLanding from '../../components/KarmaAnalysisLanding';
+import KarmaTool from '../../components/KarmaTool';
+import { buildKarmaStructuredData } from '../../lib/karmaSeoContent';
 
 const KEYWORDS = [
   'past life karma analysis',

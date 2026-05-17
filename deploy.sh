@@ -154,24 +154,29 @@ deploy_timing "encryption setup finished"
 
 # --- Phase 2: restart backend when backend/ changed or API unhealthy (skip for frontend-only) ---
 restart_backend=true
-if [ -n "${PREV_HEAD}" ] && [ "${FORCE_FULL_DEPLOY}" != "true" ] && [ -n "${CHANGED_FILES}" ]; then
-  if ! echo "${CHANGED_FILES}" | grep -qE '^backend/'; then
+if [ "${FORCE_FULL_DEPLOY}" != "true" ]; then
+  backend_changed=false
+  if [ -n "${CHANGED_FILES}" ] && echo "${CHANGED_FILES}" | grep -qE '^backend/'; then
+    backend_changed=true
+  fi
+
+  if [ "${FORCE_FRONTEND_DEPLOY}" = "true" ] || { [ -n "${PREV_HEAD}" ] && [ "${backend_changed}" != "true" ]; }; then
     if curl -fsS --max-time 5 http://localhost:8001/api/health >/dev/null 2>&1; then
       restart_backend=false
-      echo "⏭️ No backend/ files in this deploy and /api/health OK — skipping backend restart (keeps API up during frontend build)"
+      echo "⏭️ Frontend-only deploy and /api/health OK — skipping backend restart (keeps mobile API traffic up)"
     else
-      echo "⚠️ No backend/ changes but /api/health failed — restarting backend"
+      echo "⚠️ Frontend-only deploy requested but /api/health failed — restarting backend"
     fi
   fi
 fi
 
 cd "${APP_ROOT}"
 
-echo "Stopping restart monitor..."
-pkill -f restart_server.sh 2>/dev/null || true
-sleep 1
-
 if [ "${restart_backend}" = "true" ]; then
+  echo "Stopping restart monitor..."
+  pkill -f restart_server.sh 2>/dev/null || true
+  sleep 1
+
   echo "🔄 Restarting backend (frontend left running until new build is ready)..."
   echo "Stopping existing backend on 8001..."
   fuser -k 8001/tcp 2>/dev/null || true

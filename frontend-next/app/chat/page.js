@@ -1,6 +1,6 @@
-import ChatSiteHeader from '@/components/ChatSiteHeader';
-import ChatLanding from '@/components/ChatLanding';
-import { buildChatStructuredData } from '@/lib/chatSeoContent';
+import ChatSiteHeader from '../../components/ChatSiteHeader';
+import ChatLanding from '../../components/ChatLanding';
+import { buildChatStructuredData } from '../../lib/chatSeoContent';
 import './chat.css';
 
 const KEYWORDS = [
