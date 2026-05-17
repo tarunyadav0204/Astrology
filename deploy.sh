@@ -30,6 +30,10 @@ deploy_timing "deploy script started"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
 FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-false}"
+case "$(printf '%s' "${FORCE_FULL_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes) FORCE_FULL_DEPLOY=true ;;
+  *) FORCE_FULL_DEPLOY=false ;;
+esac
 
 # Pull latest changes
 echo "📥 Pulling latest changes from Git..."
@@ -108,7 +112,7 @@ if [ "${SKIP_BACKEND_PIP}" = "true" ] && [ "${FORCE_BACKEND_PIP}" != "true" ]; t
   fi
 fi
 
-echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build}"
+echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build}"
 
 # Repo root (deploy.sh is always run from here)
 APP_ROOT="$(pwd)"
@@ -288,6 +292,23 @@ else
   echo "⏭️ Leaving existing frontend server on 3001 running (no new build)"
   deploy_timing "frontend serve unchanged"
 fi
+
+echo "🔎 Verifying public Next SEO routes..."
+seo_check() {
+  local route="$1"
+  local marker="$2"
+  if curl -fsS "http://127.0.0.1:3001${route}" | grep -q "${marker}"; then
+    echo "✅ ${route} serves Next SEO HTML"
+  else
+    echo "❌ ${route} did not serve expected Next SEO HTML"
+    echo "   Check that frontend/build has the matching .html file and that node scripts/serve-build.mjs is running on 3001."
+    exit 1
+  fi
+}
+seo_check "/karma-analysis" "Personalized Karma Analysis"
+seo_check "/kundli-matching" "Kundli Matching"
+seo_check "/chat" "AI Vedic Astrologer Chat"
+deploy_timing "frontend SEO route verification complete"
 
 # --- Phase 5: auto-restart monitor (backend watchdog) ---
 echo "🔄 Starting auto-restart monitor..."

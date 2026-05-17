@@ -57,18 +57,3 @@ def test_parallel_chat_allowlist_invalid_ids_means_nobody(monkeypatch):
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT_USER_IDS", "not_a_number, also_bad")
     assert should_use_parallel_chat(ctx, user_id=1) is False
 
-
-def test_looks_like_many_questions_hindi_multi_sentence():
-    from ai.question_heuristics import looks_like_many_questions
-
-    msg = (
-        "meri saadi kab hui thi. Meri wife kaisi hai. Mera career ke baare mein batao. "
-        "Aur paisa kitna hoga."
-    )
-    assert looks_like_many_questions(msg) is True
-
-
-def test_looks_like_many_questions_single_when_english():
-    from ai.question_heuristics import looks_like_many_questions
-
-    assert looks_like_many_questions("In which year did I get married?") is False

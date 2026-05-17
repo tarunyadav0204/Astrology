@@ -53,7 +53,13 @@ def build_multi_question_focus_instruction(language: str = "english") -> str:
     _ = (language or "english").strip()
     return """
 📌 MULTIPLE QUESTIONS IN "CURRENT QUESTION" (APPLY ONLY WHEN RELEVANT):
-If the user's CURRENT QUESTION (at the end of this prompt) clearly contains **two or more distinct questions**—for example several question marks, numbered asks, or clearly separate topics in one message—do **not** try to answer everything at equal depth in a single reply.
+If the user's CURRENT QUESTION (at the end of this prompt) clearly contains **two or more distinct, unrelated questions**—for example several question marks, numbered asks, "I have two questions", or clearly separate unrelated topics in one message—do **not** try to answer everything at equal depth in a single reply.
+
+Do NOT treat one coherent question with related facets as multiple questions. Examples that are ONE question:
+- career + job + salary + promotion
+- marriage + spouse + husband/wife + relationship
+- health + stress + work pressure
+- timing + description of the same event/person
 
 Instead you MUST:
 1) **Choose one focus question** for this reading: the most urgent, chart-central, or emotionally weighty ask (use dasha timing, house emphasis, or what the chart best supports).

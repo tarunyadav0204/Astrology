@@ -7,7 +7,6 @@ import random
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from ai.question_heuristics import looks_like_many_questions
 from ai.output_schema import resolve_output_language_policy
 from daily.daily_micro_intents import classify_daily_micro_intent
 from utils.query_context import normalize_query_context, resolve_query_now
@@ -911,9 +910,9 @@ Rules:
 - Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` for remedy requests tied to a specific problem.
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
-- Return `CLARIFY` when the user has not made the core topic specific enough to answer well in one instant reply.
+- Return `CLARIFY` only when the user has not made the core topic specific enough to answer well in one instant reply, or when the message explicitly contains separate unrelated asks.
 - Good reasons to `CLARIFY`:
-  - the message mixes unrelated areas like career + marriage + money
+  - the message explicitly mixes unrelated life areas as separate asks, like "career, marriage, and money" or "first tell career, then marriage"
   - the user says something broad like "tell me about my life", "what is coming", "analyze my chart", "what do you see" without a clear focus
   - the user asks for timing or prediction but the event/topic itself is unclear
   - the user asks "which is better?" or "what about this?" but the reference is ambiguous from recent chat
@@ -926,9 +925,14 @@ Rules:
   - "Will today go well?"
   - "When will I get married?"
   - "How is my relationship with my husband?"
+  - "How is my marriage life and relationship with my husband?"
+  - "Will I get promotion and salary hike this year?"
+  - "How is my career growth and income in 2026?"
+  - "When will I get married and what will my spouse be like?"
   - "You said Rahu activates my 10th house. How?"
   - "Why do you think that about my behavior?"
-- If the user message bundles multiple unrelated asks, prefer `CLARIFY` unless clarification has already been used.
+- Related facets inside one domain are ONE question, not multiple questions. Examples: job + salary + promotion = career; marriage + spouse + husband/wife + relationship = relationship/marriage; health + stress + work pressure = health/stress.
+- If the user message bundles explicit multiple unrelated asks, prefer `CLARIFY` unless clarification has already been used.
 - If asking about an exact day, relative day, or specific date-bound event, return `extracted_context.specific_date` in YYYY-MM-DD.
 - Resolve "today", "tomorrow", and "day after tomorrow" from the current date context above.
 - Set `needs_transits=true` for daily, timing, and period outlook questions. Otherwise false unless clearly timing-sensitive.
@@ -1100,7 +1104,16 @@ Return ONLY this JSON shape:
         if clarification_count < 1:
             multi_question_instruction = r"""
 MULTI-QUESTION IN ONE MESSAGE (WHEN status WOULD BE "CLARIFY"):
-If the user's current message clearly packs SEVERAL distinct questions into one (e.g. two or more "?" marks, numbered asks like "1. ... 2. ...", phrases like "another question" / "few questions", or clearly separate topics joined with ";" / "also"), then:
+Clarify only when the user's current message explicitly packs SEVERAL distinct, unrelated questions into one. Strong signals include two or more question marks, numbered asks like "1. ... 2. ...", phrases like "another question" / "few questions" / "I have two questions", or clearly separate unrelated topics joined with ";" / "also".
+- Do NOT invent multiple questions from one integrated question.
+- Related facets inside one domain are ONE question, not multiple questions. Examples:
+  - marriage + spouse + husband/wife + relationship = one relationship/marriage question
+  - career + job + promotion + salary/income = one career/earnings question
+  - health + stress + work pressure = one health/stress question
+  - timing + description of the same event/person = one timing question
+- If the user asks one coherent question with related facets, return READY and classify the dominant domain.
+
+If the message truly has several unrelated asks, then:
 - Your "clarification_question" MUST still do your normal narrowing (which area, timeframe, etc.).
 - In the SAME language as the clarification (Hindi Devanagari for Hindi/Hinglish users per rules above), add ONE short polite sentence asking them to ask **one question at a time** so the reading can stay focused and detailed. Keep tone warm—not scolding.
 - If you already included that idea, do not repeat it.
@@ -1198,6 +1211,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
 - When status is "CLARIFY" and you are presenting multiple choices, format the clarification so users can reply with a single letter.
 - Use wording like: "Type A for ..., Type B for ..., Type C for ...".
 - IMPORTANT: Do NOT hardcode exactly 3 options. Use only the number naturally needed (usually 2-5).
+- Use Type A / Type B options only after you have decided CLARIFY is genuinely needed. Never create Type A / Type B choices by splitting a single coherent question into imaginary sub-questions.
 - If only 2 choices are needed, provide only A-B. If 4 are needed, provide A-D, etc.
 - End with a short fallback like: "or type your topic in your own words."
 - Keep the full clarification in the inferred CURRENT QUESTION language/script.

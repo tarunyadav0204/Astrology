@@ -60,7 +60,7 @@ for (const route of routes) {
 }
 
 // Compatibility only for simple static hosting. Query-aware routing such as
-// /karma-analysis?app=1 and /kundli-matching?app=1 require frontend/scripts/serve-build.mjs.
+// /karma-analysis?app=1, /kundli-matching?app=1, and /chat?app=1 require frontend/scripts/serve-build.mjs.
 const serveJson = {
   rewrites: [
     { source: '/karma-analysis', destination: '/karma-analysis.html' },

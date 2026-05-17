@@ -65,7 +65,8 @@ Migrate **public/marketing routes only** to **Next.js App Router**:
 | Route group | Rendering |
 |-------------|-----------|
 | `/`, `/panchang`, `/blog/*`, `/nakshatras`, tools | **SSG/ISR** — best SEO |
-| `/chat`, `/dashboard`, profile | Stay CRA or **client-only** in Next |
+| `/dashboard`, profile | Stay CRA or **client-only** in Next |
+| `/chat` | Next static SEO landing + CRA app at `/chat?app=1` |
 
 **Why consider Next.js**
 
@@ -108,11 +109,17 @@ Served by **Next.js static export** (`frontend-next/`), merged into `frontend/bu
 
 The public `/kundli-matching` URL is owned by Next for SEO. The CRA interactive app still owns the logged-in matching workflow at `/kundli-matching?app=1`, including saved chart selection, free compatibility analysis, and premium AI report unlock.
 
+## Chat (`/chat`) — Next SEO page + CRA chat app
+
+Served by **Next.js static export** (`frontend-next/`), merged into `frontend/build/chat/` on deploy. The public URL contains crawlable content for AI Vedic astrology chat and related FAQs.
+
+The public `/chat` URL is owned by Next for SEO. The CRA interactive chat experience still runs at `/chat?app=1` through the production static server.
+
 ---
 
 ## Checklist after deploy
 
 - [ ] `curl -I https://astroroshni.com/sitemap.xml` → `200` + `Content-Type: application/xml`
 - [ ] View source on `/panchang` → see title + description in HTML (not only in JS)
-- [ ] Search Console: submit sitemap, request indexing for `/panchang`, `/kundli-matching`
+- [ ] Search Console: submit sitemap, request indexing for `/panchang`, `/kundli-matching`, `/chat`
 - [ ] Rich Results Test on homepage and one blog post

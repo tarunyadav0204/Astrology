@@ -15,6 +15,10 @@ on:
         description: 'Run pip install -r backend/requirements.txt (even if file unchanged)'
         type: boolean
         default: false
+      force_full_deploy:
+        description: 'Force backend setup, frontend rebuild, and frontend static server restart'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -32,6 +36,7 @@ jobs:
           echo "========== GitHub Actions: deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           cd AstrologyApp
           export FORCE_BACKEND_PIP="${{ github.event.inputs.force_backend_pip == 'true' && 'true' || 'false' }}"
+          export FORCE_FULL_DEPLOY="${{ github.event.inputs.force_full_deploy == 'true' && 'true' || 'false' }}"
           bash deploy.sh
           echo "========== GitHub Actions: deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') exit code $? =========="
           echo "========== (Timestamps above are the runner clock; lines starting with ⏱️ are from deploy.sh on the server.) =========="
