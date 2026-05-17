@@ -172,8 +172,13 @@ function outputPathForRoute(routePath) {
 }
 
 async function prerenderRoutes() {
+  // Deploy sets CI=true and PRERENDER=false; skip unless explicitly PRERENDER=true.
   if (process.env.PRERENDER === 'false') {
     console.log('[seo] Prerender skipped (PRERENDER=false)');
+    return;
+  }
+  if (process.env.CI === 'true' && process.env.PRERENDER !== 'true') {
+    console.log('[seo] Prerender skipped (CI=true; set PRERENDER=true to enable on deploy)');
     return;
   }
 

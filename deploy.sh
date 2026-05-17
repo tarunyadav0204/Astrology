@@ -243,11 +243,10 @@ if [ "${needs_frontend_build}" = "true" ]; then
   export CI=true
   export GENERATE_SOURCEMAP=false
   export INLINE_RUNTIME_CHUNK=true
-  # SEO: postbuild-seo.mjs writes build/sitemap.xml; Next export (build:karma-next) adds karma/kundli/chat HTML
+  # SEO: sitemap + Next export (karma/kundli/chat). Puppeteer prerender off on deploy (slow; use PRERENDER=true to force).
+  export PRERENDER=false
   SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
   BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
-  # Puppeteer prerender is slow and times out CI SSH (~10m). Next.js export covers /karma-analysis, /kundli-matching, /chat.
-  PRERENDER="${PRERENDER:-false}" \
   npm run build
   deploy_timing "npm run build finished (includes frontend-next karma export)"
 else
