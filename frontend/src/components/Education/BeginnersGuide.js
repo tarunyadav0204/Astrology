@@ -236,7 +236,7 @@ const BeginnersGuide = () => {
             <div className="next-step-card">
               <h3>💬 Ask Questions</h3>
               <p>Get personalized guidance from experts</p>
-              <button className="next-step-btn" onClick={() => navigate('/chat')}>
+              <button className="next-step-btn" onClick={() => navigate('/chat?app=1')}>
                 Start Chat
               </button>
             </div>

@@ -5,7 +5,7 @@ import './SearchBar.css';
 const SEARCH_DATA = [
   { title: 'Marriage Analysis', path: '/marriage-analysis', keywords: ['marriage', 'spouse', 'compatibility', 'wedding', 'partner'] },
   { title: 'Kundli Matching (Ashtakoot)', path: '/kundli-matching', keywords: ['kundli', 'matching', 'ashtakoot', 'guna', 'milan', 'gun milan', 'horoscope match'] },
-  { title: 'AI Astrologer Chat (Ask Tara)', path: '/chat', keywords: ['chat', 'astrologer', 'ai', 'tara', 'kundli chat', 'birth chart questions', 'vedic chat'] },
+  { title: 'AI Astrologer Chat (Ask Tara)', path: '/chat?app=1', keywords: ['chat', 'astrologer', 'ai', 'tara', 'kundli chat', 'birth chart questions', 'vedic chat'] },
   { title: 'Career Guidance', path: '/career-guidance', keywords: ['career', 'job', 'profession', 'work', 'business'] },
   { title: 'Wealth Analysis', path: '/wealth-analysis', keywords: ['wealth', 'money', 'finance', 'prosperity', 'income'] },
   { title: 'Health Analysis', path: '/health-analysis', keywords: ['health', 'medical', 'wellness', 'disease', 'fitness'] },
@@ -16,7 +16,7 @@ const SEARCH_DATA = [
   { title: 'Muhurat Finder', path: '/muhurat-finder', keywords: ['muhurat', 'auspicious', 'timing', 'shubh'] },
   { title: 'Festivals', path: '/festivals', keywords: ['festival', 'celebration', 'holiday', 'event'] },
   { title: 'Nakshatras', path: '/nakshatras', keywords: ['nakshatra', 'constellation', 'lunar', 'star'] },
-  { title: 'Chat with Astrologer', path: '/chat', keywords: ['chat', 'ask', 'question', 'astrologer', 'consultation'] },
+  { title: 'Chat with Astrologer', path: '/chat?app=1', keywords: ['chat', 'ask', 'question', 'astrologer', 'consultation'] },
   { title: 'Profile', path: '/profile', keywords: ['profile', 'account', 'settings', 'history'] }
 ];
 

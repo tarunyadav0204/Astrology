@@ -65,12 +65,29 @@ function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   if (pathname === '/chat' || pathname === '/speech-chat' || pathname.startsWith('/tools/')) return null;
   const handleOpenChat = () => {
     if (user) {
-      navigate('/chat');
+      navigate('/chat?app=1');
     } else if (onRequireLogin) {
       onRequireLogin();
     }
   };
   return <FloatingChatButton onOpenChat={handleOpenChat} />;
+}
+
+function ChatRouteGate({ children }) {
+  const location = useLocation();
+  const isAppRoute = new URLSearchParams(location.search).get('app') === '1';
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' && !isAppRoute) {
+      window.location.replace('/chat');
+    }
+  }, [isAppRoute]);
+
+  if (process.env.NODE_ENV === 'production' && !isAppRoute) {
+    return null;
+  }
+
+  return children;
 }
 
 /** Logged-in shell for chart selector, dashboard, and marketing home — only at `/`. */
@@ -949,7 +966,7 @@ function App() {
             <Route
               path="/chat"
               element={
-                <>
+                <ChatRouteGate>
                   <ChatPage onLogin={() => setShowLoginModal(true)} />
                   <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
                     <div style={{ marginBottom: '20px' }}>
@@ -1007,7 +1024,7 @@ function App() {
                       />
                     )}
                   </AuthModalShell>
-                </>
+                </ChatRouteGate>
               }
             />
             <Route path="/speech-chat" element={user ? <SpeechChatPage /> : <Navigate to="/" replace />} />

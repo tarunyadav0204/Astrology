@@ -1146,7 +1146,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <button 
                 className="ask-tara-prominent-btn"
-                onClick={() => user ? navigate('/chat') : onLogin()}
+                onClick={() => user ? navigate('/chat?app=1') : onLogin()}
                 style={{
                   background: 'white',
                   color: '#e91e63',
@@ -1575,7 +1575,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
 
               <div className="consultation-categories">
-                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
                   <div className="consultation-icon">💕</div>
                   <h4>Love & Relationships</h4>
                   <p>Marriage compatibility, relationship timing, soulmate analysis</p>
@@ -1586,7 +1586,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   <button type="button" className="ask-btn">Ask Tara</button>
                 </div>
 
-                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
                   <div className="consultation-icon">💼</div>
                   <h4>Career & Finance</h4>
                   <p>Job changes, business success, wealth timing, investment guidance</p>
@@ -1597,7 +1597,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   <button type="button" className="ask-btn">Ask Tara</button>
                 </div>
 
-                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
                   <div className="consultation-icon">🏥</div>
                   <h4>Health & Wellness</h4>
                   <p>Health predictions, disease timing, remedies, lifestyle guidance</p>
@@ -1608,7 +1608,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   <button type="button" className="ask-btn">Ask Tara</button>
                 </div>
 
-                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
                   <div className="consultation-icon">👶</div>
                   <h4>Family & Children</h4>
                   <p>Child birth timing, family harmony, parenting guidance</p>
@@ -1619,7 +1619,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   <button type="button" className="ask-btn">Ask Tara</button>
                 </div>
 
-                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
                   <div className="consultation-icon">🎓</div>
                   <h4>Education & Growth</h4>
                   <p>Study success, exam results, skill development, learning path</p>
@@ -1630,7 +1630,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   <button type="button" className="ask-btn">Ask Tara</button>
                 </div>
 
-                <div className="consultation-card" onClick={() => user ? navigate('/chat') : onLogin()}>
+                <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
                   <div className="consultation-icon">🌟</div>
                   <h4>General Predictions</h4>
                   <p>Life overview, upcoming events, lucky periods, general guidance</p>
@@ -1775,7 +1775,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           <div className="offers-scroll">
             {liveOffers.map((offer, index) => {
               const goChat = () => {
-                if (user) navigate('/chat');
+                if (user) navigate('/chat?app=1');
                 else if (onLogin) onLogin();
               };
               const onClaim = (e) => {
@@ -2097,7 +2097,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
             <button 
               className="start-numerology-btn"
-              onClick={() => user ? navigate('/chat') : onLogin()}
+              onClick={() => user ? navigate('/chat?app=1') : onLogin()}
             >
               🌟 Explore Numerology with Tara
             </button>
@@ -2216,7 +2216,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
       {/* Live Chat Widget */}
       <div className="live-chat-widget">
-        <button className="chat-widget-btn" onClick={() => user ? navigate('/chat') : onLogin()}>
+        <button className="chat-widget-btn" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
           <span className="chat-text-full">⭐ Ask Tara Now</span>
           <span className="chat-text-short">⭐ Ask Tara</span>
           <span className="chat-pulse"></span>
@@ -2767,7 +2767,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 gap: '10px'
               }}>
                 <button 
-                  onClick={() => user ? navigate('/chat') : onLogin()}
+                  onClick={() => user ? navigate('/chat?app=1') : onLogin()}
                   style={{
                     background: 'linear-gradient(135deg, #e91e63, #f06292)',
                     color: 'white',

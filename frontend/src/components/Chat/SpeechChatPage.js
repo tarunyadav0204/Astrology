@@ -520,7 +520,7 @@ const SpeechChatPage = () => {
         <div className={`speech-chat-page ${sessionActive ? 'speech-chat-page--session' : ''}`}>
             <div className={`speech-chat-shell ${sessionActive ? 'speech-chat-shell--session' : ''}`}>
                 <header className="speech-chat-header">
-                    <button type="button" className="speech-chat-back" onClick={() => navigate('/chat')} aria-label="Back to chat">
+                    <button type="button" className="speech-chat-back" onClick={() => navigate('/chat?app=1')} aria-label="Back to chat">
                         <svg className="speech-chat-back-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden>
                             <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
                         </svg>
@@ -542,7 +542,7 @@ const SpeechChatPage = () => {
                     <section className="speech-chat-empty">
                         <h2>Select a chart first</h2>
                         <p>Tara needs a birth chart so she knows which chart to read.</p>
-                        <button type="button" onClick={() => navigate('/chat')}>
+                        <button type="button" onClick={() => navigate('/chat?app=1')}>
                             Choose chart in chat
                         </button>
                     </section>
@@ -554,7 +554,7 @@ const SpeechChatPage = () => {
                                 ? 'Voice features are not enabled for your account right now.'
                                 : 'Instant chat is turned off. You can still use typed chat from the main chat screen.'}
                         </p>
-                        <button type="button" onClick={() => navigate('/chat')}>
+                        <button type="button" onClick={() => navigate('/chat?app=1')}>
                             Back to chat
                         </button>
                     </section>

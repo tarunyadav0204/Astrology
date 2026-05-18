@@ -741,7 +741,7 @@ export default function EventsTimelinePage({
                 ) : null}
 
                 <div className="events-timeline__footer-actions">
-                  <button type="button" className="events-timeline__secondary" onClick={() => navigate('/chat')}>
+                  <button type="button" className="events-timeline__secondary" onClick={() => navigate('/chat?app=1')}>
                     Open Tara chat
                   </button>
                   <button
