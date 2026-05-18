@@ -10,6 +10,13 @@ from fastapi.responses import JSONResponse
 import swisseph as swe
 import os
 import json
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()  # backend/.env — sets POSTGRES_DSN, JWT_SECRET, etc.
+except ImportError:
+    pass
 from datetime import datetime, timedelta, date as date_type
 from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
