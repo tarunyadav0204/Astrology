@@ -12,6 +12,7 @@ import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import AdminSubscriptionPurchases from './AdminSubscriptionPurchases';
+import AdminSubscriptionEvents from './AdminSubscriptionEvents';
 import AdminRazorpayRefund from './AdminRazorpayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
@@ -1981,6 +1982,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             Subscription purchases
           </button>
           <button
+            className={`subtab ${activeSubTab === 'subscriptionEvents' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('subscriptionEvents')}
+          >
+            Subscription events
+          </button>
+          <button
             className={`subtab ${activeSubTab === 'questionCost' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('questionCost')}
           >
@@ -3039,6 +3046,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'subscriptionPurchases' && (
           <AdminSubscriptionPurchases />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'subscriptionEvents' && (
+          <AdminSubscriptionEvents />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'playRefund' && (

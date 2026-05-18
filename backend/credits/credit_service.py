@@ -230,6 +230,18 @@ class CreditService:
                     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            for col_def in (
+                "userid INTEGER",
+                "source TEXT",
+                "event_kind TEXT",
+                "start_date DATE",
+                "end_date DATE",
+            ):
+                col_name = col_def.split()[0]
+                try:
+                    execute(conn, f"ALTER TABLE play_subscription_event_log ADD COLUMN IF NOT EXISTS {col_def}")
+                except Exception:
+                    pass
 
             execute(conn, '''
                 CREATE TABLE IF NOT EXISTS play_subscription_token_map (
@@ -598,44 +610,333 @@ class CreditService:
         except Exception:
             return False
 
+    def get_latest_subscription_on_platform(self, userid: int, platform: str) -> Optional[dict]:
+        """Most recent subscription row for user on platform (any status), for renewal inference."""
+        from db import get_conn, execute
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT us.plan_id, us.start_date, us.end_date, us.status, sp.plan_name, sp.tier_name
+                    FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE us.userid = ?
+                      AND sp.platform = ?
+                    ORDER BY us.end_date DESC NULLS LAST, us.created_at DESC NULLS LAST, us.id DESC
+                    LIMIT 1
+                    """,
+                    (userid, platform),
+                )
+                row = cur.fetchone()
+        except Exception:
+            row = None
+        if not row:
+            return None
+        return {
+            "plan_id": row[0],
+            "start_date": str(row[1])[:10] if row[1] else None,
+            "end_date": str(row[2])[:10] if row[2] else None,
+            "status": row[3],
+            "plan_name": row[4],
+            "tier_name": row[5],
+        }
+
     def log_play_subscription_event(
         self,
         *,
         event_id: str,
         purchase_token: Optional[str],
         product_id: Optional[str],
-        notification_type: Optional[int],
-        event_time_millis: Optional[int],
-        payload_json: Optional[str],
+        notification_type: Optional[int] = None,
+        event_time_millis: Optional[int] = None,
+        payload_json: Optional[str] = None,
+        userid: Optional[int] = None,
+        source: Optional[str] = None,
+        event_kind: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        processed_at: Optional[Any] = None,
     ) -> bool:
         from db import get_conn, execute
         eid = (event_id or "").strip()
         if not eid:
             return False
+        processed_sql = "CURRENT_TIMESTAMP"
+        params: List[Any] = [
+            eid,
+            (purchase_token or "").strip() or None,
+            (product_id or "").strip() or None,
+            int(notification_type) if notification_type is not None else None,
+            int(event_time_millis) if event_time_millis is not None else None,
+            payload_json,
+            int(userid) if userid is not None else None,
+            (source or "").strip() or None,
+            (event_kind or "").strip() or None,
+            (start_date or "").strip()[:10] or None,
+            (end_date or "").strip()[:10] or None,
+        ]
+        if processed_at is not None:
+            processed_sql = "?"
+            params.append(processed_at)
         try:
             with get_conn() as conn:
                 execute(
                     conn,
-                    """
+                    f"""
                     INSERT INTO play_subscription_event_log (
-                        event_id, purchase_token, product_id, notification_type, event_time_millis, payload_json, processed_at
+                        event_id, purchase_token, product_id, notification_type, event_time_millis,
+                        payload_json, userid, source, event_kind, start_date, end_date, processed_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {processed_sql})
                     ON CONFLICT (event_id) DO NOTHING
                     """,
-                    (
-                        eid,
-                        (purchase_token or "").strip() or None,
-                        (product_id or "").strip() or None,
-                        int(notification_type) if notification_type is not None else None,
-                        int(event_time_millis) if event_time_millis is not None else None,
-                        payload_json,
-                    ),
+                    tuple(params),
                 )
                 conn.commit()
                 return True
         except Exception:
             return False
+
+    def list_admin_subscription_events(
+        self,
+        from_date: str,
+        to_date: str,
+        *,
+        query: Optional[str] = None,
+        event_kind: Optional[str] = None,
+        source: Optional[str] = None,
+        page: int = 1,
+        limit: int = 50,
+    ) -> dict:
+        """Admin list of play_subscription_event_log with user display fields."""
+        from db import get_conn, execute
+        from credits.play_subscription_events import display_label_for_event
+
+        page = max(1, page)
+        limit = max(1, min(200, limit))
+        offset = (page - 1) * limit
+
+        base = """
+            FROM play_subscription_event_log e
+            LEFT JOIN users u ON u.userid = e.userid
+            LEFT JOIN play_subscription_token_map m
+              ON e.userid IS NULL AND m.purchase_token = e.purchase_token
+            LEFT JOIN users u2 ON u2.userid = m.userid
+            WHERE DATE(e.processed_at) >= ? AND DATE(e.processed_at) <= ?
+        """
+        params: list = [from_date, to_date]
+        if event_kind and event_kind.strip():
+            ek = event_kind.strip().lower()
+            if ek == "renewed":
+                base += " AND (e.event_kind = 'renewed' OR (e.source = 'rtdn' AND e.notification_type = 2))"
+            else:
+                base += " AND e.event_kind = ?"
+                params.append(ek)
+        if source and source.strip():
+            base += " AND e.source = ?"
+            params.append(source.strip().lower())
+        if query and query.strip():
+            q = f"%{query.strip()}%"
+            base += " AND (u.name ILIKE ? OR u.phone ILIKE ? OR u2.name ILIKE ? OR u2.phone ILIKE ? OR CAST(COALESCE(e.userid, m.userid) AS TEXT) ILIKE ?)"
+            params.extend([q, q, q, q, q])
+
+        count_sql = f"SELECT COUNT(*) {base}"
+        select_sql = f"""
+            SELECT e.id, e.event_id, e.userid, COALESCE(e.userid, m.userid) AS resolved_userid,
+                   COALESCE(u.name, u2.name) AS user_name,
+                   COALESCE(u.phone, u2.phone) AS user_phone,
+                   e.source, e.event_kind, e.notification_type,
+                   e.product_id, e.purchase_token, e.start_date, e.end_date,
+                   e.event_time_millis, e.processed_at
+            {base}
+            ORDER BY e.processed_at DESC, e.id DESC
+            LIMIT ? OFFSET ?
+        """
+
+        with get_conn() as conn:
+            cur = execute(conn, count_sql, tuple(params))
+            total = int(cur.fetchone()[0] or 0)
+            cur = execute(conn, select_sql, tuple(params + [limit, offset]))
+            colnames = [d[0] for d in (cur.description or [])]
+            rows = cur.fetchall() or []
+
+        events = []
+        for r in rows:
+            row = dict(zip(colnames, r))
+            uid = row.get("resolved_userid") or row.get("userid")
+            src = row.get("source") or ""
+            kind = row.get("event_kind") or ""
+            ntype = row.get("notification_type")
+            processed = row.get("processed_at")
+            events.append({
+                "id": row.get("id"),
+                "event_id": row.get("event_id"),
+                "userid": uid,
+                "user_name": row.get("user_name"),
+                "user_phone": row.get("user_phone"),
+                "source": src,
+                "event_kind": kind,
+                "event_label": display_label_for_event(src, kind, ntype),
+                "notification_type": ntype,
+                "product_id": row.get("product_id"),
+                "purchase_token_prefix": (row.get("purchase_token") or "")[:12] or None,
+                "start_date": str(row["start_date"])[:10] if row.get("start_date") else None,
+                "end_date": str(row["end_date"])[:10] if row.get("end_date") else None,
+                "event_time_millis": row.get("event_time_millis"),
+                "processed_at": processed.isoformat() if hasattr(processed, "isoformat") else processed,
+                "is_renewal": kind == "renewed" or (src == "rtdn" and ntype == 2),
+            })
+
+        return {
+            "from_date": from_date,
+            "to_date": to_date,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "events": events,
+        }
+
+    @staticmethod
+    def _infer_backfill_event_kind(prior: Optional[dict], plan_id: int, start_date: str, end_date: str) -> str:
+        if not prior:
+            return "purchased"
+        try:
+            prior_plan = int(prior.get("plan_id"))
+        except (TypeError, ValueError):
+            prior_plan = None
+        if prior_plan is not None and prior_plan != plan_id:
+            return "upgraded"
+        prior_end = (prior.get("end_date") or "")[:10]
+        prior_start = (prior.get("start_date") or "")[:10]
+        if prior_end and end_date and end_date > prior_end:
+            return "renewed"
+        if prior_start == start_date and prior_end == end_date:
+            return "synced"
+        return "updated"
+
+    def backfill_subscription_events_from_history(self, *, dry_run: bool = True) -> dict:
+        """
+        One-time style backfill: create play_subscription_event_log rows from existing
+        user_subscriptions (paid plans). Idempotent via event_id backfill|sub|{id}.
+        Does not call Google Play API.
+        """
+        from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
+
+        select_sql = f"""
+            SELECT us.id, us.userid, us.plan_id, us.start_date, us.end_date, us.status,
+                   us.created_at, sp.platform, sp.google_play_product_id, sp.plan_name
+            FROM user_subscriptions us
+            JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+            WHERE (
+                (sp.google_play_product_id IS NOT NULL AND TRIM(sp.google_play_product_id) <> '')
+                OR COALESCE(sp.price, 0) > 0
+            )
+            ORDER BY us.userid ASC, sp.platform ASC,
+                     COALESCE(us.created_at, us.start_date::timestamp) ASC NULLS LAST,
+                     us.id ASC
+        """
+        with get_conn() as conn:
+            cur = execute(conn, select_sql)
+            colnames = [d[0] for d in (cur.description or [])]
+            sub_rows = [dict(zip(colnames, r)) for r in (cur.fetchall() or [])]
+
+            cur = execute(
+                conn,
+                """
+                SELECT userid, purchase_token, product_id
+                FROM play_subscription_token_map
+                ORDER BY last_seen_at DESC NULLS LAST, created_at DESC NULLS LAST
+                """,
+            )
+            token_by_user: Dict[int, Dict[str, Optional[str]]] = {}
+            for r in cur.fetchall() or []:
+                uid = int(r[0])
+                if uid not in token_by_user:
+                    token_by_user[uid] = {
+                        "purchase_token": r[1],
+                        "product_id": r[2],
+                    }
+
+        prior_by_platform: Dict[tuple, dict] = {}
+        stats = {
+            "dry_run": dry_run,
+            "subscription_rows_scanned": len(sub_rows),
+            "events_would_insert": 0,
+            "events_inserted": 0,
+            "events_skipped_existing": 0,
+            "by_kind": {},
+        }
+        preview: List[dict] = []
+
+        for row in sub_rows:
+            sub_id = row.get("id")
+            userid = int(row.get("userid"))
+            plan_id = int(row.get("plan_id"))
+            platform = (row.get("platform") or "").strip() or "unknown"
+            start_date = str(row.get("start_date") or "")[:10]
+            end_date = str(row.get("end_date") or "")[:10]
+            if not start_date or not end_date:
+                continue
+
+            key = (userid, platform)
+            prior = prior_by_platform.get(key)
+            kind = self._infer_backfill_event_kind(prior, plan_id, start_date, end_date)
+            prior_by_platform[key] = {
+                "plan_id": plan_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            }
+
+            stats["by_kind"][kind] = stats["by_kind"].get(kind, 0) + 1
+            event_id = f"backfill|sub|{sub_id}"
+            token_info = token_by_user.get(userid) or {}
+            product_id = (row.get("google_play_product_id") or token_info.get("product_id") or "").strip() or None
+            purchase_token = token_info.get("purchase_token")
+
+            created = row.get("created_at")
+            processed_note = created.isoformat() if hasattr(created, "isoformat") else str(created or start_date)
+
+            entry = {
+                "event_id": event_id,
+                "userid": userid,
+                "platform": platform,
+                "plan_name": row.get("plan_name"),
+                "event_kind": kind,
+                "start_date": start_date,
+                "end_date": end_date,
+                "processed_at": processed_note,
+            }
+            if len(preview) < 25:
+                preview.append(entry)
+
+            if dry_run:
+                stats["events_would_insert"] += 1
+                continue
+
+            if self.has_processed_play_subscription_event(event_id):
+                stats["events_skipped_existing"] += 1
+                continue
+
+            ok = self.log_play_subscription_event(
+                event_id=event_id,
+                purchase_token=purchase_token,
+                product_id=product_id,
+                userid=userid,
+                source="backfill",
+                event_kind=kind,
+                start_date=start_date,
+                end_date=end_date,
+                processed_at=created if created is not None else None,
+                payload_json='{"note":"backfilled from user_subscriptions history"}',
+            )
+            if ok:
+                stats["events_inserted"] += 1
+            else:
+                stats["events_skipped_existing"] += 1
+
+        stats["preview"] = preview
+        return stats
 
     def has_processed_play_onetime_event(self, event_id: str) -> bool:
         from db import get_conn, execute

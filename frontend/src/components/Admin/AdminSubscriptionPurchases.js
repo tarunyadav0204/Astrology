@@ -81,7 +81,8 @@ const AdminSubscriptionPurchases = () => {
         <p className="play-refund-hint">
           State meanings: <strong>current_active</strong> = currently valid;{' '}
           <strong>inactive_superseded</strong> = older row replaced by another active row on same platform;{' '}
-          <strong>inactive_ended</strong> = ended in past.
+          <strong>inactive_ended</strong> = ended in past. For renewals and Google RTDN events, use the{' '}
+          <strong>Subscription events</strong> tab.
         </p>
         <p className="play-refund-hint">
           Active range:{' '}

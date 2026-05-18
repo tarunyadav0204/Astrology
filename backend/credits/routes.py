@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
@@ -586,6 +586,7 @@ async def verify_google_play_subscription(
             product_id,
             request.purchase_token.strip(),
             accept_any_payment_state=False,
+            event_source="verify",
         )
         return {
             "success": True,
@@ -599,12 +600,71 @@ async def verify_google_play_subscription(
         raise HTTPException(status_code=400, detail=f"Invalid or expired subscription: {str(e)}")
 
 
+def _infer_app_subscription_event_kind(
+    prior: Optional[dict],
+    plan_id: int,
+    start_date: str,
+    end_date: str,
+) -> str:
+    """Classify verify/sync updates for admin event log (not used for RTDN)."""
+    if not prior:
+        return "purchased"
+    try:
+        prior_plan = int(prior.get("plan_id"))
+    except (TypeError, ValueError):
+        prior_plan = None
+    if prior_plan is not None and prior_plan != plan_id:
+        return "upgraded"
+    prior_end = (prior.get("end_date") or "")[:10]
+    prior_start = (prior.get("start_date") or "")[:10]
+    if prior_end and end_date and end_date > prior_end:
+        return "renewed"
+    if prior_start == start_date and prior_end == end_date:
+        return "synced"
+    return "updated"
+
+
+def _log_app_subscription_event(
+    *,
+    userid: int,
+    product_id: str,
+    purchase_token: str,
+    source: str,
+    event_kind: str,
+    start_date: str,
+    end_date: str,
+) -> None:
+    """Idempotent audit log for in-app verify/sync (distinct from RTDN event_id)."""
+    eid = "|".join(
+        [
+            "app",
+            (source or "sync").strip().lower(),
+            str(userid),
+            (product_id or "").strip(),
+            start_date,
+            end_date,
+            (event_kind or "updated").strip().lower(),
+        ]
+    )
+    credit_service.log_play_subscription_event(
+        event_id=eid,
+        purchase_token=purchase_token,
+        product_id=product_id,
+        userid=userid,
+        source=source,
+        event_kind=event_kind,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
 def _sync_subscription_from_play(
     userid: int,
     product_id: str,
     purchase_token: str,
     *,
     accept_any_payment_state: bool = False,
+    event_source: Optional[str] = None,
 ) -> dict:
     """Verify subscription with Google Play and update our DB. Used by both verify and sync.
     If accept_any_payment_state is True (sync), we update DB even when cancelled/expired so our record matches Play."""
@@ -614,6 +674,16 @@ def _sync_subscription_from_play(
             status_code=400,
             detail=f"Unknown subscription product_id: {product_id}",
         )
+    from db import get_conn, execute
+
+    platform = "astroroshni"
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT platform FROM subscription_plans WHERE plan_id = ?", (plan_id,))
+        prow = cur.fetchone()
+        if prow and prow[0]:
+            platform = prow[0]
+    prior = credit_service.get_latest_subscription_on_platform(userid, platform)
+
     purchase = _verify_google_play_subscription(PACKAGE_NAME, product_id, purchase_token)
     if not accept_any_payment_state:
         payment_state = purchase.get("paymentState")
@@ -635,7 +705,20 @@ def _sync_subscription_from_play(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
     tier_name = credit_service.get_subscription_tier_name(userid)
-    return {"tier_name": tier_name or product_id, "end_date": end_date}
+
+    if event_source in ("verify", "sync"):
+        kind = _infer_app_subscription_event_kind(prior, plan_id, start_date, end_date)
+        _log_app_subscription_event(
+            userid=userid,
+            product_id=product_id,
+            purchase_token=purchase_token,
+            source=event_source,
+            event_kind=kind,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    return {"tier_name": tier_name or product_id, "end_date": end_date, "start_date": start_date}
 
 
 def _extract_rtdn_payload_from_pubsub_push(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -680,6 +763,7 @@ async def sync_google_play_subscription(
             product_id,
             request.purchase_token.strip(),
             accept_any_payment_state=True,
+            event_source="sync",
         )
         return {
             "success": True,
@@ -743,7 +827,9 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             )
             return {"success": True, "ignored": "unknown_purchase_token"}
 
-        _sync_subscription_from_play(
+        from credits.play_subscription_events import rtdn_kind_for_notification_type
+
+        sync_result = _sync_subscription_from_play(
             userid=userid,
             product_id=product_id,
             purchase_token=purchase_token,
@@ -756,6 +842,11 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             notification_type=int(notification_type) if notification_type is not None else None,
             event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
             payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+            userid=userid,
+            source="rtdn",
+            event_kind=rtdn_kind_for_notification_type(notification_type),
+            start_date=sync_result.get("start_date"),
+            end_date=sync_result.get("end_date"),
         )
         return {"success": True}
 
@@ -2174,6 +2265,98 @@ async def admin_subscription_purchases(
         "total": total,
         "purchases": purchases,
     }
+
+
+@router.get("/admin/subscription-events")
+async def admin_subscription_events(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    query: Optional[str] = None,
+    event_kind: Optional[str] = None,
+    source: Optional[str] = None,
+    renewals_only: Optional[bool] = False,
+    page: Optional[int] = 1,
+    limit: Optional[int] = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Play subscription lifecycle events (RTDN + in-app verify/sync).
+    Filter by processed_at date. Use event_kind=renewed or renewals_only=true for renewals.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from datetime import date as date_type, timedelta
+
+    today = date_type.today()
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    elif from_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = today
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    elif to_date:
+        try:
+            td = date_type.fromisoformat(to_date)
+            fd = td - timedelta(days=30)
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    else:
+        fd = today - timedelta(days=30)
+        td = today
+
+    kind_filter = (event_kind or "").strip().lower() or None
+    if renewals_only:
+        kind_filter = "renewed"
+
+    try:
+        data = credit_service.list_admin_subscription_events(
+            fd.isoformat(),
+            td.isoformat(),
+            query=query,
+            event_kind=kind_filter,
+            source=(source or "").strip().lower() or None,
+            page=page or 1,
+            limit=limit or 50,
+        )
+    except Exception as e:
+        logger.exception("GET /admin/subscription-events failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load subscription events: {e!s}",
+        ) from e
+
+    return data
+
+
+@router.post("/admin/subscription-events/backfill")
+async def admin_subscription_events_backfill(
+    dry_run: bool = Query(True, description="Preview only; set false to insert rows"),
+    current_user: User = Depends(get_current_user),
+):
+    """Backfill event log from user_subscriptions. Idempotent via event_id backfill|sub|{id}."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        stats = credit_service.backfill_subscription_events_from_history(dry_run=dry_run)
+    except Exception as e:
+        logger.exception("POST /admin/subscription-events/backfill failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Backfill failed: {e!s}",
+        ) from e
+    return stats
 
 
 @router.get("/admin/dashboard")

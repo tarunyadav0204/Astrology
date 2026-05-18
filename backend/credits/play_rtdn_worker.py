@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional
 from google.cloud import pubsub_v1
 
 from credits.credit_service import CreditService
+from credits.play_subscription_events import rtdn_kind_for_notification_type
 from credits.routes import _sync_subscription_from_play, _credit_verified_google_play_purchase
 
 logger = logging.getLogger("play_rtdn_worker")
@@ -131,7 +132,7 @@ def _process_one(
 
     if is_subscription:
         # Accept any payment state for RTDN sync so cancelled/non-renewing states update end_date.
-        _sync_subscription_from_play(
+        sync_result = _sync_subscription_from_play(
             userid=userid,
             product_id=product_id,
             purchase_token=purchase_token,
@@ -144,6 +145,11 @@ def _process_one(
             notification_type=notification_type,
             event_time_millis=event_time_millis,
             payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+            userid=userid,
+            source="rtdn",
+            event_kind=rtdn_kind_for_notification_type(notification_type),
+            start_date=sync_result.get("start_date"),
+            end_date=sync_result.get("end_date"),
         )
     else:
         _credit_verified_google_play_purchase(
