@@ -14,6 +14,20 @@ class CreditService:
     def _date_today_expr(self) -> str:
         return "CURRENT_DATE"
 
+    @staticmethod
+    def _safe_ddl(conn, sql: str) -> None:
+        """Run DDL on Postgres; rollback on failure so the connection stays usable."""
+        from db import execute
+
+        try:
+            execute(conn, sql)
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
     def _date_yesterday_expr(self) -> str:
         return "CURRENT_DATE - INTERVAL '1 day'"
 
@@ -122,17 +136,16 @@ class CreditService:
                 )
                 conn.commit()
             except Exception:
-                pass
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
             # Web: honor-system flag when browser notification permission is granted (free-first-question gate).
-            try:
-                execute(
-                    conn,
-                    "ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS web_notifications_granted INTEGER DEFAULT 0",
-                )
-                conn.commit()
-            except Exception:
-                pass
+            self._safe_ddl(
+                conn,
+                "ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS web_notifications_granted INTEGER DEFAULT 0",
+            )
 
             # Global guardrail: one free standard-chat question per normalized birth hash
             # across all accounts (prevents multi-account abuse on same chart data).
@@ -148,22 +161,11 @@ class CreditService:
                 '''
             )
 
-            try:
-                execute(
-                    conn,
-                    "ALTER TABLE birth_charts ADD COLUMN IF NOT EXISTS birth_hash TEXT",
-                )
-                conn.commit()
-            except Exception:
-                pass
-            try:
-                execute(
-                    conn,
-                    "CREATE INDEX IF NOT EXISTS idx_birth_charts_policy_hash ON birth_charts (birth_hash)",
-                )
-                conn.commit()
-            except Exception:
-                pass
+            self._safe_ddl(conn, "ALTER TABLE birth_charts ADD COLUMN IF NOT EXISTS birth_hash TEXT")
+            self._safe_ddl(
+                conn,
+                "CREATE INDEX IF NOT EXISTS idx_birth_charts_policy_hash ON birth_charts (birth_hash)",
+            )
 
         # Credit transactions table
             execute(conn, '''
@@ -237,11 +239,10 @@ class CreditService:
                 "start_date DATE",
                 "end_date DATE",
             ):
-                col_name = col_def.split()[0]
-                try:
-                    execute(conn, f"ALTER TABLE play_subscription_event_log ADD COLUMN IF NOT EXISTS {col_def}")
-                except Exception:
-                    pass
+                self._safe_ddl(
+                    conn,
+                    f"ALTER TABLE play_subscription_event_log ADD COLUMN IF NOT EXISTS {col_def}",
+                )
 
             execute(conn, '''
                 CREATE TABLE IF NOT EXISTS play_subscription_token_map (
@@ -292,7 +293,10 @@ class CreditService:
                 )
                 conn.commit()
             except Exception:
-                pass
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
             # Backfill: users who have ever paid for a chat question should not get "first question free"
             try:
@@ -305,7 +309,10 @@ class CreditService:
                 """)
                 conn.commit()
             except Exception:
-                pass
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
             # Insert default credit costs
             defaults = [
