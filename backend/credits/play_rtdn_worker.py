@@ -150,6 +150,7 @@ def _process_one(
             event_kind=rtdn_kind_for_notification_type(notification_type),
             start_date=sync_result.get("start_date"),
             end_date=sync_result.get("end_date"),
+            google_play_order_id=sync_result.get("google_play_order_id"),
         )
     else:
         _credit_verified_google_play_purchase(

@@ -406,7 +406,8 @@ const CreditScreen = ({ navigation }) => {
         const token = p.purchaseToken ?? p.purchaseTokenAndroid;
         const productId = p.productId ?? p.productIds?.[0];
         if (token && productId) {
-          await creditAPI.syncSubscription(token, productId);
+          const orderId = p.transactionId ?? p.transactionIdAndroid ?? null;
+          await creditAPI.syncSubscription(token, productId, orderId);
           synced = true;
           break;
         }

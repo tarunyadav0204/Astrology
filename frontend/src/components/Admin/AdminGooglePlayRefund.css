@@ -329,6 +329,34 @@
   text-transform: uppercase;
 }
 
+.subscription-tree-group td {
+  background: rgba(33, 150, 243, 0.1);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.subscription-tree-group:hover td {
+  background: rgba(33, 150, 243, 0.16);
+}
+
+.subscription-tree-toggle {
+  display: inline-block;
+  width: 1.25rem;
+  margin-right: 6px;
+  color: #1565c0;
+}
+
+.subscription-tree-child td {
+  padding-left: 1.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-left: 3px solid rgba(33, 150, 243, 0.35);
+}
+
+.subscription-tree-child td:first-child {
+  padding-left: 2rem;
+}
+
 .play-refund-checkbox-label {
   display: flex;
   align-items: center;

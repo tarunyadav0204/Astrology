@@ -2,12 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminGooglePlayRefund.css';
 
+const formatOrderLabel = (orderId, renewalIndex) => {
+  if (!orderId) return '—';
+  if (renewalIndex == null) return orderId;
+  return `${orderId} (#${renewalIndex})`;
+};
+
 /**
  * Admin: Play subscription lifecycle events (RTDN + verify/sync), including renewals.
  */
 const AdminSubscriptionEvents = () => {
   const [events, setEvents] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalGroups, setTotalGroups] = useState(0);
   const [page, setPage] = useState(1);
   const [listLoading, setListLoading] = useState(false);
   const [searchFrom, setSearchFrom] = useState('');
@@ -16,6 +24,8 @@ const AdminSubscriptionEvents = () => {
   const [eventKind, setEventKind] = useState('');
   const [source, setSource] = useState('');
   const [renewalsOnly, setRenewalsOnly] = useState(false);
+  const [groupByOrder, setGroupByOrder] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState({});
   const [appliedRange, setAppliedRange] = useState({ from: '', to: '' });
 
   const limit = 50;
@@ -30,21 +40,37 @@ const AdminSubscriptionEvents = () => {
       if (eventKind) params.append('event_kind', eventKind);
       if (source) params.append('source', source);
       if (renewalsOnly) params.append('renewals_only', 'true');
-      params.append('page', String(pageNum));
-      params.append('limit', String(limit));
+      if (groupByOrder) {
+        params.append('grouped', 'true');
+        params.append('limit', String(limit));
+      } else {
+        params.append('page', String(pageNum));
+        params.append('limit', String(limit));
+      }
       const response = await fetch(`/api/credits/admin/subscription-events?${params.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
       if (!response.ok) throw new Error('Failed to load subscription events');
       const data = await response.json();
-      setEvents(data.events || []);
-      setTotal(typeof data.total === 'number' ? data.total : 0);
+      if (data.grouped) {
+        setGroups(data.groups || []);
+        setEvents([]);
+        setTotalGroups(typeof data.total_groups === 'number' ? data.total_groups : 0);
+        setTotal(0);
+      } else {
+        setEvents(data.events || []);
+        setGroups([]);
+        setTotal(typeof data.total === 'number' ? data.total : 0);
+        setTotalGroups(0);
+        setPage(pageNum);
+      }
       setAppliedRange({ from: data.from_date || '', to: data.to_date || '' });
-      setPage(pageNum);
     } catch (err) {
       console.error(err);
       setEvents([]);
+      setGroups([]);
       setTotal(0);
+      setTotalGroups(0);
     } finally {
       setListLoading(false);
     }
@@ -55,6 +81,7 @@ const AdminSubscriptionEvents = () => {
   }, []);
 
   const handleSearch = () => {
+    setExpandedGroups({});
     loadEvents(searchFrom, searchTo, searchQuery, 1);
   };
 
@@ -73,6 +100,45 @@ const AdminSubscriptionEvents = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  const toggleGroup = (key) => {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const renderEventRow = (row, { nested = false } = {}) => (
+    <tr
+      key={row.id || row.event_id}
+      className={[
+        row.is_renewal ? 'subscription-event-row--renewal' : '',
+        nested ? 'subscription-tree-child' : '',
+      ]
+        .filter(Boolean)
+        .join(' ') || undefined}
+    >
+      <td className="date-cell">{formatTs(row.processed_at)}</td>
+      <td>
+        <strong>{row.event_label || row.event_kind || '—'}</strong>
+        {row.is_renewal ? <span className="subscription-event-badge"> renewal</span> : null}
+      </td>
+      <td>{row.source || '—'}</td>
+      <td>{row.userid != null ? row.userid : '—'}</td>
+      <td>{row.user_name || '—'}</td>
+      <td>{row.user_phone || '—'}</td>
+      <td className="order-id-cell" title={row.google_play_order_id || ''}>
+        {formatOrderLabel(row.google_play_order_id, row.renewal_index)}
+      </td>
+      <td className="order-id-cell" title={row.order_id_base || ''}>
+        {row.order_id_base || '—'}
+      </td>
+      <td className="order-id-cell">{row.product_id || '—'}</td>
+      <td className="date-cell">{row.start_date || '—'}</td>
+      <td className="date-cell">{row.end_date || '—'}</td>
+      <td>{row.notification_type != null ? row.notification_type : '—'}</td>
+    </tr>
+  );
+
+  const groupKey = (g, idx) =>
+    `${g.userid}|${g.product_id}|${g.order_id_base}|${idx}`;
+
   return (
     <div className="admin-google-play-refund">
       <div className="play-refund-list-card">
@@ -80,21 +146,8 @@ const AdminSubscriptionEvents = () => {
         <p className="play-refund-desc">
           Google Play subscription lifecycle from <strong>RTDN (Pub/Sub)</strong> and in-app{' '}
           <strong>verify / sync</strong>. Filter by <strong>when we recorded the event</strong>{' '}
-          (<code>processed_at</code>), not subscription start date. Empty until RTDN is wired or users
-          verify/sync in the app after deploy.
-        </p>
-        <p className="play-refund-hint">
-          <strong>Renewed</strong> = RTDN type 2 or app detected a longer <code>end_date</code>.{' '}
-          <strong>Purchased</strong> = first paid period on that platform. Use &quot;Subscription
-          purchases&quot; for entitlement rows (start-date filter). Historical rows: run server
-          backfill once (see below).
-        </p>
-        <p className="play-refund-hint">
-          <strong>Backfill past events:</strong> on the server,{' '}
-          <code>cd backend &amp;&amp; python3 -m credits.backfill_subscription_events</code> (preview), then{' '}
-          <code>--apply</code>. Or POST{' '}
-          <code>/api/credits/admin/subscription-events/backfill?dry_run=false</code> as admin. Source
-          will show <strong>backfill</strong>; dates use each subscription row&apos;s <code>created_at</code>.
+          (<code>processed_at</code>). <strong>Order ID</strong> is the GPA id from Play; renewals share
+          the same base id with a <code>..N</code> suffix (e.g. <code>..0</code>, <code>..1</code>).
         </p>
         <p className="play-refund-hint">
           Active range:{' '}
@@ -152,16 +205,26 @@ const AdminSubscriptionEvents = () => {
             />
             <span>Renewals only</span>
           </label>
+          <label className="play-refund-checkbox-label">
+            <input
+              type="checkbox"
+              checked={groupByOrder}
+              onChange={(e) => setGroupByOrder(e.target.checked)}
+            />
+            <span>Group by order (tree)</span>
+          </label>
           <button type="button" className="play-refund-search-btn" onClick={handleSearch} disabled={listLoading}>
             {listLoading ? 'Loading…' : 'Search'}
           </button>
         </div>
-        {listLoading && events.length === 0 ? (
+        {listLoading && events.length === 0 && groups.length === 0 ? (
           <div className="play-refund-loading">Loading…</div>
         ) : (
           <>
             <p className="play-refund-hint" style={{ marginTop: 12 }}>
-              {total} event{total !== 1 ? 's' : ''} · page {page} of {totalPages}
+              {groupByOrder
+                ? `${totalGroups} order group${totalGroups !== 1 ? 's' : ''} (showing up to ${limit})`
+                : `${total} event${total !== 1 ? 's' : ''} · page ${page} of ${totalPages}`}
             </p>
             <div className="play-refund-table-wrap">
               <table className="play-refund-table">
@@ -173,6 +236,8 @@ const AdminSubscriptionEvents = () => {
                     <th>User ID</th>
                     <th>User</th>
                     <th>Phone</th>
+                    <th>Order ID</th>
+                    <th>Order base</th>
                     <th>Product</th>
                     <th>Period start</th>
                     <th>Period end</th>
@@ -180,40 +245,57 @@ const AdminSubscriptionEvents = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {events.length === 0 ? (
+                  {groupByOrder ? (
+                    groups.length === 0 ? (
+                      <tr>
+                        <td colSpan={12} className="play-refund-empty">
+                          No events in this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      groups.map((g, idx) => {
+                        const key = groupKey(g, idx);
+                        const expanded = expandedGroups[key] !== false;
+                        const childEvents = g.events || [];
+                        return (
+                          <React.Fragment key={key}>
+                            <tr
+                              className="subscription-tree-group"
+                              onClick={() => toggleGroup(key)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') toggleGroup(key);
+                              }}
+                            >
+                              <td colSpan={12}>
+                                <span className="subscription-tree-toggle">{expanded ? '▼' : '▶'}</span>
+                                <strong>{g.order_id_base || 'Unknown order'}</strong>
+                                {' · '}
+                                {g.user_name || '—'} ({g.userid}) · {g.product_id || '—'} ·{' '}
+                                {childEvents.length} event{childEvents.length !== 1 ? 's' : ''}
+                              </td>
+                            </tr>
+                            {expanded
+                              ? childEvents.map((row) => renderEventRow(row, { nested: true }))
+                              : null}
+                          </React.Fragment>
+                        );
+                      })
+                    )
+                  ) : events.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="play-refund-empty">
-                        No events in this period. New verify/sync and RTDN events will appear here after deploy.
+                      <td colSpan={12} className="play-refund-empty">
+                        No events in this period.
                       </td>
                     </tr>
                   ) : (
-                    events.map((row) => (
-                      <tr
-                        key={row.id || row.event_id}
-                        className={row.is_renewal ? 'subscription-event-row--renewal' : undefined}
-                      >
-                        <td className="date-cell">{formatTs(row.processed_at)}</td>
-                        <td>
-                          <strong>{row.event_label || row.event_kind || '—'}</strong>
-                          {row.is_renewal ? (
-                            <span className="subscription-event-badge"> renewal</span>
-                          ) : null}
-                        </td>
-                        <td>{row.source || '—'}</td>
-                        <td>{row.userid != null ? row.userid : '—'}</td>
-                        <td>{row.user_name || '—'}</td>
-                        <td>{row.user_phone || '—'}</td>
-                        <td className="order-id-cell">{row.product_id || '—'}</td>
-                        <td className="date-cell">{row.start_date || '—'}</td>
-                        <td className="date-cell">{row.end_date || '—'}</td>
-                        <td>{row.notification_type != null ? row.notification_type : '—'}</td>
-                      </tr>
-                    ))
+                    events.map((row) => renderEventRow(row))
                   )}
                 </tbody>
               </table>
             </div>
-            {totalPages > 1 && (
+            {!groupByOrder && totalPages > 1 && (
               <div className="play-refund-search" style={{ marginTop: 16 }}>
                 <button
                   type="button"

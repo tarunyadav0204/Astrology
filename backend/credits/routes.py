@@ -155,20 +155,123 @@ def _verify_google_play_purchase(package_name: str, product_id: str, purchase_to
 
 def _verify_google_play_subscription(package_name: str, subscription_id: str, purchase_token: str) -> dict:
     """Verify subscription with Google Play Developer API. Returns subscription info (expiryTimeMillis, startTimeMillis, etc.) or raises."""
-    logger.info("Google Play: verifying subscription package=%s subscriptionId=%s", package_name, subscription_id)
-    try:
-        service = _get_play_service()
-        request = service.purchases().subscriptions().get(
-            packageName=package_name,
-            subscriptionId=subscription_id,
-            token=purchase_token,
+    return _fetch_google_play_subscription_purchase(
+        package_name, subscription_id, purchase_token, prefer_v2=True
+    )
+
+
+def _fetch_google_play_subscription_purchase(
+    package_name: str,
+    subscription_id: str,
+    purchase_token: str,
+    *,
+    prefer_v2: bool = True,
+) -> dict:
+    """
+    Load subscription state from Play (subscriptionsv2, then v1 fallback).
+    Normalizes v2 fields onto v1-style keys where possible (orderId, startTimeMillis, expiryTimeMillis).
+    """
+    token = (purchase_token or "").strip()
+    if not token:
+        raise ValueError("purchase_token is required")
+    service = _get_play_service()
+    last_err: Optional[Exception] = None
+
+    def _try_v2() -> Optional[dict]:
+        try:
+            result = (
+                service.purchases()
+                .subscriptionsv2()
+                .get(packageName=package_name, token=token)
+                .execute()
+            )
+            if not isinstance(result, dict):
+                return None
+            line_items = result.get("lineItems") or []
+            line = line_items[0] if line_items else {}
+            order_id = (
+                line.get("latestSuccessfulOrderId")
+                or result.get("latestOrderId")
+            )
+            start_iso = result.get("startTime") or line.get("startTime")
+            expiry_iso = line.get("expiryTime") or result.get("expiryTime")
+            out = dict(result)
+            if order_id:
+                out["orderId"] = order_id
+                out["latestOrderId"] = order_id
+            if start_iso:
+                try:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(str(start_iso).replace("Z", "+00:00"))
+                    out["startTimeMillis"] = int(dt.timestamp() * 1000)
+                except Exception:
+                    pass
+            if expiry_iso:
+                try:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(str(expiry_iso).replace("Z", "+00:00"))
+                    out["expiryTimeMillis"] = int(dt.timestamp() * 1000)
+                except Exception:
+                    pass
+            product_id = line.get("productId") or subscription_id
+            if product_id:
+                out["productId"] = product_id
+            return out
+        except Exception as e:
+            nonlocal last_err
+            last_err = e
+            return None
+
+    def _try_v1() -> dict:
+        logger.info(
+            "Google Play: verifying subscription package=%s subscriptionId=%s",
+            package_name,
+            subscription_id,
         )
-        result = request.execute()
-        logger.info("Google Play: subscription verify response keys=%s", list(result.keys()) if isinstance(result, dict) else type(result))
+        result = (
+            service.purchases()
+            .subscriptions()
+            .get(
+                packageName=package_name,
+                subscriptionId=subscription_id,
+                token=token,
+            )
+            .execute()
+        )
+        logger.info(
+            "Google Play: subscription verify response keys=%s",
+            list(result.keys()) if isinstance(result, dict) else type(result),
+        )
         return result
+
+    if prefer_v2:
+        v2 = _try_v2()
+        if v2:
+            return v2
+    try:
+        return _try_v1()
     except Exception as e:
-        logger.error("Google Play: subscription verify error: %s", e, exc_info=True)
-        raise
+        last_err = e
+    if prefer_v2:
+        try:
+            return _try_v1()
+        except Exception as e:
+            last_err = e
+    raise last_err or RuntimeError("Failed to fetch subscription from Google Play")
+
+
+def _subscription_period_dates_from_purchase(purchase: dict) -> tuple:
+    """Return (start_date, end_date) as YYYY-MM-DD from Play subscription payload."""
+    from datetime import datetime
+
+    purchase = purchase or {}
+    expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
+    start_ms = purchase.get("startTimeMillis") or expiry_ms
+    start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
+    end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
+    return start_date, end_date
 
 
 def _credits_from_product_id(product_id: str) -> Optional[int]:
@@ -440,6 +543,7 @@ class GooglePlayVerifyRequest(BaseModel):
 class GooglePlaySubscriptionVerifyRequest(BaseModel):
     purchase_token: str
     product_id: str  # subscription_vip_silver, subscription_vip_gold, subscription_vip_platinum (tier-based; price set in Play Console)
+    order_id: Optional[str] = None  # GPA order id from client (Play verify response is authoritative when present)
 
 
 def _credit_verified_google_play_purchase(
@@ -587,6 +691,7 @@ async def verify_google_play_subscription(
             request.purchase_token.strip(),
             accept_any_payment_state=False,
             event_source="verify",
+            order_id_hint=(request.order_id or "").strip() or None,
         )
         return {
             "success": True,
@@ -598,6 +703,18 @@ async def verify_google_play_subscription(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid or expired subscription: {str(e)}")
+
+
+def _subscription_order_id_from_purchase(purchase: dict, order_id_hint: Optional[str] = None) -> Optional[str]:
+    """Resolve GPA order id from Play subscription verify payload or client hint."""
+    from credits.play_order_id_util import normalize_play_order_id
+
+    raw = (
+        (purchase or {}).get("orderId")
+        or (purchase or {}).get("latestOrderId")
+        or order_id_hint
+    )
+    return normalize_play_order_id(raw)
 
 
 def _infer_app_subscription_event_kind(
@@ -633,6 +750,7 @@ def _log_app_subscription_event(
     event_kind: str,
     start_date: str,
     end_date: str,
+    google_play_order_id: Optional[str] = None,
 ) -> None:
     """Idempotent audit log for in-app verify/sync (distinct from RTDN event_id)."""
     eid = "|".join(
@@ -655,6 +773,7 @@ def _log_app_subscription_event(
         event_kind=event_kind,
         start_date=start_date,
         end_date=end_date,
+        google_play_order_id=google_play_order_id,
     )
 
 
@@ -665,6 +784,7 @@ def _sync_subscription_from_play(
     *,
     accept_any_payment_state: bool = False,
     event_source: Optional[str] = None,
+    order_id_hint: Optional[str] = None,
 ) -> dict:
     """Verify subscription with Google Play and update our DB. Used by both verify and sync.
     If accept_any_payment_state is True (sync), we update DB even when cancelled/expired so our record matches Play."""
@@ -696,12 +816,17 @@ def _sync_subscription_from_play(
     # Google keeps cancelled subscriptions entitled until expiryTimeMillis.
     # userCancellationTimeMillis only means renewal is off, not that access ended.
     end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
+    play_order_id = _subscription_order_id_from_purchase(purchase, order_id_hint)
     # Keep token->user mapping fresh so RTDN worker can resolve ownership.
     try:
-        credit_service.upsert_play_subscription_token(userid, purchase_token, product_id)
+        credit_service.upsert_play_subscription_token(
+            userid, purchase_token, product_id, latest_order_id=play_order_id
+        )
     except Exception:
         pass
-    success = credit_service.set_user_subscription(userid, plan_id, start_date, end_date)
+    success = credit_service.set_user_subscription(
+        userid, plan_id, start_date, end_date, google_play_order_id=play_order_id
+    )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
     tier_name = credit_service.get_subscription_tier_name(userid)
@@ -716,9 +841,15 @@ def _sync_subscription_from_play(
             event_kind=kind,
             start_date=start_date,
             end_date=end_date,
+            google_play_order_id=play_order_id,
         )
 
-    return {"tier_name": tier_name or product_id, "end_date": end_date, "start_date": start_date}
+    return {
+        "tier_name": tier_name or product_id,
+        "end_date": end_date,
+        "start_date": start_date,
+        "google_play_order_id": play_order_id,
+    }
 
 
 def _extract_rtdn_payload_from_pubsub_push(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -764,6 +895,7 @@ async def sync_google_play_subscription(
             request.purchase_token.strip(),
             accept_any_payment_state=True,
             event_source="sync",
+            order_id_hint=(request.order_id or "").strip() or None,
         )
         return {
             "success": True,
@@ -847,6 +979,7 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             event_kind=rtdn_kind_for_notification_type(notification_type),
             start_date=sync_result.get("start_date"),
             end_date=sync_result.get("end_date"),
+            google_play_order_id=sync_result.get("google_play_order_id"),
         )
         return {"success": True}
 
@@ -2083,6 +2216,8 @@ async def get_razorpay_transactions(
 
 def _serialize_admin_subscription_row(row: Dict[str, Any]) -> Dict[str, Any]:
     """JSON-friendly values for admin subscription purchase list."""
+    from credits.play_order_id_util import play_order_id_base, play_order_renewal_index
+
     out: Dict[str, Any] = {}
     for key, val in row.items():
         if val is None:
@@ -2097,7 +2232,52 @@ def _serialize_admin_subscription_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 out[key] = float(val)
             except (TypeError, ValueError):
                 out[key] = str(val)
+    oid = out.get("google_play_order_id")
+    out["order_id_base"] = play_order_id_base(oid)
+    out["renewal_index"] = play_order_renewal_index(oid)
     return out
+
+
+def _group_admin_subscription_purchases(purchases: List[Dict[str, Any]], *, limit: int) -> dict:
+    """Group purchase rows by Play order_id_base (renewal family)."""
+    from credits.play_order_id_util import play_order_sort_key
+
+    groups_map: Dict[str, dict] = {}
+    for row in purchases:
+        base = row.get("order_id_base") or row.get("google_play_order_id") or (
+            f"unknown-{row.get('userid')}-{row.get('google_play_product_id')}"
+        )
+        key = f"{row.get('userid')}|{row.get('google_play_product_id')}|{base}"
+        if key not in groups_map:
+            groups_map[key] = {
+                "order_id_base": base,
+                "userid": row.get("userid"),
+                "user_name": row.get("user_name"),
+                "user_phone": row.get("user_phone"),
+                "google_play_product_id": row.get("google_play_product_id"),
+                "plan_name": row.get("plan_name"),
+                "tier_name": row.get("tier_name"),
+                "purchases": [],
+            }
+        groups_map[key]["purchases"].append(row)
+
+    groups = []
+    for g in groups_map.values():
+        g["purchases"].sort(
+            key=lambda p: (
+                play_order_sort_key(p.get("google_play_order_id")),
+                p.get("start_date") or "",
+            )
+        )
+        groups.append(g)
+    groups.sort(
+        key=lambda g: (
+            (g.get("purchases") or [{}])[-1].get("start_date") or "",
+            g.get("order_id_base") or "",
+        ),
+        reverse=True,
+    )
+    return {"total_groups": len(groups), "groups": groups[:limit]}
 
 
 @router.get("/admin/subscription-purchases")
@@ -2107,6 +2287,7 @@ async def admin_subscription_purchases(
     query: Optional[str] = None,
     page: Optional[int] = 1,
     limit: Optional[int] = 50,
+    grouped: Optional[bool] = False,
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -2150,6 +2331,7 @@ async def admin_subscription_purchases(
     page = max(1, page or 1)
     limit = max(1, min(200, limit or 50))
     offset = (page - 1) * limit
+    use_grouped = bool(grouped)
 
     base_from = """
         FROM user_subscriptions us
@@ -2184,6 +2366,7 @@ async def admin_subscription_purchases(
                    us.status,
                    us.start_date,
                    us.end_date,
+                   us.google_play_order_id,
                    us.created_at AS recorded_at,
                    CASE
                        WHEN us.status = 'active' AND us.end_date >= CURRENT_DATE THEN TRUE
@@ -2226,8 +2409,8 @@ async def admin_subscription_purchases(
         + """
         SELECT row_id, subscription_id, userid, user_name, user_phone, platform,
                plan_name, tier_name, google_play_product_id, plan_price,
-               plan_discount_percent, status, start_date, end_date, recorded_at,
-               is_current, cancelled_or_ended_at_estimate, lifecycle_state
+               plan_discount_percent, status, start_date, end_date, google_play_order_id,
+               recorded_at, is_current, cancelled_or_ended_at_estimate, lifecycle_state
         FROM ranked
         WHERE rn = 1
         ORDER BY start_date DESC, row_id DESC
@@ -2236,6 +2419,18 @@ async def admin_subscription_purchases(
     )
 
     count_sql = dedup_cte + "SELECT COUNT(*) FROM ranked WHERE rn = 1"
+    flat_select_sql = (
+        dedup_cte
+        + """
+        SELECT row_id, subscription_id, userid, user_name, user_phone, platform,
+               plan_name, tier_name, google_play_product_id, plan_price,
+               plan_discount_percent, status, start_date, end_date, google_play_order_id,
+               recorded_at, is_current, cancelled_or_ended_at_estimate, lifecycle_state
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY start_date DESC, row_id DESC
+        """
+    )
 
     try:
         with get_conn() as conn:
@@ -2243,7 +2438,10 @@ async def admin_subscription_purchases(
             count_row = cur.fetchone()
             total = int(count_row[0]) if count_row and count_row[0] is not None else 0
 
-            cur = execute(conn, select_sql, tuple(params + [limit, offset]))
+            if use_grouped:
+                cur = execute(conn, flat_select_sql, tuple(params))
+            else:
+                cur = execute(conn, select_sql, tuple(params + [limit, offset]))
             colnames = [d[0] for d in (cur.description or [])]
             raw_rows = cur.fetchall() or []
             purchases = [
@@ -2257,7 +2455,7 @@ async def admin_subscription_purchases(
             detail=f"Failed to load subscription purchases: {e!s}",
         ) from e
 
-    return {
+    result = {
         "from_date": fd.isoformat(),
         "to_date": td.isoformat(),
         "page": page,
@@ -2265,6 +2463,12 @@ async def admin_subscription_purchases(
         "total": total,
         "purchases": purchases,
     }
+    if use_grouped:
+        grouped_data = _group_admin_subscription_purchases(purchases, limit=limit)
+        result["grouped"] = True
+        result["groups"] = grouped_data["groups"]
+        result["total_groups"] = grouped_data["total_groups"]
+    return result
 
 
 @router.get("/admin/subscription-events")
@@ -2275,6 +2479,7 @@ async def admin_subscription_events(
     event_kind: Optional[str] = None,
     source: Optional[str] = None,
     renewals_only: Optional[bool] = False,
+    grouped: Optional[bool] = False,
     page: Optional[int] = 1,
     limit: Optional[int] = 50,
     current_user: User = Depends(get_current_user),
@@ -2321,15 +2526,27 @@ async def admin_subscription_events(
         kind_filter = "renewed"
 
     try:
-        data = credit_service.list_admin_subscription_events(
-            fd.isoformat(),
-            td.isoformat(),
-            query=query,
-            event_kind=kind_filter,
-            source=(source or "").strip().lower() or None,
-            page=page or 1,
-            limit=limit or 50,
-        )
+        if grouped:
+            data = credit_service.list_admin_subscription_event_groups(
+                fd.isoformat(),
+                td.isoformat(),
+                query=query,
+                event_kind=kind_filter,
+                source=(source or "").strip().lower() or None,
+                renewals_only=bool(renewals_only),
+                limit=limit or 50,
+            )
+            data["grouped"] = True
+        else:
+            data = credit_service.list_admin_subscription_events(
+                fd.isoformat(),
+                td.isoformat(),
+                query=query,
+                event_kind=kind_filter,
+                source=(source or "").strip().lower() or None,
+                page=page or 1,
+                limit=limit or 50,
+            )
     except Exception as e:
         logger.exception("GET /admin/subscription-events failed")
         raise HTTPException(
@@ -2356,6 +2573,34 @@ async def admin_subscription_events_backfill(
             status_code=500,
             detail=f"Backfill failed: {e!s}",
         ) from e
+    return stats
+
+
+@router.post("/admin/subscription-order-ids/backfill")
+async def admin_subscription_order_ids_backfill(
+    dry_run: bool = Query(True, description="Preview only; set false to write order IDs"),
+    limit: Optional[int] = Query(None, ge=1, le=5000, description="Max tokens to process"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Fetch latest GPA order id from Google Play for each known subscription purchase_token.
+    Does not recover full renewal chains (..0, ..1) — only Play's latest order per token.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        stats = credit_service.backfill_subscription_order_ids_from_play(
+            dry_run=dry_run,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.exception("POST /admin/subscription-order-ids/backfill failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Order ID backfill failed: {e!s}",
+        ) from e
+    if stats.get("error"):
+        raise HTTPException(status_code=503, detail=stats["error"])
     return stats
 
 

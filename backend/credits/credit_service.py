@@ -238,6 +238,8 @@ class CreditService:
                 "event_kind TEXT",
                 "start_date DATE",
                 "end_date DATE",
+                "google_play_order_id TEXT",
+                "order_id_base TEXT",
             ):
                 self._safe_ddl(
                     conn,
@@ -254,6 +256,9 @@ class CreditService:
                     last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+
+            self._safe_ddl(conn, "ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS google_play_order_id TEXT")
+            self._safe_ddl(conn, "ALTER TABLE play_subscription_token_map ADD COLUMN IF NOT EXISTS latest_order_id TEXT")
 
             execute(conn, '''
                 CREATE TABLE IF NOT EXISTS play_onetime_token_map (
@@ -447,7 +452,14 @@ class CreditService:
             row = None
         return row[0] if row else None
 
-    def set_user_subscription(self, userid: int, plan_id: int, start_date: str, end_date: str) -> bool:
+    def set_user_subscription(
+        self,
+        userid: int,
+        plan_id: int,
+        start_date: str,
+        end_date: str,
+        google_play_order_id: Optional[str] = None,
+    ) -> bool:
         """
         Set user's subscription entitlement window for a plan.
 
@@ -456,8 +468,12 @@ class CreditService:
         - Idempotent per (userid, plan_id, start_date, end_date): re-sync should not create duplicate rows.
         - Ensure only one current active row on a platform.
         Dates are YYYY-MM-DD.
+        Optional google_play_order_id: latest GPA order id from Play (may include ..N renewal suffix).
         """
         from db import get_conn, execute
+        from credits.play_order_id_util import normalize_play_order_id
+
+        play_order_id = normalize_play_order_id(google_play_order_id)
         try:
             with get_conn() as conn:
                 cursor = execute(conn, "SELECT platform FROM subscription_plans WHERE plan_id = ?", (plan_id,))
@@ -506,10 +522,11 @@ class CreditService:
                         UPDATE user_subscriptions
                         SET status = 'active',
                             start_date = ?,
-                            end_date = ?
+                            end_date = ?,
+                            google_play_order_id = COALESCE(?, google_play_order_id)
                         WHERE id = ?
                         """,
-                        (start_date, end_date, keep_id),
+                        (start_date, end_date, play_order_id, keep_id),
                     )
                     execute(
                         conn,
@@ -538,35 +555,47 @@ class CreditService:
                     execute(
                         conn,
                         """
-                        INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
-                        VALUES (?, ?, ?, ?, 'active')
+                        INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status, google_play_order_id)
+                        VALUES (?, ?, ?, ?, 'active', ?)
                         """,
-                        (userid, plan_id, start_date, end_date),
+                        (userid, plan_id, start_date, end_date, play_order_id),
                     )
                 conn.commit()
                 return True
         except Exception:
             return False
 
-    def upsert_play_subscription_token(self, userid: int, purchase_token: str, product_id: Optional[str] = None) -> bool:
+    def upsert_play_subscription_token(
+        self,
+        userid: int,
+        purchase_token: str,
+        product_id: Optional[str] = None,
+        latest_order_id: Optional[str] = None,
+    ) -> bool:
         """Persist purchase_token -> userid mapping for RTDN processing."""
         from db import get_conn, execute
+        from credits.play_order_id_util import normalize_play_order_id
+
         token = (purchase_token or "").strip()
         if not token:
             return False
+        order_id = normalize_play_order_id(latest_order_id)
         try:
             with get_conn() as conn:
                 execute(
                     conn,
                     """
-                    INSERT INTO play_subscription_token_map (userid, purchase_token, product_id, created_at, last_seen_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    INSERT INTO play_subscription_token_map (
+                        userid, purchase_token, product_id, latest_order_id, created_at, last_seen_at
+                    )
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     ON CONFLICT (purchase_token) DO UPDATE
                       SET userid = EXCLUDED.userid,
                           product_id = EXCLUDED.product_id,
+                          latest_order_id = COALESCE(EXCLUDED.latest_order_id, play_subscription_token_map.latest_order_id),
                           last_seen_at = CURRENT_TIMESTAMP
                     """,
-                    (userid, token, (product_id or "").strip() or None),
+                    (userid, token, (product_id or "").strip() or None, order_id),
                 )
                 conn.commit()
                 return True
@@ -664,11 +693,16 @@ class CreditService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         processed_at: Optional[Any] = None,
+        google_play_order_id: Optional[str] = None,
     ) -> bool:
         from db import get_conn, execute
+        from credits.play_order_id_util import normalize_play_order_id, play_order_id_base
+
         eid = (event_id or "").strip()
         if not eid:
             return False
+        play_order_id = normalize_play_order_id(google_play_order_id)
+        order_base = play_order_id_base(play_order_id)
         processed_sql = "CURRENT_TIMESTAMP"
         params: List[Any] = [
             eid,
@@ -682,6 +716,8 @@ class CreditService:
             (event_kind or "").strip() or None,
             (start_date or "").strip()[:10] or None,
             (end_date or "").strip()[:10] or None,
+            play_order_id,
+            order_base,
         ]
         if processed_at is not None:
             processed_sql = "?"
@@ -693,9 +729,10 @@ class CreditService:
                     f"""
                     INSERT INTO play_subscription_event_log (
                         event_id, purchase_token, product_id, notification_type, event_time_millis,
-                        payload_json, userid, source, event_kind, start_date, end_date, processed_at
+                        payload_json, userid, source, event_kind, start_date, end_date,
+                        google_play_order_id, order_id_base, processed_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {processed_sql})
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {processed_sql})
                     ON CONFLICT (event_id) DO NOTHING
                     """,
                     tuple(params),
@@ -755,6 +792,7 @@ class CreditService:
                    COALESCE(u.phone, u2.phone) AS user_phone,
                    e.source, e.event_kind, e.notification_type,
                    e.product_id, e.purchase_token, e.start_date, e.end_date,
+                   e.google_play_order_id, e.order_id_base,
                    e.event_time_millis, e.processed_at
             {base}
             ORDER BY e.processed_at DESC, e.id DESC
@@ -768,32 +806,7 @@ class CreditService:
             colnames = [d[0] for d in (cur.description or [])]
             rows = cur.fetchall() or []
 
-        events = []
-        for r in rows:
-            row = dict(zip(colnames, r))
-            uid = row.get("resolved_userid") or row.get("userid")
-            src = row.get("source") or ""
-            kind = row.get("event_kind") or ""
-            ntype = row.get("notification_type")
-            processed = row.get("processed_at")
-            events.append({
-                "id": row.get("id"),
-                "event_id": row.get("event_id"),
-                "userid": uid,
-                "user_name": row.get("user_name"),
-                "user_phone": row.get("user_phone"),
-                "source": src,
-                "event_kind": kind,
-                "event_label": display_label_for_event(src, kind, ntype),
-                "notification_type": ntype,
-                "product_id": row.get("product_id"),
-                "purchase_token_prefix": (row.get("purchase_token") or "")[:12] or None,
-                "start_date": str(row["start_date"])[:10] if row.get("start_date") else None,
-                "end_date": str(row["end_date"])[:10] if row.get("end_date") else None,
-                "event_time_millis": row.get("event_time_millis"),
-                "processed_at": processed.isoformat() if hasattr(processed, "isoformat") else processed,
-                "is_renewal": kind == "renewed" or (src == "rtdn" and ntype == 2),
-            })
+        events = [self._serialize_admin_subscription_event(dict(zip(colnames, r))) for r in rows]
 
         return {
             "from_date": from_date,
@@ -802,6 +815,104 @@ class CreditService:
             "limit": limit,
             "total": total,
             "events": events,
+        }
+
+    def _serialize_admin_subscription_event(self, row: dict) -> dict:
+        from credits.play_subscription_events import display_label_for_event
+        from credits.play_order_id_util import play_order_id_base, play_order_renewal_index
+
+        uid = row.get("resolved_userid") or row.get("userid")
+        src = row.get("source") or ""
+        kind = row.get("event_kind") or ""
+        ntype = row.get("notification_type")
+        processed = row.get("processed_at")
+        order_id = row.get("google_play_order_id")
+        order_base = row.get("order_id_base") or play_order_id_base(order_id)
+        return {
+            "id": row.get("id"),
+            "event_id": row.get("event_id"),
+            "userid": uid,
+            "user_name": row.get("user_name"),
+            "user_phone": row.get("user_phone"),
+            "source": src,
+            "event_kind": kind,
+            "event_label": display_label_for_event(src, kind, ntype),
+            "notification_type": ntype,
+            "product_id": row.get("product_id"),
+            "purchase_token_prefix": (row.get("purchase_token") or "")[:12] or None,
+            "google_play_order_id": order_id,
+            "order_id_base": order_base,
+            "renewal_index": play_order_renewal_index(order_id),
+            "start_date": str(row["start_date"])[:10] if row.get("start_date") else None,
+            "end_date": str(row["end_date"])[:10] if row.get("end_date") else None,
+            "event_time_millis": row.get("event_time_millis"),
+            "processed_at": processed.isoformat() if hasattr(processed, "isoformat") else processed,
+            "is_renewal": kind == "renewed" or (src == "rtdn" and ntype == 2),
+        }
+
+    def list_admin_subscription_event_groups(
+        self,
+        from_date: str,
+        to_date: str,
+        *,
+        query: Optional[str] = None,
+        event_kind: Optional[str] = None,
+        source: Optional[str] = None,
+        renewals_only: bool = False,
+        limit: int = 100,
+    ) -> dict:
+        """Group subscription events by Play order_id_base (renewal family tree)."""
+        from credits.play_order_id_util import play_order_sort_key
+
+        flat = self.list_admin_subscription_events(
+            from_date,
+            to_date,
+            query=query,
+            event_kind=event_kind,
+            source=source,
+            page=1,
+            limit=min(5000, max(200, limit * 20)),
+        )
+        events = flat.get("events") or []
+        if renewals_only:
+            events = [e for e in events if e.get("is_renewal")]
+
+        groups_map: Dict[str, dict] = {}
+        for ev in events:
+            base = ev.get("order_id_base") or ev.get("google_play_order_id") or f"unknown-{ev.get('userid')}-{ev.get('product_id')}"
+            key = f"{ev.get('userid')}|{ev.get('product_id')}|{base}"
+            if key not in groups_map:
+                groups_map[key] = {
+                    "order_id_base": base,
+                    "userid": ev.get("userid"),
+                    "user_name": ev.get("user_name"),
+                    "user_phone": ev.get("user_phone"),
+                    "product_id": ev.get("product_id"),
+                    "events": [],
+                }
+            groups_map[key]["events"].append(ev)
+
+        groups = []
+        for g in groups_map.values():
+            g["events"].sort(
+                key=lambda e: (
+                    play_order_sort_key(e.get("google_play_order_id")),
+                    e.get("processed_at") or "",
+                )
+            )
+            groups.append(g)
+        groups.sort(
+            key=lambda g: (
+                (g.get("events") or [{}])[-1].get("processed_at") or "",
+                g.get("order_id_base") or "",
+            ),
+            reverse=True,
+        )
+        return {
+            "from_date": from_date,
+            "to_date": to_date,
+            "total_groups": len(groups),
+            "groups": groups[:limit],
         }
 
     @staticmethod
@@ -832,7 +943,8 @@ class CreditService:
 
         select_sql = f"""
             SELECT us.id, us.userid, us.plan_id, us.start_date, us.end_date, us.status,
-                   us.created_at, sp.platform, sp.google_play_product_id, sp.plan_name
+                   us.created_at, us.google_play_order_id,
+                   sp.platform, sp.google_play_product_id, sp.plan_name
             FROM user_subscriptions us
             JOIN subscription_plans sp ON us.plan_id = sp.plan_id
             WHERE (
@@ -936,6 +1048,7 @@ class CreditService:
                 end_date=end_date,
                 processed_at=created if created is not None else None,
                 payload_json='{"note":"backfilled from user_subscriptions history"}',
+                google_play_order_id=row.get("google_play_order_id"),
             )
             if ok:
                 stats["events_inserted"] += 1
@@ -943,6 +1056,194 @@ class CreditService:
                 stats["events_skipped_existing"] += 1
 
         stats["preview"] = preview
+        return stats
+
+    def backfill_subscription_order_ids_from_play(
+        self,
+        *,
+        dry_run: bool = True,
+        limit: Optional[int] = None,
+        sleep_seconds: float = 0.15,
+    ) -> dict:
+        """
+        Call Google Play for each known subscription purchase_token and store the
+        latest GPA order id on token map, matching user_subscriptions period, and events.
+
+        Limitation: Play returns the latest order for that token, not full ..0, ..1 history.
+        Rows without a token in play_subscription_token_map are skipped.
+        """
+        import time
+        from db import get_conn, execute
+        from credits.play_order_id_util import normalize_play_order_id, play_order_id_base
+
+        try:
+            from credits.routes import (
+                PACKAGE_NAME,
+                _fetch_google_play_subscription_purchase,
+                _subscription_order_id_from_purchase,
+                _subscription_period_dates_from_purchase,
+            )
+        except Exception as e:
+            return {"error": f"Could not load Play API helpers: {e}", "dry_run": dry_run}
+
+        select_sql = """
+            SELECT userid, purchase_token, product_id, latest_order_id
+            FROM play_subscription_token_map
+            WHERE purchase_token IS NOT NULL AND TRIM(purchase_token) <> ''
+            ORDER BY last_seen_at DESC NULLS LAST, created_at DESC NULLS LAST
+        """
+        if limit is not None and limit > 0:
+            select_sql += f" LIMIT {int(limit)}"
+
+        with get_conn() as conn:
+            cur = execute(conn, select_sql)
+            tokens = [
+                {
+                    "userid": int(r[0]),
+                    "purchase_token": (r[1] or "").strip(),
+                    "product_id": (r[2] or "").strip(),
+                    "existing_order_id": (r[3] or "").strip() or None,
+                }
+                for r in (cur.fetchall() or [])
+            ]
+
+        stats: Dict[str, Any] = {
+            "dry_run": dry_run,
+            "tokens_scanned": len(tokens),
+            "play_ok": 0,
+            "play_errors": 0,
+            "order_ids_found": 0,
+            "token_map_updated": 0,
+            "subscriptions_updated": 0,
+            "events_updated": 0,
+            "skipped_no_product": 0,
+            "errors": [],
+            "preview": [],
+        }
+
+        for row in tokens:
+            userid = row["userid"]
+            token = row["purchase_token"]
+            product_id = row["product_id"]
+            if not product_id:
+                stats["skipped_no_product"] += 1
+                continue
+
+            plan_id = self.get_plan_id_by_google_play_product_id(product_id)
+            if not plan_id:
+                stats["skipped_no_product"] += 1
+                continue
+
+            try:
+                purchase = _fetch_google_play_subscription_purchase(
+                    PACKAGE_NAME, product_id, token
+                )
+                stats["play_ok"] += 1
+            except Exception as e:
+                stats["play_errors"] += 1
+                if len(stats["errors"]) < 20:
+                    stats["errors"].append(
+                        {"userid": userid, "product_id": product_id, "error": str(e)[:200]}
+                    )
+                continue
+
+            order_id = _subscription_order_id_from_purchase(purchase)
+            if not order_id:
+                continue
+            stats["order_ids_found"] += 1
+            order_base = play_order_id_base(order_id)
+            start_date, end_date = _subscription_period_dates_from_purchase(purchase)
+
+            entry = {
+                "userid": userid,
+                "product_id": product_id,
+                "order_id": order_id,
+                "order_id_base": order_base,
+                "start_date": start_date,
+                "end_date": end_date,
+            }
+            if len(stats["preview"]) < 25:
+                stats["preview"].append(entry)
+
+            if dry_run:
+                if sleep_seconds > 0:
+                    time.sleep(sleep_seconds)
+                continue
+
+            try:
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                        UPDATE play_subscription_token_map
+                        SET latest_order_id = ?
+                        WHERE purchase_token = ?
+                        """,
+                        (order_id, token),
+                    )
+                    stats["token_map_updated"] += 1
+
+                    cur = execute(
+                        conn,
+                        """
+                        UPDATE user_subscriptions
+                        SET google_play_order_id = ?
+                        WHERE userid = ?
+                          AND plan_id = ?
+                          AND DATE(start_date) = DATE(?)
+                          AND DATE(end_date) = DATE(?)
+                          AND (google_play_order_id IS NULL OR TRIM(google_play_order_id) = '')
+                        """,
+                        (order_id, userid, plan_id, start_date, end_date),
+                    )
+                    if getattr(cur, "rowcount", 0):
+                        stats["subscriptions_updated"] += int(cur.rowcount)
+
+                    if getattr(cur, "rowcount", 0) == 0:
+                        cur2 = execute(
+                            conn,
+                            """
+                            UPDATE user_subscriptions
+                            SET google_play_order_id = ?
+                            WHERE id = (
+                                SELECT id FROM user_subscriptions
+                                WHERE userid = ?
+                                  AND plan_id = ?
+                                  AND (google_play_order_id IS NULL OR TRIM(google_play_order_id) = '')
+                                ORDER BY end_date DESC NULLS LAST, id DESC
+                                LIMIT 1
+                            )
+                            """,
+                            (order_id, userid, plan_id),
+                        )
+                        if getattr(cur2, "rowcount", 0):
+                            stats["subscriptions_updated"] += int(cur2.rowcount)
+
+                    cur3 = execute(
+                        conn,
+                        """
+                        UPDATE play_subscription_event_log
+                        SET google_play_order_id = ?,
+                            order_id_base = ?
+                        WHERE purchase_token = ?
+                          AND (google_play_order_id IS NULL OR TRIM(google_play_order_id) = '')
+                        """,
+                        (order_id, order_base, token),
+                    )
+                    if getattr(cur3, "rowcount", 0):
+                        stats["events_updated"] += int(cur3.rowcount)
+
+                    conn.commit()
+            except Exception as e:
+                stats["play_errors"] += 1
+                if len(stats["errors"]) < 20:
+                    stats["errors"].append(
+                        {"userid": userid, "product_id": product_id, "error": str(e)[:200]}
+                    )
+
+            if sleep_seconds > 0:
+                time.sleep(sleep_seconds)
+
         return stats
 
     def has_processed_play_onetime_event(self, event_id: str) -> bool:

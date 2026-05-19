@@ -657,10 +657,11 @@ export const creditAPI = {
     }, GLOBAL_ERROR_CONFIG),
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
-  syncSubscription: (purchaseToken, productId) =>
+  syncSubscription: (purchaseToken, productId, orderId = null) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {
       purchase_token: purchaseToken,
       product_id: productId,
+      ...(orderId ? { order_id: orderId } : {}),
     }, GLOBAL_ERROR_CONFIG),
   clearSubscriptionNoPurchase: () =>
     api.post(getEndpoint('/credits/google-play/subscription/clear')),
