@@ -48,15 +48,25 @@ def main() -> int:
     args = parser.parse_args()
     dry_run = not args.apply
 
+    _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
         from dotenv import load_dotenv
 
-        load_dotenv()
+        load_dotenv(os.path.join(_backend_dir, ".env"))
+        load_dotenv()  # optional override from cwd
     except ImportError:
         pass
 
     if not os.getenv("POSTGRES_DSN") and not os.getenv("DATABASE_URL"):
-        print("ERROR: set POSTGRES_DSN or DATABASE_URL (e.g. in backend/.env)", file=sys.stderr)
+        env_path = os.path.join(_backend_dir, ".env")
+        print(
+            "ERROR: POSTGRES_DSN or DATABASE_URL is not set.\n"
+            f"  - Add it to {env_path}\n"
+            "  - Or export before running, e.g.:\n"
+            "      export POSTGRES_DSN='postgresql://user:pass@127.0.0.1:5432/astroroshni'\n"
+            "  - Or run from the same shell/env as the app (systemd may load it for uvicorn only).",
+            file=sys.stderr,
+        )
         return 1
 
     from credits.credit_service import CreditService
