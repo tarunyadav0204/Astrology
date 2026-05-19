@@ -26,6 +26,12 @@ const ProfilePage = ({ user, onLogout }) => {
           >
             📋 Past Consultations
           </button>
+          <button
+            className={`tab-btn ${activeTab === 'membership' ? 'active' : ''}`}
+            onClick={() => navigate('/subscription')}
+          >
+            ⭐ Membership
+          </button>
           <button 
             className={`tab-btn ${activeTab === 'credits' ? 'active' : ''}`}
             onClick={() => setActiveTab('credits')}

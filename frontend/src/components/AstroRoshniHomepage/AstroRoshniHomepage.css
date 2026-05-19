@@ -2602,7 +2602,7 @@
   color: #333;
 }
 
-.vip-btn {
+.vip-card .vip-btn {
   background: var(--ar-gradient-rose);
   color: white;
   border: none;

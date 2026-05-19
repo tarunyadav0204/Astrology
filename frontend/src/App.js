@@ -38,6 +38,7 @@ import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPag
 import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
+import SubscriptionPage from './components/Subscription/SubscriptionPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import PolicyPage from './components/Policy/PolicyPage';
 import DeleteAccountPage from './components/Policy/DeleteAccountPage';
@@ -931,6 +932,17 @@ function App() {
           <Route path="/policy" element={<PolicyPage />} />
           <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route
+            path="/subscription"
+            element={
+              <SubscriptionPage
+                user={user}
+                onLogin={() => setShowLoginModal(true)}
+                onLogout={handleLogout}
+                onAdminClick={handleAdminClick}
+              />
+            }
+          />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/calendar-2026" element={<Calendar2026 user={null} onLogin={() => setShowLoginModal(true)} />} />
             <Route path="/blog" element={<BlogList />} />

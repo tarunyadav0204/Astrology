@@ -825,7 +825,12 @@ def _sync_subscription_from_play(
     except Exception:
         pass
     success = credit_service.set_user_subscription(
-        userid, plan_id, start_date, end_date, google_play_order_id=play_order_id
+        userid,
+        plan_id,
+        start_date,
+        end_date,
+        google_play_order_id=play_order_id,
+        billing_provider="google_play",
     )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")

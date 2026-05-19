@@ -71,6 +71,7 @@ function FullHamburgerMenuItems({
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/blog'); onClose(); }}>📝 Blogs</button>
 
     <div className="mobile-menu-section-label">Account</div>
+    <button type="button" className="mobile-menu-item" onClick={() => { navigate('/subscription'); onClose(); }}>⭐ VIP membership</button>
     <button type="button" className="mobile-menu-item" onClick={() => { navigate('/contact'); onClose(); }}>📧 Contact us</button>
     {user ? (
       <>
@@ -212,6 +213,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                       💳 {credits}
                     </button>
                   )}
+                  <button type="button" className="credits-btn nav-vip-btn" onClick={() => navigate('/subscription')}>
+                    ⭐ VIP
+                  </button>
                   {birthData && birthData.name && onChangeNative && (
                     <button
                       type="button"
@@ -323,6 +327,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           <div className="top-links">
             <a href="/calendar-2026" className="top-link">Calendar 2026</a>
             <a href="/contact" className="top-link">Contact us</a>
+            {!user && <a href="/subscription" className="top-link">VIP membership</a>}
             {/* <a href="/astroroshni" target="_blank" className="astroroshni-link">
               ⭐ AstroVishnu Pro
             </a> */}
@@ -331,12 +336,23 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             {user ? (
               <div className="user-menu">
                 {!creditsLoading && onCreditsClick && (
-                  <button className="credits-btn" onClick={onCreditsClick}>
-                    💳 {credits}
+                  <button type="button" className="credits-btn" onClick={onCreditsClick}>
+                    <span className="credits-btn__icon" aria-hidden>💳</span>
+                    <span className="credits-btn__value">{credits}</span>
                   </button>
                 )}
-                <button className="profile-btn" onClick={() => navigate('/profile')}>
-                  👤 {user.name || user.phone}
+                <button type="button" className="credits-btn nav-vip-btn" onClick={() => navigate('/subscription')}>
+                  <span aria-hidden>⭐</span>
+                  <span>VIP</span>
+                </button>
+                <button
+                  type="button"
+                  className="profile-btn"
+                  onClick={() => navigate('/profile')}
+                  title={user.name || user.phone || 'Profile'}
+                >
+                  <span className="profile-btn__icon" aria-hidden>👤</span>
+                  <span className="profile-btn__name">{user.name || user.phone}</span>
                 </button>
                 <button className="auth-btn" onClick={onLogout}>Logout</button>
               </div>
@@ -366,6 +382,24 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <button className="mobile-search-btn" onClick={() => setShowMobileSearch(true)}>
               🔍
             </button>
+            {user && (
+              <div className="mobile-actions-group__account">
+                {!creditsLoading && onCreditsClick && (
+                  <button type="button" className="credits-btn credits-btn--compact" onClick={onCreditsClick}>
+                    <span className="credits-btn__icon" aria-hidden>💳</span>
+                    <span className="credits-btn__value">{credits}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="credits-btn nav-vip-btn credits-btn--compact"
+                  onClick={() => navigate('/subscription')}
+                >
+                  <span aria-hidden>⭐</span>
+                  <span>VIP</span>
+                </button>
+              </div>
+            )}
             {user && birthData && birthData.name && onChangeNative && (
               <button
                 type="button"

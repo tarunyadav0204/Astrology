@@ -259,6 +259,27 @@ class CreditService:
 
             self._safe_ddl(conn, "ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS google_play_order_id TEXT")
             self._safe_ddl(conn, "ALTER TABLE play_subscription_token_map ADD COLUMN IF NOT EXISTS latest_order_id TEXT")
+            self._safe_ddl(conn, "ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS razorpay_plan_id TEXT")
+            for col_def in (
+                "billing_provider TEXT",
+                "razorpay_subscription_id TEXT",
+                "cancel_at_period_end BOOLEAN DEFAULT FALSE",
+            ):
+                self._safe_ddl(
+                    conn,
+                    f"ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS {col_def}",
+                )
+
+            execute(conn, '''
+                CREATE TABLE IF NOT EXISTS razorpay_subscription_map (
+                    razorpay_subscription_id TEXT PRIMARY KEY,
+                    userid INTEGER NOT NULL,
+                    internal_plan_id INTEGER,
+                    product_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
             execute(conn, '''
                 CREATE TABLE IF NOT EXISTS play_onetime_token_map (
@@ -411,7 +432,9 @@ class CreditService:
             with get_conn() as conn:
                 date_expr = self._date_today_expr()
                 cursor = execute(conn, f"""
-                    SELECT sp.tier_name, sp.discount_percent, us.start_date, us.end_date, sp.features
+                    SELECT sp.tier_name, sp.discount_percent, us.start_date, us.end_date, sp.features,
+                           us.billing_provider, us.razorpay_subscription_id, us.cancel_at_period_end,
+                           sp.plan_id, sp.price, sp.google_play_product_id
                     FROM user_subscriptions us
                     JOIN subscription_plans sp ON us.plan_id = sp.plan_id
                     WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= {date_expr}
@@ -424,6 +447,14 @@ class CreditService:
         if not row:
             return None
         features = row[4]
+        billing_provider = (row[5] or "").strip().lower() or None
+        razorpay_sub_id = (row[6] or "").strip() or None
+        cancel_at_period_end = bool(row[7]) if row[7] is not None else False
+        internal_plan_id = row[8]
+        plan_price = float(row[9]) if row[9] is not None else None
+        google_product_id = row[10]
+        if not billing_provider:
+            billing_provider = "razorpay" if razorpay_sub_id else "google_play"
         if isinstance(features, str):
             try:
                 features = json.loads(features) if features else {}
@@ -435,6 +466,14 @@ class CreditService:
             "start_date": row[2] or "",
             "end_date": row[3] or "",
             "features": features,
+            "billing_provider": billing_provider,
+            "razorpay_subscription_id": razorpay_sub_id,
+            "cancel_at_period_end": cancel_at_period_end,
+            "plan_id": internal_plan_id,
+            "plan_price_inr": plan_price,
+            "google_play_product_id": google_product_id,
+            "manage_in_google_play": billing_provider == "google_play",
+            "manage_on_web": billing_provider == "razorpay",
         }
 
     def get_plan_id_by_google_play_product_id(self, product_id: str, platform: str = "astroroshni") -> Optional[int]:
@@ -452,6 +491,240 @@ class CreditService:
             row = None
         return row[0] if row else None
 
+    def _razorpay_plan_id_from_env(self, product_id: str) -> Optional[str]:
+        import os
+
+        pid = (product_id or "").strip()
+        if not pid:
+            return None
+        keys = [
+            f"RAZORPAY_PLAN_{pid}",
+            f"RAZORPAY_PLAN_{pid.upper()}",
+        ]
+        if pid.startswith("subscription_vip_"):
+            keys.append(f"RAZORPAY_SUBSCRIPTION_PLAN_{pid.replace('subscription_vip_', '').upper()}")
+        for key in keys:
+            val = (os.environ.get(key) or "").strip()
+            if val:
+                return val
+        return None
+
+    def list_razorpay_subscription_plans(self, platform: str = "astroroshni") -> List[dict]:
+        """VIP plans available for Razorpay web subscriptions."""
+        from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id,
+                       price, features, razorpay_plan_id
+                FROM subscription_plans
+                WHERE platform = ?
+                  AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
+                  AND google_play_product_id IS NOT NULL
+                  AND TRIM(google_play_product_id) <> ''
+                  AND COALESCE(discount_percent, 0) > 0
+                ORDER BY COALESCE(discount_percent, 0) ASC
+                """,
+                (platform,),
+            )
+            rows = cur.fetchall() or []
+
+        from credits.subscription_pricing_util import parse_plan_benefits
+
+        plans = []
+        for r in rows:
+            product_id = (r[3] or "").strip()
+            rz_plan = (r[6] or "").strip() or self._razorpay_plan_id_from_env(product_id)
+            if not rz_plan:
+                continue
+            price = float(r[4]) if r[4] is not None else 0.0
+            features_raw = r[5]
+            plans.append(
+                {
+                    "plan_id": r[0],
+                    "tier_name": r[1] or "VIP",
+                    "discount_percent": int(r[2] or 0),
+                    "product_id": product_id,
+                    "price_inr": price,
+                    "amount_display": f"₹{int(price)}" if price == int(price) else f"₹{price:.2f}",
+                    "razorpay_plan_id": rz_plan,
+                    "benefits": parse_plan_benefits(features_raw),
+                }
+            )
+        return plans
+
+    def get_plan_by_internal_id(self, plan_id: int) -> Optional[dict]:
+        from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, razorpay_plan_id
+                FROM subscription_plans
+                WHERE plan_id = ? AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
+                """,
+                (int(plan_id),),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        product_id = (row[3] or "").strip()
+        rz_plan = (row[5] or "").strip() or self._razorpay_plan_id_from_env(product_id)
+        return {
+            "plan_id": row[0],
+            "tier_name": row[1],
+            "discount_percent": int(row[2] or 0),
+            "product_id": product_id,
+            "price_inr": float(row[4]) if row[4] is not None else 0.0,
+            "razorpay_plan_id": rz_plan,
+        }
+
+    def get_plan_by_razorpay_plan_id(self, razorpay_plan_id: str, platform: str = "astroroshni") -> Optional[dict]:
+        """Resolve internal VIP plan from Razorpay plan_id (DB column or env fallback)."""
+        rz = (razorpay_plan_id or "").strip()
+        if not rz:
+            return None
+        from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, razorpay_plan_id
+                FROM subscription_plans
+                WHERE platform = ? AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
+                  AND TRIM(COALESCE(razorpay_plan_id, '')) = ?
+                """,
+                (platform, rz),
+            )
+            row = cur.fetchone()
+        if row:
+            product_id = (row[3] or "").strip()
+            return {
+                "plan_id": row[0],
+                "tier_name": row[1],
+                "discount_percent": int(row[2] or 0),
+                "product_id": product_id,
+                "price_inr": float(row[4]) if row[4] is not None else 0.0,
+                "razorpay_plan_id": rz,
+            }
+        for plan in self.list_razorpay_subscription_plans(platform):
+            if plan.get("razorpay_plan_id") == rz:
+                return self.get_plan_by_internal_id(plan["plan_id"])
+        return None
+
+    def user_has_active_google_play_subscription(self, userid: int, platform: str = "astroroshni") -> bool:
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT 1
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON sp.plan_id = us.plan_id
+                WHERE us.userid = ?
+                  AND sp.platform = ?
+                  AND us.status = 'active'
+                  AND us.end_date >= {self._date_today_expr()}
+                  AND COALESCE(us.billing_provider, 'google_play') <> 'razorpay'
+                LIMIT 1
+                """,
+                (userid, platform),
+            )
+            return bool(cur.fetchone())
+
+    def upsert_razorpay_subscription_map(
+        self,
+        razorpay_subscription_id: str,
+        userid: int,
+        internal_plan_id: int,
+        product_id: str,
+    ) -> None:
+        from db import get_conn, execute
+
+        sub_id = (razorpay_subscription_id or "").strip()
+        if not sub_id:
+            return
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                INSERT INTO razorpay_subscription_map (
+                    razorpay_subscription_id, userid, internal_plan_id, product_id, updated_at
+                )
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (razorpay_subscription_id) DO UPDATE
+                  SET userid = EXCLUDED.userid,
+                      internal_plan_id = EXCLUDED.internal_plan_id,
+                      product_id = EXCLUDED.product_id,
+                      updated_at = CURRENT_TIMESTAMP
+                """,
+                (sub_id, userid, internal_plan_id, product_id),
+            )
+            conn.commit()
+
+    def get_userid_by_razorpay_subscription(self, razorpay_subscription_id: str) -> Optional[int]:
+        from db import get_conn, execute
+
+        sub_id = (razorpay_subscription_id or "").strip()
+        if not sub_id:
+            return None
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT userid FROM razorpay_subscription_map WHERE razorpay_subscription_id = ?",
+                (sub_id,),
+            )
+            row = cur.fetchone()
+        return int(row[0]) if row else None
+
+    def get_razorpay_subscription_map(self, razorpay_subscription_id: str) -> Optional[dict]:
+        from db import get_conn, execute
+
+        sub_id = (razorpay_subscription_id or "").strip()
+        if not sub_id:
+            return None
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT userid, internal_plan_id, product_id
+                FROM razorpay_subscription_map
+                WHERE razorpay_subscription_id = ?
+                """,
+                (sub_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "userid": int(row[0]),
+            "internal_plan_id": int(row[1]) if row[1] is not None else None,
+            "product_id": row[2],
+        }
+
+    def mark_razorpay_subscription_cancel_pending(self, userid: int, razorpay_subscription_id: str) -> bool:
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                UPDATE user_subscriptions
+                SET cancel_at_period_end = TRUE
+                WHERE userid = ?
+                  AND razorpay_subscription_id = ?
+                  AND status = 'active'
+                """,
+                (userid, razorpay_subscription_id.strip()),
+            )
+            conn.commit()
+            return bool(getattr(cur, "rowcount", 0))
+
     def set_user_subscription(
         self,
         userid: int,
@@ -459,6 +732,9 @@ class CreditService:
         start_date: str,
         end_date: str,
         google_play_order_id: Optional[str] = None,
+        billing_provider: Optional[str] = None,
+        razorpay_subscription_id: Optional[str] = None,
+        cancel_at_period_end: Optional[bool] = None,
     ) -> bool:
         """
         Set user's subscription entitlement window for a plan.
@@ -474,6 +750,8 @@ class CreditService:
         from credits.play_order_id_util import normalize_play_order_id
 
         play_order_id = normalize_play_order_id(google_play_order_id)
+        provider = (billing_provider or "").strip().lower() or None
+        rz_sub = (razorpay_subscription_id or "").strip() or None
         try:
             with get_conn() as conn:
                 cursor = execute(conn, "SELECT platform FROM subscription_plans WHERE plan_id = ?", (plan_id,))
@@ -523,10 +801,21 @@ class CreditService:
                         SET status = 'active',
                             start_date = ?,
                             end_date = ?,
-                            google_play_order_id = COALESCE(?, google_play_order_id)
+                            google_play_order_id = COALESCE(?, google_play_order_id),
+                            billing_provider = COALESCE(?, billing_provider),
+                            razorpay_subscription_id = COALESCE(?, razorpay_subscription_id),
+                            cancel_at_period_end = COALESCE(?, cancel_at_period_end)
                         WHERE id = ?
                         """,
-                        (start_date, end_date, play_order_id, keep_id),
+                        (
+                            start_date,
+                            end_date,
+                            play_order_id,
+                            provider,
+                            rz_sub,
+                            cancel_at_period_end,
+                            keep_id,
+                        ),
                     )
                     execute(
                         conn,
@@ -555,10 +844,23 @@ class CreditService:
                     execute(
                         conn,
                         """
-                        INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status, google_play_order_id)
-                        VALUES (?, ?, ?, ?, 'active', ?)
+                        INSERT INTO user_subscriptions (
+                            userid, plan_id, start_date, end_date, status,
+                            google_play_order_id, billing_provider, razorpay_subscription_id,
+                            cancel_at_period_end
+                        )
+                        VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)
                         """,
-                        (userid, plan_id, start_date, end_date, play_order_id),
+                        (
+                            userid,
+                            plan_id,
+                            start_date,
+                            end_date,
+                            play_order_id,
+                            provider,
+                            rz_sub,
+                            bool(cancel_at_period_end) if cancel_at_period_end is not None else False,
+                        ),
                     )
                 conn.commit()
                 return True

@@ -277,6 +277,16 @@
   color: #6b7280;
 }
 
+.credits-modal-vip-link {
+  color: #e91e63;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.credits-modal-vip-link:hover {
+  text-decoration: underline;
+}
+
 .credits-modal-buy-loading {
   color: #6b7280;
   font-size: 14px;

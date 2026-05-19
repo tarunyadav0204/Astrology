@@ -261,7 +261,10 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
 
                 <div className="credits-modal-buy-section">
                     <h3 className="credits-modal-section-title">Buy credits</h3>
-                    <p className="credits-modal-buy-lead">Secure checkout (UPI, cards, netbanking) — same packs as the Android app.</p>
+                    <p className="credits-modal-buy-lead">
+                        Secure checkout (UPI, cards, netbanking) — same packs as the Android app.{' '}
+                        <a href="/subscription" className="credits-modal-vip-link">VIP members save up to 30% on credits →</a>
+                    </p>
                     {!isLoggedIn && (
                         <div className="credits-modal-buy-guest">
                             <p className="credits-modal-buy-guest-text">Sign in to purchase credits.</p>
