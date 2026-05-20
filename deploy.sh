@@ -328,24 +328,54 @@ else
 fi
 
 echo "🔎 Verifying public SEO routes..."
+cd "${APP_ROOT}"
 # Next static export: clean URLs for tool landing pages.
-# Root "/" is CRA index.html (prerendered for crawlers), not home.html — do not expect Next-only copy there.
+# Root "/" is CRA index.html (Puppeteer prerender in postbuild-seo.mjs), not Next — never expect Next-only copy on /.
 verify_route_marker() {
   local route="$1"
   local marker="$2"
   local desc="$3"
-  if curl -fsS "http://127.0.0.1:3001${route}" | grep -q "${marker}"; then
+  local url="http://127.0.0.1:3001${route}"
+  if curl -fsS --max-time 20 "${url}" | grep -Fq "${marker}"; then
     echo "✅ ${route} — ${desc}"
   else
-    echo "❌ ${route} — missing expected content (${marker})"
-    echo "   Check frontend/build, scripts/serve-build.mjs on 3001, and prerender markers for /."
+    echo "❌ ${route} — missing expected marker for: ${desc}"
+    echo "   curl -fsS --max-time 20 ${url} | head -c 4000"
+    echo "   Check frontend/build, scripts/serve-build.mjs on 3001, and route content."
     exit 1
   fi
 }
+
+# Match postbuild-seo.mjs: both strings must appear in prerendered HTML (fixed-string grep; retries for slow bind).
+verify_homepage_prerender() {
+  local url="http://127.0.0.1:3001/"
+  local attempt html
+  for attempt in 1 2 3 4 5 6; do
+    html="$(curl -fsS --max-time 25 "${url}" 2>/dev/null || true)"
+    if printf '%s' "${html}" | grep -Fq "Ask Tara your questions" \
+      && printf '%s' "${html}" | grep -Fq "Frequently asked questions"; then
+      echo "✅ / — CRA homepage HTML (prerender; markers OK)"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "❌ / — CRA homepage prerender markers missing after retries"
+  echo "   Expected literal substrings: Ask Tara your questions  AND  Frequently asked questions"
+  echo "   (Root is CRA + postbuild-seo, not Next karma/kundli/chat HTML.)"
+  if [ -f "${APP_ROOT}/frontend/build/index.html" ]; then
+    if grep -Fq "Ask Tara your questions" "${APP_ROOT}/frontend/build/index.html" 2>/dev/null; then
+      echo "   ℹ️  frontend/build/index.html on disk contains Ask Tara — check serve-build.mjs / port 3001."
+    else
+      echo "   ℹ️  frontend/build/index.html on disk also lacks Ask Tara — rerun PRERENDER=true npm run build in frontend/."
+    fi
+  fi
+  exit 1
+}
+
 verify_route_marker "/karma-analysis" "Past Life Karma Analysis" "Next SEO HTML (karma)"
 verify_route_marker "/kundli-matching" "Kundli Matching" "Next SEO HTML (kundli)"
 verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
-verify_route_marker "/" "Ask Tara your questions" "CRA homepage HTML (prerender)"
+verify_homepage_prerender
 deploy_timing "frontend SEO route verification complete"
 
 # --- Phase 5: auto-restart monitor (backend watchdog) ---

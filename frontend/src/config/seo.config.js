@@ -225,26 +225,31 @@ export const SEO_CONFIG = {
   },
   
   structuredData: {
+    /** Single canonical Organization (legal entity + consumer brand). Referenced elsewhere via @id. */
     organization: {
       "@context": "https://schema.org",
       "@type": "Organization",
-      "name": "AstroRoshni",
-      "url": "https://astroroshni.com",
-      "logo": "https://astroroshni.com/images/astroroshni-icon.png",
-      "description": "Professional Vedic Astrology Services - Accurate predictions, birth chart analysis, horoscope matching and expert consultations",
-      "telephone": "+91-9999999999",
-      "email": "info@astroroshni.com",
-      "address": {
+      "@id": "https://astroroshni.com/#organization",
+      name: "Apeiron Logic LLP",
+      alternateName: "AstroRoshni",
+      url: "https://astroroshni.com",
+      logo: "https://astroroshni.com/images/astroroshni-icon.png",
+      description:
+        "Professional Vedic Astrology Services & Creators of Tara, the world's most advanced AI Predictive Astrology Engine.",
+      telephone: "+91-9560214006",
+      email: "help@astroroshni.com",
+      address: {
         "@type": "PostalAddress",
-        "addressCountry": "IN",
-        "addressRegion": "Delhi", 
-        "addressLocality": "New Delhi"
+        addressCountry: "IN",
+        addressRegion: "Gurgaon",
+        addressLocality: "Haryana",
       },
-      "sameAs": [
+      sameAs: [
         "https://www.facebook.com/astroroshni",
-        "https://www.instagram.com/astroroshni",
-        "https://twitter.com/astroroshni"
-      ]
+        "https://www.instagram.com/astroroshniai",
+        "https://twitter.com/astroroshni",
+        "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
+      ],
     },
     
     website: {
@@ -278,17 +283,6 @@ export const generatePageSEO = (pageKey, customData = {}) => {
 export const buildHomeAccuracyProofStructuredData = () => ({
   "@context": "https://schema.org",
   "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://astroroshni.com/#organization",
-      "name": "Apeiron Logic LLP",
-      "url": "https://astroroshni.com/",
-      "logo": "https://astroroshni.com/images/astroroshni-icon.png",
-      "description": "Creators of Tara, the world's most advanced AI Predictive Astrology Engine.",
-      "sameAs": [
-        "https://play.google.com/store/apps/details?id=com.astroroshni.mobile"
-      ]
-    },
     {
       "@type": "WebPage",
       "@id": "https://astroroshni.com/#accuracy-proof",
@@ -486,9 +480,7 @@ export const buildHomePlayStoreBannerStructuredData = () => {
           availability: "https://schema.org/InStock",
         },
         publisher: {
-          "@type": "Organization",
-          name: site.name,
-          url: site.url,
+          "@id": `${site.url}/#organization`,
         },
       },
     ],
