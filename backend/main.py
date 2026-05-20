@@ -4871,8 +4871,14 @@ async def delete_admin_chart(chart_id: int, current_user: User = Depends(get_cur
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
+    from birth_charts.deletion import delete_birth_chart_dependencies
+
     with get_conn() as conn:
-        execute(conn, 'DELETE FROM birth_charts WHERE id=%s', (chart_id,))
+        cur = execute(conn, "SELECT id FROM birth_charts WHERE id = %s", (chart_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Chart not found")
+        delete_birth_chart_dependencies(conn, chart_id)
+        execute(conn, "DELETE FROM birth_charts WHERE id = %s", (chart_id,))
         conn.commit()
     return {"message": "Chart deleted successfully"}
 

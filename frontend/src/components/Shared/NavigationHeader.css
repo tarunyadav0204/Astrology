@@ -22,13 +22,14 @@
 }
 
 .compact-nav .container {
-  max-width: 1200px;
+  max-width: min(1440px, 100%);
   margin: 0 auto;
-  padding: 0 20px;
-  display: flex;
-  justify-content: space-between;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 30px;
+  column-gap: 12px;
+  row-gap: 8px;
 }
 
 .compact-nav__brand-row {
@@ -36,6 +37,8 @@
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  justify-self: start;
+  min-width: 0;
 }
 
 /* Compact: hamburger before logo on desktop (top-left of bar); on narrow screens use trailing toggle in .compact-actions */
@@ -64,9 +67,12 @@
 .compact-menu {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex: 1;
   justify-content: center;
+  justify-self: center;
+  gap: clamp(6px, 0.9vw, 14px);
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .compact-menu button,
@@ -112,7 +118,60 @@
 .compact-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.compact-actions .credits-btn,
+.compact-actions .nav-vip-btn,
+.compact-actions .native-selector-chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.compact-actions .credits-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.compact-actions .nav-vip-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+@media (min-width: 969px) and (max-width: 1320px) {
+  .compact-menu button,
+  .compact-menu a {
+    font-size: 12px;
+  }
+
+  .compact-menu {
+    gap: 8px;
+  }
+}
+
+@media (min-width: 969px) and (max-width: 1160px) {
+  .compact-menu button,
+  .compact-menu a {
+    font-size: 11px;
+  }
+
+  .compact-menu {
+    gap: 5px;
+  }
+
+  .compact-actions .credits-btn,
+  .compact-actions .nav-vip-btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
 }
 
 .compact-actions .auth-btn {

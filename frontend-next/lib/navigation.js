@@ -5,6 +5,11 @@ export function craHref(path) {
   return p;
 }
 
+/** CRA marketing homepage at `/` (same shell users expect). */
+export function appHomeHref() {
+  return '/';
+}
+
 /** Interactive karma tool: CRA shell + NavigationHeader + login modal */
 export function karmaAppHref({ login = false, hash = '' } = {}) {
   const params = new URLSearchParams({ app: '1' });

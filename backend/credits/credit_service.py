@@ -1820,8 +1820,8 @@ class CreditService:
             conn.commit()
 
     def notification_opt_in_satisfied_for_free_question(self, userid: int) -> bool:
-        """Free first question requires app push registration or (web) explicit browser-notification ack."""
-        return self.user_has_registered_push_token(userid) or self.get_web_notifications_granted(userid)
+        """Free first question no longer requires push or web notification opt-in (userid kept for API stability)."""
+        return True
 
     def is_free_standard_chat_question_available(self, userid: int) -> bool:
         """Unused one-time free standard chat AND notifications requirement met."""

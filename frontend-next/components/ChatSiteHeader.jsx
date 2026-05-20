@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { chatAppHref, craHref } from '../lib/navigation';
+import { appHomeHref, chatAppHref, craHref } from '../lib/navigation';
 import { loadStoredUser } from '../lib/api';
 
 export default function ChatSiteHeader() {
@@ -23,7 +23,7 @@ export default function ChatSiteHeader() {
           <a href={craHref('/kundli-matching')}>Kundli matching</a>
           <a href={chatAppHref()}>Open chat</a>
           {user ? (
-            <a href={craHref('/')}>My account</a>
+            <a href={appHomeHref()}>My account</a>
           ) : (
             <a href={chatAppHref({ login: true })}>Sign in</a>
           )}

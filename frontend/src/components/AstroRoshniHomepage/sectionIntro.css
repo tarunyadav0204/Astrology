@@ -1,0 +1,146 @@
+/**
+ * Shared section intros on AstroRoshni homepage (FAQ, How Tara works, Western horoscopes, Ask Tara).
+ * Use: .section-intro + layout (--band | --card) + tone + accent + optional lead width.
+ */
+
+.section-intro {
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 32px 28px 28px;
+}
+
+/* Top band inside a rounded shell (e.g. tara-aeo-section, tara-faq-section) */
+.section-intro--band {
+  margin: 0;
+  border-bottom: 1px solid rgba(150, 27, 72, 0.1);
+  background: linear-gradient(165deg, #faf8fc 0%, #fff6f9 48%, #ffffff 100%);
+}
+
+/* Standalone card above content (horoscope, Ask Tara) */
+.section-intro--card {
+  margin: 0 0 32px;
+  border: 1px solid rgba(150, 27, 72, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 10px 36px rgba(106, 27, 154, 0.06);
+}
+
+.section-intro--card.section-intro--tone-warm {
+  background: linear-gradient(165deg, #fff8fb 0%, #fce4ec 38%, #fff5f0 100%);
+}
+
+.section-intro--card.section-intro--tone-cool {
+  border-color: rgba(106, 27, 154, 0.12);
+  background: linear-gradient(165deg, #f3f6ff 0%, #fdf8fc 48%, #ffffff 100%);
+  box-shadow: 0 10px 36px rgba(80, 60, 120, 0.06);
+}
+
+.section-intro__eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.section-intro--accent-rose .section-intro__eyebrow {
+  color: #ad1457;
+}
+
+.section-intro--accent-indigo .section-intro__eyebrow {
+  color: #5e35b1;
+}
+
+.section-intro__title {
+  margin: 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.section-intro__title-line {
+  font-size: clamp(1.5rem, 3.2vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.section-intro--accent-rose .section-intro__title-line {
+  color: #4a1942;
+}
+
+.section-intro--accent-indigo .section-intro__title-line {
+  color: #311b92;
+  font-size: clamp(1.55rem, 3.5vw, 2.15rem);
+}
+
+.section-intro__title-sub {
+  font-size: clamp(0.95rem, 2vw, 1.12rem);
+  font-weight: 600;
+}
+
+.section-intro--accent-rose .section-intro__title-sub {
+  color: #880e4f;
+}
+
+/* FAQ secondary line — slightly more violet */
+.section-intro--accent-rose.section-intro--sub-violet .section-intro__title-sub {
+  color: #7b1fa2;
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+}
+
+.section-intro--accent-indigo .section-intro__title-sub {
+  color: #6a1b9a;
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+}
+
+.section-intro__lead {
+  margin: 0 auto;
+  max-width: 640px;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: #3d3540;
+}
+
+.section-intro--lead-narrow .section-intro__lead {
+  max-width: 560px;
+}
+
+.section-intro--lead-chat .section-intro__lead {
+  max-width: 620px;
+}
+
+.section-intro__title-star {
+  display: inline-block;
+  filter: drop-shadow(0 1px 2px rgba(136, 14, 79, 0.25));
+}
+
+@media (max-width: 768px) {
+  .section-intro {
+    padding: 22px 16px 20px;
+  }
+
+  .section-intro--card {
+    margin-bottom: 22px;
+    border-radius: 16px;
+  }
+
+  .section-intro--accent-rose .section-intro__title-line,
+  .section-intro--accent-indigo .section-intro__title-line {
+    font-size: 1.45rem;
+  }
+
+  .section-intro__title-sub,
+  .section-intro--accent-indigo .section-intro__title-sub {
+    font-size: 0.92rem;
+  }
+
+  .section-intro--accent-rose.section-intro--sub-violet .section-intro__title-sub {
+    font-size: 0.92rem;
+  }
+
+  .section-intro__lead {
+    font-size: 0.93rem;
+  }
+}

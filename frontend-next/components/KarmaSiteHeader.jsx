@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { craHref, karmaAppHref } from '../lib/navigation';
+import { appHomeHref, craHref, karmaAppHref } from '../lib/navigation';
 import { loadStoredUser } from '../lib/api';
 
 export default function KarmaSiteHeader() {
@@ -24,7 +24,7 @@ export default function KarmaSiteHeader() {
           <a href={craHref('/nakshatras')}>Nakshatras</a>
           <a href={karmaAppHref()}>Open full app view</a>
           {user ? (
-            <a href={craHref('/')}>My account</a>
+            <a href={appHomeHref()}>My account</a>
           ) : (
             <a href={karmaAppHref({ login: true })}>Sign in</a>
           )}

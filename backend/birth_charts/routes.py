@@ -4,6 +4,7 @@ from auth import get_current_user, User
 from pydantic import BaseModel
 from encryption_utils import EncryptionManager
 from db import get_conn, execute
+from birth_charts.deletion import delete_birth_chart_dependencies
 from types import SimpleNamespace
 
 try:
@@ -452,7 +453,8 @@ async def delete_birth_chart(chart_id: int, current_user: User = Depends(get_cur
         )
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Chart not found or access denied")
-        
+
+        delete_birth_chart_dependencies(conn, chart_id, current_user.userid)
         cursor.execute(
             "DELETE FROM birth_charts WHERE id=%s AND userid=%s",
             (chart_id, current_user.userid),

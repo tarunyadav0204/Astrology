@@ -341,6 +341,7 @@ seo_check() {
 seo_check "/karma-analysis" "Past Life Karma Analysis"
 seo_check "/kundli-matching" "Kundli Matching"
 seo_check "/chat" "AI Vedic Astrologer Chat"
+seo_check "/" "AstroRoshni AI Vedic Astrology"
 deploy_timing "frontend SEO route verification complete"
 
 # --- Phase 5: auto-restart monitor (backend watchdog) ---

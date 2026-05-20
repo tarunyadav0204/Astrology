@@ -41,7 +41,7 @@ node scripts/copy-to-cra-build.mjs
 
 `deploy.sh` runs this automatically after the CRA build when `frontend-next/` exists.
 
-Serve from `frontend/build` with **`npm run serve:build`** (custom `scripts/serve-build.mjs` — serves `karma-analysis.html`, `kundli-matching.html`, and `chat.html` for their public SEO URLs, and CRA `index.html` for the matching `?app=1` app URLs).
+Serve from `frontend/build` with **`npm run serve:build`** (custom `scripts/serve-build.mjs` — `/` is the CRA app; `/karma-analysis`, `/kundli-matching`, and `/chat` serve Next SEO HTML unless `?app=1`, then CRA).
 
 For local login/API testing, keep the backend running on `http://127.0.0.1:8001`. To use a different backend:
 
@@ -51,6 +51,12 @@ API_TARGET=http://127.0.0.1:8001 npm run serve:build
 ```
 
 For SEO HTML check: open `/karma-analysis`, `/kundli-matching`, or `/chat` in incognito — Network should show `/_next/static/...`. In-app links use React Router (CRA route).
+
+## Homepage (`/`)
+
+**Users** always get the **CRA** marketing homepage at `/` (your `NavigationHeader`, sections, widgets, and layout). SEO for that URL comes from CRA’s existing `react-helmet-async` + JSON-LD in `AstroRoshniHomepage`.
+
+The Next export still builds **`home.html`** in `frontend/build` as an **optional** crawlable snapshot (e.g. audits, `href` from sitemap, or future nginx rules). It is **not** the default document for `/` in `serve-build.mjs` or `serve.json` so the live site matches the app you designed.
 
 ## CRA integration
 

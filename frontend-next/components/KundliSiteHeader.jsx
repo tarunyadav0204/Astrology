@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { craHref, kundliAppHref } from '../lib/navigation';
+import { appHomeHref, craHref, kundliAppHref } from '../lib/navigation';
 import { loadStoredUser } from '../lib/api';
 
 export default function KundliSiteHeader() {
@@ -24,7 +24,7 @@ export default function KundliSiteHeader() {
           <a href={craHref('/nakshatras')}>Nakshatras</a>
           <a href={kundliAppHref()}>Open matching tool</a>
           {user ? (
-            <a href={craHref('/')}>My account</a>
+            <a href={appHomeHref()}>My account</a>
           ) : (
             <a href={kundliAppHref({ login: true })}>Sign in</a>
           )}

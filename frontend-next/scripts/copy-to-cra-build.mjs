@@ -27,8 +27,8 @@ function copyRecursive(src, dest) {
 }
 
 function readRouteHtml(route) {
-  const flat = path.join(OUT, `${route}.html`);
-  const nested = path.join(OUT, route, 'index.html');
+  const flat = route ? path.join(OUT, `${route}.html`) : path.join(OUT, 'index.html');
+  const nested = route ? path.join(OUT, route, 'index.html') : path.join(OUT, 'index.html');
   if (fs.existsSync(flat)) return fs.readFileSync(flat, 'utf8');
   if (fs.existsSync(nested)) return fs.readFileSync(nested, 'utf8');
   return null;
@@ -43,6 +43,14 @@ if (fs.existsSync(path.join(OUT, '_next'))) {
   copyRecursive(path.join(OUT, '_next'), path.join(CRA_BUILD, '_next'));
   console.log('[next-karma] Copied _next assets to frontend/build/_next');
 }
+
+const homeHtml = readRouteHtml('');
+if (!homeHtml) {
+  console.error('[next-karma] No homepage HTML in out/index.html — run npm run build in frontend-next');
+  process.exit(1);
+}
+fs.writeFileSync(path.join(CRA_BUILD, 'home.html'), homeHtml, 'utf8');
+console.log('[next-karma] Wrote home.html (optional crawlable snapshot — root / stays CRA index.html)');
 
 const routes = ['karma-analysis', 'kundli-matching', 'chat'];
 for (const route of routes) {
@@ -59,10 +67,11 @@ for (const route of routes) {
   console.log(`[next-karma] Wrote ${route}.html and ${route}/index.html`);
 }
 
-// Compatibility only for simple static hosting. Query-aware routing such as
+// Compatibility only for simple static hosting. Query-aware routing for
 // /karma-analysis?app=1, /kundli-matching?app=1, and /chat?app=1 require frontend/scripts/serve-build.mjs.
 const serveJson = {
   rewrites: [
+    { source: '/', destination: '/index.html' },
     { source: '/karma-analysis', destination: '/karma-analysis.html' },
     { source: '/karma-analysis/', destination: '/karma-analysis.html' },
     { source: '/kundli-matching', destination: '/kundli-matching.html' },

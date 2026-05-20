@@ -1,8 +1,7 @@
 /**
  * Production static server for frontend/build.
- * - /karma-analysis (+ trailing slash) → karma-analysis.html (Next SEO export)
- * - /kundli-matching (+ trailing slash) → kundli-matching.html (Next SEO export)
- * - /chat (+ trailing slash) → chat.html (Next SEO export)
+ * - / (+ trailing slash) → CRA index.html (your full AstroRoshni homepage + NavigationHeader)
+ * - /karma-analysis, /kundli-matching, /chat → Next SEO HTML by default; ?app=1 → CRA for those paths
  * - Everything else → static file, or index.html for SPA routes
  */
 import http from 'http';
@@ -96,13 +95,15 @@ const server = http.createServer(async (req, res) => {
       return proxyApi(req, res);
     }
 
-    // SEO HTML by default; ?app=1 → CRA (full nav, login modal, tool)
+    // SEO HTML by default for tool landing URLs; ?app=1 → CRA (full nav, login modal, tool).
+    // Root `/` is always the CRA marketing homepage (see home.html only at /home.html if copied).
     const nextSeoRoutes = {
       '/karma-analysis': 'karma-analysis.html',
       '/kundli-matching': 'kundli-matching.html',
       '/chat': 'chat.html',
     };
-    const seoFileName = nextSeoRoutes[pathname.replace(/\/$/, '')];
+    const seoRouteKey = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
+    const seoFileName = nextSeoRoutes[seoRouteKey];
     if (seoFileName) {
       const useCraApp = url.searchParams.get('app') === '1';
       if (useCraApp) {
@@ -151,6 +152,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Serving ${BUILD} at http://localhost:${PORT}`);
+  console.log('Home:       http://localhost:' + PORT + '/  (CRA)');
   console.log('Karma SEO:  http://localhost:' + PORT + '/karma-analysis');
   console.log('Karma app:  http://localhost:' + PORT + '/karma-analysis?app=1');
   console.log('Kundli SEO: http://localhost:' + PORT + '/kundli-matching');

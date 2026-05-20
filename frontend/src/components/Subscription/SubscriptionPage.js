@@ -258,7 +258,35 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
           </section>
         )}
 
-        {loading && <p className="subscription-loading">Loading…</p>}
+        {loading && (
+          <section
+            className="subscription-plans-section subscription-plans-loading"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label="Loading membership plans"
+          >
+            <div className="subscription-plans-loading__status">
+              <div className="subscription-plans-loading__spinner" aria-hidden />
+              <p className="subscription-plans-loading__text">Loading membership plans…</p>
+            </div>
+            <div className="subscription-plans-grid subscription-plans-grid--skeleton">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="subscription-plan-skeleton" aria-hidden>
+                  <div className="subscription-plan-skeleton__title" />
+                  <div className="subscription-plan-skeleton__price" />
+                  <div className="subscription-plan-skeleton__rows">
+                    <div className="subscription-plan-skeleton__row" />
+                    <div className="subscription-plan-skeleton__row" />
+                    <div className="subscription-plan-skeleton__row" />
+                    <div className="subscription-plan-skeleton__row" />
+                    <div className="subscription-plan-skeleton__row" />
+                  </div>
+                  <div className="subscription-plan-skeleton__cta" />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {!loading && plansError && (
           <section className="subscription-card subscription-card--error">

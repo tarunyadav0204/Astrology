@@ -209,12 +209,14 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               {user ? (
                 <>
                   {!creditsLoading && onCreditsClick && (
-                    <button className="credits-btn" onClick={onCreditsClick}>
-                      💳 {credits}
+                    <button type="button" className="credits-btn credits-btn--compact" onClick={onCreditsClick}>
+                      <span className="credits-btn__icon" aria-hidden>💳</span>
+                      <span className="credits-btn__value">{credits}</span>
                     </button>
                   )}
-                  <button type="button" className="credits-btn nav-vip-btn" onClick={() => navigate('/subscription')}>
-                    ⭐ VIP
+                  <button type="button" className="credits-btn nav-vip-btn credits-btn--compact" onClick={() => navigate('/subscription')}>
+                    <span aria-hidden>⭐</span>
+                    <span>VIP</span>
                   </button>
                   {birthData && birthData.name && onChangeNative && (
                     <button

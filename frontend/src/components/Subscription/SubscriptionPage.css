@@ -364,9 +364,100 @@
   margin: 8px 0 0;
 }
 
-.subscription-loading {
+.subscription-plans-loading {
+  margin-top: 8px;
+}
+
+.subscription-plans-loading__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 20px;
+}
+
+.subscription-plans-loading__spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #f3e5f5;
+  border-top-color: #e91e63;
+  border-radius: 50%;
+  animation: subscription-spin 0.85s linear infinite;
+}
+
+.subscription-plans-loading__text {
+  margin: 0;
   color: #666;
-  padding: 24px 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+@keyframes subscription-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes subscription-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.subscription-plan-skeleton {
+  background: #fff;
+  border: 2px solid #ece4f0;
+  border-radius: 16px;
+  padding: 20px 18px;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.subscription-plan-skeleton > div {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f0f0f0 0%, #fafafa 45%, #f0f0f0 90%);
+  background-size: 200% 100%;
+  animation: subscription-shimmer 1.4s ease-in-out infinite;
+}
+
+.subscription-plan-skeleton__title {
+  height: 22px;
+  width: 55%;
+}
+
+.subscription-plan-skeleton__price {
+  height: 48px;
+  width: 40%;
+}
+
+.subscription-plan-skeleton__rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: none !important;
+  animation: none !important;
+}
+
+.subscription-plan-skeleton__row {
+  height: 14px;
+  width: 100%;
+}
+
+.subscription-plan-skeleton__row:nth-child(odd) {
+  width: 92%;
+}
+
+.subscription-plan-skeleton__cta {
+  height: 42px;
+  width: 100%;
+  margin-top: auto;
+  border-radius: 8px;
 }
 
 .subscription-message {

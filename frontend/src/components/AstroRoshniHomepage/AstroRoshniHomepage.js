@@ -6,6 +6,7 @@ import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } 
 import {
   SEO_CONFIG,
   generatePageSEO,
+  buildHomeAccuracyProofStructuredData,
   buildHomePlayStoreBannerStructuredData,
 } from '../../config/seo.config';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -27,6 +28,7 @@ import AuthModalShell from '../Auth/AuthModalShell';
 import { showToast } from '../../utils/toast';
 import TrustBanner from '../TrustBanner/TrustBanner';
 import './AstroRoshniHomepage.css';
+import './sectionIntro.css';
 import './search-section.css';
 
 /** Demo ticker content for the life-events card preview (not user-specific). */
@@ -39,6 +41,118 @@ const LIFE_EVENTS_PREVIEW_THEMES = [
   'Rahu–Ketu axis stirs travel; short journeys may unlock unexpected professional or karmic links.',
   'Mars period: channel drive into decisive action — sidestep impulsive clashes in the middle of the month.',
   'Mercury sub-period — contracts, study, and commerce favour careful, well-documented deals.',
+];
+
+const TARA_METHOD_CARDS = [
+  {
+    title: 'How accurate is Tara AI astrology?',
+    answer:
+      'Tara improves prediction quality by reading the complete Vedic chart instead of only a Sun sign. It combines birth chart placements, divisional charts, dashas, transits, yogas, and Ashtakavarga strength into one synthesis.',
+    links: [
+      { label: 'Ask Tara', href: '/chat' },
+      { label: 'Past-life karma analysis', href: '/karma-analysis' },
+    ],
+  },
+  {
+    title: 'What calculations does Tara use?',
+    answer:
+      'The engine uses Swiss Ephemeris precision for planetary positions, then applies Vedic layers such as Vimshottari Dasha, Jaimini Chara Dasha, Yogini Dasha, divisional charts, Ashtakavarga, yoga detection, and transit overlays.',
+    links: [
+      { label: 'Daily Panchang', href: '/panchang' },
+      { label: 'AI chat guide', href: '/chat' },
+    ],
+  },
+  {
+    title: 'How is Tara different from generic horoscopes?',
+    answer:
+      'Generic horoscopes usually describe broad zodiac trends. Tara uses your date, exact time, and place of birth to calculate a personal Kundli, then answers questions against your own chart and current timing periods.',
+    links: [
+      { label: 'Create Kundli in chat', href: '/chat?app=1' },
+      { label: 'Kundli matching', href: '/kundli-matching' },
+    ],
+  },
+  {
+    title: 'What birth details are required?',
+    answer:
+      'For the most accurate Kundli, enter date of birth, birth time, and birth place. Birth time sets the Lagna, houses, Moon nakshatra pada, dashas, and divisional chart details used in deeper predictions.',
+    links: [
+      { label: 'Open chat tool', href: '/chat?app=1' },
+      { label: 'Match two Kundlis', href: '/kundli-matching' },
+    ],
+  },
+];
+
+const TARA_HOME_FAQS = [
+  {
+    question: 'Is Tara AI astrology accurate?',
+    answer:
+      'Tara is designed for personalized Vedic chart analysis. It reads multiple calculation layers at the same time, including dashas, transits, yogas, divisional charts, Ashtakavarga, and nakshatra context. Astrology is guidance, not a guarantee, but this chart-first method is much more specific than generic horoscope text.',
+  },
+  {
+    question: 'How is Tara different from generic horoscopes?',
+    answer:
+      'Most generic horoscopes are based on a zodiac sign. Tara calculates your Janam Kundli from your birth date, time, and place, then answers questions using your own houses, Lagna, Moon, dashas, transits, and chart strengths.',
+  },
+  {
+    question: 'Can Kundli predict the future accurately?',
+    answer:
+      'A Kundli can show tendencies, timing windows, and planetary periods when themes are more likely to unfold. Tara uses Vimshottari Dasha, Jaimini Chara Dasha, Yogini Dasha, and transit activations to explain likely periods, while still treating predictions as guidance.',
+  },
+  {
+    question: 'What is a divisional chart or Varga?',
+    answer:
+      'A divisional chart is a derived Vedic chart that focuses on a specific life area. For example, D9/Navamsa is important for marriage and dharma, while other Vargas help study career, children, wealth, and deeper karmic patterns.',
+  },
+  {
+    question: 'What is a Kundali or birth chart?',
+    answer:
+      'A Kundali is a map of planetary positions at your exact birth moment. It shows the Lagna, 12 houses, 9 planets, nakshatras, yogas, and timing systems used to understand personality, relationships, career, health, and life events.',
+  },
+  {
+    question: 'What information do I need to create my Kundli?',
+    answer:
+      'You need your date of birth, time of birth, and place of birth. The more accurate the birth time, the more reliable the Lagna, houses, dashas, nakshatra pada, and divisional chart interpretation will be.',
+  },
+  {
+    question: 'Why is birth time important for Kundli?',
+    answer:
+      'Birth time determines the Ascendant or Lagna, which can change roughly every two hours. Even a smaller difference can affect house cusps, nakshatra pada, dasha calculations, and some divisional charts.',
+  },
+  {
+    question: 'What is Lagna or Ascendant?',
+    answer:
+      'Lagna is the zodiac sign rising on the eastern horizon at the time of birth. It sets the house structure of the chart and is one of the most important anchors for personal Vedic astrology readings.',
+  },
+  {
+    question: 'What are the 12 houses in a Kundli?',
+    answer:
+      'The 12 houses represent life areas: self, wealth, siblings, home, children and education, health, marriage, longevity, fortune, career, gains, and losses or moksha. Tara reads planets through these houses to explain life themes.',
+  },
+  {
+    question: 'Why do twins have different lives?',
+    answer:
+      'Twins may be born minutes apart, but small time differences can shift sensitive chart factors such as Lagna degrees, nakshatra pada, divisional charts, and dasha timing. Their choices and environment also shape outcomes.',
+  },
+  {
+    question: "How accurate is Tara's Kundli matching?",
+    answer:
+      'Tara combines traditional 36-point Ashtakoot Guna Milan with Manglik checks, Nadi and Bhakoot context, Navamsa support, and cross-chart relationship factors. This gives a fuller picture than a single compatibility score.',
+  },
+  {
+    question: 'Is my birth data secure with AstroRoshni?',
+    answer:
+      'Your birth details are tied to your account and are used to generate chart-based guidance. AstroRoshni does not publish your personal reports as public pages, and account deletion options are available from the privacy and account tools.',
+  },
+  {
+    question: 'Do astrological remedies really work?',
+    answer:
+      'Remedies are best understood as spiritual and behavioral supports. They may help people build focus, discipline, and positive habits, but they should not replace medical, legal, financial, or mental health advice.',
+  },
+  {
+    question: 'What are common remedies for weak planets?',
+    answer:
+      'Common Vedic remedies include mantra practice, charity, fasting, prayer, gemstones, yantras, and habit changes aligned to the relevant planet. The right remedy depends on the full chart, not one placement alone.',
+  },
 ];
 
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
@@ -875,6 +989,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           {JSON.stringify(SEO_CONFIG.structuredData.website)}
         </script>
 
+        {/* Structured Data - Tara architecture, accuracy proof, and FAQ */}
+        <script type="application/ld+json">
+          {JSON.stringify(buildHomeAccuracyProofStructuredData())}
+        </script>
+
         {/* Structured Data - Homepage Play Store banner (ImageObject + Android app) */}
         <script type="application/ld+json">
           {JSON.stringify(buildHomePlayStoreBannerStructuredData())}
@@ -1567,12 +1686,25 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
 
           {/* Ask Tara — below Kundli matching row (content-grid: matching, chart, nakshatra, panchang) */}
-          <section className="chat-consultations">
+          <section className="chat-consultations" aria-labelledby="chat-tara-heading">
             <div className="container">
-              <div className="section-header">
-                <h2>⭐ Ask Tara Your Questions</h2>
-                <p className="section-subtitle">Get instant AI-powered Vedic insights on any life topic</p>
-              </div>
+              <header className="section-intro section-intro--card section-intro--tone-warm section-intro--accent-rose section-intro--lead-chat">
+                <p className="section-intro__eyebrow">AI chat</p>
+                <h2 id="chat-tara-heading" className="section-intro__title">
+                  <span className="section-intro__title-line">
+                    <span className="section-intro__title-star" aria-hidden>
+                      ⭐
+                    </span>{' '}
+                    Ask Tara your questions
+                  </span>
+                  <span className="section-intro__title-sub">
+                    Vedic guidance on love, career, health, family &amp; more
+                  </span>
+                </h2>
+                <p className="section-intro__lead">
+                  Get clear, chart-aware answers in seconds—open a category below to start chatting with Tara.
+                </p>
+              </header>
 
               <div className="consultation-categories">
                 <div className="consultation-card" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
@@ -1661,6 +1793,61 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
           </section>
+
+          <section className="tara-aeo-section" aria-labelledby="tara-method-heading">
+            <header className="section-intro section-intro--band section-intro--accent-rose">
+              <p className="section-intro__eyebrow">Method &amp; accuracy</p>
+              <h2 id="tara-method-heading" className="section-intro__title">
+                <span className="section-intro__title-line">How Tara AI astrology works</span>
+                <span className="section-intro__title-sub">Charts, calculations &amp; personalized readings</span>
+              </h2>
+              <p className="section-intro__lead">
+                Clear answers about Tara&apos;s calculation engine, birth-chart method, and what makes its readings personal.
+              </p>
+            </header>
+
+            <div className="tara-method-grid">
+              {TARA_METHOD_CARDS.map((item) => (
+                <article className="tara-method-card" key={item.title}>
+                  <h3>{item.title}</h3>
+                  <p>{item.answer}</p>
+                  <div className="tara-method-links" aria-label={`Related links for ${item.title}`}>
+                    {item.links.map((link) => (
+                      <a key={link.href + link.label} href={link.href}>
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="tara-faq-section" aria-labelledby="tara-faq-heading">
+            <header className="section-intro section-intro--band section-intro--accent-rose section-intro--sub-violet">
+              <p className="section-intro__eyebrow">Help center</p>
+              <h2 id="tara-faq-heading" className="section-intro__title">
+                <span className="section-intro__title-line">Frequently asked questions</span>
+                <span className="section-intro__title-sub">About Tara, Kundli &amp; AI astrology</span>
+              </h2>
+              <p className="section-intro__lead">
+                Short, direct answers for people comparing AI astrology, Kundli analysis, and chart-based predictions.
+              </p>
+            </header>
+
+            <div className="tara-faq-list">
+              {TARA_HOME_FAQS.map((item) => (
+                <details className="tara-faq-item" key={item.question}>
+                  <summary>
+                    <span className="tara-faq-item__question">{item.question}</span>
+                  </summary>
+                  <div className="tara-faq-item__answer">
+                    <p>{item.answer}</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
 
@@ -1669,9 +1856,19 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Horoscope Section */}
       <section className="horoscope-section">
         <div className="container">
-          <div className="section-header">
-            <h2>Western Horoscopes</h2>
-          </div>
+          <header
+            className="section-intro section-intro--card section-intro--tone-cool section-intro--accent-indigo section-intro--lead-narrow"
+            aria-labelledby="western-horoscope-heading"
+          >
+            <p className="section-intro__eyebrow">Sun signs &amp; timing</p>
+            <h2 id="western-horoscope-heading" className="section-intro__title">
+              <span className="section-intro__title-line">Western horoscopes</span>
+              <span className="section-intro__title-sub">Daily, weekly, monthly &amp; yearly</span>
+            </h2>
+            <p className="section-intro__lead">
+              Choose your zodiac and period for at-a-glance love, career, health, and finance—then open the full reading anytime.
+            </p>
+          </header>
           <div className="horoscope-grid">
             <div className="horoscope-content">
               <div className="horoscope-tabs">
