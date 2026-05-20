@@ -257,8 +257,9 @@ if [ "${needs_frontend_build}" = "true" ]; then
   export CI=true
   export GENERATE_SOURCEMAP=false
   export INLINE_RUNTIME_CHUNK=true
-  # SEO: sitemap + Next export (karma/kundli/chat). Puppeteer prerender off on deploy (slow; use PRERENDER=true to force).
-  export PRERENDER=false
+  # SEO: prerender only the CRA homepage so / remains the real homepage but has crawlable HTML.
+  export PRERENDER=true
+  export PRERENDER_ROUTES="/"
   SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
   BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
   npm run build
@@ -326,7 +327,7 @@ else
   deploy_timing "frontend serve unchanged"
 fi
 
-echo "🔎 Verifying public Next SEO routes..."
+echo "🔎 Verifying public SEO routes..."
 seo_check() {
   local route="$1"
   local marker="$2"
@@ -341,7 +342,7 @@ seo_check() {
 seo_check "/karma-analysis" "Past Life Karma Analysis"
 seo_check "/kundli-matching" "Kundli Matching"
 seo_check "/chat" "AI Vedic Astrologer Chat"
-seo_check "/" "AstroRoshni AI Vedic Astrology"
+seo_check "/" "AstroRoshni — Best Vedic Astrology"
 deploy_timing "frontend SEO route verification complete"
 
 # --- Phase 5: auto-restart monitor (backend watchdog) ---

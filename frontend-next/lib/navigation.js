@@ -5,7 +5,7 @@ export function craHref(path) {
   return p;
 }
 
-/** CRA marketing homepage at `/` (same shell users expect). */
+/** Root of the CRA app/homepage. */
 export function appHomeHref() {
   return '/';
 }

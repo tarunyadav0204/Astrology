@@ -1,6 +1,6 @@
 /**
  * Production static server for frontend/build.
- * - / (+ trailing slash) → CRA index.html (your full AstroRoshni homepage + NavigationHeader)
+ * - / (+ trailing slash) → CRA index.html, prerendered after build for homepage SEO
  * - /karma-analysis, /kundli-matching, /chat → Next SEO HTML by default; ?app=1 → CRA for those paths
  * - Everything else → static file, or index.html for SPA routes
  */
@@ -34,8 +34,8 @@ const MIME = {
   '.map': 'application/json',
 };
 
-function send(res, status, body, contentType) {
-  res.writeHead(status, { 'Content-Type': contentType });
+function send(res, status, body, contentType, extraHeaders = {}) {
+  res.writeHead(status, { 'Content-Type': contentType, ...extraHeaders });
   res.end(body);
 }
 
@@ -95,8 +95,21 @@ const server = http.createServer(async (req, res) => {
       return proxyApi(req, res);
     }
 
+    const sendCraApp = async (headers = {}) => {
+      const indexPath = path.join(BUILD, 'index.html');
+      if (await exists(indexPath)) {
+        const html = await readFile(indexPath);
+        return send(res, 200, html, MIME['.html'], headers);
+      }
+      return false;
+    };
+
+    if (pathname === '/app' || pathname === '/app/' || (pathname === '/' && url.searchParams.get('app') === '1')) {
+      return sendCraApp({ 'X-Robots-Tag': 'noindex, follow' });
+    }
+
     // SEO HTML by default for tool landing URLs; ?app=1 → CRA (full nav, login modal, tool).
-    // Root `/` is always the CRA marketing homepage (see home.html only at /home.html if copied).
+    // Root `/` is the real CRA homepage; build-time prerender makes its index.html crawlable.
     const nextSeoRoutes = {
       '/karma-analysis': 'karma-analysis.html',
       '/kundli-matching': 'kundli-matching.html',
@@ -107,11 +120,7 @@ const server = http.createServer(async (req, res) => {
     if (seoFileName) {
       const useCraApp = url.searchParams.get('app') === '1';
       if (useCraApp) {
-        const indexPath = path.join(BUILD, 'index.html');
-        if (await exists(indexPath)) {
-          const html = await readFile(indexPath);
-          return send(res, 200, html, MIME['.html']);
-        }
+        return sendCraApp({ 'X-Robots-Tag': 'noindex, follow' });
       }
       if (!useCraApp) {
         const seoFile = path.join(BUILD, seoFileName);
@@ -137,11 +146,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // SPA fallback (CRA)
-    const indexPath = path.join(BUILD, 'index.html');
-    if (await exists(indexPath)) {
-      const html = await readFile(indexPath);
-      return send(res, 200, html, MIME['.html']);
-    }
+    return sendCraApp();
 
     send(res, 404, 'Not found', 'text/plain');
   } catch (err) {
@@ -152,7 +157,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Serving ${BUILD} at http://localhost:${PORT}`);
-  console.log('Home:       http://localhost:' + PORT + '/  (CRA)');
+  console.log('Home:       http://localhost:' + PORT + '/  (CRA, prerendered)');
   console.log('Karma SEO:  http://localhost:' + PORT + '/karma-analysis');
   console.log('Karma app:  http://localhost:' + PORT + '/karma-analysis?app=1');
   console.log('Kundli SEO: http://localhost:' + PORT + '/kundli-matching');

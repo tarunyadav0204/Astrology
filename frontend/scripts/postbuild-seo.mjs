@@ -4,6 +4,7 @@
  * Env:
  *   SITEMAP_URL — fetch sitemap XML (default http://127.0.0.1:8001/sitemap.xml)
  *   PRERENDER — set to "false" to skip prerender
+ *   PRERENDER_ROUTES — comma-separated routes to prerender (deploy uses "/" only)
  *   BLOG_API_URL — optional blog list for extra prerender paths
  */
 import fs from 'fs';
@@ -151,6 +152,26 @@ function startStaticServer(port) {
   });
 }
 
+function splitRoutes(value) {
+  return String(value || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => (p.startsWith('/') ? p : `/${p}`));
+}
+
+function findChromeExecutable() {
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].filter(Boolean);
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
 async function fetchBlogSlugs() {
   const apiBase = process.env.BLOG_API_URL || 'http://127.0.0.1:8001';
   try {
@@ -186,25 +207,34 @@ async function prerenderRoutes() {
   try {
     puppeteer = await import('puppeteer');
   } catch {
-    console.warn('[seo] puppeteer not installed — run npm install && rebuild for prerendered HTML');
+    const message = '[seo] puppeteer not installed — run npm install && rebuild for prerendered HTML';
+    if (process.env.PRERENDER === 'true') {
+      throw new Error(message);
+    }
+    console.warn(message);
     return;
   }
 
   const port = Number(process.env.PRERENDER_PORT || 4567);
-  const blogSlugs = await fetchBlogSlugs();
   const year = new Date().getFullYear();
-  const paths = [
-    ...STATIC_PRERENDER_PATHS,
-    ...NAKSHATRA_SLUGS.map((n) => `/nakshatra/${n}/${year}`),
-    ...blogSlugs.map((s) => `/blog/${s}`),
-  ];
+  const explicitRoutes = splitRoutes(process.env.PRERENDER_ROUTES);
+  const blogSlugs = explicitRoutes.length ? [] : await fetchBlogSlugs();
+  const paths = explicitRoutes.length
+    ? explicitRoutes
+    : [
+        ...STATIC_PRERENDER_PATHS,
+        ...NAKSHATRA_SLUGS.map((n) => `/nakshatra/${n}/${year}`),
+        ...blogSlugs.map((s) => `/blog/${s}`),
+      ];
   const uniquePaths = [...new Set(paths)];
 
   const server = await startStaticServer(port);
   try {
     await waitForServer(port);
+    const executablePath = findChromeExecutable();
     const browser = await puppeteer.default.launch({
       headless: true,
+      ...(executablePath ? { executablePath } : {}),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
@@ -214,16 +244,29 @@ async function prerenderRoutes() {
       const url = `http://127.0.0.1:${port}${routePath}`;
       process.stdout.write(`[seo] Prerender ${routePath} ... `);
       try {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForSelector('#root', { timeout: 15000 });
-        await new Promise((r) => setTimeout(r, 500));
+        if (routePath === '/') {
+          await page.waitForFunction(
+            () => document.body.innerText.includes('Ask Tara your questions')
+              && document.body.innerText.includes('Frequently asked questions'),
+            { timeout: 30000 }
+          );
+        }
+        await new Promise((r) => setTimeout(r, 1000));
         const html = await page.content();
+        if (routePath === '/' && !html.includes('Ask Tara your questions')) {
+          throw new Error('homepage marker missing after render');
+        }
         const out = outputPathForRoute(routePath);
         fs.mkdirSync(path.dirname(out), { recursive: true });
         fs.writeFileSync(out, html, 'utf8');
         console.log('ok');
       } catch (err) {
         console.log(`failed (${err.message})`);
+        if (explicitRoutes.includes(routePath) || process.env.PRERENDER === 'true') {
+          throw err;
+        }
       }
     }
 
