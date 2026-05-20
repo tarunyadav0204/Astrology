@@ -193,7 +193,7 @@ function outputPathForRoute(routePath) {
 }
 
 async function prerenderRoutes() {
-  // Deploy sets CI=true and PRERENDER=false; skip unless explicitly PRERENDER=true.
+  // Skip entirely when PRERENDER=false. When CI=true, prerender runs only if PRERENDER=true (deploy sets both).
   if (process.env.PRERENDER === 'false') {
     console.log('[seo] Prerender skipped (PRERENDER=false)');
     return;
@@ -272,6 +272,33 @@ async function prerenderRoutes() {
 
     await browser.close();
     console.log(`[seo] Prerendered ${uniquePaths.length} routes`);
+
+    const mustVerifyHome =
+      process.env.PRERENDER === 'true' &&
+      uniquePaths.includes('/');
+    if (mustVerifyHome) {
+      const idxPath = path.join(BUILD_DIR, 'index.html');
+      const finalHtml = fs.readFileSync(idxPath, 'utf8');
+      if (
+        !finalHtml.includes('Ask Tara your questions') ||
+        !finalHtml.includes('Frequently asked questions')
+      ) {
+        throw new Error(
+          '[seo] build/index.html is missing prerendered homepage markers. Crawlers would see an empty #root.',
+        );
+      }
+      const start = finalHtml.indexOf('id="root"');
+      if (start === -1) {
+        throw new Error('[seo] build/index.html has no #root after prerender.');
+      }
+      const bodyEnd = finalHtml.indexOf('</body>', start);
+      const rootChunk = finalHtml.slice(start, bodyEnd === -1 ? start + 80000 : bodyEnd);
+      if (rootChunk.length < 2000) {
+        throw new Error(
+          '[seo] build/index.html #root region looks too small after prerender. Check Puppeteer / homepage content.',
+        );
+      }
+    }
   } finally {
     server.kill('SIGTERM');
   }

@@ -328,21 +328,24 @@ else
 fi
 
 echo "🔎 Verifying public SEO routes..."
-seo_check() {
+# Next static export: clean URLs for tool landing pages.
+# Root "/" is CRA index.html (prerendered for crawlers), not home.html — do not expect Next-only copy there.
+verify_route_marker() {
   local route="$1"
   local marker="$2"
+  local desc="$3"
   if curl -fsS "http://127.0.0.1:3001${route}" | grep -q "${marker}"; then
-    echo "✅ ${route} serves Next SEO HTML"
+    echo "✅ ${route} — ${desc}"
   else
-    echo "❌ ${route} did not serve expected Next SEO HTML"
-    echo "   Check that frontend/build has the matching .html file and that node scripts/serve-build.mjs is running on 3001."
+    echo "❌ ${route} — missing expected content (${marker})"
+    echo "   Check frontend/build, scripts/serve-build.mjs on 3001, and prerender markers for /."
     exit 1
   fi
 }
-seo_check "/karma-analysis" "Past Life Karma Analysis"
-seo_check "/kundli-matching" "Kundli Matching"
-seo_check "/chat" "AI Vedic Astrologer Chat"
-seo_check "/" "AstroRoshni — Best Vedic Astrology"
+verify_route_marker "/karma-analysis" "Past Life Karma Analysis" "Next SEO HTML (karma)"
+verify_route_marker "/kundli-matching" "Kundli Matching" "Next SEO HTML (kundli)"
+verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
+verify_route_marker "/" "Ask Tara your questions" "CRA homepage HTML (prerender)"
 deploy_timing "frontend SEO route verification complete"
 
 # --- Phase 5: auto-restart monitor (backend watchdog) ---
