@@ -3,15 +3,27 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 
-const rootElement = document.getElementById('root');
+function hasAuthToken() {
+  try {
+    return typeof localStorage !== 'undefined' && !!localStorage.getItem('token');
+  } catch {
+    return false;
+  }
+}
 
-if (rootElement.hasChildNodes()) {
-  // Hydrate pre-rendered content from react-snap
+const rootElement = document.getElementById('root');
+const prerendered = rootElement?.hasChildNodes();
+const tokenPresent = hasAuthToken();
+
+if (prerendered && !tokenPresent) {
+  // Crawlers / logged-out: static HTML matches first paint when App starts with loading=false (see App.js).
   ReactDOM.hydrateRoot(rootElement, <App />, {
-    onRecoverableError: () => {} // Suppress hydration warnings
+    onRecoverableError: () => {},
   });
+} else if (prerendered && tokenPresent) {
+  // Logged-in HTML cannot match prerender (always logged-out homepage). Hydrating would mis-bind handlers / user.
+  rootElement.textContent = '';
+  ReactDOM.createRoot(rootElement).render(<App />);
 } else {
-  // Normal render for development
-  const root = ReactDOM.createRoot(rootElement);
-  root.render(<App />);
+  ReactDOM.createRoot(rootElement).render(<App />);
 }

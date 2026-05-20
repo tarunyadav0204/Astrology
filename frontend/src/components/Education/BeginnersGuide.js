@@ -1,10 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import './BeginnersGuide.css';
 
-const BeginnersGuide = () => {
+const BeginnersGuide = ({
+  user: propUser = null,
+  onLogout,
+  onAdminClick,
+  onLogin,
+}) => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(propUser);
+
+  useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+    } else {
+      try {
+        const token = localStorage.getItem('token');
+        const saved = localStorage.getItem('user');
+        if (token && saved) {
+          setUser(JSON.parse(saved));
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      }
+    }
+  }, [propUser]);
   const lessons = [
     {
       id: 1,
@@ -81,7 +106,6 @@ const BeginnersGuide = () => {
   ];
 
   const [completedLessons, setCompletedLessons] = React.useState(new Set());
-  const navigate = useNavigate();
 
   const toggleLessonComplete = (lessonId) => {
     const newCompleted = new Set(completedLessons);
@@ -118,11 +142,11 @@ const BeginnersGuide = () => {
         zodiacSigns={[]}
         selectedZodiac={''}
         onZodiacChange={() => {}}
-        user={null}
-        onAdminClick={() => {}}
-        onLogout={() => {}}
-        onLogin={() => {}}
-        showLoginButton={true}
+        user={user}
+        onAdminClick={user ? onAdminClick : () => {}}
+        onLogout={user ? onLogout : () => {}}
+        onLogin={user ? undefined : onLogin || (() => navigate('/'))}
+        showLoginButton={!user}
       />
       <div className="container">
         <header className="page-header">

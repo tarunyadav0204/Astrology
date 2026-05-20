@@ -1,9 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdvancedCourses.css';
 
-const AdvancedCourses = () => {
+const AdvancedCourses = ({
+  user: propUser = null,
+  onLogout,
+  onAdminClick,
+  onLogin,
+}) => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(propUser);
+
+  useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+    } else {
+      try {
+        const token = localStorage.getItem('token');
+        const saved = localStorage.getItem('user');
+        if (token && saved) {
+          setUser(JSON.parse(saved));
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      }
+    }
+  }, [propUser]);
+
   const courses = [
     {
       id: 1,
@@ -73,8 +99,6 @@ const AdvancedCourses = () => {
     }
   ];
 
-  const navigate = useNavigate();
-
   return (
     <div className="advanced-courses-page">
       <NavigationHeader 
@@ -83,11 +107,11 @@ const AdvancedCourses = () => {
         zodiacSigns={[]}
         selectedZodiac={''}
         onZodiacChange={() => {}}
-        user={null}
-        onAdminClick={() => {}}
-        onLogout={() => {}}
-        onLogin={() => {}}
-        showLoginButton={true}
+        user={user}
+        onAdminClick={user ? onAdminClick : () => {}}
+        onLogout={user ? onLogout : () => {}}
+        onLogin={user ? undefined : onLogin || (() => navigate('/'))}
+        showLoginButton={!user}
       />
       <div className="container">
         <header className="page-header">

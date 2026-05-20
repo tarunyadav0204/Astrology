@@ -1,11 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavigationHeader from '../../Shared/NavigationHeader';
 import './LessonPage.css';
 
-const LessonPage = () => {
+const LessonPage = ({
+  user: propUser = null,
+  onLogout,
+  onAdminClick,
+  onLogin,
+}) => {
   const { lessonId } = useParams();
   const navigate = useNavigate();
+  const [user, setUser] = useState(propUser);
+
+  useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+    } else {
+      try {
+        const token = localStorage.getItem('token');
+        const saved = localStorage.getItem('user');
+        if (token && saved) {
+          setUser(JSON.parse(saved));
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      }
+    }
+  }, [propUser]);
 
   const lessons = {
     1: {
@@ -584,11 +608,11 @@ const LessonPage = () => {
         zodiacSigns={[]}
         selectedZodiac={''}
         onZodiacChange={() => {}}
-        user={null}
-        onAdminClick={() => {}}
-        onLogout={() => {}}
-        onLogin={() => {}}
-        showLoginButton={true}
+        user={user}
+        onAdminClick={user ? onAdminClick : () => {}}
+        onLogout={user ? onLogout : () => {}}
+        onLogin={user ? undefined : onLogin || (() => navigate('/'))}
+        showLoginButton={!user}
       />
       <div className="container">
         <div className="back-button-container">

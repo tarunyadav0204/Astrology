@@ -1,10 +1,36 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import './MythsVsReality.css';
 
-const MythsVsReality = () => {
+const MythsVsReality = ({
+  user: propUser = null,
+  onLogout,
+  onAdminClick,
+  onLogin,
+}) => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(propUser);
+
+  useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+    } else {
+      try {
+        const token = localStorage.getItem('token');
+        const saved = localStorage.getItem('user');
+        if (token && saved) {
+          setUser(JSON.parse(saved));
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      }
+    }
+  }, [propUser]);
+
   const articles = [
     {
       id: 1,
@@ -79,8 +105,6 @@ const MythsVsReality = () => {
     ? articles 
     : articles.filter(article => article.category === selectedCategory);
 
-  const navigate = useNavigate();
-
   return (
     <div className="myths-reality-page">
       <SEOHead 
@@ -103,11 +127,11 @@ const MythsVsReality = () => {
         zodiacSigns={[]}
         selectedZodiac={''}
         onZodiacChange={() => {}}
-        user={null}
-        onAdminClick={() => {}}
-        onLogout={() => {}}
-        onLogin={() => {}}
-        showLoginButton={true}
+        user={user}
+        onAdminClick={user ? onAdminClick : () => {}}
+        onLogout={user ? onLogout : () => {}}
+        onLogin={user ? undefined : onLogin || (() => navigate('/'))}
+        showLoginButton={!user}
       />
       <div className="container">
         <header className="page-header">

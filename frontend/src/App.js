@@ -210,7 +210,14 @@ function AuthenticatedRootShell({
 function App() {
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('selector'); // user-home, selector, form, dashboard, predictions
-  const [loading, setLoading] = useState(true);
+  /** When false, first paint matches prerendered / (no token). When true, session restore runs before UI (see index.js). */
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !!localStorage.getItem('token');
+    } catch {
+      return false;
+    }
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
 
@@ -492,12 +499,38 @@ function App() {
               )
               )
             } />
-            <Route path="/beginners-guide" element={<BeginnersGuide />} />
-            <Route path="/advanced-courses" element={<AdvancedCourses />} />
-            <Route path="/myths-vs-reality" element={<MythsVsReality />} />
+            <Route path="/beginners-guide" element={
+              <BeginnersGuide
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+              />
+            } />
+            <Route path="/advanced-courses" element={
+              <AdvancedCourses
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+              />
+            } />
+            <Route path="/myths-vs-reality" element={
+              <MythsVsReality
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+              />
+            } />
             <Route path="/horoscope/:period" element={<HoroscopePage />} />
             <Route path="/horoscope" element={<HoroscopePage />} />
             <Route path="/marriage-analysis" element={
+              user ? (
+                <AnalysisDetailPage
+                  analysisType="marriage"
+                  user={user}
+                  onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
+                />
+              ) : (
               <>
                 <AstroRoshniHomepage 
                   user={null} 
@@ -559,8 +592,17 @@ function App() {
                       )}
                 </AuthModalShell>
               </>
+              )
             } />
             <Route path="/career-guidance" element={
+              user ? (
+                <AnalysisDetailPage
+                  analysisType="career"
+                  user={user}
+                  onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
+                />
+              ) : (
               <>
                 <AstroRoshniHomepage 
                   user={null} 
@@ -622,9 +664,18 @@ function App() {
                       )}
                 </AuthModalShell>
               </>
+              )
             } />
             <Route path="/muhurat-finder" element={<MuhuratFinderPage user={user} onLogout={user ? handleLogout : undefined} onAdminClick={user ? handleAdminClick : undefined} />} />
             <Route path="/health-analysis" element={
+              user ? (
+                <AnalysisDetailPage
+                  analysisType="health"
+                  user={user}
+                  onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
+                />
+              ) : (
               <>
                 <AstroRoshniHomepage 
                   user={null} 
@@ -686,8 +737,17 @@ function App() {
                       )}
                 </AuthModalShell>
               </>
+              )
             } />
             <Route path="/wealth-analysis" element={
+              user ? (
+                <AnalysisDetailPage
+                  analysisType="wealth"
+                  user={user}
+                  onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
+                />
+              ) : (
               <>
                 <AstroRoshniHomepage 
                   user={null} 
@@ -749,15 +809,24 @@ function App() {
                       )}
                 </AuthModalShell>
               </>
+              )
             } />
-            <Route path="/lesson/:lessonId" element={<LessonPage />} />
+            <Route path="/lesson/:lessonId" element={
+              <LessonPage
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+              />
+            } />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
           <Route path="/monthly-panchang" element={
             <MonthlyPanchangPage 
-              user={null}
-              onLogin={() => setShowLoginModal(true)}
-              showLoginButton={true}
+              user={user}
+              onLogout={user ? handleLogout : undefined}
+              onAdminClick={user ? handleAdminClick : undefined}
+              onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              showLoginButton={!user}
             />
           } />
           <Route path="/festivals" element={<FestivalsPage />} />
@@ -907,24 +976,31 @@ function App() {
             path="/astrovastu"
             element={
               <AstroVastuTool
-                user={null}
-                onLogout={() => {}}
-                onAdminClick={() => {}}
+                user={user}
+                onLogout={user ? handleLogout : () => {}}
+                onAdminClick={user ? handleAdminClick : () => {}}
                 onLogin={() => setShowLoginModal(true)}
               />
             }
           />
           <Route
             path="/life-events"
-            element={<EventsTimelinePage onLogin={() => setShowLoginModal(true)} />}
+            element={
+              <EventsTimelinePage
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+                onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              />
+            }
           />
           <Route
             path="/tools/ashtakavarga"
             element={
               <AshtakavargaToolPage
-                user={null}
-                onLogout={() => {}}
-                onAdminClick={() => {}}
+                user={user}
+                onLogout={user ? handleLogout : () => {}}
+                onAdminClick={user ? handleAdminClick : () => {}}
                 onLogin={() => setShowLoginModal(true)}
               />
             }
@@ -944,7 +1020,13 @@ function App() {
             }
           />
           <Route path="/about" element={<AboutUs />} />
-          <Route path="/calendar-2026" element={<Calendar2026 user={null} onLogin={() => setShowLoginModal(true)} />} />
+          <Route path="/calendar-2026" element={
+            <Calendar2026
+              user={user}
+              onLogout={user ? handleLogout : undefined}
+              onLogin={!user ? () => setShowLoginModal(true) : undefined}
+            />
+          } />
             <Route path="/blog" element={<BlogList />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route
