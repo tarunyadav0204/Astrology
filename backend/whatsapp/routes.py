@@ -39,6 +39,35 @@ def _app_secret() -> str:
     return (os.environ.get("WHATSAPP_APP_SECRET") or "").strip()
 
 
+def _load_whatsapp_flow_private_key_pem() -> str:
+    """
+    PEM for RSA key that pairs with the public key uploaded to
+    POST .../PHONE_NUMBER_ID/whatsapp_business_encryption.
+    Prefer WHATSAPP_FLOW_PRIVATE_KEY_FILE on servers to avoid .env mangling.
+    """
+    path = (os.environ.get("WHATSAPP_FLOW_PRIVATE_KEY_FILE") or "").strip()
+    if path:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                raw = f.read().strip()
+        except OSError as e:
+            logger.error("whatsapp-flow: cannot read WHATSAPP_FLOW_PRIVATE_KEY_FILE=%r: %s", path, e)
+            raise HTTPException(
+                status_code=503,
+                detail="WHATSAPP_FLOW_PRIVATE_KEY_FILE not readable",
+            ) from e
+        if not raw:
+            raise HTTPException(status_code=503, detail="WHATSAPP_FLOW_PRIVATE_KEY_FILE is empty")
+        return raw
+    pem = (os.environ.get("WHATSAPP_FLOW_PRIVATE_KEY") or "").strip()
+    if not pem:
+        return ""
+    # Some hosts wrap the whole value in quotes.
+    if (pem.startswith('"') and pem.endswith('"')) or (pem.startswith("'") and pem.endswith("'")):
+        pem = pem[1:-1].strip()
+    return pem
+
+
 def _signature_valid(body: bytes, signature_header: Optional[str]) -> bool:
     secret = _app_secret()
     if not secret:
@@ -125,27 +154,43 @@ async def whatsapp_flow_data_exchange(request: Request) -> PlainTextResponse:
         if key not in outer or not isinstance(outer[key], str):
             raise HTTPException(status_code=400, detail=f"Missing or invalid field: {key}")
 
-    private_pem = (os.environ.get("WHATSAPP_FLOW_PRIVATE_KEY") or "").strip()
+    try:
+        private_pem = _load_whatsapp_flow_private_key_pem()
+    except HTTPException:
+        raise
     if not private_pem:
-        logger.error("whatsapp-flow: WHATSAPP_FLOW_PRIVATE_KEY is not set")
+        logger.error("whatsapp-flow: set WHATSAPP_FLOW_PRIVATE_KEY or WHATSAPP_FLOW_PRIVATE_KEY_FILE")
         raise HTTPException(status_code=503, detail="Flow data endpoint not configured")
 
-    try:
-        from . import flow_crypto
-        from . import flow_data_handler
+    from . import flow_crypto
+    from . import flow_data_handler
 
+    try:
         decrypted, aes_key, iv = flow_crypto.decrypt_flow_request(
             outer["encrypted_flow_data"],
             outer["encrypted_aes_key"],
             outer["initial_vector"],
             private_pem,
         )
-        response_obj = flow_data_handler.build_flow_data_response(decrypted)
-        out_b64 = flow_crypto.encrypt_flow_response(response_obj, aes_key, iv)
     except HTTPException:
         raise
-    except Exception:
-        logger.exception("whatsapp-flow: decrypt or handle failed")
+    except Exception as e:
+        logger.exception(
+            "whatsapp-flow: decrypt failed (wrong PEM, key does not match uploaded public key, or corrupt payload): %s",
+            e,
+        )
+        return PlainTextResponse(content="", status_code=421)
+
+    try:
+        response_obj = flow_data_handler.build_flow_data_response(decrypted)
+        out_b64 = flow_crypto.encrypt_flow_response(response_obj, aes_key, iv)
+    except Exception as e:
+        logger.exception(
+            "whatsapp-flow: handler/encrypt failed action=%r screen=%r err=%s",
+            decrypted.get("action"),
+            decrypted.get("screen"),
+            e,
+        )
         return PlainTextResponse(content="", status_code=421)
 
     return PlainTextResponse(content=out_b64, status_code=200, media_type="text/plain")

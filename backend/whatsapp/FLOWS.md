@@ -69,6 +69,24 @@ Optional overrides (defaults match a typical birth-chart Flow layout):
 
 Until those screens exist in your published Flow, the endpoint still answers Meta **`ping`** (health check) and **`INIT`**.
 
+### Health check returns HTTP 421 (empty body)
+
+That status is returned when **decrypt** or **encrypt** throws (see server logs).
+
+| Cause | What to do |
+|--------|------------|
+| **Private key ≠ public key** uploaded to `.../whatsapp_business_encryption` for this **Phone number ID** | Regenerate a pair, re-`POST` the **public** key, put the matching **private** key on the server. Verify with Graph `GET .../whatsapp_business_encryption` → `business_public_key_signature_status` should be **`VALID`**. |
+| **PEM mangled in `.env`** | Use **`WHATSAPP_FLOW_PRIVATE_KEY_FILE`** pointing to a `chmod 600` PEM file on the host instead of a giant env var. Avoid wrapping the PEM in extra quotes unless your loader strips them (we strip one layer of `"` / `'`). |
+| **Wrong phone number** | The health check uses the number shown in Manager; the public key must be registered for that number’s **`PHONE_NUMBER_ID`**. |
+
+OpenSSL check (modulus of public vs private must match):
+
+```bash
+# Works on common OpenSSL / macOS LibreSSL (avoid `pkey -modulus` — not everywhere).
+openssl rsa -noout -modulus -in flow_endpoint_private.pem | openssl md5
+openssl rsa -pubin -noout -modulus -in flow_endpoint_public.pem | openssl md5
+```
+
 ## References
 
 - [Sending a Flow](https://developers.facebook.com/docs/whatsapp/flows/guides/sendingaflow/) (templates vs interactive CTA).

@@ -20,9 +20,10 @@ logger = logging.getLogger(__name__)
 
 def _normalize_pem(pem: str) -> str:
     pem = (pem or "").strip()
-    if "\\n" in pem and pem.count("\n") < 2:
+    # Env often stores PEM as one line with literal \n sequences.
+    if "\\n" in pem:
         pem = pem.replace("\\n", "\n")
-    return pem
+    return pem.strip()
 
 
 def decrypt_flow_request(

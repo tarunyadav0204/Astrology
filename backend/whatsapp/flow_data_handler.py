@@ -23,7 +23,7 @@ def build_flow_data_response(decrypted: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build plaintext JSON object for encrypt_flow_response.
     """
-    action = str(decrypted.get("action") or "")
+    action = str(decrypted.get("action") or "").strip().lower()
     screen = str(decrypted.get("screen") or "")
     data = decrypted.get("data")
     if not isinstance(data, dict):
