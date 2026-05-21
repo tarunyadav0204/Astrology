@@ -10,6 +10,9 @@ Meta sends:
   POST — message + status events (JSON body; optional X-Hub-Signature-256)
 
 Razorpay credit webhooks are unchanged: POST /api/credits/razorpay/webhook
+
+Flow data channel (encrypted): POST /api/webhooks/whatsapp-flow
+  Configure this URL in WhatsApp Manager → Flow → Endpoint. Requires WHATSAPP_FLOW_PRIVATE_KEY.
 """
 from __future__ import annotations
 
@@ -99,3 +102,50 @@ async def whatsapp_webhook_events(request: Request) -> dict[str, str]:
         logger.info("whatsapp webhook POST object=%r", object_type)
 
     return {"status": "ok"}
+
+
+@router.post("/webhooks/whatsapp-flow")
+async def whatsapp_flow_data_exchange(request: Request) -> PlainTextResponse:
+    """
+    WhatsApp Flows data endpoint (RSA + AES-GCM). Meta POSTs encrypted JSON;
+    response is base64 ciphertext as text/plain.
+    """
+    body = await request.body()
+    sig = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
+    if not _signature_valid(body, sig):
+        logger.warning("whatsapp-flow: invalid or missing X-Hub-Signature-256")
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    try:
+        outer = json.loads(body.decode("utf-8")) if body else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Expected JSON body")
+
+    for key in ("encrypted_flow_data", "encrypted_aes_key", "initial_vector"):
+        if key not in outer or not isinstance(outer[key], str):
+            raise HTTPException(status_code=400, detail=f"Missing or invalid field: {key}")
+
+    private_pem = (os.environ.get("WHATSAPP_FLOW_PRIVATE_KEY") or "").strip()
+    if not private_pem:
+        logger.error("whatsapp-flow: WHATSAPP_FLOW_PRIVATE_KEY is not set")
+        raise HTTPException(status_code=503, detail="Flow data endpoint not configured")
+
+    try:
+        from . import flow_crypto
+        from . import flow_data_handler
+
+        decrypted, aes_key, iv = flow_crypto.decrypt_flow_request(
+            outer["encrypted_flow_data"],
+            outer["encrypted_aes_key"],
+            outer["initial_vector"],
+            private_pem,
+        )
+        response_obj = flow_data_handler.build_flow_data_response(decrypted)
+        out_b64 = flow_crypto.encrypt_flow_response(response_obj, aes_key, iv)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("whatsapp-flow: decrypt or handle failed")
+        return PlainTextResponse(content="", status_code=421)
+
+    return PlainTextResponse(content=out_b64, status_code=200, media_type="text/plain")

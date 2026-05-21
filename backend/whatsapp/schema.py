@@ -37,8 +37,15 @@ def ensure_whatsapp_schema() -> None:
                 pending_charts_json TEXT,
                 active_chart_id INTEGER,
                 last_phone_number_id TEXT,
+                pending_flow_token TEXT,
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )
+            """,
+        )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS pending_flow_token TEXT
             """,
         )
         conn.commit()
