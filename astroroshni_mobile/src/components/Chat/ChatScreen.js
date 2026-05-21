@@ -1481,17 +1481,6 @@ export default function ChatScreen({ navigation, route }) {
       const personId = chatPersonStorageKey(birthData);
       const switchedFromAnotherNative = Boolean(currentPersonId) && currentPersonId !== personId;
 
-      // Check if person changed
-      if (switchedFromAnotherNative) {
-        // Different chart selected — clear thread + server session so the next send starts clean
-        // (avoids answers that still use the previous session's history / facts context).
-        setMessages([]);
-        setSessionId(null);
-        if (!shouldKeepChatOpen && !partnershipPrefillInProgressRef.current && !partnershipMode) {
-          setShowGreeting(true);
-        }
-      }
-
       // Only update if person ID actually changed
       if (currentPersonId !== personId) {
         chatModeHydratedRef.current = false;
@@ -1505,16 +1494,36 @@ export default function ChatScreen({ navigation, route }) {
           loadDashaData(birthData);
         }
 
-        if (shouldStartFreshSession) {
+        // Changing native (or explicit returnToChat fresh): blank thread + welcome only — no local/server restore.
+        const forceBlankWelcomeOnly =
+          !partnershipMode &&
+          !partnershipPrefillInProgressRef.current &&
+          !isMundane &&
+          (switchedFromAnotherNative || shouldStartFreshSession);
+
+        if (forceBlankWelcomeOnly) {
+          (async () => {
+            try {
+              await AsyncStorage.multiRemove([`chatMessages_${personId}`, `chatSessions_${personId}`]);
+            } catch {
+              /* ignore */
+            }
+          })();
+
           const welcomeMessage = buildFreshWelcomeMessage(birthData?.name || null);
           setMessages([]);
           setSessionId(null);
           setLoading(false);
           setIsTyping(false);
+          setPendingMessages(new Set());
           setMessagesWithStorage([welcomeMessage]);
           setShowGreeting(false);
           keepChatOpenAfterNativeSelectRef.current = false;
           startFreshSessionAfterNativeSelectRef.current = false;
+
+          setTimeout(() => {
+            checkPendingResponses(personId);
+          }, 200);
           return;
         }
         

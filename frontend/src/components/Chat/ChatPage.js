@@ -796,51 +796,8 @@ const ChatPage = ({ onLogin }) => {
 
         return () => clearTimeout(timeout);
     }, [mundaneForm.placeQuery, wizardMode, wizardCompleted]);
-    
-    // Initialize message thread after wizard completion.
+
     const threadInitializedRef = useRef(false);
-    useEffect(() => {
-        if (!wizardCompleted) return;
-        if (!birthData && !isMundaneMode) return;
-        if (threadInitializedRef.current) return;
-
-        threadInitializedRef.current = true;
-        if (isMundaneMode) {
-            addGreetingMessage(
-                `🌍 Mundane mode enabled.\n\nYou’ll be able to ask about global trends and event dynamics related to ${mundaneForm.country || 'your selected region'}. Start by asking your main question (e.g. “What are the likely phases for this event category this year?”).`
-            );
-            return;
-        }
-
-        if (wizardMode === 'single') {
-            loadChatHistory();
-            return;
-        }
-
-        if (
-            wizardMode === 'partnership' &&
-            wizardPrimaryChart &&
-            wizardSecondaryChart &&
-            (wizardRelationshipText || '').trim()
-        ) {
-            const rel = wizardRelationshipText.trim();
-            addGreetingMessage(
-                `Everything set! Analysis for **${wizardPrimaryChart.name}** & **${wizardSecondaryChart.name}** (${rel}) is ready.\n\nAsk any question about your compatibility!`
-            );
-            return;
-        }
-
-        addGreetingMessage();
-    }, [
-        wizardCompleted,
-        wizardMode,
-        birthData,
-        isMundaneMode,
-        mundaneForm.country,
-        wizardPrimaryChart,
-        wizardSecondaryChart,
-        wizardRelationshipText,
-    ]);
 
     const loadChatHistory = async () => {
         try {
@@ -903,6 +860,85 @@ const ChatPage = ({ onLogin }) => {
             addGreetingMessage();
         }
     };
+
+    /** Single-chart: when the active native (chart identity) changes, never restore old chat-v2 or legacy history. */
+    const prevSingleChartSessionKeyRef = useRef(null);
+    useEffect(() => {
+        if (!wizardCompleted || wizardMode !== 'single' || isMundaneMode) return;
+        if (!isBirthChartReadyForChat(birthData)) return;
+        if (!singleChartSessionStorageKey) return;
+
+        const key = singleChartSessionStorageKey;
+        const prev = prevSingleChartSessionKeyRef.current;
+
+        if (prev !== null && prev !== key) {
+            try {
+                localStorage.removeItem(prev);
+            } catch {
+                /* ignore */
+            }
+            try {
+                localStorage.removeItem(key);
+            } catch {
+                /* ignore */
+            }
+            setChatV2SessionId(null);
+            addGreetingMessage();
+            threadInitializedRef.current = true;
+        }
+
+        prevSingleChartSessionKeyRef.current = key;
+    }, [
+        singleChartSessionStorageKey,
+        wizardCompleted,
+        wizardMode,
+        isMundaneMode,
+        birthData,
+    ]);
+
+    // After single-chart key effect: avoids loadChatHistory racing past a native switch and refilling the thread.
+    useEffect(() => {
+        if (!wizardCompleted) return;
+        if (!birthData && !isMundaneMode) return;
+        if (threadInitializedRef.current) return;
+
+        threadInitializedRef.current = true;
+        if (isMundaneMode) {
+            addGreetingMessage(
+                `🌍 Mundane mode enabled.\n\nYou’ll be able to ask about global trends and event dynamics related to ${mundaneForm.country || 'your selected region'}. Start by asking your main question (e.g. “What are the likely phases for this event category this year?”).`
+            );
+            return;
+        }
+
+        if (wizardMode === 'single') {
+            loadChatHistory();
+            return;
+        }
+
+        if (
+            wizardMode === 'partnership' &&
+            wizardPrimaryChart &&
+            wizardSecondaryChart &&
+            (wizardRelationshipText || '').trim()
+        ) {
+            const rel = wizardRelationshipText.trim();
+            addGreetingMessage(
+                `Everything set! Analysis for **${wizardPrimaryChart.name}** & **${wizardSecondaryChart.name}** (${rel}) is ready.\n\nAsk any question about your compatibility!`
+            );
+            return;
+        }
+
+        addGreetingMessage();
+    }, [
+        wizardCompleted,
+        wizardMode,
+        birthData,
+        isMundaneMode,
+        mundaneForm.country,
+        wizardPrimaryChart,
+        wizardSecondaryChart,
+        wizardRelationshipText,
+    ]);
 
     const resetThreadForWizard = (nextMode) => {
         setMessages([]);
