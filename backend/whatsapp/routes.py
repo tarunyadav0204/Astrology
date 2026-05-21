@@ -49,14 +49,6 @@ def _signature_valid(body: bytes, signature_header: Optional[str]) -> bool:
     return hmac.compare_digest(received, expected_hex)
 
 
-def _log_payload_preview(payload: dict[str, Any]) -> None:
-    try:
-        preview = json.dumps(payload, default=str)[:2000]
-    except Exception:
-        preview = str(payload)[:2000]
-    logger.info("whatsapp webhook POST preview: %s", preview)
-
-
 @router.get("/webhooks/whatsapp")
 async def whatsapp_webhook_verify(request: Request) -> PlainTextResponse:
     """
@@ -97,8 +89,12 @@ async def whatsapp_webhook_events(request: Request) -> dict[str, str]:
     # Acknowledge quickly; heavy work should go to a background queue later.
     object_type = payload.get("object")
     if object_type == "whatsapp_business_account":
-        _log_payload_preview(payload)
-        # TODO: parse entry[].changes[] → messages / statuses → birth chart / chat / payment deep links
+        try:
+            from .handlers import process_whatsapp_payload
+
+            process_whatsapp_payload(payload)
+        except Exception:
+            logger.exception("whatsapp webhook processing failed")
     else:
         logger.info("whatsapp webhook POST object=%r", object_type)
 
