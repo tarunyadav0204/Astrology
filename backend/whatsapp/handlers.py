@@ -871,7 +871,10 @@ def _handle_chart_pick(
     if not raw.isdigit():
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body="Tap *Choose chart* on the last message, or reply with a list number / NEW.",
+            body=(
+                "Reply with a chart number (1–9), or NEW to add one. "
+                "If you see a *Choose chart* button above, you can use that list too."
+            ),
             phone_number_id=phone_number_id,
         )
         return
@@ -1067,7 +1070,10 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                 st = sess.get("state") or "idle"
 
                 if st == "await_chart_pick":
-                    _handle_chart_pick(conn, wa_id, body, phone_number_id, sess)
+                    if is_greeting(body):
+                        _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+                    else:
+                        _handle_chart_pick(conn, wa_id, body, phone_number_id, sess)
                     continue
 
                 if st == "await_flow_birth":
