@@ -1193,7 +1193,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             if "festival" in q_lower and "remedies" in q_lower:
                 is_notification_question = True
         
-        max_clarifications = INSTANT_MAX_CLARIFICATIONS if instant_chat_active else STANDARD_MAX_CLARIFICATIONS
+        is_whatsapp_plain_text = delivery_channel == "whatsapp" or render_target == "plain_text"
+        max_clarifications = 0 if is_whatsapp_plain_text else (
+            INSTANT_MAX_CLARIFICATIONS if instant_chat_active else STANDARD_MAX_CLARIFICATIONS
+        )
 
         # If user is replying to a prior clarification, merge with original question so topic survives
         # (e.g., "car battery failure" + "last week of April").
@@ -1213,6 +1216,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             partnership_mode
             or clarification_count >= max_clarifications
             or is_notification_question
+            or is_whatsapp_plain_text
         )
         
         intent_router = IntentRouter()
@@ -2128,7 +2132,27 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 clarification_count = state_row[0] if state_row else 0
             
             intent_router = IntentRouter()
-            force_ready = question.startswith('@All_Events')
+            cached_delivery_channel = (
+                str(cached_intent.get("delivery_channel") or "").strip().lower()
+                if isinstance(cached_intent, dict)
+                else ""
+            )
+            cached_render_target = (
+                str(cached_intent.get("render_target") or "").strip().lower()
+                if isinstance(cached_intent, dict)
+                else ""
+            )
+            cached_plain_text_output = (
+                bool(cached_intent.get("plain_text_output"))
+                if isinstance(cached_intent, dict)
+                else False
+            )
+            is_whatsapp_plain_text = (
+                cached_delivery_channel == "whatsapp"
+                or cached_render_target == "plain_text"
+                or cached_plain_text_output
+            )
+            force_ready = question.startswith('@All_Events') or is_whatsapp_plain_text
             
             print(f"\n{'='*80}")
             print(f"🔗 CLARIFICATION CONTEXT CHECK")
@@ -2165,7 +2189,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
                 else None
             )
-            max_clarifications = INSTANT_MAX_CLARIFICATIONS if is_instant_chat else STANDARD_MAX_CLARIFICATIONS
+            max_clarifications = 0 if is_whatsapp_plain_text else (
+                INSTANT_MAX_CLARIFICATIONS if is_instant_chat else STANDARD_MAX_CLARIFICATIONS
+            )
             if is_instant_chat:
                 intent = await intent_router.classify_instant_intent(
                     combined_question,

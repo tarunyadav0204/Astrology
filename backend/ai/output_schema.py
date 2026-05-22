@@ -55,6 +55,7 @@ def build_delivery_format_instruction(intent_block: dict | None) -> str:
     return """
 DELIVERY FORMAT — WHATSAPP PLAIN TEXT:
 - The final answer will be sent as a WhatsApp text message, not rendered by the app UI.
+- Do NOT ask option-based clarification questions like "Type A/B/C" for broad but understandable questions. Answer the broad topic directly. Ask a clarification only if answering would be impossible without it.
 - Do NOT output HTML tags of any kind: no `<span>`, no `<div>`, no `<br>`, no classes, and no follow-up question HTML block.
 - Do NOT use markdown tables or UI-only cards. Use short paragraphs and simple "- " bullets.
 - If emphasis is needed, use WhatsApp-friendly `*bold*` sparingly. Keep the answer readable as plain text.

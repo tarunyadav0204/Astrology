@@ -48,7 +48,8 @@ def _load_whatsapp_flow_private_key_pem() -> str:
     path = (os.environ.get("WHATSAPP_FLOW_PRIVATE_KEY_FILE") or "").strip()
     if path:
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            # utf-8-sig strips BOM so cryptography can parse the PEM.
+            with open(path, "r", encoding="utf-8-sig") as f:
                 raw = f.read().strip()
         except OSError as e:
             logger.error("whatsapp-flow: cannot read WHATSAPP_FLOW_PRIVATE_KEY_FILE=%r: %s", path, e)

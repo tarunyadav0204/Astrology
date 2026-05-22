@@ -69,9 +69,13 @@ Optional overrides (defaults match a typical birth-chart Flow layout):
 2. Screen **`place_pick`**: **`RadioButtonsGroup`** (options show on the same screen; a **`Dropdown`** needs an extra tap to open the list) with **`data-source`: `${data.place_options}`** (array of `{ "id", "title" }` from the server). Each **`title`** must be **≤ 30 characters** (Meta rule); the server truncates Google descriptions automatically. **`name` = `selected_place`**. Footer **`data_exchange`** to resolve coordinates.  
 3. Server returns **`data`** with `selected_latitude`, `selected_longitude`, `selected_formatted_address`, `selected_place_id` on the next screen — bind these in your Flow JSON as needed.
 
-Until those screens exist in your published Flow, the endpoint still answers Meta **`ping`** (health check) and **`INIT`**.
+Until those screens exist in your published Flow, the endpoint still answers Meta **`ping`** (health check) and **`init`** (first screen; Meta may send `init` or `INIT` — the server normalizes to lowercase).
 
 **Birth chart Flow JSON in repo:** edit `whatsapp/flows/birth_chart_flow.json`, then paste into WhatsApp Manager (the app does not load this file at runtime). Birth time is collected as **`birth_hour`** + **`birth_minute`** (dropdowns `00`–`23` and `00`–`59`); your webhook should join them as `HH:MM` for storage.
+
+### Meta error `139000` — “Blocked by Integrity”
+
+If Graph returns **`(#139000) Blocked by Integrity`** / **`Integrity requirements not met`** when **sending** a Flow, that is a **Meta / WABA restriction**, not an application bug. See Meta’s [Flow error codes](https://developers.facebook.com/docs/whatsapp/flows/reference/error-codes/). Check Business Suite for account or quality issues, ensure Flow JSON includes required **`version`** / **`data_api_version`**, and use [Meta business direct support](https://business.facebook.com/direct-support) if the block persists.
 
 ### Health check returns HTTP 421 (empty body)
 

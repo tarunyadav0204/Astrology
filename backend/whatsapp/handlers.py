@@ -164,6 +164,14 @@ WHATSAPP_CHAT_WAIT_ACK = (
     "If the answer is long, we will send it in a few back-to-back messages on this chat."
 )
 
+WHATSAPP_SERVICES_TEXT = (
+    "AstroRoshni can help with Vedic astrology readings on WhatsApp after you choose a saved birth chart.\n\n"
+    "- Ask a Standard astrology question\n"
+    "- Choose or add a birth chart\n"
+    "- Use the app for richer reports like Kundli matching, Karma Analysis, charts, and premium analysis\n\n"
+    "Tap *Menu* below to choose what you want to do."
+)
+
 
 def _whatsapp_menu_command(body: str) -> Optional[str]:
     low = (body or "").strip().lower()
@@ -172,7 +180,7 @@ def _whatsapp_menu_command(body: str) -> Optional[str]:
     return None
 
 
-def _should_route_idle_text_to_chart_chat(body: str, sess: Dict[str, Any]) -> bool:
+def _should_route_text_to_chart_chat(body: str, sess: Dict[str, Any]) -> bool:
     if not sess.get("userid") or not sess.get("active_chart_id"):
         return False
     if not (body or "").strip():
@@ -184,7 +192,7 @@ def _should_route_idle_text_to_chart_chat(body: str, sess: Dict[str, Any]) -> bo
     raw = (body or "").strip()
     if raw.startswith("cr_"):
         return False
-    if len(raw) < 2:
+    if len(raw) < 2 and raw.lower() not in {"a", "b", "c", "d", "e"}:
         return False
     return True
 
@@ -782,7 +790,7 @@ def _handle_flow_completion(
         conn,
         wa_id,
         sess,
-        state="idle",
+        state="await_question",
         pending_flow_token=None,
         pending_charts_json=None,
         active_chart_id=chart_id,
@@ -792,12 +800,11 @@ def _handle_flow_completion(
     send_whatsapp_text(
         to_wa_id=wa_id,
         body=(
-            f"Saved birth chart *{birth_data.name}*. It is active now — ask your astrology question in one message, "
-            "or use the list to switch charts. A Standard reading can take 1–1.5 minutes."
+            f"Saved birth chart *{birth_data.name}*. It is active now. "
+            "Send your astrology question in one message. A Standard reading can take 1–1.5 minutes."
         ),
         phone_number_id=phone_number_id,
     )
-    _push_chart_menu(conn, wa_id, int(uid), phone_number_id)
 
 
 def _handle_chart_pick(
@@ -813,6 +820,12 @@ def _handle_chart_pick(
 
     def _new_chart_message() -> None:
         _launch_birth_chart_flow_or_url(conn, wa_id, phone_number_id, sess)
+
+    def _chart_selected_message(label: Any) -> str:
+        return (
+            f"Using chart: {label}. Now send your astrology question in one message. "
+            "A Standard reading can take 1–1.5 minutes and may arrive in several parts."
+        )
 
     if low in ("new", "n", "create") or raw == "cr_new" or low == "cr_new":
         _new_chart_message()
@@ -852,7 +865,7 @@ def _handle_chart_pick(
             conn,
             wa_id,
             sess,
-            state="idle",
+            state="await_question",
             pending_charts_json=None,
             active_chart_id=cid,
             whatsapp_chat_session_id=None,
@@ -860,10 +873,7 @@ def _handle_chart_pick(
         )
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body=(
-                f"Using chart: {label}. Ask your astrology question in one message. "
-                "A Standard reading can take 1–1.5 minutes and may arrive in several parts."
-            ),
+            body=_chart_selected_message(label),
             phone_number_id=phone_number_id,
         )
         return
@@ -896,7 +906,7 @@ def _handle_chart_pick(
         conn,
         wa_id,
         sess,
-        state="idle",
+        state="await_question",
         pending_charts_json=None,
         active_chart_id=cid,
         whatsapp_chat_session_id=None,
@@ -904,10 +914,7 @@ def _handle_chart_pick(
     )
     send_whatsapp_text(
         to_wa_id=wa_id,
-        body=(
-            f"Using chart: {chosen.get('label', cid)}. Ask your astrology question in one message. "
-            "A Standard reading can take 1–1.5 minutes and may arrive in several parts."
-        ),
+        body=_chart_selected_message(chosen.get('label', cid)),
         phone_number_id=phone_number_id,
     )
 
@@ -975,6 +982,103 @@ def _push_chart_menu(conn, wa_id: str, userid: int, phone_number_id: str) -> Non
         send_whatsapp_text(to_wa_id=wa_id, body=body_txt, phone_number_id=phone_number_id)
 
 
+def _push_main_menu(
+    conn,
+    wa_id: str,
+    phone_number_id: str,
+    sess: Optional[Dict[str, Any]] = None,
+    *,
+    body: Optional[str] = None,
+) -> None:
+    sess = sess or _get_session(conn, wa_id)
+    rows: List[Tuple[str, str, str]] = [
+        ("wa_ask", "Ask question", "Use selected birth chart"),
+        ("wa_charts", "Choose chart", "Pick an existing chart"),
+        ("wa_add_chart", "Add new chart", "Open birth details form"),
+        ("wa_services", "What Tara can do", "Services and reports"),
+    ]
+    ok = send_whatsapp_interactive_list(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body=body or "Choose what you want to do on AstroRoshni.",
+        button_text="Menu",
+        section_title="AstroRoshni",
+        rows=rows,
+        header_text="AstroRoshni",
+        footer_text="astroroshni.com",
+    )
+    if not ok:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body=(
+                "Choose an option:\n"
+                "1. Ask question\n"
+                "2. Choose chart\n"
+                "3. Add new chart\n"
+                "4. What Tara can do\n\n"
+                "Reply with Menu to show these options again."
+            ),
+            phone_number_id=phone_number_id,
+        )
+
+
+def _handle_main_menu_choice(
+    conn,
+    wa_id: str,
+    choice: str,
+    phone_number_id: str,
+    profile_name: str,
+    sess: Dict[str, Any],
+) -> bool:
+    raw = (choice or "").strip()
+    if (sess.get("state") or "idle") == "await_chart_pick" and raw.isdigit():
+        return False
+    raw = {"1": "wa_ask", "2": "wa_charts", "3": "wa_add_chart", "4": "wa_services"}.get(raw, raw)
+    if raw not in {"wa_ask", "wa_charts", "wa_add_chart", "wa_services"}:
+        return False
+
+    uid = sess.get("userid")
+    if raw == "wa_services":
+        send_whatsapp_text(to_wa_id=wa_id, body=WHATSAPP_SERVICES_TEXT, phone_number_id=phone_number_id)
+        sess2 = _get_session(conn, wa_id)
+        _push_main_menu(conn, wa_id, phone_number_id, sess2)
+        return True
+
+    if not uid:
+        _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+        return True
+
+    if raw == "wa_add_chart":
+        _launch_birth_chart_flow_or_url(conn, wa_id, phone_number_id, sess)
+        return True
+
+    if raw == "wa_charts":
+        _push_chart_menu(conn, wa_id, int(uid), phone_number_id)
+        return True
+
+    if raw == "wa_ask":
+        if sess.get("active_chart_id"):
+            _session_write(conn, wa_id, sess, state="await_question")
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body=(
+                    "Send your astrology question in one message for the selected chart. "
+                    "A Standard reading can take 1–1.5 minutes."
+                ),
+                phone_number_id=phone_number_id,
+            )
+        else:
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="Choose a birth chart first, then send your astrology question.",
+                phone_number_id=phone_number_id,
+            )
+            _push_chart_menu(conn, wa_id, int(uid), phone_number_id)
+        return True
+
+    return False
+
+
 def _handle_idle_greeting(
     conn,
     wa_id: str,
@@ -989,7 +1093,7 @@ def _handle_idle_greeting(
         uid = row_wa[0]
         _session_write(conn, wa_id, sess, state="idle", userid=uid)
         send_whatsapp_text(to_wa_id=wa_id, body=GREETING_LINES, phone_number_id=phone_number_id)
-        _push_chart_menu(conn, wa_id, uid, phone_number_id)
+        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
         return
 
     row_phone = _find_user_by_phone(conn, lookup_phone)
@@ -1003,7 +1107,7 @@ def _handle_idle_greeting(
         )
         sess = _get_session(conn, wa_id)
         _session_write(conn, wa_id, sess, state="idle", userid=uid)
-        _push_chart_menu(conn, wa_id, uid, phone_number_id)
+        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
         return
 
     canonical = canonical_phone_for_registration(wa_id)
@@ -1069,6 +1173,9 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
 
                 st = sess.get("state") or "idle"
 
+                if _handle_main_menu_choice(conn, wa_id, body, phone_number_id, profile_name, sess):
+                    continue
+
                 if st == "await_chart_pick":
                     if is_greeting(body):
                         _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
@@ -1083,6 +1190,32 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                         send_whatsapp_text(
                             to_wa_id=wa_id,
                             body="Please finish the form (tap the button on our last message). Or say hi to start over.",
+                            phone_number_id=phone_number_id,
+                        )
+                    continue
+
+                if st == "await_question":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle")
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    if _should_route_text_to_chart_chat(body, sess):
+                        _session_write(conn, wa_id, sess, state="idle")
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body=WHATSAPP_CHAT_WAIT_ACK,
+                            phone_number_id=phone_number_id,
+                        )
+                        schedule_whatsapp_chart_chat(
+                            wa_id=wa_id,
+                            phone_number_id=phone_number_id,
+                            userid=int(sess["userid"]),
+                            question=body.strip(),
+                        )
+                    else:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please send your astrology question in one message, or type Menu.",
                             phone_number_id=phone_number_id,
                         )
                     continue
@@ -1188,26 +1321,8 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     cmd = _whatsapp_menu_command(body)
                     uid_menu = sess.get("userid")
                     if cmd and uid_menu:
-                        _push_chart_menu(conn, wa_id, int(uid_menu), phone_number_id)
+                        _push_main_menu(conn, wa_id, phone_number_id, sess)
                         continue
-
-                if (
-                    st == "idle"
-                    and input_kind == "text"
-                    and _should_route_idle_text_to_chart_chat(body, sess)
-                ):
-                    send_whatsapp_text(
-                        to_wa_id=wa_id,
-                        body=WHATSAPP_CHAT_WAIT_ACK,
-                        phone_number_id=phone_number_id,
-                    )
-                    schedule_whatsapp_chart_chat(
-                        wa_id=wa_id,
-                        phone_number_id=phone_number_id,
-                        userid=int(sess["userid"]),
-                        question=body.strip(),
-                    )
-                    continue
 
                 soft_intro_done = bool(sess.get("idle_soft_intro_done"))
                 if (
@@ -1221,18 +1336,20 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                         body=SOFT_FIRST_CONTACT_NUDGE,
                         phone_number_id=phone_number_id,
                     )
-                    _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
                     sess_after = _get_session(conn, wa_id)
                     _session_write(conn, wa_id, sess_after, idle_soft_intro_done=True)
+                    _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
                     continue
 
                 if is_greeting(body):
                     _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
                 else:
-                    send_whatsapp_text(
-                        to_wa_id=wa_id,
-                        body="Say hi to connect your AstroRoshni account or see your charts.",
-                        phone_number_id=phone_number_id,
+                    _push_main_menu(
+                        conn,
+                        wa_id,
+                        phone_number_id,
+                        sess,
+                        body="Please choose what you want to do. Free text is accepted after you choose *Ask question*.",
                     )
         except Exception:
             logger.exception("WhatsApp handler failed for wa_id=%s", wa_id)

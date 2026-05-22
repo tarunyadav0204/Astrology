@@ -69,10 +69,11 @@ def build_flow_data_response(decrypted: Dict[str, Any]) -> Dict[str, Any]:
     query_field = _env("WHATSAPP_FLOW_DATA_FIELD_PLACE_QUERY", "place_query")
     pick_field = _env("WHATSAPP_FLOW_DATA_FIELD_SELECTED_PLACE", "selected_place")
 
-    if action == "INIT":
+    # Meta sends action lowercased in practice; we normalize with .lower() above.
+    if action == "init":
         return {"screen": init_screen, "data": {}}
 
-    if action == "BACK":
+    if action == "back":
         # Minimal: echo empty data; override with refresh_on_back logic if needed.
         return {"screen": screen or init_screen, "data": {}}
 

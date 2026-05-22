@@ -293,6 +293,7 @@ def _run_whatsapp_chart_chat(
 
         content: Optional[str] = None
         err: Optional[str] = None
+        message_type: str = "answer"
         try:
             r = requests.post(ask_url, headers=headers, json=payload, timeout=120)
             if r.status_code == 402:
@@ -357,6 +358,7 @@ def _run_whatsapp_chart_chat(
                     continue
                 sj = sr.json()
                 st = (sj.get("status") or "").strip().lower()
+                message_type = (sj.get("message_type") or message_type or "answer").strip().lower()
                 if st == "completed":
                     content = sj.get("content") or ""
                     break
@@ -396,6 +398,8 @@ def _run_whatsapp_chart_chat(
                     logger.warning("whatsapp chat chunk send failed mid-stream wa_id=%s", wa_id)
                     break
                 time.sleep(0.35)
+            if message_type == "clarification":
+                return
             if sent_any and balance_before is not None:
                 try:
                     balance_after = credit_service.get_user_credits(userid)
