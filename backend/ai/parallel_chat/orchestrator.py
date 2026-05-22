@@ -217,15 +217,16 @@ def _merge_instruction_blocks(
     user_context: Optional[Dict],
     premium_analysis: bool,
     mode: str,
-) -> Tuple[str, str, str, str, str, str]:
+) -> Tuple[str, str, str, str, str, str, str]:
     """Mirror `build_final_prompt` tail: language, elaborate, schema, user context, final checks."""
     intent_mode = _intent_mode(context, mode)
     chart_focus = context.get("intent", {}).get("chart_focus")
     _lang = str(language or "english").strip() or "english"
 
-    from ai.output_schema import build_output_language_blocks
+    from ai.output_schema import build_delivery_format_instruction, build_output_language_blocks
 
     _, language_instruction, final_check = build_output_language_blocks(_lang, user_question)
+    delivery_format_instruction = build_delivery_format_instruction(context.get("intent", {}))
 
     elaborate_instruction = """
 CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):
@@ -262,6 +263,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
 
     return (
         language_instruction,
+        delivery_format_instruction,
         elaborate_instruction,
         response_format_instruction,
         user_context_instruction,
@@ -928,6 +930,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
 """
     (
         language_instruction,
+        delivery_format_instruction,
         elaborate_instruction,
         response_format_instruction,
         user_context_instruction,
@@ -994,6 +997,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             MERGE_ROLE_PREAMBLE,
             merge_system_instruction,
             language_instruction,
+            delivery_format_instruction,
             elaborate_instruction,
             response_format_instruction,
             user_context_instruction,

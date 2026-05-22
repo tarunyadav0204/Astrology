@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+from html import unescape
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -27,6 +29,36 @@ def truncate_whatsapp(s: str, max_len: int) -> str:
     if max_len <= 1:
         return s[:max_len]
     return s[: max_len - 1] + "…"
+
+
+def format_for_whatsapp_text(text: str) -> str:
+    """Convert app/web rich chat output into WhatsApp-safe plain text."""
+    body = unescape(str(text or ""))
+    if not body.strip():
+        return ""
+
+    # Preserve meaningful layout before dropping tags.
+    body = re.sub(r"(?i)<\s*br\s*/?\s*>", "\n", body)
+    body = re.sub(r"(?i)</\s*(p|div|li|h[1-6])\s*>", "\n", body)
+    body = re.sub(r"(?i)<\s*li(?:\s+[^>]*)?>", "- ", body)
+    body = re.sub(r"(?is)<\s*script[^>]*>.*?<\s*/\s*script\s*>", "", body)
+    body = re.sub(r"(?is)<\s*style[^>]*>.*?<\s*/\s*style\s*>", "", body)
+    body = re.sub(r"<[^>]+>", "", body)
+    body = unescape(body)
+
+    # WhatsApp supports *bold*; convert common app markdown without exposing HTML.
+    body = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", body)
+    body = re.sub(r"\*\*([^*\n]+)\*\*", r"*\1*", body)
+    body = re.sub(r"__([^_\n]+)__", r"*\1*", body)
+    body = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r"\1 (\2)", body)
+
+    # Collapse noisy whitespace while keeping paragraph breaks and bullets readable.
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
+    body = re.sub(r"[ \t]+\n", "\n", body)
+    body = re.sub(r"\n[ \t]+", "\n", body)
+    body = re.sub(r"\n{3,}", "\n\n", body)
+    body = re.sub(r"[ \t]{2,}", " ", body)
+    return body.strip()
 
 
 def send_whatsapp_text(*, to_wa_id: str, body: str, phone_number_id: str) -> bool:

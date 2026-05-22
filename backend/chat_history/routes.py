@@ -830,6 +830,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     birth_details = request.get("birth_details")
     client_request_id = request.get("client_request_id")
     mode = request.get("mode")  # e.g. "lab" for Chart Lab (educational) mode
+    delivery_channel = str(request.get("delivery_channel") or request.get("deliveryChannel") or "").strip().lower()
+    render_target = str(request.get("render_target") or request.get("renderTarget") or "").strip().lower()
     
     if not session_id or not question or not birth_details:
         raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
@@ -1243,6 +1245,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         # prompt builder can switch to teaching-focused instructions.
         if mode == 'lab':
             intent['lab_mode'] = True
+        if delivery_channel:
+            intent['delivery_channel'] = delivery_channel
+        if render_target:
+            intent['render_target'] = render_target
+        if delivery_channel == "whatsapp" or render_target == "plain_text":
+            intent['plain_text_output'] = True
         
         # Handle clarification immediately - do NOT start background task
         if intent.get('status') == 'CLARIFY' and clarification_count < max_clarifications:
@@ -2190,6 +2198,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent['status'] = 'READY'
                 intent['mode'] = 'LIFESPAN_EVENT_TIMING'
                 intent['needs_transits'] = True
+
+            if isinstance(cached_intent, dict):
+                for channel_key in ("delivery_channel", "render_target", "plain_text_output"):
+                    if cached_intent.get(channel_key) is not None:
+                        intent[channel_key] = cached_intent.get(channel_key)
 
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
             if intent.get('mode') == 'LIFESPAN_EVENT_TIMING' and intent.get('status') == 'READY':

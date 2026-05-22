@@ -19,7 +19,7 @@ from auth import create_access_token_for_phone
 from credits.credit_service import CreditService
 from db import execute, get_conn
 
-from .messaging import send_whatsapp_text
+from .messaging import format_for_whatsapp_text, send_whatsapp_text
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +281,13 @@ def _run_whatsapp_chart_chat(
             "chat_tier": "standard",
             "partnership_mode": False,
             "native_name": bd.get("name"),
-            "query_context": {},
+            "delivery_channel": "whatsapp",
+            "render_target": "plain_text",
+            "query_context": {
+                "source": "whatsapp",
+                "delivery_channel": "whatsapp",
+                "render_target": "plain_text",
+            },
             "client_request_id": client_request_id,
         }
 
@@ -379,7 +385,10 @@ def _run_whatsapp_chart_chat(
 
         if content and str(content).strip():
             sent_any = False
-            for part in chunk_text_for_whatsapp(str(content)):
+            whatsapp_content = format_for_whatsapp_text(str(content))
+            if not whatsapp_content:
+                whatsapp_content = "Your reading is ready, but it could not be formatted for WhatsApp. Please open the AstroRoshni app to view the full answer."
+            for part in chunk_text_for_whatsapp(whatsapp_content):
                 ok = send_whatsapp_text(to_wa_id=wa_id, body=part, phone_number_id=phone_number_id)
                 if ok:
                     sent_any = True

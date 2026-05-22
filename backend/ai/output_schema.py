@@ -44,6 +44,24 @@ CRITICAL:
     return policy, language_instruction, final_check
 
 
+def build_delivery_format_instruction(intent_block: dict | None) -> str:
+    if not isinstance(intent_block, dict):
+        return ""
+    delivery_channel = str(intent_block.get("delivery_channel") or "").strip().lower()
+    render_target = str(intent_block.get("render_target") or "").strip().lower()
+    plain_text_output = bool(intent_block.get("plain_text_output"))
+    if delivery_channel != "whatsapp" and render_target != "plain_text" and not plain_text_output:
+        return ""
+    return """
+DELIVERY FORMAT — WHATSAPP PLAIN TEXT:
+- The final answer will be sent as a WhatsApp text message, not rendered by the app UI.
+- Do NOT output HTML tags of any kind: no `<span>`, no `<div>`, no `<br>`, no classes, and no follow-up question HTML block.
+- Do NOT use markdown tables or UI-only cards. Use short paragraphs and simple "- " bullets.
+- If emphasis is needed, use WhatsApp-friendly `*bold*` sparingly. Keep the answer readable as plain text.
+- Any follow-up suggestions, if present, must be plain text bullets only.
+"""
+
+
 def build_multi_question_focus_instruction(language: str = "english") -> str:
     """
     Tells the answer model: if CURRENT QUESTION still bundles several distinct asks,
@@ -576,6 +594,7 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
 
     _lang = str(language or "english").strip() or "english"
     _, language_instruction, final_check = build_output_language_blocks(_lang, user_question)
+    delivery_format_instruction = build_delivery_format_instruction(intent_block)
     
     if str(intent_mode or "").upper() == "PREDICT_DAILY":
         elaborate_instruction = """
@@ -668,6 +687,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     prompt_parts.append(system_instruction)
     prompt_parts.append(
         f"{language_instruction}"
+        f"{delivery_format_instruction}"
         f"{elaborate_instruction}"
         f"{response_format_instruction}"
         f"{user_context_instruction}"
