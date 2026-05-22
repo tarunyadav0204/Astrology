@@ -40,7 +40,7 @@ def _api_base() -> str:
 
     Prefer WHATSAPP_INTERNAL_API_URL (or ASTRO_INTERNAL_API_URL / PUBLIC_API_BASE_URL).
     If unset, default to loopback using PORT or UVICORN_PORT when present (e.g. Cloud Run,
-    gunicorn --bind 0.0.0.0:$PORT); else 8000.
+    gunicorn --bind 0.0.0.0:$PORT); else **8001** — same as `main.py` (`os.getenv("PORT", 8001)`).
     """
     explicit = (
         os.environ.get("WHATSAPP_INTERNAL_API_URL")
@@ -49,9 +49,9 @@ def _api_base() -> str:
     )
     if explicit:
         return explicit.strip().rstrip("/")
-    port_raw = (os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8000").strip()
+    port_raw = (os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8001").strip()
     if not port_raw.isdigit():
-        port_raw = "8000"
+        port_raw = "8001"
     return f"http://127.0.0.1:{port_raw}".rstrip("/")
 
 
