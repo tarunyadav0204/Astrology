@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from auth import create_access_token_for_phone
+from credits.credit_service import CreditService
 from db import execute, get_conn
 
 from .messaging import send_whatsapp_text
@@ -248,6 +249,13 @@ def _run_whatsapp_chart_chat(
 
         assert token and session_id and chart_id
 
+        credit_service = CreditService()
+        balance_before: Optional[int] = None
+        try:
+            balance_before = credit_service.get_user_credits(userid)
+        except Exception:
+            logger.exception("whatsapp chat: could not read balance_before user=%s", userid)
+
         client_request_id = str(uuid.uuid4())
         ask_url = f"{base}/api/chat-v2/ask"
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -341,12 +349,42 @@ def _run_whatsapp_chart_chat(
             time.sleep(4.0)
 
         if content and str(content).strip():
+            sent_any = False
             for part in chunk_text_for_whatsapp(str(content)):
                 ok = send_whatsapp_text(to_wa_id=wa_id, body=part, phone_number_id=phone_number_id)
+                if ok:
+                    sent_any = True
                 if not ok:
                     logger.warning("whatsapp chat chunk send failed mid-stream wa_id=%s", wa_id)
                     break
                 time.sleep(0.35)
+            if sent_any and balance_before is not None:
+                try:
+                    balance_after = credit_service.get_user_credits(userid)
+                    charged = balance_before - balance_after
+                    if charged > 0:
+                        credit_line = (
+                            f"Credits charged: {charged}. Your balance now: {balance_after} credits."
+                        )
+                    elif charged == 0:
+                        credit_line = (
+                            "No credits charged for this Standard reading "
+                            "(for example a free first question on this chart). "
+                            f"Credits balance: {balance_after}."
+                        )
+                    else:
+                        credit_line = (
+                            f"Credits balance: {balance_after}. "
+                            "Your balance changed during this reading — open the AstroRoshni app for a full statement."
+                        )
+                    time.sleep(0.45)
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body=credit_line[:4090],
+                        phone_number_id=phone_number_id,
+                    )
+                except Exception:
+                    logger.exception("whatsapp chat: credit summary failed user=%s", userid)
             return
 
         send_whatsapp_text(

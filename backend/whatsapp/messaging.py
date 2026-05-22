@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 def _graph_messages_url() -> Tuple[str, str]:
-    token = (os.environ.get("WHATSAPP_ACCESS_TOKEN") or "").strip()
+    raw = (os.environ.get("WHATSAPP_ACCESS_TOKEN") or "").strip()
+    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        raw = raw[1:-1].strip()
+    token = raw
     ver = (os.environ.get("WHATSAPP_GRAPH_API_VERSION") or "v22.0").strip().lstrip("/")
     return token, ver
 
