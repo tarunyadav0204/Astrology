@@ -35,12 +35,24 @@ def _wa_lock(wa_id: str) -> threading.Lock:
 
 
 def _api_base() -> str:
-    return (
+    """
+    Base URL for same-machine HTTP calls to /api/chat-v2/* from the WhatsApp worker thread.
+
+    Prefer WHATSAPP_INTERNAL_API_URL (or ASTRO_INTERNAL_API_URL / PUBLIC_API_BASE_URL).
+    If unset, default to loopback using PORT or UVICORN_PORT when present (e.g. Cloud Run,
+    gunicorn --bind 0.0.0.0:$PORT); else 8000.
+    """
+    explicit = (
         os.environ.get("WHATSAPP_INTERNAL_API_URL")
         or os.environ.get("ASTRO_INTERNAL_API_URL")
         or os.environ.get("PUBLIC_API_BASE_URL")
-        or "http://127.0.0.1:8000"
-    ).rstrip("/")
+    )
+    if explicit:
+        return explicit.strip().rstrip("/")
+    port_raw = (os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8000").strip()
+    if not port_raw.isdigit():
+        port_raw = "8000"
+    return f"http://127.0.0.1:{port_raw}".rstrip("/")
 
 
 def _encryptor():
@@ -273,80 +285,97 @@ def _run_whatsapp_chart_chat(
             "client_request_id": client_request_id,
         }
 
-        r = requests.post(ask_url, headers=headers, json=payload, timeout=120)
-        if r.status_code == 402:
-            send_whatsapp_text(
-                to_wa_id=wa_id,
-                body="You do not have enough credits for a standard reading on this chart. Open the AstroRoshni app to top up, then try again here.",
-                phone_number_id=phone_number_id,
-            )
-            return
-        if r.status_code == 409 and "CHART_SESSION_MISMATCH" in (r.text or ""):
-            with get_conn() as conn:
-                sid_new = str(uuid.uuid4())
-                execute(
-                    conn,
-                    "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (%s, %s, %s)",
-                    (sid_new, userid, chart_id),
-                )
-                execute(
-                    conn,
-                    """
-                    UPDATE whatsapp_sessions
-                    SET whatsapp_chat_session_id = %s, whatsapp_chat_session_chart_id = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE wa_id = %s
-                    """,
-                    (sid_new, chart_id, wa_id),
-                )
-                conn.commit()
-            session_id = sid_new
-            payload["session_id"] = session_id
-            payload["client_request_id"] = str(uuid.uuid4())
-            r = requests.post(ask_url, headers=headers, json=payload, timeout=120)
-
-        if not (200 <= r.status_code < 300):
-            logger.warning(
-                "whatsapp chat ask failed status=%s body=%s",
-                r.status_code,
-                (r.text or "")[:800],
-            )
-            send_whatsapp_text(
-                to_wa_id=wa_id,
-                body="We could not start that reading (server error). Please try again or use the AstroRoshni app.",
-                phone_number_id=phone_number_id,
-            )
-            return
-
-        ask_json = r.json()
-        assistant_message_id = ask_json.get("message_id")
-        if not assistant_message_id:
-            send_whatsapp_text(
-                to_wa_id=wa_id,
-                body="We could not start that reading (unexpected response). Please try again.",
-                phone_number_id=phone_number_id,
-            )
-            return
-
-        status_url = f"{base}/api/chat-v2/status/{int(assistant_message_id)}"
-        deadline = time.time() + 600.0
         content: Optional[str] = None
         err: Optional[str] = None
-        while time.time() < deadline:
-            sr = requests.get(status_url, headers=headers, timeout=60)
-            if sr.status_code != 200:
+        try:
+            r = requests.post(ask_url, headers=headers, json=payload, timeout=120)
+            if r.status_code == 402:
+                send_whatsapp_text(
+                    to_wa_id=wa_id,
+                    body="You do not have enough credits for a standard reading on this chart. Open the AstroRoshni app to top up, then try again here.",
+                    phone_number_id=phone_number_id,
+                )
+                return
+            if r.status_code == 409 and "CHART_SESSION_MISMATCH" in (r.text or ""):
+                with get_conn() as conn:
+                    sid_new = str(uuid.uuid4())
+                    execute(
+                        conn,
+                        "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (%s, %s, %s)",
+                        (sid_new, userid, chart_id),
+                    )
+                    execute(
+                        conn,
+                        """
+                        UPDATE whatsapp_sessions
+                        SET whatsapp_chat_session_id = %s, whatsapp_chat_session_chart_id = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE wa_id = %s
+                        """,
+                        (sid_new, chart_id, wa_id),
+                    )
+                    conn.commit()
+                session_id = sid_new
+                payload["session_id"] = session_id
+                payload["client_request_id"] = str(uuid.uuid4())
+                r = requests.post(ask_url, headers=headers, json=payload, timeout=120)
+
+            if not (200 <= r.status_code < 300):
+                logger.warning(
+                    "whatsapp chat ask failed status=%s body=%s",
+                    r.status_code,
+                    (r.text or "")[:800],
+                )
+                send_whatsapp_text(
+                    to_wa_id=wa_id,
+                    body="We could not start that reading (server error). Please try again or use the AstroRoshni app.",
+                    phone_number_id=phone_number_id,
+                )
+                return
+
+            ask_json = r.json()
+            assistant_message_id = ask_json.get("message_id")
+            if not assistant_message_id:
+                send_whatsapp_text(
+                    to_wa_id=wa_id,
+                    body="We could not start that reading (unexpected response). Please try again.",
+                    phone_number_id=phone_number_id,
+                )
+                return
+
+            status_url = f"{base}/api/chat-v2/status/{int(assistant_message_id)}"
+            deadline = time.time() + 600.0
+            while time.time() < deadline:
+                sr = requests.get(status_url, headers=headers, timeout=60)
+                if sr.status_code != 200:
+                    time.sleep(4.0)
+                    continue
+                sj = sr.json()
+                st = (sj.get("status") or "").strip().lower()
+                if st == "completed":
+                    content = sj.get("content") or ""
+                    break
+                if st == "failed":
+                    err = sj.get("error_message") or sj.get("postprocess_error_message") or "Reading failed."
+                    if (sj.get("content") or "").strip():
+                        content = sj.get("content")
+                    break
                 time.sleep(4.0)
-                continue
-            sj = sr.json()
-            st = (sj.get("status") or "").strip().lower()
-            if st == "completed":
-                content = sj.get("content") or ""
-                break
-            if st == "failed":
-                err = sj.get("error_message") or sj.get("postprocess_error_message") or "Reading failed."
-                if (sj.get("content") or "").strip():
-                    content = sj.get("content")
-                break
-            time.sleep(4.0)
+        except requests.RequestException:
+            logger.exception(
+                "whatsapp chat: HTTP to internal API failed (set WHATSAPP_INTERNAL_API_URL / PORT). base=%r ask=%s",
+                base,
+                ask_url,
+            )
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body=(
+                    "This server could not reach its own chat API (often wrong port or missing "
+                    "WHATSAPP_INTERNAL_API_URL). Ask the admin to point that env var at this API's base URL "
+                    "(same host and port the app listens on). You can use the AstroRoshni app for chat meanwhile."
+                )[:4090],
+                phone_number_id=phone_number_id,
+            )
+            return
 
         if content and str(content).strip():
             sent_any = False
