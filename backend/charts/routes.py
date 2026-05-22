@@ -1,7 +1,7 @@
 """Chart calculation routes"""
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 import traceback
 import time
@@ -46,6 +46,130 @@ class BirthData(BaseModel):
         except Exception as e:
             print(f"Timezone detection failed: {e}")
             return "UTC+0"  # UTC default instead of IST
+
+
+def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Optional[int], Optional[str]]:
+    """
+    Insert or reuse a birth_charts row using the same encryption, dedupe, and INSERT logic as
+    POST /charts/calculate-chart (without running chart math).
+
+    Stored ``timezone`` always comes from ``birth_data.timezone``, which is derived from
+    latitude/longitude on the BirthData model — callers must not rely on a client-supplied timezone.
+    """
+    if not birth_data.latitude or not birth_data.longitude:
+        return None, "Valid coordinates required. Please select location from suggestions."
+
+    try:
+        datetime.strptime(birth_data.date, "%Y-%m-%d")
+    except ValueError:
+        return None, f"Invalid date format. Expected YYYY-MM-DD, got: {birth_data.date}"
+
+    try:
+        time_parts = birth_data.time.split(":")
+        if len(time_parts) not in [2, 3]:
+            raise ValueError("Time must be in HH:MM or HH:MM:SS format")
+        hour = int(time_parts[0])
+        minute = int(time_parts[1])
+        if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+            raise ValueError("Invalid hour or minute values")
+    except (ValueError, IndexError) as e:
+        return None, f"Invalid time format. Expected HH:MM or HH:MM:SS, got: {birth_data.time}. ({e})"
+
+    tz_value = birth_data.timezone
+    if not tz_value:
+        return None, "Could not determine timezone from birth coordinates."
+
+    if encryptor:
+        enc_name = encryptor.encrypt(birth_data.name)
+        enc_date = encryptor.encrypt(birth_data.date)
+        enc_time = encryptor.encrypt(birth_data.time)
+        enc_lat = encryptor.encrypt(str(birth_data.latitude))
+        enc_lon = encryptor.encrypt(str(birth_data.longitude))
+        enc_place = encryptor.encrypt(birth_data.place)
+    else:
+        enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+        enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
+
+    from utils.birth_hash import birth_hash_from_parts
+
+    chart_birth_hash = birth_hash_from_parts(
+        birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
+    )
+
+    new_chart_id: Optional[int] = None
+    try:
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT id
+                FROM birth_charts
+                WHERE userid = %s AND name = %s AND date = %s AND time = %s AND place = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (userid, enc_name, enc_date, enc_time, enc_place),
+            )
+            dup = cur.fetchone()
+            if dup:
+                new_chart_id = dup[0]
+                if chart_birth_hash:
+                    execute(
+                        conn,
+                        "UPDATE birth_charts SET birth_hash = COALESCE(birth_hash, %s) WHERE id = %s",
+                        (chart_birth_hash, new_chart_id),
+                    )
+                    conn.commit()
+                print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (exact native match)")
+            else:
+                print(f"🔍 [CHART_DEBUG] About to insert chart for user {userid}:")
+                print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
+                print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")
+                print(f"🔍 [CHART_DEBUG] - Final relation value: {birth_data.relation or 'other'}")
+
+                cur = execute(
+                    conn,
+                    """
+                    INSERT INTO birth_charts
+                        (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
+                    VALUES
+                        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        userid,
+                        enc_name,
+                        enc_date,
+                        enc_time,
+                        enc_lat,
+                        enc_lon,
+                        tz_value,
+                        enc_place,
+                        birth_data.gender,
+                        birth_data.relation or "other",
+                        chart_birth_hash,
+                    ),
+                )
+                row = cur.fetchone()
+                new_chart_id = row[0] if row else None
+                print(f"📝 [CHART_DEBUG] Inserted new chart with id: {new_chart_id}")
+                conn.commit()
+
+            if new_chart_id is not None:
+                cur = execute(
+                    conn,
+                    "SELECT relation FROM birth_charts WHERE id = %s",
+                    (new_chart_id,),
+                )
+                rel_row = cur.fetchone()
+                actual_relation = rel_row[0] if rel_row else None
+                print(f"✅ [CHART_DEBUG] Verified inserted relation: {actual_relation}")
+    except Exception as dedupe_err:
+        print(f"🔍 [CHART_DEBUG] Dedupe/insert check failed: {dedupe_err}")
+        return None, f"Failed to save birth chart: {dedupe_err}"
+
+    return new_chart_id, None
+
 
 router = APIRouter()
 
@@ -604,132 +728,29 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
     try:
         print(f"🔍 Chart calculation request for: {birth_data.name}")
         print(f"📊 Birth data: {birth_data.model_dump()}")
-        
-        # CRITICAL: Validate coordinates before saving
-        if not birth_data.latitude or not birth_data.longitude:
-            print(f"❌ Invalid coordinates: lat={birth_data.latitude}, lon={birth_data.longitude}")
-            raise HTTPException(status_code=422, detail="Valid coordinates required. Please select location from suggestions.")
-        
-        # Validate date format
-        try:
-            datetime.strptime(birth_data.date, '%Y-%m-%d')
-        except ValueError as e:
-            print(f"❌ Invalid date format: {birth_data.date}, error: {e}")
-            raise HTTPException(status_code=422, detail=f"Invalid date format. Expected YYYY-MM-DD, got: {birth_data.date}")
-        
-        # Validate time format
-        try:
-            time_parts = birth_data.time.split(':')
-            if len(time_parts) not in [2, 3]:
-                raise ValueError("Time must be in HH:MM or HH:MM:SS format")
-            hour = int(time_parts[0])
-            minute = int(time_parts[1])
-            if not (0 <= hour <= 23) or not (0 <= minute <= 59):
-                raise ValueError("Invalid hour or minute values")
-        except (ValueError, IndexError) as e:
-            print(f"❌ Invalid time format: {birth_data.time}, error: {e}")
-            raise HTTPException(status_code=422, detail=f"Invalid time format. Expected HH:MM or HH:MM:SS, got: {birth_data.time}")
-        
-        # Validate timezone
-        if not birth_data.timezone:
-            print(f"❌ Missing timezone")
-            raise HTTPException(status_code=422, detail="Timezone is required")
-        
-        print(f"✅ Validation passed, proceeding with chart calculation")
-        
-        # Store birth data in database (update if exists for current user only)
-        if encryptor:
-            enc_name = encryptor.encrypt(birth_data.name)
-            enc_date = encryptor.encrypt(birth_data.date)
-            enc_time = encryptor.encrypt(birth_data.time)
-            enc_lat = encryptor.encrypt(str(birth_data.latitude))
-            enc_lon = encryptor.encrypt(str(birth_data.longitude))
-            enc_place = encryptor.encrypt(birth_data.place)
-        else:
-            enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
-            enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
-        from utils.birth_hash import birth_hash_from_parts
-
-        chart_birth_hash = birth_hash_from_parts(
-            birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
-        )
-
-        new_chart_id = None
-        try:
-            with get_conn() as conn:
-                # Dedupe: same user + same name/date/time/place (exact duplicate native) -> return existing chart
-                cur = execute(
-                    conn,
-                    """
-                    SELECT id
-                    FROM birth_charts
-                    WHERE userid = %s AND name = %s AND date = %s AND time = %s AND place = %s
-                    ORDER BY id DESC
-                    LIMIT 1
-                    """,
-                    (current_user.userid, enc_name, enc_date, enc_time, enc_place),
+        new_chart_id, persist_err = persist_birth_chart_for_user(current_user.userid, birth_data)
+        if persist_err or new_chart_id is None:
+            detail = persist_err or "Could not save birth chart."
+            print(f"❌ Persist failed: {detail}")
+            low = detail.lower()
+            if any(
+                x in low
+                for x in (
+                    "invalid",
+                    "format",
+                    "required",
+                    "coordinates",
+                    "timezone",
+                    "time format",
+                    "date format",
                 )
-                dup = cur.fetchone()
-                if dup:
-                    new_chart_id = dup[0]
-                    if chart_birth_hash:
-                        execute(
-                            conn,
-                            "UPDATE birth_charts SET birth_hash = COALESCE(birth_hash, %s) WHERE id = %s",
-                            (chart_birth_hash, new_chart_id),
-                        )
-                        conn.commit()
-                    print(f"🔍 [CHART_DEBUG] Dedupe: returning existing chart id={new_chart_id} (exact native match)")
-                else:
-                    print(f"🔍 [CHART_DEBUG] About to insert chart for user {current_user.userid}:")
-                    print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
-                    print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")
-                    print(f"🔍 [CHART_DEBUG] - Final relation value: {birth_data.relation or 'other'}")
+            ):
+                raise HTTPException(status_code=422, detail=detail)
+            raise HTTPException(status_code=500, detail=detail)
 
-                    cur = execute(
-                        conn,
-                        """
-                        INSERT INTO birth_charts
-                            (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
-                        VALUES
-                            (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        RETURNING id
-                        """,
-                        (
-                            current_user.userid,
-                            enc_name,
-                            enc_date,
-                            enc_time,
-                            enc_lat,
-                            enc_lon,
-                            birth_data.timezone,
-                            enc_place,
-                            birth_data.gender,
-                            birth_data.relation or "other",
-                            chart_birth_hash,
-                        ),
-                    )
-                    row = cur.fetchone()
-                    new_chart_id = row[0] if row else None
-                    print(f"📝 [CHART_DEBUG] Inserted new chart with id: {new_chart_id}")
-                    # Persist the insert (psycopg2 defaults to transactional mode)
-                    conn.commit()
+        print(f"✅ Birth chart row ready (id={new_chart_id}), proceeding with calculation")
 
-                # Verify what was actually inserted (only when we have an id)
-                if new_chart_id is not None:
-                    cur = execute(
-                        conn,
-                        "SELECT relation FROM birth_charts WHERE id = %s",
-                        (new_chart_id,),
-                    )
-                    rel_row = cur.fetchone()
-                    actual_relation = rel_row[0] if rel_row else None
-                    print(f"✅ [CHART_DEBUG] Verified inserted relation: {actual_relation}")
-        except Exception as dedupe_err:
-            print(f"🔍 [CHART_DEBUG] Dedupe/insert check failed: {dedupe_err}")
-            raise HTTPException(status_code=500, detail=f"Failed to save birth chart: {dedupe_err}")
-        
         # Calculate and return chart data using new calculators
         from calculators.chart_calculator import ChartCalculator
         from calculators.divisional_chart_calculator import DivisionalChartCalculator

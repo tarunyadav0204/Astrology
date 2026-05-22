@@ -23,7 +23,7 @@ import logging
 import os
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ async def whatsapp_webhook_verify(request: Request) -> PlainTextResponse:
 
 
 @router.post("/webhooks/whatsapp")
-async def whatsapp_webhook_events(request: Request) -> dict[str, str]:
+async def whatsapp_webhook_events(request: Request, background_tasks: BackgroundTasks) -> dict[str, str]:
     body = await request.body()
     sig = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
     if not _signature_valid(body, sig):
@@ -118,15 +118,17 @@ async def whatsapp_webhook_events(request: Request) -> dict[str, str]:
         logger.warning("whatsapp webhook: non-JSON body")
         raise HTTPException(status_code=400, detail="Expected JSON body")
 
-    # Acknowledge quickly; heavy work should go to a background queue later.
     object_type = payload.get("object")
     if object_type == "whatsapp_business_account":
-        try:
-            from .handlers import process_whatsapp_payload
+        from .handlers import process_whatsapp_payload
 
-            process_whatsapp_payload(payload)
-        except Exception:
-            logger.exception("whatsapp webhook processing failed")
+        def _run() -> None:
+            try:
+                process_whatsapp_payload(payload)
+            except Exception:
+                logger.exception("whatsapp webhook processing failed")
+
+        background_tasks.add_task(_run)
     else:
         logger.info("whatsapp webhook POST object=%r", object_type)
 

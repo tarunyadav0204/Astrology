@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from auth import get_current_user
 from db import get_conn, execute
 
@@ -165,20 +165,35 @@ def _parallel_stage_cost_breakdown_inr(
 
 
 def _timestamp_to_ist_iso(val) -> Optional[str]:
-    """Convert DB timestamp (naive, stored as server local / IST) to ISO string with +05:30 so frontend displays correct IST."""
+    """
+    Return an absolute timestamp so the admin frontend can format it in IST.
+
+    chat_sessions/chat_messages timestamps are stored as UTC in DB, but many
+    columns are TIMESTAMP WITHOUT TIME ZONE and arrive as naive datetimes. Do
+    not append +05:30 here; that labels the UTC clock value as IST and prevents
+    the browser from adding the IST offset.
+    """
     if val is None:
         return None
+    if isinstance(val, datetime):
+        dt = val
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
+
     s = str(val).strip()
     if not s:
         return None
     # Already has timezone suffix
     if "Z" in s or "+" in s or (s.count("-") >= 2 and len(s) > 19 and s[-6] in ("+", "-")):
         return s
-    # Naive: treat as IST and append +05:30
+    # Naive DB value: treat as UTC.
     s = s.replace(" ", "T", 1)
     if len(s) >= 19:
         s = s[:19]  # YYYY-MM-DDTHH:MM:SS
-    return s + "+05:30"
+    return s + "Z"
 
 
 # Rough USD rates per 1M tokens for chat-history cost estimates.

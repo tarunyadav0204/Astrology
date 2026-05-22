@@ -10,7 +10,7 @@ import random
 import re
 import secrets
 from datetime import datetime, timedelta, date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import bcrypt
 
@@ -29,9 +29,121 @@ from .phone_utils import (
     phone_lookup_variants,
     wa_id_to_lookup_phone,
 )
+
+from .chat_worker import schedule_whatsapp_chart_chat
 from .schema import ensure_whatsapp_schema
 
+if TYPE_CHECKING:
+    from charts.routes import BirthData
+
 logger = logging.getLogger(__name__)
+
+_ALLOWED_FLOW_RELATIONS = frozenset(
+    {"self", "spouse", "child", "parent", "sibling", "friend", "other"}
+)
+
+
+def _flatten_whatsapp_flow_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """WhatsApp may send `complete` fields at the top level or nested under `payload`."""
+    inner = data.get("payload")
+    if isinstance(inner, dict):
+        merged = {k: v for k, v in data.items() if k not in ("payload",)}
+        merged.update(inner)
+        return merged
+    return data
+
+
+def _parse_flow_birth_date(raw: Any) -> Optional[str]:
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        ts = float(raw)
+        if ts > 1e12:
+            ts /= 1000.0
+        return datetime.utcfromtimestamp(ts).date().isoformat()
+    s = str(raw).strip()
+    if not s:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        return s
+    try:
+        return datetime.fromisoformat(s.replace("Z", "")).date().isoformat()
+    except ValueError:
+        pass
+    for fmt in ("%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s[:10], fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+
+def _flow_time_hhmm(hour: Any, minute: Any) -> Optional[str]:
+    try:
+        h = int(str(hour).strip(), 10)
+        m = int(str(minute).strip(), 10)
+    except (ValueError, TypeError, AttributeError):
+        return None
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return None
+    return f"{h:02d}:{m:02d}"
+
+
+def _birth_data_from_whatsapp_flow(data: Dict[str, Any]) -> Tuple[Optional["BirthData"], Optional[str]]:
+    """
+    Map birth_chart_flow.json `complete` payload into BirthData.
+
+    Timezone is never read from the flow — ``BirthData.timezone`` is computed from lat/lon
+    (same as POST /charts/calculate-chart).
+    """
+    from charts.routes import BirthData
+
+    flat = _flatten_whatsapp_flow_payload(data)
+    name = str(flat.get("chart_name") or "").strip()
+    if len(name) < 1 or len(name) > 120:
+        return None, "Chart name is missing or too long."
+
+    relation = str(flat.get("relation") or "other").strip().lower()
+    if relation not in _ALLOWED_FLOW_RELATIONS:
+        relation = "other"
+
+    date_iso = _parse_flow_birth_date(flat.get("birth_date"))
+    if not date_iso:
+        return None, "Birth date is missing or invalid."
+
+    time_str = _flow_time_hhmm(flat.get("birth_hour"), flat.get("birth_minute"))
+    if not time_str:
+        return None, "Birth hour and minute are required."
+
+    try:
+        lat = float(flat.get("latitude"))
+        lon = float(flat.get("longitude"))
+    except (TypeError, ValueError):
+        return None, "Birth place coordinates are missing or invalid."
+
+    place = str(flat.get("place") or "").strip()
+    if not place:
+        return None, "Birth place text is missing."
+
+    gender = str(flat.get("gender") or "").strip().lower()
+    if gender not in ("male", "female", "other", ""):
+        gender = "other"
+
+    try:
+        bd = BirthData(
+            name=name,
+            date=date_iso,
+            time=time_str,
+            latitude=lat,
+            longitude=lon,
+            place=place,
+            gender=gender,
+            relation=relation,
+        )
+    except Exception as e:
+        return None, f"Invalid birth details: {e}"
+
+    return bd, None
 
 sms_service = SMSService()
 
@@ -40,6 +152,41 @@ GREETING_LINES = (
     "We use your WhatsApp number to find your account. "
     "Say hi anytime to see your charts."
 )
+
+# First inbound text while idle: one-time nudge, then same routing as a greeting (Path A/B).
+SOFT_FIRST_CONTACT_NUDGE = (
+    "Thanks for messaging AstroRoshni. "
+    "We use this WhatsApp number to find or set up your account—the next message has your next step."
+)
+
+WHATSAPP_CHAT_WAIT_ACK = (
+    "Working on your *Standard* reading now. This usually takes about 1 to 1.5 minutes. "
+    "If the answer is long, we will send it in a few back-to-back messages on this chat."
+)
+
+
+def _whatsapp_menu_command(body: str) -> Optional[str]:
+    low = (body or "").strip().lower()
+    if low in ("charts", "menu", "list", "choose chart", "pick chart"):
+        return low
+    return None
+
+
+def _should_route_idle_text_to_chart_chat(body: str, sess: Dict[str, Any]) -> bool:
+    if not sess.get("userid") or not sess.get("active_chart_id"):
+        return False
+    if not (body or "").strip():
+        return False
+    if is_greeting(body):
+        return False
+    if _whatsapp_menu_command(body):
+        return False
+    raw = (body or "").strip()
+    if raw.startswith("cr_"):
+        return False
+    if len(raw) < 2:
+        return False
+    return True
 
 
 def _hash_password(password: str) -> str:
@@ -150,7 +297,7 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
     cur = execute(
         conn,
         """
-        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token
+        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token, idle_soft_intro_done, whatsapp_chat_session_id, whatsapp_chat_session_chart_id
         FROM whatsapp_sessions WHERE wa_id = %s
         """,
         (wa_id,),
@@ -168,6 +315,9 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
             "active_chart_id": row[7],
             "last_phone_number_id": row[8],
             "pending_flow_token": row[9],
+            "idle_soft_intro_done": bool(row[10]),
+            "whatsapp_chat_session_id": row[11],
+            "whatsapp_chat_session_chart_id": row[12],
         }
     try:
         execute(
@@ -181,7 +331,7 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
     cur = execute(
         conn,
         """
-        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token
+        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token, idle_soft_intro_done, whatsapp_chat_session_id, whatsapp_chat_session_chart_id
         FROM whatsapp_sessions WHERE wa_id = %s
         """,
         (wa_id,),
@@ -200,6 +350,9 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
         "active_chart_id": row[7],
         "last_phone_number_id": row[8],
         "pending_flow_token": row[9],
+        "idle_soft_intro_done": bool(row[10]),
+        "whatsapp_chat_session_id": row[11],
+        "whatsapp_chat_session_chart_id": row[12],
     }
 
 
@@ -219,6 +372,9 @@ def _session_write(conn, wa_id: str, sess: Dict[str, Any], **updates: Any) -> Di
             active_chart_id = %s,
             last_phone_number_id = COALESCE(%s, last_phone_number_id),
             pending_flow_token = %s,
+            idle_soft_intro_done = %s,
+            whatsapp_chat_session_id = %s,
+            whatsapp_chat_session_chart_id = %s,
             updated_at = CURRENT_TIMESTAMP
         WHERE wa_id = %s
         """,
@@ -232,6 +388,9 @@ def _session_write(conn, wa_id: str, sess: Dict[str, Any], **updates: Any) -> Di
             merged.get("active_chart_id"),
             merged.get("last_phone_number_id"),
             merged.get("pending_flow_token"),
+            bool(merged.get("idle_soft_intro_done")),
+            merged.get("whatsapp_chat_session_id"),
+            merged.get("whatsapp_chat_session_chart_id"),
             wa_id,
         ),
     )
@@ -561,11 +720,64 @@ def _handle_flow_completion(
         )
         return
 
-    # Log field names (values may contain PII — keep short in production logs).
     keys = [k for k in data.keys() if k != "flow_token"]
     logger.info("whatsapp flow_reply wa_id=%s fields=%s", wa_id, keys)
 
     uid = sess.get("userid")
+    if not uid:
+        _session_write(
+            conn,
+            wa_id,
+            sess,
+            state="idle",
+            pending_flow_token=None,
+            pending_charts_json=None,
+        )
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="We saved your answers but could not link them to an AstroRoshni account. Log in on the app, then say hi here again.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    birth_data, parse_err = _birth_data_from_whatsapp_flow(data)
+    if parse_err or not birth_data:
+        logger.warning("whatsapp flow_reply: parse failed wa_id=%s err=%s", wa_id, parse_err)
+        _session_write(
+            conn,
+            wa_id,
+            sess,
+            state="idle",
+            pending_flow_token=None,
+            pending_charts_json=None,
+        )
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body=f"We could not save that chart: {parse_err or 'invalid data'}. You can add it on https://astroroshni.com or say hi to try again.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    from charts.routes import persist_birth_chart_for_user
+
+    chart_id, persist_err = persist_birth_chart_for_user(int(uid), birth_data)
+    if persist_err or chart_id is None:
+        logger.warning("whatsapp flow_reply: persist failed wa_id=%s err=%s", wa_id, persist_err)
+        _session_write(
+            conn,
+            wa_id,
+            sess,
+            state="idle",
+            pending_flow_token=None,
+            pending_charts_json=None,
+        )
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body=f"We could not save your chart: {persist_err or 'database error'}. Try again from the app at https://astroroshni.com .",
+            phone_number_id=phone_number_id,
+        )
+        return
+
     _session_write(
         conn,
         wa_id,
@@ -573,14 +785,19 @@ def _handle_flow_completion(
         state="idle",
         pending_flow_token=None,
         pending_charts_json=None,
+        active_chart_id=chart_id,
+        whatsapp_chat_session_id=None,
+        whatsapp_chat_session_chart_id=None,
     )
     send_whatsapp_text(
         to_wa_id=wa_id,
-        body="Thanks — we received your form. Mapping fields into a saved birth chart is the next backend step; for now you can also add the chart on https://astroroshni.com .",
+        body=(
+            f"Saved birth chart *{birth_data.name}*. It is active now — ask your astrology question in one message, "
+            "or use the list to switch charts. A Standard reading can take 1–1.5 minutes."
+        ),
         phone_number_id=phone_number_id,
     )
-    if uid:
-        _push_chart_menu(conn, wa_id, int(uid), phone_number_id)
+    _push_chart_menu(conn, wa_id, int(uid), phone_number_id)
 
 
 def _handle_chart_pick(
@@ -638,10 +855,15 @@ def _handle_chart_pick(
             state="idle",
             pending_charts_json=None,
             active_chart_id=cid,
+            whatsapp_chat_session_id=None,
+            whatsapp_chat_session_chart_id=None,
         )
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body=f"Using chart: {label}. (Chat and chart features from WhatsApp can be wired next.)",
+            body=(
+                f"Using chart: {label}. Ask your astrology question in one message. "
+                "A Standard reading can take 1–1.5 minutes and may arrive in several parts."
+            ),
             phone_number_id=phone_number_id,
         )
         return
@@ -674,10 +896,15 @@ def _handle_chart_pick(
         state="idle",
         pending_charts_json=None,
         active_chart_id=cid,
+        whatsapp_chat_session_id=None,
+        whatsapp_chat_session_chart_id=None,
     )
     send_whatsapp_text(
         to_wa_id=wa_id,
-        body=f"Using chart: {chosen.get('label', cid)}. (Chat and chart features from WhatsApp can be wired next.)",
+        body=(
+            f"Using chart: {chosen.get('label', cid)}. Ask your astrology question in one message. "
+            "A Standard reading can take 1–1.5 minutes and may arrive in several parts."
+        ),
         phone_number_id=phone_number_id,
     )
 
@@ -951,6 +1178,48 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     continue
 
                 # idle (default)
+                if st == "idle" and input_kind == "text":
+                    cmd = _whatsapp_menu_command(body)
+                    uid_menu = sess.get("userid")
+                    if cmd and uid_menu:
+                        _push_chart_menu(conn, wa_id, int(uid_menu), phone_number_id)
+                        continue
+
+                if (
+                    st == "idle"
+                    and input_kind == "text"
+                    and _should_route_idle_text_to_chart_chat(body, sess)
+                ):
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body=WHATSAPP_CHAT_WAIT_ACK,
+                        phone_number_id=phone_number_id,
+                    )
+                    schedule_whatsapp_chart_chat(
+                        wa_id=wa_id,
+                        phone_number_id=phone_number_id,
+                        userid=int(sess["userid"]),
+                        question=body.strip(),
+                    )
+                    continue
+
+                soft_intro_done = bool(sess.get("idle_soft_intro_done"))
+                if (
+                    st == "idle"
+                    and not soft_intro_done
+                    and input_kind == "text"
+                    and (body or "").strip()
+                ):
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body=SOFT_FIRST_CONTACT_NUDGE,
+                        phone_number_id=phone_number_id,
+                    )
+                    _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+                    sess_after = _get_session(conn, wa_id)
+                    _session_write(conn, wa_id, sess_after, idle_soft_intro_done=True)
+                    continue
+
                 if is_greeting(body):
                     _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
                 else:

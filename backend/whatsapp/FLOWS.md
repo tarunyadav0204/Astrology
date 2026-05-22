@@ -32,9 +32,11 @@ Set **either** `WHATSAPP_BIRTHCHART_FLOW_ID` **or** `WHATSAPP_BIRTHCHART_FLOW_NA
 
 ## How the backend behaves
 
+- **First contact (softer onboarding):** the first **non-empty text** while `whatsapp_sessions.state` is `idle` and `idle_soft_intro_done` is false sends a short **nudge**, then runs the same **phone / account lookup** as “hi” (`_handle_idle_greeting`—chart list, link, or SMS OTP). The flag `idle_soft_intro_done` is then set so later idle messages are not auto-routed again (unless the user sends a greeting again, which still re-runs the greeting handler).
+- **Chart chat (Standard):** when a user has an **`active_chart_id`** and sends a normal text question (not a greeting / menu keyword), the server replies with a short wait line, then runs the same **`POST /api/chat-v2/ask`** pipeline as the mobile app (`chat_tier: standard`, `premium_analysis: false`). Replies are polled via **`GET /api/chat-v2/status/{message_id}`** and sent on WhatsApp in **≤4090-character chunks**. The worker calls your own HTTP API, so set **`WHATSAPP_INTERNAL_API_URL`** (or **`ASTRO_INTERNAL_API_URL`** / **`PUBLIC_API_BASE_URL`**) to the backend base URL the worker can reach (e.g. `http://127.0.0.1:8000` in dev, your public origin in prod if the worker runs on the same host).
 - On **Flow open**, we generate a **`flow_token`**, store it in `whatsapp_sessions.pending_flow_token`, and set state **`await_flow_birth`**.
 - On submit, Meta sends an **`interactive` / `nfm_reply`** message; `response_json` is a **string** containing JSON that **includes the same `flow_token`** plus your form fields. We verify the token, log field **names**, clear the token, and reply with a confirmation.  
-- **Persisting** answers into `birth_charts` is **not** implemented yet — field names depend on your Flow JSON; extend `_handle_flow_completion` in `handlers.py` when your form is fixed.
+- **Persisting** answers into `birth_charts`: `_handle_flow_completion` in `handlers.py` maps the Flow `complete` payload to `BirthData` and calls `persist_birth_chart_for_user` in `charts/routes.py` (same insert/dedupe/encryption path as `POST /charts/calculate-chart`). Timezone is **not** taken from the client; it is derived from latitude/longitude on the server.
 
 ## Flow data endpoint (Google place search inside the Flow)
 
@@ -64,10 +66,12 @@ Optional overrides (defaults match a typical birth-chart Flow layout):
 ### Flow JSON expectations (for autocomplete)
 
 1. Screen **`place_search`** (id configurable): `TextInput` **`name` = `place_query`**, Footer **`data_exchange`** (payload includes `place_query`).  
-2. Screen **`place_pick`**: `Dropdown` with **`data-source`: `${data.place_options}`** (array of `{ "id", "title" }` from the server). **`name` = `selected_place`**. Footer **`data_exchange`** to resolve coordinates.  
+2. Screen **`place_pick`**: **`RadioButtonsGroup`** (options show on the same screen; a **`Dropdown`** needs an extra tap to open the list) with **`data-source`: `${data.place_options}`** (array of `{ "id", "title" }` from the server). Each **`title`** must be **≤ 30 characters** (Meta rule); the server truncates Google descriptions automatically. **`name` = `selected_place`**. Footer **`data_exchange`** to resolve coordinates.  
 3. Server returns **`data`** with `selected_latitude`, `selected_longitude`, `selected_formatted_address`, `selected_place_id` on the next screen — bind these in your Flow JSON as needed.
 
 Until those screens exist in your published Flow, the endpoint still answers Meta **`ping`** (health check) and **`INIT`**.
+
+**Birth chart Flow JSON in repo:** edit `whatsapp/flows/birth_chart_flow.json`, then paste into WhatsApp Manager (the app does not load this file at runtime). Birth time is collected as **`birth_hour`** + **`birth_minute`** (dropdowns `00`–`23` and `00`–`59`); your webhook should join them as `HH:MM` for storage.
 
 ### Health check returns HTTP 421 (empty body)
 

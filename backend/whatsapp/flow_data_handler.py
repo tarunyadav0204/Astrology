@@ -19,6 +19,35 @@ def _env(name: str, default: str) -> str:
     return (os.environ.get(name) or default).strip()
 
 
+# Meta: RadioButtonsGroup option titles must be ≤30 chars. The client shows one red banner per bad row.
+def _utf16_code_unit_len(s: str) -> int:
+    """Some clients count string limits like UTF-16 (BMP) length."""
+    return len(s.encode("utf-16-le")) // 2
+
+
+def _truncate_flow_radio_title(text: str, max_units: int = 30) -> str:
+    s = " ".join((text or "").strip().split()) or "?"
+    if _utf16_code_unit_len(s) <= max_units:
+        return s
+    suffix = "..."
+    su = _utf16_code_unit_len(suffix)
+    budget = max_units - su
+    if budget <= 0:
+        return suffix[:max_units]
+    lo, hi = 0, len(s)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        cand = s[:mid].rstrip() + suffix
+        if _utf16_code_unit_len(cand) <= max_units:
+            lo = mid
+        else:
+            hi = mid - 1
+    out = s[:lo].rstrip() + suffix
+    while _utf16_code_unit_len(out) > max_units and out:
+        out = out[:-1]
+    return out or "?"
+
+
 def build_flow_data_response(decrypted: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build plaintext JSON object for encrypt_flow_response.
@@ -68,7 +97,10 @@ def build_flow_data_response(decrypted: Dict[str, Any]) -> Dict[str, Any]:
                     "place_options": [],
                 },
             }
-        place_options = [{"id": r["place_id"], "title": (r["description"] or "")[:80]} for r in rows]
+        place_options = [
+            {"id": r["place_id"], "title": _truncate_flow_radio_title(r.get("description") or "")}
+            for r in rows
+        ]
         if not place_options:
             return {
                 "screen": search_screen,

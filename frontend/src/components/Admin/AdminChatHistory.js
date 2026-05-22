@@ -499,8 +499,8 @@ const AdminChatHistory = () => {
     if (!dateStr) return null;
     const raw = String(dateStr).trim();
     if (!raw) return null;
-    // Backend DB timestamps are UTC but often arrive without a timezone suffix.
-    // Add Z so JS does not interpret them as browser-local time before IST formatting.
+    // Admin APIs return absolute UTC timestamps; older rows may still arrive
+    // without a timezone suffix, so default naive values to UTC before IST formatting.
     const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
     const normalized = hasTimezone ? raw : `${raw.replace(' ', 'T')}Z`;
     const d = new Date(normalized);

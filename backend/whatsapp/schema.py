@@ -48,5 +48,24 @@ def ensure_whatsapp_schema() -> None:
             ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS pending_flow_token TEXT
             """,
         )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions
+            ADD COLUMN IF NOT EXISTS idle_soft_intro_done BOOLEAN NOT NULL DEFAULT FALSE
+            """,
+        )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS whatsapp_chat_session_id TEXT
+            """,
+        )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS whatsapp_chat_session_chart_id INTEGER
+            """,
+        )
         conn.commit()
     logger.debug("whatsapp schema ensured")

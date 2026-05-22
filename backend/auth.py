@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -87,3 +88,15 @@ def get_current_user(
     if sc is not None and str(sc).strip() == "":
         sc = None
     return User(userid=user[0], name=user[1], phone=user[2], role=user[3], signup_client=sc)
+
+
+def create_access_token_for_phone(phone: str, expire_minutes: int = 180) -> str:
+    """
+    Mint a JWT with `sub` = user phone (same shape as login) for server-side callers
+    (e.g. WhatsApp background worker) that cannot attach a browser Bearer token.
+    """
+    p = (phone or "").strip()
+    if not p:
+        raise ValueError("phone is required for token")
+    expire = datetime.utcnow() + timedelta(minutes=int(expire_minutes))
+    return jwt.encode({"sub": p, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
