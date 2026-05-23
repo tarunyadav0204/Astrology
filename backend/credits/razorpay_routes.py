@@ -94,6 +94,89 @@ def _format_inr(paise: int) -> str:
     return f"₹{rupees:.2f}"
 
 
+def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
+    packs: List[Dict[str, Any]] = []
+    for c in ALLOWED_CREDITS:
+        paise = _price_paise(c)
+        packs.append(
+            {
+                "credits": c,
+                "product_id": _product_id(c),
+                "amount_paise": paise,
+                "amount_display": _format_inr(paise),
+                "currency": "INR",
+            }
+        )
+    return packs
+
+
+def create_razorpay_credit_payment_link(
+    *,
+    userid: int,
+    credits: int,
+    name: str = "",
+    phone: str = "",
+    email: str = "",
+) -> Dict[str, Any]:
+    """Create a Razorpay Payment Link for non-browser channels like WhatsApp."""
+    if credits not in ALLOWED_CREDITS:
+        raise ValueError("Invalid credits pack")
+
+    amount = _price_paise(credits)
+    receipt = f"wa{int(userid)}c{credits}{secrets.token_hex(4)}"[:40]
+    product_id = _product_id(credits)
+    callback_base = (os.environ.get("PUBLIC_WEB_BASE_URL") or "https://astroroshni.com").rstrip("/")
+    payload: Dict[str, Any] = {
+        "amount": amount,
+        "currency": "INR",
+        "accept_partial": False,
+        "reference_id": receipt,
+        "description": f"AstroRoshni {credits} credits",
+        "callback_url": f"{callback_base}/credits",
+        "callback_method": "get",
+        "notify": {"sms": False, "email": False},
+        "notes": {
+            "userid": str(userid),
+            "credits": str(credits),
+            "product_id": product_id,
+            "channel": "whatsapp",
+        },
+    }
+    customer: Dict[str, str] = {}
+    if name:
+        customer["name"] = str(name)[:100]
+    if phone:
+        customer["contact"] = str(phone)[:20]
+    if email:
+        customer["email"] = str(email)[:100]
+    if customer:
+        payload["customer"] = customer
+
+    try:
+        r = requests.post(f"{RAZORPAY_API_BASE}/payment_links", auth=_auth(), json=payload, timeout=30)
+    except requests.RequestException as e:
+        logger.exception("Razorpay create payment link request failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not reach payment provider") from e
+
+    if r.status_code not in (200, 201):
+        logger.warning("Razorpay create payment link: %s %s", r.status_code, r.text[:500])
+        raise HTTPException(status_code=502, detail="Could not create payment link. Try again later.")
+
+    link = r.json()
+    short_url = (link.get("short_url") or "").strip()
+    if not short_url:
+        raise HTTPException(status_code=502, detail="Invalid payment link response")
+    return {
+        "payment_link_id": link.get("id"),
+        "short_url": short_url,
+        "amount": amount,
+        "currency": "INR",
+        "credits": credits,
+        "product_id": product_id,
+        "amount_display": _format_inr(amount),
+    }
+
+
 class CreateOrderBody(BaseModel):
     credits: int = Field(..., description="One of 50, 100, 250, 500, 999")
 
@@ -220,6 +303,42 @@ def _fetch_payment(payment_id: str) -> Dict[str, Any]:
     return r.json()
 
 
+def _notify_whatsapp_credit_purchase(userid: int, credits_added: int) -> None:
+    if not userid or not credits_added:
+        return
+    try:
+        from db import get_conn, execute
+        from whatsapp.messaging import send_whatsapp_text
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT u.whatsapp_wa_id, ws.last_phone_number_id
+                FROM users u
+                LEFT JOIN whatsapp_sessions ws ON ws.wa_id = u.whatsapp_wa_id
+                WHERE u.userid = ?
+                """,
+                (int(userid),),
+            )
+            row = cur.fetchone()
+        if not row or not row[0] or not row[1]:
+            logger.info("Razorpay WhatsApp notify skipped user=%s: missing wa_id or phone_number_id", userid)
+            return
+        balance = credit_service.get_user_credits(int(userid))
+        send_whatsapp_text(
+            to_wa_id=str(row[0]),
+            phone_number_id=str(row[1]),
+            body=(
+                f"Payment successful. Added {int(credits_added)} AstroRoshni credits.\n"
+                f"Your new balance: {balance} credits.\n\n"
+                "You can choose *Ask question* to continue."
+            ),
+        )
+    except Exception:
+        logger.exception("Razorpay WhatsApp credit notification failed user=%s credits=%s", userid, credits_added)
+
+
 @router.get("/razorpay/catalog")
 async def razorpay_catalog(current_user: User = Depends(get_current_user)):
     key_id, _ = _get_razorpay_keys()
@@ -228,19 +347,7 @@ async def razorpay_catalog(current_user: User = Depends(get_current_user)):
             status_code=503,
             detail="Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).",
         )
-    packs: List[Dict[str, Any]] = []
-    for c in ALLOWED_CREDITS:
-        paise = _price_paise(c)
-        packs.append(
-            {
-                "credits": c,
-                "product_id": _product_id(c),
-                "amount_paise": paise,
-                "amount_display": _format_inr(paise),
-                "currency": "INR",
-            }
-        )
-    return {"key_id": key_id, "currency": "INR", "packs": packs}
+    return {"key_id": key_id, "currency": "INR", "packs": get_razorpay_credit_packs()}
 
 
 @router.post("/razorpay/create-order")
@@ -368,6 +475,7 @@ async def razorpay_webhook(request: Request):
 
     uid = result.get("userid")
     if result.get("credits_added") and uid:
+        notes = payment.get("notes") or {}
         try:
             from db import get_conn, execute
 
@@ -388,9 +496,12 @@ async def razorpay_webhook(request: Request):
             resource_id=(payment.get("id") or ""),
             metadata={
                 "credits_added": result["credits_added"],
+                "product_id": notes.get("product_id"),
                 "channel": "razorpay_webhook",
             },
         )
+        if str(notes.get("channel") or "").strip().lower() == "whatsapp":
+            _notify_whatsapp_credit_purchase(int(uid), int(result["credits_added"]))
 
     return {"status": "ok", "credits_added": result.get("credits_added", 0)}
 

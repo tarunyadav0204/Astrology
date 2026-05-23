@@ -172,6 +172,9 @@ WHATSAPP_SERVICES_TEXT = (
     "Tap *Menu* below to choose what you want to do."
 )
 
+WHATSAPP_CREDIT_PACK_PREFIX = "wa_credit_"
+WHATSAPP_SUPPORT_TICKET_PREFIX = "wa_ticket_"
+
 
 def _whatsapp_menu_command(body: str) -> Optional[str]:
     low = (body or "").strip().lower()
@@ -195,6 +198,66 @@ def _should_route_text_to_chart_chat(body: str, sess: Dict[str, Any]) -> bool:
     if len(raw) < 2 and raw.lower() not in {"a", "b", "c", "d", "e"}:
         return False
     return True
+
+
+def _credit_pack_from_reply(raw: str) -> Optional[int]:
+    text = (raw or "").strip()
+    if text.startswith(WHATSAPP_CREDIT_PACK_PREFIX):
+        text = text[len(WHATSAPP_CREDIT_PACK_PREFIX):]
+    if not text.isdigit():
+        return None
+    credits = int(text)
+    return credits if credits in {50, 100, 250, 500, 999} else None
+
+
+def _support_ticket_id_from_reply(raw: str) -> Optional[int]:
+    text = (raw or "").strip()
+    if text.startswith(WHATSAPP_SUPPORT_TICKET_PREFIX):
+        text = text[len(WHATSAPP_SUPPORT_TICKET_PREFIX):]
+    if not text.isdigit():
+        return None
+    tid = int(text)
+    return tid if tid > 0 else None
+
+
+def _load_pending_json(sess: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        val = json.loads(sess.get("pending_charts_json") or "{}")
+        return val if isinstance(val, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def _normalize_user_gender(raw: str) -> Optional[str]:
+    value = (raw or "").strip().lower()
+    if value in {"1", "m", "male", "man"}:
+        return "male"
+    if value in {"2", "f", "female", "woman"}:
+        return "female"
+    return None
+
+
+def _normalize_email(raw: str) -> Optional[str]:
+    email = (raw or "").strip().lower()
+    if not email or len(email) > 254:
+        return None
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        return None
+    return email
+
+
+def _send_whatsapp_email_otp(email: str, code: str) -> bool:
+    try:
+        from utils.smtp_mail import send_plain_text_email
+
+        body = (
+            f"Your AstroRoshni email verification code is: {code}\n\n"
+            "This code expires in 10 minutes."
+        )
+        return bool(send_plain_text_email(email, "Verify your AstroRoshni email", body))
+    except Exception:
+        logger.exception("WhatsApp signup email OTP failed for %s", email)
+        return False
 
 
 def _hash_password(password: str) -> str:
@@ -508,6 +571,8 @@ def _complete_whatsapp_registration(
     canonical_phone: str,
     otp_token: str,
     name: str,
+    email: str,
+    gender: str,
     password: str,
 ) -> Tuple[bool, str]:
     cur = execute(
@@ -526,12 +591,19 @@ def _complete_whatsapp_registration(
     if cur.fetchone():
         return False, "That number is already registered. Try logging in on the app."
 
+    email_clean = _normalize_email(email)
+    if not email_clean:
+        return False, "A verified email is required to create your account."
+    gender_clean = _normalize_user_gender(gender)
+    if not gender_clean:
+        return False, "Gender is required to create your account."
+
     hashed = _hash_password(password)
     try:
         execute(
             conn,
             "INSERT INTO users (name, phone, password, role, email, signup_client, gender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (name.strip(), canonical_phone, hashed, "user", None, "mobile", None),
+            (name.strip(), canonical_phone, hashed, "user", email_clean, "whatsapp", gender_clean),
         )
     except Exception as e:
         conn.rollback()
@@ -994,6 +1066,8 @@ def _push_main_menu(
     rows: List[Tuple[str, str, str]] = [
         ("wa_ask", "Ask question", "Use selected birth chart"),
         ("wa_charts", "Choose chart", "Pick an existing chart"),
+        ("wa_buy_credits", "Buy credits", "Pay with Razorpay"),
+        ("wa_support", "Support", "Open or reply to ticket"),
         ("wa_add_chart", "Add new chart", "Open birth details form"),
         ("wa_services", "What Tara can do", "Services and reports"),
     ]
@@ -1014,12 +1088,320 @@ def _push_main_menu(
                 "Choose an option:\n"
                 "1. Ask question\n"
                 "2. Choose chart\n"
-                "3. Add new chart\n"
-                "4. What Tara can do\n\n"
+                "3. Buy credits\n"
+                "4. Support\n"
+                "5. Add new chart\n"
+                "6. What Tara can do\n\n"
                 "Reply with Menu to show these options again."
             ),
             phone_number_id=phone_number_id,
         )
+
+
+def _push_credit_pack_menu(conn, wa_id: str, phone_number_id: str, sess: Dict[str, Any]) -> None:
+    uid = sess.get("userid")
+    if not uid:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Please connect your AstroRoshni account first, then you can buy credits.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    try:
+        from credits.razorpay_routes import get_razorpay_credit_packs
+
+        packs = get_razorpay_credit_packs()
+    except Exception:
+        logger.exception("whatsapp credits: could not load Razorpay catalog")
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Credit purchase options are not available right now. Please try again later or use the AstroRoshni app.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    rows: List[Tuple[str, str, str]] = []
+    for pack in packs:
+        credits = int(pack.get("credits") or 0)
+        if credits <= 0:
+            continue
+        rows.append(
+            (
+                f"{WHATSAPP_CREDIT_PACK_PREFIX}{credits}",
+                f"{credits} credits",
+                str(pack.get("amount_display") or "INR"),
+            )
+        )
+    if not rows:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="No credit packs are available right now. Please try again later.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    _session_write(conn, wa_id, sess, state="await_credit_pack")
+    ok = send_whatsapp_interactive_list(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body="Choose a credit pack. We will send a secure Razorpay payment link.",
+        button_text="Buy credits",
+        section_title="Credit packs",
+        rows=rows[:10],
+        header_text="AstroRoshni",
+        footer_text="Secured by Razorpay",
+    )
+    if not ok:
+        lines = ["Choose a credit pack:"]
+        for i, row in enumerate(rows, start=1):
+            lines.append(f"{i}. {row[1]} - {row[2]}")
+        lines.append("\nReply with the credit amount, for example 50 or 100.")
+        send_whatsapp_text(to_wa_id=wa_id, body="\n".join(lines), phone_number_id=phone_number_id)
+
+
+def _send_credit_payment_link(
+    conn,
+    wa_id: str,
+    credits: int,
+    phone_number_id: str,
+    sess: Dict[str, Any],
+) -> None:
+    uid = sess.get("userid")
+    if not uid:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Please connect your AstroRoshni account first, then you can buy credits.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    try:
+        from credits.razorpay_routes import create_razorpay_credit_payment_link
+
+        cur = execute(conn, "SELECT name, phone, email FROM users WHERE userid = %s", (int(uid),))
+        row = cur.fetchone()
+        link = create_razorpay_credit_payment_link(
+            userid=int(uid),
+            credits=int(credits),
+            name=str(row[0] or "") if row else "",
+            phone=str(row[1] or "") if row else "",
+            email=str(row[2] or "") if row else "",
+        )
+    except Exception:
+        logger.exception("whatsapp credits: could not create Razorpay payment link user=%s credits=%s", uid, credits)
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="We could not create the payment link right now. Please try again later or use the AstroRoshni app.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    _session_write(conn, wa_id, sess, state="idle")
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        body=(
+            f"Pay {link['amount_display']} for {link['credits']} AstroRoshni credits:\n"
+            f"{link['short_url']}\n\n"
+            "After payment succeeds, credits are added automatically. You can return here and choose *Ask question*."
+        ),
+        phone_number_id=phone_number_id,
+    )
+
+
+def _push_support_menu(conn, wa_id: str, phone_number_id: str, sess: Dict[str, Any]) -> None:
+    if not sess.get("userid"):
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Please connect your AstroRoshni account first, then you can contact support.",
+            phone_number_id=phone_number_id,
+        )
+        return
+    _session_write(conn, wa_id, sess, state="await_support_menu", pending_charts_json=None)
+    rows: List[Tuple[str, str, str]] = [
+        ("wa_support_new", "New ticket", "Create a support request"),
+        ("wa_support_tickets", "My tickets", "View recent open tickets"),
+        ("wa_menu", "Main menu", "Back to AstroRoshni menu"),
+    ]
+    ok = send_whatsapp_interactive_list(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body="Support tickets are stored in the same AstroRoshni support inbox used by the app.",
+        button_text="Support",
+        section_title="Support",
+        rows=rows,
+        header_text="AstroRoshni",
+        footer_text="help@astroroshni.com",
+    )
+    if not ok:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Support options:\n1. New ticket\n2. My tickets\n\nReply 1 or 2, or type Menu.",
+            phone_number_id=phone_number_id,
+        )
+
+
+def _push_support_ticket_list(conn, wa_id: str, phone_number_id: str, sess: Dict[str, Any]) -> None:
+    uid = sess.get("userid")
+    if not uid:
+        _push_support_menu(conn, wa_id, phone_number_id, sess)
+        return
+    try:
+        from support_routes import _ensure_tables
+
+        _ensure_tables(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT id, subject, status, last_message_preview
+            FROM support_tickets
+            WHERE userid = %s AND status <> 'closed'
+            ORDER BY updated_at DESC
+            LIMIT 9
+            """,
+            (int(uid),),
+        )
+        rows_db = cur.fetchall() or []
+    except Exception:
+        logger.exception("whatsapp support: could not load ticket list user=%s", uid)
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Could not load your support tickets right now. Please try again later.",
+            phone_number_id=phone_number_id,
+        )
+        return
+
+    if not rows_db:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="You do not have any open support tickets. Choose *New ticket* to create one.",
+            phone_number_id=phone_number_id,
+        )
+        _push_support_menu(conn, wa_id, phone_number_id, sess)
+        return
+
+    rows: List[Tuple[str, str, str]] = []
+    for r in rows_db:
+        tid = int(r[0])
+        title = truncate_whatsapp(f"#{tid} {r[1] or 'Support'}", 24)
+        desc = truncate_whatsapp(f"{r[2] or 'open'} - {r[3] or ''}", 72)
+        rows.append((f"{WHATSAPP_SUPPORT_TICKET_PREFIX}{tid}", title, desc))
+
+    _session_write(conn, wa_id, sess, state="await_support_ticket_pick")
+    ok = send_whatsapp_interactive_list(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body="Choose a ticket to reply.",
+        button_text="My tickets",
+        section_title="Open tickets",
+        rows=rows,
+        header_text="AstroRoshni Support",
+        footer_text="help@astroroshni.com",
+    )
+    if not ok:
+        lines = ["Reply with a ticket number:"]
+        for r in rows_db:
+            lines.append(f"{int(r[0])}. {r[1] or 'Support'} ({r[2] or 'open'})")
+        send_whatsapp_text(to_wa_id=wa_id, body="\n".join(lines), phone_number_id=phone_number_id)
+
+
+def _start_support_ticket_reply(conn, wa_id: str, ticket_id: int, phone_number_id: str, sess: Dict[str, Any]) -> None:
+    uid = sess.get("userid")
+    if not uid:
+        _push_support_menu(conn, wa_id, phone_number_id, sess)
+        return
+    cur = execute(
+        conn,
+        "SELECT id, subject, status FROM support_tickets WHERE id = %s AND userid = %s",
+        (int(ticket_id), int(uid)),
+    )
+    row = cur.fetchone()
+    if not row:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="That support ticket was not found on your account. Choose Support > My tickets again.",
+            phone_number_id=phone_number_id,
+        )
+        return
+    if str(row[2] or "").lower() == "closed":
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="That ticket is closed. Please create a new support ticket if you still need help.",
+            phone_number_id=phone_number_id,
+        )
+        return
+    pending = json.dumps({"ticket_id": int(ticket_id), "subject": str(row[1] or "Support")})
+    _session_write(conn, wa_id, sess, state="await_support_reply", pending_charts_json=pending)
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        body=f"Reply with your message for support ticket #{int(ticket_id)}.",
+        phone_number_id=phone_number_id,
+    )
+
+
+def _create_support_ticket_from_whatsapp(conn, wa_id: str, phone_number_id: str, sess: Dict[str, Any], message: str) -> None:
+    uid = sess.get("userid")
+    if not uid:
+        _push_support_menu(conn, wa_id, phone_number_id, sess)
+        return
+    try:
+        pending = json.loads(sess.get("pending_charts_json") or "{}")
+    except json.JSONDecodeError:
+        pending = {}
+    subject = str(pending.get("subject") or "WhatsApp support").strip()
+    try:
+        from support_routes import create_support_ticket_for_user
+
+        tid = create_support_ticket_for_user(int(uid), subject, message, "whatsapp")
+    except Exception:
+        logger.exception("whatsapp support: create ticket failed user=%s", uid)
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Could not create your support ticket right now. Please try again later.",
+            phone_number_id=phone_number_id,
+        )
+        return
+    _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        body=f"Support ticket #{tid} created. Our team will reply here or in the app.",
+        phone_number_id=phone_number_id,
+    )
+
+
+def _post_support_reply_from_whatsapp(conn, wa_id: str, phone_number_id: str, sess: Dict[str, Any], message: str) -> None:
+    uid = sess.get("userid")
+    try:
+        pending = json.loads(sess.get("pending_charts_json") or "{}")
+    except json.JSONDecodeError:
+        pending = {}
+    ticket_id = pending.get("ticket_id")
+    if not uid or not ticket_id:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Could not find the selected ticket. Please choose Support > My tickets again.",
+            phone_number_id=phone_number_id,
+        )
+        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+        return
+    try:
+        from support_routes import post_support_message_for_user
+
+        post_support_message_for_user(int(uid), int(ticket_id), message)
+    except Exception:
+        logger.exception("whatsapp support: reply failed user=%s ticket=%s", uid, ticket_id)
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            body="Could not send your support reply right now. Please try again later.",
+            phone_number_id=phone_number_id,
+        )
+        return
+    _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        body=f"Reply sent on support ticket #{int(ticket_id)}.",
+        phone_number_id=phone_number_id,
+    )
 
 
 def _handle_main_menu_choice(
@@ -1031,10 +1413,44 @@ def _handle_main_menu_choice(
     sess: Dict[str, Any],
 ) -> bool:
     raw = (choice or "").strip()
-    if (sess.get("state") or "idle") == "await_chart_pick" and raw.isdigit():
+    st = sess.get("state") or "idle"
+    if st in {"await_otp", "await_name", "await_gender", "await_email", "await_email_otp", "await_password"}:
         return False
-    raw = {"1": "wa_ask", "2": "wa_charts", "3": "wa_add_chart", "4": "wa_services"}.get(raw, raw)
-    if raw not in {"wa_ask", "wa_charts", "wa_add_chart", "wa_services"}:
+    if st == "await_chart_pick" and raw.isdigit():
+        return False
+    if st == "await_support_ticket_pick" and raw.isdigit():
+        return False
+    if st == "await_support_menu":
+        raw = {"1": "wa_support_new", "2": "wa_support_tickets", "3": "wa_menu"}.get(raw, raw)
+    else:
+        raw = {
+            "1": "wa_ask",
+            "2": "wa_charts",
+            "3": "wa_buy_credits",
+            "4": "wa_support",
+            "5": "wa_add_chart",
+            "6": "wa_services",
+        }.get(raw, raw)
+    if raw in {"wa_menu"}:
+        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+        return True
+    if raw in {"wa_support_new", "wa_support_tickets"}:
+        uid = sess.get("userid")
+        if not uid:
+            _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+            return True
+        if raw == "wa_support_new":
+            _session_write(conn, wa_id, sess, state="await_support_subject", pending_charts_json=None)
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="Please send a short subject for your support ticket.",
+                phone_number_id=phone_number_id,
+            )
+        else:
+            _push_support_ticket_list(conn, wa_id, phone_number_id, sess)
+        return True
+    if raw not in {"wa_ask", "wa_charts", "wa_buy_credits", "wa_support", "wa_add_chart", "wa_services"}:
         return False
 
     uid = sess.get("userid")
@@ -1046,6 +1462,14 @@ def _handle_main_menu_choice(
 
     if not uid:
         _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+        return True
+
+    if raw == "wa_buy_credits":
+        _push_credit_pack_menu(conn, wa_id, phone_number_id, sess)
+        return True
+
+    if raw == "wa_support":
+        _push_support_menu(conn, wa_id, phone_number_id, sess)
         return True
 
     if raw == "wa_add_chart":
@@ -1173,6 +1597,22 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
 
                 st = sess.get("state") or "idle"
 
+                if st in {"await_otp", "await_name", "await_gender", "await_email", "await_email_otp", "await_password"}:
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(
+                            conn,
+                            wa_id,
+                            sess,
+                            state="idle",
+                            reg_phone=None,
+                            reg_otp_token=None,
+                            reg_name=None,
+                            pending_charts_json=None,
+                            userid=None,
+                        )
+                        _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+                        continue
+
                 if _handle_main_menu_choice(conn, wa_id, body, phone_number_id, profile_name, sess):
                     continue
 
@@ -1192,6 +1632,93 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                             body="Please finish the form (tap the button on our last message). Or say hi to start over.",
                             phone_number_id=phone_number_id,
                         )
+                    continue
+
+                if st == "await_credit_pack":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle")
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    credits = _credit_pack_from_reply(body)
+                    if credits is None:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please choose a credit pack from the list, or type Menu.",
+                            phone_number_id=phone_number_id,
+                        )
+                    else:
+                        _send_credit_payment_link(conn, wa_id, credits, phone_number_id, sess)
+                    continue
+
+                if st == "await_support_menu":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body="Please choose New ticket or My tickets from the Support menu, or type Menu.",
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
+
+                if st == "await_support_subject":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    subject = body.strip()
+                    if len(subject) < 3:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please send a slightly longer support ticket subject.",
+                            phone_number_id=phone_number_id,
+                        )
+                        continue
+                    _session_write(
+                        conn,
+                        wa_id,
+                        sess,
+                        state="await_support_message",
+                        pending_charts_json=json.dumps({"subject": subject[:500]}),
+                    )
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body="Now send the full support message.",
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
+
+                if st == "await_support_message":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    _create_support_ticket_from_whatsapp(conn, wa_id, phone_number_id, sess, body)
+                    continue
+
+                if st == "await_support_ticket_pick":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    ticket_id = _support_ticket_id_from_reply(body)
+                    if ticket_id is None:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please choose a support ticket from the list, or type Menu.",
+                            phone_number_id=phone_number_id,
+                        )
+                    else:
+                        _start_support_ticket_reply(conn, wa_id, ticket_id, phone_number_id, sess)
+                    continue
+
+                if st == "await_support_reply":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    _post_support_reply_from_whatsapp(conn, wa_id, phone_number_id, sess, body)
                     continue
 
                 if st == "await_question":
@@ -1256,7 +1783,7 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     if len(name) < 2 or len(name) > 80:
                         send_whatsapp_text(
                             to_wa_id=wa_id,
-                            body="Please send your name (2–80 characters).",
+                            body="Please send your name (2-80 characters).",
                             phone_number_id=phone_number_id,
                         )
                         continue
@@ -1264,12 +1791,111 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                         conn,
                         wa_id,
                         sess,
-                        state="await_password",
+                        state="await_gender",
                         reg_name=name,
+                        pending_charts_json=None,
                     )
                     send_whatsapp_text(
                         to_wa_id=wa_id,
-                        body="Choose a password (at least 8 characters). You can change it later in the app.",
+                        body="Please choose your gender for your AstroRoshni profile.\nReply 1 for Male or 2 for Female.",
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
+
+                if st == "await_gender":
+                    gender = _normalize_user_gender(body)
+                    if not gender:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please reply 1 for Male or 2 for Female.",
+                            phone_number_id=phone_number_id,
+                        )
+                        continue
+                    _session_write(
+                        conn,
+                        wa_id,
+                        sess,
+                        state="await_email",
+                        pending_charts_json=json.dumps({"gender": gender}),
+                    )
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body="Please send your email address. We will send a verification code to confirm it.",
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
+
+                if st == "await_email":
+                    email = _normalize_email(body)
+                    if not email:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please send a valid email address, for example name@example.com.",
+                            phone_number_id=phone_number_id,
+                        )
+                        continue
+                    code = str(random.randint(100000, 999999))
+                    sent = _send_whatsapp_email_otp(email, code)
+                    is_dev = (os.getenv("ENVIRONMENT", "development") == "development")
+                    if not sent and is_dev:
+                        logger.warning("WhatsApp signup email OTP (dev email failed): %s for %s", code, email)
+                    if not sent and not is_dev:
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="We could not send the email verification code right now. Please try another email or try again later.",
+                            phone_number_id=phone_number_id,
+                        )
+                        continue
+                    pending = _load_pending_json(sess)
+                    pending.update(
+                        {
+                            "gender": _normalize_user_gender(str(pending.get("gender") or "")),
+                            "email": email,
+                            "email_code": code,
+                            "email_expires_at": (datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+                        }
+                    )
+                    _session_write(
+                        conn,
+                        wa_id,
+                        sess,
+                        state="await_email_otp",
+                        pending_charts_json=json.dumps(pending),
+                    )
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body=f"We sent a 6-digit code to {email}. Reply here with that code to verify your email.",
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
+
+                if st == "await_email_otp":
+                    pending = _load_pending_json(sess)
+                    expected = str(pending.get("email_code") or "").strip()
+                    expires_raw = str(pending.get("email_expires_at") or "")
+                    try:
+                        expires_at = datetime.fromisoformat(expires_raw)
+                    except ValueError:
+                        expires_at = datetime.utcnow() - timedelta(seconds=1)
+                    if not re.fullmatch(r"\d{6}", body.strip()) or body.strip() != expected or expires_at <= datetime.utcnow():
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="That email code is invalid or expired. Type Menu to start again, or send the code from your email.",
+                            phone_number_id=phone_number_id,
+                        )
+                        continue
+                    pending["email_verified"] = True
+                    pending.pop("email_code", None)
+                    _session_write(
+                        conn,
+                        wa_id,
+                        sess,
+                        state="await_password",
+                        pending_charts_json=json.dumps(pending),
+                    )
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body="Email verified. Choose a password (at least 8 characters). You can change it later in the app.",
                         phone_number_id=phone_number_id,
                     )
                     continue
@@ -1286,12 +1912,22 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     reg_phone = sess.get("reg_phone") or ""
                     otp_tok = sess.get("reg_otp_token") or ""
                     nm = sess.get("reg_name") or "User"
+                    pending = _load_pending_json(sess)
+                    if not pending.get("email_verified"):
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body="Please verify your email before choosing a password. Type Menu to start again.",
+                            phone_number_id=phone_number_id,
+                        )
+                        continue
                     ok, detail = _complete_whatsapp_registration(
                         conn,
                         wa_id=wa_id,
                         canonical_phone=reg_phone,
                         otp_token=otp_tok,
                         name=nm,
+                        email=str(pending.get("email") or ""),
+                        gender=str(pending.get("gender") or ""),
                         password=pw,
                     )
                     if ok:

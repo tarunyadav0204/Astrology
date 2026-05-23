@@ -30,7 +30,7 @@ PUBLIC_WEB_BASE_URL = (os.getenv("PUBLIC_WEB_BASE_URL") or "https://astroroshni.
 router = APIRouter(tags=["support"])
 
 VALID_STATUSES = frozenset({"open", "pending_user", "resolved", "closed"})
-USER_SOURCES = frozenset({"web", "ios", "android"})
+USER_SOURCES = frozenset({"web", "ios", "android", "whatsapp"})
 
 _TICKETS_TABLE_READY = False
 SUPPORT_ATTACHMENT_DIR = Path(os.getenv("SUPPORT_ATTACHMENT_DIR") or Path(__file__).resolve().parent / "storage" / "support_attachments")
@@ -309,6 +309,40 @@ def _notify_ticket_owner_support_reply(owner_userid: int, ticket_id: int, reply_
         logger.exception("Support reply notify failed for user %s ticket %s: %s", owner_userid, ticket_id, e)
 
 
+def _notify_ticket_owner_whatsapp(owner_userid: int, ticket_id: int, reply_preview: str) -> None:
+    try:
+        from whatsapp.messaging import send_whatsapp_text
+
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT u.whatsapp_wa_id, ws.last_phone_number_id
+                FROM users u
+                LEFT JOIN whatsapp_sessions ws ON ws.wa_id = u.whatsapp_wa_id
+                WHERE u.userid = %s
+                """,
+                (owner_userid,),
+            )
+            row = cur.fetchone()
+        if not row or not row[0] or not row[1]:
+            return
+        preview = (reply_preview or "Support replied to your ticket.").strip().replace("\n", " ")
+        if len(preview) > 800:
+            preview = preview[:797] + "..."
+        send_whatsapp_text(
+            to_wa_id=str(row[0]),
+            phone_number_id=str(row[1]),
+            body=(
+                f"Support replied to ticket #{ticket_id}:\n"
+                f"{preview}\n\n"
+                "To reply here, open *Menu* > *Support* > *My tickets*."
+            ),
+        )
+    except Exception:
+        logger.exception("Support WhatsApp notify failed for user %s ticket %s", owner_userid, ticket_id)
+
+
 def _sanitize_attachment_filename(name: str) -> str:
     raw = os.path.basename((name or "").strip()) or "attachment.pdf"
     safe = "".join(ch if ch.isalnum() or ch in ("-", "_", ".", " ") else "_" for ch in raw).strip()
@@ -434,19 +468,18 @@ def _require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-@router.post("/tickets")
-async def create_ticket(body: CreateTicketBody, current_user: User = Depends(get_current_user)):
-    subject = sanitize_support_subject(body.subject)
-    message = sanitize_support_body(body.message)
+def create_support_ticket_for_user(userid: int, subject: str, message: str, source: str = "web") -> int:
+    subject = sanitize_support_subject(subject)
+    message = sanitize_support_body(message)
     if not subject or not message:
         raise HTTPException(status_code=400, detail="Subject and message are required")
-    src = (body.source or "web").strip().lower()
+    src = (source or "web").strip().lower()
     if src not in USER_SOURCES:
         src = "web"
 
     with get_conn() as conn:
         _ensure_tables(conn)
-        _rate_limit_new_tickets(conn, current_user.userid)
+        _rate_limit_new_tickets(conn, userid)
         cur = execute(
             conn,
             """
@@ -454,30 +487,77 @@ async def create_ticket(body: CreateTicketBody, current_user: User = Depends(get
             VALUES (%s, %s, 'open', %s, %s, CURRENT_TIMESTAMP)
             RETURNING id
             """,
-            (current_user.userid, subject, src, _preview(message)),
+            (userid, subject, src, _preview(message)),
         )
-        tid = cur.fetchone()[0]
+        tid = int(cur.fetchone()[0])
         execute(
             conn,
             """
             INSERT INTO support_messages (ticket_id, author_role, author_userid, body)
             VALUES (%s, 'user', %s, %s)
             """,
-            (tid, current_user.userid, message),
+            (tid, userid, message),
         )
-        u_email, u_name, u_phone = _fetch_user_contact(conn, current_user.userid)
+        u_email, u_name, u_phone = _fetch_user_contact(conn, userid)
         conn.commit()
 
-    _notify_help_staff_new_ticket(
-        tid,
-        subject,
-        current_user.userid,
-        u_name,
-        u_phone,
-        u_email,
-        src,
-        message,
-    )
+    _notify_help_staff_new_ticket(tid, subject, userid, u_name, u_phone, u_email, src, message)
+    return tid
+
+
+def post_support_message_for_user(userid: int, ticket_id: int, message: str) -> None:
+    message = sanitize_support_body(message)
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    with get_conn() as conn:
+        _ensure_tables(conn)
+        _rate_limit_user_messages(conn, userid)
+        cur = execute(
+            conn,
+            "SELECT id, userid, status FROM support_tickets WHERE id = %s",
+            (ticket_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        if row[1] != userid:
+            raise HTTPException(status_code=403, detail="Access denied")
+        status = row[2]
+        if status == "closed":
+            raise HTTPException(status_code=400, detail="Ticket is closed. Open a new ticket if needed.")
+
+        execute(
+            conn,
+            """
+            INSERT INTO support_messages (ticket_id, author_role, author_userid, body)
+            VALUES (%s, 'user', %s, %s)
+            """,
+            (ticket_id, userid, message),
+        )
+        execute(
+            conn,
+            """
+            UPDATE support_tickets
+            SET status = 'open',
+                updated_at = CURRENT_TIMESTAMP,
+                last_message_preview = %s
+            WHERE id = %s
+            """,
+            (_preview(message), ticket_id),
+        )
+        cur_sub = execute(conn, "SELECT subject FROM support_tickets WHERE id = %s", (ticket_id,))
+        sub_row = cur_sub.fetchone()
+        ticket_subject = (sub_row[0] if sub_row else "") or ""
+        u_email, u_name, u_phone = _fetch_user_contact(conn, userid)
+        conn.commit()
+
+    _notify_help_staff_user_reply(ticket_id, ticket_subject, userid, u_name, u_phone, u_email, message)
+
+
+@router.post("/tickets")
+async def create_ticket(body: CreateTicketBody, current_user: User = Depends(get_current_user)):
+    tid = create_support_ticket_for_user(current_user.userid, body.subject, body.message, body.source)
     return {"ticket_id": tid, "message": "Ticket created"}
 
 
@@ -573,69 +653,7 @@ async def get_ticket_detail(ticket_id: int, current_user: User = Depends(get_cur
 async def post_user_message(
     ticket_id: int, body: PostMessageBody, current_user: User = Depends(get_current_user)
 ):
-    message = sanitize_support_body(body.message)
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
-
-    with get_conn() as conn:
-        _ensure_tables(conn)
-        _rate_limit_user_messages(conn, current_user.userid)
-        cur = execute(
-            conn,
-            "SELECT id, userid, status FROM support_tickets WHERE id = %s",
-            (ticket_id,),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Ticket not found")
-        if row[1] != current_user.userid:
-            raise HTTPException(status_code=403, detail="Access denied")
-        status = row[2]
-        if status == "closed":
-            raise HTTPException(status_code=400, detail="Ticket is closed. Open a new ticket if needed.")
-
-        new_status = "open"
-        if status == "resolved":
-            new_status = "open"
-
-        execute(
-            conn,
-            """
-            INSERT INTO support_messages (ticket_id, author_role, author_userid, body)
-            VALUES (%s, 'user', %s, %s)
-            """,
-            (ticket_id, current_user.userid, message),
-        )
-        execute(
-            conn,
-            """
-            UPDATE support_tickets
-            SET status = %s,
-                updated_at = CURRENT_TIMESTAMP,
-                last_message_preview = %s
-            WHERE id = %s
-            """,
-            (new_status, _preview(message), ticket_id),
-        )
-        cur_sub = execute(
-            conn,
-            "SELECT subject FROM support_tickets WHERE id = %s",
-            (ticket_id,),
-        )
-        sub_row = cur_sub.fetchone()
-        ticket_subject = (sub_row[0] if sub_row else "") or ""
-        u_email, u_name, u_phone = _fetch_user_contact(conn, current_user.userid)
-        conn.commit()
-
-    _notify_help_staff_user_reply(
-        ticket_id,
-        ticket_subject,
-        current_user.userid,
-        u_name,
-        u_phone,
-        u_email,
-        message,
-    )
+    post_support_message_for_user(current_user.userid, ticket_id, body.message)
     return {"message": "Sent"}
 
 
@@ -831,10 +849,10 @@ async def admin_post_message(
         cur = execute(
             conn,
             """
-            SELECT st.id, st.userid, st.subject, u.email
-            FROM support_tickets st
-            LEFT JOIN users u ON u.userid = st.userid
-            WHERE st.id = %s
+                SELECT st.id, st.userid, st.subject, st.source, u.email
+                FROM support_tickets st
+                LEFT JOIN users u ON u.userid = st.userid
+                WHERE st.id = %s
             """,
             (ticket_id,),
         )
@@ -843,7 +861,8 @@ async def admin_post_message(
             raise HTTPException(status_code=404, detail="Ticket not found")
         owner_userid = int(row[1])
         ticket_subject = (row[2] or "").strip()
-        raw_em = (row[3] or "").strip()
+        ticket_source = (row[3] or "").strip().lower()
+        raw_em = (row[4] or "").strip()
         owner_email = raw_em if raw_em else None
         message_body = message or ""
         insert_cur = execute(
@@ -899,6 +918,8 @@ async def admin_post_message(
         email_body = f"{email_body}\n\nAttached PDF: {stored_filename}"
 
     _notify_ticket_owner_support_reply(owner_userid, ticket_id, _preview(push_preview))
+    if ticket_source == "whatsapp":
+        _notify_ticket_owner_whatsapp(owner_userid, ticket_id, _preview(push_preview))
     _notify_ticket_owner_email(
         owner_email,
         ticket_id,
