@@ -19,12 +19,14 @@ from auth import create_access_token_for_phone
 from credits.credit_service import CreditService
 from db import execute, get_conn
 
-from .messaging import format_for_whatsapp_text, send_whatsapp_text
+from .messaging import format_for_whatsapp_text, send_whatsapp_interactive_list, send_whatsapp_text
 
 logger = logging.getLogger(__name__)
 
 _LOCK_GUARD = threading.Lock()
 _WA_LOCKS: Dict[str, threading.Lock] = {}
+WHATSAPP_MENU_HINT = "Type Menu anytime to see options."
+WHATSAPP_CREDIT_PACK_PREFIX = "wa_credit_"
 
 
 def _wa_lock(wa_id: str) -> threading.Lock:
@@ -53,6 +55,65 @@ def _api_base() -> str:
     if not port_raw.isdigit():
         port_raw = "8001"
     return f"http://127.0.0.1:{port_raw}".rstrip("/")
+
+
+def _send_menu_hint(wa_id: str, phone_number_id: str, prefix: str) -> None:
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body=f"{prefix.rstrip()}\n\n{WHATSAPP_MENU_HINT}",
+    )
+
+
+def _push_credit_pack_menu_for_low_balance(wa_id: str, phone_number_id: str) -> None:
+    try:
+        from credits.razorpay_routes import get_razorpay_credit_packs
+
+        packs = get_razorpay_credit_packs()
+        rows = []
+        for pack in packs:
+            credits = int(pack.get("credits") or 0)
+            if credits <= 0:
+                continue
+            rows.append(
+                (
+                    f"{WHATSAPP_CREDIT_PACK_PREFIX}{credits}",
+                    f"{credits} credits",
+                    str(pack.get("amount_display") or "INR"),
+                )
+            )
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE whatsapp_sessions
+                SET state = 'await_credit_pack', updated_at = CURRENT_TIMESTAMP
+                WHERE wa_id = %s
+                """,
+                (wa_id,),
+            )
+            conn.commit()
+        if rows:
+            ok = send_whatsapp_interactive_list(
+                to_wa_id=wa_id,
+                phone_number_id=phone_number_id,
+                body="You do not have enough credits for a Standard reading. Choose a credit pack below.",
+                button_text="Buy credits",
+                section_title="Credit packs",
+                rows=rows[:10],
+                header_text="AstroRoshni",
+                footer_text="Secured by Razorpay",
+            )
+            if ok:
+                return
+    except Exception:
+        logger.exception("whatsapp chat: could not push credit pack menu for wa_id=%s", wa_id)
+
+    _send_menu_hint(
+        wa_id,
+        phone_number_id,
+        "You do not have enough credits for a Standard reading. Type Menu, then choose Buy credits.",
+    )
 
 
 def _encryptor():
@@ -170,7 +231,10 @@ def _run_whatsapp_chart_chat_guarded(**kwargs: Any) -> None:
         try:
             send_whatsapp_text(
                 to_wa_id=str(kwargs.get("wa_id") or ""),
-                body="Something went wrong while preparing your reading. Please try again in a minute or use the AstroRoshni app.",
+                body=(
+                    "Something went wrong while preparing your reading. Please try again in a minute "
+                    f"or use the AstroRoshni app. {WHATSAPP_MENU_HINT}"
+                ),
                 phone_number_id=str(kwargs.get("phone_number_id") or ""),
             )
         except Exception:
@@ -188,7 +252,7 @@ def _run_whatsapp_chart_chat(
     if not lock.acquire(blocking=False):
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body="We are still working on your previous question. Please wait for it to finish, then ask again.",
+            body=f"We are still working on your previous question. Please wait for it to finish, then ask again. {WHATSAPP_MENU_HINT}",
             phone_number_id=phone_number_id,
         )
         return
@@ -204,7 +268,7 @@ def _run_whatsapp_chart_chat(
             if not phone:
                 send_whatsapp_text(
                     to_wa_id=wa_id,
-                    body="We could not load your account phone. Say hi to reconnect.",
+                    body=f"We could not load your account phone. Type Menu to reconnect. {WHATSAPP_MENU_HINT}",
                     phone_number_id=phone_number_id,
                 )
                 return
@@ -223,7 +287,7 @@ def _run_whatsapp_chart_chat(
             if not srow or not srow[0]:
                 send_whatsapp_text(
                     to_wa_id=wa_id,
-                    body="Pick a birth chart first (say hi → Choose chart), then ask your question.",
+                    body=f"Pick a birth chart first. Type Menu, choose a chart, then ask your question. {WHATSAPP_MENU_HINT}",
                     phone_number_id=phone_number_id,
                 )
                 return
@@ -234,7 +298,7 @@ def _run_whatsapp_chart_chat(
             if not bd:
                 send_whatsapp_text(
                     to_wa_id=wa_id,
-                    body="That birth chart could not be loaded. Choose another chart from the menu (say hi).",
+                    body=f"That birth chart could not be loaded. Type Menu and choose another chart. {WHATSAPP_MENU_HINT}",
                     phone_number_id=phone_number_id,
                 )
                 return
@@ -297,11 +361,7 @@ def _run_whatsapp_chart_chat(
         try:
             r = requests.post(ask_url, headers=headers, json=payload, timeout=120)
             if r.status_code == 402:
-                send_whatsapp_text(
-                    to_wa_id=wa_id,
-                    body="You do not have enough credits for a standard reading on this chart. Open the AstroRoshni app to top up, then try again here.",
-                    phone_number_id=phone_number_id,
-                )
+                _push_credit_pack_menu_for_low_balance(wa_id, phone_number_id)
                 return
             if r.status_code == 409 and "CHART_SESSION_MISMATCH" in (r.text or ""):
                 with get_conn() as conn:
@@ -334,7 +394,7 @@ def _run_whatsapp_chart_chat(
                 )
                 send_whatsapp_text(
                     to_wa_id=wa_id,
-                    body="We could not start that reading (server error). Please try again or use the AstroRoshni app.",
+                    body=f"We could not start that reading (server error). Please try again or use the AstroRoshni app. {WHATSAPP_MENU_HINT}",
                     phone_number_id=phone_number_id,
                 )
                 return
@@ -344,7 +404,7 @@ def _run_whatsapp_chart_chat(
             if not assistant_message_id:
                 send_whatsapp_text(
                     to_wa_id=wa_id,
-                    body="We could not start that reading (unexpected response). Please try again.",
+                    body=f"We could not start that reading (unexpected response). Please try again. {WHATSAPP_MENU_HINT}",
                     phone_number_id=phone_number_id,
                 )
                 return
@@ -379,7 +439,7 @@ def _run_whatsapp_chart_chat(
                 body=(
                     "This server could not reach its own chat API (often wrong port or missing "
                     "WHATSAPP_INTERNAL_API_URL). Ask the admin to point that env var at this API's base URL "
-                    "(same host and port the app listens on). You can use the AstroRoshni app for chat meanwhile."
+                    f"(same host and port the app listens on). You can use the AstroRoshni app for chat meanwhile. {WHATSAPP_MENU_HINT}"
                 )[:4090],
                 phone_number_id=phone_number_id,
             )
@@ -422,7 +482,7 @@ def _run_whatsapp_chart_chat(
                     time.sleep(0.45)
                     send_whatsapp_text(
                         to_wa_id=wa_id,
-                        body=credit_line[:4090],
+                        body=(credit_line + f"\n\nYou can ask another question on this chart, or type Menu for more options.").strip()[:4090],
                         phone_number_id=phone_number_id,
                     )
                 except Exception:
@@ -431,7 +491,7 @@ def _run_whatsapp_chart_chat(
 
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body=err or "Your reading is taking longer than expected. Check the AstroRoshni app for the full answer, or try asking again.",
+            body=(err or "Your reading is taking longer than expected. Check the AstroRoshni app for the full answer, or try asking again.") + f"\n\n{WHATSAPP_MENU_HINT}",
             phone_number_id=phone_number_id,
         )
     finally:

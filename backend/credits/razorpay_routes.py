@@ -308,7 +308,7 @@ def _notify_whatsapp_credit_purchase(userid: int, credits_added: int) -> None:
         return
     try:
         from db import get_conn, execute
-        from whatsapp.messaging import send_whatsapp_text
+        from whatsapp.messaging import send_whatsapp_interactive_list, send_whatsapp_text
 
         with get_conn() as conn:
             cur = execute(
@@ -317,7 +317,7 @@ def _notify_whatsapp_credit_purchase(userid: int, credits_added: int) -> None:
                 SELECT u.whatsapp_wa_id, ws.last_phone_number_id
                 FROM users u
                 LEFT JOIN whatsapp_sessions ws ON ws.wa_id = u.whatsapp_wa_id
-                WHERE u.userid = ?
+                WHERE u.userid = %s
                 """,
                 (int(userid),),
             )
@@ -332,8 +332,24 @@ def _notify_whatsapp_credit_purchase(userid: int, credits_added: int) -> None:
             body=(
                 f"Payment successful. Added {int(credits_added)} AstroRoshni credits.\n"
                 f"Your new balance: {balance} credits.\n\n"
-                "You can choose *Ask question* to continue."
+                "You can now choose *Ask question* to continue, or use the menu below."
             ),
+        )
+        send_whatsapp_interactive_list(
+            to_wa_id=str(row[0]),
+            phone_number_id=str(row[1]),
+            body="What would you like to do next?",
+            button_text="Menu",
+            section_title="AstroRoshni",
+            rows=[
+                ("wa_ask", "Ask question", "Use selected birth chart"),
+                ("wa_charts", "Choose chart", "Pick an existing chart"),
+                ("wa_buy_credits", "Buy credits", "Pay with Razorpay"),
+                ("wa_support", "Support", "Open or reply to ticket"),
+                ("wa_add_chart", "Add new chart", "Open birth details form"),
+            ],
+            header_text="AstroRoshni",
+            footer_text="Type Menu anytime to see options.",
         )
     except Exception:
         logger.exception("Razorpay WhatsApp credit notification failed user=%s credits=%s", userid, credits_added)

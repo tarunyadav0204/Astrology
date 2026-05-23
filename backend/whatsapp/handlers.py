@@ -174,6 +174,7 @@ WHATSAPP_SERVICES_TEXT = (
 
 WHATSAPP_CREDIT_PACK_PREFIX = "wa_credit_"
 WHATSAPP_SUPPORT_TICKET_PREFIX = "wa_ticket_"
+WHATSAPP_MENU_HINT = "Type Menu anytime to see options."
 
 
 def _whatsapp_menu_command(body: str) -> Optional[str]:
@@ -753,14 +754,20 @@ def _launch_birth_chart_flow_or_url(
             )
             send_whatsapp_text(
                 to_wa_id=wa_id,
-                body="We could not open the form. Open https://astroroshni.com to add a birth chart, then say hi.",
+                body=(
+                    "We could not open the form. Open https://astroroshni.com to add a birth chart, "
+                    f"then come back here. {WHATSAPP_MENU_HINT}"
+                ),
                 phone_number_id=phone_number_id,
             )
         return
 
     send_whatsapp_text(
         to_wa_id=wa_id,
-        body="Open https://astroroshni.com to create a new birth chart (full form). Say hi when you are done to pick it here.",
+        body=(
+            "Open https://astroroshni.com to create a new birth chart (full form). "
+            f"When you are done, come back here and type Menu. {WHATSAPP_MENU_HINT}"
+        ),
         phone_number_id=phone_number_id,
     )
     _clear_chart_pick_state(conn, wa_id, sess)
@@ -780,7 +787,7 @@ def _handle_flow_completion(
         logger.warning("whatsapp flow_reply: invalid JSON")
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body="We could not read that form response. Say hi to try again.",
+            body=f"We could not read that form response. Type Menu to try again. {WHATSAPP_MENU_HINT}",
             phone_number_id=phone_number_id,
         )
         return
@@ -795,7 +802,7 @@ def _handle_flow_completion(
         )
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body="This form does not match your current session. Say hi to start again.",
+            body=f"This form does not match your current session. Type Menu to start again. {WHATSAPP_MENU_HINT}",
             phone_number_id=phone_number_id,
         )
         return
@@ -815,7 +822,10 @@ def _handle_flow_completion(
         )
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body="We saved your answers but could not link them to an AstroRoshni account. Log in on the app, then say hi here again.",
+            body=(
+                "We saved your answers but could not link them to an AstroRoshni account. "
+                f"Log in on the app, then type Menu here again. {WHATSAPP_MENU_HINT}"
+            ),
             phone_number_id=phone_number_id,
         )
         return
@@ -833,7 +843,10 @@ def _handle_flow_completion(
         )
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body=f"We could not save that chart: {parse_err or 'invalid data'}. You can add it on https://astroroshni.com or say hi to try again.",
+            body=(
+                f"We could not save that chart: {parse_err or 'invalid data'}. "
+                f"You can add it on https://astroroshni.com or type Menu to try again. {WHATSAPP_MENU_HINT}"
+            ),
             phone_number_id=phone_number_id,
         )
         return
@@ -853,7 +866,10 @@ def _handle_flow_completion(
         )
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body=f"We could not save your chart: {persist_err or 'database error'}. Try again from the app at https://astroroshni.com .",
+            body=(
+                f"We could not save your chart: {persist_err or 'database error'}. "
+                f"Try again from the app at https://astroroshni.com, or type Menu here. {WHATSAPP_MENU_HINT}"
+            ),
             phone_number_id=phone_number_id,
         )
         return
@@ -873,7 +889,7 @@ def _handle_flow_completion(
         to_wa_id=wa_id,
         body=(
             f"Saved birth chart *{birth_data.name}*. It is active now. "
-            "Send your astrology question in one message. A Standard reading can take 1–1.5 minutes."
+            f"Send your astrology question in one message. A Standard reading can take 1-1.5 minutes. {WHATSAPP_MENU_HINT}"
         ),
         phone_number_id=phone_number_id,
     )
@@ -896,7 +912,7 @@ def _handle_chart_pick(
     def _chart_selected_message(label: Any) -> str:
         return (
             f"Using chart: {label}. Now send your astrology question in one message. "
-            "A Standard reading can take 1–1.5 minutes and may arrive in several parts."
+            f"A Standard reading can take 1-1.5 minutes and may arrive in several parts. {WHATSAPP_MENU_HINT}"
         )
 
     if low in ("new", "n", "create") or raw == "cr_new" or low == "cr_new":
@@ -954,8 +970,8 @@ def _handle_chart_pick(
         send_whatsapp_text(
             to_wa_id=wa_id,
             body=(
-                "Reply with a chart number (1–9), or NEW to add one. "
-                "If you see a *Choose chart* button above, you can use that list too."
+                "Reply with a chart number (1-9), or NEW to add one. "
+                f"If you see a *Choose chart* button above, you can use that list too. {WHATSAPP_MENU_HINT}"
             ),
             phone_number_id=phone_number_id,
         )
@@ -968,7 +984,7 @@ def _handle_chart_pick(
     if not charts or idx < 1 or idx > len(charts):
         send_whatsapp_text(
             to_wa_id=wa_id,
-            body="Invalid choice. Say hi to see your chart list again.",
+            body=f"Invalid choice. Type Menu to see your chart list again. {WHATSAPP_MENU_HINT}",
             phone_number_id=phone_number_id,
         )
         return
@@ -1016,7 +1032,7 @@ def _push_chart_menu(conn, wa_id: str, userid: int, phone_number_id: str) -> Non
     if meta_charts:
         body = (
             "Tap the button below, then choose a birth chart. "
-            "You can still reply with a number (1–9) or NEW if you prefer." + truncated_note
+            "You can still reply with a number (1-9) or NEW if you prefer." + truncated_note
         )
     else:
         body = "You do not have a saved birth chart yet. Tap *Choose chart*, then *Add new chart*."
@@ -1203,7 +1219,8 @@ def _send_credit_payment_link(
         body=(
             f"Pay {link['amount_display']} for {link['credits']} AstroRoshni credits:\n"
             f"{link['short_url']}\n\n"
-            "After payment succeeds, credits are added automatically. You can return here and choose *Ask question*."
+            "After payment succeeds, credits are added automatically and we will confirm here.\n"
+            f"{WHATSAPP_MENU_HINT}"
         ),
         phone_number_id=phone_number_id,
     )
@@ -1364,9 +1381,13 @@ def _create_support_ticket_from_whatsapp(conn, wa_id: str, phone_number_id: str,
     _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
     send_whatsapp_text(
         to_wa_id=wa_id,
-        body=f"Support ticket #{tid} created. Our team will reply here or in the app.",
+        body=(
+            f"Support ticket #{tid} created. Our team will reply here or in the app.\n\n"
+            f"{WHATSAPP_MENU_HINT}"
+        ),
         phone_number_id=phone_number_id,
     )
+    _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
 
 
 def _post_support_reply_from_whatsapp(conn, wa_id: str, phone_number_id: str, sess: Dict[str, Any], message: str) -> None:
@@ -1399,9 +1420,10 @@ def _post_support_reply_from_whatsapp(conn, wa_id: str, phone_number_id: str, se
     _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
     send_whatsapp_text(
         to_wa_id=wa_id,
-        body=f"Reply sent on support ticket #{int(ticket_id)}.",
+        body=f"Reply sent on support ticket #{int(ticket_id)}.\n\n{WHATSAPP_MENU_HINT}",
         phone_number_id=phone_number_id,
     )
+    _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
 
 
 def _handle_main_menu_choice(
