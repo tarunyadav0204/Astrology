@@ -1192,6 +1192,8 @@ You are ABSOLUTELY REQUIRED to return status: "CLARIFY".
 You are ABSOLUTELY FORBIDDEN from returning status: "READY".
 
 You MUST generate exactly ONE concise "clarification_question" that asks the user to pick one topic/question first.
+The choices MUST come only from topics/questions explicitly present in the user's current message.
+Do NOT invent generic life-area choices like career, relationships, or health unless those are actually in the user's message.
 Keep it warm and polite. Do not ask for birth details.
 The clarification_question MUST follow the language rule and use the inferred CURRENT QUESTION language/script.
 """
@@ -1202,6 +1204,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
 - Use wording like: "Type A for ..., Type B for ..., Type C for ...".
 - IMPORTANT: Do NOT hardcode exactly 3 options. Use only the number naturally needed (usually 2-5).
 - Use Type A / Type B options only after you have decided CLARIFY is genuinely needed. Never create Type A / Type B choices by splitting a single coherent question into imaginary sub-questions.
+- The options MUST be based on topics the user actually mentioned. Never offer unrelated defaults such as career, relationships, or health for an unusual single-topic question.
 - If only 2 choices are needed, provide only A-B. If 4 are needed, provide A-D, etc.
 - End with a short fallback like: "or type your topic in your own words."
 - Keep the full clarification in the inferred CURRENT QUESTION language/script.
@@ -1221,7 +1224,10 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - You have access to ALL planetary positions, houses, and signs
         - NEVER ask for birth date, time, place, or any birth information
         - If a question seems to need birth details, use the provided chart data to answer
-        - Only ask clarification about WHICH ASPECT of their life they want to focus on (career, health, relationships, etc.)
+        - Do NOT ask generic life-area clarification for a single understandable question
+        - If a single question asks about one identifiable theme, including spiritual guidance, identity, life purpose, remedies, family, or relationships, classify it to the closest category and return READY
+        - Ask clarification only when the user's message is truly broad (for example "tell me about my life") or explicitly bundles multiple unrelated questions
+        - Never invent generic choices like career, relationships, or health unless those are actually the competing topics in the user's message
         
         {force_ready_instruction}
         {force_clarify_instruction}

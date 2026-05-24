@@ -25,6 +25,10 @@ import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
 import AuthModalShell from '../Auth/AuthModalShell';
+import WhatsAppHomeBannerModal, {
+  dismissWhatsappHomeBannerPersist,
+  isWhatsappHomeBannerDismissed,
+} from '../WhatsAppBanner/WhatsAppHomeBannerModal';
 import { showToast } from '../../utils/toast';
 import TrustBanner from '../TrustBanner/TrustBanner';
 import './AstroRoshniHomepage.css';
@@ -169,6 +173,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [authView, setAuthView] = useState('login');
   const [showChartModal, setShowChartModal] = useState(false);
   const [showBirthFormModal, setShowBirthFormModal] = useState(false);
+  const [showWhatsappHomeBanner, setShowWhatsappHomeBanner] = useState(false);
   const [chartRefHighlight, setChartRefHighlight] = useState(null);
   const [matchingData, setMatchingData] = useState({
     boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
@@ -300,6 +305,19 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     }, 80);
     return () => window.clearTimeout(t);
   }, [location.hash]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (location.pathname !== '/') return;
+    if (!isWhatsappHomeBannerDismissed()) {
+      setShowWhatsappHomeBanner(true);
+    }
+  }, [location.pathname]);
+
+  const dismissWhatsappHomeBanner = useCallback(() => {
+    dismissWhatsappHomeBannerPersist();
+    setShowWhatsappHomeBanner(false);
+  }, []);
 
   const generateTodaysData = useCallback(() => {
     const today = new Date();
@@ -3000,6 +3018,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
         </div>
       )}
+      <WhatsAppHomeBannerModal isOpen={showWhatsappHomeBanner} onDismiss={dismissWhatsappHomeBanner} />
     </div>
   );
 };

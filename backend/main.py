@@ -364,7 +364,7 @@ MIN_IOS_BUILD_NUMBER = int(os.getenv("MIN_IOS_BUILD_NUMBER", "0"))
 
 
 def ensure_users_signup_client_column() -> None:
-    """Add signup_client (web | mobile) for registration source; safe to run repeatedly."""
+    """Add signup_client (web | mobile | whatsapp) for registration source; safe to run repeatedly."""
     try:
         with get_conn() as conn:
             execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_client TEXT")
@@ -853,7 +853,7 @@ class UserCreate(BaseModel):
         if isinstance(v, str) and not str(v).strip():
             return None
         s = str(v).strip().lower()
-        return s if s in ("web", "mobile") else None
+        return s if s in ("web", "mobile", "whatsapp") else None
 
     @field_validator("gender", mode="before")
     @classmethod
@@ -1194,7 +1194,7 @@ class UserRegistrationWithBirth(BaseModel):
         if isinstance(v, str) and not str(v).strip():
             return None
         s = str(v).strip().lower()
-        return s if s in ("web", "mobile") else None
+        return s if s in ("web", "mobile", "whatsapp") else None
 
     @field_validator("gender", mode="before")
     @classmethod

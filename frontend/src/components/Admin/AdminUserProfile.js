@@ -441,7 +441,9 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
                   ? 'Web'
                   : user.signup_client === 'mobile'
                     ? 'Mobile app'
-                    : '—'}
+                    : String(user.signup_client || '').toLowerCase() === 'whatsapp'
+                      ? 'WhatsApp'
+                      : '—'}
               </span>
               {' · '}
               <span>credits {user.credits_balance ?? '—'}</span>

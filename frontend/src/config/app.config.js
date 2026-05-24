@@ -66,5 +66,15 @@ export const APP_CONFIG = {
     geocodingService: 'nominatim',
     debounceMs: 300,
     minSearchLength: 3
-  }
+  },
+  /**
+   * Homepage WhatsApp promo (9:16 banner modal).
+   * Image file: place your asset at `frontend/public/images/whatsapp-home-banner.png` (see README in that folder).
+   * Optional click-through: set REACT_APP_WHATSAPP_CHAT_URL (e.g. https://wa.me/15551234567) in `.env`.
+   */
+  whatsappHomeBanner: {
+    imageSrc: '/images/whatsapp-home-banner.png',
+    ctaHref: (typeof process !== 'undefined' && process.env.REACT_APP_WHATSAPP_CHAT_URL) || '',
+    storageDismissKey: 'ar_home_whatsapp_banner_dismissed_v1',
+  },
 };

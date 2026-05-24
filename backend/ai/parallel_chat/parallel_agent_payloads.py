@@ -10,6 +10,10 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 from calculators.vedic_graha_drishti import GRAHA_HOUSE_ASPECTS
+from ai.parallel_chat.dispositor_evidence import (
+    build_dispositor_evidence,
+    compact_planets_from_core,
+)
 
 # Parallel Parashari: div_intent must not repeat D1/D9 already sent as core_d1 + div_d9.
 _PARASHARI_DIV_INTENT_OMIT = frozenset({"D1", "D9"})
@@ -686,6 +690,18 @@ def _build_parashari_derived_payload(agent_ctx: AgentContext, agents: Dict[str, 
         )
         for lvl in ("md", "ad", "pd", "sk", "pr")
     }
+    compact_planets, compact_lordships = compact_planets_from_core(core)
+    dispositor_evidence = build_dispositor_evidence(
+        planets=compact_planets,
+        lordships=compact_lordships or lordships,
+        graha=graha,
+        topic_houses=topic["hs"],
+        active_levels={
+            lvl: str(row.get("p"))
+            for lvl, row in levels.items()
+            if isinstance(row, dict) and row.get("p")
+        },
+    )
 
     divs = {code: bool(code in div_charts) for code in topic["dv"]}
     dx_topic = _divisional_topic_payload(topic["cat"], div_charts, topic["hs"])
@@ -713,6 +729,7 @@ def _build_parashari_derived_payload(agent_ctx: AgentContext, agents: Dict[str, 
         "dv": divs,
         "dx": dx,
         "D": levels,
+        "disp": dispositor_evidence,
         "HI": _house_impact_summary(topic["hs"], levels),
         "TR": _transit_summary(topic["hs"], levels, agents.get("transit_win") or {}),
         "career": _build_parashari_career_payload(levels, divs),

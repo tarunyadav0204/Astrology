@@ -2232,7 +2232,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             ? 'Web'
                             : user.signup_client === 'mobile'
                               ? 'Mobile app'
-                              : '—'}
+                              : String(user.signup_client || '').toLowerCase() === 'whatsapp'
+                                ? 'WhatsApp'
+                                : '—'}
                         </td>
                         <td>
                           {user.gender

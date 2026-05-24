@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from ai.parallel_chat.dispositor_evidence import build_dispositor_evidence, legacy_planets_from_context
+
 # Same mapping as ChatContextBuilder.build_complete_context (intent filter).
 DIVISIONAL_CODE_TO_KEY: Dict[str, str] = {
     "D3": "d3_drekkana",
@@ -55,6 +57,35 @@ _PARASHARI_KEYS: Set[str] = {
     "current_date_info",
     "response_format",
     "bhavat_bhavam",
+}
+
+_PARASHARI_TOPIC_HOUSES: Dict[str, List[int]] = {
+    "career": [10, 6, 2, 11],
+    "job": [10, 6, 2, 11],
+    "promotion": [10, 6, 2, 11],
+    "business": [10, 7, 2, 11],
+    "wealth": [2, 11, 5, 9],
+    "money": [2, 11, 5, 9],
+    "finance": [2, 11, 5, 9],
+    "marriage": [7, 2, 8, 11],
+    "love": [5, 7, 11, 2],
+    "relationship": [7, 5, 2, 11],
+    "partner": [7, 2, 8, 11],
+    "spouse": [7, 2, 8, 11],
+    "health": [6, 8, 12, 1],
+    "disease": [6, 8, 12, 1],
+    "education": [4, 5, 9, 2],
+    "learning": [4, 5, 9, 2],
+    "property": [4, 11, 2, 8],
+    "home": [4, 2, 11, 8],
+    "child": [5, 9, 2, 11],
+    "children": [5, 9, 2, 11],
+    "pregnancy": [5, 8, 2, 11],
+    "travel": [3, 9, 12, 7],
+    "foreign": [12, 9, 7, 3],
+    "visa": [12, 9, 7, 3],
+    "general": [1, 5, 7, 10],
+    "timing": [1, 5, 7, 10],
 }
 
 
@@ -118,7 +149,28 @@ def without_keys(d: Dict[str, Any], omit: Set[str]) -> Dict[str, Any]:
 
 def build_parashari_slice(context: Dict[str, Any]) -> Dict[str, Any]:
     """D1 + D9 + intent divisionals + Vimshottari-aligned dashas + transits + Parashari blocks (no Chara Dasha — Jaimini branch)."""
-    return _pick_keys(context, _PARASHARI_KEYS)
+    out = _pick_keys(context, _PARASHARI_KEYS)
+    intent = context.get("intent") or {}
+    cat = str(intent.get("category") or "general").strip().lower() or "general"
+    topic_houses = list(_PARASHARI_TOPIC_HOUSES.get(cat, _PARASHARI_TOPIC_HOUSES["general"]))
+    current_dashas = context.get("current_dashas") or {}
+    active_levels: Dict[str, str] = {}
+    for level in ("mahadasha", "antardasha", "pratyantardasha", "sookshma", "prana"):
+        row = current_dashas.get(level) if isinstance(current_dashas, dict) else {}
+        planet = row.get("planet") if isinstance(row, dict) else None
+        if planet:
+            active_levels[level] = str(planet)
+    planets, lordships, graha = legacy_planets_from_context(context)
+    disp = build_dispositor_evidence(
+        planets=planets,
+        lordships=lordships,
+        graha=graha,
+        topic_houses=topic_houses,
+        active_levels=active_levels,
+    )
+    if disp:
+        out["dispositor_evidence"] = disp
+    return out
 
 
 def build_jaimini_slice(context: Dict[str, Any]) -> Dict[str, Any]:
