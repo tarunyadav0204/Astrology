@@ -45,15 +45,15 @@ def test_extract_specific_date_from_explicit_month_day():
     assert _extract_specific_date_from_question("What happens on 16 March 2027?", now=now) == "2027-03-16"
 
 
-def test_apply_transit_timing_guards_sets_exact_day_fields():
+def test_apply_transit_timing_guards_sets_exact_day_fields_from_llm_specific_date():
     now = __import__("datetime").datetime(2026, 4, 22, 12, 0, 0)
     result = {
         "category": "general",
         "mode": "ANALYZE_PERSONALITY",
-        "extracted_context": {},
+        "extracted_context": {"specific_date": "2026-04-23"},
         "needs_transits": False,
     }
-    apply_transit_timing_guards(result, "How is tomorrow?", current_year=2026, now=now)
+    apply_transit_timing_guards(result, "How is tomorrow for me?", current_year=2026, now=now)
     assert result["mode"] == "PREDICT_DAILY"
     assert result["context_type"] == "birth"
     assert result["analysis_type"] == "DAILY_PREDICTION"
@@ -61,6 +61,24 @@ def test_apply_transit_timing_guards_sets_exact_day_fields():
     assert result["dasha_as_of"] == "2026-04-23"
     assert result["transit_request"]["startYear"] == 2026
     assert result["transit_request"]["yearMonthMap"] == {"2026": ["April"]}
+
+
+def test_apply_transit_timing_guards_does_not_force_daily_from_narrative_date_in_text():
+    now = __import__("datetime").datetime(2026, 4, 22, 12, 0, 0)
+    result = {
+        "category": "general",
+        "mode": "ANALYZE_TOPIC_POTENTIAL",
+        "extracted_context": {},
+        "needs_transits": False,
+    }
+    apply_transit_timing_guards(
+        result,
+        "My father passed away on 2020-03-15. Will my career improve this year?",
+        current_year=2026,
+        now=now,
+    )
+    assert result["mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert result.get("dasha_as_of") is None
 
 
 def test_apply_transit_timing_guards_prefers_llm_specific_date():

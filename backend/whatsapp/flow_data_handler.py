@@ -7,16 +7,218 @@ from __future__ import annotations
 
 import logging
 import os
+import random
+import re
+import secrets
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
+from db import execute, get_conn
 from utils.google_places_client import place_details as gp_place_details
 from utils.google_places_client import places_autocomplete_suggestions
+from utils.smtp_mail import send_plain_text_email
 
 logger = logging.getLogger(__name__)
 
 
 def _env(name: str, default: str) -> str:
     return (os.environ.get(name) or default).strip()
+
+
+def _flow_token(decrypted: Dict[str, Any], data: Dict[str, Any]) -> str:
+    return str(decrypted.get("flow_token") or data.get("flow_token") or "").strip()
+
+
+def _normalize_email(raw: str) -> str:
+    email = (raw or "").strip().lower()
+    if not email or len(email) > 254:
+        return ""
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        return ""
+    return email
+
+
+def _normalize_gender(raw: str) -> str:
+    value = (raw or "").strip().lower()
+    if value in {"1", "m", "male", "man"}:
+        return "male"
+    if value in {"2", "f", "female", "woman"}:
+        return "female"
+    return ""
+
+
+def _send_email_otp(email: str, code: str) -> bool:
+    body = (
+        f"Your AstroRoshni email verification code is: {code}\n\n"
+        "This code expires in 10 minutes."
+    )
+    try:
+        return bool(send_plain_text_email(email, "Verify your AstroRoshni email", body))
+    except Exception:
+        logger.exception("registration flow email OTP failed for %s", email)
+        return False
+
+
+def _find_registration_session(flow_token: str):
+    if not flow_token:
+        return None
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT wa_id, reg_phone, reg_otp_token, reg_name, pending_charts_json
+            FROM whatsapp_sessions
+            WHERE pending_flow_token = %s AND state = 'await_flow_registration'
+            """,
+            (flow_token,),
+        )
+        return cur.fetchone()
+
+
+def _update_registration_session(flow_token: str, **updates: Any) -> None:
+    if not flow_token or not updates:
+        return
+    allowed = {
+        "reg_otp_token",
+        "reg_name",
+        "pending_charts_json",
+    }
+    sets = []
+    vals = []
+    for k, v in updates.items():
+        if k in allowed:
+            sets.append(f"{k} = %s")
+            vals.append(v)
+    if not sets:
+        return
+    vals.append(flow_token)
+    with get_conn() as conn:
+        execute(
+            conn,
+            f"""
+            UPDATE whatsapp_sessions
+            SET {", ".join(sets)}, updated_at = CURRENT_TIMESTAMP
+            WHERE pending_flow_token = %s AND state = 'await_flow_registration'
+            """,
+            tuple(vals),
+        )
+        conn.commit()
+
+
+def _load_pending_json(raw: Any) -> Dict[str, Any]:
+    try:
+        import json
+
+        val = json.loads(raw or "{}")
+        return val if isinstance(val, dict) else {}
+    except Exception:
+        return {}
+
+
+def _registration_error(screen: str, message: str) -> Dict[str, Any]:
+    return {"screen": screen, "data": {"error_message": message}}
+
+
+def _verify_registration_sms_otp(flow_token: str, data: Dict[str, Any]) -> Dict[str, Any] | None:
+    if not flow_token:
+        return _registration_error("sms_otp", "Session expired. Close this form and start again.")
+    row = _find_registration_session(flow_token)
+    if not row:
+        return _registration_error("sms_otp", "Session expired. Close this form and start again.")
+    reg_phone = str(row[1] or "")
+    code = str(data.get("sms_otp") or "").strip()
+    if not re.fullmatch(r"\d{6}", code):
+        return _registration_error("sms_otp", "Enter the 6-digit SMS code.")
+
+    from whatsapp.phone_utils import phone_lookup_variants
+
+    variants = phone_lookup_variants(reg_phone)
+    if not variants:
+        return _registration_error("sms_otp", "Could not verify this phone. Start again.")
+    ph = ", ".join(["%s"] * len(variants))
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            f"""
+            SELECT token FROM password_reset_codes
+            WHERE phone IN ({ph}) AND code = %s AND expires_at > %s
+              AND COALESCE(LOWER(TRIM(used::text)), '') NOT IN ('true', '1', 't', 'yes')
+            """,
+            tuple(variants) + (code, datetime.utcnow()),
+        )
+        otp_row = cur.fetchone()
+    if not otp_row:
+        return _registration_error("sms_otp", "That SMS code is invalid or expired.")
+
+    _update_registration_session(flow_token, reg_otp_token=str(otp_row[0]))
+    return {"screen": "profile", "data": {}}
+
+
+def _send_registration_email_otp(flow_token: str, data: Dict[str, Any]) -> Dict[str, Any] | None:
+    if not flow_token or not _find_registration_session(flow_token):
+        return _registration_error("email_entry", "Session expired. Close this form and start again.")
+    name = str(data.get("name") or "").strip()
+    gender = _normalize_gender(str(data.get("gender") or ""))
+    email = _normalize_email(str(data.get("email") or ""))
+    if len(name) < 2 or len(name) > 80:
+        return _registration_error("email_entry", "Enter your full name on the previous screen.")
+    if not gender:
+        return _registration_error("email_entry", "Choose your gender on the previous screen.")
+    if not email:
+        return _registration_error("email_entry", "Enter a valid email address.")
+
+    code = str(random.randint(100000, 999999))
+    sent = _send_email_otp(email, code)
+    is_dev = (os.getenv("ENVIRONMENT", "development") == "development")
+    if not sent and is_dev:
+        logger.warning("registration flow email OTP (dev email failed): %s for %s", code, email)
+    if not sent and not is_dev:
+        return _registration_error("email_entry", "Could not send email code. Try another email.")
+
+    pending = {
+        "name": name,
+        "gender": gender,
+        "email": email,
+        "email_code": code,
+        "email_expires_at": (datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+    }
+    import json
+
+    _update_registration_session(flow_token, reg_name=name, pending_charts_json=json.dumps(pending))
+    return {"screen": "email_otp", "data": {"email_display": email}}
+
+
+def _verify_registration_email_otp(flow_token: str, data: Dict[str, Any]) -> Dict[str, Any] | None:
+    row = _find_registration_session(flow_token)
+    if not flow_token or not row:
+        return _registration_error("email_otp", "Session expired. Close this form and start again.")
+    pending = _load_pending_json(row[4])
+    expected = str(pending.get("email_code") or "").strip()
+    code = str(data.get("email_otp") or "").strip()
+    try:
+        expires_at = datetime.fromisoformat(str(pending.get("email_expires_at") or ""))
+    except ValueError:
+        expires_at = datetime.utcnow() - timedelta(seconds=1)
+    if not re.fullmatch(r"\d{6}", code) or code != expected or expires_at <= datetime.utcnow():
+        return _registration_error("email_otp", "That email code is invalid or expired.")
+    pending["email_verified"] = True
+    pending.pop("email_code", None)
+    import json
+
+    _update_registration_session(flow_token, pending_charts_json=json.dumps(pending))
+    return {"screen": "password", "data": {}}
+
+
+def _validate_registration_password(flow_token: str, data: Dict[str, Any]) -> Dict[str, Any] | None:
+    if not flow_token or not _find_registration_session(flow_token):
+        return _registration_error("password", "Session expired. Close this form and start again.")
+    password = str(data.get("password") or "")
+    confirm = str(data.get("confirm_password") or "")
+    if len(password.strip()) < 8:
+        return _registration_error("password", "Password must be at least 8 characters.")
+    if password != confirm:
+        return _registration_error("password", "Passwords do not match.")
+    return {"screen": "registration_review", "data": {}}
 
 
 # Meta: RadioButtonsGroup option titles must be ≤30 chars. The client shows one red banner per bad row.
@@ -62,6 +264,24 @@ def build_flow_data_response(decrypted: Dict[str, Any]) -> Dict[str, Any]:
     if action == "ping":
         return {"data": {"status": "active"}}
 
+    flow_token = _flow_token(decrypted, data)
+    if action == "data_exchange" and screen == "sms_otp":
+        res = _verify_registration_sms_otp(flow_token, data)
+        if res is not None:
+            return res
+    if action == "data_exchange" and screen == "email_entry":
+        res = _send_registration_email_otp(flow_token, data)
+        if res is not None:
+            return res
+    if action == "data_exchange" and screen == "email_otp":
+        res = _verify_registration_email_otp(flow_token, data)
+        if res is not None:
+            return res
+    if action == "data_exchange" and screen == "password":
+        res = _validate_registration_password(flow_token, data)
+        if res is not None:
+            return res
+
     init_screen = _env("WHATSAPP_FLOW_DATA_INIT_SCREEN", "create_birth_chart")
     search_screen = _env("WHATSAPP_FLOW_DATA_SCREEN_SEARCH", "place_search")
     pick_screen = _env("WHATSAPP_FLOW_DATA_SCREEN_PICK", "place_pick")
@@ -71,6 +291,12 @@ def build_flow_data_response(decrypted: Dict[str, Any]) -> Dict[str, Any]:
 
     # Meta sends action lowercased in practice; we normalize with .lower() above.
     if action == "init":
+        reg_row = _find_registration_session(flow_token)
+        if reg_row:
+            return {
+                "screen": "registration_welcome",
+                "data": {"phone_display": str(reg_row[1] or "")},
+            }
         return {"screen": init_screen, "data": {}}
 
     if action == "back":

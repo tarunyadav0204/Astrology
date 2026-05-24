@@ -131,5 +131,6 @@ backend/gcp_key.json
 !package.json
 !package-lock.json
 !astroroshni_mobile/src/locales/*.json
+!backend/whatsapp/flows/registration_flow.json
 !frontend/public/.well-known/
 !frontend/public/.well-known/assetlinks.json

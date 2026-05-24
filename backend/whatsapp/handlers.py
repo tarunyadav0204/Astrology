@@ -18,6 +18,7 @@ from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 from sms_service import SMSService
 
 from .messaging import (
+    send_whatsapp_interactive_buttons,
     send_whatsapp_interactive_flow,
     send_whatsapp_interactive_list,
     send_whatsapp_text,
@@ -164,6 +165,15 @@ WHATSAPP_CHAT_WAIT_ACK = (
     "If the answer is long, we will send it in a few back-to-back messages on this chat."
 )
 
+# Shown once per WhatsApp user (session flag) before the first chart astrology question.
+WA_TARA_DISCLAIMER_BUTTON_ID = "wa_tara_disclaimer_yes"
+WHATSAPP_TARA_DISCLAIMER_BODY = (
+    "Welcome to AstroRoshni! 🌟 Before we look into your stars, please note our Ethical Guarantee: "
+    "We focus entirely on proactive care and will never predict death dates or induce fear.\n\n"
+    "Disclaimer: The insights provided by Ask Tara and our astrologers are intended as an advisory only. "
+    "Individuals are requested to use their own discretion when making major life decisions."
+)
+
 WHATSAPP_SERVICES_TEXT = (
     "AstroRoshni can help with Vedic astrology readings on WhatsApp after you choose a saved birth chart.\n\n"
     "- Ask a Standard astrology question\n"
@@ -199,6 +209,39 @@ def _should_route_text_to_chart_chat(body: str, sess: Dict[str, Any]) -> bool:
     if len(raw) < 2 and raw.lower() not in {"a", "b", "c", "d", "e"}:
         return False
     return True
+
+
+def _is_tara_disclaimer_ack(body: str, input_kind: str) -> bool:
+    raw = (body or "").strip()
+    if raw == WA_TARA_DISCLAIMER_BUTTON_ID:
+        return True
+    if (input_kind or "") == "text":
+        low = raw.lower()
+        if low in {"yes", "y", "ok", "okay", "agree", "i agree"}:
+            return True
+    return False
+
+
+def _send_whatsapp_tara_disclaimer(wa_id: str, phone_number_id: str) -> None:
+    sent = send_whatsapp_interactive_buttons(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body=WHATSAPP_TARA_DISCLAIMER_BODY,
+        buttons=[(WA_TARA_DISCLAIMER_BUTTON_ID, "Yes")],
+    )
+    if not sent:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            phone_number_id=phone_number_id,
+            body=WHATSAPP_TARA_DISCLAIMER_BODY + "\n\nReply *YES* to continue.",
+        )
+
+
+def _tara_disclaimer_accepted_today(sess: Dict[str, Any]) -> bool:
+    accepted_on = sess.get("tara_disclaimer_accepted_on")
+    if isinstance(accepted_on, date):
+        return accepted_on == date.today()
+    return str(accepted_on or "")[:10] == date.today().isoformat()
 
 
 def _credit_pack_from_reply(raw: str) -> Optional[int]:
@@ -340,6 +383,19 @@ def extract_inbound_messages(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
                                     "input_kind": "flow_reply",
                                 }
                             )
+                    elif itype == "button_reply":
+                        br = inter.get("button_reply") or {}
+                        bid = str(br.get("id") or "").strip()
+                        if bid:
+                            out.append(
+                                {
+                                    "from": frm,
+                                    "body": bid,
+                                    "phone_number_id": phone_number_id,
+                                    "profile_name": name_by_wa.get(frm, ""),
+                                    "input_kind": "button_reply",
+                                }
+                            )
     return out
 
 
@@ -369,7 +425,7 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
     cur = execute(
         conn,
         """
-        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token, idle_soft_intro_done, whatsapp_chat_session_id, whatsapp_chat_session_chart_id
+        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token, idle_soft_intro_done, whatsapp_chat_session_id, whatsapp_chat_session_chart_id, tara_disclaimer_accepted, tara_disclaimer_accepted_on, pending_disclaimer_question
         FROM whatsapp_sessions WHERE wa_id = %s
         """,
         (wa_id,),
@@ -390,6 +446,9 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
             "idle_soft_intro_done": bool(row[10]),
             "whatsapp_chat_session_id": row[11],
             "whatsapp_chat_session_chart_id": row[12],
+            "tara_disclaimer_accepted": bool(row[13]),
+            "tara_disclaimer_accepted_on": row[14],
+            "pending_disclaimer_question": row[15],
         }
     try:
         execute(
@@ -403,7 +462,7 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
     cur = execute(
         conn,
         """
-        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token, idle_soft_intro_done, whatsapp_chat_session_id, whatsapp_chat_session_chart_id
+        SELECT wa_id, state, userid, reg_phone, reg_otp_token, reg_name, pending_charts_json, active_chart_id, last_phone_number_id, pending_flow_token, idle_soft_intro_done, whatsapp_chat_session_id, whatsapp_chat_session_chart_id, tara_disclaimer_accepted, tara_disclaimer_accepted_on, pending_disclaimer_question
         FROM whatsapp_sessions WHERE wa_id = %s
         """,
         (wa_id,),
@@ -425,6 +484,9 @@ def _get_session(conn, wa_id: str) -> Dict[str, Any]:
         "idle_soft_intro_done": bool(row[10]),
         "whatsapp_chat_session_id": row[11],
         "whatsapp_chat_session_chart_id": row[12],
+        "tara_disclaimer_accepted": bool(row[13]),
+        "tara_disclaimer_accepted_on": row[14],
+        "pending_disclaimer_question": row[15],
     }
 
 
@@ -447,6 +509,9 @@ def _session_write(conn, wa_id: str, sess: Dict[str, Any], **updates: Any) -> Di
             idle_soft_intro_done = %s,
             whatsapp_chat_session_id = %s,
             whatsapp_chat_session_chart_id = %s,
+            tara_disclaimer_accepted = %s,
+            tara_disclaimer_accepted_on = %s,
+            pending_disclaimer_question = %s,
             updated_at = CURRENT_TIMESTAMP
         WHERE wa_id = %s
         """,
@@ -463,6 +528,9 @@ def _session_write(conn, wa_id: str, sess: Dict[str, Any], **updates: Any) -> Di
             bool(merged.get("idle_soft_intro_done")),
             merged.get("whatsapp_chat_session_id"),
             merged.get("whatsapp_chat_session_chart_id"),
+            bool(merged.get("tara_disclaimer_accepted")),
+            merged.get("tara_disclaimer_accepted_on"),
+            merged.get("pending_disclaimer_question"),
             wa_id,
         ),
     )
@@ -709,6 +777,107 @@ def _birth_chart_flow_config() -> Dict[str, Any]:
     }
 
 
+def _registration_flow_config() -> Dict[str, Any]:
+    return {
+        "flow_id": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_ID") or "").strip(),
+        "flow_name": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_NAME") or "").strip(),
+        "cta": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_CTA") or "Create account").strip(),
+        "mode": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_MODE") or "published").strip().lower(),
+        "header": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_HEADER") or "AstroRoshni").strip() or None,
+        "body": (
+            os.environ.get("WHATSAPP_REGISTRATION_FLOW_BODY")
+            or "Create your AstroRoshni account securely inside WhatsApp."
+        ).strip(),
+        "footer": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_FOOTER") or "").strip() or None,
+        "screen": (os.environ.get("WHATSAPP_REGISTRATION_FLOW_SCREEN") or "registration_welcome").strip() or None,
+    }
+
+
+def _phone_display(phone: str) -> str:
+    raw = (phone or "").strip()
+    if raw.startswith("+91") and len("".join(c for c in raw if c.isdigit())) >= 12:
+        d = "".join(c for c in raw if c.isdigit())[-10:]
+        return f"+91 {d[:5]} {d[5:]}"
+    return raw
+
+
+def _launch_registration_flow_or_text(
+    conn,
+    wa_id: str,
+    phone_number_id: str,
+    sess: Dict[str, Any],
+    canonical_phone: str,
+) -> None:
+    ok, err = _send_registration_sms(conn, canonical_phone)
+    if not ok:
+        if err == "already_registered":
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="This number looks registered already but is not linked here. Log in on the AstroRoshni app with this number, or contact help@astroroshni.com.",
+                phone_number_id=phone_number_id,
+            )
+        else:
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="We could not send an SMS code right now. Try again later or use the AstroRoshni app to sign up.",
+                phone_number_id=phone_number_id,
+            )
+        return
+
+    cfg = _registration_flow_config()
+    tok = secrets.token_urlsafe(24)
+    if cfg["flow_id"] or cfg["flow_name"]:
+        _session_write(
+            conn,
+            wa_id,
+            sess,
+            state="await_flow_registration",
+            reg_phone=canonical_phone,
+            reg_otp_token=None,
+            reg_name=None,
+            pending_charts_json=None,
+            pending_flow_token=tok,
+            userid=None,
+            last_phone_number_id=phone_number_id,
+        )
+        ok_flow = send_whatsapp_interactive_flow(
+            to_wa_id=wa_id,
+            phone_number_id=phone_number_id,
+            body_text=cfg["body"],
+            flow_cta=cfg["cta"],
+            flow_token=tok,
+            flow_id=cfg["flow_id"] or None,
+            flow_name=cfg["flow_name"] or None,
+            header_text=cfg["header"],
+            footer_text=cfg["footer"],
+            mode=cfg["mode"] if cfg["mode"] in ("draft", "published") else "published",
+            screen=cfg["screen"] or None,
+            screen_data={"phone_display": _phone_display(canonical_phone)},
+        )
+        if ok_flow:
+            return
+        logger.warning("WhatsApp registration Flow send failed; falling back to text signup wa_id=%s", wa_id)
+
+    _session_write(
+        conn,
+        wa_id,
+        sess,
+        state="await_otp",
+        reg_phone=canonical_phone,
+        reg_otp_token=None,
+        reg_name=None,
+        pending_charts_json=None,
+        pending_flow_token=None,
+        userid=None,
+        last_phone_number_id=phone_number_id,
+    )
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        body=f"We sent a 6-digit code to {canonical_phone}. Reply here with that code to create your AstroRoshni account.",
+        phone_number_id=phone_number_id,
+    )
+
+
 def _launch_birth_chart_flow_or_url(
     conn,
     wa_id: str,
@@ -809,6 +978,73 @@ def _handle_flow_completion(
 
     keys = [k for k in data.keys() if k != "flow_token"]
     logger.info("whatsapp flow_reply wa_id=%s fields=%s", wa_id, keys)
+
+    if (sess.get("state") or "") == "await_flow_registration":
+        reg_phone = str(sess.get("reg_phone") or "")
+        otp_tok = str(sess.get("reg_otp_token") or "")
+        pending = _load_pending_json(sess)
+        name = str(data.get("name") or pending.get("name") or sess.get("reg_name") or "").strip()
+        email = str(data.get("email") or pending.get("email") or "").strip()
+        gender = str(data.get("gender") or pending.get("gender") or "").strip()
+        password = str(data.get("password") or "")
+        confirm_password = str(data.get("confirm_password") or "")
+        if not otp_tok:
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="Phone verification was not completed. Please type Menu and start registration again.",
+                phone_number_id=phone_number_id,
+            )
+            _session_write(conn, wa_id, sess, state="idle", pending_flow_token=None, pending_charts_json=None)
+            return
+        if not pending.get("email_verified"):
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="Email verification was not completed. Please type Menu and start registration again.",
+                phone_number_id=phone_number_id,
+            )
+            _session_write(conn, wa_id, sess, state="idle", pending_flow_token=None, pending_charts_json=None)
+            return
+        if len(password.strip()) < 8 or password != confirm_password:
+            send_whatsapp_text(
+                to_wa_id=wa_id,
+                body="Password validation failed. Please type Menu and start registration again.",
+                phone_number_id=phone_number_id,
+            )
+            _session_write(conn, wa_id, sess, state="idle", pending_flow_token=None, pending_charts_json=None)
+            return
+        ok, detail = _complete_whatsapp_registration(
+            conn,
+            wa_id=wa_id,
+            canonical_phone=reg_phone,
+            otp_token=otp_tok,
+            name=name,
+            email=email,
+            gender=gender,
+            password=password,
+        )
+        if not ok:
+            _session_write(conn, wa_id, sess, state="idle", pending_flow_token=None, pending_charts_json=None)
+            send_whatsapp_text(to_wa_id=wa_id, body=detail, phone_number_id=phone_number_id)
+            return
+        linked = _find_user_by_wa_id(conn, wa_id)
+        uid_new = linked[0] if linked else None
+        sess2 = _get_session(conn, wa_id)
+        _session_write(
+            conn,
+            wa_id,
+            sess2,
+            state="idle",
+            userid=uid_new,
+            reg_phone=None,
+            reg_otp_token=None,
+            reg_name=None,
+            pending_charts_json=None,
+            pending_flow_token=None,
+        )
+        send_whatsapp_text(to_wa_id=wa_id, body=detail, phone_number_id=phone_number_id)
+        if uid_new is not None:
+            _push_chart_menu(conn, wa_id, int(uid_new), phone_number_id)
+        return
 
     uid = sess.get("userid")
     if not uid:
@@ -1436,7 +1672,16 @@ def _handle_main_menu_choice(
 ) -> bool:
     raw = (choice or "").strip()
     st = sess.get("state") or "idle"
-    if st in {"await_otp", "await_name", "await_gender", "await_email", "await_email_otp", "await_password"}:
+    if st in {
+        "await_otp",
+        "await_name",
+        "await_gender",
+        "await_email",
+        "await_email_otp",
+        "await_password",
+        "await_flow_registration",
+        "await_tara_disclaimer",
+    }:
         return False
     if st == "await_chart_pick" and raw.isdigit():
         return False
@@ -1454,26 +1699,43 @@ def _handle_main_menu_choice(
             "6": "wa_services",
         }.get(raw, raw)
     if raw in {"wa_menu"}:
-        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None)
+        if st == "await_flow_registration":
+            _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None, pending_flow_token=None)
+            _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
+            return True
+        _session_write(conn, wa_id, sess, state="idle", pending_charts_json=None, pending_disclaimer_question=None)
         _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
         return True
     if raw in {"wa_support_new", "wa_support_tickets"}:
         uid = sess.get("userid")
         if not uid:
+            if sess.get("pending_disclaimer_question"):
+                sess = _session_write(conn, wa_id, sess, pending_disclaimer_question=None)
             _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
             return True
         if raw == "wa_support_new":
-            _session_write(conn, wa_id, sess, state="await_support_subject", pending_charts_json=None)
+            _session_write(
+                conn,
+                wa_id,
+                sess,
+                state="await_support_subject",
+                pending_charts_json=None,
+                pending_disclaimer_question=None,
+            )
             send_whatsapp_text(
                 to_wa_id=wa_id,
                 body="Please send a short subject for your support ticket.",
                 phone_number_id=phone_number_id,
             )
         else:
+            _session_write(conn, wa_id, sess, pending_disclaimer_question=None)
             _push_support_ticket_list(conn, wa_id, phone_number_id, sess)
         return True
     if raw not in {"wa_ask", "wa_charts", "wa_buy_credits", "wa_support", "wa_add_chart", "wa_services"}:
         return False
+
+    if sess.get("pending_disclaimer_question"):
+        sess = _session_write(conn, wa_id, sess, pending_disclaimer_question=None)
 
     uid = sess.get("userid")
     if raw == "wa_services":
@@ -1483,6 +1745,8 @@ def _handle_main_menu_choice(
         return True
 
     if not uid:
+        if sess.get("pending_disclaimer_question"):
+            sess = _session_write(conn, wa_id, sess, pending_disclaimer_question=None)
         _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
         return True
 
@@ -1557,40 +1821,7 @@ def _handle_idle_greeting(
         return
 
     canonical = canonical_phone_for_registration(wa_id)
-    ok, err = _send_registration_sms(conn, canonical)
-    if not ok:
-        if err == "already_registered":
-            send_whatsapp_text(
-                to_wa_id=wa_id,
-                body="This number looks registered already but is not linked here. Log in on the AstroRoshni app with this number, or contact help@astroroshni.com.",
-                phone_number_id=phone_number_id,
-            )
-        else:
-            send_whatsapp_text(
-                to_wa_id=wa_id,
-                body="We could not send an SMS code right now. Try again later or use the AstroRoshni app to sign up.",
-                phone_number_id=phone_number_id,
-            )
-        return
-
-    sess = _get_session(conn, wa_id)
-    _session_write(
-        conn,
-        wa_id,
-        sess,
-        state="await_otp",
-        reg_phone=canonical,
-        reg_otp_token=None,
-        reg_name=None,
-        pending_charts_json=None,
-        userid=None,
-        last_phone_number_id=phone_number_id,
-    )
-    send_whatsapp_text(
-        to_wa_id=wa_id,
-        body=f"We sent a 6-digit code to {canonical}. Reply here with that code to create your AstroRoshni account.",
-        phone_number_id=phone_number_id,
-    )
+    _launch_registration_flow_or_text(conn, wa_id, phone_number_id, _get_session(conn, wa_id), canonical)
 
 
 def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
@@ -1619,7 +1850,15 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
 
                 st = sess.get("state") or "idle"
 
-                if st in {"await_otp", "await_name", "await_gender", "await_email", "await_email_otp", "await_password"}:
+                if st in {
+                    "await_otp",
+                    "await_name",
+                    "await_gender",
+                    "await_email",
+                    "await_email_otp",
+                    "await_password",
+                    "await_flow_registration",
+                }:
                     if is_greeting(body) or _whatsapp_menu_command(body):
                         _session_write(
                             conn,
@@ -1630,6 +1869,7 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                             reg_otp_token=None,
                             reg_name=None,
                             pending_charts_json=None,
+                            pending_flow_token=None,
                             userid=None,
                         )
                         _handle_idle_greeting(conn, wa_id, phone_number_id, profile_name)
@@ -1743,12 +1983,65 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     _post_support_reply_from_whatsapp(conn, wa_id, phone_number_id, sess, body)
                     continue
 
+                if st == "await_tara_disclaimer":
+                    if is_greeting(body) or _whatsapp_menu_command(body):
+                        _session_write(conn, wa_id, sess, state="idle", pending_disclaimer_question=None)
+                        _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
+                        continue
+                    if _is_tara_disclaimer_ack(body, input_kind):
+                        pending_q = (sess.get("pending_disclaimer_question") or "").strip()
+                        if not pending_q:
+                            _session_write(conn, wa_id, sess, state="idle", pending_disclaimer_question=None)
+                            send_whatsapp_text(
+                                to_wa_id=wa_id,
+                                body="Please choose *Ask Tara* from the menu and send your question again.",
+                                phone_number_id=phone_number_id,
+                            )
+                            continue
+                        _session_write(
+                            conn,
+                            wa_id,
+                            sess,
+                            state="idle",
+                            tara_disclaimer_accepted=True,
+                            tara_disclaimer_accepted_on=date.today(),
+                            pending_disclaimer_question=None,
+                        )
+                        send_whatsapp_text(
+                            to_wa_id=wa_id,
+                            body=WHATSAPP_CHAT_WAIT_ACK,
+                            phone_number_id=phone_number_id,
+                        )
+                        schedule_whatsapp_chart_chat(
+                            wa_id=wa_id,
+                            phone_number_id=phone_number_id,
+                            userid=int(sess["userid"]),
+                            question=pending_q,
+                        )
+                        continue
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body="Please tap *Yes* on the disclaimer above to continue, or type Menu.",
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
+
                 if st == "await_question":
                     if is_greeting(body) or _whatsapp_menu_command(body):
                         _session_write(conn, wa_id, sess, state="idle")
                         _push_main_menu(conn, wa_id, phone_number_id, _get_session(conn, wa_id))
                         continue
                     if _should_route_text_to_chart_chat(body, sess):
+                        if not _tara_disclaimer_accepted_today(sess):
+                            _session_write(
+                                conn,
+                                wa_id,
+                                sess,
+                                state="await_tara_disclaimer",
+                                pending_disclaimer_question=body.strip(),
+                            )
+                            _send_whatsapp_tara_disclaimer(wa_id, phone_number_id)
+                            continue
                         _session_write(conn, wa_id, sess, state="idle")
                         send_whatsapp_text(
                             to_wa_id=wa_id,

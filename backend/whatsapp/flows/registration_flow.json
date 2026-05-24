@@ -1,0 +1,348 @@
+{
+  "data_api_version": "3.0",
+  "version": "7.3",
+  "routing_model": {
+    "registration_welcome": [
+      "sms_otp"
+    ],
+    "sms_otp": [
+      "profile"
+    ],
+    "profile": [
+      "email_entry"
+    ],
+    "email_entry": [
+      "email_otp"
+    ],
+    "email_otp": [
+      "password"
+    ],
+    "password": [
+      "registration_review"
+    ],
+    "registration_review": []
+  },
+  "screens": [
+    {
+      "id": "registration_welcome",
+      "title": "Create account",
+      "data": {
+        "phone_display": {
+          "type": "string",
+          "__example__": "+91 98765 43210"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Create your AstroRoshni account"
+          },
+          {
+            "type": "TextBody",
+            "text": "We will use your WhatsApp number as your login phone."
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Phone"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.phone_display}"
+          },
+          {
+            "type": "TextBody",
+            "text": "You will verify your phone, add your profile details, verify your email, and choose a password."
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "sms_otp"
+              },
+              "payload": {
+                "phone_display": "${data.phone_display}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sms_otp",
+      "title": "Verify phone",
+      "data": {
+        "phone_display": {
+          "type": "string",
+          "__example__": "+91 98765 43210"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Enter SMS code"
+          },
+          {
+            "type": "TextBody",
+            "text": "We sent a 6-digit code to your WhatsApp phone number."
+          },
+          {
+            "type": "TextCaption",
+            "text": "${data.phone_display}"
+          },
+          {
+            "type": "TextInput",
+            "name": "sms_otp",
+            "label": "6-digit SMS code",
+            "label-variant": "large",
+            "input-type": "number",
+            "required": true
+          },
+          {
+            "type": "Footer",
+            "label": "Verify",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "sms_otp": "${form.sms_otp}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "profile",
+      "title": "Profile",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Tell us about you"
+          },
+          {
+            "type": "TextBody",
+            "text": "This helps us personalize your AstroRoshni account."
+          },
+          {
+            "type": "TextInput",
+            "name": "name",
+            "label": "Full name",
+            "label-variant": "large",
+            "input-type": "text",
+            "required": true
+          },
+          {
+            "type": "RadioButtonsGroup",
+            "name": "gender",
+            "label": "Gender",
+            "required": true,
+            "data-source": [
+              {
+                "id": "male",
+                "title": "Male"
+              },
+              {
+                "id": "female",
+                "title": "Female"
+              }
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "email_entry"
+              },
+              "payload": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "email_entry",
+      "title": "Email",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Verify your email"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter an email address you can access. We will send a verification code."
+          },
+          {
+            "type": "TextInput",
+            "name": "email",
+            "label": "Email address",
+            "label-variant": "large",
+            "input-type": "email",
+            "required": true
+          },
+          {
+            "type": "Footer",
+            "label": "Send code",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "email": "${form.email}",
+                "name": "${screen.profile.form.name}",
+                "gender": "${screen.profile.form.gender}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "email_otp",
+      "title": "Email code",
+      "data": {
+        "email_display": {
+          "type": "string",
+          "__example__": "name@example.com"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Enter email code"
+          },
+          {
+            "type": "TextBody",
+            "text": "We sent a 6-digit code to:"
+          },
+          {
+            "type": "TextCaption",
+            "text": "${data.email_display}"
+          },
+          {
+            "type": "TextInput",
+            "name": "email_otp",
+            "label": "6-digit email code",
+            "label-variant": "large",
+            "input-type": "number",
+            "required": true
+          },
+          {
+            "type": "Footer",
+            "label": "Verify",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "email_otp": "${form.email_otp}",
+                "email": "${screen.email_entry.form.email}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "password",
+      "title": "Password",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Create password"
+          },
+          {
+            "type": "TextBody",
+            "text": "Use at least 8 characters. You can change this later in the app."
+          },
+          {
+            "type": "TextInput",
+            "name": "password",
+            "label": "Password",
+            "label-variant": "large",
+            "input-type": "password",
+            "required": true
+          },
+          {
+            "type": "TextInput",
+            "name": "confirm_password",
+            "label": "Confirm password",
+            "label-variant": "large",
+            "input-type": "password",
+            "required": true
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "password": "${form.password}",
+                "confirm_password": "${form.confirm_password}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "registration_review",
+      "title": "Review",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Almost done"
+          },
+          {
+            "type": "TextBody",
+            "text": "Tap Create account to finish your AstroRoshni signup."
+          },
+          {
+            "type": "TextSubheading",
+            "text": "What happens next"
+          },
+          {
+            "type": "TextBody",
+            "text": "After signup, we will show your chart options. You can add a birth chart and start asking Tara on WhatsApp."
+          },
+          {
+            "type": "Footer",
+            "label": "Create account",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "sms_otp": "${screen.sms_otp.form.sms_otp}",
+                "name": "${screen.profile.form.name}",
+                "gender": "${screen.profile.form.gender}",
+                "email": "${screen.email_entry.form.email}",
+                "email_otp": "${screen.email_otp.form.email_otp}",
+                "password": "${screen.password.form.password}",
+                "confirm_password": "${screen.password.form.confirm_password}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -67,5 +67,26 @@ def ensure_whatsapp_schema() -> None:
             ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS whatsapp_chat_session_chart_id INTEGER
             """,
         )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions
+            ADD COLUMN IF NOT EXISTS tara_disclaimer_accepted BOOLEAN NOT NULL DEFAULT FALSE
+            """,
+        )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions
+            ADD COLUMN IF NOT EXISTS tara_disclaimer_accepted_on DATE
+            """,
+        )
+        execute(
+            conn,
+            """
+            ALTER TABLE whatsapp_sessions
+            ADD COLUMN IF NOT EXISTS pending_disclaimer_question TEXT
+            """,
+        )
         conn.commit()
     logger.debug("whatsapp schema ensured")

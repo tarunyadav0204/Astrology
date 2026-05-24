@@ -353,6 +353,10 @@ def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None
 
 
 def _extract_specific_date_from_question(user_question: str, *, now: datetime) -> str | None:
+    """Parse relative / explicit calendar phrases from English text.
+
+    Not used for intent routing (forcing ``PREDICT_DAILY``); kept for tests and optional tooling.
+    """
     q = (user_question or "").strip()
     if not q:
         return None
@@ -447,7 +451,10 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     extracted_context = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
     month_window = _extract_month_window_from_question(user_question, now=now_dt)
     llm_date = _normalize_specific_date(extracted_context.get("specific_date")) if extracted_context else None
-    exact_date = llm_date or _extract_specific_date_from_question(user_question, now=now_dt)
+    # Only the intent model's `specific_date` may force exact-day mode. Do not parse dates from free
+    # text (e.g. "father passed on 2020-03-15 …") or English-only keywords — that misclassified many
+    # non-daily and non-English questions as PREDICT_DAILY.
+    exact_date = llm_date
 
     if month_window and not exact_date:
         result["mode"] = "PREDICT_PERIOD_OUTLOOK"
@@ -758,24 +765,7 @@ class IntentRouter:
         normalized_query_context: Dict[str, Any] | None,
     ) -> Dict[str, Any]:
         is_timing_question = any(w in user_question.lower() for w in ['when', 'time', 'date', 'year', 'month', 'will i', 'should i'])
-        is_daily_question = any(w in user_question.lower() for w in ['today', 'tomorrow', 'day after tomorrow', 'daily'])
 
-        if is_daily_question:
-            result = {
-                "status": "READY", "extracted_context": {}, "mode": "PREDICT_DAILY", "context_type": "birth", "category": "general", "needs_transits": True,
-                "divisional_charts": ["D1", "D9"],
-                "chart_insights": [],
-                "transit_request": {
-                    "startYear": current_year, "endYear": current_year,
-                    "yearMonthMap": {str(current_year): [current_month]}
-                }
-            }
-            apply_transit_timing_guards(result, user_question, current_year=current_year, now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now)
-            apply_daily_micro_intent_guards(result, user_question)
-            if normalized_query_context:
-                result["query_context"] = normalized_query_context
-            apply_chart_focus_guards(result, user_question)
-            return result
         if is_timing_question:
             result = {
                 "status": "READY", "extracted_context": {}, "mode": "LIFESPAN_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,

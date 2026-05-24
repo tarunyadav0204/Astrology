@@ -31,6 +31,16 @@ def truncate_whatsapp(s: str, max_len: int) -> str:
     return s[: max_len - 1] + "…"
 
 
+def truncate_whatsapp_interactive_body(s: str, max_len: int) -> str:
+    """Like truncate_whatsapp but keeps newlines (for interactive message body)."""
+    s = (s or "").strip()
+    if len(s) <= max_len:
+        return s
+    if max_len <= 1:
+        return s[:max_len]
+    return s[: max_len - 1] + "…"
+
+
 def format_for_whatsapp_text(text: str) -> str:
     """Convert app/web rich chat output into WhatsApp-safe plain text."""
     body = unescape(str(text or ""))
@@ -165,6 +175,71 @@ def send_whatsapp_interactive_list(
         return False
 
 
+def send_whatsapp_interactive_buttons(
+    *,
+    to_wa_id: str,
+    phone_number_id: str,
+    body: str,
+    buttons: List[Tuple[str, str]],
+    header_text: Optional[str] = None,
+    footer_text: Optional[str] = None,
+) -> bool:
+    """
+    Interactive reply buttons (max 3). Each button: (reply_id, title); title ≤ 20 chars (Meta).
+    """
+    token, ver = _graph_messages_url()
+    if not token or not phone_number_id:
+        logger.warning("Skipping WhatsApp buttons send: missing WHATSAPP_ACCESS_TOKEN or phone_number_id")
+        return False
+    if not buttons:
+        return send_whatsapp_text(to_wa_id=to_wa_id, body=body, phone_number_id=phone_number_id)
+
+    url = f"https://graph.facebook.com/{ver}/{phone_number_id}/messages"
+    btn_objs: List[Dict[str, Any]] = []
+    for bid, title in buttons[:3]:
+        btn_objs.append(
+            {
+                "type": "reply",
+                "reply": {
+                    "id": truncate_whatsapp(str(bid), 200),
+                    "title": truncate_whatsapp(str(title), 20),
+                },
+            }
+        )
+
+    interactive: Dict[str, Any] = {
+        "type": "button",
+        "body": {"text": truncate_whatsapp_interactive_body(body, 1024)},
+        "action": {"buttons": btn_objs},
+    }
+    if header_text:
+        interactive["header"] = {"type": "text", "text": truncate_whatsapp(header_text, 60)}
+    if footer_text:
+        interactive["footer"] = {"text": truncate_whatsapp(footer_text, 60)}
+
+    payload: Dict[str, Any] = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to_wa_id,
+        "type": "interactive",
+        "interactive": interactive,
+    }
+    try:
+        r = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=30,
+        )
+        if not (200 <= r.status_code < 300):
+            logger.warning("WhatsApp buttons send failed: %s %s", r.status_code, (r.text or "")[:800])
+            return False
+        return True
+    except Exception as e:
+        logger.exception("WhatsApp buttons send error: %s", e)
+        return False
+
+
 def send_whatsapp_interactive_flow(
     *,
     to_wa_id: str,
@@ -211,7 +286,7 @@ def send_whatsapp_interactive_flow(
         if screen:
             fap["screen"] = screen
         if screen_data is not None and len(screen_data) > 0:
-            fap["data"] = json.dumps(screen_data, separators=(",", ":"))
+            fap["data"] = screen_data
         if fap:
             params["flow_action_payload"] = fap
 

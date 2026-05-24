@@ -30,6 +30,19 @@ Set **either** `WHATSAPP_BIRTHCHART_FLOW_ID` **or** `WHATSAPP_BIRTHCHART_FLOW_NA
 
 `WHATSAPP_ACCESS_TOKEN` must allow sending **interactive** `type: flow` messages.
 
+For WhatsApp registration, set **either** `WHATSAPP_REGISTRATION_FLOW_ID` **or** `WHATSAPP_REGISTRATION_FLOW_NAME`. When set, a new WhatsApp number that does not match an existing user opens the registration Flow instead of the older text-by-text signup.
+
+| Variable | Purpose |
+|----------|---------|
+| `WHATSAPP_REGISTRATION_FLOW_ID` | Published registration Flow ID from WhatsApp Manager |
+| `WHATSAPP_REGISTRATION_FLOW_NAME` | Alternative to ID (Cloud API) |
+| `WHATSAPP_REGISTRATION_FLOW_CTA` | Button label, default `Create account` |
+| `WHATSAPP_REGISTRATION_FLOW_MODE` | `published` (default) or `draft` while testing |
+| `WHATSAPP_REGISTRATION_FLOW_HEADER` | Optional short header, default `AstroRoshni` |
+| `WHATSAPP_REGISTRATION_FLOW_BODY` | Intro body above the CTA |
+| `WHATSAPP_REGISTRATION_FLOW_FOOTER` | Optional footer |
+| `WHATSAPP_REGISTRATION_FLOW_SCREEN` | First screen id, default `registration_welcome` |
+
 ## How the backend behaves
 
 - **First contact (softer onboarding):** the first **non-empty text** while `whatsapp_sessions.state` is `idle` and `idle_soft_intro_done` is false sends a short **nudge**, then runs the same **phone / account lookup** as “hi” (`_handle_idle_greeting`—chart list, link, or SMS OTP). The flag `idle_soft_intro_done` is then set so later idle messages are not auto-routed again (unless the user sends a greeting again, which still re-runs the greeting handler).
