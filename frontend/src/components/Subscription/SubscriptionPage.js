@@ -244,6 +244,13 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
             Purchase credits anytime in the app or from your account, then spend them as usual—at the
             lower rates shown on each plan below.
           </p>
+          <button
+            type="button"
+            className="subscription-btn subscription-btn--secondary"
+            onClick={() => navigate('/order-management')}
+          >
+            View orders and billing support
+          </button>
         </section>
 
         {!isLoggedIn && (

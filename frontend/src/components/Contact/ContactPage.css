@@ -91,7 +91,8 @@
   line-height: 1.5;
 }
 
-.contact-page-email-btn {
+.contact-page-email-btn,
+.contact-page-order-btn {
   color: #ffffff;
   font-size: 18px;
   text-decoration: none;
@@ -102,6 +103,10 @@
   font-weight: bold;
   max-width: 100%;
   word-break: break-word;
+}
+
+.contact-page-order-btn {
+  background: linear-gradient(135deg, #7e224f, #e91e63);
 }
 
 .contact-page-badge {
@@ -210,7 +215,8 @@
     margin-bottom: 14px;
   }
 
-  .contact-page-email-btn {
+  .contact-page-email-btn,
+  .contact-page-order-btn {
     font-size: 15px;
     padding: 10px 18px;
     border-radius: 999px;

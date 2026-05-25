@@ -72,6 +72,7 @@ function FullHamburgerMenuItems({
 
     <div className="mobile-menu-section-label">Account</div>
     <button type="button" className="mobile-menu-item" onClick={() => { navigate('/subscription'); onClose(); }}>⭐ VIP membership</button>
+    <button type="button" className="mobile-menu-item" onClick={() => { navigate('/order-management'); onClose(); }}>🧾 Orders & billing</button>
     <button type="button" className="mobile-menu-item" onClick={() => { navigate('/contact'); onClose(); }}>📧 Contact us</button>
     {user ? (
       <>
@@ -346,6 +347,10 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 <button type="button" className="credits-btn nav-vip-btn" onClick={() => navigate('/subscription')}>
                   <span aria-hidden>⭐</span>
                   <span>VIP</span>
+                </button>
+                <button type="button" className="credits-btn nav-orders-btn" onClick={() => navigate('/order-management')}>
+                  <span aria-hidden>🧾</span>
+                  <span>Orders</span>
                 </button>
                 <button
                   type="button"

@@ -128,6 +128,7 @@
 
 .compact-actions .credits-btn,
 .compact-actions .nav-vip-btn,
+.compact-actions .nav-orders-btn,
 .compact-actions .native-selector-chip {
   display: inline-flex;
   align-items: center;
@@ -141,7 +142,8 @@
   gap: 4px;
 }
 
-.compact-actions .nav-vip-btn {
+.compact-actions .nav-vip-btn,
+.compact-actions .nav-orders-btn {
   padding: 6px 10px;
   font-size: 12px;
 }
@@ -168,7 +170,8 @@
   }
 
   .compact-actions .credits-btn,
-  .compact-actions .nav-vip-btn {
+  .compact-actions .nav-vip-btn,
+  .compact-actions .nav-orders-btn {
     font-size: 11px;
     padding: 5px 8px;
   }
@@ -403,6 +406,7 @@
 
 .top-bar .user-menu .credits-btn,
 .top-bar .user-menu .nav-vip-btn,
+.top-bar .user-menu .nav-orders-btn,
 .top-bar .user-menu .profile-btn,
 .top-bar .user-menu .auth-btn {
   display: inline-flex;
@@ -453,6 +457,15 @@
   padding: 6px 12px;
 }
 
+.nav-orders-btn {
+  background: #fff0f6;
+  color: #8a174c;
+  width: auto;
+  max-width: none;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}
+
 .profile-btn__name {
   max-width: 10rem;
   overflow: hidden;
@@ -489,6 +502,7 @@
   }
 
   .top-bar .credits-btn,
+  .top-bar .nav-orders-btn,
   .top-bar .profile-btn,
   .top-bar .auth-section .auth-btn {
     padding: 6px 10px;

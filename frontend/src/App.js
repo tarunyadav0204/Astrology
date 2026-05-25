@@ -39,6 +39,7 @@ import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
 import SubscriptionPage from './components/Subscription/SubscriptionPage';
+import OrderManagementPage from './components/OrderManagement/OrderManagementPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import PolicyPage from './components/Policy/PolicyPage';
 import DeleteAccountPage from './components/Policy/DeleteAccountPage';
@@ -1012,6 +1013,17 @@ function App() {
             path="/subscription"
             element={
               <SubscriptionPage
+                user={user}
+                onLogin={() => setShowLoginModal(true)}
+                onLogout={handleLogout}
+                onAdminClick={handleAdminClick}
+              />
+            }
+          />
+          <Route
+            path="/order-management"
+            element={
+              <OrderManagementPage
                 user={user}
                 onLogin={() => setShowLoginModal(true)}
                 onLogout={handleLogout}

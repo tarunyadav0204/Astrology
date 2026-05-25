@@ -287,6 +287,18 @@
   text-decoration: underline;
 }
 
+.credits-modal-order-link {
+  display: inline-flex;
+  margin: 0 0 14px;
+  color: #b83265;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.credits-modal-order-link:hover {
+  text-decoration: underline;
+}
+
 .credits-modal-buy-loading {
   color: #6b7280;
   font-size: 14px;

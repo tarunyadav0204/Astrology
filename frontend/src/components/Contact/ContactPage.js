@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import ContactSupportForm from './ContactSupportForm';
 import './ContactPage.css';
@@ -27,6 +28,17 @@ const ContactPage = () => {
               <a href="mailto:help@astroroshni.com" className="contact-page-email-btn">
                 help@astroroshni.com
               </a>
+            </div>
+
+            <div className="contact-page-tile">
+              <div className="contact-page-tile-icon" aria-hidden="true">
+                🧾
+              </div>
+              <h3 style={{ color: '#e91e63' }}>Orders & Billing</h3>
+              <p>View purchases, payment references, refund requests, and billing support tickets</p>
+              <Link to="/order-management" className="contact-page-order-btn">
+                Manage orders
+              </Link>
             </div>
 
             <div className="contact-page-tile">

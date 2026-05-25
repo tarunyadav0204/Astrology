@@ -32,6 +32,12 @@ const ProfilePage = ({ user, onLogout }) => {
           >
             ⭐ Membership
           </button>
+          <button
+            className="tab-btn"
+            onClick={() => navigate('/order-management')}
+          >
+            🧾 Orders & Billing
+          </button>
           <button 
             className={`tab-btn ${activeTab === 'credits' ? 'active' : ''}`}
             onClick={() => setActiveTab('credits')}

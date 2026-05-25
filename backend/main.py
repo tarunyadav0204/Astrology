@@ -122,6 +122,7 @@ from karma_analysis.routes import router as karma_router
 from astrovastu.routes import router as astrovastu_router
 from reddit.routes import router as reddit_router
 from support_routes import router as support_router, admin_router as support_admin_router
+from order_management_routes import router as order_management_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from yoga_routes import router as yoga_router
 from chat_error_logging import router as chat_error_router
@@ -623,6 +624,7 @@ app.include_router(places_router, prefix="/api")
 app.include_router(reddit_router)
 app.include_router(support_router, prefix="/api/support")
 app.include_router(support_admin_router, prefix="/api")
+app.include_router(order_management_router, prefix="/api/order-management")
 
 
 
