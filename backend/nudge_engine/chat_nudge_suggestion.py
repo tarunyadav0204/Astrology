@@ -19,14 +19,14 @@ _MAX_A_CHARS = 12000
 _CHEAP_NUDGE_GEMINI_MODELS = [
     "models/gemini-2.5-flash-lite",
     "models/gemini-2.0-flash-lite-001",
-    "models/gemini-3.1-flash-lite-preview",
+    "models/gemini-3.1-flash-lite",
 ]
 
 # Rough USD rates per 1M tokens (input/output) for estimate display only.
 # These are intentionally approximate and can be overridden per env.
 _MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     # Gemini 3.1 (USD per 1M tokens; see Google AI pricing)
-    "models/gemini-3.1-flash-lite-preview": {
+    "models/gemini-3.1-flash-lite": {
         "input_le_200k": 0.25,
         "input_gt_200k": 0.25,
         "output_le_200k": 1.50,

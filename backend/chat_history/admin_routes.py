@@ -200,7 +200,7 @@ def _timestamp_to_ist_iso(val) -> Optional[str]:
 # Gemini 3.1 published pricing (USD per 1M tokens unless noted). INR ≈ USD × rate from _usd_to_inr_rate().
 _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     # Gemini 3.1 (current product pricing)
-    "models/gemini-3.1-flash-lite-preview": {
+    "models/gemini-3.1-flash-lite": {
         "input_le_200k": 0.25,
         "input_gt_200k": 0.25,
         "output_le_200k": 1.50,

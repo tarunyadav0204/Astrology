@@ -2646,7 +2646,7 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
             m = "models/gemini-2.5-flash"
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
     rates = {
-        "models/gemini-3.1-flash-lite-preview": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
+        "models/gemini-3.1-flash-lite": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
         "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00},
         "models/gemini-3.1-flash-live-preview": {"in_le": 0.75, "in_gt": 0.75, "cached_in_le": 0.075, "cached_in_gt": 0.075, "out_le": 4.50, "out_gt": 4.50},
         "models/gemini-3.1-flash-image-preview": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},

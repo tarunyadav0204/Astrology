@@ -3,7 +3,7 @@ from typing import Optional, Any, Set
 # Allowed Gemini model IDs (with models/ prefix for API). Used by admin UI and as fallbacks.
 GEMINI_MODEL_OPTIONS = [
     ("models/gemini-3.1-pro-preview", "Gemini 3.1 Pro (New – complex reasoning)"),
-    ("models/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite (New – high-volume, low-cost)"),
+    ("models/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite (GA – high-volume, low-cost)"),
     ("models/gemini-3-flash-preview", "Gemini 3 Flash (Preview)"),
     ("models/gemini-3-pro-preview", "Gemini 3 Pro (Retiring Mar 2026)"),
     ("models/gemini-2.5-pro", "Gemini 2.5 Pro (Stable)"),
@@ -13,10 +13,14 @@ GEMINI_MODEL_OPTIONS = [
     ("models/gemini-2.0-flash-lite-001", "Gemini 2.0 Flash Lite (Stable)"),
 ]
 
-DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite-preview"
+DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite"
 DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
-DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite-preview"
+DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite"
 DEFAULT_GEMINI_INSTANT_MODEL = "models/gemini-2.5-flash-lite"
+
+# Deprecated May 2026 — replaced by GA id in DB + code.
+_DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW = "models/gemini-3.1-flash-lite-preview"
+_GEMINI_31_FLASH_LITE_GA = "models/gemini-3.1-flash-lite"
 
 # Chat only: which vendor handles `GeminiChatAnalyzer.generate_chat_response` (analysis stays on Gemini).
 CHAT_LLM_GEMINI = "gemini"
@@ -61,6 +65,47 @@ def _ensure_admin_settings_table(conn: Any) -> None:
         )
         """,
     )
+
+
+def migrate_deprecated_gemini_model_ids_on_startup() -> None:
+    """
+    Rewrite admin_settings values that still use the retired preview id
+    `models/gemini-3.1-flash-lite-preview` to the GA id `models/gemini-3.1-flash-lite`.
+    Idempotent; safe to run every process start.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    try:
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            _ensure_admin_settings_table(conn)
+            cur = execute(
+                conn,
+                """
+                UPDATE admin_settings
+                SET value = REPLACE(value, ?, ?),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE value LIKE ?
+                """,
+                (
+                    _DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW,
+                    _GEMINI_31_FLASH_LITE_GA,
+                    f"%{_DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW}%",
+                ),
+            )
+            n = cur.rowcount if cur is not None else 0
+            conn.commit()
+            if n and n > 0:
+                logger.warning(
+                    "admin_settings: migrated %s row(s) from %s to %s",
+                    n,
+                    _DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW,
+                    _GEMINI_31_FLASH_LITE_GA,
+                )
+    except Exception as e:
+        logger.warning("admin_settings Gemini preview→GA migration skipped: %s", e, exc_info=True)
 
 
 def get_setting(key: str) -> Optional[str]:

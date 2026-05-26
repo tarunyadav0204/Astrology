@@ -419,6 +419,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Subscription tier migration skipped: {e}")
     try:
+        from utils.admin_settings import migrate_deprecated_gemini_model_ids_on_startup
+
+        migrate_deprecated_gemini_model_ids_on_startup()
+        print("Admin settings: checked deprecated Gemini 3.1 Flash Lite preview model ids")
+    except Exception as e:
+        print(f"Warning: Gemini admin_settings migration skipped: {e}")
+    try:
         with nudge_db.get_conn() as conn:
             nudge_db.init_nudge_tables(conn)
             print("Nudge engine tables (device_tokens, nudge_deliveries) initialized")
