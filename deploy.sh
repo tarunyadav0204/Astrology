@@ -122,6 +122,64 @@ echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACK
 # Repo root (deploy.sh is always run from here)
 APP_ROOT="$(pwd)"
 
+# --- Secret Manager sync: materialize runtime-only secrets before backend imports .env ---
+# Keep secret names configurable so staging/prod can use different Secret Manager entries.
+SYNC_GCP_SECRETS="${SYNC_GCP_SECRETS:-true}"
+APP_ENV_SECRET_NAME="${APP_ENV_SECRET_NAME:-APP_ENV_FILE}"
+WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME="${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME:-WHATSAPP_FLOW_PRIVATE_KEY_FILE}"
+WHATSAPP_FLOW_PRIVATE_KEY_PATH="${WHATSAPP_FLOW_PRIVATE_KEY_PATH:-/home/tarun_yadav/AstrologyApp/backend/flow_endpoint_private.pem}"
+
+case "$(printf '%s' "${SYNC_GCP_SECRETS}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes) SYNC_GCP_SECRETS=true ;;
+  *) SYNC_GCP_SECRETS=false ;;
+esac
+
+sync_gcp_secret_to_file() {
+  local secret_name="$1"
+  local target_path="$2"
+  local mode="$3"
+  local temp_path
+
+  if [ -z "${secret_name}" ] || [ -z "${target_path}" ]; then
+    echo "❌ Secret sync misconfigured: secret name and target path are required"
+    exit 1
+  fi
+  if ! command -v gcloud >/dev/null 2>&1; then
+    echo "❌ gcloud CLI not found. Install/configure Google Cloud SDK or set SYNC_GCP_SECRETS=false."
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "${target_path}")"
+  temp_path="$(mktemp "${target_path}.tmp.XXXXXX")"
+  chmod 600 "${temp_path}" 2>/dev/null || true
+  if ! gcloud secrets versions access latest --secret="${secret_name}" > "${temp_path}"; then
+    rm -f "${temp_path}"
+    echo "❌ Failed to read Secret Manager secret: ${secret_name}"
+    exit 1
+  fi
+  if [ ! -s "${temp_path}" ]; then
+    rm -f "${temp_path}"
+    echo "❌ Secret Manager secret is empty: ${secret_name}"
+    exit 1
+  fi
+  chmod "${mode}" "${temp_path}"
+  mv "${temp_path}" "${target_path}"
+}
+
+if [ "${SYNC_GCP_SECRETS}" = "true" ]; then
+  echo "🔑 Pulling runtime secrets from Google Secret Manager..."
+  sync_gcp_secret_to_file "${APP_ENV_SECRET_NAME}" "${APP_ROOT}/backend/.env" 600
+  sync_gcp_secret_to_file "${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME}" "${WHATSAPP_FLOW_PRIVATE_KEY_PATH}" 600
+  if ! grep -q "BEGIN .*PRIVATE KEY" "${WHATSAPP_FLOW_PRIVATE_KEY_PATH}"; then
+    echo "❌ WhatsApp Flow private key file does not look like a PEM private key: ${WHATSAPP_FLOW_PRIVATE_KEY_PATH}"
+    exit 1
+  fi
+  echo "✅ Runtime secrets synced"
+  deploy_timing "gcp secret sync finished"
+else
+  echo "⏭️ Skipping Google Secret Manager sync (SYNC_GCP_SECRETS=false)"
+fi
+
 # --- Phase 1: backend dependencies (venv, pip, encryption) ---
 echo "🐍 Setting up backend..."
 cd "${APP_ROOT}/backend"
