@@ -1,11 +1,36 @@
-# Push to main replaces the Managed Instance Group one VM at a time. Each fresh
-# VM startup script pulls latest main, syncs Secret Manager files, and runs deploy.sh.
+# Push to main deploys the app on the current Managed Instance Group VMs one at
+# a time. VM names are discovered dynamically from the MIG, so autoscaling or
+# self-healing replacements do not require changing this workflow.
 name: Deploy to GCP
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      deployment_mode:
+        description: "app = run deploy.sh on existing VMs; replace_vms = recreate MIG VMs"
+        required: true
+        default: app
+        type: choice
+        options:
+          - app
+          - replace_vms
+      force_backend_pip:
+        description: "Run pip install even if requirements.txt did not change"
+        required: false
+        default: false
+        type: boolean
+      force_frontend_deploy:
+        description: "Force frontend rebuild/restart"
+        required: false
+        default: false
+        type: boolean
+      force_full_deploy:
+        description: "Force full backend/frontend dependency setup and rebuild"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -30,7 +55,64 @@ jobs:
       with:
         project_id: ${{ vars.GCP_PROJECT_ID }}
 
-    - name: Rolling deploy Managed Instance Group
+    - name: Rolling app deploy on current MIG VMs
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+        CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+        GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
+        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
+        FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
+        FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
+        FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
+      run: |
+        set -euo pipefail
+        echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+        gcloud config set project "${GCP_PROJECT_ID}"
+
+        mapfile -t INSTANCES < <(
+          gcloud compute instance-groups managed list-instances "${GCP_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_MIG_ZONE}" \
+            --filter="instanceStatus=RUNNING" \
+            --format="value(instance.basename())" \
+          | sort
+        )
+
+        if [ "${#INSTANCES[@]}" -eq 0 ]; then
+          echo "❌ No RUNNING instances found in MIG ${GCP_MIG_NAME}"
+          exit 1
+        fi
+
+        echo "📋 Deploying to ${#INSTANCES[@]} current MIG instance(s): ${INSTANCES[*]}"
+        for INSTANCE in "${INSTANCES[@]}"; do
+          echo "========== Deploying ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+          gcloud compute ssh "${INSTANCE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_MIG_ZONE}" \
+            --tunnel-through-iap \
+            --quiet \
+            --command "cd ~/AstrologyApp && export DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' SYNC_GCP_SECRETS='true' && bash deploy.sh"
+
+          echo "🔎 Waiting for ${INSTANCE} local app health"
+          gcloud compute ssh "${INSTANCE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_MIG_ZONE}" \
+            --tunnel-through-iap \
+            --quiet \
+            --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 5; done; echo 'health check failed on ${INSTANCE}'; exit 1"
+
+          echo "✅ ${INSTANCE} deployed and healthy"
+        done
+
+        echo "🔎 Final public health check"
+        curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
+        curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
+        echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+
+    - name: Emergency rolling VM replacement
+      if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
       env:
         GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
@@ -39,7 +121,7 @@ jobs:
         GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
       run: |
         set -euo pipefail
-        echo "========== GitHub Actions: MIG deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+        echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
         gcloud config set project "${GCP_PROJECT_ID}"
         gcloud compute instance-groups managed rolling-action replace "${GCP_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
@@ -54,4 +136,4 @@ jobs:
         gcloud compute instance-groups managed list-instances "${GCP_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
           --zone "${GCP_MIG_ZONE}"
-        echo "========== GitHub Actions: MIG deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+        echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
