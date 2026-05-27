@@ -1,49 +1,50 @@
-# Push to main runs deploy.sh on the server (backend restart + health first, then frontend).
-# Pip install runs only when backend/requirements.txt changed (or first deploy), unless you
-# add [pip] to the commit message or use "Run workflow" → Force backend pip.
-# Do NOT git pull/reset before deploy.sh: deploy.sh records PREV_HEAD then
-# fetches/resets so CHANGED_FILES is non-empty and frontend rebuilds when
-# frontend/ changed. A pre-reset makes PREV_HEAD == NEW_HEAD and skips npm build.
+# Push to main rolls the Managed Instance Group. Each VM startup script pulls
+# latest main, syncs Secret Manager files, and runs deploy.sh locally.
 name: Deploy to GCP
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      force_backend_pip:
-        description: 'Run pip install -r backend/requirements.txt (even if file unchanged)'
-        type: boolean
-        default: false
-      force_frontend_deploy:
-        description: 'Force frontend rebuild and frontend static server restart only'
-        type: boolean
-        default: false
-      force_full_deploy:
-        description: 'Force full backend + frontend deploy, including API restart'
-        type: boolean
-        default: false
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Deploy to server
-      uses: appleboy/ssh-action@v0.1.7
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
       with:
-        command_timeout: 30m
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script_stop: true
-        script: |
-          set -e
-          echo "========== GitHub Actions: deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-          cd AstrologyApp
-          export FORCE_BACKEND_PIP="${{ github.event.inputs.force_backend_pip == 'true' && 'true' || 'false' }}"
-          export FORCE_FRONTEND_DEPLOY="${{ github.event.inputs.force_frontend_deploy == 'true' && 'true' || 'false' }}"
-          export FORCE_FULL_DEPLOY="${{ github.event.inputs.force_full_deploy == 'true' && 'true' || 'false' }}"
-          bash deploy.sh
-          echo "========== GitHub Actions: deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-          echo "========== (Timestamps above are the runner clock; lines starting with ⏱️ are from deploy.sh on the server.) =========="
+        workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+    - name: Set up gcloud
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+
+    - name: Rolling deploy Managed Instance Group
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
+        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
+      run: |
+        set -euo pipefail
+        echo "========== GitHub Actions: MIG deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+        gcloud config set project "${GCP_PROJECT_ID}"
+        gcloud compute instance-groups managed rolling-action restart "${GCP_MIG_NAME}" \
+          --zone "${GCP_MIG_ZONE}"
+        gcloud compute instance-groups managed wait-until "${GCP_MIG_NAME}" \
+          --stable \
+          --zone "${GCP_MIG_ZONE}" \
+          --timeout 3600
+        gcloud compute instance-groups managed list-instances "${GCP_MIG_NAME}" \
+          --zone "${GCP_MIG_ZONE}"
+        echo "========== GitHub Actions: MIG deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
