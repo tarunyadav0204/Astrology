@@ -1,5 +1,5 @@
-# Push to main rolls the Managed Instance Group. Each VM startup script pulls
-# latest main, syncs Secret Manager files, and runs deploy.sh locally.
+# Push to main replaces the Managed Instance Group one VM at a time. Each fresh
+# VM startup script pulls latest main, syncs Secret Manager files, and runs deploy.sh.
 name: Deploy to GCP
 
 on:
@@ -41,9 +41,11 @@ jobs:
         set -euo pipefail
         echo "========== GitHub Actions: MIG deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
         gcloud config set project "${GCP_PROJECT_ID}"
-        gcloud compute instance-groups managed rolling-action restart "${GCP_MIG_NAME}" \
+        gcloud compute instance-groups managed rolling-action replace "${GCP_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_MIG_ZONE}"
+          --zone "${GCP_MIG_ZONE}" \
+          --max-unavailable 1 \
+          --max-surge 1
         gcloud compute instance-groups managed wait-until "${GCP_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
           --stable \
