@@ -33,6 +33,8 @@ jobs:
     - name: Rolling deploy Managed Instance Group
       env:
         GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+        CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
         GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
         GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
       run: |
@@ -40,11 +42,14 @@ jobs:
         echo "========== GitHub Actions: MIG deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
         gcloud config set project "${GCP_PROJECT_ID}"
         gcloud compute instance-groups managed rolling-action restart "${GCP_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
           --zone "${GCP_MIG_ZONE}"
         gcloud compute instance-groups managed wait-until "${GCP_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
           --stable \
           --zone "${GCP_MIG_ZONE}" \
           --timeout 3600
         gcloud compute instance-groups managed list-instances "${GCP_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
           --zone "${GCP_MIG_ZONE}"
         echo "========== GitHub Actions: MIG deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
