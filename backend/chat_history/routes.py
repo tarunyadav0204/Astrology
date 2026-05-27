@@ -1,11 +1,12 @@
 """
 Chat History API Routes
 """
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header
 from datetime import datetime, timedelta
 import uuid
 import json
 import logging
+import os
 from auth import get_current_user
 from db import get_conn, execute
 
@@ -164,6 +165,118 @@ MAX_USER_MESSAGES_PER_CHAT_SESSION = 40
 SESSION_TURN_LIMIT_PREFIX = "session_turn_limit"
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+CHAT_PROCESSING_STALE_MINUTES = _env_int("CHAT_PROCESSING_STALE_MINUTES", 12)
+CHAT_QUEUED_STALE_MINUTES = _env_int("CHAT_QUEUED_STALE_MINUTES", 90)
+CHAT_PROCESSING_STALE_MESSAGE = (
+    "This reading was interrupted before it could finish. Please ask again; no credits were charged."
+)
+
+
+def _processing_started_at_age_minutes(started_at) -> float | None:
+    if not started_at:
+        return None
+    if isinstance(started_at, str):
+        try:
+            started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not hasattr(started_at, "tzinfo"):
+        return None
+    now = datetime.now(started_at.tzinfo) if started_at.tzinfo else datetime.now()
+    try:
+        return max(0.0, (now - started_at).total_seconds() / 60.0)
+    except TypeError:
+        return None
+
+
+def _timestamp_is_future(value) -> bool:
+    if not value:
+        return False
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    if not hasattr(value, "tzinfo"):
+        return False
+    now = datetime.now(value.tzinfo) if value.tzinfo else datetime.now()
+    try:
+        return value > now
+    except TypeError:
+        return False
+
+
+def _claim_chat_processing_message(message_id: int, claim_id: str, *, claim_minutes: int = 35) -> str:
+    """
+    Atomically claim a processing message for one queue worker.
+
+    Returns: claimed, completed, failed, missing, or busy.
+    """
+    with get_conn() as conn:
+        _ensure_chat_messages_task_claim_cols(conn)
+        conn.commit()
+        cur = execute(
+            conn,
+            "SELECT status FROM chat_messages WHERE message_id = %s",
+            (message_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.commit()
+            return "missing"
+        status = str(row[0] or "").strip().lower()
+        if status in {"completed", "failed", "cancelled"}:
+            conn.commit()
+            return status
+
+        cur = execute(
+            conn,
+            """
+                UPDATE chat_messages
+                SET task_claim_id = %s,
+                    task_claimed_until = CURRENT_TIMESTAMP + (%s * INTERVAL '1 minute'),
+                    started_at = COALESCE(started_at, CURRENT_TIMESTAMP)
+                WHERE message_id = %s
+                  AND status = 'processing'
+                  AND (
+                    task_claimed_until IS NULL
+                    OR task_claimed_until < CURRENT_TIMESTAMP
+                    OR task_claim_id = %s
+                  )
+                RETURNING message_id
+            """,
+            (claim_id, int(claim_minutes), message_id, claim_id),
+        )
+        claimed = cur.fetchone()
+        conn.commit()
+        return "claimed" if claimed else "busy"
+
+
+def _clear_chat_processing_claim(message_id: int, claim_id: str) -> None:
+    try:
+        with get_conn() as conn:
+            _ensure_chat_messages_task_claim_cols(conn)
+            execute(
+                conn,
+                """
+                    UPDATE chat_messages
+                    SET task_claim_id = NULL, task_claimed_until = NULL
+                    WHERE message_id = %s AND task_claim_id = %s
+                """,
+                (message_id, claim_id),
+            )
+            conn.commit()
+    except Exception:
+        logger.exception("failed to clear chat task claim message_id=%s", message_id)
+
+
 def _ensure_chat_messages_gate_metadata(conn):
     """Idempotent DDL — older DBs or skipped startup init may lack this column."""
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS gate_metadata TEXT")
@@ -177,6 +290,13 @@ def _ensure_chat_messages_parallel_llm_usage(conn):
 def _ensure_chat_messages_engagement_updates(conn):
     """JSON array of non-final wait-time engagement snippets."""
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS engagement_updates TEXT")
+
+
+def _ensure_chat_messages_task_claim_cols(conn):
+    """Durable queue claim metadata for chat workers."""
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS task_claim_id TEXT")
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS task_claimed_until TIMESTAMP")
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS task_enqueued_at TIMESTAMP")
 
 
 def _ensure_wait_side_conversation_tables(conn):
@@ -357,6 +477,7 @@ def init_chat_tables():
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_parallel_llm_usage(conn)
         _ensure_chat_messages_engagement_updates(conn)
+        _ensure_chat_messages_task_claim_cols(conn)
         _ensure_wait_side_conversation_tables(conn)
 
         # Indexes
@@ -365,6 +486,8 @@ def init_chat_tables():
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON chat_sessions (created_at)")
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages (session_id)")
         execute(conn, "CREATE INDEX IF NOT EXISTS idx_messages_status ON chat_messages (status)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_messages_task_claimed_until ON chat_messages (task_claimed_until)")
+        execute(conn, "CREATE INDEX IF NOT EXISTS idx_messages_task_enqueued_at ON chat_messages (task_enqueued_at)")
 
         # Glossary terms table for centralized term/definition management
         execute(conn, """
@@ -1313,11 +1436,52 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     else:
         chart_insights = [x for x in chart_insights if isinstance(x, dict) and x.get("house_number") and x.get("message")]
     
-    # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save; using_free_question for first-question-free; effective_cost for deduction)
-    background_tasks.add_task(
-        process_gemini_response,
-        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
-    )
+    # Start processing. Cloud Tasks gives us durable retry across VM restarts; BackgroundTasks remains
+    # the local/dev fallback and keeps the rollout safe until queue env is enabled.
+    task_payload = {
+        "message_id": assistant_message_id,
+        "session_id": session_id,
+        "question": sanitize_text(question),
+        "user_id": current_user.userid,
+        "language": language,
+        "response_style": response_style,
+        "premium_analysis": premium_analysis,
+        "birth_details": birth_details,
+        "chat_cost": chat_cost,
+        "partnership_mode": partnership_mode,
+        "partner_birth_details": partner_birth_details,
+        "cached_intent": intent,
+        "user_message_id": user_message_id,
+        "using_free_question": using_free_question,
+        "effective_cost": effective_cost,
+        "chat_tier": effective_chat_tier,
+        "speech_chat_billing": speech_chat_billing,
+        "claim_id": str(uuid.uuid4()),
+    }
+    queued = False
+    try:
+        from chat_history.task_queue import enqueue_chat_processing_task
+        queued = enqueue_chat_processing_task(message_id=assistant_message_id, payload=task_payload)
+    except Exception as exc:
+        logger.exception("chat queue enqueue failed before fallback message_id=%s: %s", assistant_message_id, exc)
+
+    if queued:
+        try:
+            with get_conn() as conn:
+                _ensure_chat_messages_task_claim_cols(conn)
+                execute(
+                    conn,
+                    "UPDATE chat_messages SET task_enqueued_at = %s WHERE message_id = %s",
+                    (datetime.now(), assistant_message_id),
+                )
+                conn.commit()
+        except Exception as exc:
+            logger.exception("failed to mark chat task enqueued message_id=%s: %s", assistant_message_id, exc)
+    else:
+        background_tasks.add_task(
+            process_gemini_response,
+            assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
+        )
     
     print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
     print(f"🚀 Returning {len(chart_insights)} chart insights: {chart_insights[:2] if chart_insights else 'EMPTY'}")
@@ -1330,6 +1494,62 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "chart_insights": chart_insights,
         "d1_chart": d1_chart
     }
+
+
+@router.post("/internal/process")
+async def process_chat_task(request: dict, x_chat_task_secret: str | None = Header(None, alias="X-Chat-Task-Secret")):
+    """Internal Cloud Tasks worker endpoint for durable chat-v2 processing."""
+    from chat_history.task_queue import chat_task_secret
+
+    def optional_int(value):
+        if value is None or value == "":
+            return None
+        return int(value)
+
+    expected_secret = chat_task_secret()
+    if not expected_secret or x_chat_task_secret != expected_secret:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        message_id = int(request.get("message_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="message_id is required")
+
+    claim_id = str(request.get("claim_id") or uuid.uuid4())
+    claim_minutes = int(os.getenv("CHAT_TASK_CLAIM_MINUTES", "35") or "35")
+    claim_state = _claim_chat_processing_message(message_id, claim_id, claim_minutes=claim_minutes)
+    if claim_state in {"completed", "failed", "cancelled"}:
+        return {"ok": True, "state": claim_state, "message_id": message_id}
+    if claim_state == "missing":
+        raise HTTPException(status_code=404, detail="Message not found")
+    if claim_state == "busy":
+        logger.info("chat Cloud Task skipped busy message_id=%s claim_id=%s", message_id, claim_id)
+        raise HTTPException(status_code=409, detail="Message is already being processed")
+
+    try:
+        await process_gemini_response(
+            message_id=message_id,
+            session_id=request.get("session_id"),
+            question=sanitize_text(request.get("question")),
+            user_id=int(request.get("user_id")),
+            language=request.get("language", "english"),
+            response_style=request.get("response_style", "detailed"),
+            premium_analysis=bool(request.get("premium_analysis")),
+            birth_details=request.get("birth_details"),
+            chat_cost=int(request.get("chat_cost", 1) or 1),
+            partnership_mode=bool(request.get("partnership_mode")),
+            partner_birth_details=request.get("partner_birth_details"),
+            cached_intent=request.get("cached_intent"),
+            user_message_id=optional_int(request.get("user_message_id")),
+            using_free_question=bool(request.get("using_free_question")),
+            effective_cost=optional_int(request.get("effective_cost")),
+            chat_tier=request.get("chat_tier", "standard"),
+            speech_chat_billing=bool(request.get("speech_chat_billing")),
+        )
+        return {"ok": True, "state": "processed", "message_id": message_id}
+    finally:
+        _clear_chat_processing_claim(message_id, claim_id)
+
 
 @router.get("/status/{message_id}")
 async def check_message_status(message_id: int, current_user = Depends(get_current_user)):
@@ -1345,6 +1565,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             _ensure_chat_messages_gate_metadata(conn)
             _ensure_chat_messages_parallel_llm_usage(conn)
             _ensure_chat_messages_engagement_updates(conn)
+            _ensure_chat_messages_task_claim_cols(conn)
             _ensure_wait_side_conversation_tables(conn)
             conn.commit()
             cur = execute(
@@ -1352,7 +1573,8 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 """
                     SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
                            cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
-                           cm.gate_metadata, cm.parallel_llm_usage, cm.engagement_updates
+                           cm.gate_metadata, cm.parallel_llm_usage, cm.engagement_updates,
+                           cm.task_claimed_until, cm.task_enqueued_at
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
                     WHERE cm.message_id = %s
@@ -1367,7 +1589,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             print(f"❌ [STATUS] Message {message_id} not found")
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, engagement_updates = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, engagement_updates, task_claimed_until, task_enqueued_at = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -1413,6 +1635,42 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
         elif status == "processing":
+            active_claim = _timestamp_is_future(task_claimed_until)
+            stale_reference = task_enqueued_at or started_at
+            stale_threshold_minutes = CHAT_QUEUED_STALE_MINUTES if task_enqueued_at else CHAT_PROCESSING_STALE_MINUTES
+            age_minutes = _processing_started_at_age_minutes(stale_reference)
+            if (
+                not active_claim
+                and age_minutes is not None
+                and age_minutes >= stale_threshold_minutes
+            ):
+                with get_conn() as stale_conn:
+                    execute(
+                        stale_conn,
+                        """
+                            UPDATE chat_messages
+                            SET status = %s, error_message = %s, completed_at = %s
+                            WHERE message_id = %s AND status = %s
+                        """,
+                        (
+                            "failed",
+                            CHAT_PROCESSING_STALE_MESSAGE,
+                            datetime.now(),
+                            message_id,
+                            "processing",
+                        ),
+                    )
+                    stale_conn.commit()
+                logger.warning(
+                    "Marked stale processing chat message as failed: message_id=%s age_minutes=%.1f",
+                    message_id,
+                    age_minutes,
+                )
+                return {
+                    "status": "failed",
+                    "message_type": message_type or "answer",
+                    "error_message": CHAT_PROCESSING_STALE_MESSAGE,
+                }
             response["started_at"] = started_at
             response["message"] = "Still analyzing your chart..."
             if engagement_updates:

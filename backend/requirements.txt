@@ -23,6 +23,7 @@ google-api-python-client==2.108.0
 google-auth==2.25.2
 praw==7.7.1
 google-cloud-texttospeech==2.16.4
+google-cloud-tasks==2.16.5
 google-cloud-pubsub==2.18.4
 google-cloud-bigquery>=3.11.0
 psycopg2-binary==2.9.9
