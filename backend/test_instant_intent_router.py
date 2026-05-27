@@ -121,7 +121,8 @@ def test_instant_router_keeps_ready_for_straightforward_daily():
     payload = {
         "status": "READY",
         "mode": "PREDICT_DAILY",
-        "extracted_context": {"specific_date": "2026-05-02"},
+        "daily_intent_confirmed": True,
+        "extracted_context": {"specific_date": "2026-05-02", "specific_date_basis": "relative_user_day"},
         "context_type": "birth",
         "category": "general",
         "needs_transits": True,

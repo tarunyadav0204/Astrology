@@ -29,7 +29,7 @@ except ModuleNotFoundError:
     sys.modules["google.generativeai"] = genai_mod
     setattr(google_mod, "generativeai", genai_mod)
 
-from ai.intent_router import _extract_month_window_from_question, _extract_specific_date_from_question, _is_transient_intent_error, apply_transit_timing_guards
+from ai.intent_router import _daily_intent_confirmed, _extract_month_window_from_question, _extract_specific_date_from_question, _is_transient_intent_error, apply_transit_timing_guards
 from utils.query_context import resolve_query_now
 
 
@@ -50,7 +50,8 @@ def test_apply_transit_timing_guards_sets_exact_day_fields_from_llm_specific_dat
     result = {
         "category": "general",
         "mode": "ANALYZE_PERSONALITY",
-        "extracted_context": {"specific_date": "2026-04-23"},
+        "daily_intent_confirmed": True,
+        "extracted_context": {"specific_date": "2026-04-23", "specific_date_basis": "relative_user_day"},
         "needs_transits": False,
     }
     apply_transit_timing_guards(result, "How is tomorrow for me?", current_year=2026, now=now)
@@ -86,7 +87,8 @@ def test_apply_transit_timing_guards_prefers_llm_specific_date():
     result = {
         "category": "general",
         "mode": "ANALYZE_PERSONALITY",
-        "extracted_context": {"specific_date": "2028-09-12"},
+        "daily_intent_confirmed": True,
+        "extracted_context": {"specific_date": "2028-09-12", "specific_date_basis": "explicit_user_day"},
         "needs_transits": False,
     }
     apply_transit_timing_guards(result, "What will happen on that day I mentioned in September 2028?", current_year=2026, now=now)
@@ -94,6 +96,46 @@ def test_apply_transit_timing_guards_prefers_llm_specific_date():
     assert result["dasha_as_of"] == "2028-09-12"
     assert result["transit_request"]["startYear"] == 2028
     assert result["transit_request"]["yearMonthMap"] == {"2028": ["September"]}
+
+
+def test_apply_transit_timing_guards_ignores_unconfirmed_today_date_for_ongoing_problem():
+    now = __import__("datetime").datetime(2026, 5, 27, 12, 0, 0)
+    result = {
+        "category": "health",
+        "mode": "PREDICT_DAILY",
+        "daily_intent_confirmed": False,
+        "extracted_context": {
+            "specific_date": "2026-05-27",
+            "specific_date_basis": "not_date_bound",
+            "aspect": "mental and physical distress",
+        },
+        "needs_transits": True,
+    }
+    apply_transit_timing_guards(
+        result,
+        "Ye saal jab se start hua hai meri puri life hil gai hai, kab tak ye sab thik hoga",
+        current_year=2026,
+        now=now,
+    )
+    assert result["mode"] == "PREDICT_PERIOD_OUTLOOK"
+    assert result["analysis_type"] == "PERIOD_OUTLOOK"
+    assert result["needs_transits"] is True
+    assert result.get("dasha_as_of") is None
+    assert "specific_date" not in result["extracted_context"]
+
+
+def test_daily_intent_requires_confirmation_and_date_basis():
+    assert _daily_intent_confirmed({
+        "daily_intent_confirmed": True,
+        "extracted_context": {"specific_date_basis": "relative_user_day"},
+    }) is True
+    assert _daily_intent_confirmed({
+        "daily_intent_confirmed": True,
+        "extracted_context": {"specific_date_basis": "not_date_bound"},
+    }) is False
+    assert _daily_intent_confirmed({
+        "extracted_context": {"specific_date_basis": "relative_user_day"},
+    }) is False
 
 
 def test_extract_month_window_from_month_year_question():

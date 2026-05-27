@@ -23,9 +23,23 @@ logger = logging.getLogger(__name__)
 DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110
 DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210
 
-# Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback
+# Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback.
+# Keep trying fallback values if the preferred env points at a missing file.
+PLAY_CREDENTIAL_ENV_KEYS = ("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "GOOGLE_SERVICE_ACCOUNT_KEY")
+
+
+def _get_play_credentials_candidates():
+    candidates = []
+    for key in PLAY_CREDENTIAL_ENV_KEYS:
+        raw = os.environ.get(key)
+        if raw and raw.strip():
+            candidates.append((key, raw.strip()))
+    return candidates
+
+
 def _get_play_credentials_path():
-    return os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON") or os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
+    candidates = _get_play_credentials_candidates()
+    return candidates[0][1] if candidates else None
 
 
 def _get_play_credentials():
@@ -35,23 +49,27 @@ def _get_play_credentials():
     """
     from google.oauth2 import service_account
     _ensure_play_env_loaded()
-    raw = _get_play_credentials_path()
-    if not raw or not raw.strip():
+    candidates = _get_play_credentials_candidates()
+    if not candidates:
         return None
-    raw = raw.strip()
     scopes = ["https://www.googleapis.com/auth/androidpublisher"]
-    # Inline JSON: value starts with { (or is wrapped in quotes by .env)
-    info = parse_json_from_env(raw)
-    if info:
-        try:
-            return service_account.Credentials.from_service_account_info(info, scopes=scopes)
-        except (ValueError, TypeError) as e:
-            logger.warning("Google Play: invalid inline JSON credentials: %s", e)
-            return None
-    # File path
-    if os.path.isfile(raw):
-        return service_account.Credentials.from_service_account_file(raw, scopes=scopes)
-    logger.warning("Google Play: credentials value is neither a valid file path nor JSON (starts with %r)", raw[:50] if len(raw) > 50 else raw)
+    for key, raw in candidates:
+        # Inline JSON: value starts with { (or is wrapped in quotes by .env)
+        info = parse_json_from_env(raw)
+        if info:
+            try:
+                return service_account.Credentials.from_service_account_info(info, scopes=scopes)
+            except (ValueError, TypeError) as e:
+                logger.warning("Google Play: invalid inline JSON credentials in %s: %s", key, e)
+                continue
+        # File path
+        if os.path.isfile(raw):
+            return service_account.Credentials.from_service_account_file(raw, scopes=scopes)
+        logger.warning(
+            "Google Play: %s is neither a valid file path nor JSON (starts with %r)",
+            key,
+            raw[:50] if len(raw) > 50 else raw,
+        )
     return None
 
 # Load backend/.env when credentials path is missing (e.g. gunicorn/workers or import order)

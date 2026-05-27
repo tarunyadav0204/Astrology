@@ -440,6 +440,24 @@ def _normalize_specific_date(value: Any) -> str | None:
         return None
 
 
+def _daily_intent_confirmed(result: Dict[str, Any]) -> bool:
+    """
+    Daily mode is an explicit router contract, not a side effect of any date in the payload.
+
+    The LLM must confirm that the user asked for one exact/relative day and explain the date basis.
+    """
+    extracted = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
+    basis = str(
+        extracted.get("specific_date_basis")
+        or result.get("specific_date_basis")
+        or ""
+    ).strip()
+    confirmed = result.get("daily_intent_confirmed")
+    if isinstance(confirmed, str):
+        confirmed = confirmed.strip().lower() in {"true", "yes", "1"}
+    return bool(confirmed) and basis in {"explicit_user_day", "relative_user_day"}
+
+
 def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int, now: datetime | None = None) -> None:
     """
     Post-process router output: career/education (and related) questions that ask *when* or *whether*
@@ -451,10 +469,10 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     extracted_context = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
     month_window = _extract_month_window_from_question(user_question, now=now_dt)
     llm_date = _normalize_specific_date(extracted_context.get("specific_date")) if extracted_context else None
-    # Only the intent model's `specific_date` may force exact-day mode. Do not parse dates from free
-    # text (e.g. "father passed on 2020-03-15 …") or English-only keywords — that misclassified many
-    # non-daily and non-English questions as PREDICT_DAILY.
+    # Only a confirmed one-day intent may force exact-day mode. A model may include today's date
+    # as ambient context for current distress/timing questions; that must not become daily mode.
     exact_date = llm_date
+    daily_confirmed = _daily_intent_confirmed(result)
 
     if month_window and not exact_date:
         result["mode"] = "PREDICT_PERIOD_OUTLOOK"
@@ -472,7 +490,7 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
         }
         result.pop("dasha_as_of", None)
 
-    if exact_date:
+    if exact_date and daily_confirmed:
         dt = datetime.strptime(exact_date, "%Y-%m-%d")
         month_name = dt.strftime("%B")
         result["mode"] = "PREDICT_DAILY"
@@ -488,6 +506,15 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
             "endYear": dt.year,
             "yearMonthMap": {str(dt.year): [month_name]},
         }
+    elif exact_date and not daily_confirmed:
+        if isinstance(result.get("extracted_context"), dict):
+            result["extracted_context"].pop("specific_date", None)
+        if str(result.get("mode") or "").upper() == "PREDICT_DAILY":
+            result["mode"] = "PREDICT_PERIOD_OUTLOOK"
+            result["context_type"] = "birth"
+            result["analysis_type"] = "PERIOD_OUTLOOK"
+            result["needs_transits"] = True
+            result.pop("dasha_as_of", None)
 
     careerish = cat in frozenset({"education", "career", "job", "promotion", "business"})
     if not careerish:
@@ -925,6 +952,17 @@ Rules:
 - If the user message bundles explicit multiple unrelated asks, prefer `CLARIFY` unless clarification has already been used.
 - If asking about an exact day, relative day, or specific date-bound event, return `extracted_context.specific_date` in YYYY-MM-DD.
 - Resolve "today", "tomorrow", and "day after tomorrow" from the current date context above.
+- Daily mode is opt-in: set `daily_intent_confirmed=true` only when the user is truly asking about one exact day.
+- Set `extracted_context.specific_date_basis` to:
+  - "explicit_user_day" when the user named a specific date/day
+  - "relative_user_day" when the user asked today/tomorrow/day-after-tomorrow
+  - "not_date_bound" for ongoing problems, current-life distress, broad timing questions, or period questions
+- Do NOT set `specific_date` just because today's date is available in context. Current distress is not daily intent.
+- Non-exhaustive calibration examples (use the principle, do not force-fit only these examples):
+  - "Since this year started my life is disturbed, when will things improve?" -> NOT daily; use PREDICT_PERIOD_OUTLOOK or LIFESPAN_EVENT_TIMING
+  - "Meri life disturbed hai, kab tak thik hoga?" -> NOT daily; use timing/problem analysis
+  - "Aaj ka din kaisa rahega?" -> daily with relative_user_day
+  - "27 May 2026 kaisa rahega?" -> daily with explicit_user_day
 - Set `needs_transits=true` for daily, timing, and period outlook questions. Otherwise false unless clearly timing-sensitive.
 - `context_type` is usually `birth`; use `annual` only for whole-year forecast style questions.
 - Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
@@ -942,7 +980,8 @@ Return ONLY this JSON shape:
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
-  "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD when relevant"}},
+  "daily_intent_confirmed": true or false,
+  "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound"}},
   "context_type": "birth" or "annual",
   "category": "career" or "job" or "promotion" or "business" or "love" or "relationship" or "marriage" or "partner" or "wealth" or "money" or "finance" or "health" or "disease" or "property" or "home" or "child" or "pregnancy" or "education" or "learning" or "travel" or "visa" or "foreign" or "gain" or "wish" or "general" or "son" or "daughter" or "mother" or "father" or "spouse" or "siblings" or "children" or "family" or "soul" or "spirituality" or "purpose" or "dharma" or "vehicles" or "timing",
   "year": "year only when annual is clearly asked",
@@ -1315,6 +1354,19 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
           - "What will happen on 12th Sep 2028?" → `2028-09-12`
         - If the question is not about one exact day, leave `extracted_context.specific_date` empty or omit it.
 
+        DAILY INTENT CONFIRMATION:
+        - Daily mode is opt-in. Set `daily_intent_confirmed=true` only when the user's actual question is about one exact/relative day.
+        - Set `extracted_context.specific_date_basis` to:
+          - "explicit_user_day" when the user named a specific date/day
+          - "relative_user_day" when the user asked today/tomorrow/day-after-tomorrow
+          - "not_date_bound" for ongoing problems, current-life distress, broad timing questions, annual/period questions, or remedy/problem questions
+        - Do NOT set `specific_date` merely because Today's Date is in the prompt. Today is context, not user intent.
+        - Non-exhaustive calibration examples (use the principle, do not force-fit only these examples):
+          - "Since this year started my life is disturbed, when will things improve?" → NOT daily; use PREDICT_PERIOD_OUTLOOK or LIFESPAN_EVENT_TIMING
+          - "Meri life disturbed hai, kab tak thik hoga?" → NOT daily; use timing/problem analysis
+          - "Aaj ka din kaisa rahega?" → daily with relative_user_day
+          - "27 May 2026 kaisa rahega?" → daily with explicit_user_day
+
         TRANSIT DETECTION:
         - "When will..." questions → needs_transits: true
         - "What period is good for..." → needs_transits: true
@@ -1330,7 +1382,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         MODES (USER INTENT):
         You must choose one of the following modes based on the user's question. This determines the structure of the final answer.
 
-        - "PREDICT_DAILY": For daily predictions (e.g., "How is today?", "What's in store for me today?").
+        - "PREDICT_DAILY": For explicit one-day predictions only (e.g., "How is today?", "What's in store for me tomorrow?", "How will 27 May 2026 be?").
         - "LIFESPAN_EVENT_TIMING": For open-ended "When" questions about major life events (e.g., "When will I get married?", "When did I buy my house?", "When will my daughter get married?", "In which year did I get married?"). 
           🚨 CRITICAL: Use this mode when the user's message is **primarily** a single timing question about one life event.
           🚨 EXCEPTION — BUNDLED MULTI-TOPIC MESSAGES: If the same message also asks **other unrelated** things (e.g. spouse nature, career, wealth, health) in separate sentences or clauses, you MUST NOT force READY just because one part is a "when" question. Return status: "CLARIFY" and ask which **one** topic to address first (or to send one question at a time), unless the clarification limit already applies.
@@ -1381,7 +1433,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             "status": "CLARIFY" or "READY",
             "clarification_question": "Your clarifying question here (only if status=CLARIFY; when giving options, use lettered quick replies like Type A/Type B with variable count, not fixed 3; keep same language + script as CURRENT QUESTION)",
             "chart_insights": [{{"house_number": 1, "message": "Message must match CURRENT QUESTION language and script style", "highlight_type": "ascendant"}}],
-            "mode": "PREDICT_DAILY" or "PREDICT_EVENT_TIMING" or "ANALYZE_PERSONALITY",
+            "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_REMEDY_FOR_PROBLEM",
             "chart_focus": {{
                 "kind": "chart_specific",
                 "primary": "D1 or D9 or D10 or D7 or Karkamsa or Swamsa",
@@ -1390,7 +1442,8 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                 "phrase": "the phrase or implied lens you detected",
                 "requested": ["D10"]
             }} or null,
-            "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD when exact-day question, else omit or empty" }},
+            "daily_intent_confirmed": true or false,
+            "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis": "explicit_user_day or relative_user_day or not_date_bound" }},
             "context_type": "annual" or "birth",
             "category": "category_name",
             "year": "SPECIFIC_YEAR_FROM_QUESTION (only for annual context_type)",

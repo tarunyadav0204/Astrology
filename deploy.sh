@@ -254,7 +254,10 @@ if [ "${restart_backend}" = "true" ]; then
 
   mkdir -p "${APP_ROOT}/logs"
 
-  export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-/home/tarun_yadav/play-billing-key.json}"
+  DEFAULT_PLAY_BILLING_KEY="/home/tarun_yadav/play-billing-key.json"
+  if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}" ] && [ -f "${DEFAULT_PLAY_BILLING_KEY}" ]; then
+    export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${DEFAULT_PLAY_BILLING_KEY}"
+  fi
 
   echo "Starting backend (appending to logs/backend.log)..."
   {
