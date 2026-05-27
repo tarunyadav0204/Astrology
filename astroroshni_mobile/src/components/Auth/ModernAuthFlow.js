@@ -28,26 +28,23 @@ const { width } = Dimensions.get('window');
 
 /** @returns {string|null} next screen id, or '__root_go_back__' to pop Login off the root stack */
 function resolveAuthHardwareBackTarget(currentScreen, isLogin, formData) {
-  const cc = formData?.countryCode || '';
-  const otpEmailRequired = cc !== '+91';
   switch (currentScreen) {
     case 'welcome':
       return '__root_go_back__';
     case 'phone':
       return 'welcome';
     case 'password':
-      return isLogin ? 'phone' : (cc === '+91' ? 'email' : 'name');
+      return isLogin ? 'phone' : 'name';
     case 'forgotPassword':
       return 'password';
     case 'email': {
       if (isLogin) {
         return 'password';
       }
-      const nonIndiaPreOtp = cc !== '+91' && !(formData?.otpCode || '').trim();
-      return nonIndiaPreOtp ? 'phone' : 'name';
+      return (formData?.otpCode || '').trim() ? 'name' : 'phone';
     }
     case 'otp':
-      return otpEmailRequired ? 'email' : 'phone';
+      return 'email';
     case 'name':
       return 'otp';
     case 'chooseLanguage':

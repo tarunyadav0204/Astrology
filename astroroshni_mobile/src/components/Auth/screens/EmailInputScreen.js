@@ -25,8 +25,8 @@ export default function EmailInputScreen({
   const [loading, setLoading] = React.useState(false);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const isValid = emailRegex.test(formData.email);
-  const isNonIndiaRegistrationPreOtp =
-    !isLogin && (formData.countryCode || '') !== '+91' && !formData.otpCode;
+  /** Signup before OTP: send registration OTP after email. Signup after OTP+name: go to password. */
+  const isRegistrationSendOtpStep = !isLogin && !(formData.otpCode || '').trim();
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -49,7 +49,7 @@ export default function EmailInputScreen({
   const handleContinue = async () => {
     if (!isValid) return;
 
-    if (!isNonIndiaRegistrationPreOtp) {
+    if (!isRegistrationSendOtpStep) {
       navigateToScreen('password');
       return;
     }
@@ -82,7 +82,7 @@ export default function EmailInputScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen(isNonIndiaRegistrationPreOtp ? 'phone' : 'name', 'back')}
+          onPress={() => navigateToScreen(isRegistrationSendOtpStep ? 'phone' : 'name', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>

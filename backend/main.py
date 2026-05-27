@@ -197,8 +197,8 @@ def _is_india_number(phone: str) -> bool:
 
 
 def _otp_email_required(phone: str) -> bool:
-    """Password / registration OTP must be sent to email for all countries except India."""
-    return not _is_india_number(phone)
+    """Password / registration OTP requires a reachable email for all numbers (including India)."""
+    return True
 
 
 def _phone_lookup_variants(phone: Optional[str]) -> List[str]:
@@ -1248,7 +1248,7 @@ async def register(user_data: UserCreate):
             if not email_clean:
                 raise HTTPException(
                     status_code=400,
-                    detail="Email is required for registration (non-India numbers).",
+                    detail="Email is required for registration.",
                 )
         if email_clean and (
             "@" not in email_clean or "." not in email_clean.split("@")[-1]
@@ -1355,7 +1355,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             if not email_clean:
                 raise HTTPException(
                     status_code=400,
-                    detail="Email is required for registration (non-India numbers).",
+                    detail="Email is required for registration.",
                 )
         if email_clean and (
             "@" not in email_clean or "." not in email_clean.split("@")[-1]
@@ -2046,10 +2046,10 @@ async def send_registration_otp(request: SendResetCode):
 
         if existing_user:
             raise HTTPException(status_code=409, detail="Phone number already registered")
-        if _otp_email_required(request.phone) and not (request.email or "").strip():
+        if not (request.email or "").strip():
             raise HTTPException(
                 status_code=400,
-                detail="Email is required for registration (non-India numbers).",
+                detail="Email is required for registration.",
             )
 
         # Generate 6-digit code and secure token
@@ -2064,28 +2064,56 @@ async def send_registration_otp(request: SendResetCode):
             (request.phone, code, token, expires_at),
         )
         conn.commit()
-    
-    # Send SMS with code
+
     from sms_service import sms_service
+
+    is_india = _is_india_number(request.phone)
+    is_development = os.getenv("ENVIRONMENT", "development") == "development"
+
+    if is_india:
+        # India: OTP only via SMS; email is collected for the account, not for OTP delivery.
+        sms_sent = sms_service.send_reset_code(request.phone, code)
+        email_sent = False
+        response = {
+            "message": "Registration OTP sent to your phone number.",
+            "delivery": {
+                "sms_sent": bool(sms_sent),
+                "email_sent": False,
+                "registration_otp_channel": "sms",
+            },
+        }
+        if not sms_sent:
+            if is_development:
+                response["dev_code"] = code
+                response["message"] += " (Development: SMS disabled, code shown below)"
+            else:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Failed to deliver registration OTP via SMS",
+                )
+        return response
+
+    # Non-India: SMS often unreliable; require OTP delivery via email.
     sms_sent = sms_service.send_reset_code(request.phone, code)
-    
-    email_sent = _send_otp_email(request.email, code) if request.email else False
+    email_clean = (request.email or "").strip()
+    email_sent = bool(_send_otp_email(email_clean, code)) if email_clean else False
     response = {
-        "message": f"Registration OTP sent to {request.phone}",
+        "message": f"Registration OTP sent to {email_clean}",
         "delivery": {
             "sms_sent": bool(sms_sent),
             "email_sent": bool(email_sent),
+            "registration_otp_channel": "email",
         },
     }
-    if _otp_email_required(request.phone) and not sms_sent and not email_sent:
-        raise HTTPException(status_code=503, detail="Failed to deliver OTP to SMS and email")
-    
-    # Development mode: show code if SMS failed and not in production
-    is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
-    if not sms_sent and is_development:
-        response["dev_code"] = code
-        response["message"] += " (Development: SMS disabled, code shown below)"
-    
+    if not email_sent:
+        if is_development:
+            response["dev_code"] = code
+            response["message"] += " (Development: email OTP unavailable, code shown below)"
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail="Failed to deliver registration OTP via email",
+            )
     return response
 
 @app.post("/api/send-reset-code")
@@ -2106,7 +2134,7 @@ async def send_reset_code(request: SendResetCode):
         if _otp_email_required(request.phone) and not target_email:
             raise HTTPException(
                 status_code=400,
-                detail="Email is required for password reset (non-India numbers).",
+                detail="Email is required for password reset.",
             )
         if requested_email and user_email and requested_email != user_email:
             raise HTTPException(status_code=400, detail="Provided email does not match account email")
@@ -2124,42 +2152,56 @@ async def send_reset_code(request: SendResetCode):
             (stored_phone, code, token, expires_at),
         )
         conn.commit()
-    
-    # Debug: Print SMS provider config
-    print(f"SMS Provider: {(os.getenv('SMS_PROVIDER') or 'auto')}")
-    print(f"MSG91 configured: {bool((os.getenv('MSG91_AUTH_KEY') or '').strip() and (os.getenv('MSG91_TEMPLATE_ID') or '').strip())}")
-    print(f"Twilio configured: {bool(os.getenv('TWILIO_ACCOUNT_SID') and os.getenv('TWILIO_AUTH_TOKEN') and os.getenv('TWILIO_PHONE_NUMBER'))}")
-    
-    # Send SMS with code
+
     from sms_service import sms_service
+
+    is_india = _is_india_number(stored_phone)
+    is_development = os.getenv("ENVIRONMENT", "development") == "development"
+
+    if is_india:
+        # India: reset OTP only via SMS (no OTP in email — avoids proving phone via inbox).
+        sms_sent = sms_service.send_reset_code(request.phone, code)
+        response = {
+            "message": "Reset code sent to your phone number.",
+            "user_name": user[1],
+            "delivery": {
+                "sms_sent": bool(sms_sent),
+                "email_sent": False,
+                "reset_otp_channel": "sms",
+            },
+        }
+        if not sms_sent:
+            if is_development:
+                response["dev_code"] = code
+                response["message"] += " (Development: SMS disabled, code shown below)"
+            else:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Failed to deliver reset code via SMS",
+                )
+        return response
+
+    # Non-India: require OTP via email; SMS is best-effort.
     sms_sent = sms_service.send_reset_code(request.phone, code)
-    email_sent = _send_otp_email(target_email, code) if target_email else False
-
-    delivered_to = []
-    if email_sent and target_email:
-        delivered_to.append(target_email)
-    if sms_sent:
-        delivered_to.append(request.phone)
-
-    if not delivered_to:
-        raise HTTPException(status_code=503, detail="Failed to deliver reset code to SMS and email")
-
-    msg = "Reset code sent to " + " and ".join(delivered_to)
-
+    email_sent = bool(_send_otp_email(target_email, code)) if target_email else False
     response = {
-        "message": msg,
+        "message": f"Reset code sent to {target_email}",
         "user_name": user[1],
         "delivery": {
             "sms_sent": bool(sms_sent),
             "email_sent": bool(email_sent),
+            "reset_otp_channel": "email",
         },
     }
-    # Development mode: show code if SMS failed and not in production
-    is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
-    if not sms_sent and is_development:
-        response["dev_code"] = code
-        response["message"] += " (Development: SMS disabled, code shown below)"
-    
+    if not email_sent:
+        if is_development:
+            response["dev_code"] = code
+            response["message"] += " (Development: email OTP unavailable, code shown below)"
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail="Failed to deliver reset code via email",
+            )
     return response
 
 @app.post("/api/verify-reset-code")

@@ -35,9 +35,9 @@ export function isNationalPhoneValid(countryCode, nationalDigits) {
   return d.length >= min && d.length <= max;
 }
 
-/** True when selected dial code is India (SMS-first; email not required for OTP). */
+/** True when email must be collected for registration / reset OTP (all countries). */
 export function otpEmailRequiredForCountry(countryCode) {
-  return (countryCode || '') !== '+91';
+  return true;
 }
 
 /**
@@ -60,7 +60,7 @@ export function isIndiaPhoneForOtp(phone) {
   return false;
 }
 
-/** Registration / reset OTP email required for all numbers except India-shaped ones. */
+/** Registration / reset OTP requires email for all numbers. */
 export function otpEmailRequiredForPhone(phone) {
-  return !isIndiaPhoneForOtp(phone);
+  return true;
 }

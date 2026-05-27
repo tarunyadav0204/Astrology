@@ -41,7 +41,8 @@ export default function NameInputScreen({
 
   const handleContinue = () => {
     if (isValid) {
-      if ((formData.countryCode || '') !== '+91' && formData.email) {
+      const emailTrim = (formData.email || '').trim();
+      if (emailTrim && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
         navigateToScreen('password');
         return;
       }

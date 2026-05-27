@@ -62,8 +62,6 @@ export default function OTPScreen({
     setIsValid(formData.otpCode.length === 6);
   }, [formData.otpCode]);
 
-  const otpEmailRequired = (formData.countryCode || '') !== '+91';
-
   const handleVerifyOTP = async () => {
     if (!isValid) return;
     
@@ -91,8 +89,8 @@ export default function OTPScreen({
     try {
       const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
       const payload = { phone: fullPhone };
-      if (otpEmailRequired && formData.email) {
-        payload.email = formData.email;
+      if ((formData.email || '').trim()) {
+        payload.email = formData.email.trim();
       }
       const response = await authAPI.sendRegistrationOtp(payload);
       setResendTimer(30);
@@ -133,7 +131,7 @@ export default function OTPScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen(otpEmailRequired ? 'email' : 'phone', 'back')}
+          onPress={() => navigateToScreen('email', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -144,7 +142,7 @@ export default function OTPScreen({
           <Text style={styles.title}>Enter OTP</Text>
           <Text style={styles.subtitle}>
             We've sent a 6-digit code to{"\n"}
-            {otpEmailRequired && formData.email
+            {formData.email
               ? formData.email
               : `${formData.countryCode} ${formData.phone}`}
           </Text>

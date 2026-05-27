@@ -18,7 +18,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';
-import { otpEmailRequiredForPhone } from './countryCodes';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 
@@ -98,7 +97,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleAuth = async () => {
-    const needEmailSignup = !isLogin && otpEmailRequiredForPhone(phone);
+    const needEmailSignup = !isLogin;
     if (!phone || !password || (!isLogin && (!name || (needEmailSignup && !email.trim())))) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -226,17 +225,14 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
-    if (otpEmailRequiredForPhone(resetData.phone) && !(resetData.email || '').trim()) {
-      Alert.alert('Error', 'Please enter your email for non-India numbers');
+    if (!(resetData.email || '').trim()) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     setLoading(true);
     try {
-      const payload = { phone: resetData.phone };
-      if (otpEmailRequiredForPhone(resetData.phone) && (resetData.email || '').trim()) {
-        payload.email = resetData.email.trim();
-      }
+      const payload = { phone: resetData.phone, email: resetData.email.trim() };
       const response = await authAPI.sendResetCode(payload);
       Alert.alert('Success', response.data.message);
       setResetStep(2);
@@ -299,9 +295,13 @@ export default function LoginScreen({ navigation }) {
     
     // Send OTP for registration
     try {
-      const regPayload = { phone: registrationData.phone };
-      if (otpEmailRequiredForPhone(registrationData.phone) && registrationData.email) {
-        regPayload.email = registrationData.email;
+      const regPayload = {
+        phone: registrationData.phone,
+        email: (registrationData.email || '').trim(),
+      };
+      if (!regPayload.email) {
+        Alert.alert('Error', 'Please enter your email address');
+        return;
       }
       await authAPI.sendRegistrationOtp(regPayload);
       setShowOtpVerification(true);
@@ -580,20 +580,18 @@ export default function LoginScreen({ navigation }) {
                       keyboardType="phone-pad"
                     />
                   </View>
-                  {otpEmailRequiredForPhone(resetData.phone) ? (
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.modernInput}
-                        placeholder="Email (required for non-India)"
-                        placeholderTextColor={COLORS.textSecondary}
-                        value={resetData.email}
-                        onChangeText={(value) => setResetData(prev => ({ ...prev, email: value }))}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                      />
-                    </View>
-                  ) : null}
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.modernInput}
+                      placeholder="Email (required)"
+                      placeholderTextColor={COLORS.textSecondary}
+                      value={resetData.email}
+                      onChangeText={(value) => setResetData(prev => ({ ...prev, email: value }))}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
                   <TouchableOpacity
                     style={[styles.modernButton, loading && styles.buttonDisabled]}
                     onPress={handleSendCode}
@@ -739,11 +737,7 @@ export default function LoginScreen({ navigation }) {
                       <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
                       <TextInput
                         style={styles.modernInput}
-                        placeholder={
-                          otpEmailRequiredForPhone(phone)
-                            ? 'Email Address'
-                            : 'Email (optional for India)'
-                        }
+                        placeholder="Email Address"
                         placeholderTextColor={COLORS.textSecondary}
                         value={email}
                         onChangeText={setEmail}

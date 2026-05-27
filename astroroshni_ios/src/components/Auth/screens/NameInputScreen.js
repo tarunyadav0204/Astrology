@@ -41,6 +41,11 @@ export default function NameInputScreen({
 
   const handleContinue = () => {
     if (isValid) {
+      const emailTrim = (formData.email || '').trim();
+      if (emailTrim && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+        navigateToScreen('password');
+        return;
+      }
       navigateToScreen('email');
     }
   };

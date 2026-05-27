@@ -87,7 +87,11 @@ export default function OTPScreen({
     
     try {
       const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
-      const response = await authAPI.sendRegistrationOtp({ phone: fullPhone });
+      const payload = { phone: fullPhone };
+      if ((formData.email || '').trim()) {
+        payload.email = formData.email.trim();
+      }
+      const response = await authAPI.sendRegistrationOtp(payload);
       setResendTimer(30);
       
       // Show dev OTP code if available
@@ -126,7 +130,7 @@ export default function OTPScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen('phone', 'back')}
+          onPress={() => navigateToScreen('email', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#000000" />
         </TouchableOpacity>
@@ -137,7 +141,7 @@ export default function OTPScreen({
           <Text style={styles.title}>Enter OTP</Text>
           <Text style={styles.subtitle}>
             We've sent a 6-digit code to{"\n"}
-            {formData.countryCode} {formData.phone}
+            {formData.email ? formData.email : `${formData.countryCode} ${formData.phone}`}
           </Text>
           {devOtpCode && (
             <View style={styles.devCodeContainer}>

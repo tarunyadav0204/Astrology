@@ -29,9 +29,6 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
-  /** Non-India: reset / registration OTP is also sent by email (backend requires it). */
-  const isOtpEmailRequired = () => resetCountryCode !== '+91';
-
   const [biometricSupported, setBiometricSupported] = useState(false);
   
   React.useEffect(() => {
@@ -103,11 +100,10 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      if (isOtpEmailRequired() && !(resetData.email || '').trim()) {
-        throw new Error('Email is required for non-India numbers');
+      if (!(resetData.email || '').trim()) {
+        throw new Error('Email is required');
       }
-      const payload = { phone: fullPhone };
-      if ((resetData.email || '').trim()) payload.email = resetData.email.trim();
+      const payload = { phone: fullPhone, email: resetData.email.trim() };
       const response = await authService.sendResetCode(payload);
       toast.success(response.message);
       // Show code if SMS service is unavailable (testing mode)
@@ -278,14 +274,14 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 color: '#e91e63',
                 fontWeight: '600'
               }}>
-                Email {isOtpEmailRequired() ? '(required for non-India numbers)' : '(optional)'}
+                Email (required)
               </label>
               <input
                 type="email"
                 value={resetData.email}
                 onChange={(e) => setResetData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="Enter your email"
-                required={isOtpEmailRequired()}
+                required
                 style={{
                   width: '100%',
                   padding: '0.75rem',

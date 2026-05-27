@@ -60,7 +60,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   };
 
-  const otpEmailRequired = countryCode !== '+91';
+  const otpEmailRequired = true;
 
   const handleSendOtp = async () => {
     const national = formData.phone.trim();
@@ -316,7 +316,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             color: '#e91e63',
             fontWeight: '600'
           }}>
-            Email {otpEmailRequired ? '(required)' : '(optional)'}
+            Email (required)
           </label>
           <input
             type="email"
@@ -324,7 +324,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             value={formData.email}
             onChange={handleInputChange}
             placeholder="Enter your email"
-            required={otpEmailRequired}
+            required
             style={{
               width: '100%',
               padding: '0.75rem',

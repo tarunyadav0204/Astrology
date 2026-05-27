@@ -15,7 +15,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
-import { authAPI } from '../../../services/api';
 import {
   COUNTRY_CODES,
   getNationalPhoneMaxLength,
@@ -76,54 +75,8 @@ export default function PhoneInputScreen({
       console.log('  → Navigating to password screen');
       navigateToScreen('password');
     } else {
-      if (selectedCountry.code !== '+91') {
-        navigateToScreen('email');
-        return;
-      }
-      // Check if phone exists by trying to send registration OTP
-      setLoading(true);
-      
-      const startTime = Date.now();
-      try {
-        const response = await authAPI.sendRegistrationOtp({ phone: fullPhone });
-        const endTime = Date.now();
-        
-        // console.log('✅ API Response received in', endTime - startTime, 'ms');
-        // console.log('📥 Response status:', response.status);
-        // console.log('📥 Response data:', response.data);
-        
-        // Store dev OTP code if available
-        if (response.data.dev_code) {
-          // console.log('📱 Development OTP Code:', response.data.dev_code);
-          updateFormData('devOtpCode', response.data.dev_code);
-        }
-        
-        // If successful, phone doesn't exist, continue to OTP verification
-        navigateToScreen('otp');
-      } catch (error) {
-        const endTime = Date.now();
-        // console.log('❌ API Error after', endTime - startTime, 'ms');
-        // console.log('📥 Error code:', error.code);
-        // console.log('📥 Error status:', error.response?.status);
-        // console.log('📥 Error data:', error.response?.data);
-        // console.log('📥 Error message:', error.message);
-        // console.log('📥 Error config URL:', error.config?.url);
-        // console.log('📥 Error config method:', error.config?.method);
-        // console.log('📥 Error config timeout:', error.config?.timeout);
-        
-        if (error.code === 'ECONNABORTED') {
-          Alert.alert('Timeout Error', 'Request timed out. Please check your internet connection and try again.');
-        } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
-          Alert.alert('Network Error', 'Unable to connect to server. Please check your internet connection.');
-        } else if (error.response?.status === 409) {
-          Alert.alert('Phone Already Registered', 'This phone number is already registered. Please sign in instead.');
-        } else {
-          Alert.alert('Error', `Unable to verify phone number: ${error.message}. Please try again.`);
-        }
-      } finally {
-        setLoading(false);
-        // console.log('🏁 Phone validation completed');
-      }
+      navigateToScreen('email');
+      return;
     }
   };
 

@@ -38,7 +38,6 @@ export default function ForgotPasswordScreen({
 
   const nationalDigits = (formData.phone || '').replace(/[^0-9]/g, '');
   const fullPhone = `${selectedCountry.code}${nationalDigits}`;
-  const otpEmailRequired = selectedCountry.code !== '+91';
   const isPhoneValid = isNationalPhoneValid(selectedCountry.code, nationalDigits);
 
   useEffect(() => {
@@ -91,19 +90,15 @@ export default function ForgotPasswordScreen({
       );
       return;
     }
-    if (otpEmailRequired && !formData.email) {
-      Alert.alert('Error', 'Please enter email for non-India numbers');
+    if (!formData.email) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     setLoading(true);
     try {
       const buildPayload = (phoneVal) => {
-        const payload = { phone: phoneVal };
-        if (otpEmailRequired && formData.email) {
-          payload.email = formData.email;
-        }
-        return payload;
+        const payload = { phone: phoneVal, email: formData.email };
       };
       let response;
       try {
@@ -183,9 +178,7 @@ export default function ForgotPasswordScreen({
               <Text style={styles.emoji}>📱</Text>
               <Text style={styles.title}>Reset Password</Text>
               <Text style={styles.subtitle}>
-                {otpEmailRequired
-                  ? 'Enter your phone number and email. We will send a reset code to your email.'
-                  : 'Enter your phone number to receive a reset code'}
+                Enter your phone number and email. We will send a reset code to your email.
               </Text>
             </View>
 
@@ -229,8 +222,7 @@ export default function ForgotPasswordScreen({
               </View>
             </Animated.View>
 
-            {otpEmailRequired && (
-              <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
+            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
                 <View style={styles.inputWrapper}>
                   <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
                   <TextInput
@@ -244,7 +236,6 @@ export default function ForgotPasswordScreen({
                   />
                 </View>
               </Animated.View>
-            )}
 
             <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
               <TouchableOpacity
@@ -273,7 +264,7 @@ export default function ForgotPasswordScreen({
               <Text style={styles.title}>Enter Code</Text>
               <Text style={styles.subtitle}>
                 We've sent a 6-digit code to{'\n'}
-                {otpEmailRequired && formData.email ? formData.email : fullPhone}
+                {formData.email ? formData.email : fullPhone}
               </Text>
             </View>
 

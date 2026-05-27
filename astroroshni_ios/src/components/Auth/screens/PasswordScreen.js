@@ -171,7 +171,7 @@ export default function PasswordScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen('phone', 'back')}
+          onPress={() => navigateToScreen(isLogin ? 'phone' : 'name', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#000000" />
         </TouchableOpacity>

@@ -62,10 +62,17 @@ export default function ForgotPasswordScreen({
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
+    if (!(formData.email || '').trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await authAPI.sendResetCode({ phone: formData.phone });
+      const response = await authAPI.sendResetCode({
+        phone: formData.phone,
+        email: formData.email.trim(),
+      });
       Alert.alert('Success', response.data.message);
       setStep(2);
     } catch (error) {
@@ -128,7 +135,7 @@ export default function ForgotPasswordScreen({
             <View style={styles.header}>
               <Text style={styles.emoji}>📱</Text>
               <Text style={styles.title}>Reset Password</Text>
-              <Text style={styles.subtitle}>Enter your phone number to receive a reset code</Text>
+              <Text style={styles.subtitle}>Enter your phone number and email to receive a reset code</Text>
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
@@ -142,6 +149,21 @@ export default function ForgotPasswordScreen({
                   onChangeText={(value) => updateFormData('phone', value)}
                   keyboardType="phone-pad"
                   autoFocus
+                />
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email Address"
+                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                  value={formData.email}
+                  onChangeText={(value) => updateFormData('email', value)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                 />
               </View>
             </Animated.View>
@@ -168,7 +190,7 @@ export default function ForgotPasswordScreen({
             <View style={styles.header}>
               <Text style={styles.emoji}>🔐</Text>
               <Text style={styles.title}>Enter Code</Text>
-              <Text style={styles.subtitle}>We've sent a 6-digit code to {formData.phone}</Text>
+              <Text style={styles.subtitle}>We've sent a 6-digit code to {formData.email || formData.phone}</Text>
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>

@@ -34,7 +34,7 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
+  const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
   const [showOtpVerification, setShowOtpVerification] = useState(false);
@@ -219,10 +219,17 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
+    if (!(resetData.email || '').trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await authAPI.sendResetCode({ phone: resetData.phone });
+      const response = await authAPI.sendResetCode({
+        phone: resetData.phone,
+        email: resetData.email.trim(),
+      });
       Alert.alert('Success', response.data.message);
       setResetStep(2);
     } catch (error) {
@@ -269,7 +276,7 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Success', 'Password reset successfully!');
       setShowForgotPassword(false);
       setResetStep(1);
-      setResetData({ phone: '', code: '', newPassword: '' });
+      setResetData({ phone: '', email: '', code: '', newPassword: '' });
       setResetToken('');
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Password reset failed');
@@ -284,7 +291,15 @@ export default function LoginScreen({ navigation }) {
     
     // Send OTP for registration
     try {
-      await authAPI.sendRegistrationOtp({ phone: registrationData.phone });
+      const emailTrim = (registrationData.email || '').trim();
+      if (!emailTrim) {
+        Alert.alert('Error', 'Please enter your email address');
+        return;
+      }
+      await authAPI.sendRegistrationOtp({
+        phone: registrationData.phone,
+        email: emailTrim,
+      });
       setShowOtpVerification(true);
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to send OTP');
@@ -561,6 +576,18 @@ export default function LoginScreen({ navigation }) {
                       keyboardType="phone-pad"
                     />
                   </View>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.modernInput}
+                      placeholder="Email (required)"
+                      placeholderTextColor={COLORS.textSecondary}
+                      value={resetData.email}
+                      onChangeText={(value) => setResetData(prev => ({ ...prev, email: value }))}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
                   <TouchableOpacity
                     style={[styles.modernButton, loading && styles.buttonDisabled]}
                     onPress={handleSendCode}
@@ -640,7 +667,7 @@ export default function LoginScreen({ navigation }) {
                 onPress={() => {
                   setShowForgotPassword(false);
                   setResetStep(1);
-                  setResetData({ phone: '', code: '', newPassword: '' });
+                  setResetData({ phone: '', email: '', code: '', newPassword: '' });
                   setResetToken('');
                 }}
               >

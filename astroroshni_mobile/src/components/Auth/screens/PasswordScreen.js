@@ -226,7 +226,7 @@ export default function PasswordScreen({
           style={styles.backButton}
           onPress={() =>
             navigateToScreen(
-              isLogin ? 'phone' : (formData.countryCode === '+91' ? 'email' : 'name'),
+              isLogin ? 'phone' : 'name',
               'back'
             )
           }
