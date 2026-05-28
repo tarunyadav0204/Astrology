@@ -274,7 +274,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 color: '#e91e63',
                 fontWeight: '600'
               }}>
-                Email (required)
+                Email
               </label>
               <input
                 type="email"

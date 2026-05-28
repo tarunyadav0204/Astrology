@@ -60,8 +60,6 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   };
 
-  const otpEmailRequired = true;
-
   const handleSendOtp = async () => {
     const national = formData.phone.trim();
     const fullPhone = buildFullPhone(countryCode, national);
@@ -70,23 +68,18 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       toast.error('Please enter a valid phone number for the selected country');
       return;
     }
-    if (otpEmailRequired) {
-      if (!email) {
-        toast.error('Please enter your email address');
-        return;
-      }
-      if (!isValidEmail(email)) {
-        toast.error('Please enter a valid email address');
-        return;
-      }
-    } else if (email && !isValidEmail(email)) {
+    if (!email) {
+      toast.error('Please enter your email address');
+      return;
+    }
+    if (!isValidEmail(email)) {
       toast.error('Please enter a valid email address');
       return;
     }
 
     setSendingOtp(true);
     try {
-      const payload = { phone: fullPhone, ...(email ? { email } : {}) };
+      const payload = { phone: fullPhone, email };
       const response = await authService.sendRegistrationOtp(payload);
       setOtpSent(true);
       setOtpVerified(false);
@@ -149,16 +142,11 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       return;
     }
     const emailTrim = formData.email.trim();
-    if (otpEmailRequired) {
-      if (!emailTrim) {
-        toast.error('Email is required');
-        return;
-      }
-      if (!isValidEmail(emailTrim)) {
-        toast.error('Please enter a valid email address');
-        return;
-      }
-    } else if (emailTrim && !isValidEmail(emailTrim)) {
+    if (!emailTrim) {
+      toast.error('Email is required');
+      return;
+    }
+    if (!isValidEmail(emailTrim)) {
       toast.error('Please enter a valid email address');
       return;
     }
@@ -169,7 +157,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       const response = await authService.register({
         name: formData.name,
         phone: registerFullPhone,
-        ...(emailTrim ? { email: emailTrim } : {}),
+        email: emailTrim,
         otp_token: otpToken,
         password: formData.password,
         signup_client: 'web',
@@ -316,7 +304,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             color: '#e91e63',
             fontWeight: '600'
           }}>
-            Email (required)
+            Email
           </label>
           <input
             type="email"
