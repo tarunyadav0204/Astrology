@@ -454,7 +454,7 @@ const BirthForm = ({
           borderBottom: '1px solid #e2e8f0',
           background: '#f8fafc',
           position: 'relative',
-          borderRadius: '24px 24px 0 0'
+          borderRadius: 0
         }}>
           <h2 style={{
             margin: '0 0 8px 0',
@@ -490,7 +490,7 @@ const BirthForm = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: '50%',
+              borderRadius: 0,
               transition: 'all 0.2s ease',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
@@ -537,7 +537,7 @@ const BirthForm = ({
             {prefilledData ? 'Marriage Analysis - Enter Details' : 'Birth Details'}
           </h2>
           {prefilledData && (
-            <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50', borderRadius: '8px', color: '#4caf50', fontSize: '0.9rem' }}>
+            <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50', borderRadius: 0, color: '#4caf50', fontSize: '0.9rem' }}>
               ✓ Form pre-filled from homepage. Please verify and complete the details.
             </div>
           )}
@@ -695,14 +695,14 @@ const BirthForm = ({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); editChart(chart); setActiveTab('new'); }}
-                      style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: 0, cursor: 'pointer' }}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); deleteChart(chart.id); }}
-                      style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: 0, cursor: 'pointer' }}
                     >
                       Delete
                     </button>

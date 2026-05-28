@@ -181,6 +181,15 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                   AR
                 </span>
               </button>
+              <button
+                type="button"
+                className="mobile-menu-btn compact-nav__menu-toggle compact-nav__menu-toggle--mobile"
+                onClick={() => setShowMobileMenu(true)}
+                aria-label="Open menu"
+                aria-expanded={showMobileMenu}
+              >
+                ☰
+              </button>
             </div>
 
             <nav className="compact-menu">
@@ -235,15 +244,6 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               ) : showLoginButton ? (
                 <button className="auth-btn" onClick={onLogin}>Sign In</button>
               ) : null}
-              <button
-                type="button"
-                className="mobile-menu-btn compact-nav__menu-toggle compact-nav__menu-toggle--mobile"
-                onClick={() => setShowMobileMenu(true)}
-                aria-label="Open menu"
-                aria-expanded={showMobileMenu}
-              >
-                ☰
-              </button>
             </div>
           </div>
         </div>

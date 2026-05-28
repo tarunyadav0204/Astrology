@@ -41,13 +41,15 @@
   min-width: 0;
 }
 
-/* Compact: hamburger before logo on desktop (top-left of bar); on narrow screens use trailing toggle in .compact-actions */
+/* Compact: desktop hamburger before logo; mobile hamburger after logo (right on narrow screens) */
 .compact-nav__menu-toggle--desktop {
   display: none;
 }
 
 .compact-nav__menu-toggle--mobile {
   display: none;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 @media (min-width: 969px) {
@@ -193,7 +195,7 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Compact hamburgers: only --desktop (brand row) or --mobile (compact-actions) per breakpoint; see .compact-nav__menu-toggle rules above */
+/* Compact hamburgers: --desktop before logo (≥969px); --mobile after logo in brand row (≤968px) */
 
 /* Denser top bar on full-page chat (mobile web) */
 .main-header.compact.compact--chat .compact-nav {
@@ -216,21 +218,38 @@
 }
 
 @media (max-width: 968px) {
+  .compact-nav .container {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+
+  .compact-nav__brand-row {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    justify-content: space-between;
+    justify-self: stretch;
+  }
+
   .compact-menu {
-    display: none;
+    display: none !important;
   }
 
   /* Beat global .mobile-menu-btn { display:flex !important } in narrow breakpoints */
   .main-header.compact .compact-nav__menu-toggle--desktop {
     display: none !important;
   }
-  
-  .compact-actions .credits-btn,
-  .compact-actions .native-selector-chip,
-  .compact-actions .auth-btn {
-    display: none;
+
+  .main-header.compact .compact-nav__menu-toggle--mobile.mobile-menu-btn {
+    display: flex !important;
   }
-  
+
+  .compact-actions {
+    display: none !important;
+  }
 }
 
 @media (max-width: 768px) {

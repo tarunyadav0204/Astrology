@@ -36,7 +36,7 @@ export const ChartsPanel = styled.div`
   max-width: 440px;
   margin: 0 auto;
   background: white;
-  border-radius: 24px;
+  border-radius: 0;
   padding: 24px;
   box-shadow: 0 20px 40px rgba(0,0,0,0.05);
 `;
@@ -48,7 +48,7 @@ export const FormContainer = styled.div`
   margin: 0 auto;
   padding: 0;
   background: #ffffff;
-  border-radius: 24px;
+  border-radius: 0;
   position: relative;
   overflow: visible;
   animation: ${fadeIn} 0.4s ease-out;
@@ -74,7 +74,7 @@ export const TabContainer = styled.div`
 export const TabNavigation = styled.div`
   display: flex;
   background: #f1f5f9; /* Slate 100 */
-  border-radius: 16px;
+  border-radius: 0;
   padding: 6px;
   margin-bottom: 32px;
   position: relative;
@@ -88,7 +88,7 @@ export const TabButton = styled.button.withConfig({
   flex: 1;
   padding: 12px 20px;
   border: none;
-  border-radius: 12px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 15px;
   font-weight: 600;
@@ -153,7 +153,7 @@ const inputStyles = css`
   width: 100%;
   padding: 14px 16px;
   border: 2px solid #e2e8f0; /* Slate 200 */
-  border-radius: 12px;
+  border-radius: 0;
   font-size: 15px;
   color: #1e293b;
   background: #f8fafc;
@@ -222,7 +222,7 @@ export const SuggestionList = styled.ul`
   left: 0;
   right: 0;
   background: white;
-  border-radius: 12px;
+  border-radius: 0;
   padding: 8px;
   list-style: none;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -234,7 +234,7 @@ export const SuggestionList = styled.ul`
 
 export const SuggestionItem = styled.li`
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 14px;
   color: #475569;
@@ -254,7 +254,7 @@ export const Button = styled.button`
   background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); /* Orange gradient */
   color: white;
   border: none;
-  border-radius: 16px;
+  border-radius: 0;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -308,7 +308,7 @@ export const ChartsList = styled.div`
   }
   &::-webkit-scrollbar-thumb {
     background: #cbd5e1;
-    border-radius: 10px;
+    border-radius: 0;
   }
   &::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
@@ -320,7 +320,7 @@ export const LoadMoreButton = styled.button`
   margin-top: 12px;
   padding: 12px 16px;
   border: none;
-  border-radius: 12px;
+  border-radius: 0;
   background: rgba(0, 0, 0, 0.06);
   color: #1e293b;
   font-size: 14px;
@@ -341,7 +341,7 @@ export const LoadMoreButton = styled.button`
 export const ChartItem = styled.div`
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border-radius: 0;
   padding: 16px;
   margin-bottom: 12px;
   display: flex;
