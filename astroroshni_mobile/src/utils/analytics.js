@@ -1,6 +1,15 @@
 import { Platform } from 'react-native';
 import axios from 'axios';
 import { trackMobileJourneyEvent } from '../services/journeyTracker';
+import {
+  logFacebookEvent,
+  logMetaAppEvent,
+  MetaStandardEvent,
+  setFacebookUserId,
+  clearFacebookUserId,
+} from '../services/facebookAnalytics';
+
+export { MetaStandardEvent, logMetaAppEvent };
 
 const GA_MEASUREMENT_ID = 'G-M0C9B8LGMR';
 const API_SECRET = 'TY4n2VL_R6qWdmqGc5rGZg'; // Get from GA4 Admin > Data Streams > Measurement Protocol API secrets
@@ -74,17 +83,31 @@ const sendToGA4 = async (eventName, params = {}) => {
   }
 };
 
-export const trackScreenView = (screenName) => {
-  console.log('📊 Screen:', screenName);
+export const trackScreenView = (screenName, meta = {}) => {
+  const contentId = meta.content_id || screenName;
+  const contentType = meta.content_type || 'screen';
+  console.log('📊 Screen:', screenName, { content_id: contentId, content_type: contentType });
   if (Platform.OS === 'web') {
-    gtag('event', 'screen_view', { screen_name: screenName });
+    gtag('event', 'screen_view', {
+      screen_name: screenName,
+      content_id: contentId,
+      content_type: contentType,
+    });
   } else {
-    sendToGA4('screen_view', { screen_name: screenName });
-    // Mirror every screen view into mobile journey pipeline (silent fire-and-forget).
+    sendToGA4('screen_view', {
+      screen_name: screenName,
+      content_id: contentId,
+      content_type: contentType,
+    });
+    logMetaAppEvent(MetaStandardEvent.VIEW_CONTENT, {
+      content_id: contentId,
+      content_type: contentType,
+    });
     trackMobileJourneyEvent('mobile_screen_view', {
       screen_name: screenName,
       resource_type: 'screen',
-      resource_id: screenName,
+      resource_id: contentId,
+      metadata: { content_type: contentType },
     });
   }
 };
@@ -95,12 +118,45 @@ export const trackEvent = (eventName, params = {}) => {
     gtag('event', eventName, params);
   } else {
     sendToGA4(eventName, params);
+    // Meta standard events are dispatched via trackMetaStandard / logMetaAppEvent; avoid duplicate custom logs.
+    if (!Object.values(MetaStandardEvent).includes(eventName)) {
+      logFacebookEvent(eventName, params);
+    }
     // Mirror every analytics event to mobile journey events.
     trackMobileJourneyEvent('mobile_action', {
       resource_type: 'event',
       resource_id: eventName,
       metadata: params || {},
     });
+  }
+};
+
+const META_GA_EVENT_ALIAS = {
+  [MetaStandardEvent.CONTACT]: 'contact',
+  [MetaStandardEvent.SEARCH]: 'search',
+  [MetaStandardEvent.COMPLETE_REGISTRATION]: 'sign_up',
+  [MetaStandardEvent.VIEW_CONTENT]: 'view_content',
+  [MetaStandardEvent.SUBSCRIBE]: 'subscribe',
+  [MetaStandardEvent.INITIATE_CHECKOUT]: 'initiate_checkout',
+  [MetaStandardEvent.START_TRIAL]: 'start_trial',
+  [MetaStandardEvent.PURCHASE]: 'purchase',
+  [MetaStandardEvent.ADD_PAYMENT_INFO]: 'add_payment_info',
+};
+
+/** Fire a Meta standard app event (+ GA4 + journey). Prefer for Events Manager checklist. */
+export const trackMetaStandard = (eventKey, params = {}) => {
+  const gaEventName = META_GA_EVENT_ALIAS[eventKey] || eventKey;
+  console.log('📊 Meta standard:', eventKey, params);
+  if (Platform.OS === 'web') {
+    gtag('event', gaEventName, params);
+  } else {
+    sendToGA4(gaEventName, params);
+    trackMobileJourneyEvent('mobile_action', {
+      resource_type: 'meta_event',
+      resource_id: gaEventName,
+      metadata: params || {},
+    });
+    logMetaAppEvent(eventKey, params);
   }
 };
 
@@ -111,12 +167,59 @@ export const trackAstrologyEvent = {
   transitViewed: (date) => trackEvent('transit_viewed', { date }),
   analysisRequested: (analysisType) => trackEvent('analysis_requested', { analysis_type: analysisType }),
   chatMessageSent: (messageType) => trackEvent('chat_message_sent', { message_type: messageType }),
-  creditPurchased: (amount) => trackEvent('credit_purchased', { amount, currency: 'INR' }),
-  userRegistered: () => trackEvent('sign_up', { method: 'mobile' }),
+  creditPurchased: (amount, opts = {}) =>
+    trackMetaStandard(MetaStandardEvent.PURCHASE, {
+      amount,
+      currency: opts.currency || 'INR',
+      content_id: opts.content_id || opts.productId,
+      content_type: opts.content_type || 'credits',
+      ...opts,
+    }),
+  userRegistered: (method = 'mobile') =>
+    trackMetaStandard(MetaStandardEvent.COMPLETE_REGISTRATION, {
+      method,
+      registration_method: method,
+    }),
   userLoggedIn: () => trackEvent('login', { method: 'mobile' }),
   pdfGenerated: (reportType) => trackEvent('pdf_generated', { report_type: reportType }),
   panchangViewed: (date) => trackEvent('panchang_viewed', { date }),
   languageChanged: (language) => trackEvent('language_changed', { language }),
+  contact: () => trackMetaStandard(MetaStandardEvent.CONTACT),
+  search: (query, contentType = 'app') =>
+    trackMetaStandard(MetaStandardEvent.SEARCH, {
+      search_string: query,
+      content_id: query,
+      content_type: contentType,
+    }),
+  viewContent: (contentId, contentType) =>
+    trackMetaStandard(MetaStandardEvent.VIEW_CONTENT, {
+      content_id: contentId,
+      content_type: contentType,
+    }),
+  initiateCheckout: (opts = {}) =>
+    trackMetaStandard(MetaStandardEvent.INITIATE_CHECKOUT, {
+      content_id: opts.content_id || opts.productId,
+      content_type: opts.content_type || 'credits',
+      currency: opts.currency || 'INR',
+      value: opts.value ?? opts.amount,
+      ...opts,
+    }),
+  subscribe: (opts = {}) =>
+    trackMetaStandard(MetaStandardEvent.SUBSCRIBE, {
+      content_id: opts.content_id || opts.productId,
+      content_type: opts.content_type || 'subscription',
+      currency: opts.currency || 'INR',
+      value: opts.value ?? opts.amount,
+      ...opts,
+    }),
+  startTrial: (opts = {}) =>
+    trackMetaStandard(MetaStandardEvent.START_TRIAL, {
+      content_id: opts.content_id || opts.productId,
+      content_type: opts.content_type || 'subscription_trial',
+      ...opts,
+    }),
+  addPaymentInfo: (success = true, opts = {}) =>
+    trackMetaStandard(MetaStandardEvent.ADD_PAYMENT_INFO, { success, ...opts }),
 };
 
 export const setUserProperties = async (properties) => {
@@ -139,5 +242,14 @@ export const setUserName = async (userName) => {
     gtag('set', 'user_properties', {
       user_name: userName
     });
+  }
+};
+
+/** Link Meta App Events to your backend user id after login/register. */
+export const setAnalyticsUserId = async (userId) => {
+  if (userId != null && String(userId).trim()) {
+    await setFacebookUserId(userId);
+  } else {
+    await clearFacebookUserId();
   }
 };

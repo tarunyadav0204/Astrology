@@ -23,6 +23,7 @@ import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, theme, colors }) => {
   return (
@@ -213,6 +214,10 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const handleLocalSearchChange = (text) => {
     setLocalSearchQuery(text);
+    const q = text.trim();
+    if (q.length >= 2) {
+      trackAstrologyEvent.search(q, 'birth_chart');
+    }
     loadProfiles({ reset: true, search: text });
   };
 
@@ -371,6 +376,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       const response = await chartAPI.searchUsers(query);
       const users = response.data?.users || [];
       setSearchResults(users);
+      trackAstrologyEvent.search(query, 'user_share');
     } catch (error) {
       console.log('Error response:', error.response);
       setSearchResults([]);

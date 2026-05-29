@@ -23,10 +23,38 @@ import { useTheme } from '../context/ThemeContext';
 import { useCredits } from './CreditContext';
 import { creditAPI } from './creditService';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../utils/analytics';
 import { useTranslation } from 'react-i18next';
 import { appLocaleForI18n } from '../utils/appLocale';
 
 const { width } = Dimensions.get('window');
+
+function getIapPriceNumber(iapProduct) {
+  const offer = iapProduct?.oneTimePurchaseOfferDetails || {};
+  const micros = offer.priceAmountMicros ? parseInt(offer.priceAmountMicros, 10) : 0;
+  if (micros > 0) return micros / 1_000_000;
+  const localized = iapProduct?.localizedPrice || iapProduct?.price;
+  if (typeof localized === 'string') {
+    const parsed = parseFloat(localized.replace(/[^\d.]/g, ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function getIapCurrency(iapProduct) {
+  return (
+    iapProduct?.oneTimePurchaseOfferDetails?.priceCurrencyCode ||
+    iapProduct?.currency ||
+    'INR'
+  );
+}
+
+function subscriptionHasFreeTrial(subscription) {
+  const phases = subscription?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList;
+  if (!Array.isArray(phases) || phases.length === 0) return false;
+  const micros = parseInt(phases[0]?.priceAmountMicros || '0', 10);
+  return micros === 0;
+}
 
 function formatSubscriptionDate(isoDate, locale = 'en-US') {
   if (!isoDate || typeof isoDate !== 'string') return isoDate || '—';
@@ -132,6 +160,13 @@ const CreditScreen = ({ navigation }) => {
       await fetchBalance();
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
+      if (!isAlreadyCredited) {
+        trackAstrologyEvent.creditPurchased(getIapPriceNumber(iapProduct), {
+          content_id: productId,
+          content_type: 'credits',
+          currency: getIapCurrency(iapProduct),
+        });
+      }
       const successMsg = isAlreadyCredited
         ? t('credits.page.purchaseAlreadyCreditedBody')
         : (() => {
@@ -172,6 +207,20 @@ const CreditScreen = ({ navigation }) => {
       await fetchBalance();
       await fetchSubscriptionDetails();
       const tierName = data?.tier_name || t('credits.page.vipFallback');
+      const subscription = iapSubscriptions.find(
+        (s) => (s.productId || s.product_id) === productId
+      );
+      const subPayload = {
+        content_id: productId,
+        content_type: 'subscription',
+        currency: getIapCurrency(subscription),
+        value: getIapPriceNumber(subscription),
+      };
+      if (subscriptionHasFreeTrial(subscription)) {
+        trackAstrologyEvent.startTrial(subPayload);
+      } else {
+        trackAstrologyEvent.subscribe(subPayload);
+      }
       setPurchaseModal({
         visible: true,
         type: 'success',
@@ -335,6 +384,10 @@ const CreditScreen = ({ navigation }) => {
             const orderId = purchase.transactionId ?? purchase.transactionIdAndroid ?? purchase.purchaseToken;
             if (!token || !productId || !orderId) return;
             const isSubscription = subscriptionProductIds.includes(productId);
+            trackAstrologyEvent.addPaymentInfo(true, {
+              content_id: productId,
+              content_type: isSubscription ? 'subscription' : 'credits',
+            });
             if (isSubscription) {
               await handleGooglePlaySubscriptionSuccess(token, productId, orderId);
               await RNIap.finishTransaction({ purchase, isConsumable: false });
@@ -569,6 +622,13 @@ const CreditScreen = ({ navigation }) => {
       return;
     }
     const productId = product.product_id || product.id;
+    const iapProduct = iapProducts.find((p) => (p.productId || p.product_id) === productId);
+    trackAstrologyEvent.initiateCheckout({
+      content_id: productId,
+      content_type: 'credits',
+      currency: getIapCurrency(iapProduct),
+      value: getIapPriceNumber(iapProduct) || Number(product.price_inr || product.price || 0),
+    });
     setPurchasingProductId(productId);
     try {
       await RNIap.requestPurchase({ skus: [productId] });
@@ -605,6 +665,12 @@ const CreditScreen = ({ navigation }) => {
       );
       return;
     }
+    trackAstrologyEvent.initiateCheckout({
+      content_id: productId,
+      content_type: 'subscription',
+      currency: getIapCurrency(subscription),
+      value: getIapPriceNumber(subscription) || Number(plan.price_inr || plan.price || 0),
+    });
     setPurchasingSubscriptionId(productId);
     try {
       await RNIap.requestSubscription({

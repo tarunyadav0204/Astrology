@@ -329,22 +329,27 @@ def _ensure_wait_side_conversation_tables(conn):
         )
     """)
 
+    sp_num = [0]
+
     def _try_create_index(sql: str):
+        # Never call conn.rollback() here: it would undo earlier DDL in the same transaction
+        # (e.g. task_claimed_until added by _ensure_chat_messages_task_claim_cols in check_message_status).
+        sp_num[0] += 1
+        sp = f"wsidx_{sp_num[0]}"
+        execute(conn, f"SAVEPOINT {sp}")
         try:
             execute(conn, sql)
         except Exception as exc:
+            execute(conn, f"ROLLBACK TO SAVEPOINT {sp}")
             msg = str(exc or "")
             # Some production DB roles can read/write these tables but are not their owner,
             # so Postgres rejects CREATE INDEX IF NOT EXISTS during request handling.
             # If the table is already deployed, we should continue instead of failing chat polling.
             if "must be owner of table chat_wait_conversations" in msg or "must be owner of table chat_wait_conversation_messages" in msg:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
                 logger.warning("Skipping wait-side index ensure due to table ownership: %s", msg)
                 return
             raise
+        execute(conn, f"RELEASE SAVEPOINT {sp}")
 
     _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_conv_main_message ON chat_wait_conversations (main_message_id)")
     _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_conv_user ON chat_wait_conversations (user_id)")

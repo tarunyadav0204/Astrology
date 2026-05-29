@@ -32,7 +32,34 @@
 				<string>com.astroroshni.mobile</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb1680930919891373</string>
+			</array>
+		</dict>
 	</array>
+	<key>FacebookAppID</key>
+	<string>1680930919891373</string>
+	<key>FacebookClientToken</key>
+	<string>ec8623a2224b639d3805e5eee642a76b</string>
+	<key>FacebookDisplayName</key>
+	<string>AstroRoshni</string>
+	<key>FacebookAutoInitEnabled</key>
+	<true/>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-api</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+	</array>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This identifier helps us measure app installs and improve AstroRoshni. You can change this anytime in Settings.</string>
 	<key>CFBundleVersion</key>
 	<string>106</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

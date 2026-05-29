@@ -196,9 +196,14 @@ def _is_india_number(phone: str) -> bool:
     return False
 
 
+def _registration_email_required(_phone: str) -> bool:
+    """Registration: email is optional (mobile may collect it after phone OTP)."""
+    return False
+
+
 def _otp_email_required(phone: str) -> bool:
-    """Password / registration OTP requires a reachable email for all numbers (including India)."""
-    return True
+    """Password reset: require email only when OTP is not India SMS-first (non-India)."""
+    return not _is_india_number(phone)
 
 
 def _phone_lookup_variants(phone: Optional[str]) -> List[str]:
@@ -1244,7 +1249,7 @@ async def register(user_data: UserCreate):
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
         email_clean = (user_data.email or "").strip()
-        if _otp_email_required(user_data.phone):
+        if _registration_email_required(user_data.phone):
             if not email_clean:
                 raise HTTPException(
                     status_code=400,
@@ -1351,7 +1356,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
         email_clean = (user_data.email or "").strip()
-        if _otp_email_required(user_data.phone):
+        if _registration_email_required(user_data.phone):
             if not email_clean:
                 raise HTTPException(
                     status_code=400,
@@ -2046,11 +2051,6 @@ async def send_registration_otp(request: SendResetCode):
 
         if existing_user:
             raise HTTPException(status_code=409, detail="Phone number already registered")
-        if not (request.email or "").strip():
-            raise HTTPException(
-                status_code=400,
-                detail="Email is required for registration.",
-            )
 
         # Generate 6-digit code and secure token
         code = str(random.randint(100000, 999999))
@@ -2093,28 +2093,45 @@ async def send_registration_otp(request: SendResetCode):
                 )
         return response
 
-    # Non-India: SMS often unreliable; require OTP delivery via email.
+    # Non-India: prefer email when provided; otherwise SMS-only (email optional for registration).
     sms_sent = sms_service.send_reset_code(request.phone, code)
     email_clean = (request.email or "").strip()
     email_sent = bool(_send_otp_email(email_clean, code)) if email_clean else False
-    response = {
-        "message": f"Registration OTP sent to {email_clean}",
-        "delivery": {
-            "sms_sent": bool(sms_sent),
-            "email_sent": bool(email_sent),
-            "registration_otp_channel": "email",
-        },
-    }
-    if not email_sent:
-        if is_development:
-            response["dev_code"] = code
-            response["message"] += " (Development: email OTP unavailable, code shown below)"
-        else:
-            raise HTTPException(
-                status_code=503,
-                detail="Failed to deliver registration OTP via email",
-            )
-    return response
+
+    if email_sent:
+        return {
+            "message": f"Registration OTP sent to {email_clean}",
+            "delivery": {
+                "sms_sent": bool(sms_sent),
+                "email_sent": True,
+                "registration_otp_channel": "email",
+            },
+        }
+
+    if sms_sent:
+        return {
+            "message": "Registration OTP sent to your phone number.",
+            "delivery": {
+                "sms_sent": True,
+                "email_sent": False,
+                "registration_otp_channel": "sms",
+            },
+        }
+
+    if is_development:
+        return {
+            "message": "Registration OTP (development: SMS/email unavailable, code below).",
+            "dev_code": code,
+            "delivery": {
+                "sms_sent": False,
+                "email_sent": False,
+                "registration_otp_channel": "none",
+            },
+        }
+    raise HTTPException(
+        status_code=503,
+        detail="Failed to deliver registration OTP (try SMS or add a valid email).",
+    )
 
 @app.post("/api/send-reset-code")
 async def send_reset_code(request: SendResetCode):
@@ -2131,7 +2148,8 @@ async def send_reset_code(request: SendResetCode):
         requested_email = (request.email or "").strip().lower()
         user_email = (user[5] or "").strip().lower() if user[5] else ""
         target_email = user_email or requested_email
-        if _otp_email_required(request.phone) and not target_email:
+        canonical_phone = (user[2] or request.phone or "").strip()
+        if _otp_email_required(canonical_phone) and not target_email:
             raise HTTPException(
                 status_code=400,
                 detail="Email is required for password reset.",

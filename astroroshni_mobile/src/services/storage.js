@@ -1,13 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAnalyticsUserId, clearFacebookUserId } from '../utils/analytics';
 
 export const storage = {
   // Auth
   setAuthToken: (token) => AsyncStorage.setItem('authToken', token),
   getAuthToken: () => AsyncStorage.getItem('authToken'),
-  removeAuthToken: () => AsyncStorage.removeItem('authToken'),
+  removeAuthToken: async () => {
+    await AsyncStorage.removeItem('authToken');
+    await clearFacebookUserId();
+  },
   
   // User data
-  setUserData: (userData) => AsyncStorage.setItem('userData', JSON.stringify(userData)),
+  setUserData: async (userData) => {
+    await AsyncStorage.setItem('userData', JSON.stringify(userData));
+    const userId = userData?.userid ?? userData?.user_id ?? userData?.id;
+    if (userId != null) {
+      await setAnalyticsUserId(userId);
+    }
+  },
   getUserData: async () => {
     const data = await AsyncStorage.getItem('userData');
     return data ? JSON.parse(data) : null;

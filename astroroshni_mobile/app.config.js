@@ -30,17 +30,48 @@ function readEnvFile() {
 
 const appJson = require('./app.json');
 const localEnv = readEnvFile();
-const sentryDsn =
-  (typeof process !== 'undefined' && process.env.EXPO_PUBLIC_SENTRY_DSN) ||
-  localEnv.EXPO_PUBLIC_SENTRY_DSN ||
-  '';
+
+const env = (key) =>
+  (typeof process !== 'undefined' && process.env[key]) || localEnv[key] || '';
+
+const sentryDsn = env('EXPO_PUBLIC_SENTRY_DSN') || '';
+const facebookAppId = env('EXPO_PUBLIC_FACEBOOK_APP_ID') || '';
+const facebookClientToken = env('EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN') || '';
+const facebookDisplayName = env('EXPO_PUBLIC_FACEBOOK_DISPLAY_NAME') || 'AstroRoshni';
+const facebookDebugLog = ['1', 'true', 'yes'].includes(
+  String(env('EXPO_PUBLIC_FACEBOOK_DEBUG_LOG') || '').toLowerCase()
+);
+
+const plugins = [...(appJson.expo.plugins || [])];
+
+if (facebookAppId && facebookClientToken) {
+  plugins.push([
+    'react-native-fbsdk-next',
+    {
+      appID: facebookAppId,
+      clientToken: facebookClientToken,
+      displayName: facebookDisplayName,
+      scheme: `fb${facebookAppId}`,
+      isAutoInitEnabled: true,
+      autoLogAppEventsEnabled: true,
+      advertiserIDCollectionEnabled: false,
+      iosUserTrackingPermission:
+        'This identifier helps us measure app installs and improve AstroRoshni. You can change this anytime in Settings.',
+    },
+  ]);
+}
 
 module.exports = {
   expo: {
     ...appJson.expo,
+    plugins,
     extra: {
       ...(appJson.expo.extra || {}),
       sentryDsn,
+      facebookAppId,
+      facebookClientToken,
+      facebookDisplayName,
+      facebookDebugLog,
     },
   },
 };

@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { supportAPI } from '../../services/api';
 import { sanitizeSupportBody, sanitizeSupportSubject } from '../../utils/supportText';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 function formatApiError(e, t) {
   const d = e.response?.data?.detail;
@@ -142,6 +143,7 @@ export default function SupportScreen({ navigation }) {
     setError('');
     try {
       await supportAPI.createTicket({ subject: sub, message: msg, source });
+      trackAstrologyEvent.contact();
       setSubject('');
       setComposeBody('');
       setView('list');

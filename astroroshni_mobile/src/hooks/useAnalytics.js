@@ -2,7 +2,12 @@ import { useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { trackScreenView, trackEvent } from '../utils/analytics';
 import { trackMobileJourneyEvent } from '../services/journeyTracker';
+import { isMainStackRoute } from '../services/navigationAnalytics';
 
+/**
+ * Screen views for main stack routes are tracked globally (NavigationContainer onStateChange).
+ * Use this hook for embedded flows (e.g. Dasha tabs inside Chart) that are not separate stack routes.
+ */
 export const useAnalytics = (screenName) => {
   const startMsRef = useRef(null);
   const screenRef = useRef(screenName);
@@ -15,10 +20,12 @@ export const useAnalytics = (screenName) => {
       const startedAt = Date.now();
       startMsRef.current = startedAt;
 
-      // Existing GA tracking
-      trackScreenView(screen);
+      if (!isMainStackRoute(screen)) {
+        trackScreenView(screen, { content_id: screen, content_type: 'embedded' });
+      }
 
       return () => {
+        if (isMainStackRoute(screen)) return;
         const endMs = Date.now();
         const durationMs = Math.max(0, endMs - (startMsRef.current || endMs));
         trackMobileJourneyEvent('mobile_screen_exit', {

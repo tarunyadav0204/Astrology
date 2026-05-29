@@ -35,9 +35,9 @@ export function isNationalPhoneValid(countryCode, nationalDigits) {
   return d.length >= min && d.length <= max;
 }
 
-/** True when email must be collected for registration / reset OTP (all countries). */
-export function otpEmailRequiredForCountry(countryCode) {
-  return true;
+/** Registration / reset: email is optional (backend may prefer email for non-India delivery). */
+export function otpEmailRequiredForCountry(_countryCode) {
+  return false;
 }
 
 /**
@@ -60,7 +60,7 @@ export function isIndiaPhoneForOtp(phone) {
   return false;
 }
 
-/** Registration / reset OTP requires email for all numbers. */
-export function otpEmailRequiredForPhone(phone) {
-  return true;
+/** Registration: email optional (aligns with backend). */
+export function otpEmailRequiredForPhone(_phone) {
+  return false;
 }

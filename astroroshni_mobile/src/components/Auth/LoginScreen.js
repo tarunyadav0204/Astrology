@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
+import { trackAstrologyEvent } from '../../utils/analytics';
 import { COLORS } from '../../utils/constants';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -204,6 +205,7 @@ export default function LoginScreen({ navigation }) {
       
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
+      trackAstrologyEvent.userRegistered('mobile');
       
       // Navigate based on whether birth details were provided
       if (response.data.self_birth_chart) {

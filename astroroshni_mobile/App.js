@@ -74,6 +74,8 @@ import {
   subscribeToFatalRuntimeError,
 } from './src/services/runtimeGuard';
 import { API_BASE_URL, getEndpoint } from './src/utils/constants';
+import { initFacebookAnalytics } from './src/services/facebookAnalytics';
+import { trackNavigationRoute } from './src/services/navigationAnalytics';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
@@ -275,6 +277,8 @@ export default function App() {
       setInitialTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark');
 
       loadSavedLanguage();
+
+      initFacebookAnalytics().catch(() => {});
 
       // Check if this build is still allowed by backend config.
       await checkForceUpdate();
@@ -541,6 +545,12 @@ export default function App() {
               <ErrorBoundary>
               <NavigationContainer
                 linking={linking}
+                onStateChange={trackNavigationRoute}
+                onReady={() => {
+                  if (navigationRef.current) {
+                    trackNavigationRoute(navigationRef.current.getRootState());
+                  }
+                }}
                 ref={(nav) => {
                   navigationRef.current = nav;
                   attachSentryNavigation(nav);

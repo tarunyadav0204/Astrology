@@ -17,6 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI, chartAPI } from '../../../services/api';
 import { storage } from '../../../services/storage';
+import { trackAstrologyEvent } from '../../../utils/analytics';
 import { useCredits } from '../../../credits/CreditContext';
 
 export default function PasswordScreen({ 
@@ -187,6 +188,7 @@ export default function PasswordScreen({
           
           await storage.setAuthToken(response.data.access_token);
           await storage.setUserData(response.data.user);
+          trackAstrologyEvent.userRegistered('mobile');
           await refreshCredits();
           
           // Language selection, then welcome (same preference as Profile → language)
