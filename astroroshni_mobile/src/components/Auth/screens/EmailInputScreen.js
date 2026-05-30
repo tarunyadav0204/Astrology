@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
+import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 
 export default function EmailInputScreen({ 
   formData, 
@@ -63,8 +64,7 @@ export default function EmailInputScreen({
       }
       navigateToScreen('otp');
     } catch (error) {
-      const message = error?.response?.data?.detail || 'Unable to send OTP. Please try again.';
-      Alert.alert('Error', message);
+      Alert.alert('Error', apiErrorMessage(error, 'Unable to send OTP. Please try again.'));
     } finally {
       setLoading(false);
     }

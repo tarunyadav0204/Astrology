@@ -22,6 +22,7 @@ from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
 from collections import defaultdict
 from utils.timezone_service import parse_timezone_offset
+from utils.calendar_date import parse_calendar_date_y_m_d
 from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 import bcrypt
 import jwt
@@ -2648,12 +2649,8 @@ async def calculate_friendship(birth_data: BirthData):
     )
     
     utc_hour = hour - tz_offset
-    jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
+    by, bm, bd = parse_calendar_date_y_m_d(birth_data.date)
+    jd = swe.julday(by, bm, bd, utc_hour)
     
     # Get planetary positions
     planets = {}
@@ -2823,12 +2820,8 @@ async def analyze_transits(request: TransitRequest):
 
 @app.post("/api/calculate-transits")
 async def calculate_transits(request: TransitRequest, current_user: User = Depends(get_current_user)):
-    jd = swe.julday(
-        int(request.transit_date.split('-')[0]),
-        int(request.transit_date.split('-')[1]),
-        int(request.transit_date.split('-')[2]),
-        12.0
-    )
+    ty, tm, td = parse_calendar_date_y_m_d(request.transit_date)
+    jd = swe.julday(ty, tm, td, 12.0)
     
     # Calculate transit planetary positions
     planets = {}
@@ -2871,12 +2864,8 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
     )
     
     utc_hour = hour - tz_offset
-    birth_jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
+    by, bm, bd = parse_calendar_date_y_m_d(birth_data.date)
+    birth_jd = swe.julday(by, bm, bd, utc_hour)
     
     birth_houses_data = swe.houses(birth_jd, birth_data.latitude, birth_data.longitude, b'P')
     birth_ayanamsa = swe.get_ayanamsa_ut(birth_jd)
@@ -2912,12 +2901,8 @@ async def calculate_yogi(birth_data: BirthData):
     )
     
     utc_hour = hour - tz_offset
-    jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
+    by, bm, bd = parse_calendar_date_y_m_d(birth_data.date)
+    jd = swe.julday(by, bm, bd, utc_hour)
     
     sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
     moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]

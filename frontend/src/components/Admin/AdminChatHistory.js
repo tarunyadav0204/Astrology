@@ -1289,6 +1289,43 @@ const AdminChatHistory = () => {
     return mod || prov || null;
   };
 
+  /** Merge / final-call model for this assistant row (parallel pipeline stores it on stages, not session). */
+  const MERGE_PARALLEL_STAGE_NAMES = new Set(['parallel_merge', 'parallel_relational_merge']);
+
+  const llmSourceFromParallelUsage = (usage) => {
+    if (!usage || typeof usage !== 'object') return null;
+    const stages = Array.isArray(usage.stages) ? usage.stages : [];
+    if (!stages.length) return null;
+
+    const merge = stages.find((st) => st && MERGE_PARALLEL_STAGE_NAMES.has(String(st.stage || '')));
+    if (merge && (String(merge.llm_provider || '').trim() || String(merge.llm_model || '').trim())) {
+      return {
+        chat_llm_provider: String(merge.llm_provider || '').trim(),
+        chat_llm_model: String(merge.llm_model || '').trim(),
+      };
+    }
+
+    if (usage.kind === 'instant_chat_usage') {
+      for (let i = stages.length - 1; i >= 0; i--) {
+        const st = stages[i];
+        if (st && String(st.llm_model || '').trim()) {
+          return {
+            chat_llm_provider: String(st.llm_provider || '').trim(),
+            chat_llm_model: String(st.llm_model || '').trim(),
+          };
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const answerLlmSourceForMessage = (message) => {
+    const fromUsage = llmSourceFromParallelUsage(message?.parallel_llm_usage);
+    if (fromUsage && (fromUsage.chat_llm_provider || fromUsage.chat_llm_model)) return fromUsage;
+    return null;
+  };
+
   const listRangeLabel = useMemo(() => {
     if (!listTotal) return '0 users';
     const start = (listPage - 1) * USER_PAGE_SIZE + 1;
@@ -1660,7 +1697,11 @@ const AdminChatHistory = () => {
                   const showPdfButton = role === 'assistant' && Array.isArray(exportBlock) && exportBlock.length > 0;
                   const isInstantUsage = message.parallel_llm_usage?.kind === 'instant_chat_usage';
                   const answerModelLabel =
-                    role === 'assistant' ? formatLlmLabel(selectedSession || {}) : null;
+                    role === 'assistant'
+                      ? formatLlmLabel(
+                          answerLlmSourceForMessage(message) || selectedSession || {},
+                        )
+                      : null;
                   const label =
                     message.sender === 'user'
                       ? 'User'
@@ -1701,7 +1742,7 @@ const AdminChatHistory = () => {
                       {answerModelLabel && (
                         <span
                           className="message-token-badge"
-                          title="Provider and model used for this answer"
+                          title="Provider and model for this answer: merge stage from parallel usage when present, else session summary for this view"
                         >
                           Model {answerModelLabel}
                         </span>

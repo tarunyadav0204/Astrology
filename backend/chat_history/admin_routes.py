@@ -231,6 +231,15 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
         "output_le_200k": 20.00,
         "output_gt_200k": 20.00,
     },
+    # Gemini 3.5 Flash (GA) — Google published standard rates (USD per 1M), May 2026.
+    "models/gemini-3.5-flash": {
+        "input_le_200k": 1.50,
+        "input_gt_200k": 1.50,
+        "cached_input_le_200k": 0.15,
+        "cached_input_gt_200k": 0.15,
+        "output_le_200k": 9.00,
+        "output_gt_200k": 9.00,
+    },
     # Gemini 3 (non-3.1) legacy preview ids
     "models/gemini-3-pro-preview": {
         "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
@@ -351,6 +360,8 @@ def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) ->
         if tier == "gt_200k":
             return {"input": 4.00, "cached_input": 0.40, "output": 18.00, "tier": tier}
         return {"input": 2.00, "cached_input": 0.20, "output": 12.00, "tier": tier}
+    if "gemini-3.5-flash" in ml or ("3.5" in ml and "flash" in ml):
+        return {"input": 1.50, "cached_input": 0.15, "output": 9.00, "tier": tier}
     if "flash-lite" in ml:
         return {"input": 0.10, "cached_input": 0.01, "output": 0.40, "tier": tier}
     if "flash" in ml:

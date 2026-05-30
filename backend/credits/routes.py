@@ -2669,6 +2669,7 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
         "models/gemini-3.1-flash-live-preview": {"in_le": 0.75, "in_gt": 0.75, "cached_in_le": 0.075, "cached_in_gt": 0.075, "out_le": 4.50, "out_gt": 4.50},
         "models/gemini-3.1-flash-image-preview": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
         "models/gemini-3.1-flash-tts-preview": {"in_le": 1.00, "in_gt": 1.00, "cached_in_le": 0.10, "cached_in_gt": 0.10, "out_le": 20.00, "out_gt": 20.00},
+        "models/gemini-3.5-flash": {"in_le": 1.50, "in_gt": 1.50, "cached_in_le": 0.15, "cached_in_gt": 0.15, "out_le": 9.00, "out_gt": 9.00},
         "models/gemini-3-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00},
         "models/gemini-3-flash-preview": {"in_le": 0.50, "in_gt": 0.50, "cached_in_le": 0.05, "cached_in_gt": 0.05, "out_le": 3.00, "out_gt": 3.00},
         "models/gemini-2.5-pro": {"in_le": 1.25, "in_gt": 2.50, "cached_in_le": 0.125, "cached_in_gt": 0.25, "out_le": 10.00, "out_gt": 15.00},
@@ -2695,6 +2696,8 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
             row = {"in_le": 1.00, "in_gt": 1.00, "cached_in_le": 0.10, "cached_in_gt": 0.10, "out_le": 20.00, "out_gt": 20.00}
         elif "gemini-3.1-pro" in ml:
             row = {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00}
+        elif "gemini-3.5-flash" in ml or ("3.5" in ml and "flash" in ml):
+            row = {"in_le": 1.50, "in_gt": 1.50, "cached_in_le": 0.15, "cached_in_gt": 0.15, "out_le": 9.00, "out_gt": 9.00}
         elif "flash-lite" in ml:
             row = {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.01, "cached_in_gt": 0.01, "out_le": 0.40, "out_gt": 0.40}
         elif "flash" in ml:

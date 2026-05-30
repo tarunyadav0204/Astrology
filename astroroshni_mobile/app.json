@@ -160,6 +160,8 @@
           }
         }
       ],
+      "react-native-nitro-modules",
+      "react-native-iap",
       "@sentry/react-native"
     ]
   }

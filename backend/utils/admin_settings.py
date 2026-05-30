@@ -4,6 +4,7 @@ from typing import Optional, Any, Set
 GEMINI_MODEL_OPTIONS = [
     ("models/gemini-3.1-pro-preview", "Gemini 3.1 Pro (New – complex reasoning)"),
     ("models/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite (GA – high-volume, low-cost)"),
+    ("models/gemini-3.5-flash", "Gemini 3.5 Flash (GA – agents & coding)"),
     ("models/gemini-3-flash-preview", "Gemini 3 Flash (Preview)"),
     ("models/gemini-3-pro-preview", "Gemini 3 Pro (Retiring Mar 2026)"),
     ("models/gemini-2.5-pro", "Gemini 2.5 Pro (Stable)"),

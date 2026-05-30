@@ -179,12 +179,20 @@ def create_razorpay_credit_payment_link(
 
 class CreateOrderBody(BaseModel):
     credits: int = Field(..., description="One of 50, 100, 250, 500, 999")
+    google_play_external_transaction_token: Optional[str] = Field(
+        default=None,
+        description="User Choice billing token from Play Billing; stored on the order for Play reporting after payment.",
+    )
 
 
 class VerifyPaymentBody(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    google_play_external_transaction_token: Optional[str] = Field(
+        default=None,
+        description="Optional override; otherwise read from Razorpay order/payment notes (gp_external_tx_token).",
+    )
 
 
 def _verify_payment_signature(order_id: str, payment_id: str, signature: str) -> bool:
@@ -194,6 +202,40 @@ def _verify_payment_signature(order_id: str, payment_id: str, signature: str) ->
     msg = f"{order_id}|{payment_id}"
     expected = hmac.new(key_secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.strip())
+
+
+def _maybe_report_play_user_choice_credit_purchase(
+    *,
+    payment: Dict[str, Any],
+    payment_notes: Dict[str, Any],
+    body_token: Optional[str] = None,
+) -> None:
+    """If this Razorpay payment was started from Play User Choice (alternative billing), report to Google Play."""
+    token = (body_token or "").strip() or str((payment_notes or {}).get("gp_external_tx_token") or "").strip()
+    if not token:
+        return
+    payment_id = (payment.get("id") or "").strip()
+    if not payment_id:
+        return
+    try:
+        amount_paise = int(payment.get("amount") or 0)
+    except (TypeError, ValueError):
+        amount_paise = 0
+    if amount_paise <= 0:
+        logger.warning("Play external report skipped: invalid amount for payment=%s", payment_id)
+        return
+    try:
+        from credits.play_external_transactions import report_one_time_razorpay_purchase
+
+        result = report_one_time_razorpay_purchase(
+            razorpay_payment_id=payment_id,
+            external_transaction_token=token,
+            amount_paise=amount_paise,
+        )
+        if not result.get("ok") and not result.get("skipped"):
+            logger.error("Play external report failed payment=%s result=%s", payment_id, result)
+    except Exception:
+        logger.exception("Play external report exception payment=%s", payment_id)
 
 
 def _verify_webhook_signature(body: bytes, signature: Optional[str]) -> bool:
@@ -377,15 +419,20 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
     receipt = f"u{current_user.userid}c{body.credits}{secrets.token_hex(4)}"
     receipt = receipt[:40]
 
+    notes: Dict[str, str] = {
+        "userid": str(current_user.userid),
+        "credits": str(body.credits),
+        "product_id": _product_id(body.credits),
+    }
+    gp_tok = (body.google_play_external_transaction_token or "").strip()
+    if gp_tok:
+        notes["gp_external_tx_token"] = gp_tok[:2048]
+
     payload = {
         "amount": amount,
         "currency": "INR",
         "receipt": receipt,
-        "notes": {
-            "userid": str(current_user.userid),
-            "credits": str(body.credits),
-            "product_id": _product_id(body.credits),
-        },
+        "notes": notes,
     }
 
     try:
@@ -430,6 +477,13 @@ async def razorpay_verify(body: VerifyPaymentBody, current_user: User = Depends(
     result = _process_captured_payment(payment)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("message") or "Could not apply credits")
+
+    gp_body_tok = (body.google_play_external_transaction_token or "").strip() or None
+    _maybe_report_play_user_choice_credit_purchase(
+        payment=payment,
+        payment_notes=notes,
+        body_token=gp_body_tok,
+    )
 
     uid = result.get("userid")
     if result["credits_added"] and uid:
@@ -488,6 +542,14 @@ async def razorpay_webhook(request: Request):
     if not result["success"]:
         logger.warning("Razorpay webhook grant failed: %s", result)
         return {"status": "not_applied", "message": result.get("message")}
+
+    pay_notes = payment.get("notes") or {}
+    if isinstance(pay_notes, dict):
+        _maybe_report_play_user_choice_credit_purchase(
+            payment=payment,
+            payment_notes=pay_notes,
+            body_token=None,
+        )
 
     uid = result.get("userid")
     if result.get("credits_added") and uid:

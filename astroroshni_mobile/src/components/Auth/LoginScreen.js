@@ -19,6 +19,7 @@ import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { trackAstrologyEvent } from '../../utils/analytics';
 import { COLORS } from '../../utils/constants';
+import { apiErrorMessage } from '../../utils/apiErrorMessage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 
@@ -148,8 +149,6 @@ export default function LoginScreen({ navigation }) {
         setShowBirthDetailsOption(true);
       }
     } catch (error) {
-      let errorMessage = isLogin ? 'Login failed' : 'Registration failed';
-      
       if (error.response?.status === 409) {
         // Phone already registered - show custom modal
         setErrorModalData({
@@ -163,16 +162,16 @@ export default function LoginScreen({ navigation }) {
         setShowErrorModal(true);
         return;
       }
-      
-      if (error.code === 'NETWORK_ERROR' || error.message.includes('Network')) {
-        errorMessage = 'Network connection failed. Please check your internet connection.';
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+
+      if (error.code === 'NETWORK_ERROR' || String(error.message || '').includes('Network')) {
+        Alert.alert('Error', 'Network connection failed. Please check your internet connection.');
+        return;
       }
-      
-      Alert.alert('Error', errorMessage);
+
+      Alert.alert(
+        'Error',
+        apiErrorMessage(error, isLogin ? 'Login failed' : 'Registration failed'),
+      );
     } finally {
       setLoading(false);
     }
@@ -236,10 +235,14 @@ export default function LoginScreen({ navigation }) {
     try {
       const payload = { phone: resetData.phone, email: resetData.email.trim() };
       const response = await authAPI.sendResetCode(payload);
-      Alert.alert('Success', response.data.message);
+      const okMsg = response?.data?.message;
+      Alert.alert(
+        'Success',
+        typeof okMsg === 'string' && okMsg.trim() ? okMsg.trim() : 'Check your email for the reset code.',
+      );
       setResetStep(2);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Phone number not found');
+      Alert.alert('Error', apiErrorMessage(error, 'Phone number not found'));
     } finally {
       setLoading(false);
     }
@@ -261,7 +264,7 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Success', 'Code verified! Enter new password.');
       setResetStep(3);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Invalid or expired code');
+      Alert.alert('Error', apiErrorMessage(error, 'Invalid or expired code'));
     } finally {
       setLoading(false);
     }
@@ -285,7 +288,7 @@ export default function LoginScreen({ navigation }) {
       setResetData({ phone: '', email: '', code: '', newPassword: '' });
       setResetToken('');
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Password reset failed');
+      Alert.alert('Error', apiErrorMessage(error, 'Password reset failed'));
     } finally {
       setLoading(false);
     }
@@ -308,7 +311,7 @@ export default function LoginScreen({ navigation }) {
       await authAPI.sendRegistrationOtp(regPayload);
       setShowOtpVerification(true);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to send OTP');
+      Alert.alert('Error', apiErrorMessage(error, 'Failed to send OTP'));
     }
   };
 

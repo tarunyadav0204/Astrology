@@ -18,6 +18,7 @@ import { COLORS } from '../../../utils/constants';
 import { authAPI, chartAPI } from '../../../services/api';
 import { storage } from '../../../services/storage';
 import { trackAstrologyEvent } from '../../../utils/analytics';
+import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { useCredits } from '../../../credits/CreditContext';
 
 export default function PasswordScreen({ 
@@ -194,11 +195,20 @@ export default function PasswordScreen({
           // Language selection, then welcome (same preference as Profile → language)
           navigateToScreen('chooseLanguage');
         } catch (error) {
-          if (error.response?.status === 400 && error.response?.data?.detail?.includes('already registered')) {
+          const already =
+            typeof error.response?.data?.detail === 'string' &&
+            error.response.data.detail.includes('already registered');
+          const alreadyFrom422 =
+            Array.isArray(error.response?.data?.detail) &&
+            error.response.data.detail.some(
+              (d) =>
+                typeof d?.msg === 'string' && d.msg.toLowerCase().includes('already registered'),
+            );
+          if (error.response?.status === 400 && (already || alreadyFrom422)) {
             // User already exists, navigate to welcome screen
             navigateToScreen('welcomeAfterRegistration');
           } else {
-            Alert.alert('Registration Error', error.response?.data?.detail || 'Registration failed');
+            Alert.alert('Registration Error', apiErrorMessage(error, 'Registration failed'));
           }
         }
       }
@@ -206,7 +216,7 @@ export default function PasswordScreen({
       console.log('  ❌ Error in handleContinue:', error.message);
       console.log('  Error response:', error.response?.data);
       console.log('  Error status:', error.response?.status);
-      Alert.alert('Error', error.response?.data?.detail || 'Authentication failed');
+      Alert.alert('Error', apiErrorMessage(error, 'Authentication failed'));
     } finally {
       setLoading(false);
     }

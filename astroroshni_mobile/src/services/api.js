@@ -673,14 +673,35 @@ export const creditAPI = {
     }, GLOBAL_ERROR_CONFIG),
   /** INR credit packs via Razorpay (same packs as web: 50, 100, 250, 500, 999). Requires checkout UI (e.g. WebView or react-native-razorpay). */
   getRazorpayCatalog: () => api.get(getEndpoint('/credits/razorpay/catalog')),
-  createRazorpayOrder: (credits) =>
-    api.post(getEndpoint('/credits/razorpay/create-order'), { credits }, GLOBAL_ERROR_CONFIG),
-  verifyRazorpayPayment: ({ razorpay_order_id, razorpay_payment_id, razorpay_signature }) =>
-    api.post(getEndpoint('/credits/razorpay/verify'), {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    }, GLOBAL_ERROR_CONFIG),
+  createRazorpayOrder: (credits, extra = {}) =>
+    api.post(getEndpoint('/credits/razorpay/create-order'), { credits, ...extra }, GLOBAL_ERROR_CONFIG),
+  verifyRazorpayPayment: ({
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    google_play_external_transaction_token,
+  }) =>
+    api.post(
+      getEndpoint('/credits/razorpay/verify'),
+      {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        ...(google_play_external_transaction_token
+          ? { google_play_external_transaction_token }
+          : {}),
+      },
+      GLOBAL_ERROR_CONFIG
+    ),
+  /** Razorpay VIP subscription (web parity); used for Play User Choice alternative billing on Android. */
+  createRazorpaySubscription: (planId, extra = {}) =>
+    api.post(
+      getEndpoint('/credits/razorpay/subscription/create'),
+      { plan_id: planId, ...extra },
+      GLOBAL_ERROR_CONFIG
+    ),
+  verifyRazorpaySubscription: (body) =>
+    api.post(getEndpoint('/credits/razorpay/subscription/verify'), body, GLOBAL_ERROR_CONFIG),
 };
 
 export const panchangAPI = {

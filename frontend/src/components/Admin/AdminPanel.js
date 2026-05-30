@@ -3952,6 +3952,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <p className="settings-hint">
                 Standard uses the standard vendor&apos;s model list; premium uses the premium vendor&apos;s list. If premium vendor is &quot;Same as standard&quot;, the premium model row reuses the standard vendor&apos;s options.
               </p>
+              <p className="settings-hint" style={{ marginTop: '-6px', fontSize: '13px', opacity: 0.95 }}>
+                These values are persisted when you click{' '}
+                <strong>Save chat vendors, models, analysis &amp; timeline</strong> in the{' '}
+                <strong>Gemini analysis &amp; timeline models</strong> section below (same save also stores vendors, OpenAI/DeepSeek chat picks, analysis model, and timeline model).
+              </p>
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Model — standard chat</strong>

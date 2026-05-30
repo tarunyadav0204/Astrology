@@ -54,6 +54,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
+import { shouldPostChatErrorToAdminLogs } from '../../utils/chatAdminErrorGating';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -411,6 +412,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [modeIntroGateTick, setModeIntroGateTick] = useState(0);
   const freeUsedThisSendRef = useRef(false);
+  /** True after chart/session 409 → new session; second /chat-v2/ask attempt uses this for admin log gating. */
+  const pendingChartMismatchSecondAttemptRef = useRef(false);
   const chatModeIntroShownKeyRef = useRef(null);
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
   const modeIntroSuppressOpenUntilRef = useRef(0);
@@ -3228,20 +3231,22 @@ export default function ChatScreen({ navigation, route }) {
         }
 
         // Only log if we could not resync from server (keeps admin Errors tab signal-heavy).
-        try {
-          const { chatErrorAPI } = require('../../services/api');
-          const errorType = isPollMessageMissing ? 'poll_message_missing' : (error.name || 'PollingError');
-          const questionHint =
-            (userQuestion && String(userQuestion).trim()) ||
-            `assistant_message_id=${messageId}`;
-          await chatErrorAPI.logError(
-            errorType,
-            error.message || 'Poll failed',
-            questionHint,
-            error.stack || null
-          );
-        } catch (logErr) {
-          console.error('Failed to log polling error:', logErr);
+        if (shouldPostChatErrorToAdminLogs(error)) {
+          try {
+            const { chatErrorAPI } = require('../../services/api');
+            const errorType = isPollMessageMissing ? 'poll_message_missing' : (error.name || 'PollingError');
+            const questionHint =
+              (userQuestion && String(userQuestion).trim()) ||
+              `assistant_message_id=${messageId}`;
+            await chatErrorAPI.logError(
+              errorType,
+              error.message || 'Poll failed',
+              questionHint,
+              error.stack || null
+            );
+          } catch (logErr) {
+            console.error('Failed to log polling error:', logErr);
+          }
         }
 
         if (isPollMessageMissing) {
@@ -3419,13 +3424,25 @@ export default function ChatScreen({ navigation, route }) {
             setSessionId(null);
             const newSessionId = await createSession();
             if (newSessionId) {
+              pendingChartMismatchSecondAttemptRef.current = true;
               setSessionId(newSessionId);
               activeSessionId = newSessionId;
               return attemptSend(2);
             }
+            const createErr = new Error(`HTTP ${response.status}: ${errorText}`);
+            createErr.createSessionFailedAfterChartMismatch = true;
+            pendingChartMismatchSecondAttemptRef.current = false;
+            throw createErr;
           }
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
+          const err = new Error(`HTTP ${response.status}: ${errorText}`);
+          if (/CHART_SESSION_MISMATCH/i.test(errorText) && pendingChartMismatchSecondAttemptRef.current) {
+            err.retryFailedAfterChartSessionRecovery = true;
+          }
+          pendingChartMismatchSecondAttemptRef.current = false;
+          throw err;
         }
+
+        pendingChartMismatchSecondAttemptRef.current = false;
 
         const result = await response.json();
         const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights, chat_tier } = result;
@@ -3906,6 +3923,7 @@ export default function ChatScreen({ navigation, route }) {
     }
 
     try {
+      pendingChartMismatchSecondAttemptRef.current = false;
       const token = await AsyncStorage.getItem('authToken');
       
       // Mundane mode - async with polling
@@ -3983,17 +4001,19 @@ export default function ChatScreen({ navigation, route }) {
     } catch (error) {
       console.error('❌ Error sending message:', error);
       
-      // Log error to backend for developer monitoring
-      try {
-        const { chatErrorAPI } = require('../../services/api');
-        await chatErrorAPI.logError(
-          error.name || 'ChatError',
-          error.message || 'Unknown error',
-          messageText,
-          error.stack
-        );
-      } catch (logError) {
-        console.error('Failed to log error:', logError);
+      // Log error to backend for developer monitoring (skip silent chart/session mismatch noise)
+      if (shouldPostChatErrorToAdminLogs(error)) {
+        try {
+          const { chatErrorAPI } = require('../../services/api');
+          await chatErrorAPI.logError(
+            error.name || 'ChatError',
+            error.message || 'Unknown error',
+            messageText,
+            error.stack
+          );
+        } catch (logError) {
+          console.error('Failed to log error:', logError);
+        }
       }
       
       // Show user-friendly error message based on error type
@@ -4055,6 +4075,7 @@ export default function ChatScreen({ navigation, route }) {
     }
 
     try {
+      pendingChartMismatchSecondAttemptRef.current = false;
       await sendChatRequestWithRetry({
         messageText: failedQuestion,
         currentSessionId,
@@ -4066,16 +4087,18 @@ export default function ChatScreen({ navigation, route }) {
       console.error('❌ Error retrying message:', error);
 
       // Log error to backend for developer monitoring
-      try {
-        const { chatErrorAPI } = require('../../services/api');
-        await chatErrorAPI.logError(
-          error.name || 'ChatRetryError',
-          error.message || 'Unknown retry error',
-          failedQuestion,
-          error.stack
-        );
-      } catch (logError) {
-        console.error('Failed to log retry error:', logError);
+      if (shouldPostChatErrorToAdminLogs(error)) {
+        try {
+          const { chatErrorAPI } = require('../../services/api');
+          await chatErrorAPI.logError(
+            error.name || 'ChatRetryError',
+            error.message || 'Unknown retry error',
+            failedQuestion,
+            error.stack
+          );
+        } catch (logError) {
+          console.error('Failed to log retry error:', logError);
+        }
       }
 
       // Show user-friendly error message based on error type

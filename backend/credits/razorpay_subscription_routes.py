@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
-from credits.razorpay_routes import RAZORPAY_API_BASE, _auth, _get_razorpay_keys, _verify_webhook_signature
+from credits.razorpay_routes import RAZORPAY_API_BASE, _auth, _get_razorpay_keys, _verify_webhook_signature, _fetch_payment
 from credits.credit_service import CreditService
 from credits.subscription_pricing_util import (
     build_feature_pricing_for_tier,
@@ -32,12 +32,20 @@ credit_service = CreditService()
 
 class CreateSubscriptionBody(BaseModel):
     plan_id: int = Field(..., description="Internal subscription_plans.plan_id")
+    google_play_external_transaction_token: Optional[str] = Field(
+        default=None,
+        description="User Choice billing token from Play Billing; stored on the Razorpay subscription for reporting.",
+    )
 
 
 class VerifySubscriptionBody(BaseModel):
     razorpay_subscription_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    google_play_external_transaction_token: Optional[str] = Field(
+        default=None,
+        description="Optional override; otherwise read from subscription notes (gp_external_tx_token).",
+    )
 
 
 class UpgradeSubscriptionBody(BaseModel):
@@ -281,6 +289,9 @@ async def razorpay_subscription_create(body: CreateSubscriptionBody, current_use
             "product_id": plan["product_id"] or "",
         },
     }
+    gp_tok = (body.google_play_external_transaction_token or "").strip()
+    if gp_tok:
+        payload["notes"]["gp_external_tx_token"] = gp_tok[:2048]
     try:
         r = requests.post(f"{RAZORPAY_API_BASE}/subscriptions", auth=_auth(), json=payload, timeout=30)
     except requests.RequestException as e:
@@ -344,6 +355,34 @@ async def razorpay_subscription_verify(body: VerifySubscriptionBody, current_use
         body.razorpay_subscription_id.strip(),
         sub,
     )
+
+    gp_tok = (body.google_play_external_transaction_token or "").strip() or str(
+        notes.get("gp_external_tx_token") or ""
+    ).strip()
+    if gp_tok:
+        try:
+            pay = _fetch_payment(body.razorpay_payment_id.strip())
+            amt = int(pay.get("amount") or 0)
+            if amt > 0:
+                from credits.play_external_transactions import report_recurring_initial_razorpay_subscription
+
+                rep = report_recurring_initial_razorpay_subscription(
+                    razorpay_subscription_id=body.razorpay_subscription_id.strip(),
+                    external_transaction_token=gp_tok,
+                    amount_paise=amt,
+                )
+                if not rep.get("ok") and not rep.get("skipped"):
+                    logger.error(
+                        "Google Play external recurring report failed sub=%s result=%s",
+                        body.razorpay_subscription_id.strip(),
+                        rep,
+                    )
+        except Exception:
+            logger.exception(
+                "Google Play external recurring report exception sub=%s",
+                body.razorpay_subscription_id.strip(),
+            )
+
     return {"success": True, "subscription": result}
 
 

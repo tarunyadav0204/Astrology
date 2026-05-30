@@ -68,6 +68,12 @@ _MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
         "output_le_200k": 3.00,
         "output_gt_200k": 3.00,
     },
+    "models/gemini-3.5-flash": {
+        "input_le_200k": 1.50,
+        "input_gt_200k": 1.50,
+        "output_le_200k": 9.00,
+        "output_gt_200k": 9.00,
+    },
     # Gemini 2.5 family
     "models/gemini-2.5-pro": {
         "input_le_200k": 1.25,
@@ -134,6 +140,8 @@ def _resolve_rate(used_model: str, input_tokens_est: int) -> Dict[str, float]:
                 if tier == "gt_200k"
                 else {"input": 2.00, "output": 12.00, "tier": tier}
             )
+        if "gemini-3.5-flash" in ml or ("3.5" in ml and "flash" in ml):
+            return {"input": 1.50, "output": 9.00, "tier": tier}
         if "flash-lite" in ml:
             return {"input": 0.10, "output": 0.40, "tier": tier}
         if "flash" in ml:

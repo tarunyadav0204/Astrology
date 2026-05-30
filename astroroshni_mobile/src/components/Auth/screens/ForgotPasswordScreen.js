@@ -20,6 +20,7 @@ import {
   getNationalPhoneMaxLength,
   isNationalPhoneValid,
 } from '../countryCodes';
+import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 
 export default function ForgotPasswordScreen({ 
   formData, 
@@ -97,9 +98,10 @@ export default function ForgotPasswordScreen({
 
     setLoading(true);
     try {
-      const buildPayload = (phoneVal) => {
-        const payload = { phone: phoneVal, email: formData.email };
-      };
+      const buildPayload = (phoneVal) => ({
+        phone: phoneVal,
+        email: (formData.email || '').trim(),
+      });
       let response;
       try {
         response = await authAPI.sendResetCode(buildPayload(fullPhone));
@@ -115,10 +117,14 @@ export default function ForgotPasswordScreen({
           throw error;
         }
       }
-      Alert.alert('Success', response.data.message);
+      const okMsg = response?.data?.message;
+      Alert.alert(
+        'Success',
+        typeof okMsg === 'string' && okMsg.trim() ? okMsg.trim() : 'Check your email for the reset code.',
+      );
       setStep(2);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.detail || error.response?.data?.message || 'Phone number not found');
+      Alert.alert('Error', apiErrorMessage(error, 'Phone number not found'));
     } finally {
       setLoading(false);
     }
@@ -141,7 +147,7 @@ export default function ForgotPasswordScreen({
       Alert.alert('Success', 'Code verified! Enter new password.');
       setStep(3);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.detail || error.response?.data?.message || 'Invalid or expired code');
+      Alert.alert('Error', apiErrorMessage(error, 'Invalid or expired code'));
     } finally {
       setLoading(false);
     }
@@ -163,7 +169,7 @@ export default function ForgotPasswordScreen({
         { text: 'OK', onPress: () => navigateToScreen('welcome') }
       ]);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.detail || error.response?.data?.message || 'Password reset failed');
+      Alert.alert('Error', apiErrorMessage(error, 'Password reset failed'));
     } finally {
       setLoading(false);
     }

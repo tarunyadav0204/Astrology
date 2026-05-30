@@ -191,6 +191,12 @@ async def run_parallel_relational_chat_pipeline(
         static_chars=len(merge_static),
         dynamic_chars=len(merge_prompt) - len(merge_static),
     )
+    merge_metrics["llm_provider"] = (
+        str((syn or {}).get("chat_llm_provider") or llm_provider or "").strip() or None
+    )
+    merge_metrics["llm_model"] = (
+        str((syn or {}).get("chat_llm_model") or gemini_model_name or "").strip() or None
+    )
 
     usage_rows = branch_llm_rows + [merge_metrics]
     totals = _totals_from_rows(usage_rows)
