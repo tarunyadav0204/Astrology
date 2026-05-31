@@ -890,6 +890,10 @@
       "subscriptionUnavailableBody": "यह प्लान स्टोर से लोड नहीं हो सका। बाद में या रीफ़्रेश करके प्रयास करें।",
       "subscriptionFailed": "सदस्यता विफल",
       "couldNotStartSubscription": "सदस्यता शुरू नहीं हो सकी। पुनः प्रयास करें।",
+      "activeSubscriptionWarningTitle": "आपकी पहले से सदस्यता है",
+      "activeSubscriptionWarningBody": "आपके खाते पर पहले से एक सक्रिय सदस्यता है। फिर भी इस खरीद को जारी रखने के लिए \"हाँ\" दबाएँ। रोकने के लिए \"रद्द करें\" दबाएँ।",
+      "activeSubscriptionWarningConfirm": "हाँ",
+      "activeSubscriptionWarningCancel": "रद्द करें",
       "transactionBalance": "बैलेंस: {{amount}}"
     }
   },

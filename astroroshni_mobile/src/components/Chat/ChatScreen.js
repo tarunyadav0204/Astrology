@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -412,6 +412,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [modeIntroGateTick, setModeIntroGateTick] = useState(0);
   const freeUsedThisSendRef = useRef(false);
+  const subjectGateOverrideRef = useRef(null);
+  const subjectGateMemoryRef = useRef([]);
   /** True after chart/session 409 → new session; second /chat-v2/ask attempt uses this for admin log gating. */
   const pendingChartMismatchSecondAttemptRef = useRef(false);
   const chatModeIntroShownKeyRef = useRef(null);
@@ -1728,6 +1730,61 @@ export default function ChatScreen({ navigation, route }) {
     setPartnershipModalCost((cost != null && cost > 0) ? cost : partnershipCost);
     setShowPartnershipModal(true);
   };
+
+  const handleStartPartnershipGate = useCallback((gateMetadata = {}) => {
+    const originalQuestion = String(gateMetadata?.original_question || '').trim();
+    if (originalQuestion) {
+      setInputText(originalQuestion);
+    }
+    setPartnershipModalCost((partnershipCost != null && partnershipCost > 0) ? partnershipCost : 0);
+    setShowPartnershipModal(true);
+  }, [partnershipCost]);
+
+  const rememberSubjectGateChoice = useCallback((gateMetadata = {}, decision = 'selected_chart_only', question = '') => {
+    const other = gateMetadata?.other_person || {};
+    const setup = gateMetadata?.relationship_setup || {};
+    const entry = {
+      decision,
+      relation_to_user: String(other.relation_to_user || setup.relation_family || '').trim(),
+      name: String(other.name || '').trim(),
+      question_about: String(gateMetadata?.question_about || '').trim(),
+      intent_gate: String(gateMetadata?.intent_gate || '').trim(),
+      original_question: String(gateMetadata?.original_question || question || '').trim(),
+      created_at: new Date().toISOString(),
+    };
+    if (!entry.relation_to_user && !entry.name && !entry.original_question) {
+      return;
+    }
+    subjectGateMemoryRef.current = [
+      ...subjectGateMemoryRef.current.filter(existing => {
+        const sameRelation = entry.relation_to_user && existing.relation_to_user === entry.relation_to_user;
+        const sameName = entry.name && existing.name === entry.name;
+        return !(sameRelation || sameName);
+      }),
+      entry,
+    ].slice(-8);
+  }, []);
+
+  const handleContinueSingleChartGate = useCallback((gateMetadata = {}) => {
+    const originalQuestion = String(gateMetadata?.original_question || '').trim();
+    const nextQuestion = originalQuestion || '';
+    subjectGateOverrideRef.current = { mode: 'selected_chart_only', question: nextQuestion, gateMetadata };
+    setInputText(nextQuestion);
+  }, []);
+
+  const handleRelationshipContextGate = useCallback((gateMetadata = {}, relationshipContext = '', nextQuestion = '') => {
+    const question = String(nextQuestion || '').trim();
+    if (!question) return;
+    subjectGateOverrideRef.current = {
+      mode: 'relationship_context_provided',
+      question,
+      gateMetadata: {
+        ...gateMetadata,
+        chosen_relationship_context: relationshipContext,
+      },
+    };
+    setInputText(question);
+  }, []);
 
   function startPrefilledPartnership(prefill) {
     if (!prefill?.nativeChart || !prefill?.partnerChart) {
@@ -3310,6 +3367,7 @@ export default function ChatScreen({ navigation, route }) {
     processingMessageId,
     userMessageId,
     clientRequestId,
+    subjectGateOverride = null,
   }) => {
     const token = await AsyncStorage.getItem('authToken');
     let activeSessionId = currentSessionId;
@@ -3366,6 +3424,8 @@ export default function ChatScreen({ navigation, route }) {
             partner_gender: partnerChart.gender || '',
             partnership_relationship: partnershipRelation
           }),
+          ...(subjectGateMemoryRef.current.length > 0 ? { subject_gate_memory: subjectGateMemoryRef.current.slice(-8) } : {}),
+          ...(subjectGateOverride ? { subject_gate_override: subjectGateOverride } : {}),
           client_request_id: clientRequestId,
         };
 
@@ -3848,6 +3908,16 @@ export default function ChatScreen({ navigation, route }) {
     const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
     const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
     const outgoingTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
+    const pendingSubjectGateOverride = subjectGateOverrideRef.current;
+    subjectGateOverrideRef.current = null;
+    const subjectGateOverride =
+      pendingSubjectGateOverride &&
+      String(pendingSubjectGateOverride.question || '').trim() === String(messageText || '').trim()
+        ? pendingSubjectGateOverride.mode
+        : null;
+    if (subjectGateOverride) {
+      rememberSubjectGateChoice(pendingSubjectGateOverride.gateMetadata || {}, subjectGateOverride, messageText);
+    }
     const userMessage = {
       id: userMessageId,
       content: messageText,
@@ -3890,6 +3960,7 @@ export default function ChatScreen({ navigation, route }) {
       userMessageId: userMessageId,
       clientRequestId,
       failedQuestion: messageText,
+      subjectGateOverride,
     };
     rememberMessageTier(processingMessageId, outgoingTier);
     
@@ -3996,6 +4067,7 @@ export default function ChatScreen({ navigation, route }) {
         processingMessageId,
         userMessageId,
         clientRequestId,
+        subjectGateOverride,
       });
 
     } catch (error) {
@@ -4082,6 +4154,7 @@ export default function ChatScreen({ navigation, route }) {
         processingMessageId: failedMessage.id,
         userMessageId,
         clientRequestId,
+        subjectGateOverride: failedMessage.subjectGateOverride || null,
       });
     } catch (error) {
       console.error('❌ Error retrying message:', error);
@@ -4730,6 +4803,9 @@ export default function ChatScreen({ navigation, route }) {
                       onRestart={restartPolling}
                       onSendRetry={handleSendRetry}
                       onStartNewChat={confirmStartNewChat}
+                      onStartPartnershipGate={handleStartPartnershipGate}
+                      onContinueSingleChartGate={handleContinueSingleChartGate}
+                      onRelationshipContextGate={handleRelationshipContextGate}
                       sessionId={sessionId}
                       podcastAutoLaunchMessageId={podcastPromoMessageId}
                       podcastAutoLaunchKey={podcastAutoLaunchKey}

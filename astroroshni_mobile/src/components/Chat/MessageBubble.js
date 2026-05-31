@@ -43,6 +43,9 @@ function MessageBubble({
   onRestart,
   onSendRetry,
   onStartNewChat,
+  onStartPartnershipGate,
+  onContinueSingleChartGate,
+  onRelationshipContextGate,
   sessionId,
   podcastAutoLaunchMessageId = null,
   podcastAutoLaunchKey = 0,
@@ -1221,10 +1224,24 @@ function MessageBubble({
 
   // Check if this is a clarification message
   const isClarification = message.message_type === 'clarification';
+  const gateMetadata = message.gate_metadata || {};
+  const gateIntent = message.intent_gate || gateMetadata.intent_gate || '';
   const isNativeGate =
     message.message_type === 'native_gate' ||
     message.intent_gate === 'create_native' ||
-    (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native');
+    (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native') ||
+    [
+      'create_subject_chart',
+      'complete_subject_birth_details',
+      'relationship_setup',
+      'partnership_offer',
+    ].includes(gateIntent);
+  const isRelationshipSetupGate = gateIntent === 'relationship_setup';
+  const isPartnershipOfferGate = gateIntent === 'partnership_offer';
+  const isSubjectChartGate =
+    gateIntent === 'create_subject_chart' ||
+    gateIntent === 'complete_subject_birth_details' ||
+    gateIntent === 'create_native';
 
   const contentStr =
     typeof message.content === 'string'
@@ -1574,48 +1591,116 @@ function MessageBubble({
 
         {isNativeGate && !message.isTyping && (
           <View style={styles.nativeGateActionsWrap}>
-            <View style={styles.nativeGateActionsRow}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
-                activeOpacity={0.7}
-                accessibilityRole="link"
-                accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
-              >
-                <Text style={[styles.nativeGateLinkText, { color: theme === 'dark' ? '#fdba74' : '#ea580c' }]}>
-                  {t('chat.nativeGateSelectNative', 'Select native')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.nativeGateCtaOuter}
-                onPress={() => {
-                  const hint = message.gate_metadata?.extracted_birth_hint || {};
-                  navigation.navigate('BirthForm', {
-                    chartGatePrefill: {
-                      name: hint.name || '',
-                      date: hint.date || null,
-                      time: hint.time || null,
-                      place: hint.place || '',
-                    },
-                    returnTo: 'Home',
-                  });
-                }}
-                activeOpacity={0.9}
-                accessibilityRole="button"
-                accessibilityLabel={t('chat.addBirthProfileA11y', 'Add a new birth profile')}
-              >
-                <LinearGradient
-                  colors={['#ff6b35', '#f97316']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.nativeGateCtaGradient}
-                >
-                  <Ionicons name="add" size={17} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.nativeGateCtaText}>
-                    {t('chat.nativeGateAddNewProfile', 'Add new birth profile')}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+            {isRelationshipSetupGate ? (
+              <View style={styles.nativeGateOptionsWrap}>
+                {(gateMetadata.relationship_setup?.options || []).map((option, index) => {
+                  const label = String(option?.label || option?.value || '').trim();
+                  const value = String(option?.value || label).trim();
+                  if (!label || !value) return null;
+                  const originalQuestion = String(gateMetadata.original_question || '').trim();
+                  const nextQuestion = originalQuestion
+                    ? `${originalQuestion}\n\nRelationship context: ${value}`
+                    : `Relationship context: ${value}`;
+                  return (
+                    <TouchableOpacity
+                      key={`relationship-gate-${index}-${label}`}
+                      style={styles.nativeGateOptionChip}
+                      onPress={() => {
+                        if (onRelationshipContextGate) {
+                          onRelationshipContextGate(gateMetadata, value, nextQuestion);
+                        } else {
+                          onFollowUpClick && onFollowUpClick(nextQuestion);
+                        }
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.nativeGateOptionText}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.nativeGateActionsRow}>
+                {(isSubjectChartGate || isPartnershipOfferGate) && (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
+                    activeOpacity={0.7}
+                    accessibilityRole="link"
+                    accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
+                  >
+                    <Text style={[styles.nativeGateLinkText, { color: theme === 'dark' ? '#fdba74' : '#ea580c' }]}>
+                      {t('chat.nativeGateSelectNative', 'Select native')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {(isSubjectChartGate || isPartnershipOfferGate) && (
+                  <TouchableOpacity
+                    style={styles.nativeGateCtaOuter}
+                    onPress={() => {
+                      const hint = gateMetadata.extracted_birth_hint || {};
+                      navigation.navigate('BirthForm', {
+                        chartGatePrefill: {
+                          name: hint.name || '',
+                          date: hint.date || null,
+                          time: hint.time || null,
+                          place: hint.place || '',
+                          latitude: hint.latitude ?? null,
+                          longitude: hint.longitude ?? null,
+                          gender: hint.gender || '',
+                        },
+                        returnTo: 'Home',
+                      });
+                    }}
+                    activeOpacity={0.9}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('chat.addBirthProfileA11y', 'Add a new birth profile')}
+                  >
+                    <LinearGradient
+                      colors={['#ff6b35', '#f97316']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.nativeGateCtaGradient}
+                    >
+                      <Ionicons name="add" size={17} color="#fff" style={{ marginRight: 6 }} />
+                      <Text style={styles.nativeGateCtaText}>
+                        {gateIntent === 'complete_subject_birth_details'
+                          ? t('chat.nativeGateCompleteProfile', 'Complete birth profile')
+                          : t('chat.nativeGateAddNewProfile', 'Add new birth profile')}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+                {(isPartnershipOfferGate || isSubjectChartGate) && (
+                  <>
+                    {isPartnershipOfferGate && (
+                      <TouchableOpacity
+                        style={styles.nativeGateSecondaryCta}
+                        onPress={() => onStartPartnershipGate && onStartPartnershipGate(gateMetadata)}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('chat.startPartnershipA11y', 'Start partnership analysis')}
+                      >
+                        <Ionicons name="people-outline" size={16} color="#ea580c" style={{ marginRight: 6 }} />
+                        <Text style={styles.nativeGateSecondaryCtaText}>
+                          {t('chat.startPartnershipAnalysis', 'Start Partnership Analysis')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.nativeGatePlainCta}
+                      onPress={() => onContinueSingleChartGate && onContinueSingleChartGate(gateMetadata)}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('chat.continueSingleChartA11y', 'Continue with selected chart only')}
+                    >
+                      <Text style={styles.nativeGatePlainCtaText}>
+                        {t('chat.continueSingleChart', 'Continue with my chart only')}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -1938,6 +2023,9 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
   if (prevProps.sessionId !== nextProps.sessionId) return false;
   if (prevProps.podcastAutoLaunchMessageId !== nextProps.podcastAutoLaunchMessageId) return false;
   if (prevProps.podcastAutoLaunchKey !== nextProps.podcastAutoLaunchKey) return false;
+  if (prevProps.onStartPartnershipGate !== nextProps.onStartPartnershipGate) return false;
+  if (prevProps.onContinueSingleChartGate !== nextProps.onContinueSingleChartGate) return false;
+  if (prevProps.onRelationshipContextGate !== nextProps.onRelationshipContextGate) return false;
   return true;
 };
 
@@ -2733,5 +2821,52 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  nativeGateOptionsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nativeGateOptionChip: {
+    backgroundColor: Platform.OS === 'android' ? 'rgba(255, 107, 53, 0.18)' : 'rgba(255, 107, 53, 0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.35)',
+  },
+  nativeGateOptionText: {
+    color: '#ea580c',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  nativeGateSecondaryCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 88, 12, 0.35)',
+    backgroundColor: 'rgba(255, 247, 237, 0.92)',
+  },
+  nativeGateSecondaryCtaText: {
+    color: '#ea580c',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  nativeGatePlainCta: {
+    borderRadius: 999,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(120, 113, 108, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  nativeGatePlainCtaText: {
+    color: '#57534e',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

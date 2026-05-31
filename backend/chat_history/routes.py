@@ -960,6 +960,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     mode = request.get("mode")  # e.g. "lab" for Chart Lab (educational) mode
     delivery_channel = str(request.get("delivery_channel") or request.get("deliveryChannel") or "").strip().lower()
     render_target = str(request.get("render_target") or request.get("renderTarget") or "").strip().lower()
+    subject_gate_override = str(
+        request.get("subject_gate_override") or request.get("subjectGateOverride") or ""
+    ).strip().lower()
+    subject_gate_memory = request.get("subject_gate_memory") or request.get("subjectGateMemory") or []
+    if not isinstance(subject_gate_memory, list):
+        subject_gate_memory = []
     
     if not session_id or not question or not birth_details:
         raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
@@ -1020,6 +1026,166 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         raise HTTPException(status_code=403, detail="Speech chat is not enabled for your account.")
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active)
     effective_chat_tier = "instant" if instant_chat_active else "standard"
+
+    with get_conn() as conn:
+        # Verify the session before any no-charge gates or credit checks.
+        cur = execute(
+            conn,
+            "SELECT user_id, birth_chart_id FROM chat_sessions WHERE session_id = %s",
+            (session_id,),
+        )
+        session = cur.fetchone()
+        if not session or session[0] != current_user.userid:
+            raise HTTPException(status_code=404, detail="Session not found")
+        session_birth_chart_id = session[1] if len(session) > 1 else None
+
+        if session_birth_chart_id is not None:
+            requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
+            if requested_chart_id is not None and int(session_birth_chart_id) != int(requested_chart_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "CHART_SESSION_MISMATCH: birth_details chart id does not match this chat session. "
+                        "Create a new session for the selected chart."
+                    ),
+                )
+
+        if client_request_id:
+            cur = execute(
+                conn,
+                """
+                    SELECT message_id, status, content, message_type, gate_metadata
+                    FROM chat_messages
+                    WHERE session_id = %s AND sender = 'assistant' AND client_request_id = %s
+                    ORDER BY message_id DESC
+                    LIMIT 1
+                """,
+                (session_id, client_request_id),
+            )
+            existing = cur.fetchone()
+            if existing:
+                assistant_message_id, existing_status, existing_content, existing_type, existing_gate_metadata = existing
+                cur = execute(
+                    conn,
+                    """
+                        SELECT message_id
+                        FROM chat_messages
+                        WHERE session_id = %s AND sender = 'user' AND message_id < %s
+                        ORDER BY message_id DESC
+                        LIMIT 1
+                    """,
+                    (session_id, assistant_message_id),
+                )
+                user_row = cur.fetchone()
+                response = {
+                    "user_message_id": user_row[0] if user_row else None,
+                    "message_id": assistant_message_id,
+                    "status": existing_status or "processing",
+                    "message_type": existing_type or "answer",
+                    "chat_tier": effective_chat_tier,
+                    "content": existing_content or "",
+                    "chart_insights": [],
+                    "loading_messages": [],
+                }
+                if existing_gate_metadata:
+                    try:
+                        meta = json.loads(existing_gate_metadata)
+                        response["gate_metadata"] = meta
+                        if isinstance(meta, dict) and meta.get("intent_gate"):
+                            response["intent_gate"] = meta.get("intent_gate")
+                    except Exception:
+                        pass
+                return response
+
+        cur = execute(
+            conn,
+            "SELECT COUNT(*) FROM chat_messages WHERE session_id = %s AND sender = 'user'",
+            (session_id,),
+        )
+        user_turn_count = (cur.fetchone() or [0])[0] or 0
+        if user_turn_count >= MAX_USER_MESSAGES_PER_CHAT_SESSION:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{SESSION_TURN_LIMIT_PREFIX}: This conversation has reached the maximum length "
+                    f"({MAX_USER_MESSAGES_PER_CHAT_SESSION} questions). Please start a new chat to continue."
+                ),
+            )
+
+    if not partnership_mode and subject_gate_override not in {
+        "selected_chart_only",
+        "single_chart_only",
+        "relationship_context_provided",
+    }:
+        try:
+            from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
+
+            subject_gate = await ChatSubjectGate().classify(
+                question=sanitize_text(question),
+                birth_details=birth_details,
+                language=language,
+                subject_gate_memory=subject_gate_memory,
+            )
+            if subject_gate.get("gate_required"):
+                assistant_content = build_subject_gate_message(
+                    subject_gate,
+                    selected_name=(birth_details or {}).get("name"),
+                )
+                if not assistant_content:
+                    logger.warning("chat subject gate returned no user_message; continuing normal chat")
+                    raise RuntimeError("subject gate missing user_message")
+                gate_metadata = {
+                    **subject_gate,
+                    "no_charge": True,
+                    "source": "chat_subject_gate",
+                }
+                with get_conn() as conn:
+                    _ensure_chat_messages_gate_metadata(conn)
+                    cur = execute(
+                        conn,
+                        """
+                            INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING message_id
+                        """,
+                        (session_id, "user", sanitize_text(question), "completed", datetime.now()),
+                    )
+                    user_message_id = cur.fetchone()[0]
+                    cur = execute(
+                        conn,
+                        """
+                            INSERT INTO chat_messages
+                                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING message_id
+                        """,
+                        (
+                            session_id,
+                            "assistant",
+                            sanitize_text(assistant_content),
+                            "completed",
+                            "native_gate",
+                            json.dumps(gate_metadata, ensure_ascii=False),
+                            datetime.now(),
+                            client_request_id,
+                        ),
+                    )
+                    assistant_message_id = cur.fetchone()[0]
+                    conn.commit()
+                return {
+                    "user_message_id": user_message_id,
+                    "message_id": assistant_message_id,
+                    "status": "completed",
+                    "message_type": "native_gate",
+                    "intent_gate": gate_metadata.get("intent_gate"),
+                    "gate_metadata": gate_metadata,
+                    "chat_tier": effective_chat_tier,
+                    "content": assistant_content,
+                    "chart_insights": [],
+                    "loading_messages": [],
+                }
+        except Exception as gate_exc:
+            logger.warning("chat subject gate skipped after error: %s", gate_exc)
 
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()

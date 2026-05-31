@@ -26,7 +26,12 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { trackAstrologyEvent } from '../utils/analytics';
 import { useTranslation } from 'react-i18next';
 import { appLocaleForI18n } from '../utils/appLocale';
-import { creditsFromGooglePlayProductId } from './androidUserChoiceRazorpay';
+import {
+  creditsFromGooglePlayProductId,
+  resolveUserChoiceCatalogSkus,
+  userChoiceIapLog,
+  describeUserChoiceRawProductsForLog,
+} from './androidUserChoiceRazorpay';
 
 const { width } = Dimensions.get('window');
 
@@ -138,6 +143,44 @@ if (Platform.OS === 'android') {
   } catch (e) {
     console.warn('react-native-iap not available:', e?.message);
   }
+}
+
+/**
+ * If the account already has an active subscription (server + balance tier hint), prompt before
+ * starting another subscription purchase. Returns false if the user cancels.
+ */
+async function confirmProceedDespiteActiveSubscription({
+  creditAPI: creditApi,
+  t,
+  subscriptionDetails: detailsSnapshot,
+  subscriptionTierName: tierNameSnapshot,
+}) {
+  let freshSubscription = detailsSnapshot ?? null;
+  try {
+    const { data: subDetailsPayload } = await creditApi.getSubscriptionDetails();
+    freshSubscription = subDetailsPayload?.subscription ?? null;
+  } catch (_) {
+    /* keep snapshot */
+  }
+  const hasActiveSubscription = Boolean(freshSubscription || tierNameSnapshot);
+  if (!hasActiveSubscription) return true;
+  return new Promise((resolve) => {
+    Alert.alert(
+      t('credits.page.activeSubscriptionWarningTitle'),
+      t('credits.page.activeSubscriptionWarningBody'),
+      [
+        {
+          text: t('credits.page.activeSubscriptionWarningCancel'),
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        {
+          text: t('credits.page.activeSubscriptionWarningConfirm'),
+          onPress: () => resolve(true),
+        },
+      ]
+    );
+  });
 }
 
 const CreditScreen = ({ navigation }) => {
@@ -406,6 +449,8 @@ const CreditScreen = ({ navigation }) => {
       iapProducts,
       productIds,
       subscriptionProductIds,
+      subscriptionDetails,
+      subscriptionTierName,
       creditAPI,
       t,
       fetchBalance,
@@ -486,35 +531,40 @@ const CreditScreen = ({ navigation }) => {
             userChoiceSub = RNIap.userChoiceBillingListenerAndroid(async (details) => {
             const externalTransactionToken = details?.externalTransactionToken;
             const rawProducts = details?.products || [];
-            
-            // Extract IDs from strings like "{id: subscription_vip_platinum, type: subs, ...}" or object rows
-            const products = rawProducts.map((p) => {
-              if (p && typeof p === 'object') {
-                const oid = p.id ?? p.productId ?? p.product_id ?? p.sku;
-                if (oid != null && String(oid).trim() !== '') return String(oid).trim();
-              }
-              if (typeof p === 'string' && p.includes('id:')) {
-                const match = p.match(/id:\s*([^,}\s]+)/);
-                return match ? match[1].trim() : p.trim();
-              }
-              if (typeof p === 'string') return p.trim();
-              if (typeof p === 'number' && Number.isFinite(p)) return String(p);
-              return null;
-            })
-            .filter((pid) => pid != null && String(pid).trim() !== '');
-
-            if (!externalTransactionToken || !products.length) return;
             const C = iapCallbacksRef.current;
+            const { playProductIds, creditSku, subSku } = resolveUserChoiceCatalogSkus(
+              rawProducts,
+              C.productIds,
+              C.subscriptionProductIds
+            );
+
+            const tok = externalTransactionToken ? String(externalTransactionToken) : '';
+            userChoiceIapLog('listener_raw', {
+              hasToken: !!tok,
+              tokenLen: tok.length,
+              tokenPrefix: tok ? `${tok.slice(0, 12)}…` : null,
+              rawProductsLen: rawProducts.length,
+              rawProductsShape: describeUserChoiceRawProductsForLog(rawProducts),
+            });
+            userChoiceIapLog('listener_resolved', {
+              playProductIds,
+              creditSku,
+              subSku,
+              nCreditCatalog: (C.productIds || []).length,
+              nSubCatalog: (C.subscriptionProductIds || []).length,
+              subscriptionProductIds: C.subscriptionProductIds,
+              creditProductIds: C.productIds,
+            });
+
+            if (!externalTransactionToken || !playProductIds.length) {
+              userChoiceIapLog('listener_early_exit', {
+                reason: !externalTransactionToken ? 'no_token' : 'no_play_product_ids',
+                playProductIds,
+              });
+              return;
+            }
 
             const { payCreditPackUserChoiceRazorpay, paySubscriptionUserChoiceRazorpay } = require('./androidUserChoiceRazorpay');
-
-            // Find which product was selected (case-insensitive and trimmed)
-            const creditSku = products.find((pid) => 
-              (C.productIds || []).some(knownId => String(knownId).toLowerCase() === String(pid).toLowerCase())
-            );
-            const subSku = products.find((pid) => 
-              (C.subscriptionProductIds || []).some(knownId => String(knownId).toLowerCase() === String(pid).toLowerCase())
-            );
 
             C.setPurchasingProductId?.(null);
             C.setPurchasingSubscriptionId?.(null);
@@ -530,6 +580,18 @@ const CreditScreen = ({ navigation }) => {
               );
             });
             if (!confirmed) return;
+
+            if (subSku) {
+              const proceedSub = await confirmProceedDespiteActiveSubscription({
+                creditAPI: C.creditAPI,
+                t: C.t,
+                subscriptionDetails: C.subscriptionDetails,
+                subscriptionTierName: C.subscriptionTierName,
+              });
+              if (!proceedSub) return;
+            }
+
+            userChoiceIapLog('listener_user_confirmed', { creditSku, subSku });
 
             try {
               if (creditSku) {
@@ -582,6 +644,7 @@ const CreditScreen = ({ navigation }) => {
                   message: successMsg,
                   creditsAdded,
                 });
+                userChoiceIapLog('listener_credit_flow_ok', { creditSku, creditsAdded });
                 return;
               }
               
@@ -631,12 +694,24 @@ const CreditScreen = ({ navigation }) => {
                   message: C.t('credits.page.subscribedMessage', { tier: tierName }),
                   creditsAdded: 0,
                 });
+                userChoiceIapLog('listener_sub_flow_ok', { subSku, planId: plan.plan_id });
                 return;
               }
               
+              userChoiceIapLog('listener_no_catalog_match', {
+                playProductIds,
+                creditSku,
+                subSku,
+              });
               console.error('IAP: Failed to match any known product ID in listener');
               Alert.alert(C.t('credits.page.alertError'), C.t('credits.page.userChoiceUnknownProducts'));
             } catch (e) {
+              userChoiceIapLog('listener_flow_error', {
+                message: e?.message,
+                code: e?.code,
+                status: e?.response?.status,
+                detail: e?.response?.data?.detail,
+              });
               console.error('IAP: User choice Razorpay flow failed:', e);
               const msg =
                 e?.response?.data?.detail ||
@@ -1051,6 +1126,15 @@ const CreditScreen = ({ navigation }) => {
       );
       return;
     }
+
+    const proceedDespiteActive = await confirmProceedDespiteActiveSubscription({
+      creditAPI,
+      t,
+      subscriptionDetails,
+      subscriptionTierName,
+    });
+    if (!proceedDespiteActive) return;
+
     trackAstrologyEvent.initiateCheckout({
       content_id: productId,
       content_type: 'subscription',
