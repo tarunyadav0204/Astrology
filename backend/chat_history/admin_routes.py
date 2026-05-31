@@ -1815,6 +1815,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_deepseek_chat_model,
             get_deepseek_premium_model,
             is_instant_chat_enabled,
+            is_chat_subject_gate_enabled,
+            get_chat_subject_gate_user_allowlist,
             get_instant_chat_user_allowlist,
             is_speech_chat_enabled,
             get_speech_chat_user_allowlist,
@@ -1855,6 +1857,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "speech_tts_voice_en": get_speech_tts_voice("en"),
             "speech_tts_voice_hi": get_speech_tts_voice("hi"),
             "instant_chat_enabled": is_instant_chat_enabled(),
+            "chat_subject_gate_enabled": is_chat_subject_gate_enabled(),
+            "chat_subject_gate_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_chat_subject_gate_user_allowlist())
+            ),
             "instant_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_instant_chat_user_allowlist())
             ),

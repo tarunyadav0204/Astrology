@@ -1005,7 +1005,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             or partner_birth_details.get('relationshipType')
         )
     
-    from utils.admin_settings import instant_chat_enabled_for_user, speech_chat_enabled_for_user
+    from utils.admin_settings import (
+        chat_subject_gate_enabled_for_user,
+        instant_chat_enabled_for_user,
+        speech_chat_enabled_for_user,
+    )
 
     instant_chat_requested = requested_chat_tier == "instant"
     speech_chat_requested = bool(request.get("speech_chat") or request.get("speechChat"))
@@ -1112,7 +1116,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 ),
             )
 
-    if not partnership_mode and subject_gate_override not in {
+    if chat_subject_gate_enabled_for_user(current_user.userid) and not partnership_mode and subject_gate_override not in {
         "selected_chart_only",
         "single_chart_only",
         "relationship_context_provided",

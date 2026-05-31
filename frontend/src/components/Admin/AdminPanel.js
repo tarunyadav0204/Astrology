@@ -137,6 +137,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiInstantChatModel, setGeminiInstantChatModel] = useState('');
   const [eventTimelineModel, setEventTimelineModel] = useState('');
+  const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
+  const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
+  const [chatSubjectGateSaving, setChatSubjectGateSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
@@ -344,6 +347,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
       setGeminiInstantChatModel(data.gemini_instant_chat_model || '');
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
+      setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
+      setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
       setSpeechChatEnabled(Boolean(data.speech_chat_enabled));
@@ -713,6 +718,46 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save instant chat settings.');
     } finally {
       setGeminiModelsSaving(false);
+    }
+  };
+
+  const handleSaveChatSubjectGateSettings = async () => {
+    setChatSubjectGateSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes] = await Promise.all([
+        fetch('/api/admin/settings/chat_subject_gate_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_subject_gate_enabled',
+            value: chatSubjectGateEnabled ? 'true' : 'false',
+            description: 'Feature flag for the chat pre-question subject/profile gate',
+          }),
+        }),
+        fetch('/api/admin/settings/chat_subject_gate_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_subject_gate_user_allowlist',
+            value: chatSubjectGateUserAllowlist,
+            description: 'Optional CSV user allowlist for the chat pre-question subject/profile gate. Empty = all users when enabled.',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok) {
+        const enabledErr = await enabledRes.json().catch(() => ({}));
+        const allowlistErr = await allowlistRes.json().catch(() => ({}));
+        alert('Failed to save pre-question gate setting: ' + (enabledErr.detail || allowlistErr.detail || 'check console'));
+        return;
+      }
+      alert(`Pre-question subject gate ${chatSubjectGateEnabled ? 'enabled' : 'disabled'}. New chat requests use it immediately.`);
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving pre-question gate setting:', error);
+      alert('Failed to save pre-question gate setting.');
+    } finally {
+      setChatSubjectGateSaving(false);
     }
   };
 
@@ -4112,6 +4157,52 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     ))}
                   </select>
                 )}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Chat pre-question gate</h3>
+              <p className="settings-hint">
+                Master switch for the LLM preflight that detects when a question needs another person&apos;s chart,
+                partnership setup, or relationship order context before the normal chat answer starts.
+                Keep this off until the mobile build with the new inline actions is approved.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable subject/profile gate</strong>
+                  <p>When off, chat skips this new pre-gate and uses the existing flow.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={chatSubjectGateEnabled}
+                    onChange={(e) => setChatSubjectGateEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={chatSubjectGateUserAllowlist}
+                  onChange={(e) => setChatSubjectGateUserAllowlist(e.target.value)}
+                  placeholder="e.g. 12, 45, 78"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveChatSubjectGateSettings}
+                  disabled={chatSubjectGateSaving}
+                >
+                  {chatSubjectGateSaving ? 'Saving…' : 'Save pre-question gate setting'}
+                </button>
               </div>
             </div>
 
