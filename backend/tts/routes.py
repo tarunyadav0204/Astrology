@@ -244,16 +244,25 @@ def _prepare_spoken_tts_text(text: str, lang: str) -> str:
     return cached
 
   try:
-    import google.generativeai as genai
-    from utils.admin_settings import get_gemini_analysis_model
+    from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-      return base_text
+    if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+      if not os.getenv("DEEPSEEK_API_KEY"):
+        return base_text
+      from ai.analysis_llm_backend import build_analysis_llm_model
 
-    genai.configure(api_key=api_key)
-    model_name = os.getenv("GEMINI_SPEECH_TTS_MODEL") or os.getenv("GEMINI_PODCAST_MODEL") or get_gemini_analysis_model()
-    model = genai.GenerativeModel(model_name)
+      model, _, _ = build_analysis_llm_model()
+    else:
+      import google.generativeai as genai
+      from utils.admin_settings import get_gemini_analysis_model
+
+      api_key = os.getenv("GEMINI_API_KEY")
+      if not api_key:
+        return base_text
+
+      genai.configure(api_key=api_key)
+      model_name = os.getenv("GEMINI_SPEECH_TTS_MODEL") or os.getenv("GEMINI_PODCAST_MODEL") or get_gemini_analysis_model()
+      model = genai.GenerativeModel(model_name)
 
     language_instruction = (
       "Write the ENTIRE response in natural spoken Hindi (Devanagari), warm and conversational, "

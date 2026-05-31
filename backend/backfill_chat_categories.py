@@ -170,31 +170,45 @@ def main():
         conn.close()
         return
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("❌ GEMINI_API_KEY not set")
-        sys.exit(1)
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        print("❌ google-generativeai not installed. Run: pip3 install google-generativeai")
-        sys.exit(1)
-    genai.configure(api_key=api_key)
-    gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
-    from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
-    model_name = get_gemini_analysis_model()
-    fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
-    model = None
-    for name in [model_name] + fallbacks:
+    from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+
+    if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            print("❌ DEEPSEEK_API_KEY not set")
+            sys.exit(1)
         try:
-            model = genai.GenerativeModel(name, generation_config=gen_config)
-            print(f"✅ Using model: {name}")
-            break
-        except Exception:
-            continue
-    if not model:
-        print("❌ No Gemini model available")
-        sys.exit(1)
+            from ai.analysis_llm_backend import build_analysis_llm_model
+        except ImportError as e:
+            print(f"❌ analysis_llm_backend import failed: {e}")
+            sys.exit(1)
+        model, used_name, _ = build_analysis_llm_model()
+        print(f"✅ Using DeepSeek model: {used_name}")
+    else:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            print("❌ GEMINI_API_KEY not set")
+            sys.exit(1)
+        try:
+            import google.generativeai as genai
+        except ImportError:
+            print("❌ google-generativeai not installed. Run: pip3 install google-generativeai")
+            sys.exit(1)
+        genai.configure(api_key=api_key)
+        gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
+        from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
+        model_name = get_gemini_analysis_model()
+        fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
+        model = None
+        for name in [model_name] + fallbacks:
+            try:
+                model = genai.GenerativeModel(name, generation_config=gen_config)
+                print(f"✅ Using model: {name}")
+                break
+            except Exception:
+                continue
+        if not model:
+            print("❌ No Gemini model available")
+            sys.exit(1)
 
     limit = args.limit or total
     batch_size = min(args.batch_size, 100)  # cap for reliability

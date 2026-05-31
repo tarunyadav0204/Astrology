@@ -30,6 +30,7 @@ import { creditsFromGooglePlayProductId } from './androidUserChoiceRazorpay';
 
 const { width } = Dimensions.get('window');
 
+
 /** Map react-native-iap v14 product shapes to fields used by this screen (legacy v12-style accessors). */
 function normalizeIapProductForLegacyHelpers(raw) {
   if (!raw) return raw;
@@ -168,6 +169,13 @@ const CreditScreen = ({ navigation }) => {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef(null);
+  /**
+   * IMPORTANT: Always force endConnection on the very first mount of this screen.
+   * Google Play's BillingClient can sometimes get stuck in a default state if the app
+   * was previously connected without the user-choice flag. By forcing a reset here,
+   * we ensure the first 'user-choice' init attempt actually takes effect.
+   */
+  const iapDisconnectBeforeNextConnectRef = useRef(true);
 
   /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
   const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
@@ -370,7 +378,10 @@ const CreditScreen = ({ navigation }) => {
     fetchPlans();
   }, []);
 
-  const productIds = googlePlayProducts.map((p) => p.product_id);
+  const productIds = useMemo(
+    () => googlePlayProducts.map((p) => p.product_id).filter(Boolean),
+    [googlePlayProducts]
+  );
   const subscriptionProductIds = useMemo(
     () => subscriptionPlans.map((p) => p.google_play_product_id).filter(Boolean),
     [subscriptionPlans]
@@ -385,6 +396,7 @@ const CreditScreen = ({ navigation }) => {
     [subscriptionPlans, iapSubscriptions]
   );
   const hasAnyIapProducts = productIds.length > 0 || subscriptionProductIds.length > 0;
+
 
   useLayoutEffect(() => {
     iapCallbacksRef.current = {
@@ -407,158 +419,242 @@ const CreditScreen = ({ navigation }) => {
   });
 
   // Google Play IAP: user-choice billing, product fetch, purchase listeners (Android only)
+  // Wait until both backend catalog requests finish so SKU list is stable (avoids init →
+  // teardown → re-init when credits load before subscription plans). On reconnect only, await
+  // endConnection before initConnection. Listeners are registered before init (same order as
+  // react-native-iap useIAP) so Google user-choice / alternative billing can attach correctly.
   useEffect(() => {
-    if (Platform.OS !== 'android' || !RNIap || !hasAnyIapProducts) return;
-    let mounted = true;
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    if (!RNIap) {
+      return;
+    }
+    if (!hasAnyIapProducts) {
+      return;
+    }
+    if (productsLoading || subscriptionPlansLoading) {
+      return;
+    }
+
+    let alive = true;
     let updateSub = null;
     let errorSub = null;
     let userChoiceSub = null;
     const initIap = async () => {
+      setIapReady(false);
       try {
-        userChoiceSub = RNIap.userChoiceBillingListenerAndroid(async (details) => {
-          const externalTransactionToken = details?.externalTransactionToken;
-          const products = details?.products || [];
-          if (!externalTransactionToken || !products.length) return;
-          const C = iapCallbacksRef.current;
-          const { payCreditPackUserChoiceRazorpay, paySubscriptionUserChoiceRazorpay } = require('./androidUserChoiceRazorpay');
-
-          const creditOnly =
-            products.length > 0 && products.every((pid) => (C.productIds || []).includes(pid));
-          const subOnly =
-            products.length > 0 && products.every((pid) => (C.subscriptionProductIds || []).includes(pid));
-          const creditSku = products.find((pid) => (C.productIds || []).includes(pid));
-          const subSku = products.find((pid) => (C.subscriptionProductIds || []).includes(pid));
-
-          C.setPurchasingProductId?.(null);
-          C.setPurchasingSubscriptionId?.(null);
-
-          const confirmed = await new Promise((resolve) => {
-            Alert.alert(
-              C.t('credits.page.userChoiceBillingTitle'),
-              C.t('credits.page.userChoiceBillingBody'),
-              [
-                { text: C.t('credits.page.userChoiceBillingCancel'), style: 'cancel', onPress: () => resolve(false) },
-                { text: C.t('credits.page.userChoiceBillingContinue'), onPress: () => resolve(true) },
-              ]
-            );
-          });
-          if (!confirmed) return;
-
+        if (iapDisconnectBeforeNextConnectRef.current) {
           try {
-            if (creditSku && creditOnly && products.length === 1) {
-              const credits = creditsFromGooglePlayProductId(creditSku);
-              if (!credits) throw new Error('invalid_product');
-              const product = (C.googlePlayProducts || []).find((p) => (p.product_id || p.id) === creditSku);
-              const iapProduct = (C.iapProducts || []).find((p) => (p.productId || p.product_id) === creditSku);
-              const desc = product
-                ? C.t('credits.page.productTitleFallback', { count: credits })
-                : `${credits} credits`;
-              const data = await payCreditPackUserChoiceRazorpay({
-                creditAPI: C.creditAPI,
-                credits,
-                externalTransactionToken,
-                description: desc,
-              });
-              await C.fetchBalance();
-              await C.fetchHistory();
-              const creditsAdded = data.credits_added || 0;
-              const isAlready =
-                creditsAdded === 0 && (data.message || '').toLowerCase().includes('already credited');
-              if (!isAlready && creditsAdded > 0 && iapProduct) {
-                C.trackAstrologyEvent.creditPurchased(getIapPriceNumber(iapProduct), {
-                  content_id: creditSku,
-                  content_type: 'credits',
-                  currency: getIapCurrency(iapProduct),
-                });
+            await RNIap.endConnection?.();
+            // Small delay to let native BillingClient settle
+            await new Promise(resolve => setTimeout(resolve, 800));
+          } catch (e) {
+            /* ignore pre-init disconnect errors */
+          }
+          iapDisconnectBeforeNextConnectRef.current = false;
+        }
+        if (!alive) {
+          return;
+        }
+
+        const tryInit = async (mode) => {
+          try {
+            await RNIap.initConnection({ alternativeBillingModeAndroid: mode });
+            return true;
+          } catch (err) {
+            console.warn(`IAP: Init with mode "${mode}" failed:`, err?.message);
+            return false;
+          }
+        };
+
+        const clearBillingListeners = () => {
+          try {
+            updateSub?.remove?.();
+            errorSub?.remove?.();
+            userChoiceSub?.remove?.();
+          } catch (_) {
+            /* ignore */
+          }
+          updateSub = null;
+          errorSub = null;
+          userChoiceSub = null;
+        };
+
+        const registerBillingListeners = () => {
+          try {
+            userChoiceSub = RNIap.userChoiceBillingListenerAndroid(async (details) => {
+            const externalTransactionToken = details?.externalTransactionToken;
+            const rawProducts = details?.products || [];
+            
+            // Extract IDs from strings like "{id: subscription_vip_platinum, type: subs, ...}" or object rows
+            const products = rawProducts.map((p) => {
+              if (p && typeof p === 'object') {
+                const oid = p.id ?? p.productId ?? p.product_id ?? p.sku;
+                if (oid != null && String(oid).trim() !== '') return String(oid).trim();
               }
-              const successMsg = isAlready
-                ? C.t('credits.page.purchaseAlreadyCreditedBody')
-                : (() => {
-                    const base = data.message || C.t('credits.page.purchaseCreditsAddedDefault');
-                    return creditsAdded
-                      ? `${base} ${C.t('credits.page.purchaseCreditsAddedSuffix', { count: creditsAdded })}`
-                      : base;
-                  })();
-              C.setPurchaseModal({
-                visible: true,
-                type: isAlready ? 'already_credited' : 'success',
-                title: isAlready ? C.t('credits.page.purchaseAlreadyCreditedTitle') : C.t('credits.page.purchaseThankYou'),
-                message: successMsg,
-                creditsAdded,
-              });
-              return;
-            }
-            if (subSku && subOnly && products.length === 1) {
-              const plan = (C.subscriptionPlans || []).find((p) => p.google_play_product_id === subSku);
-              if (!plan?.plan_id) throw new Error('missing_plan');
-              const subscription = (C.iapSubscriptions || []).find(
-                (s) => (s.productId || s.product_id) === subSku
+              if (typeof p === 'string' && p.includes('id:')) {
+                const match = p.match(/id:\s*([^,}\s]+)/);
+                return match ? match[1].trim() : p.trim();
+              }
+              if (typeof p === 'string') return p.trim();
+              if (typeof p === 'number' && Number.isFinite(p)) return String(p);
+              return null;
+            })
+            .filter((pid) => pid != null && String(pid).trim() !== '');
+
+            if (!externalTransactionToken || !products.length) return;
+            const C = iapCallbacksRef.current;
+
+            const { payCreditPackUserChoiceRazorpay, paySubscriptionUserChoiceRazorpay } = require('./androidUserChoiceRazorpay');
+
+            // Find which product was selected (case-insensitive and trimmed)
+            const creditSku = products.find((pid) => 
+              (C.productIds || []).some(knownId => String(knownId).toLowerCase() === String(pid).toLowerCase())
+            );
+            const subSku = products.find((pid) => 
+              (C.subscriptionProductIds || []).some(knownId => String(knownId).toLowerCase() === String(pid).toLowerCase())
+            );
+
+            C.setPurchasingProductId?.(null);
+            C.setPurchasingSubscriptionId?.(null);
+
+            const confirmed = await new Promise((resolve) => {
+              Alert.alert(
+                C.t('credits.page.userChoiceBillingTitle'),
+                C.t('credits.page.userChoiceBillingBody'),
+                [
+                  { text: C.t('credits.page.userChoiceBillingCancel'), style: 'cancel', onPress: () => resolve(false) },
+                  { text: C.t('credits.page.userChoiceBillingContinue'), onPress: () => resolve(true) },
+                ]
               );
-              const data = await paySubscriptionUserChoiceRazorpay({
-                creditAPI: C.creditAPI,
-                planId: plan.plan_id,
-                externalTransactionToken,
-                tierName: plan.tier_name,
-              });
-              await C.fetchBalance();
-              await C.fetchSubscriptionDetails();
-              const tierName =
-                data?.subscription?.tier_name ||
-                data?.tier_name ||
-                plan.tier_name ||
-                C.t('credits.page.vipFallback');
-              const subPayload = {
-                content_id: subSku,
-                content_type: 'subscription',
-                currency: getIapCurrency(subscription),
-                value: getIapPriceNumber(subscription),
-              };
-              if (subscriptionHasFreeTrial(subscription)) {
-                C.trackAstrologyEvent.startTrial(subPayload);
-              } else {
-                C.trackAstrologyEvent.subscribe(subPayload);
+            });
+            if (!confirmed) return;
+
+            try {
+              if (creditSku) {
+                const credits = creditsFromGooglePlayProductId(creditSku);
+                if (!credits) throw new Error(`Invalid credit product: ${creditSku}`);
+                
+                const product = (C.googlePlayProducts || []).find((p) => 
+                  String(p.product_id || p.id).toLowerCase() === String(creditSku).toLowerCase()
+                );
+                const iapProduct = (C.iapProducts || []).find((p) => 
+                  String(p.productId || p.product_id).toLowerCase() === String(creditSku).toLowerCase()
+                );
+                const desc = product
+                  ? C.t('credits.page.productTitleFallback', { count: credits })
+                  : `${credits} credits`;
+
+                const data = await payCreditPackUserChoiceRazorpay({
+                  creditAPI: C.creditAPI,
+                  credits,
+                  externalTransactionToken,
+                  description: desc,
+                });
+                await C.fetchBalance();
+                await C.fetchHistory();
+                const creditsAdded = data.credits_added || 0;
+                const isAlready =
+                  creditsAdded === 0 && (data.message || '').toLowerCase().includes('already credited');
+                
+                if (!isAlready && creditsAdded > 0 && iapProduct) {
+                  C.trackAstrologyEvent.creditPurchased(getIapPriceNumber(iapProduct), {
+                    content_id: creditSku,
+                    content_type: 'credits',
+                    currency: getIapCurrency(iapProduct),
+                  });
+                }
+                
+                const successMsg = isAlready
+                  ? C.t('credits.page.purchaseAlreadyCreditedBody')
+                  : (() => {
+                      const base = data.message || C.t('credits.page.purchaseCreditsAddedDefault');
+                      return creditsAdded
+                        ? `${base} ${C.t('credits.page.purchaseCreditsAddedSuffix', { count: creditsAdded })}`
+                        : base;
+                    })();
+                    
+                C.setPurchaseModal({
+                  visible: true,
+                  type: isAlready ? 'already_credited' : 'success',
+                  title: isAlready ? C.t('credits.page.purchaseAlreadyCreditedTitle') : C.t('credits.page.purchaseThankYou'),
+                  message: successMsg,
+                  creditsAdded,
+                });
+                return;
               }
+              
+              if (subSku) {
+                const plan = (C.subscriptionPlans || []).find((p) => 
+                  String(p.google_play_product_id).toLowerCase() === String(subSku).toLowerCase()
+                );
+                if (!plan?.plan_id) throw new Error(`Missing plan details for: ${subSku}`);
+                
+                const subscription = (C.iapSubscriptions || []).find(
+                  (s) => String(s.productId || s.product_id).toLowerCase() === String(subSku).toLowerCase()
+                );
+                
+                const data = await paySubscriptionUserChoiceRazorpay({
+                  creditAPI: C.creditAPI,
+                  planId: plan.plan_id,
+                  externalTransactionToken,
+                  tierName: plan.tier_name,
+                });
+                
+                await C.fetchBalance();
+                await C.fetchSubscriptionDetails();
+                
+                const tierName =
+                  data?.subscription?.tier_name ||
+                  data?.tier_name ||
+                  plan.tier_name ||
+                  C.t('credits.page.vipFallback');
+                  
+                const subPayload = {
+                  content_id: subSku,
+                  content_type: 'subscription',
+                  currency: getIapCurrency(subscription),
+                  value: getIapPriceNumber(subscription),
+                };
+                
+                if (subscriptionHasFreeTrial(subscription)) {
+                  C.trackAstrologyEvent.startTrial(subPayload);
+                } else {
+                  C.trackAstrologyEvent.subscribe(subPayload);
+                }
+                
+                C.setPurchaseModal({
+                  visible: true,
+                  type: 'success',
+                  title: C.t('credits.page.subscribedTitle'),
+                  message: C.t('credits.page.subscribedMessage', { tier: tierName }),
+                  creditsAdded: 0,
+                });
+                return;
+              }
+              
+              console.error('IAP: Failed to match any known product ID in listener');
+              Alert.alert(C.t('credits.page.alertError'), C.t('credits.page.userChoiceUnknownProducts'));
+            } catch (e) {
+              console.error('IAP: User choice Razorpay flow failed:', e);
+              const msg =
+                e?.response?.data?.detail ||
+                e?.message ||
+                C.t('credits.page.userChoiceRazorpayFailed');
               C.setPurchaseModal({
                 visible: true,
-                type: 'success',
-                title: C.t('credits.page.subscribedTitle'),
-                message: C.t('credits.page.subscribedMessage', { tier: tierName }),
+                type: 'error',
+                title: C.t('credits.page.userChoiceRazorpayFailed'),
+                message: typeof msg === 'string' ? msg : C.t('credits.page.userChoiceRazorpayFailed'),
                 creditsAdded: 0,
               });
-              return;
             }
-            Alert.alert(C.t('credits.page.alertError'), C.t('credits.page.userChoiceUnknownProducts'));
-          } catch (e) {
-            const msg =
-              e?.response?.data?.detail ||
-              e?.message ||
-              C.t('credits.page.userChoiceRazorpayFailed');
-            C.setPurchaseModal({
-              visible: true,
-              type: 'error',
-              title: C.t('credits.page.userChoiceRazorpayFailed'),
-              message: typeof msg === 'string' ? msg : C.t('credits.page.userChoiceRazorpayFailed'),
-              creditsAdded: 0,
-            });
-          }
-        });
+          });
+        } catch (listenerErr) {
+          console.warn('userChoiceBillingListenerAndroid registration failed:', listenerErr?.message);
+        }
 
-        await RNIap.initConnection({ alternativeBillingModeAndroid: 'user-choice' });
-        if (!mounted) return;
-        if (productIds.length > 0) {
-          const products = await RNIap.fetchProducts({ skus: productIds });
-          if (mounted && Array.isArray(products)) {
-            setIapProducts(products.map(normalizeIapProductForLegacyHelpers));
-          }
-        }
-        if (subscriptionProductIds.length > 0) {
-          const subs = await RNIap.fetchProducts({ skus: subscriptionProductIds, type: 'subs' });
-          if (mounted && Array.isArray(subs)) {
-            setIapSubscriptions(subs.map(normalizeIapProductForLegacyHelpers));
-          }
-        }
-        if (!mounted) return;
-        setIapReady(true);
         updateSub = RNIap.purchaseUpdatedListener(async (purchase) => {
           try {
             const token = purchase.purchaseToken ?? purchase.purchaseTokenAndroid;
@@ -588,29 +684,134 @@ const CreditScreen = ({ navigation }) => {
             console.warn('Purchase error:', error?.message);
           }
         });
+        };
+
+        const runBillingConnectionInit = async () => {
+          let initOutcome = 'unknown';
+          let ok = false;
+          // Nitro bridge expects 'user-choice'. We removed the numeric fallback to avoid
+          // unnecessary disconnect/reconnect cycles that were causing timing issues.
+          ok = await tryInit('user-choice');
+          if (ok) initOutcome = 'user-choice';
+
+          if (!ok && alive) {
+            await RNIap.endConnection?.().catch(() => {});
+            await new Promise(r => setTimeout(r, 600));
+            // Fallback to uppercase variant name
+            ok = await tryInit('USER_CHOICE');
+            if (ok) initOutcome = 'USER_CHOICE';
+          }
+
+          if (!ok && alive) {
+            console.warn('IAP: User-choice init failed, falling back to default Play billing');
+            await RNIap.endConnection?.().catch(() => {});
+            await new Promise(r => setTimeout(r, 600));
+            try {
+              await RNIap.initConnection();
+              initOutcome = 'plain_fallback';
+            } catch (plainErr) {
+              initOutcome = 'plain_fallback_failed';
+              throw plainErr;
+            }
+          }
+          return { initOutcome, ok };
+        };
+
+        registerBillingListeners();
+        let { initOutcome } = await runBillingConnectionInit();
+
+        const userChoiceBillingActive =
+          initOutcome === 'user-choice' || initOutcome === 'USER_CHOICE';
+        if (
+          alive &&
+          userChoiceBillingActive &&
+          !globalThis.__ASTRO_ANDROID_PLAY_BILLING_WARM__
+        ) {
+          globalThis.__ASTRO_ANDROID_PLAY_BILLING_WARM__ = true;
+          clearBillingListeners();
+          await RNIap.endConnection?.().catch(() => {});
+          await new Promise(r => setTimeout(r, 600));
+          if (!alive) {
+            return;
+          }
+          registerBillingListeners();
+          const second = await runBillingConnectionInit();
+          initOutcome = second.initOutcome;
+        }
+
+        if (!alive) {
+          return;
+        }
+
+        // Mark as ready early so user can click Buy without waiting for fetch
+        setIapReady(true);
+
+        if (productIds.length > 0) {
+          RNIap.fetchProducts({ skus: productIds, type: 'in-app' })
+            .then(products => {
+              if (alive && Array.isArray(products)) {
+                setIapProducts(products.map(normalizeIapProductForLegacyHelpers));
+              }
+            })
+            .catch(fetchErr => {
+              console.warn('IAP fetch in-app products failed:', fetchErr?.message);
+            });
+        }
+        if (subscriptionProductIds.length > 0) {
+          RNIap.fetchProducts({ skus: subscriptionProductIds, type: 'subs' })
+            .then(subs => {
+              if (alive && Array.isArray(subs)) {
+                setIapSubscriptions(subs.map(normalizeIapProductForLegacyHelpers));
+              }
+            })
+            .catch(fetchErr => {
+              console.warn('IAP fetch subscriptions failed:', fetchErr?.message);
+            });
+        }
+
         purchaseListenerRef.current = { updateSub, errorSub, userChoiceSub };
       } catch (e) {
-        if (mounted) setIapReady(false);
-        if (mounted) {
-          setIapProducts([]);
-          setIapSubscriptions([]);
+        if (!alive) return;
+        try {
+          updateSub?.remove?.();
+          errorSub?.remove?.();
+          userChoiceSub?.remove?.();
+        } catch (_) {
+          /* ignore */
         }
+        try {
+          await RNIap.endConnection?.();
+        } catch (_) {
+          /* ignore */
+        }
+        setIapReady(false);
+        setIapProducts([]);
+        setIapSubscriptions([]);
         console.warn('IAP init failed:', e?.message);
       }
     };
     initIap();
     return () => {
-      mounted = false;
+      iapDisconnectBeforeNextConnectRef.current = true;
+      alive = false;
       try {
         updateSub?.remove?.();
         errorSub?.remove?.();
         userChoiceSub?.remove?.();
-        RNIap.endConnection?.();
       } catch (e) {
-        console.warn('IAP cleanup:', e?.message);
+        console.warn('IAP listener cleanup:', e?.message);
       }
+      void RNIap.endConnection?.().catch(() => {
+        /* ignore */
+      });
     };
-  }, [productIds.join(','), subscriptionProductIds.join(',')]);
+  }, [
+    hasAnyIapProducts,
+    productsLoading,
+    subscriptionPlansLoading,
+    productIds.join(','),
+    subscriptionProductIds.join(','),
+  ]);
 
   const fetchSubscriptionDetails = async () => {
     try {
@@ -791,6 +992,11 @@ const CreditScreen = ({ navigation }) => {
       Alert.alert(t('credits.page.storeLoadingTitle'), t('credits.page.storeLoadingBody'));
       return;
     }
+
+    startGooglePlayPurchase(product);
+  };
+
+  const startGooglePlayPurchase = async (product) => {
     const productId = product.product_id || product.id;
     const iapProduct = iapProducts.find((p) => (p.productId || p.product_id) === productId);
     trackAstrologyEvent.initiateCheckout({
@@ -827,6 +1033,11 @@ const CreditScreen = ({ navigation }) => {
     }
     const productId = plan.google_play_product_id;
     if (!productId) return;
+    startGooglePlaySubscription(plan);
+  };
+
+  const startGooglePlaySubscription = async (plan) => {
+    const productId = plan.google_play_product_id;
     // Google Play requires subscriptionOffers with offerToken (from getSubscriptions)
     const subscription = iapSubscriptions.find(
       (s) => (s.productId || s.product_id) === productId

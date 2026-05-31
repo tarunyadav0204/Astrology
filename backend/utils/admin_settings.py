@@ -23,7 +23,8 @@ DEFAULT_GEMINI_INSTANT_MODEL = "models/gemini-2.5-flash-lite"
 _DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW = "models/gemini-3.1-flash-lite-preview"
 _GEMINI_31_FLASH_LITE_GA = "models/gemini-3.1-flash-lite"
 
-# Chat only: which vendor handles `GeminiChatAnalyzer.generate_chat_response` (analysis stays on Gemini).
+# Chat: which vendor handles `GeminiChatAnalyzer.generate_chat_response`.
+# Non-chat analysis & event timelines use `analysis_llm_vendor` / `timeline_llm_vendor` (Gemini or DeepSeek).
 CHAT_LLM_GEMINI = "gemini"
 CHAT_LLM_OPENAI = "openai"
 CHAT_LLM_DEEPSEEK = "deepseek"
@@ -50,6 +51,8 @@ DEEPSEEK_CHAT_MODEL_OPTIONS = [
 ]
 DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-chat"
 DEFAULT_DEEPSEEK_PREMIUM_MODEL = "deepseek-reasoner"
+DEFAULT_DEEPSEEK_ANALYSIS_MODEL = "deepseek-chat"
+DEFAULT_DEEPSEEK_TIMELINE_MODEL = "deepseek-reasoner"
 
 
 def _ensure_admin_settings_table(conn: Any) -> None:
@@ -167,6 +170,36 @@ def get_event_timeline_model() -> str:
     if value and value.strip():
         return value.strip()
     return get_gemini_premium_model()
+
+
+def get_analysis_llm_vendor() -> str:
+    """Vendor for non-chat analysis (health, wealth, karma, structured reports, etc.): gemini or deepseek."""
+    value = (get_setting("analysis_llm_vendor") or "").strip().lower()
+    if value == CHAT_LLM_DEEPSEEK:
+        return CHAT_LLM_DEEPSEEK
+    return CHAT_LLM_GEMINI
+
+
+def get_timeline_llm_vendor() -> str:
+    """Vendor for yearly/monthly event timeline generation: gemini or deepseek."""
+    value = (get_setting("timeline_llm_vendor") or "").strip().lower()
+    if value == CHAT_LLM_DEEPSEEK:
+        return CHAT_LLM_DEEPSEEK
+    return CHAT_LLM_GEMINI
+
+
+def get_deepseek_analysis_model() -> str:
+    value = get_setting("deepseek_analysis_model")
+    if value and value.strip():
+        return _normalize_deepseek_model_id(value.strip())
+    return DEFAULT_DEEPSEEK_ANALYSIS_MODEL
+
+
+def get_deepseek_timeline_model() -> str:
+    value = get_setting("deepseek_timeline_model")
+    if value and value.strip():
+        return _normalize_deepseek_model_id(value.strip())
+    return DEFAULT_DEEPSEEK_TIMELINE_MODEL
 
 
 def get_chat_llm_provider() -> str:

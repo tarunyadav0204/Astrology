@@ -1,4 +1,3 @@
-import google.generativeai as genai
 import os
 import logging
 import json
@@ -25,26 +24,21 @@ class GeminiPhysicalAnalyzer:
     
     def __init__(self):
         self.cache = PhysicalTraitsCache()
-        
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable not set")
-        
-        genai.configure(api_key=api_key)
-        from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
-        model_name = get_gemini_analysis_model()
-        fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
-        self.model = None
-        for name in [model_name] + fallbacks:
-            try:
-                self.model = genai.GenerativeModel(name)
-                logging.info(f"✅ Physical analyzer using: {name}")
-                break
-            except Exception as e:
-                logging.warning(f"⚠️ Model {name} not available: {e}")
-                continue
-        if not self.model:
-            raise ValueError("No available Gemini model found")
+
+        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+
+        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+            if not os.getenv("DEEPSEEK_API_KEY"):
+                raise ValueError("DEEPSEEK_API_KEY environment variable not set")
+        else:
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable not set")
+
+        from ai.analysis_llm_backend import build_analysis_llm_model
+
+        self.model, resolved_name, vendor = build_analysis_llm_model()
+        logging.info("✅ Physical analyzer using (%s): %s", vendor, resolved_name)
     
     def analyze_physical_traits(self, chart_data: Dict, birth_data: Dict, birth_chart_id: int = None) -> List[Dict]:
         """

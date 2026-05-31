@@ -991,7 +991,11 @@
       "userChoiceBillingCancel": "Not now",
       "userChoiceUnknownProducts": "We could not match this purchase to a credit pack or plan. Please try again or use Google Play billing.",
       "userChoiceRazorpayFailed": "Payment did not complete",
-      "transactionBalance": "Balance: {{amount}}"
+      "transactionBalance": "Balance: {{amount}}",
+      "paymentChoiceTitle": "How would you like to pay?",
+      "paymentChoiceBody": "You can pay using Google Play or via UPI/Cards (Alternative Billing). Both methods are secure.",
+      "paymentChoiceGoogle": "Google Play",
+      "paymentChoiceAlternative": "UPI / Cards / Netbanking"
     }
   },
   "birthForm": {
@@ -1049,6 +1053,7 @@
     }
   },
   "common": {
+    "cancel": "Cancel",
     "current": "Current",
     "unknown": "Unknown",
     "ends": "Ends: ",

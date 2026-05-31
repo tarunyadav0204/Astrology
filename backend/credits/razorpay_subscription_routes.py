@@ -9,7 +9,8 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import requests
@@ -104,11 +105,46 @@ def _fetch_razorpay_subscription(subscription_id: str) -> Dict[str, Any]:
     return data
 
 
+def _coerce_unix_ts(val: Any) -> Optional[int]:
+    if val is None:
+        return None
+    try:
+        i = int(val)
+    except (TypeError, ValueError):
+        return None
+    return i if i > 0 else None
+
+
 def _dates_from_razorpay_subscription(sub: Dict[str, Any]) -> tuple:
-    start = sub.get("current_start") or sub.get("start_at")
-    end = sub.get("current_end") or sub.get("end_at")
-    if not start or not end:
-        raise HTTPException(status_code=400, detail="Subscription period not available yet")
+    """
+    Map Razorpay subscription payload to (start_date, end_date) for our DB.
+
+    Right after checkout, status is often `authenticated` with null current_start/current_end.
+    We fall back to start_at / charge_at / created_at and derive a short provisional end window
+    when the billing cycle is not materialised yet (webhooks + later sync fill real periods).
+    """
+    cs = _coerce_unix_ts(sub.get("current_start"))
+    ce = _coerce_unix_ts(sub.get("current_end"))
+    sa = _coerce_unix_ts(sub.get("start_at"))
+    ea = _coerce_unix_ts(sub.get("end_at"))
+    ca = _coerce_unix_ts(sub.get("charge_at"))
+    cr = _coerce_unix_ts(sub.get("created_at"))
+    status = (sub.get("status") or "").strip().lower()
+
+    if cs and ce:
+        start, end = cs, ce
+    else:
+        start = cs or sa or ca or cr
+        if not start:
+            raise HTTPException(status_code=400, detail="Subscription period not available yet")
+        end = ce or ea
+        if not end:
+            end = int((datetime.utcfromtimestamp(start) + timedelta(days=35)).timestamp())
+        elif ce is None and ea is not None and (ea - start) > 86400 * 62:
+            # Long contract end_at right after auth — use a short provisional window until current_* exist.
+            if status in ("authenticated", "created"):
+                end = min(ea, int((datetime.utcfromtimestamp(start) + timedelta(days=35)).timestamp()))
+
     start_date = datetime.utcfromtimestamp(int(start)).strftime("%Y-%m-%d")
     end_date = datetime.utcfromtimestamp(int(end)).strftime("%Y-%m-%d")
     return start_date, end_date
@@ -348,13 +384,28 @@ async def razorpay_subscription_verify(body: VerifySubscriptionBody, current_use
     if internal_plan_id is None:
         raise HTTPException(status_code=400, detail="Missing plan on subscription")
 
-    result = _apply_razorpay_subscription_entitlement(
-        current_user.userid,
-        internal_plan_id,
-        product_id,
-        body.razorpay_subscription_id.strip(),
-        sub,
-    )
+    result = None
+    last_period_err: Optional[str] = None
+    for attempt in range(5):
+        try:
+            result = _apply_razorpay_subscription_entitlement(
+                current_user.userid,
+                internal_plan_id,
+                product_id,
+                body.razorpay_subscription_id.strip(),
+                sub,
+            )
+            break
+        except HTTPException as e:
+            detail = e.detail if isinstance(e.detail, str) else ""
+            if e.status_code == 400 and "not available yet" in detail.lower() and attempt < 4:
+                await asyncio.sleep(0.45)
+                sub = _fetch_razorpay_subscription(body.razorpay_subscription_id.strip())
+                last_period_err = detail
+                continue
+            raise
+    if result is None:
+        raise HTTPException(status_code=400, detail=last_period_err or "Subscription period not available yet")
 
     gp_tok = (body.google_play_external_transaction_token or "").strip() or str(
         notes.get("gp_external_tx_token") or ""

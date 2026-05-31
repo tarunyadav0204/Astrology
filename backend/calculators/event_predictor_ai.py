@@ -92,23 +92,19 @@ class EventPredictor:
         self.ashtakavarga_cls = ashtakavarga_calculator_cls
         self.model = None
         self.model_name = None
-        api_key = os.getenv('GEMINI_API_KEY')
-        if api_key:
-            genai.configure(api_key=api_key)
-            try:
-                from utils.admin_settings import get_event_timeline_model, GEMINI_MODEL_OPTIONS
-                name = get_event_timeline_model()
-                fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
-                for model_name in [name] + fallbacks:
-                    try:
-                        self.model = genai.GenerativeModel(model_name)
-                        self.model_name = model_name
-                        print(f"✅ EventPredictor using {model_name}")
-                        break
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+        self._timeline_llm_vendor = "gemini"
+        self._timeline_log_provider = "gemini"
+        try:
+            from ai.analysis_llm_backend import build_timeline_llm_model
+            from utils.admin_settings import CHAT_LLM_DEEPSEEK
+
+            self.model, self.model_name, self._timeline_llm_vendor = build_timeline_llm_model()
+            self._timeline_log_provider = (
+                "deepseek" if self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK else "gemini"
+            )
+            print(f"✅ EventPredictor using {self._timeline_log_provider} model {self.model_name}")
+        except Exception as e:
+            print(f"⚠️ EventPredictor model init failed: {e}")
 
     @staticmethod
     def _env_bool(name: str, default: bool = False) -> bool:
@@ -245,7 +241,10 @@ class EventPredictor:
             raw_data = self._prepare_yearly_data(birth_data, year)
             print(f"✅ Yearly data prepared (length: {len(raw_data)} chars)")
 
-            if self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=False):
+            use_parallel_yearly = self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=False)
+            from utils.admin_settings import CHAT_LLM_DEEPSEEK
+
+            if use_parallel_yearly and self._timeline_llm_vendor != CHAT_LLM_DEEPSEEK:
                 print("\n⚡ Parallel yearly timeline enabled (with context cache)")
                 ai_response = await self._predict_yearly_events_parallel_cached(
                     raw_data=raw_data,
@@ -254,6 +253,11 @@ class EventPredictor:
                     progress_callback=progress_callback,
                 )
             else:
+                if use_parallel_yearly and self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK:
+                    print(
+                        "\n⚠️ EVENT_TIMELINE_PARALLEL_YEARLY is ignored for DeepSeek "
+                        "(Gemini context cache only). Using single-call timeline."
+                    )
                 # Pass Age to prompt generator for Desha Kala Patra logic
                 print("\n🔄 Creating prediction prompt...")
                 prompt = self._create_prediction_prompt(raw_data, year, current_age)
@@ -660,7 +664,10 @@ class EventPredictor:
             raw_data = self._prepare_yearly_data(birth_data, year)
             transit_facts = self._get_transit_facts_for_month(birth_data, year, month)
             dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
-            if self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=False):
+            use_parallel_monthly = self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=False)
+            from utils.admin_settings import CHAT_LLM_DEEPSEEK
+
+            if use_parallel_monthly and self._timeline_llm_vendor != CHAT_LLM_DEEPSEEK:
                 print("\n⚡ Parallel monthly deep enabled (with context cache + domain shards)")
                 ai_response = await self._predict_monthly_deep_parallel_cached(
                     raw_data=raw_data,
@@ -671,6 +678,11 @@ class EventPredictor:
                     dasha_facts=dasha_facts,
                 )
             else:
+                if use_parallel_monthly and self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK:
+                    print(
+                        "\n⚠️ EVENT_TIMELINE_PARALLEL_MONTHLY is ignored for DeepSeek "
+                        "(Gemini context cache only). Using single-call monthly deep."
+                    )
                 prompt = self._create_monthly_deep_prompt(
                     raw_data, year, month, current_age, transit_facts, dasha_facts
                 )
@@ -2095,7 +2107,7 @@ Plain-language style for `prediction`:
         debug_logging = is_debug_logging_enabled()
         token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}
         selected_model = model_override or self.model
-        model_name = getattr(selected_model, "model_name", None)
+        model_name = getattr(selected_model, "model_name", None) or self.model_name
 
         def run_sync_gemini():
             print("\n" + "="*100)
@@ -2251,7 +2263,7 @@ Plain-language style for `prediction`:
             if debug_logging:
                 log_llm_roundtrip(
                     tag=llm_log_tag,
-                    provider="gemini",
+                    provider=self._timeline_log_provider,
                     model=model_name,
                     prompt=prompt,
                     response_text=resp_text,
@@ -2294,7 +2306,7 @@ Plain-language style for `prediction`:
             if debug_logging:
                 log_llm_roundtrip(
                     tag=llm_log_tag,
-                    provider="gemini",
+                    provider=self._timeline_log_provider,
                     model=model_name,
                     prompt=prompt,
                     response_text=resp_text if "resp_text" in locals() else None,
@@ -2316,7 +2328,7 @@ Plain-language style for `prediction`:
             if debug_logging:
                 log_llm_roundtrip(
                     tag=llm_log_tag,
-                    provider="gemini",
+                    provider=self._timeline_log_provider,
                     model=model_name,
                     prompt=prompt,
                     response_text=resp_text if "resp_text" in locals() else None,

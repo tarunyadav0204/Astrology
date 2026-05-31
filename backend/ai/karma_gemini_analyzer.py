@@ -25,9 +25,13 @@ class KarmaGeminiAnalyzer:
     """Integrates Karma Context with Gemini AI for personalized readings"""
     
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        from utils.admin_settings import get_gemini_analysis_model
-        self.model = genai.GenerativeModel(get_gemini_analysis_model())
+        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+
+        if get_analysis_llm_vendor() != CHAT_LLM_DEEPSEEK:
+            genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY") or "")
+        from ai.analysis_llm_backend import build_analysis_llm_model
+
+        self.model, _, _ = build_analysis_llm_model()
     
     def analyze_karma(self, chart_data: Dict[str, Any], divisional_charts: Dict[str, Any] = None, native_name: str = None, log_request: bool = False) -> Dict[str, Any]:
         """Generate complete karma analysis with AI interpretation"""

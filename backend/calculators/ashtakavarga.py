@@ -463,17 +463,9 @@ class AshtakavargaCalculator:
             import google.generativeai as genai
             import os
             import json
-            
-            # Configure Gemini
-            api_key = os.getenv('GEMINI_API_KEY')
-            if not api_key:
-                return {"error": "Gemini API key not configured"}
-            
-            genai.configure(api_key=api_key)
-            from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
-            preferred = get_gemini_analysis_model()
-            model_names = [preferred] + [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != preferred]
-            
+
+            from utils.admin_settings import CHAT_LLM_DEEPSEEK, GEMINI_MODEL_OPTIONS, get_analysis_llm_vendor, get_gemini_analysis_model
+
             # Prepare comprehensive data payload
             sarva = self.calculate_sarvashtakavarga()
             bindus = sarva['sarvashtakavarga']
@@ -586,40 +578,72 @@ Provide predictions in this JSON format (fill every top-level key; use substanti
 }}
 """
             
-            # Generate predictions with error logging (try admin model, then stable fallbacks)
-            print(f"🔮 Calling Gemini API for life predictions...")
+            # Generate predictions with error logging (try admin model, then stable fallbacks for Gemini)
+            use_deepseek = get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK
+            print(
+                f"🔮 Calling {'DeepSeek' if use_deepseek else 'Gemini'} API for life predictions..."
+            )
             print(f"📊 Prompt length: {len(prompt)} characters")
             print(f"📤 REQUEST PROMPT (preview):\n{prompt[:1000]}...")
 
             response_text = None
             last_model_error = None
             response = None
-            for model_name in model_names:
+            model_names: list = []
+
+            if use_deepseek:
                 try:
-                    print(f"🎯 Trying model: {model_name}")
-                    model = genai.GenerativeModel(model_name)
+                    from ai.analysis_llm_backend import build_analysis_llm_model
+
+                    model, mn, _ = build_analysis_llm_model()
+                    print(f"🎯 Trying model: {mn}")
                     response = model.generate_content(prompt)
                     response_text, extract_err = _safe_gemini_response_text(response)
                     if response_text:
-                        print(f"✅ Gemini API call successful with {model_name}")
+                        print(f"✅ DeepSeek API call successful with {mn}")
                         print(f"📝 Response length: {len(response_text)} characters")
                         print(f"📥 RESPONSE TEXT (preview):\n{response_text[:1000]}...")
-                        break
-                    last_model_error = extract_err or "no usable text"
-                    print(f"⚠️ Model {model_name}: {last_model_error}")
+                    else:
+                        last_model_error = extract_err or "no usable text"
+                        print(f"⚠️ Model {mn}: {last_model_error}")
                 except Exception as call_err:
                     last_model_error = f"{type(call_err).__name__}: {call_err}"
-                    print(f"⚠️ Model {model_name} failed: {last_model_error}")
-                    continue
+                    print(f"⚠️ DeepSeek call failed: {last_model_error}")
+            else:
+                api_key = os.getenv('GEMINI_API_KEY')
+                if not api_key:
+                    return {"error": "Gemini API key not configured"}
+
+                genai.configure(api_key=api_key)
+                preferred = get_gemini_analysis_model()
+                model_names = [preferred] + [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != preferred]
+                for model_name in model_names:
+                    try:
+                        print(f"🎯 Trying model: {model_name}")
+                        model = genai.GenerativeModel(model_name)
+                        response = model.generate_content(prompt)
+                        response_text, extract_err = _safe_gemini_response_text(response)
+                        if response_text:
+                            print(f"✅ Gemini API call successful with {model_name}")
+                            print(f"📝 Response length: {len(response_text)} characters")
+                            print(f"📥 RESPONSE TEXT (preview):\n{response_text[:1000]}...")
+                            break
+                        last_model_error = extract_err or "no usable text"
+                        print(f"⚠️ Model {model_name}: {last_model_error}")
+                    except Exception as call_err:
+                        last_model_error = f"{type(call_err).__name__}: {call_err}"
+                        print(f"⚠️ Model {model_name} failed: {last_model_error}")
+                        continue
 
             if not response_text:
+                tried = "DeepSeek" if use_deepseek else f"Gemini ({len(model_names)} model(s))"
                 return {
                     "error": (
-                        "Could not get a valid response from Gemini "
-                        f"(tried {len(model_names)} model(s)). Last error: {last_model_error}"
+                        "Could not get a valid response from the configured analysis LLM "
+                        f"({tried}). Last error: {last_model_error}"
                     ),
                     "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
-                    "error_type": "GeminiNoText",
+                    "error_type": "LlmNoText",
                 }
 
             # Parse JSON response

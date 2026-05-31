@@ -2,33 +2,26 @@ import json
 import os
 from typing import Any, Dict, List
 
-import google.generativeai as genai
-
-from utils.admin_settings import GEMINI_MODEL_OPTIONS, get_gemini_analysis_model
+from ai.analysis_llm_backend import build_analysis_llm_model
 
 
 class GeminiAstroVastuAnalyzer:
     """AI narrative layer for AstroVastu deterministic outputs."""
 
     def __init__(self) -> None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable not set")
-        genai.configure(api_key=api_key)
+        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-        model_name = get_gemini_analysis_model()
-        fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
-        self.model = None
-        self.model_name = None
-        for name in [model_name] + fallbacks:
-            try:
-                self.model = genai.GenerativeModel(name)
-                self.model_name = name
-                break
-            except Exception:
-                continue
+        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+            if not os.getenv("DEEPSEEK_API_KEY"):
+                raise ValueError("DEEPSEEK_API_KEY environment variable not set")
+        else:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable not set")
+
+        self.model, self.model_name, _vendor = build_analysis_llm_model()
         if not self.model:
-            raise ValueError("No available Gemini model found for AstroVastu analysis")
+            raise ValueError("No available model found for AstroVastu analysis")
 
     def enrich(
         self,

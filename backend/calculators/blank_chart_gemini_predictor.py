@@ -27,45 +27,48 @@ class BlankChartGeminiPredictor:
     """Gemini AI predictor for blank chart context with comprehensive error handling"""
     
     def __init__(self):
-        self.api_key = os.getenv('GEMINI_API_KEY')
-        print(f"🔑 GEMINI_API_KEY present: {bool(self.api_key)}")
-        print(f"🔑 GEMINI_API_KEY length: {len(self.api_key) if self.api_key else 0}")
-        
-        if not self.api_key:
-            logger.error("GEMINI_API_KEY not found in environment variables")
-            raise ValueError("GEMINI_API_KEY not found in environment variables")
-        
+        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+
+        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+            self.api_key = None
+            if not os.getenv("DEEPSEEK_API_KEY"):
+                logger.error("DEEPSEEK_API_KEY not found in environment variables")
+                raise ValueError("DEEPSEEK_API_KEY not found in environment variables")
+        else:
+            self.api_key = os.getenv('GEMINI_API_KEY')
+            print(f"🔑 GEMINI_API_KEY present: {bool(self.api_key)}")
+            print(f"🔑 GEMINI_API_KEY length: {len(self.api_key) if self.api_key else 0}")
+            if not self.api_key:
+                logger.error("GEMINI_API_KEY not found in environment variables")
+                raise ValueError("GEMINI_API_KEY not found in environment variables")
+
         # Initialize model with fallback options
         self.model = None
         self._initialize_model()
     
     def _initialize_model(self):
-        """Initialize Gemini model with fallback options"""
+        """Initialize analysis LLM (Gemini or DeepSeek per admin)."""
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            
-            from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
-            preferred = get_gemini_analysis_model()
-            fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != preferred]
-            for model_name in [preferred] + fallbacks:
-                try:
-                    self.model = genai.GenerativeModel(model_name)
-                    logger.info(f"✅ Blank chart predictor using: {model_name}")
-                    print(f"✅ Blank chart predictor using: {model_name}")
-                    return
-                except Exception as e:
-                    logger.warning(f"⚠️ Model {model_name} not available: {e}")
-                    print(f"⚠️ Model {model_name} not available: {e}")
-                    continue
-            raise ValueError("No available Gemini model found")
-                
+            from ai.analysis_llm_backend import build_analysis_llm_model
+
+            self.model, self._resolved_analysis_model_name, self._analysis_vendor = (
+                build_analysis_llm_model()
+            )
+            logger.info(
+                "✅ Blank chart predictor using (%s): %s",
+                self._analysis_vendor,
+                self._resolved_analysis_model_name,
+            )
+            print(
+                f"✅ Blank chart predictor using ({self._analysis_vendor}): "
+                f"{self._resolved_analysis_model_name}"
+            )
         except ImportError as e:
-            logger.error(f"Failed to import google.generativeai: {e}")
-            raise ValueError(f"Google Generative AI library not available: {e}")
+            logger.error(f"Failed to import analysis LLM backend: {e}")
+            raise ValueError(f"Analysis LLM backend not available: {e}") from e
         except Exception as e:
-            logger.error(f"Failed to initialize Gemini model: {e}")
-            raise ValueError(f"Failed to initialize Gemini model: {e}")
+            logger.error(f"Failed to initialize analysis model: {e}")
+            raise ValueError(f"Failed to initialize analysis model: {e}") from e
     
     def generate_prediction(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Generate AI prediction from blank chart context with comprehensive error handling"""

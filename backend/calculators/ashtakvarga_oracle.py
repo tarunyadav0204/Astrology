@@ -2,7 +2,6 @@ import os
 import json
 import re
 from datetime import datetime
-import google.generativeai as genai
 from calculators.ashtakavarga import AshtakavargaCalculator
 
 # Global oracle instance to maintain cache across requests
@@ -16,13 +15,13 @@ def get_oracle_instance():
 
 class AshtakvargaOracle:
     def __init__(self):
-        # Configure Gemini
-        api_key = os.getenv('GEMINI_API_KEY')
         self.model = None
-        if api_key:
-            genai.configure(api_key=api_key)
-            from utils.admin_settings import get_gemini_analysis_model
-            self.model = genai.GenerativeModel(get_gemini_analysis_model())
+        try:
+            from ai.analysis_llm_backend import build_analysis_llm_model
+
+            self.model, _, _ = build_analysis_llm_model()
+        except ValueError:
+            self.model = None
         
         # Sign names for reference
         self.sign_names = [

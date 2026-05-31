@@ -1,4 +1,3 @@
-import google.generativeai as genai
 import json
 import os
 import html
@@ -24,28 +23,21 @@ class GeminiWealthAnalyzer:
     """Gemini AI integration for personalized wealth insights"""
     
     def __init__(self):
-        # Configure Gemini API
-        api_key = os.getenv('GEMINI_API_KEY')
+        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+
         print(f"Current working directory: {os.getcwd()}")
-        print(f"API key found: {bool(api_key)}")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable not set")
-        
-        genai.configure(api_key=api_key)
-        from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
-        model_name = get_gemini_analysis_model()
-        fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
-        self.model = None
-        for name in [model_name] + fallbacks:
-            try:
-                self.model = genai.GenerativeModel(name)
-                print(f"✅ Wealth analyzer using: {name}")
-                break
-            except Exception as e:
-                print(f"⚠️ Model {name} not available: {e}")
-                continue
-        if not self.model:
-            raise ValueError("No available Gemini model found")
+        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+            print(f"DEEPSEEK_API_KEY found: {bool(os.getenv('DEEPSEEK_API_KEY'))}")
+        else:
+            api_key = os.getenv('GEMINI_API_KEY')
+            print(f"API key found: {bool(api_key)}")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable not set")
+
+        from ai.analysis_llm_backend import build_analysis_llm_model
+
+        self.model, resolved_name, vendor = build_analysis_llm_model()
+        print(f"✅ Wealth analyzer using ({vendor}): {resolved_name}")
     
     def generate_wealth_insights(self, wealth_data: Dict[str, Any], chart_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate personalized wealth insights using Gemini AI"""

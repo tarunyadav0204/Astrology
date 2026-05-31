@@ -3,8 +3,6 @@ import re
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Tuple
 
-import google.generativeai as genai
-
 from db import get_conn, execute
 
 
@@ -87,10 +85,13 @@ class FactExtractor:
             self.model = None
             return
 
-        genai.configure(api_key=api_key)
-        from utils.admin_settings import get_gemini_analysis_model
+        try:
+            from ai.analysis_llm_backend import build_analysis_llm_model
 
-        self.model = genai.GenerativeModel(get_gemini_analysis_model())
+            self.model, _, _ = build_analysis_llm_model()
+        except ValueError as e:
+            print(f"⚠️ Analysis LLM not available - fact extraction disabled: {e}")
+            self.model = None
 
     def _load_existing_rows(self, birth_chart_id: int) -> List[Tuple[str, str]]:
         with get_conn() as conn:

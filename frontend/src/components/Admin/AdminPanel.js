@@ -154,6 +154,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deepseekModelOptions, setDeepseekModelOptions] = useState([]);
   const [deepseekChatModel, setDeepseekChatModel] = useState('');
   const [deepseekPremiumModel, setDeepseekPremiumModel] = useState('');
+  const [analysisLlmVendor, setAnalysisLlmVendor] = useState('gemini');
+  const [timelineLlmVendor, setTimelineLlmVendor] = useState('gemini');
+  const [deepseekAnalysisModel, setDeepseekAnalysisModel] = useState('');
+  const [deepseekTimelineModel, setDeepseekTimelineModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
   const [chatCountdownStandardSeconds, setChatCountdownStandardSeconds] = useState('110');
   const [chatCountdownPremiumSeconds, setChatCountdownPremiumSeconds] = useState('210');
@@ -355,6 +359,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setDeepseekModelOptions(data.deepseek_model_options || []);
       setDeepseekChatModel(data.deepseek_chat_model || '');
       setDeepseekPremiumModel(data.deepseek_premium_model || '');
+      setAnalysisLlmVendor(data.analysis_llm_vendor || 'gemini');
+      setTimelineLlmVendor(data.timeline_llm_vendor || 'gemini');
+      setDeepseekAnalysisModel(data.deepseek_analysis_model || '');
+      setDeepseekTimelineModel(data.deepseek_timeline_model || '');
       setPodcastProvider(data.podcast_provider || 'tts');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
@@ -415,6 +423,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         premiumRes,
         analysisRes,
         timelineRes,
+        analysisVendorRes,
+        timelineVendorRes,
+        deepseekAnalysisRes,
+        deepseekTimelineRes,
         providerRes,
         premiumProviderRes,
         openaiChatRes,
@@ -456,6 +468,42 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             key: 'event_timeline_model',
             value: eventTimelineModel,
             description: 'Gemini model for yearly/monthly event timeline generation',
+          }),
+        }),
+        fetch('/api/admin/settings/analysis_llm_vendor', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'analysis_llm_vendor',
+            value: analysisLlmVendor,
+            description: 'Vendor for non-chat analysis: gemini or deepseek',
+          }),
+        }),
+        fetch('/api/admin/settings/timeline_llm_vendor', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'timeline_llm_vendor',
+            value: timelineLlmVendor,
+            description: 'Vendor for event timeline generation: gemini or deepseek',
+          }),
+        }),
+        fetch('/api/admin/settings/deepseek_analysis_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'deepseek_analysis_model',
+            value: deepseekAnalysisModel,
+            description: 'DeepSeek model id when analysis vendor is deepseek',
+          }),
+        }),
+        fetch('/api/admin/settings/deepseek_timeline_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'deepseek_timeline_model',
+            value: deepseekTimelineModel,
+            description: 'DeepSeek model id when timeline vendor is deepseek',
           }),
         }),
         fetch('/api/admin/settings/chat_llm_provider', {
@@ -518,6 +566,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         !premiumRes.ok ||
         !analysisRes.ok ||
         !timelineRes.ok ||
+        !analysisVendorRes.ok ||
+        !timelineVendorRes.ok ||
+        !deepseekAnalysisRes.ok ||
+        !deepseekTimelineRes.ok ||
         !providerRes.ok ||
         !premiumProviderRes.ok ||
         !openaiChatRes.ok ||
@@ -529,19 +581,43 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const premiumErr = await premiumRes.json().catch(() => ({}));
         const analysisErr = await analysisRes.json().catch(() => ({}));
         const timelineErr = await timelineRes.json().catch(() => ({}));
+        const analysisVendorErr = await analysisVendorRes.json().catch(() => ({}));
+        const timelineVendorErr = await timelineVendorRes.json().catch(() => ({}));
+        const dsAnalysisErr = await deepseekAnalysisRes.json().catch(() => ({}));
+        const dsTimelineErr = await deepseekTimelineRes.json().catch(() => ({}));
         const providerErr = await providerRes.json().catch(() => ({}));
         const premiumProviderErr = await premiumProviderRes.json().catch(() => ({}));
         const oaChatErr = await openaiChatRes.json().catch(() => ({}));
         const oaPremErr = await openaiPremiumRes.json().catch(() => ({}));
         const dsChatErr = await deepseekChatRes.json().catch(() => ({}));
         const dsPremErr = await deepseekPremiumRes.json().catch(() => ({}));
-        console.error('Save failed:', chatErr, premiumErr, analysisErr, timelineErr, providerErr, premiumProviderErr, oaChatErr, oaPremErr, dsChatErr, dsPremErr);
+        console.error(
+          'Save failed:',
+          chatErr,
+          premiumErr,
+          analysisErr,
+          timelineErr,
+          analysisVendorErr,
+          timelineVendorErr,
+          dsAnalysisErr,
+          dsTimelineErr,
+          providerErr,
+          premiumProviderErr,
+          oaChatErr,
+          oaPremErr,
+          dsChatErr,
+          dsPremErr
+        );
         alert(
           'Failed to save: ' +
             (chatErr.detail ||
               premiumErr.detail ||
               analysisErr.detail ||
               timelineErr.detail ||
+              analysisVendorErr.detail ||
+              timelineVendorErr.detail ||
+              dsAnalysisErr.detail ||
+              dsTimelineErr.detail ||
               providerErr.detail ||
               premiumProviderErr.detail ||
               oaChatErr.detail ||
@@ -552,7 +628,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         );
         return;
       }
-      alert('Chat vendors, chat models, analysis model, and event timeline model saved. New requests will use them immediately.');
+      alert(
+        'Chat vendors, chat models, analysis/timeline vendors, Gemini & DeepSeek picks saved. New requests use them immediately.'
+      );
     } catch (error) {
       console.error('Error saving Gemini models:', error);
       alert('Failed to save Gemini models.');
@@ -3912,7 +3990,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <div className="settings-section">
               <h3>Chat LLM vendors</h3>
               <p className="settings-hint">
-                Pick who runs each tier first. Model choices in the next section follow these vendors. Intent routing and non-chat analysis still use Gemini (analysis model below). Set <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, and <code>DEEPSEEK_API_KEY</code> as needed.
+                Pick who runs each tier first. Model choices in the next section follow these vendors. Non-chat analysis and timelines use the <strong>Analysis &amp; event timeline models</strong> section below (same save). Set <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, and <code>DEEPSEEK_API_KEY</code> as needed.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
@@ -4267,14 +4345,30 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
 
             <div className="settings-section">
-              <h3>Gemini analysis & timeline models</h3>
+              <h3>Analysis &amp; event timeline models</h3>
               <p className="settings-hint">
-                Health, wealth, career, karma, physical, and other non-chat features use the analysis model. Event timeline yearly/monthly generation uses the timeline model below, independent from chat vendor selection.
+                <strong>Vendor</strong> picks which API is active for that lane (independent from chat vendors above).{' '}
+                <strong>Model rows below are always shown</strong> so you can keep e.g. DeepSeek for chat while choosing and saving Gemini and DeepSeek model ids for analysis/timeline without switching vendor to edit the other list. Only the vendor matching the active lane is used at runtime. Requires{' '}
+                <code>GEMINI_API_KEY</code> and/or <code>DEEPSEEK_API_KEY</code> on the backend. If timeline vendor is DeepSeek, Gemini-only parallel cache flags (<code>EVENT_TIMELINE_PARALLEL_*</code>) are skipped automatically.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Analysis model</strong>
-                  <p>All analysis routes that are not the main chat completion.</p>
+                  <strong>Analysis — vendor</strong>
+                  <p>Which API runs non-chat analysis features.</p>
+                </div>
+                <select
+                  value={analysisLlmVendor}
+                  onChange={(e) => setAnalysisLlmVendor(e.target.value)}
+                  style={{ minWidth: '200px' }}
+                >
+                  <option value="gemini">Gemini</option>
+                  <option value="deepseek">DeepSeek</option>
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Analysis — Gemini model</strong>
+                  <p>Used when analysis vendor is Gemini (saved even if vendor is DeepSeek).</p>
                 </div>
                 <select
                   value={geminiAnalysisModel}
@@ -4288,8 +4382,37 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Event timeline model</strong>
-                  <p>Used by yearly and monthly event timeline generation.</p>
+                  <strong>Analysis — DeepSeek model</strong>
+                  <p>Used when analysis vendor is DeepSeek (saved even if vendor is Gemini).</p>
+                </div>
+                <select
+                  value={deepseekAnalysisModel}
+                  onChange={(e) => setDeepseekAnalysisModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
+                    <option key={`dsa-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Timeline — vendor</strong>
+                  <p>Which API runs yearly/monthly event timeline generation.</p>
+                </div>
+                <select
+                  value={timelineLlmVendor}
+                  onChange={(e) => setTimelineLlmVendor(e.target.value)}
+                  style={{ minWidth: '200px' }}
+                >
+                  <option value="gemini">Gemini</option>
+                  <option value="deepseek">DeepSeek</option>
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Timeline — Gemini model</strong>
+                  <p>Used when timeline vendor is Gemini (saved even if vendor is DeepSeek).</p>
                 </div>
                 <select
                   value={eventTimelineModel}
@@ -4298,6 +4421,21 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 >
                   {geminiModelOptions.map((opt) => (
                     <option key={`etl-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Timeline — DeepSeek model</strong>
+                  <p>Used when timeline vendor is DeepSeek (saved even if vendor is Gemini).</p>
+                </div>
+                <select
+                  value={deepseekTimelineModel}
+                  onChange={(e) => setDeepseekTimelineModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }]).map((opt) => (
+                    <option key={`dst-${opt.value}`} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>

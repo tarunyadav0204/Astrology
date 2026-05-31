@@ -28,17 +28,27 @@ def generate_podcast_script(message_content: str, language: str = "en") -> str:
         return ""
 
     try:
-        import google.generativeai as genai
+        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return _fallback_script(message_content)
+        model = None
+        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+            if not os.getenv("DEEPSEEK_API_KEY"):
+                return _fallback_script(message_content)
+            from ai.analysis_llm_backend import build_analysis_llm_model
 
-        genai.configure(api_key=api_key)
-        # Use same analysis model as rest of app (models/ prefix required by API)
-        from utils.admin_settings import get_gemini_analysis_model
-        model_name = os.getenv("GEMINI_PODCAST_MODEL") or get_gemini_analysis_model()
-        model = genai.GenerativeModel(model_name)
+            model, _, _ = build_analysis_llm_model()
+        else:
+            import google.generativeai as genai
+
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                return _fallback_script(message_content)
+
+            genai.configure(api_key=api_key)
+            from utils.admin_settings import get_gemini_analysis_model
+
+            model_name = os.getenv("GEMINI_PODCAST_MODEL") or get_gemini_analysis_model()
+            model = genai.GenerativeModel(model_name)
 
         lang = (language or "en").lower().strip()
         use_hindi = lang.startswith("hi")

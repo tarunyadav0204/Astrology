@@ -171,8 +171,38 @@ async def _generate_voice_guide_lines(
     if cached:
         return cached
 
-    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-    if not api_key:
+    from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+
+    try:
+        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+            if not (os.getenv("DEEPSEEK_API_KEY") or "").strip():
+                return _fallback_voice_guide(
+                    normalized_scene,
+                    language=normalized_lang,
+                    user_name=user_name,
+                    chart_name=chart_name,
+                    question=question,
+                    follow_ups=follow_ups,
+                )
+            from ai.analysis_llm_backend import build_analysis_llm_model
+
+            model, _, _ = build_analysis_llm_model()
+        else:
+            api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+            if not api_key:
+                return _fallback_voice_guide(
+                    normalized_scene,
+                    language=normalized_lang,
+                    user_name=user_name,
+                    chart_name=chart_name,
+                    question=question,
+                    follow_ups=follow_ups,
+                )
+
+            genai.configure(api_key=api_key)
+            model_name = (os.getenv(VOICE_GUIDE_MODEL_ENV) or get_gemini_analysis_model()).strip()
+            model = genai.GenerativeModel(model_name)
+    except ValueError:
         return _fallback_voice_guide(
             normalized_scene,
             language=normalized_lang,
@@ -181,10 +211,6 @@ async def _generate_voice_guide_lines(
             question=question,
             follow_ups=follow_ups,
         )
-
-    genai.configure(api_key=api_key)
-    model_name = (os.getenv(VOICE_GUIDE_MODEL_ENV) or get_gemini_analysis_model()).strip()
-    model = genai.GenerativeModel(model_name)
 
     scene_instruction = {
         "greeting": (
