@@ -302,7 +302,10 @@ async def razorpay_subscription_plans():
 
 @router.post("/razorpay/subscription/create")
 async def razorpay_subscription_create(body: CreateSubscriptionBody, current_user: User = Depends(get_current_user)):
-    if credit_service.user_has_active_google_play_subscription(current_user.userid):
+    gp_tok = (body.google_play_external_transaction_token or "").strip()
+    # Web / default: block duplicate Play + Razorpay. Play User Choice (alternative billing): user picked
+    # Razorpay for this purchase — allow create when we have the external transaction token from Billing.
+    if not gp_tok and credit_service.user_has_active_google_play_subscription(current_user.userid):
         raise HTTPException(
             status_code=409,
             detail="You already have an active subscription via Google Play. Manage it in the Play Store.",
@@ -325,7 +328,6 @@ async def razorpay_subscription_create(body: CreateSubscriptionBody, current_use
             "product_id": plan["product_id"] or "",
         },
     }
-    gp_tok = (body.google_play_external_transaction_token or "").strip()
     if gp_tok:
         payload["notes"]["gp_external_tx_token"] = gp_tok[:2048]
     try:
