@@ -38,6 +38,8 @@ _MONTH_NAME_TO_NUM = {
     "dec": 12,
 }
 
+_MONTH_TOKEN_RE = r"(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)"
+
 
 # Canonical divisional bundles per intent category (keep in sync with IntentRouter._get_default_divisional_charts).
 _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
@@ -427,6 +429,27 @@ def _extract_month_window_from_question(user_question: str, *, now: datetime) ->
     }
 
 
+def _question_has_date_range(user_question: str) -> bool:
+    """
+    Detect explicit calendar ranges so the router cannot collapse "19 Jun to 25 Jun"
+    into a single-day daily prediction.
+    """
+    low = re.sub(r"\s+", " ", str(user_question or "").strip().lower())
+    if not low:
+        return False
+
+    day_month = rf"\d{{1,2}}(?:st|nd|rd|th)?\s*{_MONTH_TOKEN_RE}"
+    month_day = rf"{_MONTH_TOKEN_RE}\s*\d{{1,2}}(?:st|nd|rd|th)?"
+    iso_date = r"20\d{2}-\d{2}-\d{2}"
+    date_expr = rf"(?:{iso_date}|{day_month}|{month_day})"
+
+    return bool(
+        re.search(rf"\bbetween\s+{date_expr}\s+(?:and|to|till|until|through|-|–|—)\s+{date_expr}\b", low)
+        or re.search(rf"\bfrom\s+{date_expr}\s+(?:to|till|until|through|-|–|—)\s+{date_expr}\b", low)
+        or re.search(rf"\b{date_expr}\s*(?:to|till|until|through|-|–|—)\s*{date_expr}\b", low)
+    )
+
+
 def _normalize_specific_date(value: Any) -> str | None:
     raw = str(value or "").strip()
     if not raw:
@@ -468,11 +491,27 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
     now_dt = (now or datetime.now()).replace(hour=12, minute=0, second=0, microsecond=0)
     extracted_context = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
     month_window = _extract_month_window_from_question(user_question, now=now_dt)
+    has_date_range = _question_has_date_range(user_question)
     llm_date = _normalize_specific_date(extracted_context.get("specific_date")) if extracted_context else None
     # Only a confirmed one-day intent may force exact-day mode. A model may include today's date
     # as ambient context for current distress/timing questions; that must not become daily mode.
     exact_date = llm_date
     daily_confirmed = _daily_intent_confirmed(result)
+
+    if has_date_range:
+        result["mode"] = "PREDICT_PERIOD_OUTLOOK"
+        result["context_type"] = "birth"
+        result["analysis_type"] = "PERIOD_OUTLOOK"
+        result["needs_transits"] = True
+        result["daily_intent_confirmed"] = False
+        result.setdefault("extracted_context", {})
+        if isinstance(result["extracted_context"], dict):
+            result["extracted_context"].pop("specific_date", None)
+            result["extracted_context"]["specific_date_basis"] = "not_date_bound"
+            result["extracted_context"].setdefault("timeframe", "date range from user question")
+        result.pop("dasha_as_of", None)
+        exact_date = None
+        daily_confirmed = False
 
     if month_window and not exact_date:
         result["mode"] = "PREDICT_PERIOD_OUTLOOK"
@@ -953,6 +992,7 @@ Rules:
 - If asking about an exact day, relative day, or specific date-bound event, return `extracted_context.specific_date` in YYYY-MM-DD.
 - Resolve "today", "tomorrow", and "day after tomorrow" from the current date context above.
 - Daily mode is opt-in: set `daily_intent_confirmed=true` only when the user is truly asking about one exact day.
+- Date ranges are NOT daily, even when they contain exact dates. For "between 19 Jun and 25 Jun", "from 19 Jun to 25 Jun", or "19 Jun-25 Jun", do NOT set `PREDICT_DAILY`, do NOT set `specific_date`, set `daily_intent_confirmed=false`, and use `PREDICT_PERIOD_OUTLOOK` or event timing for the whole range.
 - Set `extracted_context.specific_date_basis` to:
   - "explicit_user_day" when the user named a specific date/day
   - "relative_user_day" when the user asked today/tomorrow/day-after-tomorrow
@@ -961,6 +1001,7 @@ Rules:
 - Non-exhaustive calibration examples (use the principle, do not force-fit only these examples):
   - "Since this year started my life is disturbed, when will things improve?" -> NOT daily; use PREDICT_PERIOD_OUTLOOK or LIFESPAN_EVENT_TIMING
   - "Meri life disturbed hai, kab tak thik hoga?" -> NOT daily; use timing/problem analysis
+  - "Will I travel between 19 Jun and 25 Jun?" -> NOT daily; use PREDICT_PERIOD_OUTLOOK for the full range
   - "Aaj ka din kaisa rahega?" -> daily with relative_user_day
   - "27 May 2026 kaisa rahega?" -> daily with explicit_user_day
 - Set `needs_transits=true` for daily, timing, and period outlook questions. Otherwise false unless clearly timing-sensitive.
@@ -1356,6 +1397,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
 
         DAILY INTENT CONFIRMATION:
         - Daily mode is opt-in. Set `daily_intent_confirmed=true` only when the user's actual question is about one exact/relative day.
+        - Date ranges are NOT daily, even when they contain exact dates. For "between 19 Jun and 25 Jun", "from 19 Jun to 25 Jun", or "19 Jun-25 Jun", do NOT set `PREDICT_DAILY`, do NOT set `specific_date`, set `daily_intent_confirmed=false`, and use `PREDICT_PERIOD_OUTLOOK` or event timing for the whole range.
         - Set `extracted_context.specific_date_basis` to:
           - "explicit_user_day" when the user named a specific date/day
           - "relative_user_day" when the user asked today/tomorrow/day-after-tomorrow
@@ -1364,6 +1406,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - Non-exhaustive calibration examples (use the principle, do not force-fit only these examples):
           - "Since this year started my life is disturbed, when will things improve?" → NOT daily; use PREDICT_PERIOD_OUTLOOK or LIFESPAN_EVENT_TIMING
           - "Meri life disturbed hai, kab tak thik hoga?" → NOT daily; use timing/problem analysis
+          - "Will I travel between 19 Jun and 25 Jun?" → NOT daily; use PREDICT_PERIOD_OUTLOOK for the full range
           - "Aaj ka din kaisa rahega?" → daily with relative_user_day
           - "27 May 2026 kaisa rahega?" → daily with explicit_user_day
 
