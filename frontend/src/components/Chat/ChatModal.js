@@ -44,6 +44,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [showChatPartnerSelector, setShowChatPartnerSelector] = useState(false);
     const [birthFormGatePrefill, setBirthFormGatePrefill] = useState(null);
     const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
+    const subjectGateOverrideRef = useRef(null);
+    const subjectGateMemoryRef = useRef([]);
 
     const openBirthModalEmpty = useCallback(() => {
         setBirthFormGatePrefill(null);
@@ -76,6 +78,66 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         }
         setBirthFormDefaultTab('new');
         setShowBirthForm(true);
+    }, []);
+
+    const rememberSubjectGateChoice = useCallback((gateMetadata = {}, decision = 'selected_chart_only', question = '') => {
+        const other = gateMetadata?.other_person || {};
+        const setup = gateMetadata?.relationship_setup || {};
+        const chosenContext = String(gateMetadata?.chosen_relationship_context || '').trim();
+        const entry = {
+            decision,
+            relation_to_user: String(chosenContext || other.relation_to_user || '').trim(),
+            relation_family: String(setup.relation_family || '').trim(),
+            name: String(other.name || '').trim(),
+            question_about: String(gateMetadata?.question_about || '').trim(),
+            intent_gate: String(gateMetadata?.intent_gate || '').trim(),
+            original_question: String(gateMetadata?.original_question || question || '').trim(),
+            created_at: new Date().toISOString(),
+        };
+        if (!entry.relation_to_user && !entry.name && !entry.original_question) return;
+        subjectGateMemoryRef.current = [
+            ...subjectGateMemoryRef.current.filter((existing) => {
+                const sameRelation = entry.relation_to_user && existing.relation_to_user === entry.relation_to_user;
+                const sameName = entry.name && existing.name === entry.name;
+                return !(sameRelation || sameName);
+            }),
+            entry,
+        ].slice(-8);
+    }, []);
+
+    const handleContinueSingleChartGate = useCallback((gateMetadata = {}) => {
+        const originalQuestion = String(gateMetadata?.original_question || '').trim();
+        subjectGateOverrideRef.current = {
+            mode: 'selected_chart_only',
+            question: originalQuestion,
+            gateMetadata,
+        };
+        if (originalQuestion) {
+            setFollowUpQuestion(originalQuestion);
+        }
+    }, []);
+
+    const handleRelationshipContextGate = useCallback((gateMetadata = {}, relationshipContext = '', nextQuestion = '') => {
+        const question = String(nextQuestion || '').trim();
+        if (!question) return;
+        subjectGateOverrideRef.current = {
+            mode: 'relationship_context_provided',
+            question,
+            gateMetadata: {
+                ...gateMetadata,
+                chosen_relationship_context: relationshipContext,
+            },
+        };
+        setFollowUpQuestion(question);
+    }, []);
+
+    const handleStartPartnershipGate = useCallback((gateMetadata = {}) => {
+        const originalQuestion = String(gateMetadata?.original_question || '').trim();
+        setIsPartnershipMode(true);
+        setShowPartnerModal(true);
+        if (originalQuestion) {
+            setFollowUpQuestion(originalQuestion);
+        }
     }, []);
 
     // Check admin status
@@ -532,6 +594,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
 
         try {
             const useFreeQuestion = !isPartnershipMode && freeQuestionAvailable;
+            const pendingSubjectGateOverride = subjectGateOverrideRef.current;
+            subjectGateOverrideRef.current = null;
+            const subjectGateOverride =
+                pendingSubjectGateOverride &&
+                String(pendingSubjectGateOverride.question || '').trim() === String(message || '').trim()
+                    ? pendingSubjectGateOverride.mode
+                    : null;
+            if (subjectGateOverride) {
+                rememberSubjectGateChoice(
+                    pendingSubjectGateOverride.gateMetadata || {},
+                    subjectGateOverride,
+                    message
+                );
+            }
             const birthForAsk = normalizeBirthDetailsForChat(birthData);
             if (!birthForAsk || !Number.isFinite(birthForAsk.latitude) || !Number.isFinite(birthForAsk.longitude)) {
                 throw new Error('Invalid or incomplete birth details — please set birth place with coordinates.');
@@ -547,6 +623,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 native_name: birthData.name,
                 birth_details: birthForAsk,
             };
+            if (subjectGateMemoryRef.current.length > 0) {
+                requestData.subject_gate_memory = subjectGateMemoryRef.current.slice(-8);
+            }
+            if (subjectGateOverride) {
+                requestData.subject_gate_override = subjectGateOverride;
+            }
             
             if (isPartnershipMode && selectedPartnerChart) {
                 requestData.partner_name = selectedPartnerChart.name;
@@ -1143,6 +1225,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             onDeleteMessage={handleDeleteMessage}
                                             onNativeGateOpenSelectNative={openBirthModalEmpty}
                                             onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
+                                            onContinueSingleChartGate={handleContinueSingleChartGate}
+                                            onRelationshipContextGate={handleRelationshipContextGate}
+                                            onStartPartnershipGate={handleStartPartnershipGate}
                                         />
                                     </div>
                                     <ChatInput 

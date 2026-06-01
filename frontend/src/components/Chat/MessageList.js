@@ -25,6 +25,9 @@ const MessageList = ({
     onDeleteMessage,
     onNativeGateOpenSelectNative,
     onNativeGateOpenAddProfile,
+    onContinueSingleChartGate,
+    onRelationshipContextGate,
+    onStartPartnershipGate,
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
@@ -60,6 +63,9 @@ const MessageList = ({
                                 onDeleteMessage={onDeleteMessage}
                                 onNativeGateOpenSelectNative={onNativeGateOpenSelectNative}
                                 onNativeGateOpenAddProfile={onNativeGateOpenAddProfile}
+                                onContinueSingleChartGate={onContinueSingleChartGate}
+                                onRelationshipContextGate={onRelationshipContextGate}
+                                onStartPartnershipGate={onStartPartnershipGate}
                                 podcastAutoLaunchMessageId={podcastAutoLaunchMessageId}
                                 podcastAutoLaunchKey={podcastAutoLaunchKey}
                                 instantLoaderRevealWords={instantLoaderRevealWords}

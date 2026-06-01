@@ -97,6 +97,10 @@ class YogiCalculator(BaseCalculator):
         tithi_shunya_point = tithi_shunya_sign * 30 + 15  # Middle of the sign
         tithi_shunya_degree = 15.0
         
+        avayogi_lord = self.get_sign_lord(avayogi_sign)
+        tithi_shunya_lord = self.get_sign_lord(tithi_shunya_sign)
+        avayogi_tithi_shunya_overlap = avayogi_lord == tithi_shunya_lord
+
         return {
             "yogi": {
                 "longitude": yogi_point,
@@ -110,7 +114,7 @@ class YogiCalculator(BaseCalculator):
                 "sign": avayogi_sign,
                 "sign_name": self.SIGN_NAMES[avayogi_sign],
                 "degree": round(avayogi_degree, 2),
-                "lord": self.get_sign_lord(avayogi_sign)
+                "lord": avayogi_lord
             },
             "dagdha_rashi": {
                 "longitude": dagdha_point,
@@ -124,7 +128,17 @@ class YogiCalculator(BaseCalculator):
                 "sign": tithi_shunya_sign,
                 "sign_name": self.SIGN_NAMES[tithi_shunya_sign],
                 "degree": round(tithi_shunya_degree, 2),
-                "lord": self.get_sign_lord(tithi_shunya_sign)
+                "lord": tithi_shunya_lord
+            },
+            "avayogi_tithi_shunya_overlap": {
+                "is_active": avayogi_tithi_shunya_overlap,
+                "planet": avayogi_lord if avayogi_tithi_shunya_overlap else None,
+                "interpretation": (
+                    "When the Avayogi planet is also the Tithi Shunya Adhipati, "
+                    "its obstructive role is modified and it can give good results."
+                    if avayogi_tithi_shunya_overlap
+                    else None
+                )
             }
         }
     

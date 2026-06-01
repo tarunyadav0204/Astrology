@@ -155,6 +155,9 @@ const MessageBubble = ({
     onDeleteMessage,
     onNativeGateOpenSelectNative,
     onNativeGateOpenAddProfile,
+    onContinueSingleChartGate,
+    onRelationshipContextGate,
+    onStartPartnershipGate,
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
@@ -200,12 +203,30 @@ const MessageBubble = ({
     const podcastBlobRef = useRef(null);
     const podcastSourceKeyRef = useRef(null);
 
+    const gateMetadata = message.gate_metadata || {};
+    const gateIntent = message.intent_gate || gateMetadata.intent_gate || '';
+    const isRelationshipSetupGate = gateIntent === 'relationship_setup';
+    const isPartnershipOfferGate = gateIntent === 'partnership_offer';
+    const isSubjectChartGate =
+        gateIntent === 'create_subject_chart' ||
+        gateIntent === 'complete_subject_birth_details' ||
+        gateIntent === 'create_native';
+    const relationshipGateOptions = Array.isArray(gateMetadata.relationship_setup?.options)
+        ? gateMetadata.relationship_setup.options
+        : [];
+    const showRelationshipOptions = isRelationshipSetupGate || (isPartnershipOfferGate && relationshipGateOptions.length > 0);
     const isNativeGate = useMemo(
         () =>
             message.message_type === 'native_gate' ||
             message.intent_gate === 'create_native' ||
-            (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native'),
-        [message.message_type, message.intent_gate, message.gate_metadata],
+            (message.gate_metadata && message.gate_metadata.intent_gate === 'create_native') ||
+            [
+                'create_subject_chart',
+                'complete_subject_birth_details',
+                'relationship_setup',
+                'partnership_offer',
+            ].includes(gateIntent),
+        [message.message_type, message.intent_gate, message.gate_metadata, gateIntent],
     );
 
     const getCleanMessageText = useCallback(() => {
@@ -1075,7 +1096,7 @@ const MessageBubble = ({
                     )}
                 </div>
 
-                {isNativeGate && !message.isTyping && !message.isProcessing && (onNativeGateOpenSelectNative || onNativeGateOpenAddProfile) && (
+                {isNativeGate && !message.isTyping && !message.isProcessing && (
                     <div
                         className="native-gate-ctas"
                         style={{
@@ -1088,29 +1109,65 @@ const MessageBubble = ({
                             marginBottom: 2,
                         }}
                     >
-                        {onNativeGateOpenSelectNative && (
+                        {showRelationshipOptions && relationshipGateOptions.map((option, index) => {
+                            const label = String(option?.label || option?.value || '').trim();
+                            const value = String(option?.value || label).trim();
+                            if (!label || !value) return null;
+                            const originalQuestion = String(gateMetadata.original_question || '').trim();
+                            const nextQuestion = originalQuestion
+                                ? `${originalQuestion}\n\nRelationship context: ${value}`
+                                : `Relationship context: ${value}`;
+                            return (
+                                <button
+                                    key={`relationship-gate-${index}-${label}`}
+                                    type="button"
+                                    onClick={() => {
+                                        if (onRelationshipContextGate) {
+                                            onRelationshipContextGate(gateMetadata, value, nextQuestion);
+                                        } else if (onFollowUpClick) {
+                                            onFollowUpClick(nextQuestion);
+                                        }
+                                    }}
+                                    style={{
+                                        border: '1px solid rgba(234, 88, 12, 0.26)',
+                                        background: 'rgba(255, 247, 237, 0.95)',
+                                        color: '#9a3412',
+                                        padding: '7px 12px',
+                                        borderRadius: 999,
+                                        cursor: 'pointer',
+                                        fontWeight: 700,
+                                        fontSize: 13,
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                        {(isSubjectChartGate || isPartnershipOfferGate) && onNativeGateOpenSelectNative && (
                             <button
                                 type="button"
                                 onClick={() => onNativeGateOpenSelectNative()}
                                 style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    padding: '4px 0',
+                                    background: '#7c2d12',
+                                    border: '1px solid #7c2d12',
+                                    borderRadius: 999,
+                                    padding: '9px 15px',
                                     cursor: 'pointer',
-                                    color: '#ea580c',
-                                    fontWeight: 700,
+                                    color: '#ffffff',
+                                    fontWeight: 800,
                                     fontSize: 14,
-                                    textDecoration: 'underline',
+                                    lineHeight: 1.2,
+                                    boxShadow: '0 2px 6px rgba(124, 45, 18, 0.24)',
                                 }}
                             >
                                 Select native
                             </button>
                         )}
-                        {onNativeGateOpenAddProfile && (
+                        {(isSubjectChartGate || isPartnershipOfferGate) && onNativeGateOpenAddProfile && (
                             <button
                                 type="button"
                                 onClick={() => {
-                                    const hint = message.gate_metadata?.extracted_birth_hint || {};
+                                    const hint = gateMetadata.extracted_birth_hint || {};
                                     onNativeGateOpenAddProfile(hint);
                                 }}
                                 style={{
@@ -1133,7 +1190,50 @@ const MessageBubble = ({
                                 <span aria-hidden style={{ fontSize: 15, fontWeight: 700 }}>
                                     +
                                 </span>
-                                Add new birth profile
+                                {gateIntent === 'complete_subject_birth_details'
+                                    ? 'Complete birth profile'
+                                    : 'Add new native'}
+                            </button>
+                        )}
+                        {isPartnershipOfferGate && onStartPartnershipGate && (
+                            <button
+                                type="button"
+                                onClick={() => onStartPartnershipGate(gateMetadata)}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    padding: '8px 14px',
+                                    borderRadius: 999,
+                                    border: '1px solid rgba(234, 88, 12, 0.28)',
+                                    cursor: 'pointer',
+                                    background: '#fff7ed',
+                                    color: '#c2410c',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    lineHeight: 1.2,
+                                }}
+                            >
+                                Start Partnership Analysis
+                            </button>
+                        )}
+                        {(isSubjectChartGate || isPartnershipOfferGate) && onContinueSingleChartGate && (
+                            <button
+                                type="button"
+                                onClick={() => onContinueSingleChartGate(gateMetadata)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '4px 0',
+                                    cursor: 'pointer',
+                                    color: '#6b7280',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    textDecoration: 'underline',
+                                }}
+                            >
+                                Continue with my chart only
                             </button>
                         )}
                     </div>

@@ -661,6 +661,8 @@ export default function ChatScreen({ navigation, route }) {
   /** assistant message_id → monotonic generation; stale poll chains bail before applying UI or scheduling follow-ups. */
   const statusPollGenerationRef = useRef(new Map());
   const suppressAutoOpenChatRef = useRef(false);
+  const keepChatOpenAfterAskEntryRef = useRef(false);
+  const nativeSwitchInProgressRef = useRef(false);
   const keepChatOpenAfterNativeSelectRef = useRef(false);
   const startFreshSessionAfterNativeSelectRef = useRef(false);
   /** Set synchronously when applying route prefill so birthData/focus effects do not force greeting in the same tick. */
@@ -1283,6 +1285,8 @@ export default function ChatScreen({ navigation, route }) {
     // Handle navigation params
     if (route.params?.resetToGreeting) {
       suppressAutoOpenChatRef.current = true;
+      nativeSwitchInProgressRef.current = false;
+      keepChatOpenAfterAskEntryRef.current = false;
       setShowGreeting(true);
       navigation.setParams({ resetToGreeting: undefined });
       setTimeout(() => {
@@ -1292,6 +1296,7 @@ export default function ChatScreen({ navigation, route }) {
 
     if (route.params?.returnToChat) {
       const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
+      nativeSwitchInProgressRef.current = true;
       keepChatOpenAfterNativeSelectRef.current = true;
       startFreshSessionAfterNativeSelectRef.current = true;
       navigation.setParams({
@@ -1301,7 +1306,7 @@ export default function ChatScreen({ navigation, route }) {
         birthChartId: undefined,
       });
       if (selectedBirthData?.name) {
-        setMessages([]);
+        setMessages([buildFreshWelcomeMessage(selectedBirthData.name)]);
         setSessionId(null);
         setLoading(false);
         setIsTyping(false);
@@ -1343,6 +1348,7 @@ export default function ChatScreen({ navigation, route }) {
       const infoTitle = typeof route.params?.infoTitle === 'string' ? route.params.infoTitle : '';
       const infoBody = typeof route.params?.infoBody === 'string' ? route.params.infoBody : '';
       const infoNonce = route.params?.infoNonce ?? Date.now();
+      keepChatOpenAfterAskEntryRef.current = false;
       setShowGreeting(true);
       setHomeInfoModalPayload({
         title: infoTitle,
@@ -1368,6 +1374,7 @@ export default function ChatScreen({ navigation, route }) {
       if (selectedBirthData?.name) {
         setBirthData(selectedBirthData);
       }
+      keepChatOpenAfterAskEntryRef.current = false;
       setShowGreeting(true);
       setTimeout(() => setShowDashaBrowser(true), 100);
     }
@@ -1412,6 +1419,7 @@ export default function ChatScreen({ navigation, route }) {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!showGreeting) {
         // In chat mode, show greeting screen and reset special modes
+        keepChatOpenAfterAskEntryRef.current = false;
         setShowGreeting(true);
         if (isMundane) {
           setIsMundane(false);
@@ -1481,7 +1489,8 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     
     if (birthData) {
-      const shouldKeepChatOpen = keepChatOpenAfterNativeSelectRef.current;
+      const shouldKeepChatOpen =
+        keepChatOpenAfterNativeSelectRef.current || keepChatOpenAfterAskEntryRef.current;
       const shouldStartFreshSession = startFreshSessionAfterNativeSelectRef.current;
       const personId = chatPersonStorageKey(birthData);
       const switchedFromAnotherNative = Boolean(currentPersonId) && currentPersonId !== personId;
@@ -1523,6 +1532,8 @@ export default function ChatScreen({ navigation, route }) {
           setPendingMessages(new Set());
           setMessagesWithStorage([welcomeMessage]);
           setShowGreeting(false);
+          nativeSwitchInProgressRef.current = false;
+          keepChatOpenAfterAskEntryRef.current = false;
           keepChatOpenAfterNativeSelectRef.current = false;
           startFreshSessionAfterNativeSelectRef.current = false;
 
@@ -1565,6 +1576,8 @@ export default function ChatScreen({ navigation, route }) {
           }
           if (shouldKeepChatOpen) {
             setShowGreeting(false);
+            nativeSwitchInProgressRef.current = false;
+            keepChatOpenAfterAskEntryRef.current = false;
             keepChatOpenAfterNativeSelectRef.current = false;
           }
           // Reset force greeting and app startup after handling
@@ -1591,6 +1604,8 @@ export default function ChatScreen({ navigation, route }) {
         }
       } else if (shouldKeepChatOpen) {
         setShowGreeting(false);
+        nativeSwitchInProgressRef.current = false;
+        keepChatOpenAfterAskEntryRef.current = false;
         keepChatOpenAfterNativeSelectRef.current = false;
         startFreshSessionAfterNativeSelectRef.current = false;
       }
@@ -1648,6 +1663,14 @@ export default function ChatScreen({ navigation, route }) {
   // Load messages when screen focuses - but don't interfere with ongoing polling
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      const skipFocusRestore =
+        nativeSwitchInProgressRef.current ||
+        keepChatOpenAfterNativeSelectRef.current ||
+        route.params?.returnToChat ||
+        startFreshSessionAfterNativeSelectRef.current;
+      if (skipFocusRestore) {
+        return;
+      }
       const shouldStayOnGreeting = forceGreeting || route.params?.resetToGreeting || suppressAutoOpenChatRef.current;
       if (currentPersonId) {
         loadMessagesFromStorage(currentPersonId).then(async storedMessages => {
@@ -1743,9 +1766,11 @@ export default function ChatScreen({ navigation, route }) {
   const rememberSubjectGateChoice = useCallback((gateMetadata = {}, decision = 'selected_chart_only', question = '') => {
     const other = gateMetadata?.other_person || {};
     const setup = gateMetadata?.relationship_setup || {};
+    const chosenContext = String(gateMetadata?.chosen_relationship_context || '').trim();
     const entry = {
       decision,
-      relation_to_user: String(other.relation_to_user || setup.relation_family || '').trim(),
+      relation_to_user: String(chosenContext || other.relation_to_user || '').trim(),
+      relation_family: String(setup.relation_family || '').trim(),
       name: String(other.name || '').trim(),
       question_about: String(gateMetadata?.question_about || '').trim(),
       intent_gate: String(gateMetadata?.intent_gate || '').trim(),
@@ -2351,6 +2376,8 @@ export default function ChatScreen({ navigation, route }) {
       }
     } else {
       
+      keepChatOpenAfterAskEntryRef.current = true;
+
       // First load any existing chat history
       await loadChatHistory();
       
@@ -3682,6 +3709,8 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const switchChatMode = (modeKey) => {
+    keepChatOpenAfterAskEntryRef.current = true;
+    setShowGreeting(false);
     if (modeKey === 'instant') {
       setIsInstantAnalysis(true);
       setIsPremiumAnalysis(false);
@@ -4396,6 +4425,7 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
                 onPress={() => {
+                  keepChatOpenAfterAskEntryRef.current = false;
                   setShowGreeting(true);
                   if (isMundane) {
                     setIsMundane(false);

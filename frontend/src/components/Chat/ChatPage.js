@@ -206,6 +206,8 @@ const ChatPage = ({ onLogin }) => {
     const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
     const [showPartnerModal, setShowPartnerModal] = useState(false);
     const messagesEndRef = useRef(null);
+    const subjectGateOverrideRef = useRef(null);
+    const subjectGateMemoryRef = useRef([]);
 
     // Guided workflow wizard (embedded in this one-screen chat page).
     const [wizardMode, setWizardMode] = useState(null); // 'single' | 'partnership' | 'mundane'
@@ -291,6 +293,72 @@ const ChatPage = ({ onLogin }) => {
         }
         setBirthFormDefaultTab('new');
         setShowBirthFormModal(true);
+    };
+
+    const rememberSubjectGateChoice = (gateMetadata = {}, decision = 'selected_chart_only', question = '') => {
+        const other = gateMetadata?.other_person || {};
+        const setup = gateMetadata?.relationship_setup || {};
+        const chosenContext = String(gateMetadata?.chosen_relationship_context || '').trim();
+        const entry = {
+            decision,
+            relation_to_user: String(chosenContext || other.relation_to_user || '').trim(),
+            relation_family: String(setup.relation_family || '').trim(),
+            name: String(other.name || '').trim(),
+            question_about: String(gateMetadata?.question_about || '').trim(),
+            intent_gate: String(gateMetadata?.intent_gate || '').trim(),
+            original_question: String(gateMetadata?.original_question || question || '').trim(),
+            created_at: new Date().toISOString(),
+        };
+        if (!entry.relation_to_user && !entry.name && !entry.original_question) return;
+        subjectGateMemoryRef.current = [
+            ...subjectGateMemoryRef.current.filter((existing) => {
+                const sameRelation = entry.relation_to_user && existing.relation_to_user === entry.relation_to_user;
+                const sameName = entry.name && existing.name === entry.name;
+                return !(sameRelation || sameName);
+            }),
+            entry,
+        ].slice(-8);
+    };
+
+    const handleContinueSingleChartGate = (gateMetadata = {}) => {
+        const originalQuestion = String(gateMetadata?.original_question || '').trim();
+        subjectGateOverrideRef.current = {
+            mode: 'selected_chart_only',
+            question: originalQuestion,
+            gateMetadata,
+        };
+        if (originalQuestion) {
+            setPendingFollowUpQuestion(originalQuestion);
+        }
+    };
+
+    const handleRelationshipContextGate = (gateMetadata = {}, relationshipContext = '', nextQuestion = '') => {
+        const question = String(nextQuestion || '').trim();
+        if (!question) return;
+        subjectGateOverrideRef.current = {
+            mode: 'relationship_context_provided',
+            question,
+            gateMetadata: {
+                ...gateMetadata,
+                chosen_relationship_context: relationshipContext,
+            },
+        };
+        setPendingFollowUpQuestion(question);
+    };
+
+    const handleStartPartnershipGate = (gateMetadata = {}) => {
+        const originalQuestion = String(gateMetadata?.original_question || '').trim();
+        resetThreadForWizard('partnership');
+        setWizardMode('partnership');
+        setWizardStep(1);
+        setWizardPartnershipStep(1);
+        if (birthData && isBirthChartReadyForChat(birthData)) {
+            setWizardPrimaryChart(birthData);
+            setWizardPartnershipStep(2);
+        }
+        if (originalQuestion) {
+            setPendingFollowUpQuestion(originalQuestion);
+        }
     };
     /** Set when navigating from analysis follow-up chips; consumed when single-chart chat is ready. */
     const analysisChatIntentRef = useRef(null);
@@ -942,6 +1010,8 @@ const ChatPage = ({ onLogin }) => {
 
     const resetThreadForWizard = (nextMode) => {
         setMessages([]);
+        subjectGateOverrideRef.current = null;
+        subjectGateMemoryRef.current = [];
         setWizardCompleted(false);
         threadInitializedRef.current = false;
         setIsPartnershipMode(false);
@@ -1398,6 +1468,20 @@ const ChatPage = ({ onLogin }) => {
             isPartnershipMode && relationshipLabel
                 ? `[Relationship: ${relationshipLabel}] ${message}`
                 : message;
+        const pendingSubjectGateOverride = subjectGateOverrideRef.current;
+        subjectGateOverrideRef.current = null;
+        const subjectGateOverride =
+            pendingSubjectGateOverride &&
+            String(pendingSubjectGateOverride.question || '').trim() === String(message || '').trim()
+                ? pendingSubjectGateOverride.mode
+                : null;
+        if (subjectGateOverride) {
+            rememberSubjectGateChoice(
+                pendingSubjectGateOverride.gateMetadata || {},
+                subjectGateOverride,
+                message
+            );
+        }
 
         const birthForAsk = normalizeBirthDetailsForChat(partnershipBirth);
         if (!birthForAsk || !Number.isFinite(birthForAsk.latitude) || !Number.isFinite(birthForAsk.longitude)) {
@@ -1431,6 +1515,12 @@ const ChatPage = ({ onLogin }) => {
             native_name: partnershipBirth?.name,
             birth_details: birthForAsk,
         };
+        if (subjectGateMemoryRef.current.length > 0) {
+            requestData.subject_gate_memory = subjectGateMemoryRef.current.slice(-8);
+        }
+        if (subjectGateOverride) {
+            requestData.subject_gate_override = subjectGateOverride;
+        }
 
         if (useInstantChat) {
             requestData.chat_tier = 'instant';
@@ -2700,6 +2790,9 @@ const ChatPage = ({ onLogin }) => {
                             onDeleteMessage={handleDeleteMessage}
                             onNativeGateOpenSelectNative={openBirthModalEmpty}
                             onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
+                            onContinueSingleChartGate={handleContinueSingleChartGate}
+                            onRelationshipContextGate={handleRelationshipContextGate}
+                            onStartPartnershipGate={handleStartPartnershipGate}
                             podcastAutoLaunchMessageId={podcastPromoMessageId}
                             podcastAutoLaunchKey={podcastAutoLaunchKey}
                             instantLoaderRevealWords={instantLoaderWordCount}

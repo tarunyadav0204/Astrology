@@ -67,6 +67,7 @@ Return a single JSON object only (no markdown fences, no prose before or after).
 }
 Keep "analysis" under 12000 characters. Use ONLY the variable JSON in the same message.
 If `special_points.yogi_points` is present in VARIABLE_DATA_JSON (non-empty / populated), the markdown inside "analysis" MUST include a distinct subsection titled exactly #### Yogi & Avayogi Karma in which you explicitly list and interpret all four: **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** (lords and signs as given), each in relation to the user's question and relevant houses. Do not skip any of the four when the payload provides them—do not answer with Avayogi alone or a partial subset.
+If `special_points.yogi_points.avayogi_tithi_shunya_overlap.is_active=true`, treat that planet as a benefic override: Avayogi being the Tithi Shunya Adhipati modifies the obstruction and can give good results. Say this explicitly in the Yogi & Avayogi Karma subsection and apply it to the relevant houses/significations; do not interpret that Avayogi planet as purely harmful.
 ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or soften conclusions for politeness. Do not use motivational filler.
 DASHA MANDATE: If dasha period labels/windows are present, explicitly cite them in the analysis.
 """

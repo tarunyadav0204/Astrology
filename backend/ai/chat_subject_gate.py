@@ -148,6 +148,7 @@ class ChatSubjectGate:
                 compact_memory.append({
                     "decision": item.get("decision"),
                     "relation_to_user": item.get("relation_to_user"),
+                    "relation_family": item.get("relation_family"),
                     "name": item.get("name"),
                     "question_about": item.get("question_about"),
                     "intent_gate": item.get("intent_gate"),
@@ -164,6 +165,7 @@ STRICT RULES:
 - Return a gate only when answering with the currently selected profile would likely be wrong or materially incomplete.
 - Write ALL user-facing text in the same language/script as the user's question when you can infer it naturally. This includes user_message and option labels.
 - If previous user choices show the user already chose selected-chart-only for the same referenced person or same exact relation in this chat, return gate_required=false for follow-up questions about that same person/relation. Do not apply that memory to a different person or different relation.
+- In previous user choices, `relation_to_user` is the exact remembered relation/context; `relation_family` is broad metadata only. Never use `relation_family` alone to suppress a new gate. For example, a prior choice about "elder sister" or "sister" must not suppress a new gate for "brother"; a prior choice about "sibling" must not suppress sister/brother unless the new question explicitly references the same exact sibling context.
 
 Currently selected birth profile:
 {json.dumps(_compact_birth_details(birth_details), ensure_ascii=False)}
@@ -186,12 +188,20 @@ When to gate:
    Example: "Mere dost ki tabiyat kab thik hogi?" -> create_subject_chart.
 2. Partnership analysis should be offered:
    If the question is about the relationship/compatibility/dynamics between the selected native and another specific person, offer partnership_offer.
+   This is mandatory for relationship/dynamics wording such as "my relationship with...", "bond with...", "compatibility with...", "equation with...", "will we get along...", or equivalent phrasing in any language, including blood relations such as sister, brother, father, mother, child, spouse, and in-laws.
+   Do NOT return gate_required=false merely because blood relations can be partially judged from the selected native's chart. For relationship/dynamics questions, the UX should still offer Partnership Analysis as the more complete option while allowing the user to continue from the selected chart.
    This applies even when the other person's birth details are not yet provided: the UX should offer combined-chart Partnership Analysis if the user knows those details, or let them continue with a general single-chart answer if they do not.
    user_message should explain that combined-chart Partnership Analysis is best when accurate birth details are available, while the user may continue with the selected chart if they do not have those details.
+   If the other person is a repeatable blood relation where house selection also needs ordinal/role context (for example sister/brother/child/spouse), still use partnership_offer for relationship/dynamics questions, but also fill relationship_setup.required=true with options like elder sister / younger sister or 1st child / 2nd child. This lets the UX offer both: quick single-chart context and optional combined-chart Partnership Analysis.
+   For parent relationship/dynamics questions such as father or mother, use partnership_offer even though ordinal setup is usually not needed.
    Example: "will I marry this person, born..." -> partnership_offer.
    Example: "Tell me my relationship with my friend" -> partnership_offer, not relationship_setup.
+   Example: "What is my relationship with my sister?" -> partnership_offer with relationship_setup options for elder sister / younger sister.
+   Example: "What is my relationship with my brother?" -> partnership_offer with relationship_setup options for elder brother / younger brother.
+   Example: "What is my relationship with my father?" -> partnership_offer.
 3. Relationship setup needed without another chart:
    If the question can be answered from the selected native's chart but the relation can repeat and the exact relation order/role changes house selection, gate to relationship_setup.
+   Use relationship_setup alone for questions about the other person's life area through the selected chart, not for relationship/compatibility/dynamics between the selected native and that person.
    Examples: daughter/son/child health or future may need first/second/third child; sibling questions may need elder/younger; spouse questions may need first/second marriage where relevant.
    Relationship setup must NEVER be used to ask the broad relation category. Do not offer options like "friend, sibling, partner, colleague". Only ask for ordinal/role context within a relation the user already stated, such as "1st daughter / 2nd daughter" or "elder brother / younger brother".
    user_message should ask for that exact ordinal/role context in the user's language.

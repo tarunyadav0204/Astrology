@@ -1116,11 +1116,17 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 ),
             )
 
-    if chat_subject_gate_enabled_for_user(current_user.userid) and not partnership_mode and subject_gate_override not in {
-        "selected_chart_only",
-        "single_chart_only",
-        "relationship_context_provided",
-    }:
+    is_plain_text_channel = delivery_channel == "whatsapp" or render_target == "plain_text"
+    if (
+        chat_subject_gate_enabled_for_user(current_user.userid)
+        and not is_plain_text_channel
+        and not partnership_mode
+        and subject_gate_override not in {
+            "selected_chart_only",
+            "single_chart_only",
+            "relationship_context_provided",
+        }
+    ):
         try:
             from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
 

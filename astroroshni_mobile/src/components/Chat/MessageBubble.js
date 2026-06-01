@@ -1623,12 +1623,13 @@ function MessageBubble({
               <View style={styles.nativeGateActionsRow}>
                 {(isSubjectChartGate || isPartnershipOfferGate) && (
                   <TouchableOpacity
+                    style={styles.nativeGateSelectCta}
                     onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
-                    activeOpacity={0.7}
-                    accessibilityRole="link"
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
                     accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
                   >
-                    <Text style={[styles.nativeGateLinkText, { color: theme === 'dark' ? '#fdba74' : '#ea580c' }]}>
+                    <Text style={styles.nativeGateSelectCtaText}>
                       {t('chat.nativeGateSelectNative', 'Select native')}
                     </Text>
                   </TouchableOpacity>
@@ -1665,7 +1666,7 @@ function MessageBubble({
                       <Text style={styles.nativeGateCtaText}>
                         {gateIntent === 'complete_subject_birth_details'
                           ? t('chat.nativeGateCompleteProfile', 'Complete birth profile')
-                          : t('chat.nativeGateAddNewProfile', 'Add new birth profile')}
+                          : t('chat.nativeGateAddNewProfile', 'Add new native')}
                       </Text>
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2803,6 +2804,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  nativeGateSelectCta: {
+    backgroundColor: '#7c2d12',
+    borderWidth: 1,
+    borderColor: '#7c2d12',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    shadowColor: '#7c2d12',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  nativeGateSelectCtaText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
   },
   nativeGateCtaOuter: {
     borderRadius: 999,

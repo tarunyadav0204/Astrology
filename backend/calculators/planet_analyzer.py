@@ -228,6 +228,7 @@ class PlanetAnalyzer(BaseCalculator):
         is_avayogi = self.yogi_data.get('avayogi', {}).get('lord') == planet_name
         is_dagdha = self.yogi_data.get('dagdha_rashi', {}).get('lord') == planet_name
         is_tithi_shunya = self.yogi_data.get('tithi_shunya_rashi', {}).get('lord') == planet_name
+        is_avayogi_tithi_shunya_benefic = is_avayogi and is_tithi_shunya
         
         # Badhaka analysis
         is_badhaka = planet_name in self.badhaka_data['badhaka_lords']
@@ -240,6 +241,8 @@ class PlanetAnalyzer(BaseCalculator):
             special_roles.append('Dagdha Lord')
         if is_tithi_shunya:
             special_roles.append('Tithi Shunya Lord')
+        if is_avayogi_tithi_shunya_benefic:
+            special_roles.append('Avayogi-Tithi Shunya Benefic Override')
         if is_badhaka:
             special_roles.append('Badhaka Lord')
         
@@ -248,7 +251,12 @@ class PlanetAnalyzer(BaseCalculator):
             'is_avayogi_lord': is_avayogi,
             'is_dagdha_lord': is_dagdha,
             'is_tithi_shunya_lord': is_tithi_shunya,
+            'is_avayogi_tithi_shunya_benefic': is_avayogi_tithi_shunya_benefic,
             'is_badhaka_lord': is_badhaka,
+            'avayogi_tithi_shunya_rule': (
+                'Avayogi planet is also Tithi Shunya Adhipati; its obstruction is modified and it can give good results.'
+                if is_avayogi_tithi_shunya_benefic else None
+            ),
             'special_roles': special_roles
         }
     
