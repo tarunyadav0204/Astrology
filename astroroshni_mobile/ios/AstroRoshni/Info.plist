@@ -39,17 +39,21 @@
 			</array>
 		</dict>
 	</array>
+	<key>CFBundleVersion</key>
+	<string>106</string>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<false/>
 	<key>FacebookAppID</key>
 	<string>1680930919891373</string>
-	<key>FacebookClientToken</key>
-	<string>ec8623a2224b639d3805e5eee642a76b</string>
-	<key>FacebookDisplayName</key>
-	<string>AstroRoshni</string>
 	<key>FacebookAutoInitEnabled</key>
 	<true/>
 	<key>FacebookAutoLogAppEventsEnabled</key>
 	<true/>
-	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<key>FacebookClientToken</key>
+	<string>ec8623a2224b639d3805e5eee642a76b</string>
+	<key>FacebookDisplayName</key>
+	<string>AstroRoshni</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
@@ -58,12 +62,6 @@
 		<string>fbauth2</string>
 		<string>fbshareextension</string>
 	</array>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This identifier helps us measure app installs and improve AstroRoshni. You can change this anytime in Settings.</string>
-	<key>CFBundleVersion</key>
-	<string>106</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -77,6 +75,8 @@
 	<string>AstroRoshni uses the microphone so you can ask chat questions by speaking.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>AstroRoshni uses speech recognition to turn your spoken question into text.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This identifier helps us measure app installs and improve AstroRoshni. You can change this anytime in Settings.</string>
 	<key>RCTNewArchEnabled</key>
 	<false/>
 	<key>UILaunchScreen</key>
