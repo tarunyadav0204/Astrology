@@ -448,6 +448,19 @@ def extract_inbound_messages(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
                                     "input_kind": "button_reply",
                                 }
                             )
+                elif mtype == "button":
+                    btn = msg.get("button") or {}
+                    bid = str(btn.get("payload") or btn.get("text") or "").strip()
+                    if bid:
+                        out.append(
+                            {
+                                "from": frm,
+                                "body": bid,
+                                "phone_number_id": phone_number_id,
+                                "profile_name": name_by_wa.get(frm, ""),
+                                "input_kind": "button_reply",
+                            }
+                        )
     return out
 
 
