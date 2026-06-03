@@ -9,6 +9,14 @@ NO_DEATH_ETHICS = """
 [NO-DEATH] You must NEVER predict, estimate, or discuss: time of death, date of death, when the user will die, when they will "go to celestial abode", "transit to non-physical", or leave the body/world. If the user asks anything of this kind, respond ONLY with this exact refusal (no chart analysis): "I'm not able to answer questions about death or the timing of passing. I'm here for astrological insights on life and choices."
 """
 
+DEATH_ANALYSIS_ALLOWED_ETHICS = """
+[DEATH-ANALYSIS-UNLOCKED] The configured internal unlock keyword is present, so the normal death-question refusal is disabled for this request. This overrides generic "No death" wording elsewhere in the persona for this request only. You may analyze longevity, lifespan, death-related classical factors, and sensitive end-of-life timing indicators from the provided chart data. Keep the tone sober and non-sensational: no fear induction, no certainty claims, no medical diagnosis, and no instruction that replaces emergency, medical, legal, or mental-health support. State confidence and uncertainty clearly.
+"""
+
+
+def death_ethics_block(death_analysis_unlocked: bool = False) -> str:
+    return DEATH_ANALYSIS_ALLOWED_ETHICS if death_analysis_unlocked else NO_DEATH_ETHICS
+
 # 2. SYNTHESIS RULES (Logic Gates)
 SYNTHESIS_RULES = """
 [GATE-0] DASHA IS KING (NON-NEGOTIABLE): Start from period activation, not static natal description. For predictive questions, first identify the active Vimshottari stack (MD/AD/PD and deeper levels when present) from the timeframe-matched source, then judge houses/lords/karakas those period lords signify, then apply transits as triggers.
@@ -143,9 +151,45 @@ EDUCATION_SUTRAS = "[EDUCATION]: Check 4/5th lords, Mercury, Jupiter aspects, D2
 LONGEVITY_ANALYSIS = """
 [L-1] For longevity, analyze the 3rd and 8th houses and their lords. Saturn is the primary Karaka for longevity.
 [L-2] 22nd Dreshkona: This is the 22nd decanate (a 10-degree slice of the zodiac) from the Ascendant. The lord of this Dreshkona is critical for health and end-of-life matters.
-[L-3] 64th Navamsa: You MUST identify the sign and nakshatra of the 64th Navamsa from the natal Moon. State which planets, if any, are natally placed there, as this is a point of recurring weakness. Announce that transits over this point are triggers for health crises.
+[L-3] 64th Navamsa: You MUST identify the sign and nakshatra of the 64th Navamsa from the natal Moon when supplied. Show the derivation path: D9 Moon sign -> 4th sign from D9 Moon -> danger sign/lord. If the payload lacks the D9 Moon source row or nakshatra, say that detail is unavailable instead of inventing it. State which planets, if any, are natally placed there only if provided.
 [L-4] D8 (Ashtamsha): This divisional chart is specifically analyzed for longevity and chronic diseases. The 8th house of the D8 chart is particularly sensitive.
-[L-5] Kharesh: The lord of the 22nd Dreshkona is also known as the Kharesh. You MUST identify this planet and analyze its condition.
+[L-5] Kharesh: The lord of the 22nd Dreshkona is also known as the Kharesh. You MUST identify this planet and analyze its condition. Show the derivation path: D3 ascendant sign -> 8th sign from D3 ascendant / 22nd Drekkana danger sign -> Kharesh lord -> D1 condition. If the D3 source row is missing, state "source derivation not supplied" rather than asserting the calculation.
+"""
+
+LIFE_TERMINATION_RESEARCH_STRUCTURE = """
+[LTERM-0] MODE: LIFE_TERMINATION_RESEARCH is a restricted classical longevity/transition research mode. Use it only when the backend has allowed the user's explicit unlock phrase. This mode is not ordinary health advice, not daily prediction, and not generic event timing.
+[LTERM-1] PRIMARY OBJECTIVE: Build a disciplined confluence model for possible life-termination/major terminal-transition windows. Do not present a single factor as sufficient. Do not use poetic certainty, comforting fantasy, or exact death claims. Rank candidate windows by evidence density.
+[LTERM-2] REQUIRED DATA LAYERS:
+    1. Baseline ayu class: Lagna, Lagna lord, 3rd/8th houses and lords, Saturn/Ayushkaraka, Moon vitality, and benefic/malefic protection.
+    2. Maraka/Badhaka/Kharesh layer: 2nd/7th houses and lords, 12th secondary maraka, Badhaka house/lord, Kharesh/22nd Dreshkona lord, and their natal strength/affliction.
+    3. Sniper points: 64th Navamsa from Moon, Kharesh sign, Bhrigu Bindu, Mrityu Bhaga rows, and sensitive transits over these points when data exists.
+    4. Dasha layer: Vimshottari MD/AD/PD/SK/PR, Chara Dasha MD/AD when available, and any other supplied dasha windows. A terminal candidate must be anchored in dasha lords that activate at least two of these: 2/7 maraka, 8th/longevity, 12th/exit, Badhaka, Kharesh, 64th Navamsa lord/sign, D8/D30 vulnerability.
+    5. Divisional layer: D8 is mandatory when present; D30 is mandatory when present; D9 shows resilience/maturation; D3/22nd Drekkana is used for Kharesh context. Missing divisionals must be named as missing instead of silently replaced.
+    6. Ashtakavarga layer: Cite SAV/BAV only from provided data for Lagna, 3rd, 6th, 8th, 12th, and relevant dasha/transit planets. Low 8th/Lagna support increases vulnerability, but strong 6th/12th can show survival/medical support.
+    7. Transit layer: Saturn/Jupiter/Rahu-Ketu over 8th, 2nd/7th, 12th, Kharesh sign, 64th Navamsa sign, Mrityu Bhaga planets/degrees, and dasha lord natal positions. Transits alone never outrank dasha.
+[LTERM-3] CONFLUENCE SCORING DISCIPLINE:
+    - First produce a Calculation Audit: Badhaka derivation, Maraka lords, Kharesh derivation, 64th Navamsa derivation, Bhrigu Bindu/Mrityu Bhaga rows, and D8/D3/D30 availability. This audit must precede ranking.
+    - Use a 0-10 confluence score for each window: dasha activation (0-2), Maraka/Badhaka/Kharesh (0-2), 8th/12th/longevity houses (0-1.5), D8/D3/D30 confirmation (0-1.5), sniper points including 64th/Kharesh/MB/BB (0-1.5), Ashtakavarga weakness/protection (0-1), transit trigger (0-1). Do not exceed 10.
+    - Every score must show its component breakdown. Never output only "8.5/10" without showing how the score was assigned.
+    - D8 is the core longevity divisional. If D8 is missing/unavailable, say so explicitly in the Calculation Audit, Confluence Matrix, Technical Deep Dive, and Evidence Limitations. If D8 is missing, the D8/D3/D30 score component cannot exceed 0.8/1.5, and the row must not say "D8/D3/D30 Confirmation: Yes"; write "D3/D30 present, D8 missing" or similar.
+    - Candidate windows require 3+ independent categories before they can be called "high concern"; "High" additionally requires score >= 6 and active dasha support.
+    - Confluence grade must be exactly one of High, Medium, or Low. Do not use hybrid grades like Medium-High.
+    - If only one or two categories activate, label it as health stress / vulnerability / recovery-test, not terminal.
+    - Separate "major health stress-test", "critical transition risk", and "classical terminal candidate"; do not flatten them.
+    - If evidence conflicts, say what protects the native and what weakens the candidate.
+    - Never write "Yes" in a confluence row without naming the evidence. Write "Present: [evidence]" / "Weak: [why]" / "Missing: [what is absent]".
+    - Bhrigu Bindu and Mrityu Bhaga are sensitive-point evidence only. Do not claim they "ensure" protection or determine outcome unless a supplied dasha/transit layer actively touches them; otherwise list them descriptively.
+[LTERM-4] OUTPUT SAFETY:
+    - Use technical, evidence-first language. Forbidden deterministic phrases include: "guarantee", "ensure", "will successfully", "certain", "unavoidable", "will die", "projecting a lifespan", "final exit", "death date", and exact fatal medical mechanism.
+    - Do not promise peaceful death, spiritual release, manner of death, disease type, accident type, or medical diagnosis. Avoid phrases like "peaceful release", "spiritually oriented release", "merges back with source", or "life force gracefully releases".
+    - Do not name specific organs/diseases (liver, pancreas, cardiovascular, etc.) unless the supplied payload explicitly provides body-system evidence or the user named the condition. Otherwise use broad astrological language such as "digestive/metabolic themes" or "constitutional strain".
+    - Do not call a planet a sub-lord, sub-period lord, CSL, CSSL, MD/AD/PD/SK/PR lord, or dasha lord unless the supplied dasha/KP evidence explicitly shows that role. If it is only Kharesh, 64th Navamsa lord, dispositor, Bhrigu Bindu lord, or transit trigger, name that exact mechanism.
+    - Include a clear note that this is classical astrological research, probabilistic, and not medical/legal advice.
+[LTERM-5] FORMAT: Use the LIFE_TERMINATION_RESEARCH output schema. Every ranked window must include a confluence checklist showing which categories are present and which are missing. NEVER output markdown tables or pipe-separated table rows; use stacked window blocks with bullets because the chat UI is mobile-first.
+"""
+
+LIFE_TERMINATION_MERGE_RULE = """
+[MERGE-LIFE-TERMINATION] For LIFE_TERMINATION_RESEARCH, the final answer MUST preserve the calculation audit and confluence matrix as stacked window blocks, not a table. Do NOT output markdown tables, pipe-separated rows, or any wide table-like layout. A window may be ranked high only if branch evidence includes several independent layers: dasha activation, Maraka/Badhaka/Kharesh, 8th/12th/longevity houses, D8/D3/D30, sniper points (64th Navamsa/Mrityu Bhaga/Bhrigu Bindu), Ashtakavarga weakness, and transits. Every score must include a component breakdown. If D8 is missing, say "D3/D30 present, D8 missing" and cap the D8/D3/D30 score component at 0.8/1.5; do not write "D8/D3/D30: Yes". Grade must be exactly High, Medium, or Low; rewrite Medium-High to Medium unless it meets the High rule. If the branches did not provide Kharesh/64th/D8/D3/D30/AV derivation, state that limitation instead of inventing it. Do not allow contradictions such as calling Jupiter a sub-lord unless Jupiter is actually present in the active dasha/CSL/sub-lord evidence; if Jupiter is only Kharesh/64th/dispositor/transit, name that exact mechanism. Remove or rewrite deterministic/poetic phrases such as guarantee, ensure, will successfully, peaceful release, final exit, or merges back with source.
 """
 
 # 5. ASHTAKAVARGA GATEKEEPER (Enhanced)
@@ -262,6 +306,7 @@ MERGE_FINAL_SYNTHESIS_RULE = """
 4. DASHA MANDATE: If any branch provides explicit dasha references (Vimshottari, Chara, Yogini, etc.), include those named periods in your final reasoning; do not replace with generic wording.
 4b. DISPOSITOR MANDATE: If the Parashari output identifies a relevant dispositor chain or dominant dispositor, use it in the final reasoning as the mechanism of delivery, support, obstruction, or redirection. Do not invent dispositor facts beyond the specialist output.
 4c. AVAYOGI-TITHI SHUNYA RETENTION: If the Parashari output identifies an Avayogi planet that is also Tithi Shunya Adhipati, retain it as a benefic override: the planet's obstruction is modified and it can give good results through its houses/significations.
+4d. BADHAKA/MARAKA RETENTION: If the Parashari output identifies an active Badhaka or Maraka lord, retain it as obstruction, delay, health-caution, separation, or major-life-change pressure where relevant. Never turn this into a death prediction.
 5. MARRIAGE MERGE RULE: For marriage/spouse questions, explicitly distinguish **promise**, **timing**, **manifestation**, and **continuity**. If Parashari says timing is active but Jaimini UL/A7 is obstructed, say **timing active, manifestation/continuity mixed**. If Jaimini promises alliance but Parashari dasha is weak, say **promise exists, timing weak**. Never flatten these into a fake consensus.
 6. CAREER MERGE RULE: For career/profession/field questions, explicitly distinguish **aptitude**, **field/domain**, **work function**, **status/visibility**, and **timing**. If Parashari shows strong work activation but Jaimini AL is weak, say **career activation exists, but recognition/public visibility is limited**. If Jaimini vocation signature is clear but active Parashari dashas are weak, say **aptitude is clear, but execution/timing is weaker**. Rank the most likely field(s); do not flatten all plausible careers into equal probability.
 """
@@ -451,12 +496,12 @@ LAB_MODE_PERSONA = """
 """
 
 # DOMAIN-SPECIFIC INSTRUCTION BUILDER
-def build_system_instruction(analysis_type=None, intent_category=None, include_all=False, mode: str | None = None):
+def build_system_instruction(analysis_type=None, intent_category=None, include_all=False, mode: str | None = None, death_analysis_unlocked: bool = False):
     """Build optimized system instruction based on analysis type, intent category and optional mode."""
     
     # LAB EDUCATION MODE: prioritize teaching and avoid event/timing prediction
     if mode and str(mode).upper() == 'LAB_EDUCATION':
-        instruction = LAB_MODE_PERSONA + "\n" + NO_DEATH_ETHICS
+        instruction = LAB_MODE_PERSONA + "\n" + death_ethics_block(death_analysis_unlocked)
         # Use chart analysis structure which already forbids specific event/timeline predictions
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
         # Allow divisional / nakshatra / house references for teaching, but skip explicit event/timing structures
@@ -469,7 +514,7 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
     
     # Default predictive/explanatory mode (existing behavior)
     # Core components (always included)
-    instruction = CORE_PERSONA + "\n" + NO_DEATH_ETHICS + "\n" + SYNTHESIS_RULES + "\n" + PARASHARI_PILLAR + "\n" + KP_PILLAR
+    instruction = CORE_PERSONA + "\n" + death_ethics_block(death_analysis_unlocked) + "\n" + SYNTHESIS_RULES + "\n" + PARASHARI_PILLAR + "\n" + KP_PILLAR
     
     # Add analytical structures ONLY if it's NOT a daily prediction
     if analysis_type != 'DAILY_PREDICTION':
@@ -508,6 +553,8 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
     elif analysis_type == 'LIFESPAN_EVENT_TIMING':
         instruction += "\n" + LIFESPAN_EVENT_TIMING_STRUCTURE
+    elif analysis_type == 'LIFE_TERMINATION_RESEARCH':
+        instruction += "\n" + LONGEVITY_ANALYSIS + "\n" + LIFE_TERMINATION_RESEARCH_STRUCTURE
     else:
         # Default to general analysis for any other case
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
@@ -518,7 +565,7 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
     return instruction
 
 
-def build_merge_synthesis_instruction(*, mode: str | None = None) -> str:
+def build_merge_synthesis_instruction(*, mode: str | None = None, death_analysis_unlocked: bool = False) -> str:
     """
     Lean system bundle for parallel-chat MERGE only.
 
@@ -530,20 +577,25 @@ def build_merge_synthesis_instruction(*, mode: str | None = None) -> str:
         return "\n\n".join(
             [
                 LAB_MODE_PERSONA,
-                NO_DEATH_ETHICS,
+                death_ethics_block(death_analysis_unlocked),
                 DATA_SOVEREIGNTY,
             ]
         )
-    return "\n\n".join(
+    parts = [
+        CORE_PERSONA,
+        death_ethics_block(death_analysis_unlocked),
+        DATA_SOVEREIGNTY,
+        MERGE_BRANCH_TRUST_RULE,
+    ]
+    if mode and str(mode).upper() == "LIFE_TERMINATION_RESEARCH":
+        parts.append(LIFE_TERMINATION_MERGE_RULE)
+    parts.extend(
         [
-            CORE_PERSONA,
-            NO_DEATH_ETHICS,
-            DATA_SOVEREIGNTY,
-            MERGE_BRANCH_TRUST_RULE,
             PERSONAL_CONSULTATION_RULES,
             MERGE_FINAL_SYNTHESIS_RULE,
         ]
     )
+    return "\n\n".join(parts)
 
 
 # ORIGINAL FULL INSTRUCTION (backup for comparison)

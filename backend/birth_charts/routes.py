@@ -430,6 +430,10 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
 
         conn.commit()
         return {"message": "Chart updated successfully"}
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
     except Exception as e:
         if conn:
             conn.rollback()
@@ -461,6 +465,10 @@ async def delete_birth_chart(chart_id: int, current_user: User = Depends(get_cur
         )
         conn.commit()
         return {"message": "Chart deleted successfully"}
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
     except Exception as e:
         if conn:
             conn.rollback()

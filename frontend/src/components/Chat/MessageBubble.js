@@ -94,6 +94,41 @@ const escapeHtmlTextContent = (s) =>
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 
+const convertMarkdownTablesToStackedBlocks = (text) => {
+    const lines = String(text || '').split('\n');
+    const out = [];
+    let i = 0;
+    const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line || '');
+    const isSeparator = (line) => /^\s*\|[\s:|-]+\|\s*$/.test(line || '');
+    const cells = (line) => String(line || '').split('|').map((c) => c.trim()).filter(Boolean);
+
+    while (i < lines.length) {
+        if (isTableRow(lines[i]) && isSeparator(lines[i + 1])) {
+            const headers = cells(lines[i]);
+            i += 2;
+            const rows = [];
+            while (i < lines.length && isTableRow(lines[i])) {
+                rows.push(cells(lines[i]));
+                i += 1;
+            }
+            if (headers.length && rows.length) {
+                rows.forEach((row, rowIndex) => {
+                    out.push(`#### ${row[0] || `Row ${rowIndex + 1}`}`);
+                    headers.slice(1).forEach((header, idx) => {
+                        const value = row[idx + 1];
+                        if (value) out.push(`- **${header}**: ${value}`);
+                    });
+                    out.push('');
+                });
+                continue;
+            }
+        }
+        out.push(lines[i]);
+        i += 1;
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n');
+};
+
 /** Block-level starts we must not wrap in <p> (invalid / breaks layout). */
 const CHAT_BLOCK_START_RE = /^<(h[34]|ul\b|ol\b|div\b|p\b|blockquote|table|hr\b)/i;
 
@@ -675,6 +710,7 @@ const MessageBubble = ({
         
         // 3. Normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        formatted = convertMarkdownTablesToStackedBlocks(formatted);
         
         // 4. Handle Follow-up Questions (chips; click handled in message-text onClick)
         formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {

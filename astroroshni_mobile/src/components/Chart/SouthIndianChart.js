@@ -344,7 +344,7 @@ const SouthIndianChart = ({
                     textAnchor="end">
                     ASC
                   </SvgText>
-                  {chartData.ascendant && (
+                  {(chartData?.ascendant ?? null) != null && (
                     <SvgText 
                       x={pos.x + pos.width - 8} 
                       y={pos.y + pos.height - 8} 

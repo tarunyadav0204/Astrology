@@ -1468,6 +1468,7 @@ def _dispatch_recent_chat_followups(
         load_last_completed_qa_turns,
         generate_push_nudge_via_gemini,
     )
+    from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
 
     lookback_minutes = max(1, min(int(lookback_minutes), 24 * 60))
     limit_users = max(1, min(int(limit_users), 500))
@@ -1478,6 +1479,8 @@ def _dispatch_recent_chat_followups(
     generated = 0
     deliveries_created = 0
     push_sent = 0
+    whatsapp_sent = 0
+    whatsapp_template_sent = 0
     skipped_dedupe = 0
     skipped_no_turns = 0
     failed = 0
@@ -1540,6 +1543,19 @@ def _dispatch_recent_chat_followups(
                         ensure_ascii=False,
                     )
                     channel = "push" if sent > 0 else "stored"
+                    if sent <= 0:
+                        if send_whatsapp_nudge(
+                            conn,
+                            userid=uid,
+                            title=title,
+                            body=body_text,
+                            question=question,
+                        ):
+                            channel = "whatsapp"
+                            whatsapp_sent += 1
+                        elif send_whatsapp_nudge_template(conn, userid=uid):
+                            channel = "whatsapp_template"
+                            whatsapp_template_sent += 1
                     db.insert_delivery(
                         conn,
                         userid=uid,
@@ -1568,6 +1584,8 @@ def _dispatch_recent_chat_followups(
                 "generated": generated,
                 "deliveries_created": deliveries_created,
                 "push_sent": push_sent,
+                "whatsapp_sent": whatsapp_sent,
+                "whatsapp_template_sent": whatsapp_template_sent,
                 "skipped_dedupe": skipped_dedupe,
                 "skipped_no_turns": skipped_no_turns,
                 "failed": failed,
@@ -1589,6 +1607,8 @@ def _dispatch_recent_chat_followups(
             "generated": generated,
             "deliveries_created": deliveries_created,
             "push_sent": push_sent,
+            "whatsapp_sent": whatsapp_sent,
+            "whatsapp_template_sent": whatsapp_template_sent,
             "skipped_dedupe": skipped_dedupe,
             "skipped_no_turns": skipped_no_turns,
             "failed": failed + 1,

@@ -5,6 +5,7 @@ such questions regardless of model behavior.
 """
 
 import re
+import os
 from typing import Tuple
 
 # Single consistent refusal message used everywhere (API and system prompt)
@@ -45,6 +46,46 @@ _DEATH_PATTERNS = [
 _COMPILED = [re.compile(p, re.IGNORECASE) for p in _DEATH_PATTERNS]
 
 
+def get_death_query_unlock_keyword() -> str:
+    """
+    Optional admin/env-controlled phrase that allows a death/longevity question
+    through the normal astrology pipeline. Empty means no override.
+    """
+    try:
+        from utils.admin_settings import get_setting
+
+        value = get_setting("death_query_unlock_keyword")
+        if value and str(value).strip():
+            return str(value).strip()
+    except Exception:
+        pass
+    return (os.environ.get("DEATH_QUERY_UNLOCK_KEYWORD") or "").strip()
+
+
+def is_death_override_unlocked(question: str) -> bool:
+    """
+    Returns True only when the configured unlock phrase appears in the question.
+    Use a deliberate phrase, not a common word, to avoid accidental bypasses.
+    """
+    keyword = get_death_query_unlock_keyword()
+    if not keyword or not question or not isinstance(question, str):
+        return False
+    return keyword.casefold() in question.casefold()
+
+
+def matches_death_patterns(question: str) -> bool:
+    """
+    Returns True when the text matches the death/life-termination patterns,
+    regardless of whether the admin unlock keyword is present.
+    """
+    if not question or not isinstance(question, str):
+        return False
+    text = question.strip()
+    if not text:
+        return False
+    return any(rx.search(text) for rx in _COMPILED)
+
+
 def is_death_related(question: str) -> bool:
     """
     Returns True if the question appears to be about death, time of death,
@@ -56,7 +97,9 @@ def is_death_related(question: str) -> bool:
     text = question.strip()
     if not text:
         return False
-    return any(rx.search(text) for rx in _COMPILED)
+    if is_death_override_unlocked(text):
+        return False
+    return matches_death_patterns(text)
 
 
 def check_and_refusal(question: str) -> Tuple[bool, str]:

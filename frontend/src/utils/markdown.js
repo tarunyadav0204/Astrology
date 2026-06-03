@@ -38,6 +38,44 @@ export const stripMarkdown = (content) => {
         .trim();
 };
 
+function convertMarkdownTablesToStackedBlocks(text) {
+    const lines = String(text || '').split('\n');
+    const out = [];
+    let i = 0;
+
+    const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line || '');
+    const isSeparator = (line) => /^\s*\|[\s:|-]+\|\s*$/.test(line || '');
+    const cells = (line) => String(line || '').split('|').map((c) => c.trim()).filter(Boolean);
+
+    while (i < lines.length) {
+        if (isTableRow(lines[i]) && isSeparator(lines[i + 1])) {
+            const headers = cells(lines[i]);
+            i += 2;
+            const rows = [];
+            while (i < lines.length && isTableRow(lines[i])) {
+                rows.push(cells(lines[i]));
+                i += 1;
+            }
+
+            if (headers.length && rows.length) {
+                rows.forEach((row, rowIndex) => {
+                    const title = row[0] || `Row ${rowIndex + 1}`;
+                    out.push(`#### ${title}`);
+                    headers.slice(1).forEach((header, idx) => {
+                        const value = row[idx + 1];
+                        if (value) out.push(`- **${header}**: ${value}`);
+                    });
+                    out.push('');
+                });
+                continue;
+            }
+        }
+        out.push(lines[i]);
+        i += 1;
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
 /**
  * Chat / admin history: decode entities, strip orphan markdown heading lines, then light markdown → HTML.
  * Models often emit a bare "###" or "#" between sections; those must not survive as visible characters.
@@ -55,6 +93,7 @@ export function formatChatMessageHtml(content) {
     // Entire line is only # … ###### (optional spaces) — nothing to show
     decoded = decoded.replace(/^\s*#{1,6}\s*$/gm, '');
     decoded = decoded.replace(/\n{3,}/g, '\n\n');
+    decoded = convertMarkdownTablesToStackedBlocks(decoded);
 
     const toH3 = (title) => {
         const s = String(title).trim();

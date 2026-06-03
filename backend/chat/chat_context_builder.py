@@ -49,6 +49,25 @@ from .system_instruction_config import (
     build_system_instruction
 )
 
+
+def _safe_year(value: Any, fallback: int) -> int:
+    if value is None or value == "":
+        return int(fallback)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(fallback)
+
+
+def _year_from_mapping(data: Optional[Dict[str, Any]], camel_key: str, snake_key: str, fallback: int) -> int:
+    if not isinstance(data, dict):
+        return int(fallback)
+    value = data.get(camel_key)
+    if value is None or value == "":
+        value = data.get(snake_key)
+    return _safe_year(value, fallback)
+
+
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
 
@@ -1210,12 +1229,10 @@ class ChatContextBuilder:
         # Add period-specific dasha activations for short-term questions
         if intent_result and intent_result.get('transit_request'):
             req = intent_result['transit_request']
-            start_year = req.get('startYear', current_year)
-            end_year = req.get('endYear', current_year)
-
-            # FIX: Ensure years are integers, as they can come from JSON as strings
-            start_year = int(start_year)
-            end_year = int(end_year)
+            start_year = _year_from_mapping(req, 'startYear', 'start_year', current_year)
+            end_year = _year_from_mapping(req, 'endYear', 'end_year', start_year)
+            if end_year < start_year:
+                start_year, end_year = end_year, start_year
             
             # Check if this is a short-term request (daily/weekly/monthly)
             if start_year == end_year:
@@ -1306,8 +1323,10 @@ class ChatContextBuilder:
             transit_start_time = time.time()
             
             # Handle both formats: Intent Router uses 'startYear', old format uses 'start_year'
-            start_year = int(transit_request.get('startYear') or transit_request.get('start_year', current_year))
-            end_year = int(transit_request.get('endYear') or transit_request.get('end_year', current_year + 2))
+            start_year = _year_from_mapping(transit_request, 'startYear', 'start_year', current_year)
+            end_year = _year_from_mapping(transit_request, 'endYear', 'end_year', current_year + 2)
+            if end_year < start_year:
+                start_year, end_year = end_year, start_year
             year_range = end_year - start_year
             # print(f"\n🎯 TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
             # print(f"⏱️ TRANSIT CALCULATION STARTED")

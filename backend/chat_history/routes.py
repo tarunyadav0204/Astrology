@@ -103,6 +103,38 @@ def _merge_clarification_chain_parts(
     return f"{head} {tail}".strip()
 
 
+def _coerce_int_or_none(value):
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _requested_period_from_intent(intent: dict | None) -> dict | None:
+    if not isinstance(intent, dict) or not intent.get("needs_transits"):
+        return None
+    tr = intent.get("transit_request")
+    if not isinstance(tr, dict):
+        return None
+    start_year = _coerce_int_or_none(tr.get("startYear") or tr.get("start_year"))
+    end_year = _coerce_int_or_none(tr.get("endYear") or tr.get("end_year"))
+    if start_year is None or end_year is None:
+        logger.warning(
+            "chat intent transit_request missing usable years; dropping transit period: %s",
+            tr,
+        )
+        return None
+    if end_year < start_year:
+        start_year, end_year = end_year, start_year
+    return {
+        "start_year": start_year,
+        "end_year": end_year,
+        "yearMonthMap": tr.get("yearMonthMap") or {},
+    }
+
+
 def get_user_question_chain_for_clarification(session_id, current_message_id, conn):
     """
     Return user-question fragments for the active clarification chain.
@@ -2386,12 +2418,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from credits.credit_service import CreditService
     from ai.intent_router import IntentRouter
     from chat.fact_extractor import FactExtractor
-    from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
+    from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
     from chat.instant_chat_pipeline import generate_instant_chat_response
     
     try:
         effective_chat_tier = str(chat_tier or "standard").strip().lower()
         is_instant_chat = effective_chat_tier == "instant"
+        death_analysis_unlocked = is_death_override_unlocked(question)
         # Refuse death-related questions without calling the model
         if is_death_related(question):
             print(f"🚫 Death-related question detected in background task - saving refusal")
@@ -2795,15 +2828,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"Target year: {target_year}")
             
             # Convert intent router transit request to old format if needed
-            requested_period = None
-            if intent.get('needs_transits') and intent.get('transit_request'):
-                tr = intent['transit_request']
-                requested_period = {
-                    'start_year': tr['startYear'],
-                    'end_year': tr['endYear'],
-                    'yearMonthMap': tr.get('yearMonthMap', {})
-                }
-                print(f"Transit period: {tr['startYear']}-{tr['endYear']}")
+            requested_period = _requested_period_from_intent(intent)
+            if requested_period:
+                print(f"Transit period: {requested_period['start_year']}-{requested_period['end_year']}")
             
             # Use build_complete_context with intent_result to get transit data
             context = context_builder.build_complete_context(
@@ -2849,15 +2876,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"{'='*80}")
             
             # Convert intent router transit request to old format if needed
-            requested_period = None
-            if intent.get('needs_transits') and intent.get('transit_request'):
-                tr = intent['transit_request']
-                requested_period = {
-                    'start_year': tr['startYear'],
-                    'end_year': tr['endYear'],
-                    'yearMonthMap': tr.get('yearMonthMap', {})
-                }
-                print(f"Transit period: {tr['startYear']}-{tr['endYear']}")
+            requested_period = _requested_period_from_intent(intent)
+            if requested_period:
+                print(f"Transit period: {requested_period['start_year']}-{requested_period['end_year']}")
             
             # Log divisional charts being requested
             if intent.get('divisional_charts'):
@@ -2941,6 +2962,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Inject user facts into context
         if user_facts and not is_instant_chat:
             context['user_facts'] = user_facts
+
+        if death_analysis_unlocked:
+            context['death_analysis_unlocked'] = True
         
         # Inject extracted context from clarifications
         if intent.get('extracted_context') and not is_instant_chat:

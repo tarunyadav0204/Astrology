@@ -7,6 +7,7 @@ from typing import List, Tuple
 from .models import NudgeEvent
 from . import db
 from . import push as push_module
+from .whatsapp_fallback import send_whatsapp_nudge
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,15 @@ def deliver(
                         ):
                             channel = "push"
                             break
+                if channel != "push":
+                    if send_whatsapp_nudge(
+                        conn,
+                        userid=userid,
+                        title=ev.title,
+                        body=ev.body,
+                        question=ev.question,
+                    ):
+                        channel = "whatsapp"
                 db.insert_delivery(
                     conn,
                     userid=userid,

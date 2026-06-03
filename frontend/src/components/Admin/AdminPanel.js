@@ -140,6 +140,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
   const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
   const [chatSubjectGateSaving, setChatSubjectGateSaving] = useState(false);
+  const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
+  const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
@@ -335,6 +337,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       const timerStandard = data.settings.find((s) => s.key === 'chat_countdown_standard_seconds');
       const timerPremium = data.settings.find((s) => s.key === 'chat_countdown_premium_seconds');
       const staticSuggestions = data.settings.find((s) => s.key === 'chat_static_suggestions');
+      const deathUnlockKeyword = data.settings.find((s) => s.key === 'death_query_unlock_keyword');
       setAndroidMinVersion(androidMin?.value ?? '');
       setIosMinVersion(iosMin?.value ?? '');
       setAppUpdateReleaseNotes(releaseNotes?.value ?? '');
@@ -349,6 +352,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
+      setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
       setSpeechChatEnabled(Boolean(data.speech_chat_enabled));
@@ -758,6 +762,33 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save pre-question gate setting.');
     } finally {
       setChatSubjectGateSaving(false);
+    }
+  };
+
+  const handleSaveDeathQueryUnlockKeyword = async () => {
+    setDeathQueryUnlockSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/death_query_unlock_keyword', {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'death_query_unlock_keyword',
+          value: deathQueryUnlockKeyword.trim(),
+          description: 'Optional exact phrase that unlocks death/longevity analysis questions. Empty = death questions are refused.',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save death unlock keyword: ' + (err.detail || 'check console'));
+        return;
+      }
+      alert(deathQueryUnlockKeyword.trim() ? 'Death-question unlock keyword saved.' : 'Death-question unlock disabled.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving death unlock keyword:', error);
+      alert('Failed to save death unlock keyword.');
+    } finally {
+      setDeathQueryUnlockSaving(false);
     }
   };
 
@@ -4202,6 +4233,37 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={chatSubjectGateSaving}
                 >
                   {chatSubjectGateSaving ? 'Saving…' : 'Save pre-question gate setting'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Death-question unlock</h3>
+              <p className="settings-hint">
+                Optional internal phrase that allows death/longevity questions through the normal astrology pipeline.
+                Leave blank to keep the hard refusal active. Use a rare phrase, not a common word.
+              </p>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Unlock keyword / phrase</strong>
+                  <p>If this exact phrase appears in the user question, the death-question refusal is bypassed for that request.</p>
+                </div>
+                <input
+                  type="text"
+                  value={deathQueryUnlockKeyword}
+                  onChange={(e) => setDeathQueryUnlockKeyword(e.target.value)}
+                  placeholder="e.g. #astrodeathresearch"
+                  style={{ width: '100%', maxWidth: '420px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveDeathQueryUnlockKeyword}
+                  disabled={deathQueryUnlockSaving}
+                >
+                  {deathQueryUnlockSaving ? 'Saving…' : 'Save death unlock keyword'}
                 </button>
               </div>
             </div>

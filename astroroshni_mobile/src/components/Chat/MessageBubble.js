@@ -790,31 +790,42 @@ function MessageBubble({
           // console.log('Table debug:', { headerRow, dataRows, rowsText, tableContent });
           
           if (dataRows.length > 0) {
+            const columnWidth = headerRow.length >= 6 ? 132 : 108;
+            const tableWidth = Math.max(headerRow.length * columnWidth, Dimensions.get('window').width - 56);
             elements.push(
-              <View key={`table-${currentIndex++}`} style={styles.tableContainer}>
-                {/* Header */}
-                <View style={styles.tableHeaderRow}>
-                  {headerRow.map((header, idx) => (
-                    <View key={`th-${idx}`} style={[styles.tableHeaderCell, { flex: 1 }]}>
-                      {renderTextWithBold(header, 2000 + idx, message.role, styles.tableHeaderCell)}
-                    </View>
-                  ))}
+              <ScrollView
+                key={`table-${currentIndex++}`}
+                horizontal
+                showsHorizontalScrollIndicator
+                nestedScrollEnabled
+                style={styles.tableScroll}
+                contentContainerStyle={styles.tableScrollContent}
+              >
+                <View style={[styles.tableContainer, { width: tableWidth }]}>
+                  {/* Header */}
+                  <View style={styles.tableHeaderRow}>
+                    {headerRow.map((header, idx) => (
+                      <View key={`th-${idx}`} style={[styles.tableHeaderCellWrap, { width: columnWidth }]}>
+                        {renderTextWithBold(header, 2000 + idx, message.role, styles.tableHeaderCell)}
+                      </View>
+                    ))}
+                  </View>
+                  {/* Rows */}
+                  {dataRows.map((row, rowIdx) => {
+                    const cells = row.split('|').map(c => c.trim()).filter(c => c);
+                    if (cells.length === 0) return null;
+                    return (
+                      <View key={`tr-${rowIdx}`} style={styles.tableRow}>
+                        {cells.map((cell, cellIdx) => (
+                          <View key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCellWrap, { width: columnWidth }]}>
+                            {renderTextWithBold(cell, 2000 + rowIdx * 100 + cellIdx, message.role, styles.tableCell)}
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  }).filter(Boolean)}
                 </View>
-                {/* Rows */}
-                {dataRows.map((row, rowIdx) => {
-                  const cells = row.split('|').map(c => c.trim()).filter(c => c);
-                  if (cells.length === 0) return null;
-                  return (
-                    <View key={`tr-${rowIdx}`} style={styles.tableRow}>
-                      {cells.map((cell, cellIdx) => (
-                        <View key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCell, { flex: 1 }]}>
-                          {renderTextWithBold(cell, 2000 + rowIdx * 100 + cellIdx, message.role, styles.tableCell)}
-                        </View>
-                      ))}
-                    </View>
-                  );
-                }).filter(Boolean)}
-              </View>
+              </ScrollView>
             );
           }
         }
@@ -2674,8 +2685,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  tableContainer: {
+  tableScroll: {
     marginVertical: 12,
+  },
+  tableScrollContent: {
+    paddingRight: 16,
+  },
+  tableContainer: {
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
@@ -2695,6 +2711,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
   },
+  tableHeaderCellWrap: {
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+  },
   tableHeaderCell: {
     fontSize: 12,
     fontWeight: '800',
@@ -2703,6 +2723,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: 4,
+    flexShrink: 0,
   },
   tableRow: {
     flexDirection: 'row',
@@ -2712,12 +2733,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     alignItems: 'center',
   },
+  tableCellWrap: {
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+  },
   tableCell: {
     fontSize: 13,
     color: '#2c3e50',
     textAlign: 'center',
     fontWeight: '500',
     paddingHorizontal: 4,
+    flexShrink: 0,
   },
   betaNotice: {
     backgroundColor: 'rgba(255, 152, 0, 0.1)',

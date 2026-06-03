@@ -99,6 +99,75 @@ def send_whatsapp_text(*, to_wa_id: str, body: str, phone_number_id: str) -> boo
         return False
 
 
+def send_whatsapp_template(
+    *,
+    to: str,
+    phone_number_id: str,
+    template_name: str,
+    language_code: str = "en",
+    body_params: Optional[List[str]] = None,
+    button_payload: Optional[str] = None,
+) -> bool:
+    """Send an approved WhatsApp message template to a phone/wa recipient."""
+    token, ver = _graph_messages_url()
+    if not token or not phone_number_id:
+        logger.warning("Skipping WhatsApp template send: missing WHATSAPP_ACCESS_TOKEN or phone_number_id")
+        return False
+    to_s = (to or "").strip()
+    if not to_s:
+        logger.warning("Skipping WhatsApp template send: missing recipient")
+        return False
+    components: List[Dict[str, Any]] = []
+    params = [str(p or "").strip() for p in (body_params or [])]
+    if params:
+        components.append(
+            {
+                "type": "body",
+                "parameters": [{"type": "text", "text": p[:1024]} for p in params],
+            }
+        )
+    if button_payload:
+        components.append(
+            {
+                "type": "button",
+                "sub_type": "quick_reply",
+                "index": "0",
+                "parameters": [
+                    {
+                        "type": "payload",
+                        "payload": truncate_whatsapp(str(button_payload), 200),
+                    }
+                ],
+            }
+        )
+    payload: Dict[str, Any] = {
+        "messaging_product": "whatsapp",
+        "to": to_s,
+        "type": "template",
+        "template": {
+            "name": (template_name or "").strip(),
+            "language": {"code": (language_code or "en").strip()},
+        },
+    }
+    if components:
+        payload["template"]["components"] = components
+    url = f"https://graph.facebook.com/{ver}/{phone_number_id}/messages"
+    try:
+        r = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=30,
+        )
+        if not (200 <= r.status_code < 300):
+            logger.warning("WhatsApp template send failed: %s %s", r.status_code, (r.text or "")[:800])
+            return False
+        return True
+    except Exception as e:
+        logger.exception("WhatsApp template send error: %s", e)
+        return False
+
+
 def send_whatsapp_interactive_list(
     *,
     to_wa_id: str,

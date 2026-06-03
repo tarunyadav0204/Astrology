@@ -376,7 +376,7 @@ const NorthIndianChart = ({
               {houseNumber === 1 && (
                 <G>
                   <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={cosmicTheme ? "#ff6b35" : "#e91e63"} fontWeight="900" textAnchor="middle">ASC</SvgText>
-                  {chartData?.ascendant && (
+                  {(chartData?.ascendant ?? null) != null && (
                     <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
                       {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                     </SvgText>

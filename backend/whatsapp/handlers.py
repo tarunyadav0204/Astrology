@@ -33,6 +33,12 @@ from .phone_utils import (
 
 from .chat_worker import schedule_whatsapp_chart_chat
 from .schema import ensure_whatsapp_schema
+from nudge_engine.whatsapp_fallback import (
+    WHATSAPP_NUDGE_CONTINUE_BUTTON_ID,
+    build_whatsapp_nudge_body,
+    mark_whatsapp_template_nudge_consumed,
+    pop_pending_whatsapp_template_nudge,
+)
 
 if TYPE_CHECKING:
     from charts.routes import BirthData
@@ -237,6 +243,52 @@ def _send_whatsapp_tara_disclaimer(wa_id: str, phone_number_id: str) -> None:
         )
 
 
+def _handle_nudge_continue_reply(conn, wa_id: str, phone_number_id: str, body: str) -> bool:
+    raw = (body or "").strip()
+    if raw != WHATSAPP_NUDGE_CONTINUE_BUTTON_ID and raw.lower() != "continue":
+        return False
+    out = pop_pending_whatsapp_template_nudge(
+        conn,
+        wa_id=wa_id,
+        phone_number_id=phone_number_id,
+    )
+    if not out:
+        send_whatsapp_text(
+            to_wa_id=wa_id,
+            phone_number_id=phone_number_id,
+            body="Thanks for continuing with AstroRoshni. Type *Menu* to see your options.",
+        )
+        return True
+    nudge = out.get("nudge")
+    if nudge:
+        ok = send_whatsapp_text(
+            to_wa_id=wa_id,
+            phone_number_id=phone_number_id,
+            body=build_whatsapp_nudge_body(
+                str(nudge.get("title") or ""),
+                str(nudge.get("body") or ""),
+                str(nudge.get("question") or ""),
+            ),
+        )
+        if ok and nudge.get("delivery_id"):
+            mark_whatsapp_template_nudge_consumed(conn, int(nudge["delivery_id"]))
+        try:
+            conn.commit()
+        except Exception:
+            pass
+        return True
+    send_whatsapp_text(
+        to_wa_id=wa_id,
+        phone_number_id=phone_number_id,
+        body="Thanks for continuing with AstroRoshni. Type *Menu* to see your options.",
+    )
+    try:
+        conn.commit()
+    except Exception:
+        pass
+    return True
+
+
 def _tara_disclaimer_accepted_today(sess: Dict[str, Any]) -> bool:
     accepted_on = sess.get("tara_disclaimer_accepted_on")
     if isinstance(accepted_on, date):
@@ -385,7 +437,7 @@ def extract_inbound_messages(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
                             )
                     elif itype == "button_reply":
                         br = inter.get("button_reply") or {}
-                        bid = str(br.get("id") or "").strip()
+                        bid = str(br.get("id") or br.get("title") or "").strip()
                         if bid:
                             out.append(
                                 {
@@ -1849,6 +1901,9 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     continue
 
                 st = sess.get("state") or "idle"
+
+                if _handle_nudge_continue_reply(conn, wa_id, phone_number_id, body):
+                    continue
 
                 if st in {
                     "await_otp",

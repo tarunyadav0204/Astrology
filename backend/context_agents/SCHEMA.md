@@ -289,6 +289,21 @@ house links, and short-term transit pressure from raw rows.
       "md": { "p": "Jupiter", "rh": [4, 7], "h": 10, "ahs": [2, 4, 6], "sn": "Gemini", "fn": "benefic", "d": "own_sign", "av": "Yuva", "sc": 73.5, "cb": false, "r": false },
       "ad": { "p": "Saturn", "rh": [5, 6], "h": 8, "ahs": [2, 5, 10] }
     },
+    "bm": {
+      "bh": 11,
+      "bs": 3,
+      "bl": "Mercury",
+      "ml": ["Venus", "Mars"],
+      "sml": ["Jupiter"],
+      "act": [{ "lvl": "ad", "p": "Saturn", "tags": ["maraka"], "h": 8, "rh": [5, 6] }]
+    },
+    "lt": {
+      "hs": { "3": ["Mercury"], "6": ["Saturn"], "8": ["Jupiter"], "12": ["Moon"] },
+      "bm": { "bh": 11, "bs": 3, "bl": "Mercury", "ml": ["Venus", "Mars"], "sml": ["Jupiter"] },
+      "sp": { "K": { "d3as": 1, "s": 8, "kl": "Mars" }, "N": { "m9s": 8, "s": 11, "l": "Saturn" }, "M": { "x": false, "r": [] } },
+      "act": [{ "lvl": "ad", "p": "Saturn", "tags": ["navamsa_64_lord", "sixth_lord"], "score": 3 }],
+      "rule": "high_candidate_requires_3plus_independent_categories"
+    },
     "HI": {
       "10": { "r": [], "o": ["md"], "a": ["ad"] },
       "6": { "r": ["ad"], "o": [], "a": [] }
@@ -311,6 +326,8 @@ house links, and short-term transit pressure from raw rows.
 | `hs` | Priority whole-sign houses for that topic. Treat these as the main houses to evaluate first. |
 | `dv` | Topic-relevant divisionals and whether they are present in the payload (`true` / `false`). |
 | `D` | Active dasha lord summaries for `md` / `ad` / `pd` / `sk` / `pr` when available: `p` planet, `rh` ruled natal houses, `h` natal house placement, `ahs` aspect-target houses from that placement, `sn` sign name, plus `fn` / `d` / `av` / `sc` / `cb` / `r` copied from `d1_graha` where available. |
+| `bm` | Badhaka/Maraka compact layer from D1 lordship: `bh` Badhaka house, `bs` Badhaka sign number, `bl` Badhaka lord, `ml` primary Maraka lords (2nd/7th), `sml` secondary Maraka lord (12th), `act` active dasha levels where a current/window lord is Badhaka/Maraka. Use only as obstruction/health-caution/life-change pressure; never for death prediction. |
+| `lt` | Restricted life-termination research confluence seed. `hs` lists lords of 3/6/8/12; `bm` repeats static Badhaka/Maraka identifiers; `sp` carries `sniper_pts` Kharesh (`K`, including D3 asc source when available), 64th Navamsa (`N`, including D9 Moon source when available), Bhrigu Bindu (`B`), and Mrityu Bhaga (`M`); `act` tags active dasha levels touching Maraka/Badhaka/Kharesh/64th/8th/12th/etc. Use only when backend intent mode is `LIFE_TERMINATION_RESEARCH`; high concern requires active dasha support plus several independent categories, not one tag. |
 | `HI` | House-impact summary for each topic house: `r` = dasha levels ruling it, `o` = occupying it, `a` = aspecting it. |
 | `TR` | Compact transit filter from `transit_win`: `n` total activation rows considered, `th` = transit-house hits on target houses, `nh` = natal-house hits on target houses, `dp` = up to 10 rows where an active dasha lord is involved, `pd` = slim period-dominance rows when `transit_win.p` exists. |
 | `career` | Dedicated compact career block: `hs` = career houses, `dv` = D10/D9 availability, `dom` = ranked activated houses, `mode` = `service` / `business` / `hybrid` / `unclear`, `work` = house-pattern scores, `vis` = visibility level, `fn` = ranked work-function tags from active dasha lords. |
@@ -395,8 +412,8 @@ Sign integer **`s`** where present is **1–12** (Aries … Pisces), same as oth
 
 | Key | Source block | Meaning |
 |-----|----------------|--------|
-| `K` | `kharesh` | `s` = danger sign 1–12 (or `nm` if name not in catalog), `kl` = Kharesh sign lord. On failure: `e` = error string. |
-| `N` | `navamsa_64th` | `s` / `nm`, `l` = danger sign lord. On failure: `e`. |
+| `K` | `kharesh` | `d3as` = D3 ascendant sign 1–12 when available (`d3nm` if name not in catalog), `s` = danger sign 1–12 (or `nm`), `kl` = Kharesh sign lord. Derivation is D3 ascendant sign -> 8th sign from it -> Kharesh lord. On failure: `e` = error string. |
+| `N` | `navamsa_64th` | `m9s` = Moon's D9 sign 1–12 when available (`m9nm` if name not in catalog), `s` / `nm` = 64th Navamsa danger sign, `l` = danger sign lord. Derivation is D9 Moon sign -> 4th sign from it -> lord. On failure: `e`. |
 | `B` | `bhrigu_bindu` | `lon` sidereal ° (0–360), `d` = degree within sign, `h` = whole-sign house from lagna, `ld` = sign lord, `s` / `nm`. On failure: `e`. |
 | `M` | `mrityu_bhaga` | `x` = `has_affliction`, `r` = afflicted rows: `p` = `"Asc"` or graha name, optional `h` (house), `dg` = degree in sign, `o` = orb, `i` = intensity (**1** = Critical, **2** = High/Strong). On failure: `e`. |
 

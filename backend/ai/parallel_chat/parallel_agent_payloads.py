@@ -93,6 +93,8 @@ _HEALTH_PLANET_SYSTEMS: Dict[str, str] = {
 
 _BENEFICS = {"Jupiter", "Venus", "Mercury", "Moon"}
 _MALEFICS = {"Sun", "Mars", "Saturn", "Rahu", "Ketu", "GK"}
+_MOVABLE_SIGNS = {1, 4, 7, 10}
+_FIXED_SIGNS = {2, 5, 8, 11}
 _NADI_CAREER_PLANETS = ("Saturn", "Mercury", "Mars", "Jupiter", "Rahu", "Sun")
 _NADI_REL_PLANETS = ("Venus", "Moon", "Jupiter", "Saturn", "Rahu", "Ketu", "Mars")
 _NADI_WEALTH_PLANETS = ("Jupiter", "Venus", "Mercury", "Moon", "Saturn", "Rahu")
@@ -635,6 +637,186 @@ def _house_impact_summary(target_houses: List[int], levels: Dict[str, Dict[str, 
     return out
 
 
+def _lords_for_houses(lordships: Dict[str, List[int]], houses: List[int]) -> List[str]:
+    wanted = {int(h) for h in houses}
+    out: List[str] = []
+    for planet, ruled_houses in lordships.items():
+        if not isinstance(ruled_houses, list):
+            continue
+        normalized: set[int] = set()
+        for house in ruled_houses:
+            try:
+                normalized.add(int(house))
+            except (TypeError, ValueError):
+                continue
+        if normalized.intersection(wanted) and str(planet) not in out:
+            out.append(str(planet))
+    return out
+
+
+def _badhaka_house_from_lagna(lagna_sign: Any) -> Optional[int]:
+    try:
+        sign_num = int(lagna_sign)
+    except (TypeError, ValueError):
+        return None
+    if sign_num in _MOVABLE_SIGNS:
+        return 11
+    if sign_num in _FIXED_SIGNS:
+        return 9
+    if 1 <= sign_num <= 12:
+        return 7
+    return None
+
+
+def _build_badhaka_maraka_payload(core: Dict[str, Any], levels: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    if not _chart_present(core):
+        return {}
+    lordships = core.get("H") or {}
+    if not isinstance(lordships, dict):
+        return {}
+    lagna_sign = (core.get("L") or {}).get("s")
+    badhaka_house = _badhaka_house_from_lagna(lagna_sign)
+    if not badhaka_house:
+        return {}
+    house_lords = _chart_house_lords(core)
+    badhaka_lord = house_lords.get(int(badhaka_house))
+    primary_marakas = _lords_for_houses(lordships, [2, 7])
+    secondary_marakas = _lords_for_houses(lordships, [12])
+    active: List[Dict[str, Any]] = []
+    for level, row in levels.items():
+        if not isinstance(row, dict):
+            continue
+        planet = str(row.get("p") or "")
+        if not planet:
+            continue
+        tags: List[str] = []
+        if badhaka_lord and planet == str(badhaka_lord):
+            tags.append("badhaka")
+        if planet in primary_marakas:
+            tags.append("maraka")
+        if planet in secondary_marakas:
+            tags.append("secondary_maraka")
+        if tags:
+            active.append(
+                {
+                    "lvl": level,
+                    "p": planet,
+                    "tags": tags,
+                    "h": row.get("h"),
+                    "rh": row.get("rh") or [],
+                }
+            )
+    return {
+        "bh": badhaka_house,
+        "bs": _house_sign_from_lagna(lagna_sign, badhaka_house),
+        "bl": badhaka_lord,
+        "ml": primary_marakas,
+        "sml": secondary_marakas,
+        "act": active,
+    }
+
+
+def _build_life_termination_payload(
+    core: Dict[str, Any],
+    levels: Dict[str, Dict[str, Any]],
+    bm: Dict[str, Any],
+    sniper: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Compact confluence seed for restricted LIFE_TERMINATION_RESEARCH mode.
+
+    This does not predict death. It exposes the classical risk categories so the
+    branch/merge prompts can rank windows by evidence density instead of prose.
+    """
+    if not _chart_present(core):
+        return {}
+    lordships = core.get("H") or {}
+    if not isinstance(lordships, dict):
+        lordships = {}
+    eighth_lords = _lords_for_houses(lordships, [8])
+    third_lords = _lords_for_houses(lordships, [3])
+    twelfth_lords = _lords_for_houses(lordships, [12])
+    sixth_lords = _lords_for_houses(lordships, [6])
+
+    kharesh_lord = ((sniper.get("K") or {}) if isinstance(sniper, dict) else {}).get("kl")
+    nav64_lord = ((sniper.get("N") or {}) if isinstance(sniper, dict) else {}).get("l")
+    bhrigu_lord = ((sniper.get("B") or {}) if isinstance(sniper, dict) else {}).get("ld")
+    mrityu_rows = ((sniper.get("M") or {}) if isinstance(sniper, dict) else {}).get("r") or []
+    mrityu_planets = {
+        str(row.get("p"))
+        for row in mrityu_rows
+        if isinstance(row, dict) and row.get("p") and str(row.get("p")) != "Asc"
+    }
+
+    active: List[Dict[str, Any]] = []
+    for level, row in levels.items():
+        if not isinstance(row, dict):
+            continue
+        planet = str(row.get("p") or "")
+        if not planet:
+            continue
+        tags: List[str] = []
+        if planet in (bm.get("ml") or []):
+            tags.append("maraka")
+        if planet in (bm.get("sml") or []):
+            tags.append("secondary_maraka")
+        if planet == str(bm.get("bl") or ""):
+            tags.append("badhaka")
+        if planet in eighth_lords:
+            tags.append("eighth_lord")
+        if planet in twelfth_lords:
+            tags.append("twelfth_lord")
+        if planet in third_lords:
+            tags.append("third_lord")
+        if planet in sixth_lords:
+            tags.append("sixth_lord")
+        if kharesh_lord and planet == str(kharesh_lord):
+            tags.append("kharesh")
+        if nav64_lord and planet == str(nav64_lord):
+            tags.append("navamsa_64_lord")
+        if bhrigu_lord and planet == str(bhrigu_lord):
+            tags.append("bhrigu_bindu_lord")
+        if planet in mrityu_planets:
+            tags.append("mrityu_bhaga")
+        score = 0
+        for tag in tags:
+            score += {
+                "kharesh": 4,
+                "navamsa_64_lord": 4,
+                "maraka": 3,
+                "eighth_lord": 3,
+                "mrityu_bhaga": 3,
+                "badhaka": 2,
+                "twelfth_lord": 2,
+                "bhrigu_bindu_lord": 2,
+                "secondary_maraka": 1,
+                "third_lord": 1,
+                "sixth_lord": -1,
+            }.get(tag, 0)
+        if tags:
+            active.append(
+                {
+                    "lvl": level,
+                    "p": planet,
+                    "tags": tags,
+                    "score": score,
+                    "h": row.get("h"),
+                    "rh": row.get("rh") or [],
+                    "d": row.get("d"),
+                    "av": row.get("av"),
+                    "sc": row.get("sc"),
+                }
+            )
+
+    return {
+        "hs": {"3": third_lords, "6": sixth_lords, "8": eighth_lords, "12": twelfth_lords},
+        "bm": {k: bm.get(k) for k in ("bh", "bs", "bl", "ml", "sml") if bm.get(k) is not None},
+        "sp": {k: sniper.get(k) for k in ("K", "N", "B", "M") if isinstance(sniper, dict) and sniper.get(k) is not None},
+        "act": sorted(active, key=lambda r: (-int(r.get("score") or 0), str(r.get("lvl") or ""))),
+        "rule": "high_candidate_requires_3plus_independent_categories",
+    }
+
+
 def _transit_summary(target_houses: List[int], levels: Dict[str, Dict[str, Any]], transit_win: Dict[str, Any]) -> Dict[str, Any]:
     acts = transit_win.get("A") or []
     if not isinstance(acts, list):
@@ -722,6 +904,7 @@ def _build_parashari_derived_payload(agent_ctx: AgentContext, agents: Dict[str, 
         "health": _divisional_topic_payload("health", div_charts, _CATEGORY_TARGETS["health"]["hs"]),
     }
 
+    bm = _build_badhaka_maraka_payload(core, levels)
     out = {
         "src": source,
         "cat": topic["cat"],
@@ -730,6 +913,8 @@ def _build_parashari_derived_payload(agent_ctx: AgentContext, agents: Dict[str, 
         "dx": dx,
         "D": levels,
         "disp": dispositor_evidence,
+        "bm": bm,
+        "lt": _build_life_termination_payload(core, levels, bm, agents.get("sniper_pts") or {}),
         "HI": _house_impact_summary(topic["hs"], levels),
         "TR": _transit_summary(topic["hs"], levels, agents.get("transit_win") or {}),
         "career": _build_parashari_career_payload(levels, divs),

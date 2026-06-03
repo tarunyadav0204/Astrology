@@ -28,7 +28,6 @@ from chat.system_instruction_config import (
     NADI_ANALYSIS_STRUCTURE,
     NADI_PILLAR,
     NAKSHATRA_PILLAR,
-    NO_DEATH_ETHICS,
     PARASHARI_PILLAR,
     KP_PILLAR,
     KP_PARALLEL_LIFE_STAGE_RULE,
@@ -37,6 +36,7 @@ from chat.system_instruction_config import (
     SYNTHESIS_RULES,
     USER_MEMORY,
     WEALTH_SUTRAS,
+    death_ethics_block,
 )
 
 _BRANCH_JSON_FOOTER = """
@@ -130,7 +130,7 @@ def _is_health_category(intent_category: str) -> bool:
     return (intent_category or "").strip().lower() in ("health", "disease")
 
 
-def build_parashari_branch_static(intent_category: str) -> str:
+def build_parashari_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     health_prompt_line = (
         "For health questions, separate **Constitution/Vitality -> Disease Pattern -> Body-System Focus -> Current Activation -> Preventive Guidance**. Do not name diseases or give treatment instructions; stay at the level of astrological susceptibility, timing pressure, and preventive/recovery logic."
         if _is_health_category(intent_category)
@@ -138,7 +138,7 @@ def build_parashari_branch_static(intent_category: str) -> str:
     )
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         SYNTHESIS_RULES,
         PARASHARI_PILLAR,
         _domain_sutras(intent_category),
@@ -168,10 +168,10 @@ def build_parashari_branch_static(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_kp_branch_static(intent_category: str) -> str:
+def build_kp_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         KP_PILLAR,
         KP_PARALLEL_LIFE_STAGE_RULE,
         _domain_sutras(intent_category),
@@ -188,10 +188,10 @@ def build_kp_branch_static(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_nakshatra_branch_static(intent_category: str) -> str:
+def build_nakshatra_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         NAKSHATRA_PILLAR,
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
@@ -208,10 +208,10 @@ def build_nakshatra_branch_static(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_ashtakavarga_branch_static() -> str:
+def build_ashtakavarga_branch_static(death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         ASHTAKAVARGA_FILTER,
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
@@ -226,10 +226,10 @@ def build_ashtakavarga_branch_static() -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_sudarshan_branch_static(intent_category: str) -> str:
+def build_sudarshan_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         SUDARSHANA_LOGIC,
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
@@ -246,10 +246,10 @@ def build_sudarshan_branch_static(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_jaimini_branch_static() -> str:
+def build_jaimini_branch_static(death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         JAIMINI_PILLAR,
         JAIMINI_ANALYSIS_STRUCTURE,
         DATA_SOVEREIGNTY,
@@ -265,10 +265,10 @@ def build_jaimini_branch_static() -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_nadi_branch_static(intent_category: str = "") -> str:
+def build_nadi_branch_static(intent_category: str = "", death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         NADI_PILLAR,
         NADI_ANALYSIS_STRUCTURE,
         DATA_SOVEREIGNTY,
@@ -291,7 +291,7 @@ def build_nadi_branch_static(intent_category: str = "") -> str:
 # --- Agent-payload TASK lines (VARIABLE_DATA_JSON uses compact SCHEMA.md keys; ASTRO_PARALLEL_AGENT_CONTEXT=1) ---
 
 
-def build_parashari_branch_static_agent(intent_category: str) -> str:
+def build_parashari_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     health_prompt_line = (
         "For health questions, explicitly separate **Constitution/Vitality -> Disease Pattern -> Sensitive Body Systems -> Current Activation -> Preventive Guidance**. Use `px.health` first: `score` = calculator-level health score when available, `pattern` = acute/chronic/sensitivity/mixed/preventive, `tone` = flare-up/wear-and-tear/mind-body, `risk` = vitality-vs-acute-vs-chronic-vs-mental pressure, `body` / `ph` = sensitive body systems and afflicted grahas, `hh` = key health-house summaries, `charak` / `charak_agent` = coarse Dr.-Charak-style dosha cue, `rw` = ranked risk windows, `dv.D30` = whether Trimsamsa confirmation exists. Do not give medical diagnosis; describe astrological vulnerability, timing pressure, and preventive logic only."
         if _is_health_category(intent_category)
@@ -302,9 +302,14 @@ def build_parashari_branch_static_agent(intent_category: str) -> str:
         if _is_health_category(intent_category)
         else ""
     )
+    life_termination_line = (
+        "STRICT LIFE_TERMINATION_RESEARCH path: if the intent mode is LIFE_TERMINATION_RESEARCH or the death-analysis unlock is active for a life-termination question, use `px.lt` as the confluence seed. `px.lt.hs` gives 3rd/6th/8th/12th lords, `px.lt.bm` gives Badhaka/Maraka, `px.lt.sp.K` = Kharesh/22nd Dreshkona (`d3as`/`d3nm` source D3 asc sign when available, `s`/`nm` danger sign, `kl` lord), `px.lt.sp.N` = 64th Navamsa (`m9s`/`m9nm` D9 Moon sign when available, `s`/`nm` danger sign, `l` lord), `px.lt.sp.B` = Bhrigu Bindu, `px.lt.sp.M` = Mrityu Bhaga, and `px.lt.act` tags active dasha lords touching these categories. First write a compact Calculation Audit; if source derivation fields are absent, say unavailable instead of inventing. Produce a scored ranked confluence assessment (0-10) with component breakdown: dasha 0-2, Maraka/Badhaka/Kharesh 0-2, 8th/12th 0-1.5, D8/D3/D30 0-1.5, sniper 0-1.5, AV 0-1, transit 0-1. If D8 is missing, explicitly say D8 missing and cap the D8/D3/D30 component at 0.8. Grade must be exactly High, Medium, or Low; do not write Medium-High. A high-concern candidate needs active dasha support plus 3+ independent categories and score >= 6; otherwise classify it as health stress-test or weak evidence. Do not call a planet sub-lord/period-lord unless the supplied dasha/KP data proves that role; if it is only Kharesh/64th/dispositor/transit, name that exact mechanism. Do not use deterministic or poetic phrases like guarantee, ensure, will successfully, peaceful release, final exit, or merges back with source. Do NOT output markdown tables or pipe-separated rows; use stacked bullet blocks."
+        if death_analysis_unlocked
+        else ""
+    )
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         SYNTHESIS_RULES,
         PARASHARI_PILLAR,
         _domain_sutras(intent_category),
@@ -327,6 +332,8 @@ def build_parashari_branch_static_agent(intent_category: str) -> str:
         "`d1_graha` → **`G`**: use **`av`** / **`sc`** for outcome delivery (Yogakaraka, 7th lord, etc.). Do not skip critical **Mrit**-style states, but do not treat them as self-sufficient failure signals without supporting weakness elsewhere per [P-7]. "
         "`px` is the derived Parashari reasoning spine: `px.src` = time authority (`current` / `window` / `day`), `px.hs` = priority houses for the topic, `px.dv` = divisional availability flags, `px.dx` = divisional evidence spine, `px.D` = active dasha lord summaries, `px.HI` = which active dasha levels rule/occupy/aspect the target houses, `px.TR` = compact transit pressure on those houses. `px.career` and `px.relationship` are dedicated compact topic blocks. Use `px` to stay concrete rather than inferring these links from scratch.",
         "`px.disp` is the computed dispositor delivery layer. For active Vimshottari lords, topic house lords, and planets occupying topic houses, use `rows[].disp`, `disp_h`, `disp_rh`, `disp_d`, `disp_av`, `disp_sc`, `band`, and `chain` to explain whether the planet can deliver cleanly through its sign lord. Treat this as a support/filter layer, not as a standalone override.",
+        "`px.bm` is the compact Badhaka/Maraka layer: `bh` = Badhaka house, `bs` = its sign number, `bl` = Badhaka lord, `ml` = primary Maraka lords of 2nd/7th, `sml` = secondary Maraka lord of 12th, and `act` = current/window dasha levels where an active lord is Badhaka/Maraka. Use it only when an active dasha lord, topic lord, or transit trigger makes it relevant. Treat it as obstruction, health caution, delay, separation, or major-life-change pressure; never use it to predict death.",
+        life_termination_line,
         health_agent_line,
         "Each raw agent value is compact JSON with `a` = agent id; see `context_agents/SCHEMA.md` for field meanings (P, G, D, C, etc.).",
         "Time authority rule: follow `px.src`. `vim_dasha` is current/present only; `dasha_win` is the authority for the asked past/future window; for short-term windows, prioritize `transit_win.p` before generic transit activations.",
@@ -349,10 +356,10 @@ def build_parashari_branch_static_agent(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_jaimini_branch_static_agent() -> str:
+def build_jaimini_branch_static_agent(death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         JAIMINI_PILLAR,
         JAIMINI_ANALYSIS_STRUCTURE,
         DATA_SOVEREIGNTY,
@@ -369,7 +376,7 @@ def build_jaimini_branch_static_agent() -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_nadi_branch_static_agent(intent_category: str = "") -> str:
+def build_nadi_branch_static_agent(intent_category: str = "", death_analysis_unlocked: bool = False) -> str:
     health_prompt_line = (
         "Health questions: use `nx.health`: `dom`, `flags`, `sig`, `lead`, `systems`, `aa` / `aa_pl` to say whether the Nadi picture is chronic, acute, irregular, or sensitivity-driven, and which body-system themes are being pulled into the pattern. Do not give medical diagnosis; describe the astrological pattern only."
         if _is_health_category(intent_category)
@@ -377,7 +384,7 @@ def build_nadi_branch_static_agent(intent_category: str = "") -> str:
     )
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         NADI_PILLAR,
         NADI_ANALYSIS_STRUCTURE,
         DATA_SOVEREIGNTY,
@@ -396,10 +403,10 @@ def build_nadi_branch_static_agent(intent_category: str = "") -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_nakshatra_branch_static_agent(intent_category: str) -> str:
+def build_nakshatra_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         NAKSHATRA_PILLAR,
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
@@ -416,10 +423,10 @@ def build_nakshatra_branch_static_agent(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_kp_branch_static_agent(intent_category: str) -> str:
+def build_kp_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         KP_PILLAR,
         KP_PARALLEL_LIFE_STAGE_RULE,
         _domain_sutras(intent_category),
@@ -435,10 +442,10 @@ def build_kp_branch_static_agent(intent_category: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_ashtakavarga_branch_static_agent() -> str:
+def build_ashtakavarga_branch_static_agent(death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         ASHTAKAVARGA_FILTER,
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
@@ -453,10 +460,10 @@ def build_ashtakavarga_branch_static_agent() -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def build_sudarshan_branch_static_agent(intent_category: str) -> str:
+def build_sudarshan_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,
-        NO_DEATH_ETHICS,
+        death_ethics_block(death_analysis_unlocked),
         SUDARSHANA_LOGIC,
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,

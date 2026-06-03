@@ -288,6 +288,87 @@ Your response must be a chronological analysis of the specific event requested a
 <div class="final-thoughts-card">**Final Verdict**: [Summary of the most certain period and why]</div>
 """
 
+# Template D2: Restricted Life Termination Research
+# Used for: LIFE_TERMINATION_RESEARCH
+TEMPLATE_LIFE_TERMINATION_RESEARCH = """
+### 🕰️ LIFE TERMINATION RESEARCH ANALYSIS (MANDATORY)
+This is a restricted classical longevity research answer. Keep it evidence-first, probabilistic, and sober.
+
+1. <div class="quick-answer-card">**Executive Summary**: [Directly state the baseline longevity class, the strongest candidate window(s), and whether the evidence is high/medium/low. Do NOT state a guaranteed death date.]</div>
+
+2. ### Method Boundary
+[One short paragraph: this is classical astrological research, not medical/legal advice; it identifies sensitive windows and life-force stress patterns, not certainty.]
+
+3. ### Baseline Longevity Promise
+- **Ayu Class**: [Alpayu/Madhyayu/Deerghayu/Purnayu or mixed classification, with reasoning]
+- **Vitality Foundation**: [Lagna, Lagna lord, Moon, Saturn/Ayushkaraka]
+- **Longevity Houses**: [3rd and 8th houses/lords]
+- **Protection Factors**: [Benefic protections, strong 6th/12th recovery support, D9 resilience, if present]
+- **Vulnerability Factors**: [Weak Lagna/8th/Saturn, afflictions, low SAV/BAV, if present]
+- **Evidence Limits**: [Name any missing mandatory layers early, especially D8 or missing sniper derivation rows]
+
+4. ### Calculation Audit
+[MANDATORY: Show the source path for each sensitive factor. If the payload does not provide a derivation row, write "source derivation not supplied" instead of asserting.]
+- **Badhaka**: [Lagna sign/type -> Badhaka house -> sign/lord -> active dasha/transit links]
+- **Primary Marakas**: [2nd/7th lords and their natal condition]
+- **Secondary Maraka / Exit Layer**: [12th lord/house and relevant activation]
+- **Kharesh / 22nd Drekkana**: [D3 ascendant sign if supplied -> 8th from D3 ascendant / danger sign -> Kharesh lord -> D1 condition. Do not merely say "Kharesh is X" without this path.]
+- **64th Navamsa from Moon**: [D9 Moon sign if supplied -> 4th from D9 Moon / danger sign -> lord -> D1 condition. Do not merely say "64th Navamsa lord is X" without this path.]
+- **Bhrigu Bindu / Mrityu Bhaga**: [Point, sign, lord, planets/degree rows if supplied]
+- **D8 / D3 / D30 Availability**: [Present or missing. If D8 is not supplied, write "D8 not supplied; longevity divisional confirmation is incomplete" and reduce D8/D3/D30 score accordingly.]
+
+5. ### Confluence Matrix
+[MANDATORY: Do NOT use markdown tables or pipe-separated table rows. Mobile chat cannot render wide tables. Use stacked window blocks exactly like this.]
+
+#### Window 1: [Name + date range]
+- **Dasha Trigger**: [Present/Weak/Missing + MD/AD/PD/SK/PR or Chara MD/AD]
+- **Maraka/Badhaka/Kharesh**: [Present/Weak/Missing + 2/7, 12th, Badhaka, Kharesh links]
+- **8th/12th/Longevity Activation**: [Present/Weak/Missing + houses/lords/karakas]
+- **D8/D3/D30 Confirmation**: [Present/Weak/Missing or "not available"; name the chart and exact confirming house/lord/planet]
+- **Sniper Points**: [Present/Weak/Missing + 64th Navamsa, Mrityu Bhaga, Bhrigu Bindu, Kharesh sign]
+- **Ashtakavarga Filter**: [Present/Weak/Missing + SAV/BAV from provided data only]
+- **Transit Trigger**: [Present/Weak/Missing + Saturn/Jupiter/Rahu-Ketu over sensitive points]
+- **Score Breakdown**: [Dasha 0-2; Maraka/Badhaka/Kharesh 0-2; 8th/12th 0-1.5; D8/D3/D30 0-1.5; Sniper 0-1.5; AV 0-1; Transit 0-1. If D8 is missing, D8/D3/D30 score cannot exceed 0.8.]
+- **Confluence Score**: [0-10 total, based only on the score breakdown above]
+- **Confluence Grade**: [Only one of: High / Medium / Low. Do not write "Medium-High". High requires 6+ score and 3+ independent categories including dasha.]
+- **Classification**: [health stress-test / critical transition risk / classical terminal candidate]
+
+[Repeat the same stacked block for Window 2, Window 3, etc. Never output a table.]
+
+6. ### Ranked Candidate Windows
+[List 3-5 windows strongest first.]
+- **Window [1/2/3]**: [Name + date range]
+  - **Promise Window**: [Broader period]
+  - **Execution Band**: [Narrower period only if evidence supports it]
+  - **Confluence Score / Grade**: [0-10 + exactly one of High/Medium/Low; do not write Medium-High]
+  - **Score Breakdown**: [Repeat compact score components; never give a score without this]
+  - **Why It Ranks Here**: [Evidence categories that agree]
+  - **What Protects**: [Contradictory/protective factors]
+  - **What Is Missing**: [Required evidence not present]
+  - **Interpretation**: [Stress-test / critical transition risk / terminal candidate; no fatal certainty]
+
+7. ### Technical Deep Dive
+- **Dasha Logic**: [Why the selected dasha lords matter]
+- **Maraka-Badhaka-Kharesh Logic**: [Specific planets/houses + derivation/source path]
+- **64th Navamsa / Mrityu Bhaga / Bhrigu Bindu**: [Only from supplied data + derivation/source path]
+- **D8 / D3 / D30 / D9 Confirmation**: [Divisional evidence; state missing charts explicitly]
+- **Ashtakavarga (SAV & BAV)**: [Numeric values only when present]
+- **Transit Confirmation**: [How transits refine timing]
+- **Conflict Resolution**: [Why lower windows are not ranked higher]
+- **Evidence Limitations**: [What could not be verified from the supplied payload]
+
+8. ### Practical Caution
+[Health/lifestyle caution and medical-care reminder without diagnosing or prescribing. Do not name specific diseases, organ diagnoses, or therapeutic instructions unless the user already named them.]
+
+<div class="final-thoughts-card">**Final Verdict**: [Ranked conclusion: strongest window, confidence level, and key evidence. No guaranteed death date.]</div>
+
+### ABSOLUTE LANGUAGE RESTRICTIONS
+- Do not use deterministic claims: "guarantee", "ensure", "will successfully", "certain", "unavoidable", "projecting a lifespan", "final exit", "death date", "will die".
+- Do not promise the manner or emotional quality of death: no "peaceful release", "spiritually oriented release", "merges back with source", or similar.
+- Do not call a planet a "sub-lord", "sub-period lord", CSL, CSSL, or dasha lord unless the supplied dasha/KP evidence explicitly shows that role. If a planet is only Kharesh, 64th Navamsa lord, dispositor, or transit trigger, name that exact mechanism.
+- Do not say D8/D3/D30 confirmation is "Yes" when D8 is missing; write "D3/D30 present, D8 missing" or equivalent.
+"""
+
 TEMPLATE_CHART_FOCUS = """
 ### 🪐 CHART-FOCUSED READING (MANDATORY)
 Use this structure when the user explicitly asks to analyze a specific chart or lens such as Lagna, D9/Navamsha, D10, Karkamsa, or Swamsa.
@@ -378,6 +459,7 @@ SCHEMA_MAPPING = {
     'MUNDANE': TEMPLATE_MUNDANE,
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
     'LIFESPAN_EVENT_TIMING': TEMPLATE_LIFESPAN_TIMELINE,
+    'LIFE_TERMINATION_RESEARCH': TEMPLATE_LIFE_TERMINATION_RESEARCH,
     'DEFAULT': TEMPLATE_DEEP_DIVE,
 }
 
@@ -463,7 +545,7 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False, char
         base_schema = SCHEMA_MAPPING.get(mode.upper(), SCHEMA_MAPPING['DEFAULT'])
     
     # Programmatically add common blocks to all schemas except special cases
-    if mode.upper() not in ['DEV_EVENT_LOG', 'LIFESPAN_EVENT_TIMING']:
+    if mode.upper() not in ['DEV_EVENT_LOG', 'LIFESPAN_EVENT_TIMING', 'LIFE_TERMINATION_RESEARCH']:
         # Ensure there's a newline before appending
         schema_with_common_blocks = base_schema.strip() + "\n"
         # Only attach follow-up questions block; glossary is injected by backend
@@ -481,7 +563,7 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False, char
    SUMMARY_IMAGE_END
 """
         # This is appended carefully to avoid breaking the structure of simpler templates
-        if mode.upper() in ['ANALYZE_TOPIC_POTENTIAL', 'ANALYZE_ROOT_CAUSE', 'PREDICT_PERIOD_OUTLOOK', 'DEFAULT', 'PREDICT_DAILY', 'LIFESPAN_EVENT_TIMING']:
+        if mode.upper() in ['ANALYZE_TOPIC_POTENTIAL', 'ANALYZE_ROOT_CAUSE', 'PREDICT_PERIOD_OUTLOOK', 'DEFAULT', 'PREDICT_DAILY', 'LIFESPAN_EVENT_TIMING', 'LIFE_TERMINATION_RESEARCH']:
              return schema_with_common_blocks + "\n" + image_instructions
 
     return schema_with_common_blocks
@@ -645,8 +727,15 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
             analysis_type_from_intent = 'DAILY_PREDICTION'
         elif intent_mode.upper() == 'LIFESPAN_EVENT_TIMING':
             analysis_type_from_intent = 'LIFESPAN_EVENT_TIMING'
+        elif intent_mode.upper() == 'LIFE_TERMINATION_RESEARCH':
+            analysis_type_from_intent = 'LIFE_TERMINATION_RESEARCH'
             
-        system_instruction = build_system_instruction(analysis_type=analysis_type_from_intent, intent_category=intent_category, mode=intent_mode)
+        system_instruction = build_system_instruction(
+            analysis_type=analysis_type_from_intent,
+            intent_category=intent_category,
+            mode=intent_mode,
+            death_analysis_unlocked=bool(context.get("death_analysis_unlocked")),
+        )
 
     prompt_parts = []
     

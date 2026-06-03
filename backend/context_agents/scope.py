@@ -71,7 +71,7 @@ def resolve_context_scope(
 
     # Lifespan / open-ended major life timing → wide context (legacy still filters Chara in places;
     # agents can send full Chara cycle + wide Vim windows).
-    if mode_u == "LIFESPAN_EVENT_TIMING":
+    if mode_u in {"LIFESPAN_EVENT_TIMING", "LIFE_TERMINATION_RESEARCH"}:
         return ContextTimeScope.FULL
 
     # Daily / today

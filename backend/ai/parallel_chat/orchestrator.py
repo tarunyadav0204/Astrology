@@ -605,6 +605,7 @@ async def run_parallel_chat_pipeline(
     ctx = astrological_context
     intent = ctx.get("intent") or {}
     category = intent.get("category", "general")
+    death_analysis_unlocked = bool(ctx.get("death_analysis_unlocked"))
     enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
     enabled_branch_set = set(enabled_branches)
     use_agent_ctx = parallel_agent_context_enabled()
@@ -620,13 +621,13 @@ async def run_parallel_chat_pipeline(
         nk_payload = ap["nakshatra"]
         kp_payload = ap["kp"]
         av_payload = ap["ashtakavarga"]
-        par_static = build_parashari_branch_static_agent(category)
-        jm_static = build_jaimini_branch_static_agent()
-        nd_static = build_nadi_branch_static_agent(category)
-        nk_static = build_nakshatra_branch_static_agent(category)
-        kp_static = build_kp_branch_static_agent(category)
-        av_static = build_ashtakavarga_branch_static_agent()
-        sd_static = build_sudarshan_branch_static_agent(category)
+        par_static = build_parashari_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
+        jm_static = build_jaimini_branch_static_agent(death_analysis_unlocked=death_analysis_unlocked)
+        nd_static = build_nadi_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
+        nk_static = build_nakshatra_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
+        kp_static = build_kp_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
+        av_static = build_ashtakavarga_branch_static_agent(death_analysis_unlocked=death_analysis_unlocked)
+        sd_static = build_sudarshan_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
     else:
         kernel_lite = build_shared_kernel_lite(ctx)
         par_slice = build_parashari_slice(ctx)
@@ -635,13 +636,13 @@ async def run_parallel_chat_pipeline(
         nk_slice = build_nakshatra_slice(ctx)
         kp_slice = build_kp_slice(ctx)
         av_slice = build_ashtakavarga_slice(ctx)
-        par_static = build_parashari_branch_static(category)
-        jm_static = build_jaimini_branch_static()
-        nd_static = build_nadi_branch_static(category)
-        nk_static = build_nakshatra_branch_static(category)
-        kp_static = build_kp_branch_static(category)
-        av_static = build_ashtakavarga_branch_static()
-        sd_static = build_sudarshan_branch_static(category)
+        par_static = build_parashari_branch_static(category, death_analysis_unlocked=death_analysis_unlocked)
+        jm_static = build_jaimini_branch_static(death_analysis_unlocked=death_analysis_unlocked)
+        nd_static = build_nadi_branch_static(category, death_analysis_unlocked=death_analysis_unlocked)
+        nk_static = build_nakshatra_branch_static(category, death_analysis_unlocked=death_analysis_unlocked)
+        kp_static = build_kp_branch_static(category, death_analysis_unlocked=death_analysis_unlocked)
+        av_static = build_ashtakavarga_branch_static(death_analysis_unlocked=death_analysis_unlocked)
+        sd_static = build_sudarshan_branch_static(category, death_analysis_unlocked=death_analysis_unlocked)
         par_payload = {"parashari_context": par_slice, "user_question": user_question}
         jm_payload = {
             "shared_kernel": without_keys(kernel_lite, {"current_dashas"}),
@@ -920,7 +921,10 @@ async def run_parallel_chat_pipeline(
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
 
     intent_mode = _intent_mode(ctx, mode)
-    merge_system_instruction = build_merge_synthesis_instruction(mode=intent_mode)
+    merge_system_instruction = build_merge_synthesis_instruction(
+        mode=intent_mode,
+        death_analysis_unlocked=death_analysis_unlocked,
+    )
     single_native_format_guard = """
 FORMAT GUARD FOR SINGLE-NATIVE READINGS:
 - This is NOT a two-person synastry/relational reading.

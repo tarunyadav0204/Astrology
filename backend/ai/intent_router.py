@@ -706,6 +706,52 @@ def _normalize_lifespan_timing_mode(result: Dict[str, Any]) -> None:
         result["mode"] = "LIFESPAN_EVENT_TIMING"
 
 
+def _is_unlocked_life_termination_research_question(question: str) -> bool:
+    """
+    Restricted death/life-termination mode selector.
+
+    The normal death guard blocks these questions unless an admin-configured
+    unlock phrase is present. When the phrase is present, keep routing explicit
+    so the answer uses the dedicated confluence protocol rather than generic
+    event timing.
+    """
+    if not question or not isinstance(question, str):
+        return False
+    try:
+        from ai.death_query_guard import is_death_override_unlocked, matches_death_patterns
+
+        return bool(is_death_override_unlocked(question) and matches_death_patterns(question))
+    except Exception:
+        return False
+
+
+def _force_life_termination_research_mode(result: Dict[str, Any], *, current_year: int) -> None:
+    result["mode"] = "LIFE_TERMINATION_RESEARCH"
+    result["context_type"] = "birth"
+    result["category"] = "health"
+    result["needs_transits"] = True
+    charts = result.get("divisional_charts")
+    if not isinstance(charts, list):
+        charts = []
+    for code in ("D1", "D3", "D8", "D9", "D30"):
+        if code not in charts:
+            charts.append(code)
+    result["divisional_charts"] = charts
+    result["extracted_context"] = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
+    result["extracted_context"]["aspect"] = result["extracted_context"].get("aspect") or "classical longevity and life-termination research"
+    result["extracted_context"]["specific_date"] = None
+    result["extracted_context"]["specific_date_basis"] = "not_date_bound"
+    end_year = current_year + 80
+    result["transit_request"] = {
+        "startYear": current_year,
+        "endYear": end_year,
+        "yearMonthMap": {
+            str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+            for y in range(current_year, end_year + 1)
+        },
+    }
+
+
 class IntentRouter:
     """
     Classifies user queries into various analysis modes for the astrology chat AI.
@@ -761,6 +807,8 @@ class IntentRouter:
         if 'mode' not in result or result['mode'] is None:
             result['mode'] = 'PREDICT_EVENTS_FOR_PERIOD' if any(w in user_question.lower() for w in ['all events', 'events', 'timeline']) else 'ANALYZE_PERSONALITY'
         _normalize_lifespan_timing_mode(result)
+        if _is_unlocked_life_termination_research_question(user_question):
+            _force_life_termination_research_mode(result, current_year=current_year)
         if 'context_type' not in result:
             result['context_type'] = 'birth'
         if 'category' not in result or result['category'] is None:
@@ -831,6 +879,23 @@ class IntentRouter:
         normalized_query_context: Dict[str, Any] | None,
     ) -> Dict[str, Any]:
         is_timing_question = any(w in user_question.lower() for w in ['when', 'time', 'date', 'year', 'month', 'will i', 'should i'])
+
+        if _is_unlocked_life_termination_research_question(user_question):
+            result = {
+                "status": "READY",
+                "extracted_context": {},
+                "mode": "LIFE_TERMINATION_RESEARCH",
+                "context_type": "birth",
+                "category": "health",
+                "needs_transits": True,
+                "divisional_charts": ["D1", "D3", "D8", "D9", "D30"],
+                "chart_insights": [],
+            }
+            _force_life_termination_research_mode(result, current_year=current_year)
+            if normalized_query_context:
+                result["query_context"] = normalized_query_context
+            apply_chart_focus_guards(result, user_question)
+            return result
 
         if is_timing_question:
             result = {
@@ -962,6 +1027,7 @@ Rules:
 - Use `PREDICT_DAILY` for today/tomorrow/exact-day questions.
 - Use `PREDICT_PERIOD_OUTLOOK` for "next 3 months", "this year", "coming months" style outlooks.
 - Use `LIFESPAN_EVENT_TIMING` for simple "when will X happen?" timing questions.
+- Use `LIFE_TERMINATION_RESEARCH` only when the configured death/longevity unlock phrase is present and the user explicitly asks death/life-termination/lifespan-end timing. This is not normal health mode.
 - Use `ANALYZE_PERSONALITY` for personality/self-understanding questions.
 - Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` for remedy requests tied to a specific problem.
@@ -1019,7 +1085,7 @@ Return ONLY this JSON shape:
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY",
   "chart_insights": [],
-  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
   "daily_intent_confirmed": true or false,
   "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound"}},
@@ -1430,6 +1496,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
           🚨 CRITICAL: Use this mode when the user's message is **primarily** a single timing question about one life event.
           🚨 EXCEPTION — BUNDLED MULTI-TOPIC MESSAGES: If the same message also asks **other unrelated** things (e.g. spouse nature, career, wealth, health) in separate sentences or clauses, you MUST NOT force READY just because one part is a "when" question. Return status: "CLARIFY" and ask which **one** topic to address first (or to send one question at a time), unless the clarification limit already applies.
           🚨 When the message is **only** a when/year question about one topic: return status: "READY" with this mode. Do not ask clarification for that narrow case.
+        - "LIFE_TERMINATION_RESEARCH": Restricted mode for explicit death/life-termination/lifespan-end timing questions only when the configured unlock phrase is present in the current question. Use D1/D3/D8/D9/D30, health category, and broad lifetime timing; do not use ordinary daily or generic lifespan-event timing for these unlocked questions.
         - "PREDICT_PERIOD_OUTLOOK": For general questions about a specific timeframe (e.g., "How will the next 6 months be for my career?"). This is for a deep-dive analysis.
         - "PREDICT_EVENT_TIMING": For "when will X happen?" questions (e.g., "When will I get married?").
         - "PREDICT_EVENTS_FOR_PERIOD": For listing numerous potential events over a period (e.g., "Tell me all events for this year."). This is for a timeline-style list.
@@ -1476,7 +1543,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             "status": "CLARIFY" or "READY",
             "clarification_question": "Your clarifying question here (only if status=CLARIFY; when giving options, use lettered quick replies like Type A/Type B with variable count, not fixed 3; keep same language + script as CURRENT QUESTION)",
             "chart_insights": [{{"house_number": 1, "message": "Message must match CURRENT QUESTION language and script style", "highlight_type": "ascendant"}}],
-            "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+            "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_REMEDY_FOR_PROBLEM",
             "chart_focus": {{
                 "kind": "chart_specific",
                 "primary": "D1 or D9 or D10 or D7 or Karkamsa or Swamsa",

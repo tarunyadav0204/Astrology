@@ -50,6 +50,8 @@ class SniperPointsCalculator(BaseCalculator):
             
             return {
                 'point_name': '22nd Drekkana (Kharesh)',
+                'd3_ascendant_sign': self.sign_names[d3_asc_sign],
+                'derivation': '8th sign from D3 ascendant',
                 'danger_sign': self.sign_names[drekkana_22_sign_idx],
                 'kharesh_lord': kharesh_lord,
                 'lord_location_d1': f"{self.sign_names[lord_in_d1.get('sign', 0)]} ({lord_in_d1.get('house', 0)}th House)",
@@ -83,6 +85,8 @@ class SniperPointsCalculator(BaseCalculator):
             
             return {
                 'point_name': '64th Navamsa',
+                'moon_d9_sign': self.sign_names[moon_d9_sign],
+                'derivation': '4th sign from Moon in D9',
                 'danger_sign': self.sign_names[navamsa_64_sign_idx],
                 'danger_lord': navamsa_lord,
                 'significance': 'Critical point for mental stress and transformation.',
