@@ -34,9 +34,9 @@ export const SEO_CONFIG = {
       width: 1200,
       height: 656,
       alt:
-        "Discover your life path with AstroRoshni — AI Vedic astrology app for Kundli, daily horoscope, marriage matching, and live chat with an AI astrologer on Google Play",
+        "Discover Your Life Path -AstroRoshni Vedic Astrology",
       title:
-        "Download AstroRoshni on Google Play — AI Kundli, horoscope, and Vedic astrology chat",
+        "Discover Your Life Path -AstroRoshni Vedic Astrology",
       caption:
         "Promotional banner: unlock your destiny with best-in-class Vedic astrology. Get the AstroRoshni Android app for free Kundli, predictions, and AI astrologer chat.",
     },
