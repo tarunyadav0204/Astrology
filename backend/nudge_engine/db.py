@@ -25,6 +25,28 @@ def get_conn():
     return _get_app_conn()
 
 
+def try_advisory_lock(conn, lock_name: str) -> bool:
+    """Acquire a Postgres advisory lock for a cron job if it is not already running."""
+    cur = execute(conn, "SELECT pg_try_advisory_lock(hashtext(%s))", (str(lock_name),))
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def try_advisory_xact_lock(conn, lock_name: str) -> bool:
+    """Acquire a transaction-scoped advisory lock; it auto-releases on commit/rollback."""
+    cur = execute(conn, "SELECT pg_try_advisory_xact_lock(hashtext(%s))", (str(lock_name),))
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def advisory_unlock(conn, lock_name: str) -> None:
+    """Release a Postgres advisory lock acquired with try_advisory_lock."""
+    try:
+        execute(conn, "SELECT pg_advisory_unlock(hashtext(%s))", (str(lock_name),))
+    except Exception as e:
+        logger.warning("Could not release advisory lock %s: %s", lock_name, e)
+
+
 def _safe_execute_nudge_ddl(conn, sql: str) -> None:
     try:
         execute(conn, sql)

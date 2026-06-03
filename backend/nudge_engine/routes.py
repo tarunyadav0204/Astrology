@@ -1263,10 +1263,27 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
     try:
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
+            if not db.try_advisory_xact_lock(conn, "nudge_broadcast_dispatch_due"):
+                summary = {
+                    "ok": True,
+                    "skipped": "already_running",
+                    "due_items": 0,
+                    "schedule_items_marked": 0,
+                    "delivery_rows_created": 0,
+                    "push_sent": 0,
+                }
+                db.insert_cron_run(
+                    conn,
+                    job_key="broadcast_dispatch_due",
+                    status="skipped",
+                    summary_json=json.dumps(summary, ensure_ascii=False),
+                )
+                conn.commit()
+                logger.warning("broadcast dispatch-due skipped: already running")
+                return summary
             due_rows = db.acquire_due_broadcast_schedule(conn, today_iso=today_iso, now_hhmm=now_hhmm, limit=limit)
             if not due_rows:
-                conn.commit()
-                return {
+                summary = {
                     "ok": True,
                     "due_items": 0,
                     "schedule_items_marked": 0,
@@ -1274,6 +1291,14 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                     "push_sent": 0,
                     "message": "No due scheduled nudges at this time.",
                 }
+                db.insert_cron_run(
+                    conn,
+                    job_key="broadcast_dispatch_due",
+                    status="success",
+                    summary_json=json.dumps(summary, ensure_ascii=False),
+                )
+                conn.commit()
+                return summary
 
             token_rows = db.get_all_device_tokens(conn)
             tokens_by_user: Dict[int, List[tuple]] = {}
@@ -1366,6 +1391,20 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                 db.mark_broadcast_schedule_dispatched(conn, schedule_id, n_users)
                 marked += 1
 
+            summary = {
+                "ok": True,
+                "due_items": len(due_rows),
+                "schedule_items_marked": marked,
+                "delivery_rows_created": total_delivery_rows,
+                "push_sent": total_push_sent,
+                "users_targeted": n_users,
+            }
+            db.insert_cron_run(
+                conn,
+                job_key="broadcast_dispatch_due",
+                status="success",
+                summary_json=json.dumps(summary, ensure_ascii=False),
+            )
             conn.commit()
 
         logger.info(
@@ -1375,14 +1414,7 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
             total_delivery_rows,
             total_push_sent,
         )
-        return {
-            "ok": True,
-            "due_items": len(due_rows),
-            "schedule_items_marked": marked,
-            "delivery_rows_created": total_delivery_rows,
-            "push_sent": total_push_sent,
-            "users_targeted": n_users,
-        }
+        return summary
     except Exception as e:
         logger.exception("_dispatch_due_broadcast failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
@@ -1471,7 +1503,8 @@ def _dispatch_recent_chat_followups(
     from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
 
     lookback_minutes = max(1, min(int(lookback_minutes), 24 * 60))
-    limit_users = max(1, min(int(limit_users), 500))
+    max_limit = max(1, min(int(os.getenv("NUDGE_CHAT_FOLLOWUP_MAX_USERS", "25")), 100))
+    limit_users = max(1, min(int(limit_users), max_limit))
     max_turns = max(1, min(int(max_turns), 2))
     dedupe_since = datetime.utcnow() - timedelta(hours=6)
 
@@ -1488,6 +1521,31 @@ def _dispatch_recent_chat_followups(
     try:
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
+            if not db.try_advisory_xact_lock(conn, "nudge_chat_followup_dispatch_recent"):
+                summary = {
+                    "ok": True,
+                    "skipped": "already_running",
+                    "targeted_users": targeted,
+                    "generated": generated,
+                    "deliveries_created": deliveries_created,
+                    "push_sent": push_sent,
+                    "whatsapp_sent": whatsapp_sent,
+                    "whatsapp_template_sent": whatsapp_template_sent,
+                    "skipped_dedupe": skipped_dedupe,
+                    "skipped_no_turns": skipped_no_turns,
+                    "failed": failed,
+                    "lookback_minutes": lookback_minutes,
+                    "limit_users": limit_users,
+                }
+                db.insert_cron_run(
+                    conn,
+                    job_key="chat_followup_dispatch_recent",
+                    status="skipped",
+                    summary_json=json.dumps(summary, ensure_ascii=False),
+                )
+                conn.commit()
+                logger.warning("chat_hourly_followup skipped: already running")
+                return summary
             candidates = _recent_chat_user_candidates(
                 conn,
                 lookback_minutes=lookback_minutes,

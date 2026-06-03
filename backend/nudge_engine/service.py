@@ -28,9 +28,16 @@ def run_nudge_scan(target_date: Optional[date] = None) -> Dict[str, Any]:
         "delivered": 0,
         "error": None,
     }
+    lock_cm = None
+    lock_conn = None
     try:
-        with db.get_conn() as conn:
-            db.init_nudge_tables(conn)
+        lock_cm = db.get_conn()
+        lock_conn = lock_cm.__enter__()
+        db.init_nudge_tables(lock_conn)
+        if not db.try_advisory_lock(lock_conn, "nudge_scan_daily"):
+            summary["skipped"] = "already_running"
+            logger.warning("Nudge scan skipped for %s: already running", target_date)
+            return summary
     except Exception as e:
         logger.exception("Init nudge tables failed: %s", e)
         summary["error"] = str(e)
@@ -54,4 +61,9 @@ def run_nudge_scan(target_date: Optional[date] = None) -> Dict[str, Any]:
     except Exception as e:
         logger.exception("Nudge scan failed for %s: %s", target_date, e)
         summary["error"] = str(e)
+    finally:
+        if lock_conn is not None:
+            db.advisory_unlock(lock_conn, "nudge_scan_daily")
+        if lock_cm is not None:
+            lock_cm.__exit__(None, None, None)
     return summary
