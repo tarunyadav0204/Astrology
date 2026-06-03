@@ -1307,6 +1307,68 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
             all_user_ids = db.get_all_user_ids(conn)
             n_users = len(all_user_ids)
 
+            try:
+                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
+                tasks_enabled = nudge_tasks_enabled()
+            except Exception as e:
+                logger.warning("nudge task queue unavailable; falling back inline broadcast: %s", e)
+                enqueue_nudge_task = None
+                tasks_enabled = False
+
+            if tasks_enabled and enqueue_nudge_task:
+                batch_size = max(1, min(int(os.getenv("NUDGE_BROADCAST_BATCH_SIZE", "500")), 2000))
+                tasks_enqueued = 0
+                enqueue_failed = 0
+                marked = 0
+                for row in due_rows:
+                    schedule_id = int(row[0])
+                    title = (row[2] or "").strip()[:100]
+                    body_text = (row[3] or "").strip()[:200]
+                    if not title or not body_text:
+                        db.mark_broadcast_schedule_dispatched(conn, schedule_id, 0)
+                        marked += 1
+                        continue
+
+                    schedule_failed = 0
+                    for batch_index, user_chunk in enumerate(_chunked(all_user_ids, batch_size)):
+                        ok = enqueue_nudge_task(
+                            task_kind="broadcast-schedule-batch",
+                            task_id=f"{schedule_id}-{batch_index}",
+                            payload={
+                                "schedule_id": schedule_id,
+                                "batch_index": batch_index,
+                                "user_ids": [int(uid) for uid in user_chunk],
+                            },
+                        )
+                        if ok:
+                            tasks_enqueued += 1
+                        else:
+                            schedule_failed += 1
+                            enqueue_failed += 1
+                    if schedule_failed == 0:
+                        db.mark_broadcast_schedule_dispatched(conn, schedule_id, n_users)
+                        marked += 1
+
+                summary = {
+                    "ok": True,
+                    "queued": True,
+                    "due_items": len(due_rows),
+                    "schedule_items_marked": marked,
+                    "tasks_enqueued": tasks_enqueued,
+                    "enqueue_failed": enqueue_failed,
+                    "users_targeted": n_users,
+                    "batch_size": batch_size,
+                }
+                db.insert_cron_run(
+                    conn,
+                    job_key="broadcast_dispatch_due",
+                    status="success" if enqueue_failed == 0 else "partial",
+                    summary_json=json.dumps(summary, ensure_ascii=False),
+                )
+                conn.commit()
+                logger.info("broadcast dispatch-due queued summary: %s", summary)
+                return summary
+
             total_push_sent = 0
             total_delivery_rows = 0
             marked = 0
@@ -1420,6 +1482,124 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
 
 
+def _process_broadcast_schedule_batch(
+    *,
+    schedule_id: int,
+    user_ids: List[int],
+) -> Dict[str, Any]:
+    """Send/store one broadcast schedule batch. Safe for Cloud Tasks retries."""
+    clean_user_ids = []
+    seen = set()
+    for uid in user_ids or []:
+        try:
+            uid_int = int(uid)
+            if uid_int > 0 and uid_int not in seen:
+                clean_user_ids.append(uid_int)
+                seen.add(uid_int)
+        except Exception:
+            continue
+    if not clean_user_ids:
+        return {"ok": True, "schedule_id": int(schedule_id), "users": 0, "deliveries_created": 0, "push_sent": 0}
+
+    with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
+        row = db.get_broadcast_schedule_item(conn, int(schedule_id))
+        if not row:
+            return {"ok": True, "skipped": "missing_schedule", "schedule_id": int(schedule_id)}
+        if not bool(row[7]):
+            return {"ok": True, "skipped": "inactive_schedule", "schedule_id": int(schedule_id)}
+
+        title = (row[2] or "").strip()[:100]
+        body_text = (row[3] or "").strip()[:200]
+        category = (row[4] or "general").strip()
+        if not title or not body_text:
+            return {"ok": True, "skipped": "empty_template", "schedule_id": int(schedule_id)}
+
+        already_done = db.get_broadcast_delivery_user_ids(
+            conn,
+            schedule_id=int(schedule_id),
+            userids=clean_user_ids,
+        )
+        target_user_ids = [uid for uid in clean_user_ids if uid not in already_done]
+        if not target_user_ids:
+            return {
+                "ok": True,
+                "skipped": "dedupe",
+                "schedule_id": int(schedule_id),
+                "users": len(clean_user_ids),
+                "deliveries_created": 0,
+                "push_sent": 0,
+            }
+
+        payload = {
+            "trigger_id": "broadcast_schedule",
+            "cta": "astroroshni://chat",
+            "schedule_id": str(int(schedule_id)),
+            "category": category,
+            "question": body_text[:500],
+        }
+        event_params = json.dumps(
+            {"schedule_id": int(schedule_id), "category": category},
+            ensure_ascii=False,
+        )
+        data_json = json.dumps(payload, ensure_ascii=False)[:8000]
+
+        token_rows = db.get_device_tokens_for_users(conn, target_user_ids)
+        tokens_by_user: Dict[int, List[str]] = defaultdict(list)
+        for uid, token, _platform in token_rows:
+            token_s = str(token or "").strip()
+            if token_s.startswith("ExponentPushToken["):
+                tokens_by_user[int(uid)].append(token_s)
+
+        token_messages: List[Dict[str, Any]] = []
+        token_user_ids: List[int] = []
+        for uid in target_user_ids:
+            for token in tokens_by_user.get(int(uid), []):
+                token_messages.append({
+                    "to": token,
+                    "title": title,
+                    "body": body_text,
+                    "sound": "default",
+                    "data": payload,
+                })
+                token_user_ids.append(int(uid))
+
+        push_sent = 0
+        push_ok_by_uid: Dict[int, bool] = defaultdict(bool)
+        for msg_chunk, uid_chunk in zip(_chunked(token_messages, 500), _chunked(token_user_ids, 500)):
+            results = push_module.send_expo_push_messages(msg_chunk)
+            for uid, ok in zip(uid_chunk, results):
+                if ok:
+                    push_ok_by_uid[int(uid)] = True
+                    push_sent += 1
+
+        sent_at_iso = date.today().isoformat()
+        delivery_rows: List[tuple] = []
+        for uid in target_user_ids:
+            channel = "push" if push_ok_by_uid.get(int(uid)) else "stored"
+            delivery_rows.append((
+                int(uid),
+                "broadcast_schedule",
+                title,
+                body_text,
+                event_params,
+                sent_at_iso,
+                channel,
+                data_json,
+            ))
+
+        db.insert_deliveries_batch(conn, delivery_rows)
+        conn.commit()
+        return {
+            "ok": True,
+            "schedule_id": int(schedule_id),
+            "users": len(target_user_ids),
+            "deduped": len(already_done),
+            "deliveries_created": len(delivery_rows),
+            "push_sent": push_sent,
+        }
+
+
 def _recent_chat_user_candidates(
     conn,
     *,
@@ -1486,6 +1666,98 @@ def _recent_chat_followup_dedupe_keys(conn, *, since_dt: datetime) -> set[tuple[
     return keys
 
 
+def _process_recent_chat_followup_user(
+    conn,
+    *,
+    uid: int,
+    message_id: int,
+    lookback_minutes: int,
+    max_turns: int,
+) -> Dict[str, Any]:
+    """Generate and deliver one recent-chat follow-up nudge."""
+    from .chat_nudge_suggestion import (
+        load_last_completed_qa_turns,
+        generate_push_nudge_via_gemini,
+    )
+    from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
+
+    dedupe_since = datetime.utcnow() - timedelta(hours=6)
+    sent_keys = _recent_chat_followup_dedupe_keys(conn, since_dt=dedupe_since)
+    if (int(uid), int(message_id)) in sent_keys:
+        return {"ok": True, "skipped": "dedupe", "user_id": int(uid), "message_id": int(message_id)}
+
+    turns = load_last_completed_qa_turns(conn, int(uid), max_turns=max_turns)
+    if not turns:
+        return {"ok": True, "skipped": "no_turns", "user_id": int(uid), "message_id": int(message_id)}
+
+    out = generate_push_nudge_via_gemini(turns)
+    title = str(out.get("title") or "").strip()[:100]
+    body_text = str(out.get("body") or "").strip()[:200]
+    question = str(out.get("question") or "").strip()[:500]
+    if not title or not body_text:
+        return {"ok": False, "error": "empty_generated_nudge", "user_id": int(uid), "message_id": int(message_id)}
+
+    push_data: Dict[str, Any] = {
+        "trigger_id": "chat_hourly_followup",
+        "cta": "astroroshni://chat",
+        "question": question,
+        "source_message_id": str(message_id),
+    }
+
+    tokens = db.get_device_tokens_for_user(conn, int(uid))
+    sent = 0
+    for token, _platform in tokens or []:
+        if push_module.send_expo_push(token, title, body_text, data=push_data):
+            sent += 1
+
+    event_params = json.dumps(
+        {
+            "source": "recent_chat_hourly",
+            "message_id": int(message_id),
+            "lookback_minutes": int(lookback_minutes),
+        },
+        ensure_ascii=False,
+    )
+    channel = "push" if sent > 0 else "stored"
+    whatsapp_sent = 0
+    whatsapp_template_sent = 0
+    if sent <= 0:
+        if send_whatsapp_nudge(
+            conn,
+            userid=int(uid),
+            title=title,
+            body=body_text,
+            question=question,
+        ):
+            channel = "whatsapp"
+            whatsapp_sent = 1
+        elif send_whatsapp_nudge_template(conn, userid=int(uid)):
+            channel = "whatsapp_template"
+            whatsapp_template_sent = 1
+    db.insert_delivery(
+        conn,
+        userid=int(uid),
+        trigger_id="chat_hourly_followup",
+        title=title,
+        body=body_text,
+        sent_at=date.today(),
+        event_params=event_params,
+        channel=channel,
+        data_payload=push_data,
+    )
+    return {
+        "ok": True,
+        "user_id": int(uid),
+        "message_id": int(message_id),
+        "generated": 1,
+        "deliveries_created": 1,
+        "push_sent": sent,
+        "whatsapp_sent": whatsapp_sent,
+        "whatsapp_template_sent": whatsapp_template_sent,
+        "channel": channel,
+    }
+
+
 def _dispatch_recent_chat_followups(
     *,
     limit_users: int = 200,
@@ -1496,12 +1768,6 @@ def _dispatch_recent_chat_followups(
     Generate + send nudges for users active in chat in the last `lookback_minutes`.
     Intended for cron/background use.
     """
-    from .chat_nudge_suggestion import (
-        load_last_completed_qa_turns,
-        generate_push_nudge_via_gemini,
-    )
-    from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
-
     lookback_minutes = max(1, min(int(lookback_minutes), 24 * 60))
     max_limit = max(1, min(int(os.getenv("NUDGE_CHAT_FOLLOWUP_MAX_USERS", "25")), 100))
     limit_users = max(1, min(int(limit_users), max_limit))
@@ -1554,6 +1820,60 @@ def _dispatch_recent_chat_followups(
             sent_keys = _recent_chat_followup_dedupe_keys(conn, since_dt=dedupe_since)
             today = date.today()
 
+            try:
+                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
+                tasks_enabled = nudge_tasks_enabled()
+            except Exception as e:
+                logger.warning("nudge task queue unavailable; falling back inline: %s", e)
+                enqueue_nudge_task = None
+                tasks_enabled = False
+
+            if tasks_enabled and enqueue_nudge_task:
+                enqueued = 0
+                enqueue_failed = 0
+                for item in candidates:
+                    uid = int(item["user_id"])
+                    message_id = int(item["message_id"])
+                    targeted += 1
+                    if (uid, message_id) in sent_keys:
+                        skipped_dedupe += 1
+                        continue
+                    ok = enqueue_nudge_task(
+                        task_kind="chat-followup-user",
+                        task_id=f"{uid}-{message_id}",
+                        payload={
+                            "user_id": uid,
+                            "message_id": message_id,
+                            "lookback_minutes": lookback_minutes,
+                            "max_turns": max_turns,
+                        },
+                    )
+                    if ok:
+                        enqueued += 1
+                    else:
+                        enqueue_failed += 1
+                        failed += 1
+
+                summary = {
+                    "ok": True,
+                    "queued": True,
+                    "targeted_users": targeted,
+                    "tasks_enqueued": enqueued,
+                    "enqueue_failed": enqueue_failed,
+                    "skipped_dedupe": skipped_dedupe,
+                    "lookback_minutes": lookback_minutes,
+                    "limit_users": limit_users,
+                }
+                db.insert_cron_run(
+                    conn,
+                    job_key="chat_followup_dispatch_recent",
+                    status="success" if enqueue_failed == 0 else "partial",
+                    summary_json=json.dumps(summary, ensure_ascii=False),
+                )
+                conn.commit()
+                logger.info("chat_hourly_followup queued summary: %s", summary)
+                return summary
+
             for item in candidates:
                 uid = int(item["user_id"])
                 message_id = int(item["message_id"])
@@ -1564,67 +1884,26 @@ def _dispatch_recent_chat_followups(
                     continue
 
                 try:
-                    turns = load_last_completed_qa_turns(conn, uid, max_turns=max_turns)
-                    if not turns:
+                    result = _process_recent_chat_followup_user(
+                        conn,
+                        uid=uid,
+                        message_id=message_id,
+                        lookback_minutes=lookback_minutes,
+                        max_turns=max_turns,
+                    )
+                    if result.get("skipped") == "no_turns":
                         skipped_no_turns += 1
                         continue
-
-                    out = generate_push_nudge_via_gemini(turns)
-                    title = str(out.get("title") or "").strip()[:100]
-                    body_text = str(out.get("body") or "").strip()[:200]
-                    question = str(out.get("question") or "").strip()[:500]
-                    if not title or not body_text:
+                    if result.get("skipped") == "dedupe":
+                        skipped_dedupe += 1
+                        continue
+                    if not result.get("ok"):
                         failed += 1
                         continue
                     generated += 1
-
-                    push_data: Dict[str, Any] = {
-                        "trigger_id": "chat_hourly_followup",
-                        "cta": "astroroshni://chat",
-                        "question": question,
-                        "source_message_id": str(message_id),
-                    }
-
-                    tokens = db.get_device_tokens_for_user(conn, uid)
-                    sent = 0
-                    for token, _platform in tokens or []:
-                        if push_module.send_expo_push(token, title, body_text, data=push_data):
-                            sent += 1
-                    push_sent += sent
-
-                    event_params = json.dumps(
-                        {
-                            "source": "recent_chat_hourly",
-                            "message_id": message_id,
-                            "lookback_minutes": lookback_minutes,
-                        },
-                        ensure_ascii=False,
-                    )
-                    channel = "push" if sent > 0 else "stored"
-                    if sent <= 0:
-                        if send_whatsapp_nudge(
-                            conn,
-                            userid=uid,
-                            title=title,
-                            body=body_text,
-                            question=question,
-                        ):
-                            channel = "whatsapp"
-                            whatsapp_sent += 1
-                        elif send_whatsapp_nudge_template(conn, userid=uid):
-                            channel = "whatsapp_template"
-                            whatsapp_template_sent += 1
-                    db.insert_delivery(
-                        conn,
-                        userid=uid,
-                        trigger_id="chat_hourly_followup",
-                        title=title,
-                        body=body_text,
-                        sent_at=today,
-                        event_params=event_params,
-                        channel=channel,
-                        data_payload=push_data,
-                    )
+                    push_sent += int(result.get("push_sent") or 0)
+                    whatsapp_sent += int(result.get("whatsapp_sent") or 0)
+                    whatsapp_template_sent += int(result.get("whatsapp_template_sent") or 0)
                     deliveries_created += 1
                 except Exception as e:
                     failed += 1
@@ -1745,6 +2024,80 @@ async def cron_dispatch_recent_chat_followups(
         "limit_users": int(limit_users),
         "lookback_minutes": int(lookback_minutes),
     }
+
+
+def _verify_nudge_task_secret(x_nudge_task_secret: Optional[str]) -> None:
+    try:
+        from .task_queue import nudge_task_secret
+        expected = nudge_task_secret()
+    except Exception:
+        expected = ""
+    received = (x_nudge_task_secret or "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="NUDGE_TASKS_SECRET is not configured on server.")
+    if not received or not hmac.compare_digest(received, expected):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@router.post("/internal/tasks/chat-followup-user")
+async def internal_chat_followup_user_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: generate and deliver one recent-chat follow-up."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    try:
+        uid = int(body.get("user_id"))
+        message_id = int(body.get("message_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="user_id and message_id are required")
+    lookback_minutes = max(1, min(int(body.get("lookback_minutes") or 60), 24 * 60))
+    max_turns = max(1, min(int(body.get("max_turns") or 2), 2))
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            result = _process_recent_chat_followup_user(
+                conn,
+                uid=uid,
+                message_id=message_id,
+                lookback_minutes=lookback_minutes,
+                max_turns=max_turns,
+            )
+            conn.commit()
+            if result.get("ok") is False and result.get("error") != "empty_generated_nudge":
+                raise HTTPException(status_code=500, detail=result.get("error") or "chat follow-up task failed")
+            return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("chat follow-up task failed user_id=%s message_id=%s: %s", uid, message_id, e)
+        raise HTTPException(status_code=500, detail="chat follow-up task failed") from e
+
+
+@router.post("/internal/tasks/broadcast-schedule-batch")
+async def internal_broadcast_schedule_batch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: send/store one broadcast schedule recipient batch."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    try:
+        schedule_id = int(body.get("schedule_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="schedule_id is required")
+    user_ids_raw = body.get("user_ids") or []
+    if not isinstance(user_ids_raw, list):
+        raise HTTPException(status_code=400, detail="user_ids must be a list")
+    try:
+        result = await run_in_threadpool(
+            _process_broadcast_schedule_batch,
+            schedule_id=schedule_id,
+            user_ids=user_ids_raw,
+        )
+        return result
+    except Exception as e:
+        logger.exception("broadcast schedule batch task failed schedule_id=%s: %s", schedule_id, e)
+        raise HTTPException(status_code=500, detail="broadcast schedule batch task failed") from e
 
 
 @router.get("/admin/cron/chat-followup/status")

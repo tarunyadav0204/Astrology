@@ -387,6 +387,23 @@ def get_all_user_ids(conn) -> List[int]:
         return []
 
 
+def get_user_ids_after(conn, *, after_userid: int = 0, limit: int = 500) -> List[int]:
+    """Return a stable userid page for fan-out workers."""
+    lim = max(1, min(int(limit), 5000))
+    cur = execute(
+        conn,
+        """
+        SELECT userid
+        FROM users
+        WHERE userid > %s
+        ORDER BY userid ASC
+        LIMIT %s
+        """,
+        (int(after_userid or 0), lim),
+    )
+    return [int(r[0]) for r in (cur.fetchall() or [])]
+
+
 def get_user_ids_receiving_nudge_on_date(
     conn, target_date: date
 ) -> Set[int]:
@@ -1072,6 +1089,42 @@ def mark_broadcast_schedule_dispatched(
         (max(0, int(dispatched_count)), int(schedule_id)),
     )
     return int(cur.rowcount or 0)
+
+
+def get_broadcast_schedule_item(conn, schedule_id: int) -> Optional[Tuple]:
+    """Return one broadcast schedule row with template content."""
+    cur = execute(
+        conn,
+        """
+        SELECT s.id, s.template_id, t.title, t.body, t.category,
+               s.send_date::text, s.send_time::text, s.is_active,
+               s.dispatched_at, s.dispatched_count
+        FROM nudge_broadcast_schedule s
+        JOIN nudge_broadcast_templates t ON t.id = s.template_id
+        WHERE s.id = %s
+        """,
+        (int(schedule_id),),
+    )
+    return cur.fetchone()
+
+
+def get_broadcast_delivery_user_ids(conn, *, schedule_id: int, userids: List[int]) -> Set[int]:
+    """Users that already have a delivery row for this broadcast schedule."""
+    ids = [int(u) for u in userids if str(u).isdigit()]
+    if not ids:
+        return set()
+    cur = execute(
+        conn,
+        """
+        SELECT userid
+        FROM nudge_deliveries
+        WHERE trigger_id = 'broadcast_schedule'
+          AND userid = ANY(%s)
+          AND NULLIF(event_params, '')::jsonb ->> 'schedule_id' = %s
+        """,
+        (ids, str(int(schedule_id))),
+    )
+    return {int(r[0]) for r in (cur.fetchall() or [])}
 
 
 def create_broadcast_schedule_item(
