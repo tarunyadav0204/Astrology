@@ -179,10 +179,32 @@ def _find_user_by_wa_phone(conn, wa_id: str) -> Optional[int]:
         return None
     placeholders = ", ".join(["%s"] * len(variants))
     try:
+        # Prefer the active account whose phone matches the incoming WhatsApp
+        # number. A stale whatsapp_wa_id can remain on deleted/old accounts.
         cur = execute(
             conn,
-            f"SELECT userid FROM users WHERE phone IN ({placeholders}) OR whatsapp_wa_id = %s ORDER BY userid DESC LIMIT 1",
-            tuple(variants) + (str(wa_id).strip(),),
+            f"""
+            SELECT userid
+            FROM users
+            WHERE phone IN ({placeholders})
+            ORDER BY userid DESC
+            LIMIT 1
+            """,
+            tuple(variants),
+        )
+        row = cur.fetchone()
+        if row and row[0] is not None:
+            return int(row[0])
+        cur = execute(
+            conn,
+            """
+            SELECT userid
+            FROM users
+            WHERE whatsapp_wa_id = %s
+            ORDER BY userid DESC
+            LIMIT 1
+            """,
+            (str(wa_id).strip(),),
         )
         row = cur.fetchone()
         if row and row[0] is not None:
