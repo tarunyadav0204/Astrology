@@ -31,10 +31,13 @@ _FUNNEL_STEPS = [
     ("auth_welcome_viewed", "Welcome viewed"),
     ("auth_mode_selected", "Mode selected"),
     ("auth_phone_submitted", "Phone submitted"),
+    ("auth_email_screen_viewed", "Email viewed"),
+    ("auth_email_submitted", "Email submitted"),
     ("registration_otp_requested", "OTP requested"),
     ("registration_otp_screen_viewed", "OTP screen viewed"),
     ("registration_otp_verified", "OTP verified"),
     ("registration_name_submitted", "Name submitted"),
+    ("auth_password_screen_viewed", "Password viewed"),
     ("registration_submitted", "Registration submitted"),
     ("registration_completed", "Registration completed"),
 ]
@@ -648,38 +651,100 @@ async def admin_acquisition_installations_analytics(
     )
 
     with get_conn() as conn:
-        cur = execute(
-            conn,
-            f"""
+        classified_cte = f"""
             WITH filtered AS (
                 SELECT ai.installation_id, ai.userid
                 FROM app_installations ai
                 WHERE {where_sql}
+            ),
+            signals AS (
+                SELECT
+                    f.installation_id,
+                    f.userid,
+                    EXISTS (
+                        SELECT 1
+                        FROM app_installation_events e
+                        WHERE e.installation_id = f.installation_id
+                          AND (
+                            e.event_name IN ('login_submitted', 'login_completed', 'login_failed')
+                            OR (
+                                e.event_name = 'auth_mode_selected'
+                                AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'login'
+                            )
+                          )
+                    ) AS existing_user_install,
+                    EXISTS (
+                        SELECT 1
+                        FROM app_installation_events e
+                        WHERE e.installation_id = f.installation_id
+                          AND (
+                            e.event_name IN (
+                                'registration_otp_requested',
+                                'registration_otp_screen_viewed',
+                                'registration_otp_verified',
+                                'registration_name_submitted',
+                                'registration_submitted',
+                                'registration_completed',
+                                'registration_failed',
+                                'registration_existing_user_redirected'
+                            )
+                            OR (
+                                e.event_name = 'auth_mode_selected'
+                                AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'register'
+                            )
+                          )
+                    ) AS registration_flow_install
+                FROM filtered f
+            ),
+            classified AS (
+                SELECT
+                    installation_id,
+                    userid,
+                    (
+                        existing_user_install
+                        OR (userid IS NOT NULL AND NOT registration_flow_install)
+                    ) AS existing_user_install,
+                    registration_flow_install
+                FROM signals
             )
+        """
+
+        cur = execute(
+            conn,
+            f"""
+            {classified_cte}
             SELECT
                 COUNT(*)::int AS installs,
-                COUNT(*) FILTER (WHERE userid IS NOT NULL)::int AS linked
-            FROM filtered
+                COUNT(*) FILTER (WHERE userid IS NOT NULL)::int AS linked,
+                COUNT(*) FILTER (WHERE existing_user_install)::int AS existing_user_installs,
+                COUNT(*) FILTER (WHERE NOT existing_user_install)::int AS new_user_candidate_installs,
+                COUNT(*) FILTER (WHERE registration_flow_install)::int AS registration_flow_installs
+            FROM classified
             """,
             params,
         )
-        base = cur.fetchone() or (0, 0)
+        base = cur.fetchone() or (0, 0, 0, 0, 0)
         installs = int(base[0] or 0)
         linked = int(base[1] or 0)
+        existing_user_installs = int(base[2] or 0)
+        new_user_candidate_installs = int(base[3] or 0)
+        registration_flow_installs = int(base[4] or 0)
+        unknown_anonymous_installs = max(0, new_user_candidate_installs - registration_flow_installs)
 
         funnel: list[dict[str, Any]] = []
-        previous = installs
+        previous = new_user_candidate_installs
         for event_name, label in _FUNNEL_STEPS:
             if event_name == "first_open":
-                count = installs
+                count = new_user_candidate_installs
             else:
                 cur = execute(
                     conn,
                     f"""
+                    {classified_cte}
                     SELECT COUNT(DISTINCT aie.installation_id)::int
                     FROM app_installation_events aie
-                    JOIN app_installations ai ON ai.installation_id = aie.installation_id
-                    WHERE {where_sql} AND aie.event_name = ?
+                    JOIN classified c ON c.installation_id = aie.installation_id
+                    WHERE NOT c.existing_user_install AND aie.event_name = ?
                     """,
                     params + [event_name],
                 )
@@ -690,7 +755,7 @@ async def admin_acquisition_installations_analytics(
                     "label": label,
                     "count": count,
                     "conversion_from_previous": round(count / previous, 4) if previous else 0.0,
-                    "conversion_from_install": round(count / installs, 4) if installs else 0.0,
+                    "conversion_from_install": round(count / new_user_candidate_installs, 4) if new_user_candidate_installs else 0.0,
                     "drop_from_previous": max(0, previous - count),
                 }
             )
@@ -737,6 +802,10 @@ async def admin_acquisition_installations_analytics(
         "installs": installs,
         "linked": linked,
         "unlinked": unlinked,
+        "existing_user_installs": existing_user_installs,
+        "new_user_candidate_installs": new_user_candidate_installs,
+        "registration_flow_installs": registration_flow_installs,
+        "unknown_anonymous_installs": unknown_anonymous_installs,
         "funnel": funnel,
         "dropoff": dropoff,
     }

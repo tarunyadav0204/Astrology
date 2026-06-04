@@ -70,7 +70,17 @@ const AdminAcquisition = () => {
     not_registered: 0,
     registration_rate: 0,
   });
-  const [analytics, setAnalytics] = useState({ funnel: [], dropoff: [], installs: 0, linked: 0, unlinked: 0 });
+  const [analytics, setAnalytics] = useState({
+    funnel: [],
+    dropoff: [],
+    installs: 0,
+    linked: 0,
+    unlinked: 0,
+    existing_user_installs: 0,
+    new_user_candidate_installs: 0,
+    registration_flow_installs: 0,
+    unknown_anonymous_installs: 0,
+  });
   const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
   const [timelineModal, setTimelineModal] = useState({ visible: false, loading: false, error: '', data: null });
 
@@ -124,6 +134,10 @@ const AdminAcquisition = () => {
         installs: analyticsRes.installs || 0,
         linked: analyticsRes.linked || 0,
         unlinked: analyticsRes.unlinked || 0,
+        existing_user_installs: analyticsRes.existing_user_installs || 0,
+        new_user_candidate_installs: analyticsRes.new_user_candidate_installs || 0,
+        registration_flow_installs: analyticsRes.registration_flow_installs || 0,
+        unknown_anonymous_installs: analyticsRes.unknown_anonymous_installs || 0,
       });
     } catch (e) {
       setError(e?.message || 'Failed to load');
@@ -174,7 +188,7 @@ const AdminAcquisition = () => {
           </p>
         </div>
         <div className="users-summary-card">
-          <h4>Linked (registered)</h4>
+          <h4>Linked user</h4>
           <p>
             <strong>{loading ? '…' : summary.registered}</strong>
           </p>
@@ -196,7 +210,25 @@ const AdminAcquisition = () => {
       {!loading && !error ? (
         <>
           <div style={{ marginBottom: 20 }}>
-            <h3 style={{ margin: '0 0 10px' }}>Funnel summary</h3>
+            <h3 style={{ margin: '0 0 10px' }}>New-user funnel summary</h3>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', background: '#f8fafc' }}>
+                <div style={{ fontSize: 11, color: '#64748b' }}>All first opens</div>
+                <div style={{ fontWeight: 800 }}>{analytics.installs || 0}</div>
+              </div>
+              <div style={{ border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 10px', background: '#eff6ff' }}>
+                <div style={{ fontSize: 11, color: '#1d4ed8' }}>Existing/login users separated</div>
+                <div style={{ fontWeight: 800 }}>{analytics.existing_user_installs || 0}</div>
+              </div>
+              <div style={{ border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px', background: '#f0fdf4' }}>
+                <div style={{ fontSize: 11, color: '#15803d' }}>New-user funnel base</div>
+                <div style={{ fontWeight: 800 }}>{analytics.new_user_candidate_installs || 0}</div>
+              </div>
+              <div style={{ border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', background: '#fffbeb' }}>
+                <div style={{ fontSize: 11, color: '#92400e' }}>No mode yet</div>
+                <div style={{ fontWeight: 800 }}>{analytics.unknown_anonymous_installs || 0}</div>
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
               {(analytics.funnel || []).map((step, index) => {
                 const prevPct = index === 0 ? 1 : Number(step.conversion_from_previous || 0);

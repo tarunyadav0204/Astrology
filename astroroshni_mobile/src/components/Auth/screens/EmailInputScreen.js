@@ -71,6 +71,11 @@ export default function EmailInputScreen({
     try {
       updateAcquisitionLeadContact({ phone: fullPhone, email: formData.email }).catch(() => {});
       trackAcquisitionFunnelEvent(
+        'auth_email_submitted',
+        { mode: 'register', sends_otp: true },
+        { status: 'accepted', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
+      trackAcquisitionFunnelEvent(
         'registration_otp_requested',
         { source: 'email_screen' },
         { status: 'started', screenName: 'EmailInputScreen' },
