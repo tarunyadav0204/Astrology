@@ -20,7 +20,7 @@ import {
   getNationalPhoneMaxLength,
   isNationalPhoneValid,
 } from '../countryCodes';
-import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
 
 export default function PhoneInputScreen({ 
   formData, 
@@ -76,6 +76,7 @@ export default function PhoneInputScreen({
     
     // Store country code separately
     updateFormData('countryCode', selectedCountry.code);
+    updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
     trackAcquisitionFunnelEvent(
       'auth_phone_submitted',
       { mode: isLogin ? 'login' : 'register', country_code: selectedCountry.code },

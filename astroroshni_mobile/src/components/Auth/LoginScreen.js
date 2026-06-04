@@ -22,7 +22,7 @@ import { COLORS } from '../../utils/constants';
 import { apiErrorMessage } from '../../utils/apiErrorMessage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
-import { trackAcquisitionFunnelEvent } from '../../services/acquisitionTracking';
+import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../services/acquisitionTracking';
 
 const { width, height } = Dimensions.get('window');
 
@@ -167,6 +167,7 @@ export default function LoginScreen({ navigation }) {
           }
         }
       } else {
+        updateAcquisitionLeadContact({ phone, email: email.trim() }).catch(() => {});
         trackAcquisitionFunnelEvent(
           'registration_started',
           { has_email: Boolean(email.trim()) },

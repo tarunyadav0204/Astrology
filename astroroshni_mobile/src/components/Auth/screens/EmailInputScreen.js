@@ -16,7 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
 import { apiErrorMessage } from '../../../utils/apiErrorMessage';
-import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
 
 export default function EmailInputScreen({ 
   formData, 
@@ -69,6 +69,7 @@ export default function EmailInputScreen({
     const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
     setLoading(true);
     try {
+      updateAcquisitionLeadContact({ phone: fullPhone, email: formData.email }).catch(() => {});
       trackAcquisitionFunnelEvent(
         'registration_otp_requested',
         { source: 'email_screen' },

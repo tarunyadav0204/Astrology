@@ -251,6 +251,37 @@ export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, opti
   }
 }
 
+export async function updateAcquisitionLeadContact({ phone, email } = {}) {
+  try {
+    const phoneText = String(phone || '').trim();
+    const emailText = String(email || '').trim();
+    if (!phoneText && !emailText) return;
+
+    const installation_id = await getOrCreateInstallationId();
+    const client_install_key = await getClientInstallKey();
+    const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/acquisition/contact')}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        installation_id,
+        client_install_key,
+        phone: phoneText || null,
+        email: emailText || null,
+      }),
+    });
+    if (!res.ok && __DEV__) {
+      const t = await res.text().catch(() => '');
+      console.warn('[acquisition] contact failed', res.status, t.slice(0, 200));
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[acquisition] contact error', e?.message);
+  }
+}
+
 /**
  * After login / register; uses Bearer from storage (set by caller after setAuthToken).
  */

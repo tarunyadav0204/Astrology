@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS app_installations (
     utm_medium VARCHAR(512),
     utm_campaign VARCHAR(512),
     client_install_key VARCHAR(128),
+    lead_phone VARCHAR(64),
+    lead_email VARCHAR(255),
     first_open_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_open_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     open_count INTEGER NOT NULL DEFAULT 1,
@@ -34,6 +36,12 @@ ALTER TABLE app_installations
 
 ALTER TABLE app_installations
     ADD COLUMN IF NOT EXISTS app_build VARCHAR(64);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS lead_phone VARCHAR(64);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS lead_email VARCHAR(255);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_app_installations_client_install_key
     ON app_installations (client_install_key)

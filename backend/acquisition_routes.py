@@ -160,6 +160,13 @@ class AcquisitionEventBody(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AcquisitionContactBody(BaseModel):
+    installation_id: str = Field(..., min_length=36, max_length=36)
+    client_install_key: Optional[str] = Field(None, max_length=512)
+    phone: Optional[str] = Field(None, max_length=64)
+    email: Optional[str] = Field(None, max_length=255)
+
+
 def _validate_installation_id(s: str) -> str:
     t = (s or "").strip()
     if not _UUID_RE.match(t):
@@ -198,6 +205,21 @@ def _normalize_client_install_key(value: Optional[str]) -> Optional[str]:
     if len(raw) < 12:
         return None
     return "sha256:" + hashlib.sha256(raw[:512].encode("utf-8")).hexdigest()
+
+
+def _clean_lead_phone(value: Optional[str]) -> Optional[str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    text = re.sub(r"[^0-9+]", "", raw)[:64]
+    return text if len(text) >= 7 else None
+
+
+def _clean_lead_email(value: Optional[str]) -> Optional[str]:
+    raw = str(value or "").strip().lower()
+    if not raw or "@" not in raw or len(raw) > 255:
+        return None
+    return raw
 
 
 def _upsert_installation_stub(conn, *, iid: str, client_install_key: Optional[str], platform: str = "unknown") -> str:
@@ -342,6 +364,39 @@ async def acquisition_event(body: AcquisitionEventBody):
     return {"ok": True}
 
 
+@router.post("/acquisition/contact")
+async def acquisition_contact(body: AcquisitionContactBody):
+    """Store reachable lead contact for an anonymous install that has not completed registration yet."""
+    iid = _validate_installation_id(body.installation_id)
+    phone = _clean_lead_phone(body.phone)
+    email = _clean_lead_email(body.email)
+    if not phone and not email:
+        return {"ok": True, "stored": False}
+
+    with get_conn() as conn:
+        resolved_iid = _upsert_installation_stub(
+            conn,
+            iid=iid,
+            client_install_key=body.client_install_key,
+            platform="unknown",
+        )
+        execute(
+            conn,
+            """
+            UPDATE app_installations
+            SET
+                lead_phone = COALESCE(lead_phone, ?),
+                lead_email = COALESCE(lead_email, ?),
+                last_open_at = NOW()
+            WHERE installation_id = ?::uuid
+            """,
+            (phone, email, resolved_iid),
+        )
+        conn.commit()
+
+    return {"ok": True, "stored": True}
+
+
 @router.post("/acquisition/link-user")
 async def acquisition_link_user(body: AcquisitionLinkBody, current_user: User = Depends(get_current_user)):
     """Attach the logged-in user to an installation row (first successful auth after install)."""
@@ -466,6 +521,8 @@ async def admin_acquisition_installations(
                 ai.open_count,
                 ai.userid,
                 ai.registered_at,
+                ai.lead_phone,
+                ai.lead_email,
                 u.phone AS user_phone,
                 u.name AS user_name,
                 le.event_name AS last_event_name,
@@ -506,12 +563,14 @@ async def admin_acquisition_installations(
                 "open_count": r[10],
                 "userid": r[11],
                 "registered_at": r[12].isoformat() if r[12] else None,
-                "user_phone": r[13],
-                "user_name": r[14],
-                "last_event_name": r[15],
-                "last_event_status": r[16],
-                "last_event_screen": r[17],
-                "last_event_at": r[18].isoformat() if r[18] else None,
+                "lead_phone": r[13],
+                "lead_email": r[14],
+                "user_phone": r[15],
+                "user_name": r[16],
+                "last_event_name": r[17],
+                "last_event_status": r[18],
+                "last_event_screen": r[19],
+                "last_event_at": r[20].isoformat() if r[20] else None,
             }
         )
 
@@ -706,6 +765,8 @@ async def admin_acquisition_installation_events(
                 ai.utm_campaign,
                 ai.app_version,
                 ai.app_build,
+                ai.lead_phone,
+                ai.lead_email,
                 u.phone,
                 u.name
             FROM app_installations ai
@@ -741,8 +802,10 @@ async def admin_acquisition_installation_events(
             "utm_campaign": install[6],
             "app_version": install[7],
             "app_build": install[8],
-            "user_phone": install[9],
-            "user_name": install[10],
+            "lead_phone": install[9],
+            "lead_email": install[10],
+            "user_phone": install[11],
+            "user_name": install[12],
         },
         "events": [
             {

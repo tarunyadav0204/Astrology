@@ -139,6 +139,7 @@ const AdminAcquisition = () => {
   }, [load]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const dropoffTotal = (analytics.dropoff || []).reduce((sum, row) => sum + Number(row.installs || 0), 0);
   const openTimeline = async (installationId) => {
     if (!installationId) return;
     setTimelineModal({ visible: true, loading: true, error: '', data: null });
@@ -264,6 +265,14 @@ const AdminAcquisition = () => {
                       </tr>
                     ))
                   )}
+                  {(analytics.dropoff || []).length > 0 ? (
+                    <tr style={{ background: '#e0f2fe', fontWeight: 800 }}>
+                      <td>Total unlinked</td>
+                      <td>—</td>
+                      <td>{dropoffTotal}</td>
+                      <td>{analytics.unlinked ? `${((dropoffTotal / analytics.unlinked) * 100).toFixed(1)}%` : '0.0%'}</td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -394,7 +403,7 @@ const AdminAcquisition = () => {
                   <th>UTM source / medium / campaign</th>
                   <th>Opens</th>
                   <th>Last funnel event</th>
-                  <th>User</th>
+                  <th>User / lead</th>
                   <th>Linked at (IST)</th>
                   <th>Referrer preview</th>
                 </tr>
@@ -464,6 +473,12 @@ const AdminAcquisition = () => {
                               <div>{row.user_phone || '—'}</div>
                               <div style={{ fontSize: 12, color: '#666' }}>{row.user_name || ''}</div>
                               <div style={{ fontSize: 11, color: '#999' }}>id {row.userid}</div>
+                            </>
+                          ) : row.lead_phone || row.lead_email ? (
+                            <>
+                              <div style={{ color: '#c2410c', fontWeight: 700 }}>{row.lead_phone || '—'}</div>
+                              <div style={{ fontSize: 12, color: '#9a3412' }}>{row.lead_email || ''}</div>
+                              <div style={{ fontSize: 11, color: '#999' }}>lead contact</div>
                             </>
                           ) : (
                             '—'
@@ -620,7 +635,7 @@ const AdminAcquisition = () => {
                       <div style={{ fontSize: 13, color: timelineModal.data.installation?.userid ? '#166534' : '#c2410c' }}>
                         User: {timelineModal.data.installation?.userid
                           ? `${timelineModal.data.installation.user_phone || '—'} · ${timelineModal.data.installation.user_name || ''} · id ${timelineModal.data.installation.userid}`
-                          : 'Not converted'}
+                          : `Not converted${timelineModal.data.installation?.lead_phone || timelineModal.data.installation?.lead_email ? ` · lead ${[timelineModal.data.installation?.lead_phone, timelineModal.data.installation?.lead_email].filter(Boolean).join(' · ')}` : ''}`}
                       </div>
                     </div>
 
