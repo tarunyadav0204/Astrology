@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 import swisseph as swe
 import os
 import json
+import re
 
 try:
     from dotenv import load_dotenv
@@ -203,6 +204,51 @@ def _registration_email_required(_phone: str) -> bool:
     return False
 
 
+def _registration_email_error(email: str) -> Optional[str]:
+    clean = (email or "").strip().lower()
+    if not clean:
+        return None
+    if len(clean) > 254:
+        return "Email address is too long"
+    if not re.match(r"^[^\s@]+@[^\s@]+\.[a-z]{2,24}$", clean, re.IGNORECASE):
+        return "Please provide a valid email address"
+
+    domain = clean.split("@", 1)[1]
+    parts = domain.split(".")
+    domain_name = parts[0]
+    tld = parts[-1] if parts else ""
+    full_tld = ".".join(parts[1:])
+    typo_tlds = {"coma", "con", "cmo", "comm", "coom", "om", "cm"}
+    common_providers = {
+        "gmail",
+        "googlemail",
+        "yahoo",
+        "hotmail",
+        "outlook",
+        "live",
+        "icloud",
+        "me",
+        "rediffmail",
+        "proton",
+        "protonmail",
+    }
+    known_provider_tlds = {"com", "co.in", "in", "net", "org"}
+    if tld in typo_tlds:
+        return "Check the email ending. Did you mean .com?"
+    if domain_name in common_providers and full_tld not in known_provider_tlds:
+        return f"Check the {domain_name} email ending"
+    return None
+
+
+def _require_mobile_registration_otp_token() -> bool:
+    return (os.getenv("REQUIRE_MOBILE_REGISTRATION_OTP_TOKEN") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _otp_email_required(phone: str) -> bool:
     """Password reset: require email only when OTP is not India SMS-first (non-India)."""
     return not _is_india_number(phone)
@@ -391,10 +437,39 @@ def ensure_users_gender_column() -> None:
         logger.warning("Could not ensure users.gender column: %s", e)
 
 
+def ensure_users_userid_default() -> None:
+    """Postgres guard: users.userid must auto-generate when INSERT omits it."""
+    try:
+        with get_conn() as conn:
+            execute(conn, "CREATE SEQUENCE IF NOT EXISTS users_userid_seq")
+            execute(
+                conn,
+                """
+                SELECT setval(
+                    'users_userid_seq',
+                    GREATEST(COALESCE((SELECT MAX(userid) FROM users), 1), 1),
+                    (SELECT COUNT(*) > 0 FROM users)
+                )
+                """,
+            )
+            execute(
+                conn,
+                "ALTER TABLE users ALTER COLUMN userid SET DEFAULT nextval('users_userid_seq'::regclass)",
+            )
+            execute(conn, "ALTER SEQUENCE users_userid_seq OWNED BY users.userid")
+            conn.commit()
+    except Exception as e:
+        logger.warning("Could not ensure users.userid default sequence: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
     # Startup
+    try:
+        ensure_users_userid_default()
+    except Exception as e:
+        print(f"Warning: users.userid default sequence check failed: {e}")
     try:
         ensure_users_signup_client_column()
     except Exception as e:
@@ -1209,6 +1284,7 @@ class UserRegistrationWithBirth(BaseModel):
     phone: str
     password: str
     email: Optional[str] = None
+    otp_token: Optional[str] = None
     birth_details: Optional[BirthData] = None
     role: str = "user"
     signup_client: Optional[str] = None
@@ -1269,10 +1345,9 @@ async def register(user_data: UserCreate):
                     status_code=400,
                     detail="Email is required for registration.",
                 )
-        if email_clean and (
-            "@" not in email_clean or "." not in email_clean.split("@")[-1]
-        ):
-            raise HTTPException(status_code=400, detail="Please provide a valid email address")
+        email_error = _registration_email_error(email_clean)
+        if email_error:
+            raise HTTPException(status_code=400, detail=email_error)
 
         hashed_password = hash_password(user_data.password)
         try:
@@ -1365,6 +1440,24 @@ async def register(user_data: UserCreate):
 async def register_with_birth(user_data: UserRegistrationWithBirth):
     """Register user with birth details for mobile app"""
     with get_conn() as conn:
+        otp_token = (user_data.otp_token or "").strip()
+        require_otp_token = _require_mobile_registration_otp_token()
+        if require_otp_token and not otp_token:
+            raise HTTPException(status_code=400, detail="OTP verification is required for registration")
+
+        if otp_token:
+            cur = execute(
+                conn,
+                """
+                    SELECT token FROM password_reset_codes
+                    WHERE phone = %s AND token = %s AND expires_at > %s
+                      AND COALESCE(LOWER(TRIM(used::text)), '') NOT IN ('true', '1', 't', 'yes')
+                """,
+                (user_data.phone, otp_token, datetime.utcnow()),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=400, detail="Invalid or expired OTP verification")
+
         cur = execute(conn, "SELECT phone FROM users WHERE phone = %s", (user_data.phone,))
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Phone number already registered")
@@ -1376,10 +1469,9 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
                     status_code=400,
                     detail="Email is required for registration.",
                 )
-        if email_clean and (
-            "@" not in email_clean or "." not in email_clean.split("@")[-1]
-        ):
-            raise HTTPException(status_code=400, detail="Please provide a valid email address")
+        email_error = _registration_email_error(email_clean)
+        if email_error:
+            raise HTTPException(status_code=400, detail=email_error)
 
         # Create user
         hashed_password = hash_password(user_data.password)
@@ -1486,7 +1578,14 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
                     (user[0], astroroshni_free[0], start_date, end_date),
                 )
 
-            conn.commit()
+        if otp_token:
+            execute(
+                conn,
+                "UPDATE password_reset_codes SET used = 'TRUE' WHERE token = %s",
+                (otp_token,),
+            )
+
+        conn.commit()
 
     access_token = create_access_token(data={"sub": user[2], "userid": user[0], "name": user[1]})
 
@@ -2114,6 +2213,9 @@ async def send_registration_otp(request: SendResetCode):
     # Non-India: prefer email when provided; otherwise SMS-only (email optional for registration).
     sms_sent = sms_service.send_reset_code(request.phone, code)
     email_clean = (request.email or "").strip()
+    email_error = _registration_email_error(email_clean)
+    if email_error:
+        raise HTTPException(status_code=400, detail=email_error)
     email_sent = bool(_send_otp_email(email_clean, code)) if email_clean else False
 
     if email_sent:

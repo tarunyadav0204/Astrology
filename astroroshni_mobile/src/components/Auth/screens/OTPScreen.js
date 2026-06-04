@@ -27,6 +27,11 @@ export default function OTPScreen({
   const [isValid, setIsValid] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
   const [devOtpCode, setDevOtpCode] = useState(null);
+  const otpChannel = formData?.otpDelivery?.registration_otp_channel || '';
+  const otpSentToEmail = otpChannel === 'email';
+  const otpDestination = otpSentToEmail && formData.email
+    ? formData.email
+    : `${formData.countryCode} ${formData.phone}`;
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -78,20 +83,20 @@ export default function OTPScreen({
         { source: 'otp_screen' },
         { status: 'started', screenName: 'OTPScreen' },
       ).catch(() => {});
-      // For now, just proceed to next screen
-      // In production, you'd verify the OTP with backend
-      // console.log('Verifying OTP:', formData.otpCode);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
+      const response = await authAPI.verifyResetCode({
+        phone: fullPhone,
+        code: formData.otpCode,
+      });
+      updateFormData('otpToken', response?.data?.reset_token || '');
       trackAcquisitionFunnelEvent(
         'registration_otp_verified',
         { source: 'otp_screen' },
         { status: 'success', screenName: 'OTPScreen' },
       ).catch(() => {});
       
-      // Continue to name screen for registration
-      navigateToScreen('name');
+      // Continue to email collection after the phone OTP has been verified.
+      navigateToScreen('email');
     } catch (error) {
       trackAcquisitionFunnelEvent(
         'registration_otp_verify_failed',
@@ -119,6 +124,7 @@ export default function OTPScreen({
         payload.email = formData.email.trim();
       }
       const response = await authAPI.sendRegistrationOtp(payload);
+      updateFormData('otpDelivery', response?.data?.delivery || formData.otpDelivery || null);
       setResendTimer(30);
       
       // Show dev OTP code if available
@@ -167,20 +173,18 @@ export default function OTPScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen('email', 'back')}
+          onPress={() => navigateToScreen('phone', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
 
         <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.emoji}>📱</Text>
+          <Text style={styles.emoji}>{otpSentToEmail ? '📧' : '📱'}</Text>
           <Text style={styles.title}>Enter OTP</Text>
           <Text style={styles.subtitle}>
             We've sent a 6-digit code to{"\n"}
-            {formData.email
-              ? formData.email
-              : `${formData.countryCode} ${formData.phone}`}
+            {otpDestination}
           </Text>
           {devOtpCode && (
             <View style={styles.devCodeContainer}>

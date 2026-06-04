@@ -215,6 +215,7 @@ export default function PasswordScreen({
             phone: fullPhone,
             password: formData.password,
             ...(emailTrim ? { email: emailTrim } : {}),
+            ...(formData.otpToken ? { otp_token: formData.otpToken } : {}),
             role: 'user',
             signup_client: 'mobile',
             ...(formData?.birthDetails?.gender ? { gender: formData.birthDetails.gender } : {}),

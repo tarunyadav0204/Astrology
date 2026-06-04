@@ -70,7 +70,7 @@ export default function NameInputScreen({
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigateToScreen('otp', 'back')}
+          onPress={() => navigateToScreen('email', 'back')}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>

@@ -41,12 +41,12 @@ function resolveAuthHardwareBackTarget(currentScreen, isLogin, formData) {
       if (isLogin) {
         return 'password';
       }
-      return (formData?.otpCode || '').trim() ? 'name' : 'phone';
+      return 'otp';
     }
     case 'otp':
-      return 'email';
+      return 'phone';
     case 'name':
-      return 'otp';
+      return 'email';
     case 'chooseLanguage':
       return 'password';
     case 'welcomeAfterRegistration':
@@ -64,6 +64,8 @@ const INITIAL_FORM_DATA = {
   email: '',
   otpCode: '',
   devOtpCode: '',
+  otpToken: '',
+  otpDelivery: null,
   resetCode: '',
   newPassword: '',
   birthDetails: {

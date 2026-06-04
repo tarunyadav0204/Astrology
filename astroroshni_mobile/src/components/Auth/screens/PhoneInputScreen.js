@@ -15,6 +15,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
+import { authAPI } from '../../../services/api';
+import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import {
   COUNTRY_CODES,
   getNationalPhoneMaxLength,
@@ -74,21 +76,62 @@ export default function PhoneInputScreen({
     console.log('  Full phone:', fullPhone);
     console.log('  Is login:', isLogin);
     
-    // Store country code separately
-    updateFormData('countryCode', selectedCountry.code);
-    updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
-    trackAcquisitionFunnelEvent(
-      'auth_phone_submitted',
-      { mode: isLogin ? 'login' : 'register', country_code: selectedCountry.code },
-      { status: 'accepted', screenName: 'PhoneInputScreen' },
-    ).catch(() => {});
-    
     if (isLogin) {
+      updateFormData('countryCode', selectedCountry.code);
+      updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
+      trackAcquisitionFunnelEvent(
+        'auth_phone_submitted',
+        { mode: 'login', country_code: selectedCountry.code },
+        { status: 'accepted', screenName: 'PhoneInputScreen' },
+      ).catch(() => {});
       console.log('  → Navigating to password screen');
       navigateToScreen('password');
-    } else {
-      navigateToScreen('email');
       return;
+    }
+
+    setLoading(true);
+    try {
+      updateFormData('countryCode', selectedCountry.code);
+      updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
+      trackAcquisitionFunnelEvent(
+        'auth_phone_submitted',
+        { mode: 'register', country_code: selectedCountry.code },
+        { status: 'accepted', screenName: 'PhoneInputScreen' },
+      ).catch(() => {});
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        { source: 'phone_screen' },
+        { status: 'started', screenName: 'PhoneInputScreen' },
+      ).catch(() => {});
+
+      const response = await authAPI.sendRegistrationOtp({ phone: fullPhone });
+      updateFormData('otpDelivery', response?.data?.delivery || null);
+      if (response?.data?.dev_code) {
+        updateFormData('devOtpCode', response.data.dev_code);
+      }
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        {
+          source: 'phone_screen',
+          channel: response?.data?.delivery?.registration_otp_channel || '',
+        },
+        { status: 'success', screenName: 'PhoneInputScreen' },
+      ).catch(() => {});
+      navigateToScreen('otp');
+    } catch (error) {
+      const message = apiErrorMessage(error, 'Unable to verify this phone number. Please try again.');
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        {
+          source: 'phone_screen',
+          status_code: error?.response?.status || '',
+          reason: message.replace(/\s+/g, ' ').slice(0, 160),
+        },
+        { status: 'failed', screenName: 'PhoneInputScreen' },
+      ).catch(() => {});
+      Alert.alert(error?.response?.status === 409 ? 'Already registered' : 'Could not continue', message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -111,7 +154,7 @@ export default function PhoneInputScreen({
             {isLogin ? "Welcome back!" : "What's your number?"}
           </Text>
           <Text style={styles.subtitle}>
-            {isLogin ? "Enter your phone number to sign in" : "We'll send you a verification code"}
+            {isLogin ? "Enter your phone number to sign in" : "We'll send a verification code to this phone"}
           </Text>
         </View>
 
