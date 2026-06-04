@@ -43,6 +43,15 @@ _FUNNEL_STEPS = [
 ]
 
 
+def _reached_funnel_events(event_name: str) -> list[str]:
+    """Events that prove an install reached this funnel step or a later one."""
+    names = [name for name, _label in _FUNNEL_STEPS]
+    if event_name == "first_open" or event_name not in names:
+        return []
+    idx = names.index(event_name)
+    return [name for name in names[idx:] if name != "first_open"]
+
+
 def _query_from_candidate(value: str) -> Optional[str]:
     raw = str(value or "").strip()
     if not raw:
@@ -666,7 +675,12 @@ async def admin_acquisition_installations_analytics(
                         FROM app_installation_events e
                         WHERE e.installation_id = f.installation_id
                           AND (
-                            e.event_name IN ('login_submitted', 'login_completed', 'login_failed')
+                            e.event_name IN (
+                                'login_submitted',
+                                'login_completed',
+                                'login_failed',
+                                'registration_existing_user_redirected'
+                            )
                             OR (
                                 e.event_name = 'auth_mode_selected'
                                 AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'login'
@@ -737,6 +751,8 @@ async def admin_acquisition_installations_analytics(
             if event_name == "first_open":
                 count = new_user_candidate_installs
             else:
+                reached_events = _reached_funnel_events(event_name)
+                placeholders = ", ".join(["?"] * len(reached_events))
                 cur = execute(
                     conn,
                     f"""
@@ -744,9 +760,9 @@ async def admin_acquisition_installations_analytics(
                     SELECT COUNT(DISTINCT aie.installation_id)::int
                     FROM app_installation_events aie
                     JOIN classified c ON c.installation_id = aie.installation_id
-                    WHERE NOT c.existing_user_install AND aie.event_name = ?
+                    WHERE NOT c.existing_user_install AND aie.event_name IN ({placeholders})
                     """,
-                    params + [event_name],
+                    params + reached_events,
                 )
                 count = int((cur.fetchone() or [0])[0] or 0)
             funnel.append(
