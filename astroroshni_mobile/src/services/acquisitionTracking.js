@@ -26,6 +26,8 @@ const BLOCKED_METADATA_KEYS = new Set([
 
 /** Serialize first-open so parallel callers cannot mint two installation_ids before AsyncStorage settles. */
 let firstOpenChain = Promise.resolve();
+let installationIdPromise = null;
+let clientInstallKeyPromise = null;
 
 function generateUuidV4() {
   if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
@@ -39,6 +41,14 @@ function generateUuidV4() {
 }
 
 export async function getOrCreateInstallationId() {
+  if (installationIdPromise) return installationIdPromise;
+  installationIdPromise = getOrCreateInstallationIdBody().finally(() => {
+    installationIdPromise = null;
+  });
+  return installationIdPromise;
+}
+
+async function getOrCreateInstallationIdBody() {
   const existing = await AsyncStorage.getItem(INSTALLATION_ID_KEY);
   if (existing && UUID_RE.test(String(existing).trim())) {
     return String(existing).trim();
@@ -46,6 +56,45 @@ export async function getOrCreateInstallationId() {
   const id = generateUuidV4();
   await AsyncStorage.setItem(INSTALLATION_ID_KEY, id);
   return id;
+}
+
+async function getClientInstallKey() {
+  if (clientInstallKeyPromise) return clientInstallKeyPromise;
+  clientInstallKeyPromise = getClientInstallKeyBody().catch(() => null);
+  return clientInstallKeyPromise;
+}
+
+async function getClientInstallKeyBody() {
+  const appId = Application.applicationId || 'unknown_app';
+  let installTime = '';
+  try {
+    if (typeof Application.getInstallationTimeAsync === 'function') {
+      const d = await Application.getInstallationTimeAsync();
+      installTime = d instanceof Date && !Number.isNaN(d.getTime()) ? d.toISOString() : String(d || '');
+    }
+  } catch (_) {
+    /* optional */
+  }
+
+  if (Platform.OS === 'android' && typeof Application.getAndroidId === 'function') {
+    try {
+      const androidId = Application.getAndroidId();
+      if (androidId && installTime) return `android:${appId}:${androidId}:${installTime}`;
+    } catch (_) {
+      /* optional */
+    }
+  }
+
+  if (Platform.OS === 'ios' && typeof Application.getIosIdForVendorAsync === 'function') {
+    try {
+      const idfv = await Application.getIosIdForVendorAsync();
+      if (idfv && installTime) return `ios:${appId}:${idfv}:${installTime}`;
+    } catch (_) {
+      /* optional */
+    }
+  }
+
+  return null;
 }
 
 async function buildReferrerPayload() {
@@ -76,6 +125,7 @@ async function sendAcquisitionFirstOpenOnceBody() {
     if (sent === '1') return;
 
     const installation_id = await getOrCreateInstallationId();
+    const client_install_key = await getClientInstallKey();
     const app_version =
       Application.nativeApplicationVersion ||
       Application.applicationVersion ||
@@ -91,6 +141,7 @@ async function sendAcquisitionFirstOpenOnceBody() {
       },
       body: JSON.stringify({
         installation_id,
+        client_install_key,
         platform: Platform.OS,
         app_version,
         referrer_raw: referrer_raw || null,
@@ -155,6 +206,7 @@ export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, opti
     const event_name = safeEventToken(eventName);
     if (!event_name) return;
     const installation_id = await getOrCreateInstallationId();
+    const client_install_key = await getClientInstallKey();
     const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/acquisition/event')}`;
     const res = await fetch(url, {
       method: 'POST',
@@ -164,6 +216,7 @@ export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, opti
       },
       body: JSON.stringify({
         installation_id,
+        client_install_key,
         event_name,
         event_status: safeEventToken(options.status || metadata.status || '').slice(0, 32) || null,
         screen_name: safeEventToken(options.screenName || metadata.screen_name || '').slice(0, 120) || null,
@@ -185,6 +238,7 @@ export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, opti
 export async function linkAcquisitionInstallationToUser() {
   try {
     const installation_id = await getOrCreateInstallationId();
+    const client_install_key = await getClientInstallKey();
     const token = await AsyncStorage.getItem('authToken');
     if (!token || !installation_id) return;
 
@@ -197,7 +251,7 @@ export async function linkAcquisitionInstallationToUser() {
         Authorization: `Bearer ${token}`,
         'X-AstroRoshni-Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ installation_id }),
+      body: JSON.stringify({ installation_id, client_install_key }),
     });
     if (!res.ok && __DEV__) {
       const t = await res.text().catch(() => '');

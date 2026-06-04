@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import re
 import json
+import hashlib
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote_plus, urlparse
 
@@ -81,6 +82,7 @@ def _parse_utm_from_referrer(referrer_raw: Optional[str]) -> tuple[Optional[str]
 
 class AcquisitionFirstOpenBody(BaseModel):
     installation_id: str = Field(..., min_length=36, max_length=36)
+    client_install_key: Optional[str] = Field(None, max_length=512)
     platform: str = Field("", max_length=32)
     app_version: Optional[str] = Field(None, max_length=64)
     referrer_raw: Optional[str] = Field(None, max_length=8192)
@@ -88,10 +90,12 @@ class AcquisitionFirstOpenBody(BaseModel):
 
 class AcquisitionLinkBody(BaseModel):
     installation_id: str = Field(..., min_length=36, max_length=36)
+    client_install_key: Optional[str] = Field(None, max_length=512)
 
 
 class AcquisitionEventBody(BaseModel):
     installation_id: str = Field(..., min_length=36, max_length=36)
+    client_install_key: Optional[str] = Field(None, max_length=512)
     event_name: str = Field(..., min_length=1, max_length=120)
     event_status: Optional[str] = Field(None, max_length=32)
     screen_name: Optional[str] = Field(None, max_length=120)
@@ -131,6 +135,47 @@ def _sanitize_event_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     return safe
 
 
+def _normalize_client_install_key(value: Optional[str]) -> Optional[str]:
+    raw = str(value or "").strip()
+    if len(raw) < 12:
+        return None
+    return "sha256:" + hashlib.sha256(raw[:512].encode("utf-8")).hexdigest()
+
+
+def _upsert_installation_stub(conn, *, iid: str, client_install_key: Optional[str], platform: str = "unknown") -> str:
+    normalized_key = _normalize_client_install_key(client_install_key)
+    if normalized_key:
+        cur = execute(
+            conn,
+            """
+            INSERT INTO app_installations (
+                installation_id, client_install_key, platform, first_open_at, last_open_at, open_count
+            )
+            VALUES (?::uuid, ?, ?, NOW(), NOW(), 1)
+            ON CONFLICT (client_install_key) WHERE client_install_key IS NOT NULL DO UPDATE SET
+                last_open_at = NOW()
+            RETURNING installation_id::text
+            """,
+            (iid, normalized_key, platform or "unknown"),
+        )
+        row = cur.fetchone()
+        return str(row[0]) if row and row[0] else iid
+
+    execute(
+        conn,
+        """
+        INSERT INTO app_installations (
+            installation_id, platform, first_open_at, last_open_at, open_count
+        )
+        VALUES (?::uuid, ?, NOW(), NOW(), 1)
+        ON CONFLICT (installation_id) DO UPDATE SET
+            last_open_at = NOW()
+        """,
+        (iid, platform or "unknown"),
+    )
+    return iid
+
+
 @router.post("/acquisition/first-open")
 async def acquisition_first_open(body: AcquisitionFirstOpenBody):
     """
@@ -145,32 +190,59 @@ async def acquisition_first_open(body: AcquisitionFirstOpenBody):
         referrer_raw = str(referrer_raw)[:8192]
 
     utm_s, utm_m, utm_c = _parse_utm_from_referrer(referrer_raw)
+    client_install_key = _normalize_client_install_key(body.client_install_key)
 
     with get_conn() as conn:
-        execute(
-            conn,
-            """
-            INSERT INTO app_installations (
-                installation_id, platform, app_version, referrer_raw,
-                utm_source, utm_medium, utm_campaign,
-                first_open_at, last_open_at, open_count
+        if client_install_key:
+            execute(
+                conn,
+                """
+                INSERT INTO app_installations (
+                    installation_id, client_install_key, platform, app_version, referrer_raw,
+                    utm_source, utm_medium, utm_campaign,
+                    first_open_at, last_open_at, open_count
+                )
+                VALUES (
+                    ?::uuid, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    NOW(), NOW(), 1
+                )
+                ON CONFLICT (client_install_key) WHERE client_install_key IS NOT NULL DO UPDATE SET
+                    last_open_at = NOW(),
+                    open_count = app_installations.open_count + 1,
+                    app_version = COALESCE(EXCLUDED.app_version, app_installations.app_version),
+                    referrer_raw = COALESCE(app_installations.referrer_raw, EXCLUDED.referrer_raw),
+                    utm_source = COALESCE(app_installations.utm_source, EXCLUDED.utm_source),
+                    utm_medium = COALESCE(app_installations.utm_medium, EXCLUDED.utm_medium),
+                    utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
+                """,
+                (iid, client_install_key, platform, app_version, referrer_raw, utm_s, utm_m, utm_c),
             )
-            VALUES (
-                ?::uuid, ?, ?, ?,
-                ?, ?, ?,
-                NOW(), NOW(), 1
+        else:
+            execute(
+                conn,
+                """
+                INSERT INTO app_installations (
+                    installation_id, platform, app_version, referrer_raw,
+                    utm_source, utm_medium, utm_campaign,
+                    first_open_at, last_open_at, open_count
+                )
+                VALUES (
+                    ?::uuid, ?, ?, ?,
+                    ?, ?, ?,
+                    NOW(), NOW(), 1
+                )
+                ON CONFLICT (installation_id) DO UPDATE SET
+                    last_open_at = NOW(),
+                    open_count = app_installations.open_count + 1,
+                    app_version = COALESCE(EXCLUDED.app_version, app_installations.app_version),
+                    referrer_raw = COALESCE(app_installations.referrer_raw, EXCLUDED.referrer_raw),
+                    utm_source = COALESCE(app_installations.utm_source, EXCLUDED.utm_source),
+                    utm_medium = COALESCE(app_installations.utm_medium, EXCLUDED.utm_medium),
+                    utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
+                """,
+                (iid, platform, app_version, referrer_raw, utm_s, utm_m, utm_c),
             )
-            ON CONFLICT (installation_id) DO UPDATE SET
-                last_open_at = NOW(),
-                open_count = app_installations.open_count + 1,
-                app_version = COALESCE(EXCLUDED.app_version, app_installations.app_version),
-                referrer_raw = COALESCE(app_installations.referrer_raw, EXCLUDED.referrer_raw),
-                utm_source = COALESCE(app_installations.utm_source, EXCLUDED.utm_source),
-                utm_medium = COALESCE(app_installations.utm_medium, EXCLUDED.utm_medium),
-                utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
-            """,
-            (iid, platform, app_version, referrer_raw, utm_s, utm_m, utm_c),
-        )
         conn.commit()
 
     return {"ok": True}
@@ -188,17 +260,11 @@ async def acquisition_event(body: AcquisitionEventBody):
     metadata = _sanitize_event_metadata(body.metadata or {})
 
     with get_conn() as conn:
-        execute(
+        resolved_iid = _upsert_installation_stub(
             conn,
-            """
-            INSERT INTO app_installations (
-                installation_id, platform, first_open_at, last_open_at, open_count
-            )
-            VALUES (?::uuid, 'unknown', NOW(), NOW(), 1)
-            ON CONFLICT (installation_id) DO UPDATE SET
-                last_open_at = NOW()
-            """,
-            (iid,),
+            iid=iid,
+            client_install_key=body.client_install_key,
+            platform="unknown",
         )
         execute(
             conn,
@@ -208,7 +274,7 @@ async def acquisition_event(body: AcquisitionEventBody):
             )
             VALUES (?::uuid, ?, ?, ?, ?::jsonb, NOW())
             """,
-            (iid, event_name, event_status, screen_name, json.dumps(metadata)),
+            (resolved_iid, event_name, event_status, screen_name, json.dumps(metadata)),
         )
         conn.commit()
 
@@ -220,36 +286,67 @@ async def acquisition_link_user(body: AcquisitionLinkBody, current_user: User = 
     """Attach the logged-in user to an installation row (first successful auth after install)."""
     iid = _validate_installation_id(body.installation_id)
     uid = int(current_user.userid)
+    client_install_key = _normalize_client_install_key(body.client_install_key)
 
     with get_conn() as conn:
-        execute(
-            conn,
-            """
-            INSERT INTO app_installations (
-                installation_id, platform, app_version, referrer_raw,
-                utm_source, utm_medium, utm_campaign,
-                first_open_at, last_open_at, open_count, userid, registered_at
+        if client_install_key:
+            execute(
+                conn,
+                """
+                INSERT INTO app_installations (
+                    installation_id, client_install_key, platform, app_version, referrer_raw,
+                    utm_source, utm_medium, utm_campaign,
+                    first_open_at, last_open_at, open_count, userid, registered_at
+                )
+                VALUES (
+                    ?::uuid, ?, 'unknown', NULL, NULL,
+                    NULL, NULL, NULL,
+                    NOW(), NOW(), 1, ?, NOW()
+                )
+                ON CONFLICT (client_install_key) WHERE client_install_key IS NOT NULL DO UPDATE SET
+                    userid = CASE
+                        WHEN app_installations.userid IS NULL OR app_installations.userid = EXCLUDED.userid
+                        THEN EXCLUDED.userid
+                        ELSE app_installations.userid
+                    END,
+                    registered_at = CASE
+                        WHEN app_installations.userid IS NULL OR app_installations.userid = EXCLUDED.userid
+                        THEN COALESCE(app_installations.registered_at, NOW())
+                        ELSE app_installations.registered_at
+                    END,
+                    last_open_at = NOW()
+                """,
+                (iid, client_install_key, uid),
             )
-            VALUES (
-                ?::uuid, 'unknown', NULL, NULL,
-                NULL, NULL, NULL,
-                NOW(), NOW(), 1, ?, NOW()
+        else:
+            execute(
+                conn,
+                """
+                INSERT INTO app_installations (
+                    installation_id, platform, app_version, referrer_raw,
+                    utm_source, utm_medium, utm_campaign,
+                    first_open_at, last_open_at, open_count, userid, registered_at
+                )
+                VALUES (
+                    ?::uuid, 'unknown', NULL, NULL,
+                    NULL, NULL, NULL,
+                    NOW(), NOW(), 1, ?, NOW()
+                )
+                ON CONFLICT (installation_id) DO UPDATE SET
+                    userid = CASE
+                        WHEN app_installations.userid IS NULL OR app_installations.userid = EXCLUDED.userid
+                        THEN EXCLUDED.userid
+                        ELSE app_installations.userid
+                    END,
+                    registered_at = CASE
+                        WHEN app_installations.userid IS NULL OR app_installations.userid = EXCLUDED.userid
+                        THEN COALESCE(app_installations.registered_at, NOW())
+                        ELSE app_installations.registered_at
+                    END,
+                    last_open_at = NOW()
+                """,
+                (iid, uid),
             )
-            ON CONFLICT (installation_id) DO UPDATE SET
-                userid = CASE
-                    WHEN app_installations.userid IS NULL OR app_installations.userid = EXCLUDED.userid
-                    THEN EXCLUDED.userid
-                    ELSE app_installations.userid
-                END,
-                registered_at = CASE
-                    WHEN app_installations.userid IS NULL OR app_installations.userid = EXCLUDED.userid
-                    THEN COALESCE(app_installations.registered_at, NOW())
-                    ELSE app_installations.registered_at
-                END,
-                last_open_at = NOW()
-            """,
-            (iid, uid),
-        )
         conn.commit()
 
     return {"ok": True}

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS app_installations (
     utm_source VARCHAR(512),
     utm_medium VARCHAR(512),
     utm_campaign VARCHAR(512),
+    client_install_key VARCHAR(128),
     first_open_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_open_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     open_count INTEGER NOT NULL DEFAULT 1,
@@ -26,6 +27,13 @@ CREATE INDEX IF NOT EXISTS idx_app_installations_userid
 
 CREATE INDEX IF NOT EXISTS idx_app_installations_utm_campaign
     ON app_installations (utm_campaign);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS client_install_key VARCHAR(128);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_installations_client_install_key
+    ON app_installations (client_install_key)
+    WHERE client_install_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS app_installation_events (
     id BIGSERIAL PRIMARY KEY,
