@@ -50,8 +50,14 @@ const AdminAcquisition = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [registered, setRegistered] = useState('all');
+  const [utmSourceInput, setUtmSourceInput] = useState('');
+  const [utmSourceFilter, setUtmSourceFilter] = useState('');
+  const [utmMediumInput, setUtmMediumInput] = useState('');
+  const [utmMediumFilter, setUtmMediumFilter] = useState('');
   const [utmCampaignInput, setUtmCampaignInput] = useState('');
   const [utmCampaignFilter, setUtmCampaignFilter] = useState('');
+  const [appBuildInput, setAppBuildInput] = useState('');
+  const [appBuildFilter, setAppBuildFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(50);
   const [total, setTotal] = useState(0);
@@ -64,30 +70,44 @@ const AdminAcquisition = () => {
     not_registered: 0,
     registration_rate: 0,
   });
+  const [analytics, setAnalytics] = useState({ funnel: [], dropoff: [], installs: 0, linked: 0, unlinked: 0 });
   const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
+  const [timelineModal, setTimelineModal] = useState({ visible: false, loading: false, error: '', data: null });
 
   const applyUtmAndSearch = useCallback(() => {
+    setUtmSourceFilter(utmSourceInput.trim());
+    setUtmMediumFilter(utmMediumInput.trim());
     setUtmCampaignFilter(utmCampaignInput.trim());
+    setAppBuildFilter(appBuildInput.trim());
     setPage(1);
-  }, [utmCampaignInput]);
+  }, [appBuildInput, utmCampaignInput, utmMediumInput, utmSourceInput]);
+
+  const activeFilterParams = useCallback(() => {
+    const params = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    if (utmSourceFilter) params.utm_source = utmSourceFilter;
+    if (utmMediumFilter) params.utm_medium = utmMediumFilter;
+    if (utmCampaignFilter) params.utm_campaign = utmCampaignFilter;
+    if (appBuildFilter) params.app_build = appBuildFilter;
+    return params;
+  }, [appBuildFilter, dateFrom, dateTo, utmCampaignFilter, utmMediumFilter, utmSourceFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const dateParams = {};
-      if (dateFrom) dateParams.date_from = dateFrom;
-      if (dateTo) dateParams.date_to = dateTo;
+      const filterParams = activeFilterParams();
 
-      const [listRes, sumRes] = await Promise.all([
+      const [listRes, sumRes, analyticsRes] = await Promise.all([
         adminService.getAcquisitionInstallations({
-          ...dateParams,
+          ...filterParams,
           registered,
-          utm_campaign: utmCampaignFilter || undefined,
           page,
           limit,
         }),
-        adminService.getAcquisitionInstallationsSummary(dateParams),
+        adminService.getAcquisitionInstallationsSummary(filterParams),
+        adminService.getAcquisitionInstallationsAnalytics(filterParams),
       ]);
 
       setItems(listRes.items || []);
@@ -98,6 +118,13 @@ const AdminAcquisition = () => {
         not_registered: sumRes.not_registered ?? 0,
         registration_rate: sumRes.registration_rate ?? 0,
       });
+      setAnalytics({
+        funnel: analyticsRes.funnel || [],
+        dropoff: analyticsRes.dropoff || [],
+        installs: analyticsRes.installs || 0,
+        linked: analyticsRes.linked || 0,
+        unlinked: analyticsRes.unlinked || 0,
+      });
     } catch (e) {
       setError(e?.message || 'Failed to load');
       setItems([]);
@@ -105,13 +132,30 @@ const AdminAcquisition = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, registered, utmCampaignFilter, page, limit]);
+  }, [activeFilterParams, registered, page, limit]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const openTimeline = async (installationId) => {
+    if (!installationId) return;
+    setTimelineModal({ visible: true, loading: true, error: '', data: null });
+    try {
+      const data = await adminService.getAcquisitionInstallationEvents(installationId);
+      setTimelineModal({ visible: true, loading: false, error: '', data });
+    } catch (e) {
+      setTimelineModal({ visible: true, loading: false, error: e?.message || 'Failed to load timeline', data: null });
+    }
+  };
+
+  const dropoffSeverity = (eventName, status) => {
+    if (status === 'failed') return '#fee2e2';
+    if (String(eventName || '').includes('otp')) return '#ffedd5';
+    if (eventName === 'first_open_only' || eventName === 'auth_welcome_viewed') return '#fef9c3';
+    return '#f8fafc';
+  };
 
   return (
     <div className="users-management">
@@ -147,6 +191,85 @@ const AdminAcquisition = () => {
           </p>
         </div>
       </div>
+
+      {!loading && !error ? (
+        <>
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ margin: '0 0 10px' }}>Funnel summary</h3>
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
+              {(analytics.funnel || []).map((step, index) => {
+                const prevPct = index === 0 ? 1 : Number(step.conversion_from_previous || 0);
+                const color =
+                  index === 0 || prevPct >= 0.75 ? '#dcfce7' : prevPct >= 0.45 ? '#fef9c3' : '#fee2e2';
+                return (
+                  <div
+                    key={step.event_name}
+                    style={{
+                      minWidth: 150,
+                      border: '1px solid #e2e8f0',
+                      background: color,
+                      borderRadius: 8,
+                      padding: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>{step.label}</div>
+                    <div style={{ fontSize: 24, fontWeight: 800 }}>{step.count}</div>
+                    <div style={{ fontSize: 12, color: '#475569' }}>
+                      {index === 0
+                        ? 'Start'
+                        : `${(Number(step.conversion_from_previous || 0) * 100).toFixed(1)}% from previous`}
+                    </div>
+                    {index > 0 ? (
+                      <div style={{ fontSize: 11, color: '#991b1b' }}>
+                        drop {step.drop_from_previous || 0}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ margin: '0 0 10px' }}>Unconverted drop-off</h3>
+            <div className="users-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Last event</th>
+                    <th>Status / screen</th>
+                    <th>Installs</th>
+                    <th>% of unlinked</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(analytics.dropoff || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="users-table-empty">
+                        No unconverted drop-off for this filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    analytics.dropoff.map((row) => (
+                      <tr
+                        key={`${row.event_name}-${row.event_status}-${row.screen_name}`}
+                        style={{ background: dropoffSeverity(row.event_name, row.event_status) }}
+                      >
+                        <td style={{ fontWeight: 700 }}>{row.event_name}</td>
+                        <td>
+                          {[row.event_status, row.screen_name].filter(Boolean).join(' · ') || '—'}
+                        </td>
+                        <td>{row.installs}</td>
+                        <td>{(Number(row.share_of_unlinked || 0) * 100).toFixed(1)}%</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <div className="users-management-filters">
         <label>
@@ -186,12 +309,48 @@ const AdminAcquisition = () => {
           </select>
         </label>
         <label>
+          <span>UTM source contains</span>
+          <input
+            type="text"
+            placeholder="google-play, meta"
+            value={utmSourceInput}
+            onChange={(e) => setUtmSourceInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <label>
+          <span>UTM medium contains</span>
+          <input
+            type="text"
+            placeholder="organic, paid_social"
+            value={utmMediumInput}
+            onChange={(e) => setUtmMediumInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <label>
           <span>UTM campaign contains</span>
           <input
             type="text"
             placeholder="e.g. summer_sale"
             value={utmCampaignInput}
             onChange={(e) => setUtmCampaignInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <label>
+          <span>App build</span>
+          <input
+            type="text"
+            placeholder="178"
+            value={appBuildInput}
+            onChange={(e) => setAppBuildInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') applyUtmAndSearch();
             }}
@@ -250,9 +409,21 @@ const AdminAcquisition = () => {
                 ) : (
                   items.map((row) => {
                     const referrerPreview = formatReferrerPreview(row.referrer_preview);
+                    const isUnconverted = row.userid == null;
+                    const isFailed = row.last_event_status === 'failed';
+                    const rowBg = isFailed ? '#fef2f2' : isUnconverted ? '#fff7ed' : undefined;
                     return (
-                      <tr key={row.installation_id}>
-                        <td title={row.installation_id || ''} style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      <tr key={row.installation_id} style={{ background: rowBg }}>
+                        <td
+                          title="Open event timeline"
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            color: '#2563eb',
+                          }}
+                          onClick={() => openTimeline(row.installation_id)}
+                        >
                           {row.installation_id
                             ? `${String(row.installation_id).slice(0, 8)}…${String(row.installation_id).slice(-6)}`
                             : '—'}
@@ -269,10 +440,15 @@ const AdminAcquisition = () => {
                           {[row.utm_source, row.utm_medium, row.utm_campaign].filter(Boolean).join(' · ') || '—'}
                         </td>
                         <td>{row.open_count ?? '—'}</td>
-                        <td>
+                        <td
+                          style={{ cursor: row.installation_id ? 'pointer' : 'default' }}
+                          onClick={() => openTimeline(row.installation_id)}
+                        >
                           {row.last_event_name ? (
                             <>
-                              <div style={{ fontWeight: 600 }}>{row.last_event_name}</div>
+                              <div style={{ fontWeight: 600, color: isFailed ? '#b91c1c' : isUnconverted ? '#c2410c' : 'inherit' }}>
+                                {row.last_event_name}
+                              </div>
                               <div style={{ fontSize: 12, color: '#666' }}>
                                 {[row.last_event_status, row.last_event_screen].filter(Boolean).join(' · ') || '—'}
                               </div>
@@ -379,6 +555,112 @@ const AdminAcquisition = () => {
                 >
                   Copy
                 </button>
+              </div>
+            </div>
+          ) : null}
+
+          {timelineModal.visible ? (
+            <div
+              role="dialog"
+              aria-modal="true"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.45)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 20,
+              }}
+              onClick={() => setTimelineModal({ visible: false, loading: false, error: '', data: null })}
+            >
+              <div
+                style={{
+                  width: 'min(820px, 100%)',
+                  maxHeight: '84vh',
+                  background: '#fff',
+                  borderRadius: 8,
+                  boxShadow: '0 20px 45px rgba(15, 23, 42, 0.25)',
+                  padding: 20,
+                  overflow: 'auto',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                  <h3 style={{ margin: 0 }}>Install event timeline</h3>
+                  <button
+                    type="button"
+                    className="users-pagination-btn"
+                    onClick={() => setTimelineModal({ visible: false, loading: false, error: '', data: null })}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {timelineModal.loading ? (
+                  <div className="loading" style={{ marginTop: 20 }}>Loading…</div>
+                ) : timelineModal.error ? (
+                  <p style={{ color: '#c2185b' }}>{timelineModal.error}</p>
+                ) : timelineModal.data ? (
+                  <>
+                    <div style={{ marginTop: 14, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+                      <div style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                        {timelineModal.data.installation?.installation_id}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#475569', marginTop: 6 }}>
+                        First open: {formatDateTimeIST(timelineModal.data.installation?.first_open_at)}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#475569' }}>
+                        Build: {timelineModal.data.installation?.app_version || '—'} / {timelineModal.data.installation?.app_build || '—'}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#475569' }}>
+                        Attribution: {[timelineModal.data.installation?.utm_source, timelineModal.data.installation?.utm_medium, timelineModal.data.installation?.utm_campaign].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                      <div style={{ fontSize: 13, color: timelineModal.data.installation?.userid ? '#166534' : '#c2410c' }}>
+                        User: {timelineModal.data.installation?.userid
+                          ? `${timelineModal.data.installation.user_phone || '—'} · ${timelineModal.data.installation.user_name || ''} · id ${timelineModal.data.installation.userid}`
+                          : 'Not converted'}
+                      </div>
+                    </div>
+
+                    <div className="users-table" style={{ marginTop: 16 }}>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Time</th>
+                            <th>Event</th>
+                            <th>Status / screen</th>
+                            <th>Metadata</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(timelineModal.data.events || []).length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="users-table-empty">No event rows yet.</td>
+                            </tr>
+                          ) : (
+                            timelineModal.data.events.map((event, idx) => (
+                              <tr
+                                key={`${event.event_name}-${event.created_at}-${idx}`}
+                                style={{ background: event.event_status === 'failed' ? '#fef2f2' : undefined }}
+                              >
+                                <td>{formatDateTimeIST(event.created_at)}</td>
+                                <td style={{ fontWeight: 700 }}>{event.event_name}</td>
+                                <td>{[event.event_status, event.screen_name].filter(Boolean).join(' · ') || '—'}</td>
+                                <td style={{ maxWidth: 300, wordBreak: 'break-word', fontSize: 12 }}>
+                                  {event.metadata && Object.keys(event.metadata).length
+                                    ? JSON.stringify(event.metadata)
+                                    : '—'}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           ) : null}

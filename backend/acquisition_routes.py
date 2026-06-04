@@ -26,6 +26,19 @@ _UUID_RE = re.compile(
     re.IGNORECASE,
 )
 
+_FUNNEL_STEPS = [
+    ("first_open", "First open"),
+    ("auth_welcome_viewed", "Welcome viewed"),
+    ("auth_mode_selected", "Mode selected"),
+    ("auth_phone_submitted", "Phone submitted"),
+    ("registration_otp_requested", "OTP requested"),
+    ("registration_otp_screen_viewed", "OTP screen viewed"),
+    ("registration_otp_verified", "OTP verified"),
+    ("registration_name_submitted", "Name submitted"),
+    ("registration_submitted", "Registration submitted"),
+    ("registration_completed", "Registration completed"),
+]
+
 
 def _query_from_candidate(value: str) -> Optional[str]:
     raw = str(value or "").strip()
@@ -53,6 +66,50 @@ def _first_utm_from_query(query: str) -> tuple[Optional[str], Optional[str], Opt
 def _parse_utm_from_referrer(referrer_raw: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[str]]:
     if not referrer_raw or not str(referrer_raw).strip():
         return None, None, None
+
+
+def _acquisition_filter_sql(
+    *,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    registered: Optional[str] = None,
+    utm_campaign: Optional[str] = None,
+    utm_source: Optional[str] = None,
+    utm_medium: Optional[str] = None,
+    app_build: Optional[str] = None,
+    alias: str = "ai",
+) -> tuple[str, list[Any]]:
+    conditions: list[str] = ["1=1"]
+    params: list[Any] = []
+
+    prefix = f"{alias}." if alias else ""
+    if date_from and date_from.strip():
+        conditions.append(f"{prefix}first_open_at >= ?::date")
+        params.append(date_from.strip())
+    if date_to and date_to.strip():
+        conditions.append(f"{prefix}first_open_at < (?::date + INTERVAL '1 day')")
+        params.append(date_to.strip())
+
+    reg = (registered or "all").strip().lower()
+    if reg == "yes":
+        conditions.append(f"{prefix}userid IS NOT NULL")
+    elif reg == "no":
+        conditions.append(f"{prefix}userid IS NULL")
+
+    if utm_campaign and utm_campaign.strip():
+        conditions.append(f"{prefix}utm_campaign ILIKE ?")
+        params.append(f"%{utm_campaign.strip()}%")
+    if utm_source and utm_source.strip():
+        conditions.append(f"{prefix}utm_source ILIKE ?")
+        params.append(f"%{utm_source.strip()}%")
+    if utm_medium and utm_medium.strip():
+        conditions.append(f"{prefix}utm_medium ILIKE ?")
+        params.append(f"%{utm_medium.strip()}%")
+    if app_build and app_build.strip():
+        conditions.append(f"{prefix}app_build = ?")
+        params.append(app_build.strip())
+
+    return " AND ".join(conditions), params
     raw = str(referrer_raw).strip()
     try:
         candidates = [raw]
@@ -363,33 +420,25 @@ async def admin_acquisition_installations(
     date_to: Optional[str] = Query(None, description="first_open_at on or before YYYY-MM-DD"),
     registered: Optional[str] = Query(None, description="yes | no | all"),
     utm_campaign: Optional[str] = Query(None, description="ILIKE filter"),
+    utm_source: Optional[str] = Query(None, description="ILIKE filter"),
+    utm_medium: Optional[str] = Query(None, description="ILIKE filter"),
+    app_build: Optional[str] = Query(None, description="Exact native build/version code"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
 ):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    conditions: list[str] = ["1=1"]
-    params: list[Any] = []
-
-    if date_from and date_from.strip():
-        conditions.append("ai.first_open_at >= ?::date")
-        params.append(date_from.strip())
-    if date_to and date_to.strip():
-        conditions.append("ai.first_open_at < (?::date + INTERVAL '1 day')")
-        params.append(date_to.strip())
-
-    reg = (registered or "all").strip().lower()
-    if reg == "yes":
-        conditions.append("ai.userid IS NOT NULL")
-    elif reg == "no":
-        conditions.append("ai.userid IS NULL")
-
-    if utm_campaign and utm_campaign.strip():
-        conditions.append("ai.utm_campaign ILIKE ?")
-        params.append(f"%{utm_campaign.strip()}%")
-
-    where_sql = " AND ".join(conditions)
+    where_sql, params = _acquisition_filter_sql(
+        date_from=date_from,
+        date_to=date_to,
+        registered=registered,
+        utm_campaign=utm_campaign,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        app_build=app_build,
+        alias="ai",
+    )
     offset = (page - 1) * limit
 
     with get_conn() as conn:
@@ -474,19 +523,23 @@ async def admin_acquisition_installations_summary(
     current_user: User = Depends(get_current_user),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    utm_campaign: Optional[str] = Query(None),
+    utm_source: Optional[str] = Query(None),
+    utm_medium: Optional[str] = Query(None),
+    app_build: Optional[str] = Query(None),
 ):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    conditions: list[str] = ["1=1"]
-    params: list[Any] = []
-    if date_from and date_from.strip():
-        conditions.append("first_open_at >= ?::date")
-        params.append(date_from.strip())
-    if date_to and date_to.strip():
-        conditions.append("first_open_at < (?::date + INTERVAL '1 day')")
-        params.append(date_to.strip())
-    where_sql = " AND ".join(conditions)
+    where_sql, params = _acquisition_filter_sql(
+        date_from=date_from,
+        date_to=date_to,
+        utm_campaign=utm_campaign,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        app_build=app_build,
+        alias="",
+    )
 
     with get_conn() as conn:
         cur = execute(
@@ -509,4 +562,196 @@ async def admin_acquisition_installations_summary(
         "registered": registered,
         "not_registered": max(0, installs - registered),
         "registration_rate": round(registered / installs, 4) if installs else 0.0,
+    }
+
+
+@router.get("/admin/acquisition-installations/analytics")
+async def admin_acquisition_installations_analytics(
+    current_user: User = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    utm_campaign: Optional[str] = Query(None),
+    utm_source: Optional[str] = Query(None),
+    utm_medium: Optional[str] = Query(None),
+    app_build: Optional[str] = Query(None),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    where_sql, params = _acquisition_filter_sql(
+        date_from=date_from,
+        date_to=date_to,
+        utm_campaign=utm_campaign,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        app_build=app_build,
+        alias="ai",
+    )
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            f"""
+            WITH filtered AS (
+                SELECT ai.installation_id, ai.userid
+                FROM app_installations ai
+                WHERE {where_sql}
+            )
+            SELECT
+                COUNT(*)::int AS installs,
+                COUNT(*) FILTER (WHERE userid IS NOT NULL)::int AS linked
+            FROM filtered
+            """,
+            params,
+        )
+        base = cur.fetchone() or (0, 0)
+        installs = int(base[0] or 0)
+        linked = int(base[1] or 0)
+
+        funnel: list[dict[str, Any]] = []
+        previous = installs
+        for event_name, label in _FUNNEL_STEPS:
+            if event_name == "first_open":
+                count = installs
+            else:
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT COUNT(DISTINCT aie.installation_id)::int
+                    FROM app_installation_events aie
+                    JOIN app_installations ai ON ai.installation_id = aie.installation_id
+                    WHERE {where_sql} AND aie.event_name = ?
+                    """,
+                    params + [event_name],
+                )
+                count = int((cur.fetchone() or [0])[0] or 0)
+            funnel.append(
+                {
+                    "event_name": event_name,
+                    "label": label,
+                    "count": count,
+                    "conversion_from_previous": round(count / previous, 4) if previous else 0.0,
+                    "conversion_from_install": round(count / installs, 4) if installs else 0.0,
+                    "drop_from_previous": max(0, previous - count),
+                }
+            )
+            previous = count
+
+        cur = execute(
+            conn,
+            f"""
+            SELECT
+                COALESCE(le.event_name, 'first_open_only') AS event_name,
+                COALESCE(le.event_status, 'none') AS event_status,
+                COALESCE(le.screen_name, '') AS screen_name,
+                COUNT(*)::int AS installs
+            FROM app_installations ai
+            LEFT JOIN LATERAL (
+                SELECT event_name, event_status, screen_name
+                FROM app_installation_events aie
+                WHERE aie.installation_id = ai.installation_id
+                ORDER BY aie.created_at DESC
+                LIMIT 1
+            ) le ON TRUE
+            WHERE {where_sql} AND ai.userid IS NULL
+            GROUP BY 1, 2, 3
+            ORDER BY installs DESC, event_name ASC
+            LIMIT 50
+            """,
+            params,
+        )
+        dropoff_rows = cur.fetchall() or []
+
+    unlinked = max(0, installs - linked)
+    dropoff = [
+        {
+            "event_name": r[0],
+            "event_status": r[1],
+            "screen_name": r[2],
+            "installs": int(r[3] or 0),
+            "share_of_unlinked": round(int(r[3] or 0) / unlinked, 4) if unlinked else 0.0,
+        }
+        for r in dropoff_rows
+    ]
+
+    return {
+        "installs": installs,
+        "linked": linked,
+        "unlinked": unlinked,
+        "funnel": funnel,
+        "dropoff": dropoff,
+    }
+
+
+@router.get("/admin/acquisition-installations/{installation_id}/events")
+async def admin_acquisition_installation_events(
+    installation_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    iid = _validate_installation_id(installation_id)
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT
+                ai.installation_id::text,
+                ai.first_open_at,
+                ai.userid,
+                ai.registered_at,
+                ai.utm_source,
+                ai.utm_medium,
+                ai.utm_campaign,
+                ai.app_version,
+                ai.app_build,
+                u.phone,
+                u.name
+            FROM app_installations ai
+            LEFT JOIN users u ON u.userid = ai.userid
+            WHERE ai.installation_id = ?::uuid
+            """,
+            (iid,),
+        )
+        install = cur.fetchone()
+        if not install:
+            raise HTTPException(status_code=404, detail="Installation not found")
+
+        cur = execute(
+            conn,
+            """
+            SELECT event_name, event_status, screen_name, metadata, created_at
+            FROM app_installation_events
+            WHERE installation_id = ?::uuid
+            ORDER BY created_at ASC
+            """,
+            (iid,),
+        )
+        events = cur.fetchall() or []
+
+    return {
+        "installation": {
+            "installation_id": install[0],
+            "first_open_at": install[1].isoformat() if install[1] else None,
+            "userid": install[2],
+            "registered_at": install[3].isoformat() if install[3] else None,
+            "utm_source": install[4],
+            "utm_medium": install[5],
+            "utm_campaign": install[6],
+            "app_version": install[7],
+            "app_build": install[8],
+            "user_phone": install[9],
+            "user_name": install[10],
+        },
+        "events": [
+            {
+                "event_name": r[0],
+                "event_status": r[1],
+                "screen_name": r[2],
+                "metadata": r[3] if isinstance(r[3], dict) else {},
+                "created_at": r[4].isoformat() if r[4] else None,
+            }
+            for r in events
+        ],
     }

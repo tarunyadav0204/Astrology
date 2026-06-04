@@ -291,6 +291,9 @@ export const adminService = {
       sp.set('registered', params.registered);
     }
     if (params.utm_campaign != null && params.utm_campaign !== '') sp.set('utm_campaign', params.utm_campaign);
+    if (params.utm_source != null && params.utm_source !== '') sp.set('utm_source', params.utm_source);
+    if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
+    if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
@@ -306,11 +309,41 @@ export const adminService = {
     const sp = new URLSearchParams();
     if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
     if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    if (params.utm_campaign != null && params.utm_campaign !== '') sp.set('utm_campaign', params.utm_campaign);
+    if (params.utm_source != null && params.utm_source !== '') sp.set('utm_source', params.utm_source);
+    if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
+    if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
     const qs = sp.toString();
     const url = getEndpoint('/admin/acquisition-installations/summary') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Failed to fetch install funnel summary');
+    }
+    return response.json();
+  },
+
+  async getAcquisitionInstallationsAnalytics(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
+    if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    if (params.utm_campaign != null && params.utm_campaign !== '') sp.set('utm_campaign', params.utm_campaign);
+    if (params.utm_source != null && params.utm_source !== '') sp.set('utm_source', params.utm_source);
+    if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
+    if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/acquisition-installations/analytics') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      throw new Error('Failed to fetch install funnel analytics');
+    }
+    return response.json();
+  },
+
+  async getAcquisitionInstallationEvents(installationId) {
+    const url = getEndpoint(`/admin/acquisition-installations/${encodeURIComponent(installationId)}/events`);
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      throw new Error('Failed to fetch install timeline');
     }
     return response.json();
   },
