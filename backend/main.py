@@ -2499,7 +2499,7 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
 @app.get("/api/health")
 async def api_health():
     try:
-        # Test database connection
+        # Health check intentionally verifies DB reachability for load balancer and deploy checks.
         with get_conn() as conn:
             cur = execute(conn, "SELECT COUNT(*) FROM users")
             user_count = cur.fetchone()[0]
