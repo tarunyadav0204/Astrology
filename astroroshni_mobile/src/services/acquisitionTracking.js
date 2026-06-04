@@ -12,6 +12,20 @@ const FIRST_OPEN_SENT_KEY = 'astro_acquisition_first_open_sent_v1';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BLOCKED_METADATA_KEYS = new Set([
+  'password',
+  'token',
+  'access_token',
+  'auth',
+  'authorization',
+  'otp',
+  'code',
+  'phone',
+  'email',
+]);
+
+/** Serialize first-open so parallel callers cannot mint two installation_ids before AsyncStorage settles. */
+let firstOpenChain = Promise.resolve();
 
 function generateUuidV4() {
   if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
@@ -42,15 +56,21 @@ async function buildReferrerPayload() {
   } catch (_) {
     /* ignore */
   }
-  // Optional: add `react-native-install-referrer` (or Play Install Referrer API) and append Play referrer string here.
+  if (Platform.OS === 'android' && typeof Application.getInstallReferrerAsync === 'function') {
+    try {
+      const playReferrer = await Application.getInstallReferrerAsync();
+      if (playReferrer) {
+        parts.push(`play_install_referrer=${encodeURIComponent(String(playReferrer))}`);
+      }
+    } catch (_) {
+      /* Play Install Referrer can be unavailable on sideloads, emulators, or non-Play installs. */
+    }
+  }
   const raw = parts.filter(Boolean).join('\n');
   return raw.length > 8000 ? raw.slice(0, 8000) : raw;
 }
 
-/**
- * Call once per install (tracked locally). Safe to fire from App bootstrap.
- */
-export async function sendAcquisitionFirstOpenOnce() {
+async function sendAcquisitionFirstOpenOnceBody() {
   try {
     const sent = await AsyncStorage.getItem(FIRST_OPEN_SENT_KEY);
     if (sent === '1') return;
@@ -79,9 +99,83 @@ export async function sendAcquisitionFirstOpenOnce() {
 
     if (res.ok) {
       await AsyncStorage.setItem(FIRST_OPEN_SENT_KEY, '1');
+      trackAcquisitionFunnelEvent(
+        'first_open',
+        {
+          app_version: app_version || '',
+          has_referrer: Boolean(referrer_raw),
+          platform: Platform.OS,
+        },
+        { status: 'success', screenName: 'AppBootstrap' },
+      ).catch(() => {});
     }
   } catch (_) {
     /* non-fatal */
+  }
+}
+
+/**
+ * Call once per install (tracked locally). Safe to fire from App bootstrap.
+ * Serialized so overlapping calls cannot create two installation rows for one cold start.
+ */
+export function sendAcquisitionFirstOpenOnce() {
+  firstOpenChain = firstOpenChain.then(() => sendAcquisitionFirstOpenOnceBody());
+  return firstOpenChain;
+}
+
+function safeEventToken(value, fallback = '') {
+  return String(value || fallback)
+    .trim()
+    .replace(/[^a-zA-Z0-9_.:-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 120);
+}
+
+function sanitizeEventMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+  const safe = {};
+  Object.entries(metadata)
+    .slice(0, 20)
+    .forEach(([key, value]) => {
+      const safeKey = safeEventToken(key).slice(0, 80);
+      if (!safeKey || BLOCKED_METADATA_KEYS.has(safeKey.toLowerCase())) return;
+      if (value == null || typeof value === 'boolean' || typeof value === 'number') {
+        safe[safeKey] = value;
+      } else if (typeof value === 'string') {
+        safe[safeKey] = value.trim().slice(0, 300);
+      } else {
+        safe[safeKey] = String(value).slice(0, 300);
+      }
+    });
+  return safe;
+}
+
+export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, options = {}) {
+  try {
+    const event_name = safeEventToken(eventName);
+    if (!event_name) return;
+    const installation_id = await getOrCreateInstallationId();
+    const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/acquisition/event')}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        installation_id,
+        event_name,
+        event_status: safeEventToken(options.status || metadata.status || '').slice(0, 32) || null,
+        screen_name: safeEventToken(options.screenName || metadata.screen_name || '').slice(0, 120) || null,
+        metadata: sanitizeEventMetadata(metadata),
+      }),
+    });
+    if (!res.ok && __DEV__) {
+      const t = await res.text().catch(() => '');
+      console.warn('[acquisition] event failed', res.status, event_name, t.slice(0, 200));
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[acquisition] event error', e?.message);
   }
 }
 

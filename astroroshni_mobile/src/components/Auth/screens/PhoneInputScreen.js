@@ -20,6 +20,7 @@ import {
   getNationalPhoneMaxLength,
   isNationalPhoneValid,
 } from '../countryCodes';
+import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 
 export default function PhoneInputScreen({ 
   formData, 
@@ -38,6 +39,11 @@ export default function PhoneInputScreen({
   const buttonAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
+    trackAcquisitionFunnelEvent(
+      'auth_phone_screen_viewed',
+      { mode: isLogin ? 'login' : 'register', country_code: selectedCountry.code },
+      { screenName: 'PhoneInputScreen' },
+    ).catch(() => {});
     Animated.parallel([
       Animated.timing(inputAnim, {
         toValue: 1,
@@ -70,6 +76,11 @@ export default function PhoneInputScreen({
     
     // Store country code separately
     updateFormData('countryCode', selectedCountry.code);
+    trackAcquisitionFunnelEvent(
+      'auth_phone_submitted',
+      { mode: isLogin ? 'login' : 'register', country_code: selectedCountry.code },
+      { status: 'accepted', screenName: 'PhoneInputScreen' },
+    ).catch(() => {});
     
     if (isLogin) {
       console.log('  → Navigating to password screen');

@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
 import { apiErrorMessage } from '../../../utils/apiErrorMessage';
+import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 
 export default function EmailInputScreen({ 
   formData, 
@@ -33,6 +34,11 @@ export default function EmailInputScreen({
   const buttonAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
+    trackAcquisitionFunnelEvent(
+      'auth_email_screen_viewed',
+      { mode: isLogin ? 'login' : 'register', sends_otp: Boolean(isRegistrationSendOtpStep) },
+      { screenName: 'EmailInputScreen' },
+    ).catch(() => {});
     Animated.parallel([
       Animated.timing(inputAnim, {
         toValue: 1,
@@ -51,6 +57,11 @@ export default function EmailInputScreen({
     if (!isValid) return;
 
     if (!isRegistrationSendOtpStep) {
+      trackAcquisitionFunnelEvent(
+        'auth_email_submitted',
+        { mode: isLogin ? 'login' : 'register', sends_otp: false },
+        { status: 'accepted', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
       navigateToScreen('password');
       return;
     }
@@ -58,12 +69,31 @@ export default function EmailInputScreen({
     const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
     setLoading(true);
     try {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        { source: 'email_screen' },
+        { status: 'started', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
       const response = await authAPI.sendRegistrationOtp({ phone: fullPhone, email: formData.email });
       if (response?.data?.dev_code) {
         updateFormData('devOtpCode', response.data.dev_code);
       }
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        { source: 'email_screen' },
+        { status: 'success', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
       navigateToScreen('otp');
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        {
+          source: 'email_screen',
+          status_code: error?.response?.status || '',
+          reason: apiErrorMessage(error, 'Unable to send OTP').replace(/\s+/g, ' ').slice(0, 160),
+        },
+        { status: 'failed', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
       Alert.alert('Error', apiErrorMessage(error, 'Unable to send OTP. Please try again.'));
     } finally {
       setLoading(false);

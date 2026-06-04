@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
+import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 
 export default function NameInputScreen({ 
   formData, 
@@ -25,6 +26,7 @@ export default function NameInputScreen({
   const buttonAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
+    trackAcquisitionFunnelEvent('registration_name_screen_viewed', {}, { screenName: 'NameInputScreen' }).catch(() => {});
     Animated.parallel([
       Animated.timing(inputAnim, {
         toValue: 1,
@@ -42,6 +44,11 @@ export default function NameInputScreen({
   const handleContinue = () => {
     if (isValid) {
       const emailTrim = (formData.email || '').trim();
+      trackAcquisitionFunnelEvent(
+        'registration_name_submitted',
+        { has_email: Boolean(emailTrim) },
+        { status: 'accepted', screenName: 'NameInputScreen' },
+      ).catch(() => {});
       if (emailTrim && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
         navigateToScreen('password');
         return;

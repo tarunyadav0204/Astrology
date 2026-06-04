@@ -20,6 +20,7 @@ import { storage } from '../../../services/storage';
 import { trackAstrologyEvent } from '../../../utils/analytics';
 import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { useCredits } from '../../../credits/CreditContext';
+import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 
 export default function PasswordScreen({ 
   formData, 
@@ -39,6 +40,11 @@ export default function PasswordScreen({
   const passwordInputRef = useRef(null);
 
   useEffect(() => {
+    trackAcquisitionFunnelEvent(
+      'auth_password_screen_viewed',
+      { mode: isLogin ? 'login' : 'register' },
+      { screenName: 'PasswordScreen' },
+    ).catch(() => {});
     Animated.parallel([
       Animated.timing(inputAnim, {
         toValue: 1,
@@ -52,6 +58,14 @@ export default function PasswordScreen({
       }),
     ]).start();
   }, []);
+
+  const acquisitionErrorMeta = (error) => ({
+    status_code: error?.response?.status || '',
+    reason:
+      apiErrorMessage(error, 'request failed')
+        .replace(/\s+/g, ' ')
+        .slice(0, 160) || 'request failed',
+  });
 
   useEffect(() => {
     setIsValid(formData.password.length >= 6);
@@ -82,7 +96,14 @@ export default function PasswordScreen({
   }, [isLogin]);
 
   const handleContinue = async () => {
-    if (!isValid) return;
+    if (!isValid) {
+      trackAcquisitionFunnelEvent(
+        'auth_password_submit_blocked',
+        { mode: isLogin ? 'login' : 'register', reason: 'invalid_password' },
+        { status: 'blocked', screenName: 'PasswordScreen' },
+      ).catch(() => {});
+      return;
+    }
     
     // Combine country code with phone for API calls
     const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
@@ -96,6 +117,7 @@ export default function PasswordScreen({
     setLoading(true);
     try {
       if (isLogin) {
+        trackAcquisitionFunnelEvent('login_submitted', {}, { status: 'started', screenName: 'PasswordScreen' }).catch(() => {});
         console.log('  📤 Calling login API with phone:', fullPhone);
         
         let response;
@@ -126,6 +148,7 @@ export default function PasswordScreen({
           const { linkAcquisitionInstallationToUser } = require('../../../services/acquisitionTracking');
           linkAcquisitionInstallationToUser().catch(() => {});
         } catch (_) {}
+        trackAcquisitionFunnelEvent('login_completed', {}, { status: 'success', screenName: 'PasswordScreen' }).catch(() => {});
         await refreshCredits();
         if (Platform.OS !== 'ios') {
           try {
@@ -180,6 +203,11 @@ export default function PasswordScreen({
       } else {
         // Registration complete - register user and navigate to birth form
         try {
+          trackAcquisitionFunnelEvent(
+            'registration_submitted',
+            { with_birth_details: Boolean(formData?.birthDetails) },
+            { status: 'started', screenName: 'PasswordScreen' },
+          ).catch(() => {});
           const emailTrim = (formData.email || '').trim();
           const response = await authAPI.registerWithBirth({
             name: formData.name,
@@ -197,6 +225,11 @@ export default function PasswordScreen({
             const { linkAcquisitionInstallationToUser } = require('../../../services/acquisitionTracking');
             linkAcquisitionInstallationToUser().catch(() => {});
           } catch (_) {}
+          trackAcquisitionFunnelEvent(
+            'registration_completed',
+            { with_birth_details: Boolean(response.data.self_birth_chart) },
+            { status: 'success', screenName: 'PasswordScreen' },
+          ).catch(() => {});
           trackAstrologyEvent.userRegistered('mobile');
           await refreshCredits();
           
@@ -213,14 +246,29 @@ export default function PasswordScreen({
                 typeof d?.msg === 'string' && d.msg.toLowerCase().includes('already registered'),
             );
           if (error.response?.status === 400 && (already || alreadyFrom422)) {
+            trackAcquisitionFunnelEvent(
+              'registration_existing_user_redirected',
+              { status_code: error.response?.status || '' },
+              { status: 'redirected', screenName: 'PasswordScreen' },
+            ).catch(() => {});
             // User already exists, navigate to welcome screen
             navigateToScreen('welcomeAfterRegistration');
           } else {
+            trackAcquisitionFunnelEvent(
+              'registration_failed',
+              acquisitionErrorMeta(error),
+              { status: 'failed', screenName: 'PasswordScreen' },
+            ).catch(() => {});
             Alert.alert('Registration Error', apiErrorMessage(error, 'Registration failed'));
           }
         }
       }
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        isLogin ? 'login_failed' : 'registration_failed',
+        acquisitionErrorMeta(error),
+        { status: 'failed', screenName: 'PasswordScreen' },
+      ).catch(() => {});
       console.log('  ❌ Error in handleContinue:', error.message);
       console.log('  Error response:', error.response?.data);
       console.log('  Error status:', error.response?.status);

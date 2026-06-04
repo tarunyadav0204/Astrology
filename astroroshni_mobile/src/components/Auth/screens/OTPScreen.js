@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
+import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 
 export default function OTPScreen({ 
   formData, 
@@ -31,6 +32,11 @@ export default function OTPScreen({
   const buttonAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
+    trackAcquisitionFunnelEvent(
+      'registration_otp_screen_viewed',
+      { mode: isLogin ? 'login' : 'register' },
+      { screenName: 'OTPScreen' },
+    ).catch(() => {});
     Animated.parallel([
       Animated.timing(inputAnim, {
         toValue: 1,
@@ -67,16 +73,31 @@ export default function OTPScreen({
     
     setLoading(true);
     try {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_verify_submitted',
+        { source: 'otp_screen' },
+        { status: 'started', screenName: 'OTPScreen' },
+      ).catch(() => {});
       // For now, just proceed to next screen
       // In production, you'd verify the OTP with backend
       // console.log('Verifying OTP:', formData.otpCode);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
+      trackAcquisitionFunnelEvent(
+        'registration_otp_verified',
+        { source: 'otp_screen' },
+        { status: 'success', screenName: 'OTPScreen' },
+      ).catch(() => {});
       
       // Continue to name screen for registration
       navigateToScreen('name');
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_verify_failed',
+        { source: 'otp_screen' },
+        { status: 'failed', screenName: 'OTPScreen' },
+      ).catch(() => {});
       Alert.alert('Error', 'Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
@@ -87,6 +108,11 @@ export default function OTPScreen({
     if (resendTimer > 0) return;
     
     try {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_resent',
+        { source: 'otp_screen' },
+        { status: 'started', screenName: 'OTPScreen' },
+      ).catch(() => {});
       const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
       const payload = { phone: fullPhone };
       if ((formData.email || '').trim()) {
@@ -99,9 +125,19 @@ export default function OTPScreen({
       if (response.data.dev_code) {
         setDevOtpCode(response.data.dev_code);
       }
+      trackAcquisitionFunnelEvent(
+        'registration_otp_resent',
+        { source: 'otp_screen' },
+        { status: 'success', screenName: 'OTPScreen' },
+      ).catch(() => {});
       
       Alert.alert('Success', 'OTP sent successfully!');
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_resent',
+        { source: 'otp_screen', status_code: error?.response?.status || '' },
+        { status: 'failed', screenName: 'OTPScreen' },
+      ).catch(() => {});
       Alert.alert('Error', 'Failed to resend OTP. Please try again.');
     }
   };

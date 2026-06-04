@@ -282,7 +282,7 @@ export default function App() {
 
       try {
         const { sendAcquisitionFirstOpenOnce } = require('./src/services/acquisitionTracking');
-        sendAcquisitionFirstOpenOnce().catch(() => {});
+        await sendAcquisitionFirstOpenOnce().catch(() => {});
       } catch (_) {
         /* optional */
       }

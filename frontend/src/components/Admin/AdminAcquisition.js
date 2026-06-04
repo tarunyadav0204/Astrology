@@ -191,11 +191,13 @@ const AdminAcquisition = () => {
             <table>
               <thead>
                 <tr>
+                  <th>Install ID</th>
                   <th>First open (IST)</th>
                   <th>Platform</th>
                   <th>App version</th>
                   <th>UTM source / medium / campaign</th>
                   <th>Opens</th>
+                  <th>Last funnel event</th>
                   <th>User</th>
                   <th>Linked at (IST)</th>
                   <th>Referrer preview</th>
@@ -204,13 +206,18 @@ const AdminAcquisition = () => {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="users-table-empty">
+                    <td colSpan={10} className="users-table-empty">
                       No rows for this filter.
                     </td>
                   </tr>
                 ) : (
                   items.map((row) => (
                     <tr key={row.installation_id}>
+                      <td title={row.installation_id || ''} style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                        {row.installation_id
+                          ? `${String(row.installation_id).slice(0, 8)}…${String(row.installation_id).slice(-6)}`
+                          : '—'}
+                      </td>
                       <td>{formatDateTimeIST(row.first_open_at)}</td>
                       <td>{row.platform || '—'}</td>
                       <td>{row.app_version || '—'}</td>
@@ -218,6 +225,19 @@ const AdminAcquisition = () => {
                         {[row.utm_source, row.utm_medium, row.utm_campaign].filter(Boolean).join(' · ') || '—'}
                       </td>
                       <td>{row.open_count ?? '—'}</td>
+                      <td>
+                        {row.last_event_name ? (
+                          <>
+                            <div style={{ fontWeight: 600 }}>{row.last_event_name}</div>
+                            <div style={{ fontSize: 12, color: '#666' }}>
+                              {[row.last_event_status, row.last_event_screen].filter(Boolean).join(' · ') || '—'}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#999' }}>{formatDateTimeIST(row.last_event_at)}</div>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td>
                         {row.userid != null ? (
                           <>

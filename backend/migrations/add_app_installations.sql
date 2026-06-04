@@ -26,3 +26,19 @@ CREATE INDEX IF NOT EXISTS idx_app_installations_userid
 
 CREATE INDEX IF NOT EXISTS idx_app_installations_utm_campaign
     ON app_installations (utm_campaign);
+
+CREATE TABLE IF NOT EXISTS app_installation_events (
+    id BIGSERIAL PRIMARY KEY,
+    installation_id UUID REFERENCES app_installations (installation_id) ON DELETE CASCADE,
+    event_name VARCHAR(120) NOT NULL,
+    event_status VARCHAR(32),
+    screen_name VARCHAR(120),
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_installation_events_installation_created
+    ON app_installation_events (installation_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_app_installation_events_name_created
+    ON app_installation_events (event_name, created_at DESC);

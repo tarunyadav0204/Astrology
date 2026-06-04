@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +22,7 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin, navigation
   const buttonAnim = useRef(new Animated.Value(100)).current;
 
   useEffect(() => {
+    trackAcquisitionFunnelEvent('auth_welcome_viewed', {}, { screenName: 'WelcomeScreen' }).catch(() => {});
     Animated.sequence([
       Animated.timing(logoAnim, {
         toValue: 1,
@@ -46,11 +48,13 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin, navigation
   }, []);
 
   const handleSignIn = () => {
+    trackAcquisitionFunnelEvent('auth_mode_selected', { mode: 'login' }, { status: 'selected', screenName: 'WelcomeScreen' }).catch(() => {});
     setIsLogin(true);
     navigateToScreen('phone');
   };
 
   const handleCreateAccount = () => {
+    trackAcquisitionFunnelEvent('auth_mode_selected', { mode: 'register' }, { status: 'selected', screenName: 'WelcomeScreen' }).catch(() => {});
     setIsLogin(false);
     navigateToScreen('phone');
   };

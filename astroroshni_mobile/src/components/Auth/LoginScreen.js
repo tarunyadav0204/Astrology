@@ -22,6 +22,7 @@ import { COLORS } from '../../utils/constants';
 import { apiErrorMessage } from '../../utils/apiErrorMessage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAcquisitionFunnelEvent } from '../../services/acquisitionTracking';
 
 const { width, height } = Dimensions.get('window');
 
@@ -77,6 +78,22 @@ export default function LoginScreen({ navigation }) {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    trackAcquisitionFunnelEvent(
+      'auth_screen_viewed',
+      { mode: isLogin ? 'login' : 'register' },
+      { screenName: 'LoginScreen' },
+    ).catch(() => {});
+  }, [isLogin]);
+
+  const acquisitionErrorMeta = (error) => ({
+    status_code: error?.response?.status || '',
+    reason:
+      apiErrorMessage(error, 'request failed')
+        .replace(/\s+/g, ' ')
+        .slice(0, 160) || 'request failed',
+  });
+
   const checkAuthStatus = async () => {
     const token = await storage.getAuthToken();
     if (token) {
@@ -101,6 +118,11 @@ export default function LoginScreen({ navigation }) {
   const handleAuth = async () => {
     const needEmailSignup = !isLogin;
     if (!phone || !password || (!isLogin && (!name || (needEmailSignup && !email.trim())))) {
+      trackAcquisitionFunnelEvent(
+        'auth_submit_blocked',
+        { mode: isLogin ? 'login' : 'register', reason: 'missing_required_fields' },
+        { status: 'blocked', screenName: 'LoginScreen' },
+      ).catch(() => {});
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -109,6 +131,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       if (isLogin) {
+        trackAcquisitionFunnelEvent('login_submitted', {}, { status: 'started', screenName: 'LoginScreen' }).catch(() => {});
         const response = await authAPI.login({ phone, password });
         // console.log('✅ Login successful:', response.data);
         await storage.setAuthToken(response.data.access_token);
@@ -117,6 +140,7 @@ export default function LoginScreen({ navigation }) {
           const { linkAcquisitionInstallationToUser } = require('../../services/acquisitionTracking');
           linkAcquisitionInstallationToUser().catch(() => {});
         } catch (_) {}
+        trackAcquisitionFunnelEvent('login_completed', {}, { status: 'success', screenName: 'LoginScreen' }).catch(() => {});
         // Refresh credits after successful login
         await refreshCredits();
         
@@ -142,6 +166,11 @@ export default function LoginScreen({ navigation }) {
           }
         }
       } else {
+        trackAcquisitionFunnelEvent(
+          'registration_started',
+          { has_email: Boolean(email.trim()) },
+          { status: 'started', screenName: 'LoginScreen' },
+        ).catch(() => {});
         // For registration, show birth details option first
         setRegistrationData({
           name,
@@ -153,6 +182,11 @@ export default function LoginScreen({ navigation }) {
         setShowBirthDetailsOption(true);
       }
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        isLogin ? 'login_failed' : 'registration_start_failed',
+        acquisitionErrorMeta(error),
+        { status: 'failed', screenName: 'LoginScreen' },
+      ).catch(() => {});
       if (error.response?.status === 409) {
         // Phone already registered - show custom modal
         setErrorModalData({
@@ -183,18 +217,34 @@ export default function LoginScreen({ navigation }) {
 
   const handleOtpVerification = async () => {
     if (!otpCode) {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_verify_blocked',
+        { reason: 'missing_otp' },
+        { status: 'blocked', screenName: 'LoginScreen' },
+      ).catch(() => {});
       Alert.alert('Error', 'Please enter OTP code');
       return;
     }
 
     setLoading(true);
     try {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_verify_submitted',
+        { with_birth_details: Boolean(collectBirthDetails) },
+        { status: 'started', screenName: 'LoginScreen' },
+      ).catch(() => {});
       // First verify OTP
       await authAPI.verifyResetCode({ phone: registrationData.phone, code: otpCode });
+      trackAcquisitionFunnelEvent('registration_otp_verified', {}, { status: 'success', screenName: 'LoginScreen' }).catch(() => {});
       
       // If OTP is valid, proceed with registration
       let response;
       if (collectBirthDetails && birthDetails.place && birthDetails.latitude && birthDetails.longitude) {
+        trackAcquisitionFunnelEvent(
+          'registration_submitted',
+          { with_birth_details: true },
+          { status: 'started', screenName: 'LoginScreen' },
+        ).catch(() => {});
         // Register with birth details
         response = await authAPI.registerWithBirth({
           ...registrationData,
@@ -202,6 +252,11 @@ export default function LoginScreen({ navigation }) {
           signup_client: 'mobile',
         });
       } else {
+        trackAcquisitionFunnelEvent(
+          'registration_submitted',
+          { with_birth_details: false },
+          { status: 'started', screenName: 'LoginScreen' },
+        ).catch(() => {});
         // Regular registration
         response = await authAPI.register({ ...registrationData, signup_client: 'mobile' });
       }
@@ -212,6 +267,11 @@ export default function LoginScreen({ navigation }) {
         const { linkAcquisitionInstallationToUser } = require('../../services/acquisitionTracking');
         linkAcquisitionInstallationToUser().catch(() => {});
       } catch (_) {}
+      trackAcquisitionFunnelEvent(
+        'registration_completed',
+        { with_birth_details: Boolean(response.data.self_birth_chart) },
+        { status: 'success', screenName: 'LoginScreen' },
+      ).catch(() => {});
       trackAstrologyEvent.userRegistered('mobile');
       
       // Navigate based on whether birth details were provided
@@ -223,6 +283,11 @@ export default function LoginScreen({ navigation }) {
         navigation.navigate('BirthForm');
       }
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        'registration_failed',
+        acquisitionErrorMeta(error),
+        { status: 'failed', screenName: 'LoginScreen' },
+      ).catch(() => {});
       Alert.alert('Error', error.response?.data?.message || 'Invalid OTP or registration failed');
     } finally {
       setLoading(false);
@@ -303,6 +368,11 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleBirthDetailsOption = async (withBirthDetails) => {
+    trackAcquisitionFunnelEvent(
+      'registration_birth_option_selected',
+      { with_birth_details: Boolean(withBirthDetails) },
+      { status: 'selected', screenName: 'LoginScreen' },
+    ).catch(() => {});
     setCollectBirthDetails(withBirthDetails);
     setShowBirthDetailsOption(false);
     
@@ -313,12 +383,28 @@ export default function LoginScreen({ navigation }) {
         email: (registrationData.email || '').trim(),
       };
       if (!regPayload.email) {
+        trackAcquisitionFunnelEvent(
+          'registration_otp_request_blocked',
+          { reason: 'missing_email' },
+          { status: 'blocked', screenName: 'LoginScreen' },
+        ).catch(() => {});
         Alert.alert('Error', 'Please enter your email address');
         return;
       }
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        { with_birth_details: Boolean(withBirthDetails) },
+        { status: 'started', screenName: 'LoginScreen' },
+      ).catch(() => {});
       await authAPI.sendRegistrationOtp(regPayload);
+      trackAcquisitionFunnelEvent('registration_otp_requested', {}, { status: 'success', screenName: 'LoginScreen' }).catch(() => {});
       setShowOtpVerification(true);
     } catch (error) {
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        acquisitionErrorMeta(error),
+        { status: 'failed', screenName: 'LoginScreen' },
+      ).catch(() => {});
       Alert.alert('Error', apiErrorMessage(error, 'Failed to send OTP'));
     }
   };

@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import logging
 import re
+import json
 from typing import Any, Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote_plus, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -25,28 +26,55 @@ _UUID_RE = re.compile(
 )
 
 
+def _query_from_candidate(value: str) -> Optional[str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if "://" in raw:
+        return urlparse(raw).query or None
+    if raw.startswith("?"):
+        return raw[1:] or None
+    return raw
+
+
+def _first_utm_from_query(query: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    parsed = parse_qs(query, keep_blank_values=False)
+    src = (parsed.get("utm_source") or [None])[0]
+    med = (parsed.get("utm_medium") or [None])[0]
+    camp = (parsed.get("utm_campaign") or [None])[0]
+    return (
+        str(src).strip() if src else None,
+        str(med).strip() if med else None,
+        str(camp).strip() if camp else None,
+    )
+
+
 def _parse_utm_from_referrer(referrer_raw: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[str]]:
     if not referrer_raw or not str(referrer_raw).strip():
         return None, None, None
     raw = str(referrer_raw).strip()
     try:
-        if "://" in raw:
-            q = urlparse(raw).query
-        elif raw.startswith("?"):
-            q = raw[1:]
-        else:
-            q = raw
-        if not q:
-            return None, None, None
-        parsed = parse_qs(q, keep_blank_values=False)
-        src = (parsed.get("utm_source") or [None])[0]
-        med = (parsed.get("utm_medium") or [None])[0]
-        camp = (parsed.get("utm_campaign") or [None])[0]
-        return (
-            str(src).strip() if src else None,
-            str(med).strip() if med else None,
-            str(camp).strip() if camp else None,
-        )
+        candidates = [raw]
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip().lower()
+            decoded_value = unquote_plus(value.strip())
+            if key in {"initial_url", "play_install_referrer", "install_referrer", "referrer", "referrer_raw"}:
+                candidates.append(decoded_value)
+            else:
+                candidates.append(line)
+
+        for candidate in candidates:
+            query = _query_from_candidate(candidate)
+            if not query:
+                continue
+            src, med, camp = _first_utm_from_query(query)
+            if src or med or camp:
+                return src, med, camp
+        return None, None, None
     except Exception:
         return None, None, None
 
@@ -62,11 +90,45 @@ class AcquisitionLinkBody(BaseModel):
     installation_id: str = Field(..., min_length=36, max_length=36)
 
 
+class AcquisitionEventBody(BaseModel):
+    installation_id: str = Field(..., min_length=36, max_length=36)
+    event_name: str = Field(..., min_length=1, max_length=120)
+    event_status: Optional[str] = Field(None, max_length=32)
+    screen_name: Optional[str] = Field(None, max_length=120)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 def _validate_installation_id(s: str) -> str:
     t = (s or "").strip()
     if not _UUID_RE.match(t):
         raise HTTPException(status_code=400, detail="installation_id must be a UUID")
     return t
+
+
+def _safe_token(value: Optional[str], *, max_len: int) -> Optional[str]:
+    if value is None:
+        return None
+    text = re.sub(r"[^a-zA-Z0-9_.:-]+", "_", str(value).strip())
+    text = text.strip("_")[:max_len]
+    return text or None
+
+
+def _sanitize_event_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(metadata, dict):
+        return {}
+    safe: dict[str, Any] = {}
+    blocked = {"password", "token", "access_token", "auth", "authorization", "otp", "code", "phone", "email"}
+    for key, value in list(metadata.items())[:20]:
+        safe_key = _safe_token(str(key), max_len=80)
+        if not safe_key or safe_key.lower() in blocked:
+            continue
+        if isinstance(value, (bool, int, float)) or value is None:
+            safe[safe_key] = value
+        elif isinstance(value, str):
+            safe[safe_key] = value.strip()[:300]
+        else:
+            safe[safe_key] = str(value)[:300]
+    return safe
 
 
 @router.post("/acquisition/first-open")
@@ -108,6 +170,45 @@ async def acquisition_first_open(body: AcquisitionFirstOpenBody):
                 utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
             """,
             (iid, platform, app_version, referrer_raw, utm_s, utm_m, utm_c),
+        )
+        conn.commit()
+
+    return {"ok": True}
+
+
+@router.post("/acquisition/event")
+async def acquisition_event(body: AcquisitionEventBody):
+    """Anonymous funnel breadcrumb tied to installation_id before login/registration."""
+    iid = _validate_installation_id(body.installation_id)
+    event_name = _safe_token(body.event_name, max_len=120)
+    if not event_name:
+        raise HTTPException(status_code=400, detail="event_name is required")
+    event_status = _safe_token(body.event_status, max_len=32)
+    screen_name = _safe_token(body.screen_name, max_len=120)
+    metadata = _sanitize_event_metadata(body.metadata or {})
+
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            INSERT INTO app_installations (
+                installation_id, platform, first_open_at, last_open_at, open_count
+            )
+            VALUES (?::uuid, 'unknown', NOW(), NOW(), 1)
+            ON CONFLICT (installation_id) DO UPDATE SET
+                last_open_at = NOW()
+            """,
+            (iid,),
+        )
+        execute(
+            conn,
+            """
+            INSERT INTO app_installation_events (
+                installation_id, event_name, event_status, screen_name, metadata, created_at
+            )
+            VALUES (?::uuid, ?, ?, ?, ?::jsonb, NOW())
+            """,
+            (iid, event_name, event_status, screen_name, json.dumps(metadata)),
         )
         conn.commit()
 
@@ -215,9 +316,20 @@ async def admin_acquisition_installations(
                 ai.userid,
                 ai.registered_at,
                 u.phone AS user_phone,
-                u.name AS user_name
+                u.name AS user_name,
+                le.event_name AS last_event_name,
+                le.event_status AS last_event_status,
+                le.screen_name AS last_event_screen,
+                le.created_at AS last_event_at
             FROM app_installations ai
             LEFT JOIN users u ON u.userid = ai.userid
+            LEFT JOIN LATERAL (
+                SELECT event_name, event_status, screen_name, created_at
+                FROM app_installation_events aie
+                WHERE aie.installation_id = ai.installation_id
+                ORDER BY aie.created_at DESC
+                LIMIT 1
+            ) le ON TRUE
             WHERE {where_sql}
             ORDER BY ai.first_open_at DESC
             LIMIT ? OFFSET ?
@@ -244,6 +356,10 @@ async def admin_acquisition_installations(
                 "registered_at": r[11].isoformat() if r[11] else None,
                 "user_phone": r[12],
                 "user_name": r[13],
+                "last_event_name": r[14],
+                "last_event_status": r[15],
+                "last_event_screen": r[16],
+                "last_event_at": r[17].isoformat() if r[17] else None,
             }
         )
 
