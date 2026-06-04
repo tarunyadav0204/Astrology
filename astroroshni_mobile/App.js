@@ -280,6 +280,13 @@ export default function App() {
 
       initFacebookAnalytics().catch(() => {});
 
+      try {
+        const { sendAcquisitionFirstOpenOnce } = require('./src/services/acquisitionTracking');
+        sendAcquisitionFirstOpenOnce().catch(() => {});
+      } catch (_) {
+        /* optional */
+      }
+
       // Check if this build is still allowed by backend config.
       await checkForceUpdate();
 
@@ -331,6 +338,14 @@ export default function App() {
       console.log('Bootstrap error:', error);
       setInitialRoute('Welcome');
     } finally {
+      try {
+        const { linkAcquisitionInstallationToUser } = require('./src/services/acquisitionTracking');
+        storage.getAuthToken().then((tok) => {
+          if (tok) linkAcquisitionInstallationToUser().catch(() => {});
+        });
+      } catch (_) {
+        /* optional */
+      }
       const elapsed = Date.now() - start;
       const remaining = Math.max(0, SPLASH_MIN_MS - elapsed);
       setTimeout(() => setIsLoading(false), remaining);

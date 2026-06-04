@@ -19,6 +19,7 @@ import ChatErrors from './ChatErrors';
 import AdminChatPerformance from './AdminChatPerformance';
 import AdminChatPerformanceCharts from './AdminChatPerformanceCharts';
 import AdminUserGrowthCharts from './AdminUserGrowthCharts';
+import AdminAcquisition from './AdminAcquisition';
 import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
 import AdminSupportInbox from './AdminSupportInbox';
@@ -2208,6 +2209,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Charts
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'installFunnel' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveSubTab('installFunnel');
+            }}
+          >
+            Install funnel
+          </button>
         </div>
       )}
 
@@ -2590,6 +2600,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'users' && activeSubTab === 'userCharts' && <AdminUserGrowthCharts />}
+
+        {activeTab === 'users' && activeSubTab === 'installFunnel' && <AdminAcquisition />}
 
         {activeTab === 'users' && activeSubTab === 'facts' && (
           <div className="facts-management">

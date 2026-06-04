@@ -25,6 +25,63 @@ import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { trackAstrologyEvent } from '../../utils/analytics';
 
+const FAMILY_RELATION_ORDER = ['self', 'father', 'mother', 'spouse', 'child', 'sibling', 'friend', 'shared', 'other'];
+
+const getRelationDisplay = (profile) => {
+  const relation = String(profile?.relation || 'other').toLowerCase();
+  if (profile?.relation_label) return profile.relation_label;
+  if (relation === 'self') return 'You';
+  if (relation === 'father') return 'Father';
+  if (relation === 'mother') return 'Mother';
+  if (relation === 'spouse') return 'Spouse / Partner';
+  if (relation === 'child') {
+    const order = Number(profile?.relation_order);
+    if (order === 1) return '1st child';
+    if (order === 2) return '2nd child';
+    if (order === 3) return '3rd child';
+    return 'Child';
+  }
+  if (relation === 'sibling') {
+    const order = Number(profile?.relation_order);
+    if (order < 0) return 'Elder sibling';
+    if (order > 0) return 'Younger sibling';
+    return 'Sibling';
+  }
+  if (relation === 'friend') return 'Friend';
+  if (relation === 'colleague') return 'Colleague';
+  if (relation === 'shared') return 'Shared';
+  return 'Other';
+};
+
+const getRelationGroupTitle = (relation) => {
+  if (relation === 'self') return 'You';
+  if (relation === 'father' || relation === 'mother') return 'Parents';
+  if (relation === 'spouse') return 'Partner';
+  if (relation === 'child') return 'Children';
+  if (relation === 'sibling') return 'Siblings';
+  if (relation === 'friend') return 'Friends';
+  if (relation === 'shared') return 'Shared charts';
+  return 'Other charts';
+};
+
+const groupProfilesByRelation = (profiles) => {
+  const groups = new Map();
+  profiles.forEach((profile) => {
+    const relation = String(profile?.relation || 'other').toLowerCase();
+    const groupKey = relation === 'father' || relation === 'mother' ? 'parents' : relation;
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        key: groupKey,
+        title: relation === 'father' || relation === 'mother' ? 'Parents' : getRelationGroupTitle(relation),
+        sort: FAMILY_RELATION_ORDER.indexOf(relation) >= 0 ? FAMILY_RELATION_ORDER.indexOf(relation) : FAMILY_RELATION_ORDER.length,
+        items: [],
+      });
+    }
+    groups.get(groupKey).items.push(profile);
+  });
+  return Array.from(groups.values()).sort((a, b) => a.sort - b.sort);
+};
+
 const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, theme, colors }) => {
   return (
     <View style={styles.profileWrapper}>
@@ -73,6 +130,9 @@ const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign
                   {profile.place && (
                     <Text style={[styles.profilePlace, { color: colors.textSecondary }]}>📍 {profile.place}</Text>
                   )}
+                  <View style={[styles.relationBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.12)' }]}>
+                    <Text style={[styles.relationBadgeText, { color: colors.textSecondary }]}>{getRelationDisplay(profile)}</Text>
+                  </View>
                 </View>
               </View>
               <View style={styles.profileRight}>
@@ -180,6 +240,10 @@ export default function SelectNativeScreen({ navigation, route }) {
           longitude: chart.longitude,
           gender: chart.gender,
           relation: rel || 'other',
+          relation_order: chart.relation_order ?? null,
+          relation_side: chart.relation_side || '',
+          relation_label: chart.relation_label || '',
+          is_family_member: !!chart.is_family_member,
           isSelf: rel === 'self',
           ascendantSign: chart.ascendant_sign,
           ascendantSignName: chart.ascendant_sign_name,
@@ -536,18 +600,24 @@ export default function SelectNativeScreen({ navigation, route }) {
                 <Text style={[styles.inlineLoaderText, { color: colors.textSecondary }]}>Loading charts...</Text>
               </View>
             ) : (
-              profiles.map((profile) => (
-              <ProfileCard
-                key={profile.id}
-                profile={profile}
-                selectedProfile={selectedProfile}
-                onSelect={selectProfile}
-                onMore={handleMore}
-                getZodiacSign={getZodiacSign}
-                theme={theme}
-                colors={colors}
-              />
-            )))}
+              groupProfilesByRelation(profiles).map((group) => (
+                <View key={group.key} style={styles.profileGroup}>
+                  <Text style={[styles.profileGroupTitle, { color: colors.textSecondary }]}>{group.title}</Text>
+                  {group.items.map((profile) => (
+                    <ProfileCard
+                      key={profile.id}
+                      profile={profile}
+                      selectedProfile={selectedProfile}
+                      onSelect={selectProfile}
+                      onMore={handleMore}
+                      getZodiacSign={getZodiacSign}
+                      theme={theme}
+                      colors={colors}
+                    />
+                  ))}
+                </View>
+              ))
+            )}
 
             {hasMore && !listLoading && (
               <TouchableOpacity
@@ -846,6 +916,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  profileGroup: {
+    marginBottom: 4,
+  },
+  profileGroupTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   profileWrapper: {
     position: 'relative',
     marginBottom: 16,
@@ -1071,6 +1152,17 @@ const styles = StyleSheet.create({
   },
   profilePlace: {
     fontSize: 12,
+  },
+  relationBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 6,
+  },
+  relationBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   profileRight: {
     flexDirection: 'row',

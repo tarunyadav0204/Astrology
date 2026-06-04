@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  ScrollView as RNScrollView,
   TouchableOpacity,
   StyleSheet,
   Animated,
@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import Svg, { Rect, Line, Polygon } from 'react-native-svg';
 import { COLORS, LANGUAGES } from '../../utils/constants';
 import { parseCalendarDateInput, formatBirthDateForDisplay } from '../../utils/birthDateUtils';
@@ -29,6 +30,41 @@ import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NorthIndianChart from '../Chart/NorthIndianChart';
 
 const { width } = Dimensions.get('window');
+
+const FAMILY_RELATION_ORDER = ['self', 'father', 'mother', 'spouse', 'child', 'sibling', 'friend', 'shared', 'other'];
+
+const normalizeRelation = (value) => String(value || 'other').trim().toLowerCase();
+
+const relationRank = (profile) => {
+  const relation = normalizeRelation(profile?.relation);
+  const rank = FAMILY_RELATION_ORDER.indexOf(relation);
+  return rank >= 0 ? rank : FAMILY_RELATION_ORDER.length;
+};
+
+const getRelationLabel = (profile) => {
+  const relation = normalizeRelation(profile?.relation);
+  if (profile?.relation_label) return profile.relation_label;
+  if (relation === 'self') return 'You';
+  if (relation === 'father') return 'Father';
+  if (relation === 'mother') return 'Mother';
+  if (relation === 'spouse') return 'Spouse';
+  if (relation === 'child') {
+    const order = Number(profile?.relation_order);
+    if (order === 1) return '1st child';
+    if (order === 2) return '2nd child';
+    if (order === 3) return '3rd child';
+    return 'Child';
+  }
+  if (relation === 'sibling') {
+    const order = Number(profile?.relation_order);
+    if (order < 0) return 'Elder sibling';
+    if (order > 0) return 'Younger sibling';
+    return 'Sibling';
+  }
+  if (relation === 'friend') return 'Friend';
+  if (relation === 'shared') return 'Shared';
+  return 'Other';
+};
 
 export default function ProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
@@ -46,6 +82,8 @@ export default function ProfileScreen({ navigation, route }) {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [language, setLanguage] = useState(i18n.language);
   const [pushSyncing, setPushSyncing] = useState(false);
+  const [familyCharts, setFamilyCharts] = useState([]);
+  const [selectedFamilyChart, setSelectedFamilyChart] = useState(null);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -153,6 +191,7 @@ export default function ProfileScreen({ navigation, route }) {
           podcastsCount,
         });
       }
+      loadFamilyCharts();
     } catch (error) {
       setBirthData(null);
       // Still try to load stats on error (e.g. no self chart but user exists)
@@ -173,6 +212,25 @@ export default function ProfileScreen({ navigation, route }) {
           });
         }
       } catch (_) {}
+      loadFamilyCharts();
+    }
+  };
+
+  const loadFamilyCharts = async () => {
+    try {
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.getExistingCharts('', 100, 0);
+      const charts = Array.isArray(response?.data?.charts) ? response.data.charts : [];
+      const sortedCharts = [...charts].sort((a, b) => {
+        const rankDiff = relationRank(a) - relationRank(b);
+        if (rankDiff !== 0) return rankDiff;
+        const orderDiff = (Number(a.relation_order) || 0) - (Number(b.relation_order) || 0);
+        if (orderDiff !== 0) return orderDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      setFamilyCharts(sortedCharts);
+    } catch (_) {
+      setFamilyCharts([]);
     }
   };
   
@@ -346,6 +404,29 @@ export default function ProfileScreen({ navigation, route }) {
     </TouchableOpacity>
   );
 
+  const FamilyChartChip = ({ chart }) => {
+    const relation = getRelationLabel(chart);
+    return (
+      <TouchableOpacity
+        style={[
+          styles.familyChip,
+          {
+            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.78)',
+            borderColor: theme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(249,115,22,0.24)',
+          },
+        ]}
+        onPress={() => setSelectedFamilyChart(chart)}
+      >
+        <Text style={[styles.familyChipRelation, { color: colors.primary }]} numberOfLines={1}>
+          {relation}
+        </Text>
+        <Text style={[styles.familyChipName, { color: colors.text }]} numberOfLines={1}>
+          {chart.name || t('profile.unnamedChart', 'Unnamed')}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
@@ -364,7 +445,7 @@ export default function ProfileScreen({ navigation, route }) {
             <View style={styles.editButton} />
           </View>
 
-          <ScrollView 
+          <GHScrollView 
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -470,6 +551,57 @@ export default function ProfileScreen({ navigation, route }) {
                 onPress={() => navigation.navigate('PodcastHistory')}
               />
             </View>
+
+            <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+              <View style={styles.familySectionHeader}>
+                <Text style={[styles.sectionTitle, styles.familySectionTitle, { color: colors.text }]}>
+                  {t('profile.familyCharts', 'Family Charts')}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.familyAddButton,
+                    { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.18)' : 'rgba(249,115,22,0.12)' },
+                  ]}
+                  onPress={() => navigation.navigate('BirthForm', { returnTo: 'Profile' })}
+                >
+                  <Ionicons name="add" size={16} color={colors.primary} />
+                  <Text style={[styles.familyAddText, { color: colors.primary }]}>
+                    {t('common.add', 'Add')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {familyCharts.length > 0 ? (
+                <GHScrollView
+                  horizontal
+                  nestedScrollEnabled
+                  directionalLockEnabled
+                  alwaysBounceHorizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.familyChipsScroll}
+                  contentContainerStyle={styles.familyChipRow}
+                >
+                  {familyCharts.map((chart) => (
+                    <FamilyChartChip key={chart.id} chart={chart} />
+                  ))}
+                </GHScrollView>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.familyEmptyCard,
+                    {
+                      backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(249,115,22,0.08)',
+                      borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)',
+                    },
+                  ]}
+                  onPress={() => navigation.navigate('BirthForm', { returnTo: 'Profile' })}
+                >
+                  <Ionicons name="people-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.familyEmptyText, { color: colors.text }]}>
+                    {t('profile.addFamilyChartsPrompt', 'Add family charts to organize relatives in one place.')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </Animated.View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -717,6 +849,18 @@ export default function ProfileScreen({ navigation, route }) {
                 
                 <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
                 
+                <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('SelectNative', { returnTo: 'Profile' })}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="people-outline" size={22} color="#9c27b0" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.familyCharts', 'Family Charts')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+
                 <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('BirthForm', { editProfile: birthData })}>
                   <View style={styles.settingLeft}>
                     <Ionicons name="person-outline" size={22} color="#ff6b35" />
@@ -831,7 +975,7 @@ export default function ProfileScreen({ navigation, route }) {
             </TouchableOpacity>
 
             <View style={styles.bottomSpacer} />
-          </ScrollView>
+          </GHScrollView>
         </SafeAreaView>
       </LinearGradient>
       
@@ -844,7 +988,7 @@ export default function ProfileScreen({ navigation, route }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🌐 {t('languageModal.title')}</Text>
-            <ScrollView
+            <RNScrollView
               style={styles.languageModalScrollView}
               contentContainerStyle={styles.languageModalScrollContent}
               showsVerticalScrollIndicator={true}
@@ -864,13 +1008,119 @@ export default function ProfileScreen({ navigation, route }) {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </RNScrollView>
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setShowLanguageModal(false)}
             >
               <Text style={styles.modalCloseText}>{t('languageModal.close')}</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!selectedFamilyChart}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedFamilyChart(null)}
+      >
+        <View style={styles.chartModalOverlay}>
+          <View
+            style={[
+              styles.chartModalContent,
+              {
+                backgroundColor: theme === 'dark' ? 'rgba(31,21,45,0.98)' : 'rgba(255,255,255,0.98)',
+                borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(249,115,22,0.22)',
+              },
+            ]}
+          >
+            <View style={styles.chartModalHeader}>
+              <View style={[styles.chartModalIcon, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.18)' : 'rgba(249,115,22,0.12)' }]}>
+                <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
+              </View>
+              <View style={styles.chartModalTitleWrap}>
+                <Text style={[styles.chartModalRelation, { color: colors.primary }]} numberOfLines={1}>
+                  {selectedFamilyChart ? getRelationLabel(selectedFamilyChart) : ''}
+                </Text>
+                <Text style={[styles.chartModalName, { color: colors.text }]} numberOfLines={2}>
+                  {selectedFamilyChart?.name || t('profile.unnamedChart', 'Unnamed')}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.chartModalClose} onPress={() => setSelectedFamilyChart(null)}>
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.chartModalDetails}>
+              <View style={styles.chartModalRow}>
+                <Text style={[styles.chartModalLabel, { color: colors.textSecondary }]}>
+                  {t('profile.birthDate', 'Birth date')}
+                </Text>
+                <Text style={[styles.chartModalValue, { color: colors.text }]}>
+                  {selectedFamilyChart?.date
+                    ? formatBirthDateForDisplay(selectedFamilyChart.date, { month: 'long', day: 'numeric', year: 'numeric' })
+                    : t('common.notSet', 'Not set')}
+                </Text>
+              </View>
+              <View style={styles.chartModalRow}>
+                <Text style={[styles.chartModalLabel, { color: colors.textSecondary }]}>
+                  {t('profile.birthTime', 'Birth time')}
+                </Text>
+                <Text style={[styles.chartModalValue, { color: colors.text }]}>
+                  {selectedFamilyChart?.time || t('common.notSet', 'Not set')}
+                </Text>
+              </View>
+              <View style={styles.chartModalRow}>
+                <Text style={[styles.chartModalLabel, { color: colors.textSecondary }]}>
+                  {t('profile.birthPlace', 'Birth place')}
+                </Text>
+                <Text style={[styles.chartModalValue, { color: colors.text }]} numberOfLines={2}>
+                  {selectedFamilyChart?.place || t('common.notSet', 'Not set')}
+                </Text>
+              </View>
+              {selectedFamilyChart?.gender ? (
+                <View style={styles.chartModalRow}>
+                  <Text style={[styles.chartModalLabel, { color: colors.textSecondary }]}>
+                    {t('profile.gender', 'Gender')}
+                  </Text>
+                  <Text style={[styles.chartModalValue, { color: colors.text }]}>
+                    {selectedFamilyChart.gender}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.chartModalActions}>
+              <TouchableOpacity
+                style={[styles.chartModalAction, { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  const chart = selectedFamilyChart;
+                  setSelectedFamilyChart(null);
+                  navigation.navigate('Chart', { birthData: chart });
+                }}
+              >
+                <Ionicons name="analytics-outline" size={18} color={COLORS.white} />
+                <Text style={styles.chartModalActionText}>{t('profile.viewChart', 'View Chart')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.chartModalAction,
+                  styles.chartModalSecondaryAction,
+                  { borderColor: colors.primary },
+                ]}
+                onPress={() => {
+                  const chart = selectedFamilyChart;
+                  setSelectedFamilyChart(null);
+                  navigation.navigate('BirthForm', { editProfile: chart });
+                }}
+              >
+                <Ionicons name="create-outline" size={18} color={colors.primary} />
+                <Text style={[styles.chartModalSecondaryActionText, { color: colors.primary }]}>
+                  {t('common.edit', 'Edit')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -921,6 +1171,32 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)' },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
+  familySectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  familySectionTitle: { marginBottom: 0 },
+  familyAddButton: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 11 },
+  familyAddText: { fontSize: 13, fontWeight: '800' },
+  familyChipsScroll: { width: '100%' },
+  familyChipRow: { flexDirection: 'row', gap: 10, paddingRight: 20 },
+  familyChip: {
+    width: 136,
+    minHeight: 72,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    justifyContent: 'center',
+  },
+  familyChipRelation: { fontSize: 12, fontWeight: '800', marginBottom: 4 },
+  familyChipName: { fontSize: 15, fontWeight: '700' },
+  familyEmptyCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  familyEmptyText: { flex: 1, fontSize: 14, fontWeight: '600', lineHeight: 19 },
   chartSummaryCard: { borderRadius: 16, overflow: 'hidden' },
   chartSummaryGradient: { padding: 20 },
   miniChart: { alignItems: 'center', marginBottom: 20, paddingVertical: 20, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
@@ -1076,4 +1352,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  chartModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  chartModalContent: {
+    width: '100%',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  chartModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  chartModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  chartModalTitleWrap: { flex: 1 },
+  chartModalRelation: { fontSize: 13, fontWeight: '800', marginBottom: 2 },
+  chartModalName: { fontSize: 20, fontWeight: '800', lineHeight: 24 },
+  chartModalClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  chartModalDetails: { gap: 12, marginBottom: 18 },
+  chartModalRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128,128,128,0.16)',
+    paddingTop: 10,
+  },
+  chartModalLabel: { fontSize: 12, fontWeight: '700', marginBottom: 3 },
+  chartModalValue: { fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  chartModalActions: { flexDirection: 'row', gap: 10 },
+  chartModalAction: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 7,
+  },
+  chartModalSecondaryAction: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+  },
+  chartModalActionText: { color: COLORS.white, fontSize: 14, fontWeight: '800' },
+  chartModalSecondaryActionText: { fontSize: 14, fontWeight: '800' },
 });

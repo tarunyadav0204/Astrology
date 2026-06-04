@@ -113,6 +113,10 @@ export default function LoginScreen({ navigation }) {
         // console.log('✅ Login successful:', response.data);
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
+        try {
+          const { linkAcquisitionInstallationToUser } = require('../../services/acquisitionTracking');
+          linkAcquisitionInstallationToUser().catch(() => {});
+        } catch (_) {}
         // Refresh credits after successful login
         await refreshCredits();
         
@@ -204,6 +208,10 @@ export default function LoginScreen({ navigation }) {
       
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
+      try {
+        const { linkAcquisitionInstallationToUser } = require('../../services/acquisitionTracking');
+        linkAcquisitionInstallationToUser().catch(() => {});
+      } catch (_) {}
       trackAstrologyEvent.userRegistered('mobile');
       
       // Navigate based on whether birth details were provided

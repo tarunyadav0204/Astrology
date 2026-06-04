@@ -122,6 +122,10 @@ export default function PasswordScreen({
         
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
+        try {
+          const { linkAcquisitionInstallationToUser } = require('../../../services/acquisitionTracking');
+          linkAcquisitionInstallationToUser().catch(() => {});
+        } catch (_) {}
         await refreshCredits();
         if (Platform.OS !== 'ios') {
           try {
@@ -189,6 +193,10 @@ export default function PasswordScreen({
           
           await storage.setAuthToken(response.data.access_token);
           await storage.setUserData(response.data.user);
+          try {
+            const { linkAcquisitionInstallationToUser } = require('../../../services/acquisitionTracking');
+            linkAcquisitionInstallationToUser().catch(() => {});
+          } catch (_) {}
           trackAstrologyEvent.userRegistered('mobile');
           await refreshCredits();
           

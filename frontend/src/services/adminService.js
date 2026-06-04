@@ -282,4 +282,36 @@ export const adminService = {
     }
     return response.json();
   },
+
+  async getAcquisitionInstallations(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
+    if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    if (params.registered != null && params.registered !== '' && params.registered !== 'all') {
+      sp.set('registered', params.registered);
+    }
+    if (params.utm_campaign != null && params.utm_campaign !== '') sp.set('utm_campaign', params.utm_campaign);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/acquisition-installations') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      throw new Error('Failed to fetch mobile install funnel');
+    }
+    return response.json();
+  },
+
+  async getAcquisitionInstallationsSummary(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
+    if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/acquisition-installations/summary') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      throw new Error('Failed to fetch install funnel summary');
+    }
+    return response.json();
+  },
 };

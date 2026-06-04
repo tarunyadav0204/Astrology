@@ -5,6 +5,11 @@ from pydantic import BaseModel
 from encryption_utils import EncryptionManager
 from db import get_conn, execute
 from birth_charts.deletion import delete_birth_chart_dependencies
+from birth_charts.schema import (
+    ensure_birth_chart_family_columns,
+    normalize_chart_relation,
+    relation_defaults,
+)
 from types import SimpleNamespace
 
 try:
@@ -50,6 +55,51 @@ class ShareChartRequest(BaseModel):
     chart_id: int
     target_user_id: int
 
+
+def _row_to_chart(row) -> dict:
+    if encryptor:
+        chart = {
+            'id': row[0],
+            'userid': row[1],
+            'name': encryptor.decrypt(row[2]),
+            'date': encryptor.decrypt(row[3]),
+            'time': encryptor.decrypt(row[4]),
+            'latitude': float(encryptor.decrypt(str(row[5]))),
+            'longitude': float(encryptor.decrypt(str(row[6]))),
+            'timezone': row[7],
+            'created_at': row[8],
+            'place': encryptor.decrypt(row[9] or ''),
+            'gender': row[10] or '',
+            'relation': row[11] or 'other',
+            'relation_order': row[12],
+            'relation_side': row[13] or '',
+            'relation_label': row[14] or '',
+            'is_family_member': bool(row[15]) if row[15] is not None else False,
+        }
+    else:
+        chart = {
+            'id': row[0],
+            'userid': row[1],
+            'name': row[2],
+            'date': row[3],
+            'time': row[4],
+            'latitude': row[5],
+            'longitude': row[6],
+            'timezone': row[7],
+            'created_at': row[8],
+            'place': row[9] or '',
+            'gender': row[10] or '',
+            'relation': row[11] or 'other',
+            'relation_order': row[12],
+            'relation_side': row[13] or '',
+            'relation_label': row[14] or '',
+            'is_family_member': bool(row[15]) if row[15] is not None else False,
+        }
+    chart['relation'] = normalize_chart_relation(chart.get('relation'))
+    if chart.get('relation') in {'self', 'father', 'mother', 'spouse', 'child', 'sibling'}:
+        chart['is_family_member'] = True
+    return chart
+
 @router.get("/birth-charts")
 async def get_birth_charts(
     search: str = "",
@@ -61,13 +111,16 @@ async def get_birth_charts(
     limit = max(1, min(limit, 100))
     offset = max(0, offset)
     with get_conn() as conn:
+        ensure_birth_chart_family_columns(conn)
+        conn.commit()
         # Name is encrypted at rest in most environments. For encrypted mode, SQL LIKE
         # cannot search plaintext, so we decrypt+filter in Python for search queries.
         if search.strip() and encryptor:
             cur = execute(
                 conn,
                 """
-                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation
+                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation,
+                       relation_order, relation_side, relation_label, is_family_member
                 FROM birth_charts
                 WHERE userid = %s
                 ORDER BY created_at DESC
@@ -101,7 +154,8 @@ async def get_birth_charts(
             cur = execute(
                 conn,
                 """
-                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation
+                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation,
+                       relation_order, relation_side, relation_label, is_family_member
                 FROM birth_charts
                 WHERE userid = %s AND name ILIKE %s
                 ORDER BY created_at DESC
@@ -123,7 +177,8 @@ async def get_birth_charts(
             cur = execute(
                 conn,
                 """
-                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation
+                SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation,
+                       relation_order, relation_side, relation_label, is_family_member
                 FROM birth_charts
                 WHERE userid = %s
                 ORDER BY created_at DESC
@@ -135,36 +190,7 @@ async def get_birth_charts(
 
     charts = []
     for row in rows:
-        if encryptor:
-            chart = {
-                'id': row[0],
-                'userid': row[1],
-                'name': encryptor.decrypt(row[2]),
-                'date': encryptor.decrypt(row[3]),
-                'time': encryptor.decrypt(row[4]),
-                'latitude': float(encryptor.decrypt(str(row[5]))),
-                'longitude': float(encryptor.decrypt(str(row[6]))),
-                'timezone': row[7],
-                'created_at': row[8],
-                'place': encryptor.decrypt(row[9] or ''),
-                'gender': row[10] or '',
-                'relation': row[11] or 'other'
-            }
-        else:
-            chart = {
-                'id': row[0],
-                'userid': row[1],
-                'name': row[2],
-                'date': row[3],
-                'time': row[4],
-                'latitude': row[5],
-                'longitude': row[6],
-                'timezone': row[7],
-                'created_at': row[8],
-                'place': row[9] or '',
-                'gender': row[10] or '',
-                'relation': row[11] or 'other'
-            }
+        chart = _row_to_chart(row)
         chart.update(_get_ascendant_sign_summary(chart))
         charts.append(chart)
     
@@ -186,6 +212,7 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
     try:
         conn_ctx = get_conn()
         conn = conn_ctx.__enter__()
+        ensure_birth_chart_family_columns(conn)
         cursor = conn.cursor()
 
         print(f"🔍 [SET_SELF_DEBUG] Setting chart {chart_id} as self for user {current_user.userid}")
@@ -213,7 +240,7 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
         cursor.execute(
             """
             UPDATE birth_charts
-            SET relation='other'
+            SET relation='other', is_family_member=FALSE
             WHERE userid=%s AND relation='self'
             """,
             (current_user.userid,),
@@ -224,7 +251,7 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
         cursor.execute(
             """
             UPDATE birth_charts
-            SET relation='self'
+            SET relation='self', is_family_member=TRUE, relation_order=NULL, relation_side=NULL
             WHERE id=%s AND userid=%s
             """,
             (chart_id, current_user.userid),
@@ -310,6 +337,7 @@ async def share_chart(request: ShareChartRequest, current_user: User = Depends(g
     try:
         conn_ctx = get_conn()
         conn = conn_ctx.__enter__()
+        ensure_birth_chart_family_columns(conn)
         cursor = conn.cursor()
 
         # Verify the chart belongs to current user
@@ -331,8 +359,11 @@ async def share_chart(request: ShareChartRequest, current_user: User = Depends(g
         # Copy encrypted data as-is to target user
         cursor.execute(
             """
-            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
-            SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared', birth_hash
+            INSERT INTO birth_charts
+                (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash,
+                 relation_order, relation_side, relation_label, is_family_member)
+            SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared', birth_hash,
+                   relation_order, relation_side, relation_label, FALSE
             FROM birth_charts WHERE id=%s
             RETURNING id
             """,
@@ -364,14 +395,20 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
     try:
         conn_ctx = get_conn()
         conn = conn_ctx.__enter__()
+        ensure_birth_chart_family_columns(conn)
         cursor = conn.cursor()
 
         # Verify chart belongs to user
         cursor.execute(
-            "SELECT id FROM birth_charts WHERE id=%s AND userid=%s",
+            """
+            SELECT id, relation, relation_order, relation_side, relation_label, is_family_member
+            FROM birth_charts
+            WHERE id=%s AND userid=%s
+            """,
             (chart_id, current_user.userid),
         )
-        if not cursor.fetchone():
+        existing_chart = cursor.fetchone()
+        if not existing_chart:
             raise HTTPException(status_code=404, detail="Chart not found or access denied")
         
         if encryptor:
@@ -407,10 +444,37 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
             except Exception:
                 timezone_value = "UTC+0"
 
+        relation = normalize_chart_relation(
+            birth_data.get("relation") if "relation" in birth_data else existing_chart[1]
+        )
+        relation_order = birth_data.get("relation_order") if "relation_order" in birth_data else existing_chart[2]
+        if relation_order in ("", None):
+            relation_order = None
+        relation_side_raw = birth_data.get("relation_side") if "relation_side" in birth_data else existing_chart[3]
+        relation_label_raw = birth_data.get("relation_label") if "relation_label" in birth_data else existing_chart[4]
+        relation_side = str(relation_side_raw or "").strip().lower() or None
+        relation_label = str(relation_label_raw or "").strip() or None
+        relation, is_family_member = relation_defaults(
+            relation,
+            birth_data.get("is_family_member") if "is_family_member" in birth_data else existing_chart[5],
+        )
+
+        if relation == "self":
+            cursor.execute(
+                """
+                UPDATE birth_charts
+                SET relation='other', is_family_member=FALSE
+                WHERE userid=%s AND relation='self' AND id != %s
+                """,
+                (current_user.userid, chart_id),
+            )
+
         cursor.execute(
             """
             UPDATE birth_charts
-            SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s, birth_hash=%s
+            SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s,
+                relation=%s, relation_order=%s, relation_side=%s, relation_label=%s, is_family_member=%s,
+                birth_hash=%s
             WHERE id=%s AND userid=%s
             """,
             (
@@ -422,6 +486,11 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
                 timezone_value,
                 enc_place,
                 birth_data.get("gender", ""),
+                relation,
+                relation_order,
+                relation_side,
+                relation_label,
+                is_family_member,
                 chart_birth_hash,
                 chart_id,
                 current_user.userid,

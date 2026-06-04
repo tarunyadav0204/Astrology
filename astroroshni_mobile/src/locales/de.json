@@ -611,6 +611,7 @@
       "vipPlans": "VIP-Pläne",
       "loadingPlans": "Pläne werden geladen…",
       "noSubscriptionPlansStore": "Keine Abo-Pläne im Store verfügbar.",
+      "subscriptionCreditClarifier": "VIP-Abos geben Rabatte auf kostenpflichtige Analysen. Sie fügen Ihrem Guthaben keine Credits hinzu; kaufen Sie Credits unten separat.",
       "buyCredits": "Credits kaufen",
       "loadingProducts": "Produkte werden geladen…",
       "noProducts": "Keine Produkte verfügbar. Später erneut versuchen.",

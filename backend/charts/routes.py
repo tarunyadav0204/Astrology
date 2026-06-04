@@ -18,6 +18,11 @@ from calculators.yogi_calculator import YogiCalculator
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
 from charts.house_insight_service import build_house_insight
+from birth_charts.schema import (
+    ensure_birth_chart_family_columns,
+    normalize_chart_relation,
+    relation_defaults,
+)
 from encryption_utils import EncryptionManager
 from db import get_conn, execute
 
@@ -36,6 +41,10 @@ class BirthData(BaseModel):
     place: str = ""
     gender: str = ""
     relation: str = "other"
+    relation_order: Optional[int] = None
+    relation_side: str = ""
+    relation_label: str = ""
+    is_family_member: Optional[bool] = None
     
     @property
     def timezone(self):
@@ -92,6 +101,20 @@ def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Op
 
     from utils.birth_hash import birth_hash_from_parts
 
+    explicit_relation_fields = set(getattr(birth_data, "model_fields_set", None) or getattr(birth_data, "__fields_set__", set()) or set())
+    has_explicit_family_metadata = bool(
+        explicit_relation_fields.intersection(
+            {"relation", "relation_order", "relation_side", "relation_label", "is_family_member"}
+        )
+    )
+
+    relation, is_family_member = relation_defaults(
+        normalize_chart_relation(birth_data.relation),
+        birth_data.is_family_member,
+    )
+    relation_side = str(birth_data.relation_side or "").strip().lower() or None
+    relation_label = str(birth_data.relation_label or "").strip() or None
+
     chart_birth_hash = birth_hash_from_parts(
         birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
     )
@@ -99,6 +122,7 @@ def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Op
     new_chart_id: Optional[int] = None
     try:
         with get_conn() as conn:
+            ensure_birth_chart_family_columns(conn)
             cur = execute(
                 conn,
                 """
@@ -113,6 +137,29 @@ def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Op
             dup = cur.fetchone()
             if dup:
                 new_chart_id = dup[0]
+                if has_explicit_family_metadata:
+                    if relation == "self":
+                        execute(
+                            conn,
+                            "UPDATE birth_charts SET relation = 'other', is_family_member = FALSE WHERE userid = %s AND relation = 'self' AND id != %s",
+                            (userid, new_chart_id),
+                        )
+                    execute(
+                        conn,
+                        """
+                        UPDATE birth_charts
+                        SET relation=%s, relation_order=%s, relation_side=%s, relation_label=%s, is_family_member=%s
+                        WHERE id = %s
+                        """,
+                        (
+                            relation,
+                            birth_data.relation_order,
+                            relation_side,
+                            relation_label,
+                            is_family_member,
+                            new_chart_id,
+                        ),
+                    )
                 if chart_birth_hash:
                     execute(
                         conn,
@@ -124,16 +171,22 @@ def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Op
             else:
                 print(f"🔍 [CHART_DEBUG] About to insert chart for user {userid}:")
                 print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
-                print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")
-                print(f"🔍 [CHART_DEBUG] - Final relation value: {birth_data.relation or 'other'}")
+                print(f"🔍 [CHART_DEBUG] - Relation: {relation}")
+                if relation == "self":
+                    execute(
+                        conn,
+                        "UPDATE birth_charts SET relation = 'other', is_family_member = FALSE WHERE userid = %s AND relation = 'self'",
+                        (userid,),
+                    )
 
                 cur = execute(
                     conn,
                     """
                     INSERT INTO birth_charts
-                        (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
+                        (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash,
+                         relation_order, relation_side, relation_label, is_family_member)
                     VALUES
-                        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -146,8 +199,12 @@ def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Op
                         tz_value,
                         enc_place,
                         birth_data.gender,
-                        birth_data.relation or "other",
+                        relation,
                         chart_birth_hash,
+                        birth_data.relation_order,
+                        relation_side,
+                        relation_label,
+                        is_family_member,
                     ),
                 )
                 row = cur.fetchone()

@@ -432,6 +432,14 @@
     "settings": "Settings",
     "lightTheme": "Light Theme",
     "darkTheme": "Dark Theme",
+    "familyCharts": "Family Charts",
+    "addFamilyChartsPrompt": "Add family charts to organize relatives in one place.",
+    "unnamedChart": "Unnamed",
+    "birthDate": "Birth date",
+    "birthTime": "Birth time",
+    "birthPlace": "Birth place",
+    "gender": "Gender",
+    "viewChart": "View Chart",
     "editBirthDetails": "Edit Birth Details",
     "notificationHistory": "Notification history",
     "turnOnNotifications": "Turn ON Notifications",
@@ -937,6 +945,7 @@
       "vipPlans": "VIP Plans",
       "loadingPlans": "Loading plans…",
       "noSubscriptionPlansStore": "No subscription plans available from the store.",
+      "subscriptionCreditClarifier": "VIP subscriptions give discounts on paid analyses. They do not add credits to your balance; buy credits separately below.",
       "buyCredits": "Buy Credits",
       "loadingProducts": "Loading products…",
       "noProducts": "No products available. Check back later.",
@@ -1010,13 +1019,36 @@
     },
     "progressText": "Step {{step}} of 5",
     "stepTitle": {
-      "name": "What's your name?",
-      "gender": "Select your gender",
-      "date": "When were you born?",
-      "time": "What time were you born?",
-      "place": "Where were you born?"
+      "name": "Whose chart is this?",
+      "gender": "Select gender",
+      "date": "When were they born?",
+      "time": "What time were they born?",
+      "place": "Where were they born?"
     },
     "namePlaceholder": "Enter your full name",
+    "relation": {
+      "title": "Who is this chart for?",
+      "subtitle": "This helps organize family charts and improves relative-specific guidance.",
+      "options": {
+        "self": "Myself",
+        "father": "Father",
+        "mother": "Mother",
+        "spouse": "Spouse / Partner",
+        "child": "Child",
+        "sibling": "Sibling",
+        "friend": "Friend",
+        "other": "Other"
+      },
+      "childOrder": {
+        "1": "1st child",
+        "2": "2nd child",
+        "3": "3rd child"
+      },
+      "siblingOrder": {
+        "elder": "Elder sibling",
+        "younger": "Younger sibling"
+      }
+    },
     "placePlaceholder": "City, State, Country",
     "gender": {
       "male": "Male",

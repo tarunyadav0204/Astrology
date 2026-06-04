@@ -204,6 +204,7 @@ const CreditScreen = ({ navigation }) => {
   const [iapSubscriptions, setIapSubscriptions] = useState([]); // from getSubscriptions (productId + subscriptionOfferDetails for offerToken)
   const [purchasingSubscriptionId, setPurchasingSubscriptionId] = useState(null);
   const [subscriptionDetails, setSubscriptionDetails] = useState(null);
+  const [vipPlansExpanded, setVipPlansExpanded] = useState(false);
   const [refreshSubscriptionStatusLoading, setRefreshSubscriptionStatusLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
@@ -1298,170 +1299,6 @@ const CreditScreen = ({ navigation }) => {
               </LinearGradient>
             </Animated.View>
 
-            {/* Your subscription — full details when user has an active subscription */}
-            {subscriptionDetails ? (
-              <View style={[styles.subscriptionCard, { backgroundColor: promoCardBg, borderColor: colors.cardBorder, borderWidth: isDark ? 1 : 0 }]}>
-                <View style={styles.subscriptionCardHeader}>
-                  <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
-                  <Text style={[styles.subscriptionCardTitle, { color: colors.text }]}>{subscriptionDetails.tier_name}</Text>
-                </View>
-                <Text style={[styles.subscriptionCardBenefit, { color: colors.textSecondary }]}>
-                  {t('credits.page.subscriptionBenefit', { percent: subscriptionDetails.discount_percent })}
-                </Text>
-                <View style={[styles.subscriptionCardDates, { borderTopColor: colors.cardBorder }]}>
-                  {subscriptionDetails.start_date ? (
-                    <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
-                      {t('credits.page.subscribedOn', { date: formatSubscriptionDate(subscriptionDetails.start_date, dateLocale) })}
-                    </Text>
-                  ) : null}
-                  {subscriptionDetails.end_date ? (
-                    <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
-                      {t('credits.page.renewsOn', { date: formatSubscriptionDate(subscriptionDetails.end_date, dateLocale) })}
-                    </Text>
-                  ) : null}
-                </View>
-                {Platform.OS === 'android' && (
-                  <>
-                    <TouchableOpacity
-                      style={[styles.manageSubscriptionButton, { borderColor: colors.cardBorder }]}
-                      onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
-                    >
-                      <Ionicons name="open-outline" size={18} color={colors.primary} />
-                      <Text style={[styles.manageSubscriptionButtonText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 8 }]}
-                      onPress={handleRefreshSubscriptionStatus}
-                      disabled={refreshSubscriptionStatusLoading}
-                    >
-                      <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
-                        {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            ) : subscriptionTierName && subscriptionDiscountPercent > 0 ? (
-              <View style={styles.vipBadgeWithManage}>
-                <View style={[styles.vipBadge, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(255,193,7,0.2)', borderColor: isDark ? 'rgba(255,215,0,0.4)' : 'rgba(255,193,7,0.5)' }]}>
-                  <Ionicons name="shield-checkmark" size={20} color={colors.primary} style={styles.vipBadgeIcon} />
-                  <Text style={[styles.vipBadgeText, { color: colors.text }]}>
-                    {t('credits.page.vipDiscountBadge', { tier: subscriptionTierName, percent: subscriptionDiscountPercent })}
-                  </Text>
-                </View>
-                {Platform.OS === 'android' && (
-                  <>
-                    <TouchableOpacity
-                      style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder }]}
-                      onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
-                    >
-                      <Ionicons name="open-outline" size={16} color={colors.primary} />
-                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
-                      onPress={handleRefreshSubscriptionStatus}
-                      disabled={refreshSubscriptionStatusLoading}
-                    >
-                      <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-                      <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
-                        {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            ) : null}
-
-            {/* VIP subscription plans — subscribe for discount (Android only) */}
-            {Platform.OS === 'android' && (
-              <View style={styles.buySection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.vipPlans')}</Text>
-                <TouchableOpacity
-                  style={[styles.membershipHelpButton, { borderColor: colors.cardBorder, backgroundColor: promoCardBg }]}
-                  onPress={() => navigation.navigate('MembershipComparison')}
-                >
-                  <Ionicons name="help-buoy-outline" size={18} color={colors.primary} />
-                  <Text style={[styles.membershipHelpButtonText, { color: colors.primary }]}>
-                    Need help choosing a plan?
-                  </Text>
-                </TouchableOpacity>
-                {subscriptionPlansLoading ? (
-                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingPlans')}</Text>
-                ) : subscriptionPlansFromPlay.length === 0 ? (
-                  subscriptionPlans.length > 0 && iapReady ? (
-                    <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noSubscriptionPlansStore')}</Text>
-                  ) : null
-                ) : (
-                  <>
-                    <View style={styles.buyProductGrid}>
-                      {subscriptionPlansFromPlay.map((plan) => {
-                        const productId = plan.google_play_product_id;
-                        const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
-                        const isPurchasing = purchasingSubscriptionId === productId;
-                        const benefits = Array.isArray(plan.benefits)
-                          ? plan.benefits.filter(Boolean)
-                          : [];
-                        return (
-                          <TouchableOpacity
-                            key={plan.plan_id ?? productId}
-                            style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
-                            onPress={() => handleSubscribePress(plan)}
-                            disabled={isCurrentPlan || isPurchasing}
-                          >
-                            <Text style={[styles.buyProductLabel, { color: colors.text }]}>{plan.tier_name || t('credits.page.vipFallback')}</Text>
-                            <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{t('credits.page.offPercent', { percent: plan.discount_percent ?? 0 })}</Text>
-                            {(() => {
-                              const displayPrice = getSubscriptionDisplayPrice(plan, iapSubscriptions);
-                              return displayPrice != null && displayPrice !== '' ? (
-                                <Text style={[styles.buyProductCredits, { color: colors.textSecondary, fontSize: 14 }]}>{displayPrice}</Text>
-                              ) : null;
-                            })()}
-                            {benefits.length > 0 && (
-                              <View style={styles.planBenefitsWrap}>
-                                {benefits.slice(0, 4).map((benefit, idx) => (
-                                  <Text key={`${productId}-benefit-${idx}`} style={[styles.planBenefitText, { color: colors.textSecondary }]}>
-                                    {'\u2022'} {benefit}
-                                  </Text>
-                                ))}
-                              </View>
-                            )}
-                            <View style={[styles.buyProductButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
-                              <Text style={styles.buyProductButtonText}>
-                                {isCurrentPlan ? t('credits.page.currentPlan') : isPurchasing ? t('credits.page.processing') : t('credits.page.subscribe')}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    {Platform.OS === 'android' && subscriptionTierName && (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}
-                          onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
-                        >
-                          <Ionicons name="open-outline" size={16} color={colors.primary} />
-                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
-                          onPress={handleRefreshSubscriptionStatus}
-                          disabled={refreshSubscriptionStatusLoading}
-                        >
-                          <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
-                            {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
-                          </Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </>
-                )}
-              </View>
-            )}
-
             {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
@@ -1475,20 +1312,19 @@ const CreditScreen = ({ navigation }) => {
                     {googlePlayProducts.map((product) => (
                       <TouchableOpacity
                         key={product.product_id}
-                        style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
+                        style={[styles.creditPackCard, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}
                         onPress={() => handleBuyCreditsPress(product)}
                         disabled={purchasingProductId === product.product_id}
                       >
-                        <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || t('credits.page.productTitleFallback', { count: product.credits })}</Text>
-                        <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{t('credits.page.creditsCount', { count: product.credits })}</Text>
+                        <Text style={[styles.creditPackCredits, { color: colors.text }]}>{t('credits.page.creditsCount', { count: product.credits })}</Text>
                         {(() => {
                           const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
                           return displayPrice ? (
-                            <Text style={[styles.buyProductPrice, { color: colors.textSecondary }]}>{displayPrice}</Text>
+                            <Text style={[styles.creditPackPrice, { color: colors.textSecondary }]}>{displayPrice}</Text>
                           ) : null;
                         })()}
-                        <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
-                          <Text style={styles.buyProductButtonText}>
+                        <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.creditPackButtonText}>
                             {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
                           </Text>
                         </View>
@@ -1496,6 +1332,131 @@ const CreditScreen = ({ navigation }) => {
                     ))}
                   </View>
                 )}
+              </View>
+            )}
+
+            {/* VIP subscriptions are discounts, not credit packs. Keep them secondary to reduce purchase confusion. */}
+            {Platform.OS === 'android' && (
+              <View style={styles.buySection}>
+                <View style={[styles.vipDiscountPanel, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
+                  <View style={styles.vipDiscountHeader}>
+                    <View style={[styles.vipDiscountIcon, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)' }]}>
+                      <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
+                    </View>
+                    <View style={styles.vipDiscountCopy}>
+                      <Text style={[styles.vipDiscountTitle, { color: colors.text }]}>
+                        {subscriptionDetails
+                          ? subscriptionDetails.tier_name
+                          : subscriptionTierName && subscriptionDiscountPercent > 0
+                            ? t('credits.page.vipDiscountBadge', { tier: subscriptionTierName, percent: subscriptionDiscountPercent })
+                            : t('credits.page.vipPlans')}
+                      </Text>
+                      <Text style={[styles.vipDiscountText, { color: colors.textSecondary }]}>
+                        {subscriptionDetails
+                          ? t('credits.page.subscriptionBenefit', { percent: subscriptionDetails.discount_percent })
+                          : t('credits.page.subscriptionCreditClarifier')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {subscriptionDetails ? (
+                    <View style={[styles.subscriptionCardDates, styles.vipDiscountDates, { borderTopColor: colors.cardBorder }]}>
+                      {subscriptionDetails.start_date ? (
+                        <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
+                          {t('credits.page.subscribedOn', { date: formatSubscriptionDate(subscriptionDetails.start_date, dateLocale) })}
+                        </Text>
+                      ) : null}
+                      {subscriptionDetails.end_date ? (
+                        <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
+                          {t('credits.page.renewsOn', { date: formatSubscriptionDate(subscriptionDetails.end_date, dateLocale) })}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.vipDiscountActions}>
+                    <TouchableOpacity
+                      style={[styles.vipDiscountPrimaryAction, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)' }]}
+                      onPress={() => setVipPlansExpanded((open) => !open)}
+                    >
+                      <Text style={[styles.vipDiscountPrimaryActionText, { color: colors.primary }]}>
+                        {t('credits.page.vipPlans')}
+                      </Text>
+                      <Ionicons name={vipPlansExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.vipDiscountSecondaryAction, { borderColor: colors.cardBorder }]}
+                      onPress={() => navigation.navigate('MembershipComparison')}
+                    >
+                      <Ionicons name="help-buoy-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.vipDiscountSecondaryActionText, { color: colors.primary }]}>
+                        Need help?
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {vipPlansExpanded ? (
+                    <View style={[styles.vipPlanList, { borderTopColor: colors.cardBorder }]}>
+                      {subscriptionPlansLoading ? (
+                        <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingPlans')}</Text>
+                      ) : subscriptionPlansFromPlay.length === 0 ? (
+                        subscriptionPlans.length > 0 && iapReady ? (
+                          <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noSubscriptionPlansStore')}</Text>
+                        ) : null
+                      ) : (
+                        subscriptionPlansFromPlay.map((plan) => {
+                          const productId = plan.google_play_product_id;
+                          const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
+                          const isPurchasing = purchasingSubscriptionId === productId;
+                          const displayPrice = getSubscriptionDisplayPrice(plan, iapSubscriptions);
+                          return (
+                            <TouchableOpacity
+                              key={plan.plan_id ?? productId}
+                              style={[styles.vipPlanRow, { borderColor: colors.cardBorder }]}
+                              onPress={() => handleSubscribePress(plan)}
+                              disabled={isCurrentPlan || isPurchasing}
+                            >
+                              <View style={styles.vipPlanRowCopy}>
+                                <Text style={[styles.vipPlanRowTitle, { color: colors.text }]}>{plan.tier_name || t('credits.page.vipFallback')}</Text>
+                                <Text style={[styles.vipPlanRowMeta, { color: colors.textSecondary }]}>
+                                  {t('credits.page.offPercent', { percent: plan.discount_percent ?? 0 })}
+                                  {displayPrice ? ` • ${displayPrice}` : ''}
+                                </Text>
+                              </View>
+                              <View style={[styles.vipPlanRowButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
+                                <Text style={styles.vipPlanRowButtonText}>
+                                  {isCurrentPlan ? t('credits.page.currentPlan') : isPurchasing ? t('credits.page.processing') : t('credits.page.subscribe')}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })
+                      )}
+                    </View>
+                  ) : null}
+
+                  {(subscriptionDetails || subscriptionTierName) && (
+                    <View style={styles.vipManageActions}>
+                      <TouchableOpacity
+                        style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder }]}
+                        onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}
+                      >
+                        <Ionicons name="open-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>{t('credits.page.manageSubscription')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 6 }]}
+                        onPress={handleRefreshSubscriptionStatus}
+                        disabled={refreshSubscriptionStatusLoading}
+                      >
+                        <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
+                          {refreshSubscriptionStatusLoading ? t('credits.page.refreshing') : t('credits.page.refreshSubscriptionStatus')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
 
@@ -1709,47 +1670,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  vipBadgeWithManage: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  vipBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  vipBadgeIcon: {
-    marginRight: 10,
-  },
-  vipBadgeText: {
-    fontSize: 15,
-    fontWeight: '600',
-    flex: 1,
-  },
-  subscriptionCard: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 18,
-    borderRadius: 16,
-  },
-  subscriptionCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  subscriptionCardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  subscriptionCardBenefit: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
   subscriptionCardDates: {
     borderTopWidth: 1,
     paddingTop: 12,
@@ -1757,21 +1677,6 @@ const styles = StyleSheet.create({
   },
   subscriptionCardDateLabel: {
     fontSize: 13,
-  },
-  manageSubscriptionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  manageSubscriptionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   manageSubscriptionLink: {
     flexDirection: 'row',
@@ -1787,21 +1692,6 @@ const styles = StyleSheet.create({
   manageSubscriptionLinkText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  membershipHelpButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-  },
-  membershipHelpButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
   },
   balanceDecoration: {
     position: 'absolute',
@@ -1867,43 +1757,141 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     textAlign: 'center',
   },
-  buyProductCard: {
+  creditPackCard: {
     width: (width - 52) / 2 - 6,
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
+    minHeight: 132,
+    justifyContent: 'space-between',
   },
-  buyProductLabel: {
-    fontSize: 16,
+  creditPackCredits: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  creditPackPrice: {
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 4,
-  },
-  buyProductCredits: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  buyProductPrice: {
-    fontSize: 14,
-    fontWeight: '600',
     marginBottom: 12,
   },
-  buyProductButton: {
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
+  creditPackButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
   },
-  buyProductButtonText: {
+  creditPackButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  vipDiscountPanel: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+  },
+  vipDiscountHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  vipDiscountIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vipDiscountCopy: {
+    flex: 1,
+  },
+  vipDiscountTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  vipDiscountText: {
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: '600',
   },
-  planBenefitsWrap: {
-    marginBottom: 10,
+  vipDiscountDates: {
+    marginTop: 14,
   },
-  planBenefitText: {
+  vipDiscountActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  vipDiscountPrimaryAction: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  vipDiscountPrimaryActionText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  vipDiscountSecondaryAction: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  vipDiscountSecondaryActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  vipPlanList: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    gap: 10,
+  },
+  vipPlanRow: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  vipPlanRowCopy: {
+    flex: 1,
+  },
+  vipPlanRowTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  vipPlanRowMeta: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  vipPlanRowButton: {
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 92,
+    alignItems: 'center',
+  },
+  vipPlanRowButtonText: {
+    color: '#fff',
     fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 2,
+    fontWeight: '800',
+  },
+  vipManageActions: {
+    marginTop: 12,
   },
   promoCard: {
     borderRadius: 16,

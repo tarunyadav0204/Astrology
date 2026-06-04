@@ -611,6 +611,7 @@
       "vipPlans": "Planes VIP",
       "loadingPlans": "Cargando planes…",
       "noSubscriptionPlansStore": "No hay planes de suscripción disponibles en la tienda.",
+      "subscriptionCreditClarifier": "Las suscripciones VIP dan descuentos en análisis de pago. No añaden créditos a tu saldo; compra créditos por separado abajo.",
       "buyCredits": "Comprar créditos",
       "loadingProducts": "Cargando productos…",
       "noProducts": "No hay productos disponibles. Vuelve más tarde.",

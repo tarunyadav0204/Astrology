@@ -123,6 +123,7 @@ from karma_analysis.routes import router as karma_router
 from astrovastu.routes import router as astrovastu_router
 from reddit.routes import router as reddit_router
 from support_routes import router as support_router, admin_router as support_admin_router
+from acquisition_routes import router as acquisition_router
 from order_management_routes import router as order_management_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from yoga_routes import router as yoga_router
@@ -403,6 +404,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: users.gender schema check failed: {e}")
     try:
+        from acquisition_schema import ensure_app_installations_schema
+
+        ensure_app_installations_schema()
+        print("app_installations schema ready (acquisition funnel)")
+    except Exception as e:
+        print(f"Warning: app_installations schema check failed: {e}")
+    try:
         prediction_engine = DailyPredictionEngine()
         prediction_engine.reset_prediction_rules()
         print("Daily prediction engine initialized with updated rules")
@@ -637,6 +645,7 @@ app.include_router(places_router, prefix="/api")
 app.include_router(reddit_router)
 app.include_router(support_router, prefix="/api/support")
 app.include_router(support_admin_router, prefix="/api")
+app.include_router(acquisition_router, prefix="/api")
 app.include_router(order_management_router, prefix="/api/order-management")
 
 
@@ -825,6 +834,10 @@ class BirthData(BaseModel):
     place: str = ""
     gender: str = ""
     relation: Optional[str] = "other"
+    relation_order: Optional[int] = None
+    relation_side: Optional[str] = ""
+    relation_label: Optional[str] = ""
+    is_family_member: Optional[bool] = None
     
     @field_validator('time')
     @classmethod
@@ -1402,6 +1415,8 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
         birth_chart_data = None
         if user_data.birth_details:
             birth_data = user_data.birth_details
+            from birth_charts.schema import ensure_birth_chart_family_columns
+            ensure_birth_chart_family_columns(conn)
             if encryptor:
                 enc_name = encryptor.encrypt(birth_data.name)
                 enc_date = encryptor.encrypt(birth_data.date)
@@ -1419,8 +1434,10 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
                 birth_data.date, birth_data.time, birth_data.latitude, birth_data.longitude
             )
             execute(conn, '''
-                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self', ?)
+                INSERT INTO birth_charts
+                    (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash,
+                     relation_order, relation_side, relation_label, is_family_member)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self', ?, NULL, NULL, NULL, TRUE)
             ''', (user[0], enc_name, enc_date, enc_time, enc_lat, enc_lon,
                 birth_data.timezone, enc_place, birth_data.gender or '', reg_birth_hash))
 
@@ -2387,6 +2404,8 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
     
     try:
         with get_conn() as conn:
+            from birth_charts.schema import ensure_birth_chart_family_columns
+            ensure_birth_chart_family_columns(conn)
         
         # Prepare encrypted data
             if encryptor:
@@ -2421,7 +2440,7 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                 if clear_existing:
                     execute(
                         conn,
-                        "UPDATE birth_charts SET relation = 'other' WHERE userid = %s AND relation = 'self' AND id != %s",
+                        "UPDATE birth_charts SET relation = 'other', is_family_member = FALSE WHERE userid = %s AND relation = 'self' AND id != %s",
                         (current_user.userid, chart_id),
                     )
 
@@ -2430,7 +2449,9 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                     conn,
                     """
                         UPDATE birth_charts
-                        SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s, relation='self', birth_hash=%s
+                        SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s,
+                            relation='self', relation_order=NULL, relation_side=NULL, relation_label=NULL, is_family_member=TRUE,
+                            birth_hash=%s
                         WHERE id=%s AND userid=%s
                     """,
                     (
@@ -2455,15 +2476,17 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                 if clear_existing:
                     execute(
                         conn,
-                        "UPDATE birth_charts SET relation = 'other' WHERE userid = %s AND relation = 'self'",
+                        "UPDATE birth_charts SET relation = 'other', is_family_member = FALSE WHERE userid = %s AND relation = 'self'",
                         (current_user.userid,),
                     )
 
                 cur = execute(
                     conn,
                     """
-                        INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO birth_charts
+                            (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash,
+                             relation_order, relation_side, relation_label, is_family_member)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL, NULL, TRUE)
                         RETURNING id
                     """,
                     (

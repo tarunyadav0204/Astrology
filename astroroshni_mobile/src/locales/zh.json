@@ -611,6 +611,7 @@
       "vipPlans": "VIP 方案",
       "loadingPlans": "正在加载方案…",
       "noSubscriptionPlansStore": "商店暂无订阅方案。",
+      "subscriptionCreditClarifier": "VIP 订阅只提供付费分析折扣，不会为余额增加积分；请在下方单独购买积分。",
       "buyCredits": "购买积分",
       "loadingProducts": "正在加载商品…",
       "noProducts": "暂无商品，请稍后再试。",

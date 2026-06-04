@@ -31,6 +31,25 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
+const RELATION_OPTIONS = [
+  { key: 'self', label: 'Myself', icon: 'person-circle-outline' },
+  { key: 'father', label: 'Father', icon: 'man-outline' },
+  { key: 'mother', label: 'Mother', icon: 'woman-outline' },
+  { key: 'spouse', label: 'Spouse / Partner', icon: 'heart-outline' },
+  { key: 'child', label: 'Child', icon: 'happy-outline' },
+  { key: 'sibling', label: 'Sibling', icon: 'people-outline' },
+  { key: 'friend', label: 'Friend', icon: 'person-add-outline' },
+  { key: 'other', label: 'Other', icon: 'ellipse-outline' },
+];
+
+const FAMILY_RELATIONS = new Set(['self', 'father', 'mother', 'spouse', 'child', 'sibling']);
+
+const normalizeRelationOrder = (value) => {
+  if (value === '' || value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function BirthFormScreen({ navigation, route }) {
   useAnalytics('BirthFormScreen');
   const { t } = useTranslation();
@@ -66,6 +85,11 @@ export default function BirthFormScreen({ navigation, route }) {
     latitude: editProfile?.latitude || null,
     longitude: editProfile?.longitude || null,
     gender: editProfile?.gender?.trim() || '',
+    relation: editProfile?.relation || prefillData?.relation || 'other',
+    relation_order: normalizeRelationOrder(editProfile?.relation_order ?? prefillData?.relation_order),
+    relation_side: editProfile?.relation_side || prefillData?.relation_side || '',
+    relation_label: editProfile?.relation_label || prefillData?.relation_label || '',
+    is_family_member: editProfile?.is_family_member ?? prefillData?.is_family_member ?? false,
   });
   
   // Log edit mode for debugging
@@ -92,6 +116,11 @@ export default function BirthFormScreen({ navigation, route }) {
       if (chartGatePrefill.time && /^\d{1,2}:\d{2}/.test(String(chartGatePrefill.time))) {
         next.time = getTimeDate(String(chartGatePrefill.time).slice(0, 5));
       }
+      if (chartGatePrefill.relation) next.relation = String(chartGatePrefill.relation);
+      if (chartGatePrefill.relation_order != null) next.relation_order = normalizeRelationOrder(chartGatePrefill.relation_order);
+      if (chartGatePrefill.relation_side) next.relation_side = String(chartGatePrefill.relation_side);
+      if (chartGatePrefill.relation_label) next.relation_label = String(chartGatePrefill.relation_label);
+      if (chartGatePrefill.is_family_member != null) next.is_family_member = Boolean(chartGatePrefill.is_family_member);
       return next;
     });
   }, [chartGatePrefill, editProfile, updateGender]);
@@ -268,6 +297,17 @@ export default function BirthFormScreen({ navigation, route }) {
       }, 300);
       setSearchTimeout(timeout);
     }
+  };
+
+  const handleRelationChange = (relation) => {
+    setFormData((prev) => ({
+      ...prev,
+      relation,
+      is_family_member: FAMILY_RELATIONS.has(relation),
+      relation_order: relation === 'child' ? (prev.relation_order > 0 ? prev.relation_order : 1) : null,
+      relation_side: '',
+      relation_label: '',
+    }));
   };
 
   // Geocoding service configuration - change 'photon' to 'nominatim' to switch back
@@ -498,7 +538,11 @@ export default function BirthFormScreen({ navigation, route }) {
         latitude: formData.latitude,
         longitude: formData.longitude,
         gender: formData.gender,
-        relation: editProfile?.relation || 'other',
+        relation: formData.relation || 'other',
+        relation_order: formData.relation_order,
+        relation_side: formData.relation_side || '',
+        relation_label: formData.relation_label || '',
+        is_family_member: formData.is_family_member || FAMILY_RELATIONS.has(formData.relation),
       };
       
       // DEBUG: Log the exact relation value being sent
@@ -597,7 +641,7 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const getStepTitle = () => {
-    const titles = [t('birthForm.stepTitle.name', 'What\'s your name?'), t('birthForm.stepTitle.gender', 'Select your gender'), t('birthForm.stepTitle.date', 'When were you born?'), t('birthForm.stepTitle.time', 'What time were you born?'), t('birthForm.stepTitle.place', 'Where were you born?')];
+    const titles = [t('birthForm.stepTitle.name', 'Whose chart is this?'), t('birthForm.stepTitle.gender', 'Select gender'), t('birthForm.stepTitle.date', 'When were they born?'), t('birthForm.stepTitle.time', 'What time were they born?'), t('birthForm.stepTitle.place', 'Where were they born?')];
     return titles[step - 1];
   };
 
@@ -664,6 +708,90 @@ export default function BirthFormScreen({ navigation, route }) {
                       autoFocus
                       autoCorrect={false}
                     />
+                    <View style={styles.relationPicker}>
+                      <Text style={[styles.relationPickerTitle, { color: colors.text }]}>
+                        {t('birthForm.relation.title', 'Who is this chart for?')}
+                      </Text>
+                      <Text style={[styles.relationPickerSubtitle, { color: colors.textSecondary }]}>
+                        {t('birthForm.relation.subtitle', 'This helps organize family charts and improves relative-specific guidance.')}
+                      </Text>
+                      <View style={styles.relationGrid}>
+                        {RELATION_OPTIONS.map((option) => {
+                          const selected = formData.relation === option.key;
+                          return (
+                            <TouchableOpacity
+                              key={option.key}
+                              style={[
+                                styles.relationChip,
+                                {
+                                  borderColor: selected ? colors.primary : (theme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)'),
+                                  backgroundColor: selected
+                                    ? (theme === 'dark' ? 'rgba(249,115,22,0.22)' : 'rgba(249,115,22,0.16)')
+                                    : (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.62)'),
+                                },
+                              ]}
+                              onPress={() => handleRelationChange(option.key)}
+                            >
+                              <Ionicons name={option.icon} size={16} color={selected ? colors.primary : colors.textSecondary} />
+                              <Text style={[styles.relationChipText, { color: selected ? colors.primary : colors.text }]}>
+                                {t(`birthForm.relation.options.${option.key}`, option.label)}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {formData.relation === 'child' && (
+                        <View style={styles.relationOrderRow}>
+                          {[1, 2, 3].map((order) => (
+                            <TouchableOpacity
+                              key={`child-${order}`}
+                              style={[
+                                styles.relationOrderChip,
+                                {
+                                  borderColor: formData.relation_order === order ? colors.primary : (theme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)'),
+                                  backgroundColor: formData.relation_order === order
+                                    ? (theme === 'dark' ? 'rgba(249,115,22,0.22)' : 'rgba(249,115,22,0.16)')
+                                    : 'transparent',
+                                },
+                              ]}
+                              onPress={() => handleInputChange('relation_order', order)}
+                            >
+                              <Text style={[styles.relationOrderText, { color: formData.relation_order === order ? colors.primary : colors.textSecondary }]}>
+                                {t(`birthForm.relation.childOrder.${order}`, `${order}${order === 1 ? 'st' : order === 2 ? 'nd' : 'rd'} child`)}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
+                      {formData.relation === 'sibling' && (
+                        <View style={styles.relationOrderRow}>
+                          {[
+                            { value: -1, label: t('birthForm.relation.siblingOrder.elder', 'Elder sibling') },
+                            { value: 1, label: t('birthForm.relation.siblingOrder.younger', 'Younger sibling') },
+                          ].map((item) => (
+                            <TouchableOpacity
+                              key={`sibling-${item.value}`}
+                              style={[
+                                styles.relationOrderChip,
+                                {
+                                  borderColor: formData.relation_order === item.value ? colors.primary : (theme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)'),
+                                  backgroundColor: formData.relation_order === item.value
+                                    ? (theme === 'dark' ? 'rgba(249,115,22,0.22)' : 'rgba(249,115,22,0.16)')
+                                    : 'transparent',
+                                },
+                              ]}
+                              onPress={() => handleInputChange('relation_order', item.value)}
+                            >
+                              <Text style={[styles.relationOrderText, { color: formData.relation_order === item.value ? colors.primary : colors.textSecondary }]}>
+                                {item.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 )}
 
@@ -1067,6 +1195,56 @@ const styles = StyleSheet.create({
     padding: 18,
     fontSize: 18,
     textAlign: 'center',
+  },
+  relationPicker: {
+    marginTop: 18,
+    width: '100%',
+  },
+  relationPickerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  relationPickerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  relationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  relationChip: {
+    minHeight: 40,
+    maxWidth: '100%',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  relationChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  relationOrderRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  relationOrderChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  relationOrderText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   genderContainer: {
     flexDirection: 'row',
