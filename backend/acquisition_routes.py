@@ -85,6 +85,7 @@ class AcquisitionFirstOpenBody(BaseModel):
     client_install_key: Optional[str] = Field(None, max_length=512)
     platform: str = Field("", max_length=32)
     app_version: Optional[str] = Field(None, max_length=64)
+    app_build: Optional[str] = Field(None, max_length=64)
     referrer_raw: Optional[str] = Field(None, max_length=8192)
 
 
@@ -185,6 +186,7 @@ async def acquisition_first_open(body: AcquisitionFirstOpenBody):
     iid = _validate_installation_id(body.installation_id)
     platform = (body.platform or "").strip()[:32] or "unknown"
     app_version = (body.app_version or "").strip()[:64] if body.app_version else None
+    app_build = (body.app_build or "").strip()[:64] if body.app_build else None
     referrer_raw = body.referrer_raw
     if referrer_raw is not None:
         referrer_raw = str(referrer_raw)[:8192]
@@ -198,7 +200,33 @@ async def acquisition_first_open(body: AcquisitionFirstOpenBody):
                 conn,
                 """
                 INSERT INTO app_installations (
-                    installation_id, client_install_key, platform, app_version, referrer_raw,
+                    installation_id, client_install_key, platform, app_version, app_build, referrer_raw,
+                    utm_source, utm_medium, utm_campaign,
+                    first_open_at, last_open_at, open_count
+                )
+                VALUES (
+                    ?::uuid, ?, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    NOW(), NOW(), 1
+                )
+                ON CONFLICT (client_install_key) WHERE client_install_key IS NOT NULL DO UPDATE SET
+                    last_open_at = NOW(),
+                    open_count = app_installations.open_count + 1,
+                    app_version = COALESCE(EXCLUDED.app_version, app_installations.app_version),
+                    app_build = COALESCE(EXCLUDED.app_build, app_installations.app_build),
+                    referrer_raw = COALESCE(app_installations.referrer_raw, EXCLUDED.referrer_raw),
+                    utm_source = COALESCE(app_installations.utm_source, EXCLUDED.utm_source),
+                    utm_medium = COALESCE(app_installations.utm_medium, EXCLUDED.utm_medium),
+                    utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
+                """,
+                (iid, client_install_key, platform, app_version, app_build, referrer_raw, utm_s, utm_m, utm_c),
+            )
+        else:
+            execute(
+                conn,
+                """
+                INSERT INTO app_installations (
+                    installation_id, platform, app_version, app_build, referrer_raw,
                     utm_source, utm_medium, utm_campaign,
                     first_open_at, last_open_at, open_count
                 )
@@ -207,41 +235,17 @@ async def acquisition_first_open(body: AcquisitionFirstOpenBody):
                     ?, ?, ?,
                     NOW(), NOW(), 1
                 )
-                ON CONFLICT (client_install_key) WHERE client_install_key IS NOT NULL DO UPDATE SET
-                    last_open_at = NOW(),
-                    open_count = app_installations.open_count + 1,
-                    app_version = COALESCE(EXCLUDED.app_version, app_installations.app_version),
-                    referrer_raw = COALESCE(app_installations.referrer_raw, EXCLUDED.referrer_raw),
-                    utm_source = COALESCE(app_installations.utm_source, EXCLUDED.utm_source),
-                    utm_medium = COALESCE(app_installations.utm_medium, EXCLUDED.utm_medium),
-                    utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
-                """,
-                (iid, client_install_key, platform, app_version, referrer_raw, utm_s, utm_m, utm_c),
-            )
-        else:
-            execute(
-                conn,
-                """
-                INSERT INTO app_installations (
-                    installation_id, platform, app_version, referrer_raw,
-                    utm_source, utm_medium, utm_campaign,
-                    first_open_at, last_open_at, open_count
-                )
-                VALUES (
-                    ?::uuid, ?, ?, ?,
-                    ?, ?, ?,
-                    NOW(), NOW(), 1
-                )
                 ON CONFLICT (installation_id) DO UPDATE SET
                     last_open_at = NOW(),
                     open_count = app_installations.open_count + 1,
                     app_version = COALESCE(EXCLUDED.app_version, app_installations.app_version),
+                    app_build = COALESCE(EXCLUDED.app_build, app_installations.app_build),
                     referrer_raw = COALESCE(app_installations.referrer_raw, EXCLUDED.referrer_raw),
                     utm_source = COALESCE(app_installations.utm_source, EXCLUDED.utm_source),
                     utm_medium = COALESCE(app_installations.utm_medium, EXCLUDED.utm_medium),
                     utm_campaign = COALESCE(app_installations.utm_campaign, EXCLUDED.utm_campaign)
                 """,
-                (iid, platform, app_version, referrer_raw, utm_s, utm_m, utm_c),
+                (iid, platform, app_version, app_build, referrer_raw, utm_s, utm_m, utm_c),
             )
         conn.commit()
 
@@ -403,6 +407,7 @@ async def admin_acquisition_installations(
                 ai.installation_id::text,
                 ai.platform,
                 ai.app_version,
+                ai.app_build,
                 LEFT(COALESCE(ai.referrer_raw, ''), 500) AS referrer_preview,
                 ai.utm_source,
                 ai.utm_medium,
@@ -442,21 +447,22 @@ async def admin_acquisition_installations(
                 "installation_id": r[0],
                 "platform": r[1],
                 "app_version": r[2],
-                "referrer_preview": r[3],
-                "utm_source": r[4],
-                "utm_medium": r[5],
-                "utm_campaign": r[6],
-                "first_open_at": r[7].isoformat() if r[7] else None,
-                "last_open_at": r[8].isoformat() if r[8] else None,
-                "open_count": r[9],
-                "userid": r[10],
-                "registered_at": r[11].isoformat() if r[11] else None,
-                "user_phone": r[12],
-                "user_name": r[13],
-                "last_event_name": r[14],
-                "last_event_status": r[15],
-                "last_event_screen": r[16],
-                "last_event_at": r[17].isoformat() if r[17] else None,
+                "app_build": r[3],
+                "referrer_preview": r[4],
+                "utm_source": r[5],
+                "utm_medium": r[6],
+                "utm_campaign": r[7],
+                "first_open_at": r[8].isoformat() if r[8] else None,
+                "last_open_at": r[9].isoformat() if r[9] else None,
+                "open_count": r[10],
+                "userid": r[11],
+                "registered_at": r[12].isoformat() if r[12] else None,
+                "user_phone": r[13],
+                "user_name": r[14],
+                "last_event_name": r[15],
+                "last_event_status": r[16],
+                "last_event_screen": r[17],
+                "last_event_at": r[18].isoformat() if r[18] else None,
             }
         )
 

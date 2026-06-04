@@ -20,6 +20,32 @@ function formatDateTimeIST(value) {
   });
 }
 
+function formatReferrerPreview(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+
+  const decodeSafely = (text) => {
+    try {
+      return decodeURIComponent(String(text || '').replace(/\+/g, ' '));
+    } catch (_) {
+      return String(text || '');
+    }
+  };
+
+  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const formatted = (lines.length ? lines : [raw])
+    .map((line) => {
+      const eq = line.indexOf('=');
+      if (eq <= 0) return decodeSafely(line);
+      const key = line.slice(0, eq).trim();
+      const valuePart = decodeSafely(line.slice(eq + 1).trim());
+      return `${key}: ${valuePart.replace(/&/g, ' & ')}`;
+    })
+    .join('\n');
+
+  return formatted.length > 500 ? `${formatted.slice(0, 500)}…` : formatted;
+}
+
 const AdminAcquisition = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -194,7 +220,7 @@ const AdminAcquisition = () => {
                   <th>Install ID</th>
                   <th>First open (IST)</th>
                   <th>Platform</th>
-                  <th>App version</th>
+                  <th>App version / build</th>
                   <th>UTM source / medium / campaign</th>
                   <th>Opens</th>
                   <th>Last funnel event</th>
@@ -211,51 +237,62 @@ const AdminAcquisition = () => {
                     </td>
                   </tr>
                 ) : (
-                  items.map((row) => (
-                    <tr key={row.installation_id}>
-                      <td title={row.installation_id || ''} style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                        {row.installation_id
-                          ? `${String(row.installation_id).slice(0, 8)}…${String(row.installation_id).slice(-6)}`
-                          : '—'}
-                      </td>
-                      <td>{formatDateTimeIST(row.first_open_at)}</td>
-                      <td>{row.platform || '—'}</td>
-                      <td>{row.app_version || '—'}</td>
-                      <td>
-                        {[row.utm_source, row.utm_medium, row.utm_campaign].filter(Boolean).join(' · ') || '—'}
-                      </td>
-                      <td>{row.open_count ?? '—'}</td>
-                      <td>
-                        {row.last_event_name ? (
-                          <>
-                            <div style={{ fontWeight: 600 }}>{row.last_event_name}</div>
-                            <div style={{ fontSize: 12, color: '#666' }}>
-                              {[row.last_event_status, row.last_event_screen].filter(Boolean).join(' · ') || '—'}
-                            </div>
-                            <div style={{ fontSize: 11, color: '#999' }}>{formatDateTimeIST(row.last_event_at)}</div>
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        {row.userid != null ? (
-                          <>
-                            <div>{row.user_phone || '—'}</div>
-                            <div style={{ fontSize: 12, color: '#666' }}>{row.user_name || ''}</div>
-                            <div style={{ fontSize: 11, color: '#999' }}>id {row.userid}</div>
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>{formatDateTimeIST(row.registered_at)}</td>
-                      <td title={row.referrer_preview || ''} style={{ maxWidth: 220, wordBreak: 'break-all' }}>
-                        {(row.referrer_preview || '').slice(0, 120)}
-                        {(row.referrer_preview || '').length > 120 ? '…' : ''}
-                      </td>
-                    </tr>
-                  ))
+                  items.map((row) => {
+                    const referrerPreview = formatReferrerPreview(row.referrer_preview);
+                    return (
+                      <tr key={row.installation_id}>
+                        <td title={row.installation_id || ''} style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                          {row.installation_id
+                            ? `${String(row.installation_id).slice(0, 8)}…${String(row.installation_id).slice(-6)}`
+                            : '—'}
+                        </td>
+                        <td>{formatDateTimeIST(row.first_open_at)}</td>
+                        <td>{row.platform || '—'}</td>
+                        <td>
+                          <div>{row.app_version || '—'}</div>
+                          <div style={{ fontSize: 11, color: '#999' }}>
+                            {row.app_build ? `build ${row.app_build}` : '—'}
+                          </div>
+                        </td>
+                        <td>
+                          {[row.utm_source, row.utm_medium, row.utm_campaign].filter(Boolean).join(' · ') || '—'}
+                        </td>
+                        <td>{row.open_count ?? '—'}</td>
+                        <td>
+                          {row.last_event_name ? (
+                            <>
+                              <div style={{ fontWeight: 600 }}>{row.last_event_name}</div>
+                              <div style={{ fontSize: 12, color: '#666' }}>
+                                {[row.last_event_status, row.last_event_screen].filter(Boolean).join(' · ') || '—'}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#999' }}>{formatDateTimeIST(row.last_event_at)}</div>
+                            </>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>
+                          {row.userid != null ? (
+                            <>
+                              <div>{row.user_phone || '—'}</div>
+                              <div style={{ fontSize: 12, color: '#666' }}>{row.user_name || ''}</div>
+                              <div style={{ fontSize: 11, color: '#999' }}>id {row.userid}</div>
+                            </>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>{formatDateTimeIST(row.registered_at)}</td>
+                        <td
+                          title={referrerPreview}
+                          style={{ maxWidth: 260, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                        >
+                          {referrerPreview.slice(0, 180)}
+                          {referrerPreview.length > 180 ? '…' : ''}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

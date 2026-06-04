@@ -130,6 +130,7 @@ async function sendAcquisitionFirstOpenOnceBody() {
       Application.nativeApplicationVersion ||
       Application.applicationVersion ||
       null;
+    const app_build = Application.nativeBuildVersion || null;
     const referrer_raw = await buildReferrerPayload();
 
     const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/acquisition/first-open')}`;
@@ -144,6 +145,7 @@ async function sendAcquisitionFirstOpenOnceBody() {
         client_install_key,
         platform: Platform.OS,
         app_version,
+        app_build,
         referrer_raw: referrer_raw || null,
       }),
     });
@@ -154,6 +156,7 @@ async function sendAcquisitionFirstOpenOnceBody() {
         'first_open',
         {
           app_version: app_version || '',
+          app_build: app_build || '',
           has_referrer: Boolean(referrer_raw),
           platform: Platform.OS,
         },

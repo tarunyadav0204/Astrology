@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS app_installations (
     installation_id UUID PRIMARY KEY,
     platform VARCHAR(32) NOT NULL DEFAULT 'unknown',
     app_version VARCHAR(64),
+    app_build VARCHAR(64),
     referrer_raw TEXT,
     utm_source VARCHAR(512),
     utm_medium VARCHAR(512),
@@ -30,6 +31,9 @@ CREATE INDEX IF NOT EXISTS idx_app_installations_utm_campaign
 
 ALTER TABLE app_installations
     ADD COLUMN IF NOT EXISTS client_install_key VARCHAR(128);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS app_build VARCHAR(64);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_app_installations_client_install_key
     ON app_installations (client_install_key)
