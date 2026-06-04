@@ -149,6 +149,7 @@ export default function PasswordScreen({
           linkAcquisitionInstallationToUser().catch(() => {});
         } catch (_) {}
         trackAcquisitionFunnelEvent('login_completed', {}, { status: 'success', screenName: 'PasswordScreen' }).catch(() => {});
+        trackAstrologyEvent.userLoggedIn();
         await refreshCredits();
         if (Platform.OS !== 'ios') {
           try {

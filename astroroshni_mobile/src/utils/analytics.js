@@ -13,6 +13,8 @@ export { MetaStandardEvent, logMetaAppEvent };
 
 const GA_MEASUREMENT_ID = 'G-M0C9B8LGMR';
 const API_SECRET = 'TY4n2VL_R6qWdmqGc5rGZg'; // Get from GA4 Admin > Data Streams > Measurement Protocol API secrets
+const GA4_CLIENT_ID_KEY = 'astro_ga4_client_id_v1';
+const ACQUISITION_INSTALLATION_ID_KEY = 'astro_installation_id_v1';
 
 if (Platform.OS === 'web') {
   const script1 = document.createElement('script');
@@ -36,25 +38,50 @@ const gtag = (...args) => {
   }
 };
 
+function generateAnalyticsClientId() {
+  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
+    return `mobile_${Platform.OS}_${globalThis.crypto.randomUUID()}`;
+  }
+  return `mobile_${Platform.OS}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+async function getStableGA4ClientId(AsyncStorage) {
+  const installId = await AsyncStorage.getItem(ACQUISITION_INSTALLATION_ID_KEY);
+  if (installId && String(installId).trim()) {
+    return `mobile_${Platform.OS}_${String(installId).trim()}`;
+  }
+
+  const existing = await AsyncStorage.getItem(GA4_CLIENT_ID_KEY);
+  if (existing && String(existing).trim()) return String(existing).trim();
+
+  const id = generateAnalyticsClientId();
+  await AsyncStorage.setItem(GA4_CLIENT_ID_KEY, id);
+  return id;
+}
+
 const sendToGA4 = async (eventName, params = {}) => {
   if (Platform.OS === 'web') return;
   
   try {
-    // Get userName from AsyncStorage if available
+    // Get stable client/user identity from AsyncStorage if available.
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const clientId = await getStableGA4ClientId(AsyncStorage);
     let userName = null;
+    let userId = null;
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       const userDataStr = await AsyncStorage.getItem('userData');
       if (userDataStr) {
         const userData = JSON.parse(userDataStr);
         userName = userData.name || userData.username || null;
+        userId = userData.userid ?? userData.user_id ?? userData.id ?? null;
       }
     } catch (e) {
-      console.log('Could not retrieve userName from storage');
+      console.log('Could not retrieve analytics user data from storage');
     }
     
     const payload = {
-      client_id: `mobile_${Platform.OS}_${Date.now()}`,
+      client_id: clientId,
+      ...(userId != null ? { user_id: String(userId) } : {}),
       user_properties: userName ? {
         user_name: { value: userName }
       } : undefined,
@@ -81,6 +108,16 @@ const sendToGA4 = async (eventName, params = {}) => {
   } catch (error) {
     console.error('❌ GA4 tracking error:', error.response?.data || error.message);
   }
+};
+
+export const trackGA4EventOnly = (eventName, params = {}) => {
+  console.log('📊 GA4 Event:', eventName, params);
+  if (Platform.OS === 'web') {
+    gtag('event', eventName, params);
+  } else {
+    return sendToGA4(eventName, params);
+  }
+  return Promise.resolve();
 };
 
 export const trackScreenView = (screenName, meta = {}) => {

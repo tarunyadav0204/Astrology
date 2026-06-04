@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking } from 'react-native';
 import * as Application from 'expo-application';
 import { API_BASE_URL, getEndpoint } from '../utils/constants';
+import { trackGA4EventOnly } from '../utils/analytics';
 
 const INSTALLATION_ID_KEY = 'astro_installation_id_v1';
 const FIRST_OPEN_SENT_KEY = 'astro_acquisition_first_open_sent_v1';
@@ -205,9 +206,24 @@ function sanitizeEventMetadata(metadata) {
 }
 
 export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, options = {}) {
+  let event_name = '';
+  let event_status = null;
+  let screen_name = null;
+  let safeMetadata = {};
   try {
-    const event_name = safeEventToken(eventName);
+    event_name = safeEventToken(eventName);
     if (!event_name) return;
+    event_status = safeEventToken(options.status || metadata.status || '').slice(0, 32) || null;
+    screen_name = safeEventToken(options.screenName || metadata.screen_name || '').slice(0, 120) || null;
+    safeMetadata = sanitizeEventMetadata(metadata);
+
+    trackGA4EventOnly('acquisition_funnel_step', {
+      funnel_step: event_name,
+      funnel_status: event_status || 'none',
+      screen_name: screen_name || '',
+      ...safeMetadata,
+    }).catch(() => {});
+
     const installation_id = await getOrCreateInstallationId();
     const client_install_key = await getClientInstallKey();
     const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/acquisition/event')}`;
@@ -221,9 +237,9 @@ export async function trackAcquisitionFunnelEvent(eventName, metadata = {}, opti
         installation_id,
         client_install_key,
         event_name,
-        event_status: safeEventToken(options.status || metadata.status || '').slice(0, 32) || null,
-        screen_name: safeEventToken(options.screenName || metadata.screen_name || '').slice(0, 120) || null,
-        metadata: sanitizeEventMetadata(metadata),
+        event_status,
+        screen_name,
+        metadata: safeMetadata,
       }),
     });
     if (!res.ok && __DEV__) {

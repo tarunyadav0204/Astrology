@@ -64,6 +64,7 @@ const AdminAcquisition = () => {
     not_registered: 0,
     registration_rate: 0,
   });
+  const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
 
   const applyUtmAndSearch = useCallback(() => {
     setUtmCampaignFilter(utmCampaignInput.trim());
@@ -205,6 +206,16 @@ const AdminAcquisition = () => {
         >
           Apply filters
         </button>
+        <button
+          type="button"
+          className="users-search-btn"
+          onClick={() => {
+            load();
+          }}
+          disabled={loading}
+        >
+          Refresh
+        </button>
       </div>
 
       {error ? (
@@ -285,10 +296,21 @@ const AdminAcquisition = () => {
                         <td>{formatDateTimeIST(row.registered_at)}</td>
                         <td
                           title={referrerPreview}
-                          style={{ maxWidth: 260, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                          style={{
+                            maxWidth: 280,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            cursor: referrerPreview === '—' ? 'default' : 'pointer',
+                            color: referrerPreview === '—' ? 'inherit' : '#2563eb',
+                          }}
+                          onClick={() => {
+                            if (referrerPreview !== '—') {
+                              setReferrerModal({ visible: true, text: referrerPreview });
+                            }
+                          }}
                         >
-                          {referrerPreview.slice(0, 180)}
-                          {referrerPreview.length > 180 ? '…' : ''}
+                          {referrerPreview}
                         </td>
                       </tr>
                     );
@@ -297,6 +319,69 @@ const AdminAcquisition = () => {
               </tbody>
             </table>
           </div>
+
+          {referrerModal.visible ? (
+            <div
+              role="dialog"
+              aria-modal="true"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.45)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 20,
+              }}
+              onClick={() => setReferrerModal({ visible: false, text: '' })}
+            >
+              <div
+                style={{
+                  width: 'min(720px, 100%)',
+                  maxHeight: '80vh',
+                  background: '#fff',
+                  borderRadius: 8,
+                  boxShadow: '0 20px 45px rgba(15, 23, 42, 0.25)',
+                  padding: 20,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                  <h3 style={{ margin: 0 }}>Referrer</h3>
+                  <button
+                    type="button"
+                    className="users-pagination-btn"
+                    onClick={() => setReferrerModal({ visible: false, text: '' })}
+                  >
+                    Close
+                  </button>
+                </div>
+                <pre
+                  style={{
+                    marginTop: 16,
+                    padding: 14,
+                    borderRadius: 8,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxHeight: '50vh',
+                    overflow: 'auto',
+                  }}
+                >
+                  {referrerModal.text}
+                </pre>
+                <button
+                  type="button"
+                  className="users-search-btn"
+                  onClick={() => navigator.clipboard?.writeText(referrerModal.text)}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
             <span className="users-pagination-info">

@@ -141,6 +141,7 @@ export default function LoginScreen({ navigation }) {
           linkAcquisitionInstallationToUser().catch(() => {});
         } catch (_) {}
         trackAcquisitionFunnelEvent('login_completed', {}, { status: 'success', screenName: 'LoginScreen' }).catch(() => {});
+        trackAstrologyEvent.userLoggedIn();
         // Refresh credits after successful login
         await refreshCredits();
         

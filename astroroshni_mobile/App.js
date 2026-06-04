@@ -76,6 +76,7 @@ import {
 import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 import { initFacebookAnalytics } from './src/services/facebookAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
+import { trackGA4EventOnly } from './src/utils/analytics';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
@@ -291,6 +292,12 @@ export default function App() {
       await checkForceUpdate();
 
       const authToken = await storage.getAuthToken();
+      trackGA4EventOnly('app_open', {
+        auth_state: authToken ? 'logged_in' : 'guest',
+        app_version: Application.nativeApplicationVersion || '',
+        app_build: Application.nativeBuildVersion || '',
+        platform: Platform.OS,
+      }).catch(() => {});
 
       if (authToken) {
         try {
