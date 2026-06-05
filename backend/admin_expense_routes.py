@@ -195,11 +195,22 @@ def _parse_amount(s: str) -> Decimal:
     return v.quantize(Decimal("0.01"))
 
 
+def _parse_required_int_id(name: str, raw: str) -> int:
+    try:
+        i = int(str(raw).strip())
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail=f"{name} must be a positive integer")
+    if i < 1:
+        raise HTTPException(status_code=400, detail=f"{name} must be positive")
+    return i
+
+
 @router.post("")
 async def admin_create_expense(
     spent_date: str = Form(...),
     amount: str = Form(...),
-    vendor: str = Form(...),
+    vendor_id: str = Form(...),
+    paid_by_id: str = Form(...),
     currency: str = Form("INR"),
     category: str = Form(""),
     notes: str = Form(""),
@@ -208,10 +219,9 @@ async def admin_create_expense(
 ):
     sd = _parse_spent_date(spent_date)
     amt = _parse_amount(amount)
+    vid = _parse_required_int_id("vendor_id", vendor_id)
+    pid = _parse_required_int_id("paid_by_id", paid_by_id)
     cur = (currency or "INR").strip().upper()[:8] or "INR"
-    ven = (vendor or "").strip()[:500]
-    if not ven:
-        raise HTTPException(status_code=400, detail="vendor is required")
     cat = (category or "").strip()[:200]
     note = (notes or "").strip()[:8000] or None
 
@@ -225,22 +235,45 @@ async def admin_create_expense(
 
     try:
         with get_conn() as conn:
+            cur_v = execute(
+                conn,
+                "SELECT label FROM admin_expense_vendors WHERE id = ? AND is_active = TRUE",
+                (vid,),
+            )
+            vrow = cur_v.fetchone()
+            if not vrow:
+                raise HTTPException(status_code=400, detail="Invalid or inactive vendor")
+            vendor_label = (vrow[0] or "").strip()[:500]
+            if not vendor_label:
+                raise HTTPException(status_code=400, detail="Invalid vendor")
+
+            cur_p = execute(
+                conn,
+                "SELECT label FROM admin_expense_paid_by WHERE id = ? AND is_active = TRUE",
+                (pid,),
+            )
+            prow = cur_p.fetchone()
+            if not prow:
+                raise HTTPException(status_code=400, detail="Invalid or inactive paid-by entry")
+
             cur_db = execute(
                 conn,
                 """
                 INSERT INTO admin_company_expenses (
-                    spent_date, amount, currency, vendor, category, notes,
+                    spent_date, amount, currency, vendor, vendor_id, paid_by_id, category, notes,
                     invoice_original_name, invoice_storage_path, invoice_mime, invoice_size_bytes,
                     created_by_userid, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 RETURNING id
                 """,
                 (
                     sd,
                     str(amt),
                     cur,
-                    ven,
+                    vendor_label,
+                    vid,
+                    pid,
                     cat,
                     note,
                     inv_name,
@@ -304,20 +337,25 @@ async def admin_list_expenses(
             conn,
             f"""
             SELECT
-                id,
-                spent_date,
-                amount::text,
-                currency,
-                vendor,
-                category,
-                LEFT(COALESCE(notes, ''), 200) AS notes_preview,
-                invoice_original_name,
-                (invoice_storage_path IS NOT NULL AND invoice_storage_path <> '') AS has_invoice,
-                created_at,
-                created_by_userid
-            FROM admin_company_expenses
+                e.id,
+                e.spent_date,
+                e.amount::text,
+                e.currency,
+                COALESCE(v.label, e.vendor, '') AS vendor_label,
+                e.category,
+                LEFT(COALESCE(e.notes, ''), 200) AS notes_preview,
+                e.invoice_original_name,
+                (e.invoice_storage_path IS NOT NULL AND e.invoice_storage_path <> '') AS has_invoice,
+                e.created_at,
+                e.created_by_userid,
+                COALESCE(pb.label, '') AS paid_by_label,
+                e.vendor_id,
+                e.paid_by_id
+            FROM admin_company_expenses e
+            LEFT JOIN admin_expense_vendors v ON v.id = e.vendor_id
+            LEFT JOIN admin_expense_paid_by pb ON pb.id = e.paid_by_id
             WHERE {where_sql}
-            ORDER BY spent_date DESC, id DESC
+            ORDER BY e.spent_date DESC, e.id DESC
             LIMIT ? OFFSET ?
             """,
             params + [limit, offset],
@@ -339,6 +377,9 @@ async def admin_list_expenses(
                 "has_invoice": bool(r[8]),
                 "created_at": r[9].isoformat() if r[9] else None,
                 "created_by_userid": r[10],
+                "paid_by": r[11],
+                "vendor_id": r[12],
+                "paid_by_id": r[13],
             }
         )
 

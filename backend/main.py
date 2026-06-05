@@ -126,6 +126,7 @@ from reddit.routes import router as reddit_router
 from support_routes import router as support_router, admin_router as support_admin_router
 from acquisition_routes import router as acquisition_router
 from admin_expense_routes import router as admin_expense_router
+from admin_expense_master_routes import router as admin_expense_master_router
 from order_management_routes import router as order_management_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from yoga_routes import router as yoga_router
@@ -730,6 +731,7 @@ app.include_router(support_router, prefix="/api/support")
 app.include_router(support_admin_router, prefix="/api")
 app.include_router(acquisition_router, prefix="/api")
 app.include_router(admin_expense_router, prefix="/api")
+app.include_router(admin_expense_master_router, prefix="/api")
 app.include_router(order_management_router, prefix="/api/order-management")
 
 

@@ -23,3 +23,38 @@ CREATE INDEX IF NOT EXISTS idx_admin_company_expenses_spent_date
 
 CREATE INDEX IF NOT EXISTS idx_admin_company_expenses_category
     ON admin_company_expenses (LOWER(category));
+
+-- Dropdown masters (managed under Admin → Expenses → "Vendors & paid by")
+CREATE TABLE IF NOT EXISTS admin_expense_vendors (
+    id SERIAL PRIMARY KEY,
+    label TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_expense_vendors_label_lower
+    ON admin_expense_vendors (LOWER(TRIM(label)));
+
+CREATE TABLE IF NOT EXISTS admin_expense_paid_by (
+    id SERIAL PRIMARY KEY,
+    label TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_expense_paid_by_label_lower
+    ON admin_expense_paid_by (LOWER(TRIM(label)));
+
+ALTER TABLE admin_company_expenses
+    ADD COLUMN IF NOT EXISTS vendor_id INTEGER REFERENCES admin_expense_vendors (id) ON DELETE SET NULL;
+
+ALTER TABLE admin_company_expenses
+    ADD COLUMN IF NOT EXISTS paid_by_id INTEGER REFERENCES admin_expense_paid_by (id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_admin_company_expenses_vendor_id
+    ON admin_company_expenses (vendor_id);
+
+CREATE INDEX IF NOT EXISTS idx_admin_company_expenses_paid_by_id
+    ON admin_company_expenses (paid_by_id);

@@ -398,4 +398,100 @@ export const adminService = {
   getAdminExpenseInvoiceUrl(expenseId) {
     return getEndpoint(`/admin/expenses/${expenseId}/invoice`);
   },
+
+  async getExpenseMasterVendors(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.include_inactive) sp.set('include_inactive', 'true');
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/expense-masters/vendors') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Failed to load vendors');
+    return response.json();
+  },
+
+  async createExpenseMasterVendor(body) {
+    const response = await fetch(getEndpoint('/admin/expense-masters/vendors'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create vendor');
+    }
+    return response.json();
+  },
+
+  async patchExpenseMasterVendor(id, body) {
+    const response = await fetch(getEndpoint(`/admin/expense-masters/vendors/${id}`), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update vendor');
+    }
+    return response.json();
+  },
+
+  async deleteExpenseMasterVendor(id) {
+    const response = await fetch(getEndpoint(`/admin/expense-masters/vendors/${id}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete vendor');
+    }
+    return response.json();
+  },
+
+  async getExpenseMasterPaidBy(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.include_inactive) sp.set('include_inactive', 'true');
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/expense-masters/paid-by') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Failed to load paid-by list');
+    return response.json();
+  },
+
+  async createExpenseMasterPaidBy(body) {
+    const response = await fetch(getEndpoint('/admin/expense-masters/paid-by'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create paid-by entry');
+    }
+    return response.json();
+  },
+
+  async patchExpenseMasterPaidBy(id, body) {
+    const response = await fetch(getEndpoint(`/admin/expense-masters/paid-by/${id}`), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update paid-by entry');
+    }
+    return response.json();
+  },
+
+  async deleteExpenseMasterPaidBy(id) {
+    const response = await fetch(getEndpoint(`/admin/expense-masters/paid-by/${id}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete paid-by entry');
+    }
+    return response.json();
+  },
 };
