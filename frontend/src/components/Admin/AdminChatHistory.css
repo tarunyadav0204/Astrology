@@ -695,6 +695,34 @@
   white-space: nowrap;
 }
 
+.session-header-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.session-panel-toggle,
+.user-value-toggle {
+  border: 1px solid #dbe4f0;
+  background: #fff;
+  color: #c2185b;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.session-panel-toggle:hover,
+.user-value-toggle:hover {
+  background: #fff5f8;
+  border-color: #f8bbd9;
+}
+
 .session-meta-chip--accent {
   background: #ecfdf5;
   border-color: #a7f3d0;
@@ -703,9 +731,13 @@
 
 .user-value-snapshot {
   flex-shrink: 0;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid #e9ecef;
   background: #fff;
+}
+
+.user-value-snapshot--collapsed {
+  overflow: hidden;
 }
 
 .user-value-snapshot--loading,
@@ -723,7 +755,7 @@
 .user-value-snapshot-main {
   display: grid;
   grid-template-columns: minmax(150px, 0.22fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -786,15 +818,20 @@
   font-weight: 700;
 }
 
+.user-value-toggle {
+  padding: 3px 9px;
+  font-size: 0.68rem;
+}
+
 .user-value-metrics {
   display: grid;
   grid-template-columns: repeat(6, minmax(76px, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .user-value-metric {
   min-width: 0;
-  padding: 7px 8px;
+  padding: 6px 8px;
   border: 1px solid #edf2f7;
   border-radius: 8px;
   background: #fafbfc;
@@ -816,6 +853,16 @@
   font-size: 0.9rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+.user-value-snapshot--collapsed .user-value-metric {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.user-value-snapshot--collapsed .user-value-reasons,
+.user-value-snapshot--collapsed .user-value-details {
+  display: none;
 }
 
 .user-value-reasons {
@@ -1495,6 +1542,83 @@
     display: block;
     margin-top: 2px;
     font-size: 0.68rem;
+  }
+
+  .session-header .session-header-actions {
+    margin-top: 4px;
+    gap: 4px;
+  }
+
+  .session-header .session-panel-toggle,
+  .session-header .message-branch-btn {
+    padding: 3px 8px;
+    font-size: 0.66rem;
+  }
+
+  .session-header .session-meta-chips {
+    max-height: 56px;
+    overflow-y: auto;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .admin-chat-content.has-selection .user-value-snapshot {
+    padding: 6px 10px;
+    max-height: 92px;
+    overflow: hidden;
+    border-bottom-color: #dfe3e8;
+  }
+
+  .admin-chat-content.has-selection .user-value-snapshot-main {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .admin-chat-content.has-selection .user-value-priority {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .admin-chat-content.has-selection .user-value-badge {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+
+  .admin-chat-content.has-selection .user-value-score {
+    font-size: 0.68rem;
+  }
+
+  .admin-chat-content.has-selection .user-value-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-chat-content.has-selection .user-value-metric {
+    padding: 5px 6px;
+    border-radius: 7px;
+  }
+
+  .admin-chat-content.has-selection .user-value-metric:nth-child(n + 4),
+  .admin-chat-content.has-selection .user-value-reasons,
+  .admin-chat-content.has-selection .user-value-details {
+    display: none;
+  }
+
+  .admin-chat-content.has-selection .user-value-metric-label {
+    font-size: 0.6rem;
+    margin-bottom: 1px;
+  }
+
+  .admin-chat-content.has-selection .user-value-metric strong {
+    font-size: 0.78rem;
+  }
+
+  @media (max-height: 620px) {
+    .admin-chat-content.has-selection .user-value-snapshot {
+      display: none;
+    }
   }
 
   .session-close {

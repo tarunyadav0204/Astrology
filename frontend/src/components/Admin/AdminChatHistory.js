@@ -357,6 +357,8 @@ const AdminChatHistory = () => {
   const [userValueSnapshot, setUserValueSnapshot] = useState(null);
   const [userValueLoading, setUserValueLoading] = useState(false);
   const [userValueError, setUserValueError] = useState('');
+  const [pricePanelExpanded, setPricePanelExpanded] = useState(false);
+  const [valuePanelExpanded, setValuePanelExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessionQuery, setSessionQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -435,6 +437,8 @@ const AdminChatHistory = () => {
         const data = await response.json();
         setSelectedUserId(userId);
         setSelectedSession(data);
+        setPricePanelExpanded(false);
+        setValuePanelExpanded(false);
       }
     } catch (error) {
       console.error('Error fetching user thread:', error);
@@ -1434,7 +1438,10 @@ const AdminChatHistory = () => {
     ].filter(Boolean).join(' · ');
 
     return (
-      <section className="user-value-snapshot" aria-label="User value snapshot">
+      <section
+        className={`user-value-snapshot${valuePanelExpanded ? ' user-value-snapshot--expanded' : ' user-value-snapshot--collapsed'}`}
+        aria-label="User value snapshot"
+      >
         <div className="user-value-snapshot-main">
           <div className="user-value-priority">
             <span className={`user-value-badge user-value-badge--${priorityClass}`}>
@@ -1443,6 +1450,14 @@ const AdminChatHistory = () => {
             <span className="user-value-score">
               Score {formatCompactNumber(snap.priority?.score)}/100
             </span>
+            <button
+              type="button"
+              className="user-value-toggle"
+              onClick={() => setValuePanelExpanded((v) => !v)}
+              aria-expanded={valuePanelExpanded}
+            >
+              {valuePanelExpanded ? 'Hide value details' : 'Show value details'}
+            </button>
           </div>
           <div className="user-value-metrics" aria-label="Key user metrics">
             <div className="user-value-metric">
@@ -1476,7 +1491,7 @@ const AdminChatHistory = () => {
           </div>
         </div>
 
-        {Array.isArray(snap.priority?.reasons) && snap.priority.reasons.length > 0 && (
+        {valuePanelExpanded && Array.isArray(snap.priority?.reasons) && snap.priority.reasons.length > 0 && (
           <div className="user-value-reasons">
             {snap.priority.reasons.map((reason, index) => (
               <span key={`${reason}-${index}`} className="user-value-reason">
@@ -1486,8 +1501,8 @@ const AdminChatHistory = () => {
           </div>
         )}
 
-        <details className="user-value-details">
-          <summary>View user details</summary>
+        {valuePanelExpanded && (
+        <div className="user-value-details">
           <div className="user-value-detail-grid">
             <div>
               <h4>Commercial</h4>
@@ -1529,7 +1544,8 @@ const AdminChatHistory = () => {
               <p>Campaign: {acquisition.utm_campaign || '—'}</p>
             </div>
           </div>
-        </details>
+        </div>
+        )}
       </section>
     );
   };
@@ -1630,6 +1646,12 @@ const AdminChatHistory = () => {
     return displayedBlocks.find((block) => block.some(isAssistantAnswer)) || null;
   }, [displayedBlocks]);
 
+  const hasSessionPricing =
+    Boolean(formatLlmLabel(selectedSession)) ||
+    Boolean(selectedSession?.cost_summary) ||
+    selectedSession?.cost_summary?.input_usd_per_1m != null ||
+    selectedSession?.cost_summary?.output_usd_per_1m != null;
+
   return (
     <>
     <div
@@ -1723,6 +1745,8 @@ const AdminChatHistory = () => {
                   onClick={() => {
                     setSelectedSession(null);
                     setSelectedUserId(null);
+                    setPricePanelExpanded(false);
+                    setValuePanelExpanded(false);
                   }}
                   aria-label="Back to user list"
                 >
@@ -1743,6 +1767,30 @@ const AdminChatHistory = () => {
                       {msgCount} message{msgCount === 1 ? '' : 's'}
                     </span>
                   )}
+                  <div className="session-header-actions">
+                    {hasSessionPricing && (
+                      <button
+                        type="button"
+                        className="session-panel-toggle"
+                        onClick={() => setPricePanelExpanded((v) => !v)}
+                        aria-expanded={pricePanelExpanded}
+                      >
+                        {pricePanelExpanded ? 'Hide pricing' : 'Show pricing'}
+                      </button>
+                    )}
+                    {selectedSession?.view_mode === 'user_thread' && latestExportBlock && (
+                      <button
+                        type="button"
+                        className="message-branch-btn"
+                        onClick={() => downloadConversationPdf(latestExportBlock, selectedSession, 'latest-thread')}
+                        disabled={pdfMessageId === 'latest-thread'}
+                        title="Download the latest visible question-answer flow as PDF"
+                      >
+                        {pdfMessageId === 'latest-thread' ? 'Generating PDF…' : 'Download Latest PDF'}
+                      </button>
+                    )}
+                  </div>
+                  {pricePanelExpanded && (
                   <div className="session-meta-chips">
                     {formatLlmLabel(selectedSession) && (
                       <span className="session-meta-chip" title="Provider and model ID from admin settings at answer time">
@@ -1797,18 +1845,8 @@ const AdminChatHistory = () => {
                         USD/INR {Number(selectedSession.cost_summary.usd_to_inr_rate).toFixed(2)}
                       </span>
                     )}
-                    {selectedSession?.view_mode === 'user_thread' && latestExportBlock && (
-                      <button
-                        type="button"
-                        className="message-branch-btn"
-                        onClick={() => downloadConversationPdf(latestExportBlock, selectedSession, 'latest-thread')}
-                        disabled={pdfMessageId === 'latest-thread'}
-                        title="Download the latest visible question-answer flow as PDF"
-                      >
-                        {pdfMessageId === 'latest-thread' ? 'Generating PDF…' : 'Download Latest PDF'}
-                      </button>
-                    )}
                   </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1816,6 +1854,8 @@ const AdminChatHistory = () => {
                   onClick={() => {
                     setSelectedSession(null);
                     setSelectedUserId(null);
+                    setPricePanelExpanded(false);
+                    setValuePanelExpanded(false);
                   }}
                   aria-label="Close conversation"
                 >
