@@ -46,9 +46,21 @@ function formatReferrerPreview(value) {
   return formatted.length > 500 ? `${formatted.slice(0, 500)}…` : formatted;
 }
 
+function getTodayISTDateInputValue() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 const AdminAcquisition = () => {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const todayIST = getTodayISTDateInputValue();
+  const [dateFrom, setDateFrom] = useState(todayIST);
+  const [dateTo, setDateTo] = useState(todayIST);
   const [registered, setRegistered] = useState('all');
   const [utmSourceInput, setUtmSourceInput] = useState('');
   const [utmSourceFilter, setUtmSourceFilter] = useState('');
@@ -179,6 +191,144 @@ const AdminAcquisition = () => {
         First app opens from the mobile client (anonymous), then rows link to a user after successful login or
         registration. Dates filter on <strong>first open</strong> (UTC stored; use date range conservatively).
       </p>
+
+      <div className="users-management-filters" style={{ marginBottom: 20 }}>
+        <label>
+          <span>First open from</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              setPage(1);
+              setDateFrom(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          <span>First open to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              setPage(1);
+              setDateTo(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          <span>Linked user</span>
+          <select
+            value={registered}
+            onChange={(e) => {
+              setPage(1);
+              setRegistered(e.target.value);
+            }}
+          >
+            <option value="all">All</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>UTM source contains</span>
+          <input
+            type="text"
+            placeholder="google-play, meta"
+            value={utmSourceInput}
+            onChange={(e) => setUtmSourceInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <label>
+          <span>UTM campaign contains</span>
+          <input
+            type="text"
+            placeholder="e.g. summer_sale"
+            value={utmCampaignInput}
+            onChange={(e) => setUtmCampaignInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <label>
+          <span>UTM medium contains</span>
+          <input
+            type="text"
+            placeholder="organic, paid_social"
+            value={utmMediumInput}
+            onChange={(e) => setUtmMediumInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <label>
+          <span>App build</span>
+          <input
+            type="text"
+            placeholder="178"
+            value={appBuildInput}
+            onChange={(e) => setAppBuildInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyUtmAndSearch();
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="users-search-btn"
+          onClick={() => {
+            const today = getTodayISTDateInputValue();
+            setDateFrom(today);
+            setDateTo(today);
+            setPage(1);
+          }}
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          className="users-search-btn"
+          onClick={() => {
+            setDateFrom('');
+            setDateTo('');
+            setRegistered('all');
+            setUtmSourceInput('');
+            setUtmSourceFilter('');
+            setUtmMediumInput('');
+            setUtmMediumFilter('');
+            setUtmCampaignInput('');
+            setUtmCampaignFilter('');
+            setAppBuildInput('');
+            setAppBuildFilter('');
+            setPage(1);
+          }}
+        >
+          Clear
+        </button>
+        <button
+          type="button"
+          className="users-search-btn"
+          onClick={() => {
+            applyUtmAndSearch();
+          }}
+        >
+          Apply filters
+        </button>
+        <button
+          type="button"
+          className="users-search-btn"
+          onClick={() => {
+            load();
+          }}
+          disabled={loading}
+        >
+          Refresh
+        </button>
+      </div>
 
       <div className="users-summary-grid" style={{ marginBottom: 20 }}>
         <div className="users-summary-card">
@@ -311,112 +461,6 @@ const AdminAcquisition = () => {
           </div>
         </>
       ) : null}
-
-      <div className="users-management-filters">
-        <label>
-          <span>First open from</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => {
-              setPage(1);
-              setDateFrom(e.target.value);
-            }}
-          />
-        </label>
-        <label>
-          <span>First open to</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => {
-              setPage(1);
-              setDateTo(e.target.value);
-            }}
-          />
-        </label>
-        <label>
-          <span>Linked user</span>
-          <select
-            value={registered}
-            onChange={(e) => {
-              setPage(1);
-              setRegistered(e.target.value);
-            }}
-          >
-            <option value="all">All</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </label>
-        <label>
-          <span>UTM source contains</span>
-          <input
-            type="text"
-            placeholder="google-play, meta"
-            value={utmSourceInput}
-            onChange={(e) => setUtmSourceInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applyUtmAndSearch();
-            }}
-          />
-        </label>
-        <label>
-          <span>UTM medium contains</span>
-          <input
-            type="text"
-            placeholder="organic, paid_social"
-            value={utmMediumInput}
-            onChange={(e) => setUtmMediumInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applyUtmAndSearch();
-            }}
-          />
-        </label>
-        <label>
-          <span>UTM campaign contains</span>
-          <input
-            type="text"
-            placeholder="e.g. summer_sale"
-            value={utmCampaignInput}
-            onChange={(e) => setUtmCampaignInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applyUtmAndSearch();
-            }}
-          />
-        </label>
-        <label>
-          <span>App build</span>
-          <input
-            type="text"
-            placeholder="178"
-            value={appBuildInput}
-            onChange={(e) => setAppBuildInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applyUtmAndSearch();
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          className="users-search-btn"
-          onClick={() => {
-            applyUtmAndSearch();
-          }}
-        >
-          Apply filters
-        </button>
-        <button
-          type="button"
-          className="users-search-btn"
-          onClick={() => {
-            load();
-          }}
-          disabled={loading}
-        >
-          Refresh
-        </button>
-      </div>
 
       {error ? (
         <p style={{ color: '#c2185b' }}>{error}</p>

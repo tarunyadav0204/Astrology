@@ -347,4 +347,55 @@ export const adminService = {
     }
     return response.json();
   },
+
+  async getAdminExpenses(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
+    if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    if (params.category != null && params.category !== '') sp.set('category', params.category);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/expenses') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      throw new Error('Failed to fetch expenses');
+    }
+    return response.json();
+  },
+
+  async createAdminExpense(formData) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(getEndpoint('/admin/expenses'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-Device-Id': getDeviceId(),
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const d = err.detail;
+      const msg = typeof d === 'string' ? d : d ? JSON.stringify(d) : 'Failed to create expense';
+      throw new Error(msg);
+    }
+    return response.json();
+  },
+
+  async deleteAdminExpense(expenseId) {
+    const response = await fetch(getEndpoint(`/admin/expenses/${expenseId}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete expense');
+    }
+    return response.json();
+  },
+
+  getAdminExpenseInvoiceUrl(expenseId) {
+    return getEndpoint(`/admin/expenses/${expenseId}/invoice`);
+  },
 };

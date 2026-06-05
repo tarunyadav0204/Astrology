@@ -125,6 +125,7 @@ from astrovastu.routes import router as astrovastu_router
 from reddit.routes import router as reddit_router
 from support_routes import router as support_router, admin_router as support_admin_router
 from acquisition_routes import router as acquisition_router
+from admin_expense_routes import router as admin_expense_router
 from order_management_routes import router as order_management_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from yoga_routes import router as yoga_router
@@ -486,6 +487,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: app_installations schema check failed: {e}")
     try:
+        from admin_expense_schema import ensure_admin_company_expenses_schema
+
+        ensure_admin_company_expenses_schema()
+        print("admin_company_expenses schema ready (internal expenses)")
+    except Exception as e:
+        print(f"Warning: admin_company_expenses schema check failed: {e}")
+    try:
         prediction_engine = DailyPredictionEngine()
         prediction_engine.reset_prediction_rules()
         print("Daily prediction engine initialized with updated rules")
@@ -721,6 +729,7 @@ app.include_router(reddit_router)
 app.include_router(support_router, prefix="/api/support")
 app.include_router(support_admin_router, prefix="/api")
 app.include_router(acquisition_router, prefix="/api")
+app.include_router(admin_expense_router, prefix="/api")
 app.include_router(order_management_router, prefix="/api/order-management")
 
 

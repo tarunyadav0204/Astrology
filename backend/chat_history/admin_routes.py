@@ -66,6 +66,158 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 router = APIRouter()
 
 
+def _table_exists(conn, table_name: str) -> bool:
+    cur = execute(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = %s
+        )
+        """,
+        (table_name,),
+    )
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def _table_columns(conn, table_name: str) -> set[str]:
+    cur = execute(
+        conn,
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = %s
+        """,
+        (table_name,),
+    )
+    return {str(r[0]) for r in (cur.fetchall() or [])}
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _days_since(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            raw = str(value).strip()
+            if not raw:
+                return None
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except Exception:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = datetime.now(timezone.utc) - dt.astimezone(timezone.utc)
+    return max(0, int(delta.total_seconds() // 86400))
+
+
+def _amount_paise_from_metadata(raw: Any) -> Optional[int]:
+    if not raw:
+        return None
+    try:
+        meta = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return None
+    if not isinstance(meta, dict):
+        return None
+    for key in ("amount_paise", "amount", "price_amount_paise"):
+        value = meta.get(key)
+        if value is not None:
+            parsed = _safe_int(value, -1)
+            if parsed >= 0:
+                return parsed
+    micros = _safe_int(meta.get("price_amount_micros"), -1)
+    if micros >= 0:
+        return int(round(micros / 10000.0))
+    return None
+
+
+def _user_value_label_and_score(
+    *,
+    lifetime_amount_inr: Optional[float],
+    lifetime_credits_purchased: int,
+    purchase_count: int,
+    total_questions: int,
+    questions_30d: int,
+    avg_rating: Optional[float],
+    feedback_count: int,
+    days_since_last_chat: Optional[int],
+    account_age_days: Optional[int],
+    current_credits: int,
+) -> Dict[str, Any]:
+    amount_score = min(45.0, float(lifetime_amount_inr or 0.0) / 100.0)
+    if amount_score <= 0:
+        amount_score = min(35.0, lifetime_credits_purchased / 20.0)
+    engagement_score = min(25.0, total_questions / 4.0) + min(10.0, questions_30d / 2.0)
+    recency_score = 0.0
+    if days_since_last_chat is not None:
+        if days_since_last_chat <= 1:
+            recency_score = 12.0
+        elif days_since_last_chat <= 7:
+            recency_score = 8.0
+        elif days_since_last_chat <= 30:
+            recency_score = 4.0
+    feedback_score = 0.0
+    if avg_rating is not None and feedback_count > 0:
+        feedback_score = max(0.0, min(8.0, (float(avg_rating) - 3.0) * 4.0))
+
+    score = int(round(min(100.0, amount_score + engagement_score + recency_score + feedback_score)))
+    reasons: List[str] = []
+    label = "Regular"
+
+    if purchase_count > 0:
+        reasons.append(f"{purchase_count} purchase{'s' if purchase_count != 1 else ''}")
+    if lifetime_credits_purchased > 0:
+        reasons.append(f"{lifetime_credits_purchased} paid credits")
+    if total_questions > 0:
+        reasons.append(f"{total_questions} question{'s' if total_questions != 1 else ''}")
+    if questions_30d > 0:
+        reasons.append(f"{questions_30d} in 30 days")
+    if avg_rating is not None and feedback_count > 0:
+        reasons.append(f"{avg_rating:.1f} avg feedback")
+
+    if purchase_count > 0 and (lifetime_credits_purchased >= 500 or (lifetime_amount_inr or 0) >= 2000):
+        label = "High value"
+    elif purchase_count > 0:
+        label = "Paid user"
+    elif questions_30d >= 15 or total_questions >= 30:
+        label = "High intent"
+    elif account_age_days is not None and account_age_days <= 7:
+        label = "New user"
+
+    if feedback_count >= 2 and avg_rating is not None and avg_rating <= 2.5:
+        label = "Needs attention"
+        reasons.insert(0, "Low feedback")
+    elif days_since_last_chat is not None and days_since_last_chat >= 14 and (purchase_count > 0 or total_questions >= 10):
+        label = "At risk"
+        reasons.insert(0, f"Inactive {days_since_last_chat} days")
+    elif current_credits <= 5 and questions_30d >= 5:
+        reasons.append("Low credits with recent usage")
+
+    return {"score": score, "label": label, "reasons": reasons[:6]}
+
+
 def _get_branch_outputs_bigquery_table() -> Optional[str]:
     project = (os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID") or "").strip()
     dataset = (
@@ -1044,6 +1196,393 @@ async def get_admin_chat_user_thread(
     except Exception as e:
         logger.exception("get_admin_chat_user_thread failed")
         raise HTTPException(status_code=500, detail=f"Error fetching user thread: {str(e)}")
+
+
+@router.get("/admin/chat/user-value-summary/{user_id}")
+async def get_admin_chat_user_value_summary(
+    user_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Lightweight value/context snapshot for one selected admin-chat user.
+
+    This intentionally runs only after a user is selected in admin chat. Keeping
+    these aggregates off the paginated left panel avoids making chat history
+    slower as user and payment volume grows.
+    """
+    try:
+        with get_conn() as conn:
+            if not _table_exists(conn, "users"):
+                raise HTTPException(status_code=404, detail="User not found")
+
+            users_cols = _table_columns(conn, "users")
+            email_select = "COALESCE(email, '')" if "email" in users_cols else "''"
+            signup_select = "COALESCE(signup_client, '')" if "signup_client" in users_cols else "''"
+            wa_select = "COALESCE(whatsapp_wa_id, '')" if "whatsapp_wa_id" in users_cols else "''"
+            created_select = "created_at" if "created_at" in users_cols else "NULL::timestamp"
+            cur = execute(
+                conn,
+                f"""
+                SELECT userid, COALESCE(name, ''), COALESCE(phone, ''), {email_select},
+                       {signup_select}, {wa_select}, {created_select}
+                FROM users
+                WHERE userid = %s
+                """,
+                (user_id,),
+            )
+            user_row = cur.fetchone()
+            if not user_row:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            current_credits = 0
+            if _table_exists(conn, "user_credits"):
+                cur = execute(
+                    conn,
+                    "SELECT COALESCE(credits, 0) FROM user_credits WHERE userid = %s",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                current_credits = _safe_int(row[0] if row else 0)
+
+            lifetime_credits_purchased = 0
+            purchase_count = 0
+            lifetime_amount_paise = 0
+            last_purchase_at = None
+            failed_payment_count = 0
+            refund_count = 0
+            last_credit_activity_at = None
+            credit_spent = 0
+            recent_spend_30d = 0
+
+            if _table_exists(conn, "credit_transactions"):
+                credit_cols = _table_columns(conn, "credit_transactions")
+                metadata_select = "metadata" if "metadata" in credit_cols else "NULL::text"
+                credit_created_select = "created_at" if "created_at" in credit_cols else "NULL::timestamp"
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT
+                        COALESCE(SUM(CASE WHEN transaction_type = 'spent' THEN ABS(amount) ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN transaction_type = 'spent'
+                                           AND {credit_created_select} >= NOW() - INTERVAL '30 days'
+                                      THEN ABS(amount) ELSE 0 END), 0),
+                        MAX({credit_created_select})
+                    FROM credit_transactions
+                    WHERE userid = %s
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone() or (0, 0, None)
+                credit_spent = _safe_int(row[0])
+                recent_spend_30d = _safe_int(row[1])
+                last_credit_activity_at = row[2]
+
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT amount, {metadata_select}, {credit_created_select}
+                    FROM credit_transactions
+                    WHERE userid = %s
+                      AND transaction_type = 'earned'
+                      AND source IN ('google_play', 'razorpay')
+                    ORDER BY {credit_created_select} DESC NULLS LAST
+                    LIMIT 500
+                    """,
+                    (user_id,),
+                )
+                purchase_rows = cur.fetchall() or []
+                purchase_count = len(purchase_rows)
+                for amount, metadata, created_at in purchase_rows:
+                    lifetime_credits_purchased += _safe_int(amount)
+                    paise = _amount_paise_from_metadata(metadata)
+                    if paise is not None:
+                        lifetime_amount_paise += paise
+                    if last_purchase_at is None:
+                        last_purchase_at = created_at
+
+                cur = execute(
+                    conn,
+                    """
+                    SELECT
+                      COALESCE(SUM(CASE WHEN source = 'razorpay_refund' THEN 1 ELSE 0 END), 0),
+                      COALESCE(SUM(CASE WHEN LOWER(COALESCE(source, '')) LIKE '%%failed%%'
+                                         THEN 1 ELSE 0 END), 0)
+                    FROM credit_transactions
+                    WHERE userid = %s
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone() or (0, 0)
+                refund_count = _safe_int(row[0])
+                failed_payment_count = _safe_int(row[1])
+
+            total_questions = 0
+            questions_7d = 0
+            questions_30d = 0
+            total_sessions = 0
+            active_days_30d = 0
+            last_chat_at = None
+            failed_messages = 0
+            if _table_exists(conn, "chat_sessions") and _table_exists(conn, "chat_messages"):
+                msg_cols = _table_columns(conn, "chat_messages")
+                failed_messages_select = (
+                    "COUNT(*) FILTER (WHERE cm.status = 'failed')::int"
+                    if "status" in msg_cols
+                    else "0::int"
+                )
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT
+                        COUNT(*) FILTER (WHERE cm.sender = 'user')::int,
+                        COUNT(*) FILTER (
+                            WHERE cm.sender = 'user'
+                              AND cm.timestamp >= NOW() - INTERVAL '7 days'
+                        )::int,
+                        COUNT(*) FILTER (
+                            WHERE cm.sender = 'user'
+                              AND cm.timestamp >= NOW() - INTERVAL '30 days'
+                        )::int,
+                        COUNT(DISTINCT cs.session_id)::int,
+                        COUNT(DISTINCT DATE(cm.timestamp)) FILTER (
+                            WHERE cm.sender = 'user'
+                              AND cm.timestamp >= NOW() - INTERVAL '30 days'
+                        )::int,
+                        MAX(cm.timestamp),
+                        {failed_messages_select}
+                    FROM chat_sessions cs
+                    LEFT JOIN chat_messages cm ON cm.session_id = cs.session_id
+                    WHERE cs.user_id = %s
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone() or (0, 0, 0, 0, 0, None, 0)
+                total_questions = _safe_int(row[0])
+                questions_7d = _safe_int(row[1])
+                questions_30d = _safe_int(row[2])
+                total_sessions = _safe_int(row[3])
+                active_days_30d = _safe_int(row[4])
+                last_chat_at = row[5]
+                failed_messages = _safe_int(row[6])
+
+            avg_rating = None
+            feedback_count = 0
+            negative_feedback_count = 0
+            latest_feedback_at = None
+            if (
+                _table_exists(conn, "message_feedback")
+                and _table_exists(conn, "chat_messages")
+                and _table_exists(conn, "chat_sessions")
+            ):
+                cur = execute(
+                    conn,
+                    """
+                    SELECT
+                        AVG(mf.rating)::float,
+                        COUNT(*)::int,
+                        COUNT(*) FILTER (WHERE mf.rating <= 2)::int,
+                        MAX(mf.created_at)
+                    FROM message_feedback mf
+                    JOIN chat_messages cm ON cm.message_id = mf.message_id
+                    JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                    WHERE cs.user_id = %s
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone() or (None, 0, 0, None)
+                avg_rating = round(_safe_float(row[0]), 2) if row[0] is not None else None
+                feedback_count = _safe_int(row[1])
+                negative_feedback_count = _safe_int(row[2])
+                latest_feedback_at = row[3]
+
+            device_token_count = 0
+            latest_device_platform = None
+            latest_device_at = None
+            if _table_exists(conn, "device_tokens"):
+                device_cols = _table_columns(conn, "device_tokens")
+                platform_select = "MAX(platform)" if "platform" in device_cols else "NULL::text"
+                updated_select = "MAX(updated_at)" if "updated_at" in device_cols else "NULL::timestamptz"
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT COUNT(*)::int, {platform_select}, {updated_select}
+                    FROM device_tokens
+                    WHERE userid = %s
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone() or (0, None, None)
+                device_token_count = _safe_int(row[0])
+                latest_device_platform = row[1]
+                latest_device_at = row[2]
+
+            latest_app_version = None
+            latest_app_build = None
+            acquisition_source = None
+            acquisition_medium = None
+            acquisition_campaign = None
+            linked_at = None
+            if _table_exists(conn, "app_installations"):
+                app_cols = _table_columns(conn, "app_installations")
+                if "userid" in app_cols:
+                    app_version_select = "app_version" if "app_version" in app_cols else "NULL::text"
+                    app_build_select = "app_build" if "app_build" in app_cols else "NULL::text"
+                    utm_source_select = "utm_source" if "utm_source" in app_cols else "NULL::text"
+                    utm_medium_select = "utm_medium" if "utm_medium" in app_cols else "NULL::text"
+                    utm_campaign_select = "utm_campaign" if "utm_campaign" in app_cols else "NULL::text"
+                    linked_select = "linked_at" if "linked_at" in app_cols else "NULL::timestamp"
+                    if "linked_at" in app_cols and "first_open_at" in app_cols:
+                        app_order = "COALESCE(linked_at, first_open_at)"
+                    elif "linked_at" in app_cols:
+                        app_order = "linked_at"
+                    elif "first_open_at" in app_cols:
+                        app_order = "first_open_at"
+                    else:
+                        app_order = "NULL::timestamp"
+                    cur = execute(
+                        conn,
+                        f"""
+                        SELECT {app_version_select}, {app_build_select}, {utm_source_select},
+                               {utm_medium_select}, {utm_campaign_select}, {linked_select}
+                        FROM app_installations
+                        WHERE userid = %s
+                        ORDER BY {app_order} DESC NULLS LAST
+                        LIMIT 1
+                        """,
+                        (user_id,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        latest_app_version = row[0]
+                        latest_app_build = row[1]
+                        acquisition_source = row[2]
+                        acquisition_medium = row[3]
+                        acquisition_campaign = row[4]
+                        linked_at = row[5]
+
+            active_subscription = None
+            if _table_exists(conn, "user_subscriptions") and _table_exists(conn, "subscription_plans"):
+                us_cols = _table_columns(conn, "user_subscriptions")
+                sp_cols = _table_columns(conn, "subscription_plans")
+                provider_select = "COALESCE(us.billing_provider, '')" if "billing_provider" in us_cols else "''"
+                cancel_select = "COALESCE(us.cancel_at_period_end, FALSE)" if "cancel_at_period_end" in us_cols else "FALSE"
+                tier_select = "COALESCE(sp.tier_name, sp.plan_name, '')" if "tier_name" in sp_cols else "COALESCE(sp.plan_name, '')"
+                discount_select = "COALESCE(sp.discount_percent, 0)" if "discount_percent" in sp_cols else "0"
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT {tier_select}, {discount_select}, {provider_select},
+                           us.end_date, {cancel_select}
+                    FROM user_subscriptions us
+                    LEFT JOIN subscription_plans sp ON sp.plan_id = us.plan_id
+                    WHERE us.userid = %s
+                      AND us.status = 'active'
+                      AND us.end_date >= CURRENT_DATE
+                    ORDER BY us.end_date DESC NULLS LAST
+                    LIMIT 1
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if row:
+                    active_subscription = {
+                        "name": row[0] or "Active plan",
+                        "discount_percent": _safe_int(row[1]),
+                        "billing_provider": row[2] or None,
+                        "end_date": str(row[3]) if row[3] is not None else None,
+                        "cancel_at_period_end": bool(row[4]),
+                    }
+
+        account_age_days = _days_since(user_row[6])
+        days_since_last_chat = _days_since(last_chat_at)
+        lifetime_amount_inr = (
+            round(lifetime_amount_paise / 100.0, 2) if lifetime_amount_paise > 0 else None
+        )
+        priority = _user_value_label_and_score(
+            lifetime_amount_inr=lifetime_amount_inr,
+            lifetime_credits_purchased=lifetime_credits_purchased,
+            purchase_count=purchase_count,
+            total_questions=total_questions,
+            questions_30d=questions_30d,
+            avg_rating=avg_rating,
+            feedback_count=feedback_count,
+            days_since_last_chat=days_since_last_chat,
+            account_age_days=account_age_days,
+            current_credits=current_credits,
+        )
+
+        avg_questions_per_session = (
+            round(total_questions / total_sessions, 1) if total_sessions > 0 else 0.0
+        )
+
+        return {
+            "user": {
+                "userid": user_row[0],
+                "name": user_row[1] or "",
+                "phone": user_row[2] or "",
+                "email": user_row[3] or "",
+                "signup_client": user_row[4] or "",
+                "whatsapp_linked": bool(user_row[5]),
+                "created_at": _timestamp_to_ist_iso(user_row[6]),
+                "account_age_days": account_age_days,
+            },
+            "priority": priority,
+            "commercial": {
+                "current_credits": current_credits,
+                "lifetime_credits_purchased": lifetime_credits_purchased,
+                "lifetime_amount_inr": lifetime_amount_inr,
+                "purchase_count": purchase_count,
+                "last_purchase_at": _timestamp_to_ist_iso(last_purchase_at),
+                "avg_order_value_inr": (
+                    round(lifetime_amount_inr / purchase_count, 2)
+                    if lifetime_amount_inr is not None and purchase_count > 0
+                    else None
+                ),
+                "credits_spent": credit_spent,
+                "credits_spent_30d": recent_spend_30d,
+                "failed_payment_count": failed_payment_count,
+                "refund_count": refund_count,
+                "last_credit_activity_at": _timestamp_to_ist_iso(last_credit_activity_at),
+                "active_subscription": active_subscription,
+            },
+            "engagement": {
+                "total_questions": total_questions,
+                "questions_7d": questions_7d,
+                "questions_30d": questions_30d,
+                "total_sessions": total_sessions,
+                "avg_questions_per_session": avg_questions_per_session,
+                "active_days_30d": active_days_30d,
+                "last_chat_at": _timestamp_to_ist_iso(last_chat_at),
+                "days_since_last_chat": days_since_last_chat,
+                "failed_messages": failed_messages,
+            },
+            "feedback": {
+                "average_rating": avg_rating,
+                "feedback_count": feedback_count,
+                "negative_feedback_count": negative_feedback_count,
+                "latest_feedback_at": _timestamp_to_ist_iso(latest_feedback_at),
+            },
+            "reachability": {
+                "push_enabled": device_token_count > 0,
+                "device_token_count": device_token_count,
+                "latest_device_platform": latest_device_platform,
+                "latest_device_at": _timestamp_to_ist_iso(latest_device_at),
+                "whatsapp_linked": bool(user_row[5]),
+            },
+            "acquisition": {
+                "latest_app_version": latest_app_version,
+                "latest_app_build": latest_app_build,
+                "utm_source": acquisition_source,
+                "utm_medium": acquisition_medium,
+                "utm_campaign": acquisition_campaign,
+                "linked_at": _timestamp_to_ist_iso(linked_at),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_admin_chat_user_value_summary failed user_id=%s", user_id)
+        raise HTTPException(status_code=500, detail=f"Error fetching user value summary: {str(e)}")
 
 
 @router.get("/admin/event-timeline/history")

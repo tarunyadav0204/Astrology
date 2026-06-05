@@ -8,6 +8,20 @@ import './AdminChatHistory.css';
 const USER_PAGE_SIZE = 10;
 const SESSION_MESSAGE_PAGE_SIZE = 20;
 
+const formatCompactNumber = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString('en-IN');
+};
+
+const formatInr = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `₹${n.toLocaleString('en-IN', {
+    maximumFractionDigits: n >= 100 ? 0 : 2,
+  })}`;
+};
+
 /** Labels that often sit on a single newline after "Astrological Analysis" — force block boundaries. */
 const PDF_SUBSECTION_BREAK_LABELS = [
   'Triple Perspective (Sudarshana):',
@@ -340,6 +354,9 @@ const AdminChatHistory = () => {
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [sessionMsgLoading, setSessionMsgLoading] = useState(false);
+  const [userValueSnapshot, setUserValueSnapshot] = useState(null);
+  const [userValueLoading, setUserValueLoading] = useState(false);
+  const [userValueError, setUserValueError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionQuery, setSessionQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -425,6 +442,45 @@ const AdminChatHistory = () => {
       setSessionMsgLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedUserId == null) {
+      setUserValueSnapshot(null);
+      setUserValueError('');
+      setUserValueLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const loadUserValueSnapshot = async () => {
+      setUserValueLoading(true);
+      setUserValueError('');
+      try {
+        const response = await fetch(`/api/admin/chat/user-value-summary/${selectedUserId}`, {
+          headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          throw new Error(errText || `Failed (${response.status})`);
+        }
+        const data = await response.json();
+        if (!cancelled) setUserValueSnapshot(data);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error fetching user value summary:', error);
+          setUserValueSnapshot(null);
+          setUserValueError('Could not load user snapshot');
+        }
+      } finally {
+        if (!cancelled) setUserValueLoading(false);
+      }
+    };
+
+    loadUserValueSnapshot();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUserId]);
 
   const closeBranchModal = () => {
     setBranchModal({
@@ -1341,6 +1397,143 @@ const AdminChatHistory = () => {
     return `${start}–${end} of ${sessionPagination.total}`;
   }, [sessionPagination]);
 
+  const renderUserValueSnapshot = () => {
+    if (userValueLoading) {
+      return (
+        <div className="user-value-snapshot user-value-snapshot--loading">
+          Loading user snapshot…
+        </div>
+      );
+    }
+
+    if (userValueError) {
+      return (
+        <div className="user-value-snapshot user-value-snapshot--error">
+          {userValueError}
+        </div>
+      );
+    }
+
+    const snap = userValueSnapshot;
+    if (!snap) return null;
+
+    const priorityLabel = snap.priority?.label || 'Regular';
+    const priorityClass = String(priorityLabel).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const commercial = snap.commercial || {};
+    const engagement = snap.engagement || {};
+    const feedback = snap.feedback || {};
+    const reachability = snap.reachability || {};
+    const acquisition = snap.acquisition || {};
+    const subscription = commercial.active_subscription;
+    const sourceLabel = [acquisition.utm_source, acquisition.utm_medium]
+      .filter(Boolean)
+      .join(' / ');
+    const appLabel = [
+      acquisition.latest_app_version ? `v${acquisition.latest_app_version}` : null,
+      acquisition.latest_app_build ? `build ${acquisition.latest_app_build}` : null,
+    ].filter(Boolean).join(' · ');
+
+    return (
+      <section className="user-value-snapshot" aria-label="User value snapshot">
+        <div className="user-value-snapshot-main">
+          <div className="user-value-priority">
+            <span className={`user-value-badge user-value-badge--${priorityClass}`}>
+              {priorityLabel}
+            </span>
+            <span className="user-value-score">
+              Score {formatCompactNumber(snap.priority?.score)}/100
+            </span>
+          </div>
+          <div className="user-value-metrics" aria-label="Key user metrics">
+            <div className="user-value-metric">
+              <span className="user-value-metric-label">Paid credits</span>
+              <strong>{formatCompactNumber(commercial.lifetime_credits_purchased)}</strong>
+            </div>
+            <div className="user-value-metric">
+              <span className="user-value-metric-label">Spend</span>
+              <strong>{commercial.lifetime_amount_inr != null ? formatInr(commercial.lifetime_amount_inr) : '—'}</strong>
+            </div>
+            <div className="user-value-metric">
+              <span className="user-value-metric-label">Balance</span>
+              <strong>{formatCompactNumber(commercial.current_credits)}</strong>
+            </div>
+            <div className="user-value-metric">
+              <span className="user-value-metric-label">Questions</span>
+              <strong>{formatCompactNumber(engagement.total_questions)}</strong>
+            </div>
+            <div className="user-value-metric">
+              <span className="user-value-metric-label">30d</span>
+              <strong>{formatCompactNumber(engagement.questions_30d)}</strong>
+            </div>
+            <div className="user-value-metric">
+              <span className="user-value-metric-label">Feedback</span>
+              <strong>
+                {feedback.average_rating != null
+                  ? `${Number(feedback.average_rating).toFixed(1)} (${formatCompactNumber(feedback.feedback_count)})`
+                  : '—'}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {Array.isArray(snap.priority?.reasons) && snap.priority.reasons.length > 0 && (
+          <div className="user-value-reasons">
+            {snap.priority.reasons.map((reason, index) => (
+              <span key={`${reason}-${index}`} className="user-value-reason">
+                {reason}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <details className="user-value-details">
+          <summary>View user details</summary>
+          <div className="user-value-detail-grid">
+            <div>
+              <h4>Commercial</h4>
+              <p>Purchases: {formatCompactNumber(commercial.purchase_count)}</p>
+              <p>Avg order: {commercial.avg_order_value_inr != null ? formatInr(commercial.avg_order_value_inr) : '—'}</p>
+              <p>Credits spent: {formatCompactNumber(commercial.credits_spent)}</p>
+              <p>Spent 30d: {formatCompactNumber(commercial.credits_spent_30d)}</p>
+              {subscription ? (
+                <p>
+                  Plan: {subscription.name}
+                  {subscription.discount_percent ? ` · ${subscription.discount_percent}% off` : ''}
+                </p>
+              ) : (
+                <p>Plan: none active</p>
+              )}
+            </div>
+            <div>
+              <h4>Engagement</h4>
+              <p>Questions 7d: {formatCompactNumber(engagement.questions_7d)}</p>
+              <p>Sessions: {formatCompactNumber(engagement.total_sessions)}</p>
+              <p>Avg/session: {formatCompactNumber(engagement.avg_questions_per_session)}</p>
+              <p>Active days 30d: {formatCompactNumber(engagement.active_days_30d)}</p>
+              <p>Last chat: {engagement.last_chat_at ? formatDate(engagement.last_chat_at) : '—'}</p>
+            </div>
+            <div>
+              <h4>Satisfaction</h4>
+              <p>Low ratings: {formatCompactNumber(feedback.negative_feedback_count)}</p>
+              <p>Failed messages: {formatCompactNumber(engagement.failed_messages)}</p>
+              <p>Latest feedback: {feedback.latest_feedback_at ? formatDate(feedback.latest_feedback_at) : '—'}</p>
+              <p>Refunds: {formatCompactNumber(commercial.refund_count)}</p>
+              <p>Payment failures: {formatCompactNumber(commercial.failed_payment_count)}</p>
+            </div>
+            <div>
+              <h4>Reach</h4>
+              <p>Push: {reachability.push_enabled ? 'enabled' : 'not enabled'}</p>
+              <p>WhatsApp: {reachability.whatsapp_linked ? 'linked' : 'not linked'}</p>
+              <p>App: {appLabel || '—'}</p>
+              <p>Source: {sourceLabel || '—'}</p>
+              <p>Campaign: {acquisition.utm_campaign || '—'}</p>
+            </div>
+          </div>
+        </details>
+      </section>
+    );
+  };
+
   const renderMessageSidebar = () => {
     return userRows.map((row) => {
       const isActive = selectedUserId != null && Number(selectedUserId) === Number(row.user_id);
@@ -1629,6 +1822,8 @@ const AdminChatHistory = () => {
                   <span aria-hidden="true">×</span>
                 </button>
               </div>
+
+              {renderUserValueSnapshot()}
 
               {selectedUserId != null && sessionPagination && (
                 <div className="session-messages-pagination" role="navigation" aria-label="Session message pages">

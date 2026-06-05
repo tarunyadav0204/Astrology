@@ -20,6 +20,7 @@ import AdminChatPerformance from './AdminChatPerformance';
 import AdminChatPerformanceCharts from './AdminChatPerformanceCharts';
 import AdminUserGrowthCharts from './AdminUserGrowthCharts';
 import AdminAcquisition from './AdminAcquisition';
+import AdminExpenses from './AdminExpenses';
 import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
 import AdminSupportInbox from './AdminSupportInbox';
@@ -2083,6 +2084,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Notifications
         </button>
+        <button
+          className={`tab ${activeTab === 'expenses' ? 'active' : ''}`}
+          onClick={() => setActiveTab('expenses')}
+        >
+          Expenses
+        </button>
         <button 
           className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
@@ -2811,6 +2818,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'ledger' && (
           <AdminCreditLedger />
         )}
+
+        {activeTab === 'expenses' && <AdminExpenses />}
 
         {activeTab === 'credits' && activeSubTab === 'management' && (
           <div className="credits-management">
