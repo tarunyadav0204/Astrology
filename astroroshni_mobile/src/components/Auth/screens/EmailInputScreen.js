@@ -119,6 +119,7 @@ export default function EmailInputScreen({
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -166,7 +167,13 @@ export default function EmailInputScreen({
               value={formData.email}
               onChangeText={(value) => updateFormData('email', value)}
               keyboardType="email-address"
+              inputMode="email"
               autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              importantForAutofill="yes"
               autoFocus
             />
             {isValid && (
@@ -214,7 +221,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    minHeight: '100%',
+    paddingBottom: 160,
   },
   backButton: {
     width: 44,

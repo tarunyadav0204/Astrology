@@ -101,6 +101,84 @@ const INSTANT_LOADER_FALLBACKS = [
 ];
 const INSTANT_LOADER_WORD_MS = 180;
 const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_FALLBACKS.join(' ').split(/\s+/).filter(Boolean).length;
+const parseChatHttpError = (error) => {
+  const message = String(error?.message || '');
+  const match = message.match(/^HTTP\s+(\d+):\s*([\s\S]*)$/i);
+  if (!match) {
+    return { status: null, detail: '' };
+  }
+
+  const status = Number(match[1]);
+  const rawBody = String(match[2] || '').trim();
+  if (!rawBody) {
+    return { status, detail: '' };
+  }
+
+  try {
+    const parsed = JSON.parse(rawBody);
+    const detail = parsed?.detail ?? parsed?.message ?? parsed?.error;
+    if (typeof detail === 'string') {
+      return { status, detail: detail.trim() };
+    }
+    if (detail != null) {
+      return { status, detail: JSON.stringify(detail) };
+    }
+  } catch (_) {
+    // Fall through to raw text for non-JSON backend/proxy errors.
+  }
+
+  return { status, detail: rawBody };
+};
+
+const isChatInsufficientCreditsError = (error) => {
+  const { status, detail } = parseChatHttpError(error);
+  return status === 402 || /insufficient credits/i.test(String(detail || ''));
+};
+
+const formatChatSendErrorMessage = (error, { expectedFreeQuestion = false, retry = false } = {}) => {
+  const { status, detail } = parseChatHttpError(error);
+  const cleanDetail = String(detail || '').trim();
+
+  if (status === 402 || /insufficient credits/i.test(cleanDetail)) {
+    const creditMatch = cleanDetail.match(/need\s+([\d.]+)\s+credits?\s+but\s+have\s+([\d.]+)/i);
+    const requiredCredits = creditMatch?.[1];
+    const currentCredits = creditMatch?.[2];
+    const creditLine = requiredCredits
+      ? `This question needs ${requiredCredits} credits${currentCredits != null ? ` and your current balance is ${currentCredits}` : ''}.`
+      : (cleanDetail || 'You do not have enough credits for this question.');
+
+    if (expectedFreeQuestion) {
+      return [
+        'The free question is not available for this birth chart anymore.',
+        creditLine,
+        'Please buy credits to continue with this question.',
+      ].join('\n\n');
+    }
+
+    return [
+      creditLine,
+      'Please buy credits to continue.',
+    ].join('\n\n');
+  }
+
+  if (error.message?.includes('DeadlineExceeded') || error.message?.includes('504') || error.message?.includes('timeout')) {
+    return 'Your question is quite complex and is taking longer than usual to analyze. Please try asking a more specific question or try again later.';
+  }
+  if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+    return 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
+  }
+  if (error.message?.includes('HTTP 500')) {
+    return 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
+  }
+  if (error.message?.includes('HTTP 404') && /session not found/i.test(error.message)) {
+    return 'Your chat session expired or was reset. Tap retry — we will start a fresh session.';
+  }
+
+  return retry
+    ? 'I apologize, but I\'m still having trouble sending your question. Please check your connection and try again.'
+    : 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
+};
+
 const DEFAULT_CHAT_SUGGESTIONS = [
   'What does my birth chart say about my career?',
   'When is a good time for marriage?',
@@ -3990,6 +4068,7 @@ export default function ChatScreen({ navigation, route }) {
       clientRequestId,
       failedQuestion: messageText,
       subjectGateOverride,
+      expectedFreeQuestion: useFreeQuestion,
     };
     rememberMessageTier(processingMessageId, outgoingTier);
     
@@ -4117,24 +4196,23 @@ export default function ChatScreen({ navigation, route }) {
         }
       }
       
-      // Show user-friendly error message based on error type
-      let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
-      
-      // Check for specific error patterns
-      if (error.message?.includes('DeadlineExceeded') || error.message?.includes('504') || error.message?.includes('timeout')) {
-        userMessage = 'Your question is quite complex and is taking longer than usual to analyze. Please try asking a more specific question or try again later.';
-      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
-        userMessage = 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
-      } else if (error.message?.includes('HTTP 500')) {
-        userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
-      } else if (error.message?.includes('HTTP 404') && /session not found/i.test(error.message)) {
-        userMessage = 'Your chat session expired or was reset. Tap retry — we will start a fresh session.';
+      const insufficientCredits = isChatInsufficientCreditsError(error);
+      if (insufficientCredits) {
+        fetchBalance().catch(() => {});
       }
+      const userMessage = formatChatSendErrorMessage(error, { expectedFreeQuestion: useFreeQuestion });
       
       // Replace processing message with error and show retry button
       setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 
-          ? { ...msg, content: userMessage, isTyping: false, showSendRetryButton: true, failedQuestion: messageText }
+          ? {
+              ...msg,
+              content: userMessage,
+              isTyping: false,
+              showSendRetryButton: !insufficientCredits,
+              failedQuestion: messageText,
+              expectedFreeQuestion: useFreeQuestion,
+            }
           : msg
       ));
       setLoading(false);
@@ -4203,19 +4281,24 @@ export default function ChatScreen({ navigation, route }) {
         }
       }
 
-      // Show user-friendly error message based on error type
-      let userMessage = 'I apologize, but I\'m still having trouble sending your question. Please check your connection and try again.';
-      if (error.message?.includes('DeadlineExceeded') || error.message?.includes('504') || error.message?.includes('timeout')) {
-        userMessage = 'Your question is quite complex and is taking longer than usual to analyze. Please try asking a more specific question or try again later.';
-      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
-        userMessage = 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
-      } else if (error.message?.includes('HTTP 500')) {
-        userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
+      const insufficientCredits = isChatInsufficientCreditsError(error);
+      if (insufficientCredits) {
+        fetchBalance().catch(() => {});
       }
+      const userMessage = formatChatSendErrorMessage(error, {
+        expectedFreeQuestion: !!failedMessage?.expectedFreeQuestion,
+        retry: true,
+      });
 
       setMessagesWithStorage(prev => prev.map(msg =>
         msg.id === failedMessage.id
-          ? { ...msg, content: userMessage, isTyping: false, showSendRetryButton: true, failedQuestion }
+          ? {
+              ...msg,
+              content: userMessage,
+              isTyping: false,
+              showSendRetryButton: !insufficientCredits,
+              failedQuestion,
+            }
           : msg
       ));
       setLoading(false);

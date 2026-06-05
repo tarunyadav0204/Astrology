@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   FlatList,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -28,17 +29,20 @@ export default function PhoneInputScreen({
   formData, 
   updateFormData, 
   navigateToScreen, 
-  isLogin 
+  isLogin,
+  setIsLogin,
 }) {
   const [loading, setLoading] = useState(false);
   const [isValid, setIsValid] = useState(false);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(
     COUNTRY_CODES.find(c => c.code === formData.countryCode) || COUNTRY_CODES[2]
   );
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
+  const lastAutoSubmitPhoneRef = useRef('');
 
   useEffect(() => {
     trackAcquisitionFunnelEvent(
@@ -64,14 +68,24 @@ export default function PhoneInputScreen({
     setIsValid(isNationalPhoneValid(selectedCountry.code, formData.phone));
   }, [formData.phone, selectedCountry]);
 
-  const handleContinue = async () => {
-    if (!isValid) return;
+  const goToSignInWithPhone = () => {
+    setPhoneError('');
+    setIsLogin?.(true);
+    updateFormData('countryCode', selectedCountry.code);
+    navigateToScreen('password');
+  };
+
+  const handleContinue = async (phoneOverride = null) => {
+    const phoneForSubmit = phoneOverride != null ? phoneOverride : formData.phone;
+    const phoneIsValid = isNationalPhoneValid(selectedCountry.code, phoneForSubmit);
+    if (!phoneIsValid || loading) return;
+    setPhoneError('');
     
     // Construct full phone number with country code
-    const fullPhone = `${selectedCountry.code}${formData.phone}`;
+    const fullPhone = `${selectedCountry.code}${phoneForSubmit}`;
     
     console.log('📱 Phone Input - handleContinue');
-    console.log('  Local phone:', formData.phone);
+    console.log('  Local phone:', phoneForSubmit);
     console.log('  Country code:', selectedCountry.code);
     console.log('  Full phone:', fullPhone);
     console.log('  Is login:', isLogin);
@@ -129,9 +143,30 @@ export default function PhoneInputScreen({
         },
         { status: 'failed', screenName: 'PhoneInputScreen' },
       ).catch(() => {});
-      Alert.alert(error?.response?.status === 409 ? 'Already registered' : 'Could not continue', message);
+      if (error?.response?.status === 409 || /already registered/i.test(message)) {
+        setPhoneError('This number is already registered.');
+      } else {
+        Alert.alert('Could not continue', message);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePhoneChange = (value) => {
+    const digits = value.replace(/[^0-9]/g, '');
+    const maxLen = getNationalPhoneMaxLength(selectedCountry.code);
+    const nextPhone = digits.slice(0, maxLen);
+    setPhoneError('');
+    updateFormData('phone', nextPhone);
+
+    const complete = isNationalPhoneValid(selectedCountry.code, nextPhone);
+    const autoKey = `${selectedCountry.code}${nextPhone}:${isLogin ? 'login' : 'register'}`;
+    if (complete && !loading && lastAutoSubmitPhoneRef.current !== autoKey) {
+      lastAutoSubmitPhoneRef.current = autoKey;
+      setTimeout(() => {
+        handleContinue(nextPhone);
+      }, 80);
     }
   };
 
@@ -139,106 +174,122 @@ export default function PhoneInputScreen({
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigateToScreen('welcome', 'back')}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigateToScreen('welcome', 'back')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
 
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>📱</Text>
-          <Text style={styles.title}>
-            {isLogin ? "Welcome back!" : "What's your number?"}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isLogin ? "Enter your phone number to sign in" : "We'll send a verification code to this phone"}
-          </Text>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.emoji}>📱</Text>
+            <Text style={styles.title}>
+              {isLogin ? "Welcome back!" : "What's your number?"}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isLogin ? "Enter your phone number to sign in" : "We'll send a verification code to this phone"}
+            </Text>
+          </View>
+
+          <Animated.View
+            style={[
+              styles.inputContainer,
+              {
+                opacity: inputAnim,
+                transform: [
+                  {
+                    translateY: inputAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
+              <TouchableOpacity
+                style={styles.countryCode}
+                onPress={() => setShowCountryPicker(true)}
+              >
+                <Text style={styles.countryText}>{selectedCountry.flag} {selectedCountry.code}</Text>
+                <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                value={formData.phone}
+                onChangeText={handlePhoneChange}
+                keyboardType="number-pad"
+                inputMode="numeric"
+                textContentType="telephoneNumber"
+                autoFocus
+                maxLength={getNationalPhoneMaxLength(selectedCountry.code)}
+              />
+              {isValid && (
+                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              )}
+            </View>
+            {!!phoneError && !isLogin && (
+              <View style={styles.inlineErrorRow}>
+                <Ionicons name="alert-circle" size={16} color="#ff6b6b" />
+                <Text style={styles.inlineErrorText}>
+                  {phoneError}{' '}
+                  <Text style={styles.inlineErrorLink} onPress={goToSignInWithPhone}>
+                    Sign In Instead
+                  </Text>
+                </Text>
+              </View>
+            )}
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.buttonContainer,
+              {
+                transform: [{ translateY: buttonAnim }],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[styles.continueButton, !isValid && styles.buttonDisabled]}
+              onPress={() => handleContinue()}
+              disabled={!isValid || loading}
+            >
+              <LinearGradient
+                colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+                style={styles.buttonGradient}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Checking...' : 'Continue'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
 
-        <Animated.View
-          style={[
-            styles.inputContainer,
-            {
-              opacity: inputAnim,
-              transform: [
-                {
-                  translateY: inputAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <TouchableOpacity 
-              style={styles.countryCode}
-              onPress={() => setShowCountryPicker(true)}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <Text
+              style={styles.footerLink}
+              onPress={() => navigateToScreen('welcome', 'back')}
             >
-              <Text style={styles.countryText}>{selectedCountry.flag} {selectedCountry.code}</Text>
-              <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" style={{ marginLeft: 4 }} />
-            </TouchableOpacity>
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={formData.phone}
-              onChangeText={(value) => {
-                const digits = value.replace(/[^0-9]/g, '');
-                const maxLen = getNationalPhoneMaxLength(selectedCountry.code);
-                updateFormData('phone', digits.slice(0, maxLen));
-              }}
-              keyboardType="phone-pad"
-              autoFocus
-              maxLength={getNationalPhoneMaxLength(selectedCountry.code)}
-            />
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-            )}
-          </View>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.buttonContainer,
-            {
-              transform: [{ translateY: buttonAnim }],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.continueButton, !isValid && styles.buttonDisabled]}
-            onPress={handleContinue}
-            disabled={!isValid || loading}
-          >
-            <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? 'Checking...' : 'Continue'}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <Text 
-            style={styles.footerLink}
-            onPress={() => navigateToScreen('welcome', 'back')}
-          >
-            {isLogin ? "Create one" : "Sign in"}
+              {isLogin ? "Create one" : "Sign in"}
+            </Text>
           </Text>
-        </Text>
-      </View>
+        </View>
+      </ScrollView>
 
       <Modal
         visible={showCountryPicker}
@@ -290,7 +341,11 @@ export default function PhoneInputScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingBottom: 160,
   },
   backButton: {
     width: 44,
@@ -412,6 +467,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontWeight: '500',
   },
+  inlineErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  inlineErrorText: {
+    flex: 1,
+    color: '#ffb4b4',
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  inlineErrorLink: {
+    color: '#ff8c5a',
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
   buttonContainer: {
     marginBottom: 40,
   },
@@ -440,7 +514,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footer: {
-    paddingBottom: 40,
+    paddingBottom: 20,
     alignItems: 'center',
   },
   footerText: {

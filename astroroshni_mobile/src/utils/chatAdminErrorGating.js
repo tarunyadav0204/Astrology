@@ -5,6 +5,7 @@
  */
 export function shouldPostChatErrorToAdminLogs(error) {
   const msg = String(error?.message || '');
+  if (/^HTTP\s+402:/i.test(msg) || /insufficient credits/i.test(msg)) return false;
   if (!/CHART_SESSION_MISMATCH/i.test(msg)) return true;
   if (error?.retryFailedAfterChartSessionRecovery) return true;
   if (error?.createSessionFailedAfterChartMismatch) return true;

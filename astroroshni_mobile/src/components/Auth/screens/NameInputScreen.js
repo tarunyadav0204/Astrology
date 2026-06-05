@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 120,
+    paddingBottom: 160,
   },
   backButton: {
     width: 44,
@@ -166,7 +166,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    minHeight: 600,
   },
   header: {
     alignItems: 'center',

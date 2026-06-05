@@ -197,12 +197,13 @@ export default function SelectNativeScreen({ navigation, route }) {
   const returnTo = route.params?.returnTo;
   const selectorTarget = route.params?.selectorTarget;
   const nativeGenderFilter = route.params?.nativeGenderFilter;
+  const refreshAt = route.params?.refreshAt;
   const returnParams = route.params?.returnParams || {};
 
   useFocusEffect(
     React.useCallback(() => {
       loadProfiles({ reset: true });
-    }, [nativeGenderFilter])
+    }, [nativeGenderFilter, refreshAt])
   );
 
   const PAGE_SIZE = 10;

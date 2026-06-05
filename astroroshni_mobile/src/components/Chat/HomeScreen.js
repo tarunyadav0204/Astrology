@@ -57,6 +57,45 @@ const getPanchangCoords = (birthData) => {
 const getPanchangCacheKey = (lat, lon, targetDate) =>
   `${HOME_PANCHANG_CACHE_PREFIX}${roundPanchangCoord(lat)}:${roundPanchangCoord(lon)}:${targetDate}`;
 
+const normalizeBirthDateForCache = (value) => {
+  if (!value) return '';
+  const raw = String(value);
+  return raw.includes('T') ? raw.split('T')[0] : raw;
+};
+
+const normalizeBirthTimeForCache = (value) => {
+  if (!value) return '';
+  const raw = String(value);
+  if (raw.includes('T')) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toTimeString().slice(0, 5);
+    }
+  }
+  return raw;
+};
+
+const normalizeBirthCoordForCache = (value) => {
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return '';
+  return String(Math.round(n * 1000000) / 1000000);
+};
+
+const getBirthChartFingerprint = (birthData) => {
+  if (!birthData) return 'none';
+  const id = birthData.id || birthData.birth_chart_id || birthData.name || 'unknown';
+  return [
+    id,
+    normalizeBirthDateForCache(birthData.date),
+    normalizeBirthTimeForCache(birthData.time),
+    normalizeBirthCoordForCache(birthData.latitude),
+    normalizeBirthCoordForCache(birthData.longitude),
+  ].join(':');
+};
+
+const getHomeChartCacheKey = (birthData) =>
+  `${HOME_CHART_CACHE_PREFIX}${getBirthChartFingerprint(birthData)}`;
+
 const mergePanchangResponses = (panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse) => {
   if (!panchangResponse?.data) return null;
   let combinedPanchangData = panchangResponse.data;
@@ -180,10 +219,10 @@ export default function HomeScreen({
   const lastPanchangCacheKeyRef = useRef('');
   const lastBlogFetchAtRef = useRef(0);
   const homeLoadInFlightRef = useRef(null);
+  const lastChartDataFingerprintRef = useRef('');
 
   const getHomeLoadFingerprint = useCallback((nativeData, targetDate) => {
-    const cacheId = nativeData?.id || nativeData?.birth_chart_id || 'none';
-    return `${cacheId}:${targetDate}`;
+    return `${getBirthChartFingerprint(nativeData)}:${targetDate}`;
   }, []);
 
   const shouldRefreshHomeData = useCallback((nativeData, targetDate) => {
@@ -558,16 +597,25 @@ const loadHomeData = async (nativeData = null) => {
       }
 
       const targetDate = new Date().toISOString().split('T')[0];
+      const chartFingerprint = getBirthChartFingerprint(currentBirthData);
+      const chartCacheKey = currentBirthData ? getHomeChartCacheKey(currentBirthData) : null;
+      if (
+        chartFingerprint &&
+        lastChartDataFingerprintRef.current &&
+        lastChartDataFingerprintRef.current !== chartFingerprint
+      ) {
+        setChartData(null);
+      }
 
-      // Fast-first render: hydrate signs from cache by native id.
-      const cacheId = currentBirthData?.id || currentBirthData?.birth_chart_id;
-      if (cacheId) {
+      // Fast-first render: hydrate signs from cache by native id + birth inputs.
+      if (chartCacheKey) {
         try {
-          const raw = await AsyncStorage.getItem(`${HOME_CHART_CACHE_PREFIX}${cacheId}`);
+          const raw = await AsyncStorage.getItem(chartCacheKey);
           if (raw) {
             const cached = JSON.parse(raw);
             if (cached?.houses && cached?.planets) {
               setChartData(cached);
+              lastChartDataFingerprintRef.current = chartFingerprint;
             }
           }
         } catch (_) {}
@@ -681,9 +729,11 @@ const loadHomeData = async (nativeData = null) => {
       if (currentBirthData) {
         
         const formattedBirthData = {
+          id: currentBirthData.id || currentBirthData.birth_chart_id,
+          birth_chart_id: currentBirthData.birth_chart_id || currentBirthData.id,
           name: currentBirthData.name,
-          date: currentBirthData.date.includes('T') ? currentBirthData.date.split('T')[0] : currentBirthData.date,
-          time: currentBirthData.time.includes('T') ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : currentBirthData.time,
+          date: normalizeBirthDateForCache(currentBirthData.date),
+          time: normalizeBirthTimeForCache(currentBirthData.time),
           latitude: parseFloat(currentBirthData.latitude),
           longitude: parseFloat(currentBirthData.longitude),
           location: currentBirthData.place || 'Unknown'
@@ -699,10 +749,11 @@ const loadHomeData = async (nativeData = null) => {
           // console.log('🏠 HomeScreen - Received chart data from backend:', JSON.stringify(chartResponse.value.data, null, 2));
           // console.log('🏠 HomeScreen - Ascendant sign from chart:', chartResponse.value.data?.houses?.[0]?.sign);
           setChartData(chartResponse.value.data);
-          if (cacheId) {
+          lastChartDataFingerprintRef.current = chartFingerprint;
+          if (chartCacheKey) {
             try {
               await AsyncStorage.setItem(
-                `${HOME_CHART_CACHE_PREFIX}${cacheId}`,
+                chartCacheKey,
                 JSON.stringify(chartResponse.value.data)
               );
             } catch (_) {}

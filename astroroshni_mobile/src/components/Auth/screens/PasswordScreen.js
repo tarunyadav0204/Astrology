@@ -68,8 +68,44 @@ export default function PasswordScreen({
   });
 
   useEffect(() => {
-    setIsValid(formData.password.length >= 6);
-  }, [formData.password]);
+    const password = formData.password || '';
+    setIsValid(isLogin ? password.length >= 6 : password.length >= 8 && /\d/.test(password));
+  }, [formData.password, isLogin]);
+
+  const passwordCriteria = [
+    {
+      label: 'Minimum 8 characters',
+      met: (formData.password || '').length >= 8,
+    },
+    {
+      label: 'At least 1 number',
+      met: /\d/.test(formData.password || ''),
+    },
+  ];
+
+  const passwordStrengthLabel = (() => {
+    const password = formData.password || '';
+    const metCount = passwordCriteria.filter((item) => item.met).length;
+    if (password.length === 0) return 'Start typing';
+    if (metCount === passwordCriteria.length && password.length >= 10) return 'Strong';
+    if (metCount === passwordCriteria.length) return 'Good';
+    return 'Weak';
+  })();
+
+  const passwordStrengthColor = (() => {
+    if (passwordStrengthLabel === 'Strong') return '#4CAF50';
+    if (passwordStrengthLabel === 'Good') return '#8BC34A';
+    if (passwordStrengthLabel === 'Start typing') return 'rgba(255, 255, 255, 0.45)';
+    return '#FF9800';
+  })();
+
+  const passwordStrengthProgress = (() => {
+    const password = formData.password || '';
+    if (!password) return 0;
+    const lengthScore = Math.min(password.length / 8, 1) * 70;
+    const numberScore = /\d/.test(password) ? 30 : 0;
+    return Math.min(lengthScore + numberScore, 100);
+  })();
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
@@ -367,17 +403,32 @@ export default function PasswordScreen({
                   style={[
                     styles.strengthFill,
                     { 
-                      width: `${Math.min((formData.password.length / 8) * 100, 100)}%`,
-                      backgroundColor: formData.password.length < 6 ? '#FF5722' : 
-                                     formData.password.length < 8 ? '#FF9800' : '#4CAF50'
+                      width: `${passwordStrengthProgress}%`,
+                      backgroundColor: passwordStrengthColor,
                     }
                   ]} 
                 />
               </View>
-              <Text style={styles.strengthText}>
-                {formData.password.length < 6 ? 'Weak' : 
-                 formData.password.length < 8 ? 'Good' : 'Strong'}
+              <Text style={[styles.strengthText, { color: passwordStrengthColor }]}>
+                {passwordStrengthLabel}
               </Text>
+              <View style={styles.passwordCriteriaList}>
+                {passwordCriteria.map((item) => (
+                  <View key={item.label} style={styles.passwordCriterionRow}>
+                    <Ionicons
+                      name={item.met ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={14}
+                      color={item.met ? '#4CAF50' : 'rgba(255, 255, 255, 0.45)'}
+                    />
+                    <Text style={[
+                      styles.passwordCriterionText,
+                      item.met && styles.passwordCriterionTextMet,
+                    ]}>
+                      {item.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           )}
         </Animated.View>
@@ -428,6 +479,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
+    paddingBottom: 160,
   },
   backButton: {
     width: 44,
@@ -441,7 +493,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    minHeight: 600,
   },
   header: {
     alignItems: 'center',
@@ -493,17 +544,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   strengthContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 12,
-    gap: 12,
   },
   strengthBar: {
-    flex: 1,
     height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 2,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   strengthFill: {
     height: '100%',
@@ -511,8 +559,25 @@ const styles = StyleSheet.create({
   },
   strengthText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  passwordCriteriaList: {
+    gap: 6,
+  },
+  passwordCriterionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  passwordCriterionText: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 12,
     fontWeight: '500',
+  },
+  passwordCriterionTextMet: {
+    color: '#9BE7A0',
+    fontWeight: '700',
   },
   buttonContainer: {
     marginBottom: 20,

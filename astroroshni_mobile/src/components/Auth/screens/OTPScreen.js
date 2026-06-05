@@ -35,6 +35,7 @@ export default function OTPScreen({
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
+  const lastAutoVerifyCodeRef = useRef('');
 
   useEffect(() => {
     trackAcquisitionFunnelEvent(
@@ -73,8 +74,9 @@ export default function OTPScreen({
     setIsValid(formData.otpCode.length === 6);
   }, [formData.otpCode]);
 
-  const handleVerifyOTP = async () => {
-    if (!isValid) return;
+  const handleVerifyOTP = async (codeOverride = null) => {
+    const codeForSubmit = String(codeOverride != null ? codeOverride : formData.otpCode || '').replace(/[^0-9]/g, '').slice(0, 6);
+    if (codeForSubmit.length !== 6 || loading) return;
     
     setLoading(true);
     try {
@@ -86,7 +88,7 @@ export default function OTPScreen({
       const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
       const response = await authAPI.verifyResetCode({
         phone: fullPhone,
-        code: formData.otpCode,
+        code: codeForSubmit,
       });
       updateFormData('otpToken', response?.data?.reset_token || '');
       trackAcquisitionFunnelEvent(
@@ -106,6 +108,17 @@ export default function OTPScreen({
       Alert.alert('Error', 'Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (value) => {
+    const digits = value.replace(/[^0-9]/g, '').slice(0, 6);
+    updateFormData('otpCode', digits);
+    if (digits.length === 6 && !loading && lastAutoVerifyCodeRef.current !== digits) {
+      lastAutoVerifyCodeRef.current = digits;
+      setTimeout(() => {
+        handleVerifyOTP(digits);
+      }, 80);
     }
   };
 
@@ -216,8 +229,11 @@ export default function OTPScreen({
               placeholder="Enter 6-digit OTP"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={formData.otpCode}
-              onChangeText={(value) => updateFormData('otpCode', value.replace(/[^0-9]/g, ''))}
-              keyboardType="numeric"
+              onChangeText={handleOtpChange}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
               autoFocus
               maxLength={6}
             />
@@ -251,7 +267,7 @@ export default function OTPScreen({
         >
           <TouchableOpacity
             style={[styles.verifyButton, !isValid && styles.buttonDisabled]}
-            onPress={handleVerifyOTP}
+            onPress={() => handleVerifyOTP()}
             disabled={!isValid || loading}
           >
             <LinearGradient
@@ -278,7 +294,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 120,
+    paddingBottom: 160,
   },
   backButton: {
     width: 44,
@@ -292,7 +308,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    minHeight: 600,
   },
   header: {
     alignItems: 'center',

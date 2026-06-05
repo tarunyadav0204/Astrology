@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -55,20 +56,20 @@ export default function ChooseLanguageScreen({ navigateToScreen }) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator
-      bounces
-    >
-      <View>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>🌐</Text>
-          <Text style={styles.title}>{t('authOnboarding.chooseLanguageTitle')}</Text>
-          <Text style={styles.subtitle}>{t('authOnboarding.chooseLanguageSubtitle')}</Text>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.emoji}>🌐</Text>
+        <Text style={styles.title}>{t('authOnboarding.chooseLanguageTitle')}</Text>
+        <Text style={styles.subtitle}>{t('authOnboarding.chooseLanguageSubtitle')}</Text>
+      </View>
 
+      <ScrollView
+        style={styles.listScroll}
+        contentContainerStyle={styles.listScrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
+        bounces
+      >
         <Animated.View
           style={[
             styles.listWrap,
@@ -94,47 +95,59 @@ export default function ChooseLanguageScreen({ navigateToScreen }) {
                 onPress={() => setSelectedCode(lang.code)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.optionText}>
-                  {lang.flag} {lang.name}
-                </Text>
+                <View style={styles.optionLabelWrap}>
+                  <Text style={styles.optionFlag}>{lang.flag}</Text>
+                  <Text
+                    style={styles.optionText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.82}
+                  >
+                    {lang.name}
+                  </Text>
+                </View>
                 {selected ? (
-                  <Ionicons name="checkmark-circle" size={22} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={26} color="#4CAF50" />
                 ) : null}
               </TouchableOpacity>
             );
           })}
         </Animated.View>
+      </ScrollView>
 
-        <Animated.View
-          style={[
-            styles.buttonContainer,
-            { transform: [{ translateY: buttonAnim }] },
-          ]}
-        >
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-            <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.buttonGradient}>
-              <Text style={styles.buttonText}>{t('authOnboarding.continue')}</Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </ScrollView>
+      <Animated.View
+        style={[
+          styles.buttonContainer,
+          { transform: [{ translateY: buttonAnim }] },
+        ]}
+      >
+        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+          <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.buttonGradient}>
+            <Text style={styles.buttonText}>{t('authOnboarding.continue')}</Text>
+            <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 48,
+  },
+  listScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  listScrollContent: {
+    paddingBottom: 8,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 28,
+    paddingTop: 8,
+    marginBottom: 22,
   },
   emoji: {
     fontSize: 56,
@@ -155,17 +168,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   listWrap: {
-    marginBottom: 28,
+    marginBottom: 8,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 78,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 14,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 10,
   },
@@ -173,13 +187,31 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
     backgroundColor: 'rgba(76, 175, 80, 0.12)',
   },
+  optionLabelWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingRight: 14,
+  },
+  optionFlag: {
+    width: 34,
+    fontSize: 25,
+    lineHeight: Platform.OS === 'android' ? 34 : 30,
+    textAlign: 'center',
+  },
   optionText: {
-    fontSize: 17,
+    flex: 1,
+    includeFontPadding: true,
+    fontSize: 20,
+    lineHeight: Platform.OS === 'android' ? 34 : 28,
     color: '#ffffff',
-    fontWeight: '500',
+    fontWeight: '700',
   },
   buttonContainer: {
-    marginTop: 8,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   continueButton: {
     borderRadius: 16,

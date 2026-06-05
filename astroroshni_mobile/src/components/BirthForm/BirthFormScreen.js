@@ -28,6 +28,7 @@ import { parseCalendarDateInput } from '../../utils/birthDateUtils';
 import locationCache from '../../services/locationCache';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import AppAlertModal from '../Common/AppAlertModal';
 
 const { width } = Dimensions.get('window');
 
@@ -58,10 +59,13 @@ export default function BirthFormScreen({ navigation, route }) {
 
   const pickerSheetGradient =
     theme === 'dark'
-      ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-      : ['rgba(249, 115, 22, 0.22)', 'rgba(249, 115, 22, 0.1)'];
+      ? ['rgba(31, 20, 18, 0.98)', 'rgba(18, 14, 16, 0.98)']
+      : ['rgba(255, 247, 237, 0.98)', 'rgba(255, 255, 255, 0.98)'];
   const pickerSheetHeaderBorder =
     theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(249, 115, 22, 0.28)';
+  const glassElevation = (level) => (
+    Platform.OS === 'android' ? styles.androidFlatGlass : { elevation: getCardElevation(level) }
+  );
 
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
@@ -91,6 +95,7 @@ export default function BirthFormScreen({ navigation, route }) {
     relation_label: editProfile?.relation_label || prefillData?.relation_label || '',
     is_family_member: editProfile?.is_family_member ?? prefillData?.is_family_member ?? false,
   });
+  const [successAlert, setSuccessAlert] = useState(null);
   
   // Log edit mode for debugging
   useEffect(() => {
@@ -594,7 +599,7 @@ export default function BirthFormScreen({ navigation, route }) {
       
       // 4. THEN save to local storage with real ID
       await storage.setBirthDetails(profileData);
-      if (!updateGender && !editProfile) {
+      if (!updateGender) {
         // console.log('📝 [DEBUG] BirthForm: Adding to profiles list (new profile)...');
         await storage.addBirthProfile(profileData);
         // console.log('✅ [DEBUG] BirthForm: addBirthProfile completed');
@@ -616,17 +621,10 @@ export default function BirthFormScreen({ navigation, route }) {
       triggerConfetti();
       setTimeout(() => {
         const successMessage = updateGender ? t('birthForm.alerts.success.genderUpdated', 'Gender updated successfully!') : editProfile ? t('birthForm.alerts.success.profileUpdated', 'Profile updated successfully!') : t('birthForm.alerts.success.chartCalculated', 'Birth chart calculated successfully!');
-        Alert.alert(t('birthForm.alerts.success.title', 'Success'), successMessage, [
-          { text: t('birthForm.alerts.ok', 'OK'), onPress: () => {
-            submittingRef.current = false;
-            setLoading(false);
-            if (editProfile) {
-              navigation.navigate('SelectNative');
-            } else {
-              navigation.replace(returnTo || 'Home');
-            }
-          }}
-        ]);
+        setSuccessAlert({
+          title: t('birthForm.alerts.success.title', 'Success'),
+          message: successMessage,
+        });
       }, 1000);
     } catch (error) {
       submittingRef.current = false;
@@ -635,14 +633,48 @@ export default function BirthFormScreen({ navigation, route }) {
     }
   };
 
+  const handleSuccessAlertClose = () => {
+    setSuccessAlert(null);
+    submittingRef.current = false;
+    setLoading(false);
+    if (editProfile) {
+      navigation.navigate('SelectNative', { refreshAt: Date.now() });
+    } else {
+      navigation.replace(returnTo || 'Home');
+    }
+  };
+
   const getStepIcon = () => {
-    const icons = ['👤', '⚧️', '📅', '🕐', '📍'];
+    const icons = ['👤', '⚧️', '', '🕐', '📍'];
     return icons[step - 1];
+  };
+
+  const renderStepIcon = () => {
+    if (step === 3) {
+      return <Ionicons name="calendar-outline" size={46} color="#ffffff" />;
+    }
+    return <Text style={styles.stepIcon}>{getStepIcon()}</Text>;
   };
 
   const getStepTitle = () => {
     const titles = [t('birthForm.stepTitle.name', 'Whose chart is this?'), t('birthForm.stepTitle.gender', 'Select gender'), t('birthForm.stepTitle.date', 'When were they born?'), t('birthForm.stepTitle.time', 'What time were they born?'), t('birthForm.stepTitle.place', 'Where were they born?')];
     return titles[step - 1];
+  };
+
+  const handleHeaderBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    if (editProfile || updateGender) {
+      navigation.navigate('SelectNative', returnTo ? { returnTo } : undefined);
+      return;
+    }
+    if (returnTo) {
+      navigation.navigate('BirthProfileIntro', { returnTo });
+      return;
+    }
+    navigation.navigate('SelectNative');
   };
 
   const progressWidth = progressAnim.interpolate({
@@ -658,7 +690,7 @@ export default function BirthFormScreen({ navigation, route }) {
             
             {/* Header */}
             <View style={styles.header}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <TouchableOpacity onPress={handleHeaderBack} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
@@ -687,9 +719,9 @@ export default function BirthFormScreen({ navigation, route }) {
               <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }, { translateX: shakeAnim }] }]}>
                 
                 {/* Step Icon */}
-                <View style={[styles.iconContainer, { elevation: getCardElevation(10) }]}>
+                <View style={[styles.iconContainer, glassElevation(10)]}>
                   <LinearGradient colors={['#ff6b35', '#ffd700', '#ff6b35']} style={styles.iconGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                    <Text style={styles.stepIcon}>{getStepIcon()}</Text>
+                    {renderStepIcon()}
                   </LinearGradient>
                 </View>
 
@@ -798,7 +830,7 @@ export default function BirthFormScreen({ navigation, route }) {
                 {step === 2 && (
                   <View style={styles.genderContainer}>
                     <TouchableOpacity
-                      style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected, { elevation: getCardElevation(8) }]}
+                      style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected, glassElevation(8)]}
                       onPress={() => handleInputChange('gender', 'Male')}
                     >
                       <LinearGradient
@@ -811,7 +843,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       </LinearGradient>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.genderCard, formData.gender === 'Female' && styles.genderCardSelected, { elevation: getCardElevation(8) }]}
+                      style={[styles.genderCard, formData.gender === 'Female' && styles.genderCardSelected, glassElevation(8)]}
                       onPress={() => handleInputChange('gender', 'Female')}
                     >
                       <LinearGradient
@@ -828,9 +860,9 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 3 && (
                   <View style={styles.dateTimeContainer}>
-                    <TouchableOpacity style={[styles.dateTimeCard, { elevation: getCardElevation(8) }]} onPress={() => setShowDatePicker(true)}>
+                    <TouchableOpacity style={[styles.dateTimeCard, glassElevation(8)]} onPress={() => setShowDatePicker(true)}>
                       <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={[styles.dateTimeGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}>
-                        <Text style={styles.dateTimeIcon}>📅</Text>
+                        <Ionicons name="calendar-outline" size={46} color="#ff6b35" style={styles.dateTimeIcon} />
                         <Text style={[styles.dateTimeValue, { color: colors.text }]}>
                           {formData.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </Text>
@@ -845,7 +877,7 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 4 && (
                   <View style={styles.dateTimeContainer}>
-                    <TouchableOpacity style={[styles.dateTimeCard, { elevation: getCardElevation(8) }]} onPress={() => {
+                    <TouchableOpacity style={[styles.dateTimeCard, glassElevation(8)]} onPress={() => {
                       const hours = formData.time.getHours();
                       const minutes = formData.time.getMinutes();
                       setTempHour(hours % 12 || 12);
@@ -883,7 +915,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       />
                       {showSuggestions && suggestions.length > 0 && (
                         <ScrollView
-                          style={[styles.suggestionsList, { backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', elevation: getCardElevation(10) }]}
+                          style={[styles.suggestionsList, { backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }, glassElevation(10)]}
                           contentContainerStyle={styles.suggestionsListContent}
                           keyboardShouldPersistTaps="always"
                           nestedScrollEnabled={true}
@@ -922,14 +954,14 @@ export default function BirthFormScreen({ navigation, route }) {
             {/* Navigation Buttons */}
             <View style={styles.navigationContainer}>
               {step > 1 && (
-                <TouchableOpacity style={[styles.navButton, { elevation: getCardElevation(5) }]} onPress={prevStep}>
+                <TouchableOpacity style={[styles.navButton, glassElevation(5)]} onPress={prevStep}>
                   <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={styles.navGradient}>
                     <Ionicons name="arrow-back" size={20} color={colors.text} />
                     <Text style={[styles.navText, { color: colors.text }]}>{t('birthForm.buttons.back', 'Back')}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={[styles.navButton, styles.navButtonPrimary, step === 1 && styles.navButtonFull, { elevation: getCardElevation(5) }]} onPress={nextStep} disabled={loading}>
+              <TouchableOpacity style={[styles.navButton, styles.navButtonPrimary, step === 1 && styles.navButtonFull, glassElevation(5)]} onPress={nextStep} disabled={loading}>
                 <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.navGradient}>
                   <Text style={styles.navTextPrimary}>{loading ? t('birthForm.buttons.processing', 'Processing...') : step === 5 ? t('birthForm.buttons.complete', 'Complete') : t('birthForm.buttons.next', 'Next')}</Text>
                   {step < 5 && <Ionicons name="arrow-forward" size={20} color={COLORS.white} />}
@@ -1085,6 +1117,15 @@ export default function BirthFormScreen({ navigation, route }) {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
+      <AppAlertModal
+        visible={!!successAlert}
+        variant="success"
+        title={successAlert?.title}
+        message={successAlert?.message}
+        primaryText={t('birthForm.alerts.ok', 'OK')}
+        onPrimaryPress={handleSuccessAlertClose}
+        onRequestClose={handleSuccessAlertClose}
+      />
     </View>
   );
 }
@@ -1093,6 +1134,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   safeArea: { flex: 1 },
+  androidFlatGlass: { elevation: 0 },
   keyboardAvoid: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -1399,9 +1441,11 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
+    alignItems: 'stretch',
   },
   navButton: {
     flex: 1,
+    minHeight: 56,
     borderRadius: 16,
     overflow: 'hidden',
     ...Platform.select({
@@ -1421,6 +1465,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
   },
   navGradient: {
+    flex: 1,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
