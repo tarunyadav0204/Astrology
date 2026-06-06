@@ -1,10 +1,12 @@
 import json
+import logging
 import os
 from datetime import datetime, date, timedelta
 from typing import Optional, Dict, List, Any
 
 # Sentinel: pass this as discount to mean "do not change discount column"
 _DISCOUNT_OMIT = object()
+logger = logging.getLogger(__name__)
 
 
 class CreditService:
@@ -315,6 +317,23 @@ class CreditService:
                     CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_gp_unique_ref
                     ON credit_transactions(userid, source, reference_id)
                     WHERE source = 'google_play' AND reference_id IS NOT NULL
+                    """,
+                )
+                conn.commit()
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+            # Hard guard against giving the first-purchase bonus more than once per user.
+            try:
+                execute(
+                    conn,
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_first_purchase_bonus_once
+                    ON credit_transactions(userid, source)
+                    WHERE source = 'first_purchase_bonus'
                     """,
                 )
                 conn.commit()
@@ -1899,6 +1918,11 @@ class CreditService:
                 conn.commit()
             return True
         except Exception:
+            logger.exception(
+                "record_zero_cost_feature_usage failed userid=%s feature=%s",
+                userid,
+                feature,
+            )
             return False
     
     def has_transaction_with_reference(self, userid: int, source: str, reference_id: str) -> bool:
@@ -1913,6 +1937,261 @@ class CreditService:
                 (userid, source, reference_id),
             )
             return cursor.fetchone() is not None
+
+    @staticmethod
+    def calculate_first_purchase_bonus_credits(purchased_credits: int, config: Optional[Dict[str, Any]] = None) -> int:
+        """Calculate extra credits from admin settings. One active mode: fixed OR percent, capped by max_bonus_credits."""
+        if config is None:
+            from utils.admin_settings import get_first_purchase_bonus_config
+
+            config = get_first_purchase_bonus_config()
+        try:
+            base = max(0, int(purchased_credits))
+        except (TypeError, ValueError):
+            return 0
+        percent = max(0, int(config.get("percent") or 0))
+        fixed = max(0, int(config.get("fixed_credits") or 0))
+        max_bonus = max(0, int(config.get("max_bonus_credits") or 0))
+        bonus_type = str(config.get("bonus_type") or "").strip().lower()
+        if bonus_type == "fixed" or (fixed > 0 and bonus_type not in {"percent", "none"}):
+            bonus = fixed
+        elif bonus_type == "percent" or percent > 0:
+            bonus = int(base * percent / 100)
+        else:
+            bonus = 0
+        if max_bonus > 0:
+            bonus = min(bonus, max_bonus)
+        return max(0, bonus)
+
+    def _recent_free_chat_question_row(self, userid: int, window_minutes: int) -> Optional[Dict[str, Any]]:
+        from db import get_conn, execute
+
+        try:
+            minutes = max(1, int(window_minutes))
+        except (TypeError, ValueError):
+            minutes = 30
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT id, created_at
+                    FROM credit_transactions
+                    WHERE userid = ?
+                      AND source = 'feature_usage'
+                      AND reference_id = 'chat_question'
+                      AND amount = 0
+                      AND created_at >= CURRENT_TIMESTAMP - (? * INTERVAL '1 minute')
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """,
+                    (userid, minutes),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return {"id": row[0], "created_at": row[1]}
+        except Exception:
+            logger.exception(
+                "recent_free_chat_question_lookup failed userid=%s window_minutes=%s",
+                userid,
+                minutes,
+            )
+            return None
+
+    def _has_prior_credit_purchase(
+        self,
+        userid: int,
+        *,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> bool:
+        from db import get_conn, execute
+
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT 1
+                    FROM credit_transactions
+                    WHERE userid = ?
+                      AND transaction_type = 'earned'
+                      AND amount > 0
+                      AND source IN ('google_play', 'razorpay')
+                      AND NOT (source = ? AND reference_id = ?)
+                    LIMIT 1
+                    """,
+                    (userid, current_source or "", current_reference_id or ""),
+                )
+                return cur.fetchone() is not None
+        except Exception:
+            return True
+
+    def get_first_purchase_bonus_status(
+        self,
+        userid: int,
+        purchased_credits: Optional[int] = None,
+        *,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return current eligibility and preview values for the post-free-question purchase bonus."""
+        from utils.admin_settings import (
+            first_purchase_bonus_enabled_for_user,
+            get_first_purchase_bonus_config,
+            is_first_purchase_bonus_enabled,
+        )
+
+        config = get_first_purchase_bonus_config()
+        bonus = self.calculate_first_purchase_bonus_credits(purchased_credits or 0, config) if purchased_credits else 0
+        feature_enabled = is_first_purchase_bonus_enabled()
+        user_allowed = first_purchase_bonus_enabled_for_user(userid)
+        free_used = self.get_free_chat_question_used(userid)
+        prior_purchase = self._has_prior_credit_purchase(
+            userid,
+            current_source=current_source,
+            current_reference_id=current_reference_id,
+        )
+        status: Dict[str, Any] = {
+            "enabled": feature_enabled,
+            "eligible": False,
+            "bonus_credits": bonus,
+            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
+            **config,
+        }
+
+        def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
+            try:
+                logger.info(
+                    "first_purchase_bonus_status userid=%s eligible=%s reason=%s "
+                    "enabled=%s user_allowed=%s free_used=%s prior_purchase=%s "
+                    "purchased_credits=%s bonus_credits=%s window_minutes=%s extra=%s",
+                    userid,
+                    bool(status.get("eligible")),
+                    reason,
+                    feature_enabled,
+                    user_allowed,
+                    free_used,
+                    prior_purchase,
+                    purchased_credits,
+                    status.get("bonus_credits"),
+                    config.get("window_minutes"),
+                    extra or {},
+                )
+            except Exception:
+                pass
+
+        if not user_allowed:
+            status["reason"] = "feature_disabled_or_user_not_allowed"
+            _log_status(status["reason"])
+            return status
+        if not free_used:
+            status["reason"] = "free_question_not_used"
+            _log_status(status["reason"])
+            return status
+        if prior_purchase:
+            status["reason"] = "prior_purchase_exists"
+            _log_status(status["reason"])
+            return status
+        free_row = self._recent_free_chat_question_row(userid, config["window_minutes"])
+        if not free_row:
+            status["reason"] = "outside_bonus_window"
+            _log_status(status["reason"])
+            return status
+        if self.has_first_purchase_bonus(userid):
+            status["reason"] = "bonus_already_granted"
+            _log_status(status["reason"], {"free_question_transaction_id": free_row.get("id")})
+            return status
+        status["eligible"] = True
+        status["reason"] = "eligible"
+        status["free_question_transaction_id"] = free_row.get("id")
+        created_at = free_row.get("created_at")
+        if created_at:
+            try:
+                status["expires_at"] = (created_at + timedelta(minutes=int(config["window_minutes"]))).isoformat()
+            except Exception:
+                pass
+        _log_status(
+            status["reason"],
+            {
+                "free_question_transaction_id": free_row.get("id"),
+                "expires_at": status.get("expires_at"),
+            },
+        )
+        return status
+
+    def has_first_purchase_bonus(self, userid: int) -> bool:
+        from db import get_conn, execute
+
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT 1 FROM credit_transactions WHERE userid = ? AND source = 'first_purchase_bonus' LIMIT 1",
+                    (userid,),
+                )
+                return cur.fetchone() is not None
+        except Exception:
+            return True
+
+    def maybe_apply_first_purchase_bonus(
+        self,
+        *,
+        userid: int,
+        purchased_credits: int,
+        purchase_source: str,
+        purchase_reference_id: str,
+        product_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Award the admin-gated first purchase bonus exactly once.
+        Safe to call from both verify and webhook paths.
+        """
+        status = self.get_first_purchase_bonus_status(
+            userid,
+            purchased_credits,
+            current_source=purchase_source,
+            current_reference_id=purchase_reference_id,
+        )
+        if not status.get("eligible"):
+            return {"applied": False, **status}
+        if self._has_prior_credit_purchase(
+            userid,
+            current_source=purchase_source,
+            current_reference_id=purchase_reference_id,
+        ):
+            return {"applied": False, **status, "eligible": False, "reason": "prior_purchase_exists"}
+
+        bonus = int(status.get("bonus_credits") or 0)
+        if bonus <= 0:
+            return {"applied": False, **status, "eligible": False, "reason": "zero_bonus"}
+
+        reference_id = f"{purchase_source}:{purchase_reference_id}"
+        metadata = json.dumps(
+            {
+                "purchase_source": purchase_source,
+                "purchase_reference_id": purchase_reference_id,
+                "product_id": product_id,
+                "purchased_credits": int(purchased_credits),
+                "percent": status.get("percent"),
+                "fixed_credits": status.get("fixed_credits"),
+                "max_bonus_credits": status.get("max_bonus_credits"),
+                "window_minutes": status.get("window_minutes"),
+                "free_question_transaction_id": status.get("free_question_transaction_id"),
+            }
+        )
+        ok = self.add_credits(
+            userid,
+            bonus,
+            "first_purchase_bonus",
+            reference_id=reference_id,
+            description=f"First purchase bonus after free question: +{bonus} credits",
+            metadata=metadata,
+        )
+        if not ok:
+            return {"applied": False, **status, "eligible": False, "reason": "bonus_write_failed"}
+        return {"applied": True, **status}
 
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:
         """Add credits to user account. metadata: optional JSON (e.g. Google Play purchase_token, purchase_time for support)."""

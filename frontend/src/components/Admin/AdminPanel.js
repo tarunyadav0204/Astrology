@@ -142,6 +142,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
   const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
   const [chatSubjectGateSaving, setChatSubjectGateSaving] = useState(false);
+  const [firstPurchaseBonusEnabled, setFirstPurchaseBonusEnabled] = useState(false);
+  const [firstPurchaseBonusUserAllowlist, setFirstPurchaseBonusUserAllowlist] = useState('');
+  const [firstPurchaseBonusPercent, setFirstPurchaseBonusPercent] = useState('20');
+  const [firstPurchaseBonusFixedCredits, setFirstPurchaseBonusFixedCredits] = useState('0');
+  const [firstPurchaseBonusMaxCredits, setFirstPurchaseBonusMaxCredits] = useState('1000');
+  const [firstPurchaseBonusWindowMinutes, setFirstPurchaseBonusWindowMinutes] = useState('30');
+  const [firstPurchaseBonusSaving, setFirstPurchaseBonusSaving] = useState(false);
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
@@ -354,6 +361,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
+      const firstBonusConfig = data.first_purchase_bonus_config || {};
+      setFirstPurchaseBonusEnabled(Boolean(data.first_purchase_bonus_enabled));
+      setFirstPurchaseBonusUserAllowlist(data.first_purchase_bonus_user_allowlist || '');
+      setFirstPurchaseBonusPercent(String(firstBonusConfig.percent ?? '20'));
+      setFirstPurchaseBonusFixedCredits(String(firstBonusConfig.fixed_credits ?? '0'));
+      setFirstPurchaseBonusMaxCredits(String(firstBonusConfig.max_bonus_credits ?? '1000'));
+      setFirstPurchaseBonusWindowMinutes(String(firstBonusConfig.window_minutes ?? '30'));
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
@@ -764,6 +778,43 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save pre-question gate setting.');
     } finally {
       setChatSubjectGateSaving(false);
+    }
+  };
+
+  const handleSaveFirstPurchaseBonusSettings = async () => {
+    setFirstPurchaseBonusSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const settingsToSave = [
+        ['first_purchase_bonus_enabled', firstPurchaseBonusEnabled ? 'true' : 'false', 'Feature flag for extra credits on the first credit purchase after a free chat question'],
+        ['first_purchase_bonus_user_allowlist', firstPurchaseBonusUserAllowlist, 'Optional CSV user allowlist for first purchase bonus. Empty = all users when enabled.'],
+        ['first_purchase_bonus_percent', firstPurchaseBonusPercent, 'Percent extra credits on eligible first purchase packs. Used only when fixed extra credits is 0.'],
+        ['first_purchase_bonus_fixed_credits', firstPurchaseBonusFixedCredits, 'Fixed extra credits on eligible first purchase packs. If greater than 0, this takes priority over percentage.'],
+        ['first_purchase_bonus_max_bonus_credits', firstPurchaseBonusMaxCredits, 'Maximum bonus credits for one eligible first purchase'],
+        ['first_purchase_bonus_window_minutes', firstPurchaseBonusWindowMinutes, 'Minutes after the free answer during which the first purchase bonus is available'],
+      ];
+      const responses = await Promise.all(
+        settingsToSave.map(([key, value, description]) =>
+          fetch(`/api/admin/settings/${key}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ key, value: String(value ?? ''), description }),
+          })
+        )
+      );
+      const failed = responses.find((res) => !res.ok);
+      if (failed) {
+        const err = await failed.json().catch(() => ({}));
+        alert('Failed to save first purchase bonus settings: ' + (err.detail || 'check console'));
+        return;
+      }
+      alert('First purchase bonus settings saved. New eligibility checks use them immediately.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving first purchase bonus settings:', error);
+      alert('Failed to save first purchase bonus settings.');
+    } finally {
+      setFirstPurchaseBonusSaving(false);
     }
   };
 
@@ -4254,6 +4305,115 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={chatSubjectGateSaving}
                 >
                   {chatSubjectGateSaving ? 'Saving…' : 'Save pre-question gate setting'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>First purchase bonus</h3>
+              <p className="settings-hint">
+                Extra credits for users who have just received their free standard chat answer and buy their first credit pack
+                within the configured window. This is granted by the backend only after payment verification, and only once per user.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable first purchase bonus</strong>
+                  <p>When off, credit packs and payment verification behave exactly as before.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={firstPurchaseBonusEnabled}
+                    onChange={(e) => setFirstPurchaseBonusEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={firstPurchaseBonusUserAllowlist}
+                  onChange={(e) => setFirstPurchaseBonusUserAllowlist(e.target.value)}
+                  placeholder="e.g. 1755, 1688"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Bonus values</strong>
+                  <p>Choose one bonus mode. Fixed credits and percentage are not combined. If fixed credits is greater than 0, fixed mode is active; otherwise percentage mode is used.</p>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', width: '100%', maxWidth: '760px' }}>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Percentage extra</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="500"
+                      value={firstPurchaseBonusPercent}
+                      onChange={(e) => {
+                        setFirstPurchaseBonusPercent(e.target.value);
+                        if (Number(e.target.value) > 0) setFirstPurchaseBonusFixedCredits('0');
+                      }}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Fixed extra credits</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={firstPurchaseBonusFixedCredits}
+                      onChange={(e) => {
+                        setFirstPurchaseBonusFixedCredits(e.target.value);
+                        if (Number(e.target.value) > 0) setFirstPurchaseBonusPercent('0');
+                      }}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Max bonus cap</span>
+                    <input type="number" min="0" value={firstPurchaseBonusMaxCredits} onChange={(e) => setFirstPurchaseBonusMaxCredits(e.target.value)} style={{ width: '100%', padding: '8px' }} />
+                  </label>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Window minutes</span>
+                    <input type="number" min="1" value={firstPurchaseBonusWindowMinutes} onChange={(e) => setFirstPurchaseBonusWindowMinutes(e.target.value)} style={{ width: '100%', padding: '8px' }} />
+                  </label>
+                </div>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Pack preview</strong>
+                  <p>Using current admin values. A cap of 0 means no cap.</p>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxWidth: '760px' }}>
+                  {[50, 100, 250, 500, 1000, 4999].map((pack) => {
+                    const pct = Math.max(0, Number(firstPurchaseBonusPercent) || 0);
+                    const fixed = Math.max(0, Number(firstPurchaseBonusFixedCredits) || 0);
+                    const cap = Math.max(0, Number(firstPurchaseBonusMaxCredits) || 0);
+                    const mode = fixed > 0 ? 'fixed' : (pct > 0 ? 'percent' : 'none');
+                    const rawBonus = mode === 'fixed' ? fixed : (mode === 'percent' ? Math.floor((pack * pct) / 100) : 0);
+                    const bonus = cap > 0 ? Math.min(rawBonus, cap) : rawBonus;
+                    return (
+                      <span key={pack} style={{ border: '1px solid #e5e7eb', borderRadius: '999px', padding: '7px 10px', background: '#fff', fontSize: '13px' }}>
+                        {pack} + {bonus} <small style={{ color: '#6b7280' }}>({mode})</small> = <strong>{pack + bonus}</strong>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveFirstPurchaseBonusSettings}
+                  disabled={firstPurchaseBonusSaving}
+                >
+                  {firstPurchaseBonusSaving ? 'Saving…' : 'Save first purchase bonus'}
                 </button>
               </div>
             </div>

@@ -1702,6 +1702,11 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
 
     execute(conn, "DELETE FROM credit_transactions WHERE userid = %s", (userid,))
     execute(conn, "DELETE FROM user_credits WHERE userid = %s", (userid,))
+    _delete_user_optional_savepoint(
+        conn,
+        "sp_del_free_birth_hash_usage",
+        [("DELETE FROM free_chat_birth_hash_usage WHERE first_userid = %s", (userid,))],
+    )
 
     _delete_user_optional_savepoint(
         conn,

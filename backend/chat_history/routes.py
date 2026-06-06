@@ -442,6 +442,8 @@ def _attach_completed_status_payload(
             response["gate_metadata"] = meta
             if isinstance(meta, dict) and meta.get("intent_gate"):
                 response["intent_gate"] = meta["intent_gate"]
+            if isinstance(meta, dict) and isinstance(meta.get("first_purchase_bonus"), dict):
+                response["first_purchase_bonus"] = meta["first_purchase_bonus"]
         except Exception:
             pass
 
@@ -3081,6 +3083,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
                 # Deduct credits on successful response (or mark first question free as used)
                 credit_service = CreditService()
+                answer_gate_metadata = None
+                first_purchase_bonus_payload = None
                 skip_instant_charge = bool(is_instant_chat and result.get("skip_instant_credit_charge"))
                 if skip_instant_charge:
                     success = True
@@ -3097,6 +3101,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         "chat_question",
                         f"{analysis_type} (Free): {question[:50]}...",
                     )
+                    try:
+                        bonus_status = credit_service.get_first_purchase_bonus_status(user_id)
+                        first_purchase_bonus_payload = bonus_status
+                        logger.info(
+                            "first_purchase_bonus_after_free_question userid=%s eligible=%s reason=%s bonus_credits=%s window_minutes=%s",
+                            user_id,
+                            bool(bonus_status.get("eligible")) if isinstance(bonus_status, dict) else None,
+                            bonus_status.get("reason") if isinstance(bonus_status, dict) else None,
+                            bonus_status.get("bonus_credits") if isinstance(bonus_status, dict) else None,
+                            bonus_status.get("window_minutes") if isinstance(bonus_status, dict) else None,
+                        )
+                    except Exception:
+                        logger.exception("first_purchase_bonus_after_free_question failed userid=%s", user_id)
+                        first_purchase_bonus_payload = None
+                    answer_gate_metadata = {
+                        "free_question_completed": True,
+                        "first_purchase_bonus": first_purchase_bonus_payload,
+                    }
                     print(f"🆓 FREE QUESTION USED for user {user_id} (no credits deducted)")
                     success = True
                 else:
@@ -3263,7 +3285,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 llm_input_tokens = %s, llm_output_tokens = %s,
                                 llm_cached_input_tokens = %s, llm_non_cached_input_tokens = %s,
                                 llm_prompt_chars = %s, llm_response_chars = %s,
-                                parallel_llm_usage = %s
+                                parallel_llm_usage = %s, gate_metadata = %s
                             WHERE message_id = %s
                         """,
                         (
@@ -3284,6 +3306,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             int(prompt_chars_to_store) if prompt_chars_to_store is not None else None,
                             int(response_chars_to_store) if response_chars_to_store is not None else None,
                             parallel_usage_json,
+                            json.dumps(answer_gate_metadata) if answer_gate_metadata else None,
                             message_id,
                         ),
                     )

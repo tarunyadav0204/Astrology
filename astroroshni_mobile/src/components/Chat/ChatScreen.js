@@ -38,7 +38,7 @@ import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
-import { chatAPI } from '../../services/api';
+import { chatAPI, creditAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { buildQueryContext } from '../../utils/queryContext';
@@ -714,6 +714,7 @@ export default function ChatScreen({ navigation, route }) {
   const [homeInfoModalPayload, setHomeInfoModalPayload] = useState(null);
   const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [firstPurchaseBonusOffer, setFirstPurchaseBonusOffer] = useState(null);
   /** Keyboard frame height for bottom inset (iOS + Android; edge-to-edge often breaks adjustResize for RN root). */
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const [isAppStartup, setIsAppStartup] = useState(true);
@@ -738,6 +739,7 @@ export default function ChatScreen({ navigation, route }) {
   const messageTierByIdRef = useRef({});
   /** assistant message_id → monotonic generation; stale poll chains bail before applying UI or scheduling follow-ups. */
   const statusPollGenerationRef = useRef(new Map());
+  const hydratedBonusOfferMessageIdRef = useRef(null);
   const suppressAutoOpenChatRef = useRef(false);
   const keepChatOpenAfterAskEntryRef = useRef(false);
   const nativeSwitchInProgressRef = useRef(false);
@@ -757,9 +759,115 @@ export default function ChatScreen({ navigation, route }) {
       : messages;
   const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
 
+  const openCreditsForFirstPurchaseBonus = useCallback(() => {
+    navigation.navigate('Credits');
+  }, [navigation]);
+
+  const showFirstPurchaseBonusOffer = useCallback((messageId, data) => {
+    console.log('[FirstPurchaseBonus] show request', {
+      messageId,
+      enabled: data?.enabled,
+      eligible: data?.eligible,
+      reason: data?.reason,
+      bonusCredits: data?.bonus_credits,
+      windowMinutes: data?.window_minutes,
+    });
+    if (!data?.enabled || !data?.eligible) {
+      setFirstPurchaseBonusOffer(null);
+      return;
+    }
+    setFirstPurchaseBonusOffer({
+      messageId,
+      percent: Number(data.percent || 0),
+      fixedCredits: Number(data.fixed_credits || 0),
+      maxBonusCredits: Number(data.max_bonus_credits || 0),
+      windowMinutes: Number(data.window_minutes || 0),
+      expiresAt: data.expires_at || null,
+      bonusType: String(data.bonus_type || '').toLowerCase(),
+      bonusCredits: Number(data.bonus_credits || 0),
+    });
+  }, []);
+
+  const restoreFirstPurchaseBonusOfferFromMessages = useCallback(async (messageList) => {
+    const candidate = [...(messageList || [])]
+      .reverse()
+      .find((msg) => {
+        const offer = msg?.gate_metadata?.first_purchase_bonus;
+        return msg?.role === 'assistant' && msg?.messageId && (
+          msg?.gate_metadata?.free_question_completed || offer?.eligible
+        );
+      });
+    if (!candidate) {
+      hydratedBonusOfferMessageIdRef.current = null;
+      setFirstPurchaseBonusOffer(null);
+      return;
+    }
+    if (
+      hydratedBonusOfferMessageIdRef.current === candidate.messageId &&
+      firstPurchaseBonusOffer?.messageId === candidate.messageId
+    ) {
+      return;
+    }
+    hydratedBonusOfferMessageIdRef.current = candidate.messageId;
+    try {
+      const { data } = await creditAPI.getFirstPurchaseBonusStatus();
+      console.log('[FirstPurchaseBonus] restore status', {
+        messageId: candidate.messageId,
+        enabled: data?.enabled,
+        eligible: data?.eligible,
+        reason: data?.reason,
+        bonusCredits: data?.bonus_credits,
+        windowMinutes: data?.window_minutes,
+      });
+      if (data?.eligible) {
+        showFirstPurchaseBonusOffer(candidate.messageId, data);
+      } else {
+        setFirstPurchaseBonusOffer(null);
+      }
+    } catch (e) {
+      console.log('[FirstPurchaseBonus] restore status failed', e?.message || e);
+      setFirstPurchaseBonusOffer(null);
+    }
+  }, [firstPurchaseBonusOffer?.messageId, showFirstPurchaseBonusOffer]);
+
+  const formatFirstPurchaseBonusCopy = useCallback((offer) => {
+    if (!offer) {
+      return 'Buy your first credits now and get extra credits.';
+    }
+    let bonusText = 'extra credits';
+    if (offer.bonusType === 'fixed' && offer.fixedCredits > 0) {
+      bonusText = `${offer.fixedCredits} bonus credits`;
+    } else if (offer.bonusType === 'percent' && offer.percent > 0) {
+      bonusText = `${offer.percent}% extra credits`;
+    } else if (offer.bonusCredits > 0) {
+      bonusText = `${offer.bonusCredits} bonus credits`;
+    }
+    const timeText = offer.windowMinutes > 0 ? ` for the next ${offer.windowMinutes} min` : '';
+    return `Free question unlocked an offer: get ${bonusText}${timeText}.`;
+  }, []);
+
   useEffect(() => {
     setRenderedMessageCount(CHAT_RENDER_WINDOW_DEFAULT);
   }, [currentPersonId, sessionId, showGreeting]);
+
+  useEffect(() => {
+    setFirstPurchaseBonusOffer(null);
+    hydratedBonusOfferMessageIdRef.current = null;
+  }, [currentPersonId, sessionId, showGreeting]);
+
+  useEffect(() => {
+    if (showGreeting || !messages.length) return;
+    restoreFirstPurchaseBonusOfferFromMessages(messages);
+  }, [messages, showGreeting, restoreFirstPurchaseBonusOfferFromMessages]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!showGreeting && messages.length) {
+        restoreFirstPurchaseBonusOfferFromMessages(messages);
+      }
+      return undefined;
+    }, [messages, showGreeting, restoreFirstPurchaseBonusOfferFromMessages])
+  );
 
   useEffect(() => {
     if (messages.length <= CHAT_RENDER_WINDOW_DEFAULT && renderedMessageCount !== CHAT_RENDER_WINDOW_DEFAULT) {
@@ -3180,13 +3288,32 @@ export default function ChatScreen({ navigation, route }) {
             } else {
               freeUsedThisSendRef.current = false;
             }
-            if (freeUsedThisSendRef.current && !gatedNoCharge) {
+            const wasFreeQuestion = Boolean(freeUsedThisSendRef.current && !gatedNoCharge);
+            if (wasFreeQuestion) {
               freeUsedThisSendRef.current = false;
-              Alert.alert(
-                'Free question used',
-                'You used your free question. Next questions will use credits.',
-                [{ text: 'OK' }]
-              );
+              const bonusOffer = status.first_purchase_bonus || status.gate_metadata?.first_purchase_bonus || null;
+              console.log('[FirstPurchaseBonus] free answer completed', {
+                messageId,
+                enabled: bonusOffer?.enabled,
+                eligible: bonusOffer?.eligible,
+                reason: bonusOffer?.reason,
+                bonusCredits: bonusOffer?.bonus_credits,
+                windowMinutes: bonusOffer?.window_minutes,
+              });
+              if (bonusOffer?.eligible) {
+                showFirstPurchaseBonusOffer(messageId, bonusOffer);
+              } else {
+                restoreFirstPurchaseBonusOfferFromMessages([
+                  {
+                    role: 'assistant',
+                    messageId,
+                    gate_metadata: status.gate_metadata || {
+                      free_question_completed: true,
+                      first_purchase_bonus: bonusOffer,
+                    },
+                  },
+                ]);
+              }
             }
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
@@ -5314,7 +5441,28 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
-            {credits < effectiveChatCost && !freeQuestionRequiresNotifications && !isKeyboardVisible && (
+            {firstPurchaseBonusOffer && !isKeyboardVisible && (
+              <TouchableOpacity
+                style={styles.firstPurchaseStickyOffer}
+                onPress={openCreditsForFirstPurchaseBonus}
+                activeOpacity={0.9}
+              >
+                <View style={styles.firstPurchaseStickyOfferIcon}>
+                  <Ionicons name="gift-outline" size={17} color={COLORS.white} />
+                </View>
+                <View style={styles.firstPurchaseStickyOfferCopy}>
+                  <Text style={styles.firstPurchaseStickyOfferTitle}>Bonus credits unlocked</Text>
+                  <Text style={styles.firstPurchaseStickyOfferText} numberOfLines={2}>
+                    {formatFirstPurchaseBonusCopy(firstPurchaseBonusOffer)}
+                  </Text>
+                </View>
+                <View style={styles.firstPurchaseStickyOfferButton}>
+                  <Text style={styles.firstPurchaseStickyOfferCta}>Buy</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {credits < effectiveChatCost && !freeQuestionRequiresNotifications && !firstPurchaseBonusOffer && !isKeyboardVisible && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -7316,6 +7464,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  firstPurchaseStickyOffer: {
+    marginTop: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.5)',
+    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  firstPurchaseStickyOfferIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  firstPurchaseStickyOfferCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  firstPurchaseStickyOfferTitle: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  firstPurchaseStickyOfferText: {
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  firstPurchaseStickyOfferButton: {
+    backgroundColor: '#ff6b35',
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  firstPurchaseStickyOfferCta: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '900',
   },
   notifGateBanner: {
     marginTop: 8,

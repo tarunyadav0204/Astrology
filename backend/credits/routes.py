@@ -606,7 +606,21 @@ def _credit_verified_google_play_purchase(
         pass
 
     if credit_service.has_transaction_with_reference(userid, GOOGLE_PLAY_SOURCE, order_id):
-        return {"success": True, "message": "Already credited", "credits_added": 0, "order_id": order_id}
+        bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+            userid=userid,
+            purchased_credits=amount,
+            purchase_source=GOOGLE_PLAY_SOURCE,
+            purchase_reference_id=order_id,
+            product_id=product_id,
+        )
+        return {
+            "success": True,
+            "message": "Already credited",
+            "credits_added": 0,
+            "order_id": order_id,
+            "first_purchase_bonus": bonus_result,
+            "bonus_credits_added": int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0,
+        }
 
     purchase_metadata = json.dumps({
         "purchase_token": purchase.get("purchaseToken") or token,
@@ -652,7 +666,23 @@ def _credit_verified_google_play_purchase(
             "order_id": order_id,
         },
     )
-    return {"success": True, "message": "Credits added", "credits_added": amount, "order_id": order_id}
+    bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+        userid=userid,
+        purchased_credits=amount,
+        purchase_source=GOOGLE_PLAY_SOURCE,
+        purchase_reference_id=order_id,
+        product_id=product_id,
+    )
+    bonus_added = int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0
+    return {
+        "success": True,
+        "message": "Credits added",
+        "credits_added": amount + bonus_added,
+        "purchased_credits_added": amount,
+        "bonus_credits_added": bonus_added,
+        "first_purchase_bonus": bonus_result,
+        "order_id": order_id,
+    }
 
 
 @router.get("/google-play/products")
@@ -660,6 +690,16 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
     """List credit products from Google Play (active in-app products with id convention credits_N)."""
     try:
         products = _list_google_play_products(PACKAGE_NAME)
+        for product in products:
+            try:
+                credits = int(product.get("credits") or 0)
+                status = credit_service.get_first_purchase_bonus_status(current_user.userid, credits)
+                product["first_purchase_bonus"] = status
+                if status.get("eligible") and int(status.get("bonus_credits") or 0) > 0:
+                    product["bonus_credits"] = int(status.get("bonus_credits") or 0)
+                    product["total_credits"] = int(status.get("total_credits") or credits)
+            except Exception:
+                pass
         return {"products": products}
     except HTTPException as e:
         # When Play is not configured (e.g. local dev without GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), return empty list so app still works
@@ -670,6 +710,15 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
     except Exception as e:
         logger.warning("Google Play products unavailable: %s", e, exc_info=True)
         return {"products": []}
+
+
+@router.get("/first-purchase-bonus/status")
+async def get_first_purchase_bonus_status(
+    purchased_credits: Optional[int] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    """Preview the gated post-free-question first purchase bonus for the current user."""
+    return credit_service.get_first_purchase_bonus_status(current_user.userid, purchased_credits)
 
 
 @router.post("/google-play/verify")
@@ -1178,6 +1227,10 @@ async def get_credit_balance(current_user: User = Depends(get_current_user)):
         "free_question_available": free_ok,
         "free_question_requires_notifications": pending_notif,
     }
+    try:
+        result["first_purchase_bonus"] = credit_service.get_first_purchase_bonus_status(current_user.userid)
+    except Exception:
+        pass
     # Optional: subscription tier for app to show "VIP Silver" etc. (backward compat: new keys)
     try:
         discount = credit_service.get_subscription_discount_percent(current_user.userid)

@@ -102,6 +102,7 @@ const shouldShowGlobalError = (error) => (
 );
 
 const GLOBAL_ERROR_CONFIG = { showGlobalError: true };
+const AUTH_LOCAL_ERROR_CONFIG = { suppressGlobalError: true };
 const BACKGROUND_REQUEST_CONFIG = { suppressGlobalError: true };
 
 // ---- Transparent client-side caching (charts) ----
@@ -222,7 +223,7 @@ api.interceptors.response.use(
     }
 
     // Unauthorized - clear token
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !shouldSuppressGlobalError(error)) {
       await AsyncStorage.removeItem('authToken');
       if (errorHandlerCallback) {
         errorHandlerCallback({
@@ -237,14 +238,14 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (credentials) => api.post(getEndpoint('/login'), credentials, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
-  register: (userData) => api.post(getEndpoint('/register'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
-  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  login: (credentials) => api.post(getEndpoint('/login'), credentials, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
+  register: (userData) => api.post(getEndpoint('/register'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
+  registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
   logout: () => api.post(getEndpoint('/logout'), {}, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
-  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
-  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
-  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
-  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
+  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
+  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
+  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
   updateSelfBirthChart: (birthData, clearExisting = true, chartId = null) => {
     let params = clearExisting ? '?clear_existing=true' : '?clear_existing=false';
     if (chartId) params += `&chart_id=${chartId}`;
@@ -656,6 +657,10 @@ export const creditAPI = {
       ...(pricing || {}),
     }, GLOBAL_ERROR_CONFIG),
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
+  getFirstPurchaseBonusStatus: (purchasedCredits = null) => {
+    const qs = purchasedCredits != null ? `?purchased_credits=${encodeURIComponent(purchasedCredits)}` : '';
+    return api.get(getEndpoint(`/credits/first-purchase-bonus/status${qs}`));
+  },
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
   syncSubscription: (purchaseToken, productId, orderId = null) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {

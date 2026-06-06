@@ -31,6 +31,7 @@ export default function PasswordScreen({
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isValid, setIsValid] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -132,6 +133,7 @@ export default function PasswordScreen({
     console.log('  fullPhone:', fullPhone);
     console.log('  isLogin:', isLogin);
     
+    setPasswordError('');
     setLoading(true);
     try {
       if (isLogin) {
@@ -292,7 +294,13 @@ export default function PasswordScreen({
       console.log('  ❌ Error in handleContinue:', error.message);
       console.log('  Error response:', error.response?.data);
       console.log('  Error status:', error.response?.status);
-      Alert.alert('Error', apiErrorMessage(error, 'Authentication failed'));
+      if (isLogin) {
+        const message = apiErrorMessage(error, 'Invalid phone number or password');
+        setPasswordError(message || 'Invalid phone number or password');
+        passwordInputRef.current?.focus();
+      } else {
+        Alert.alert('Error', apiErrorMessage(error, 'Authentication failed'));
+      }
     } finally {
       setLoading(false);
     }
@@ -355,7 +363,10 @@ export default function PasswordScreen({
             placeholder="Password"
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
             value={formData.password}
-            onChangeText={(value) => updateFormData('password', value)}
+            onChangeText={(value) => {
+              if (passwordError) setPasswordError('');
+              updateFormData('password', value);
+            }}
             secureTextEntry={!showPassword}
           />
           <TouchableOpacity
@@ -372,6 +383,13 @@ export default function PasswordScreen({
             <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
           )}
         </View>
+
+        {!!passwordError && (
+          <View style={styles.inlineError}>
+            <Ionicons name="alert-circle-outline" size={15} color="#ffb4a2" />
+            <Text style={styles.inlineErrorText}>{passwordError}</Text>
+          </View>
+        )}
 
         {!isLogin && (
           <View style={styles.strengthContainer}>
@@ -450,6 +468,24 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: 4,
+  },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 180, 162, 0.35)',
+  },
+  inlineErrorText: {
+    flex: 1,
+    color: '#ffcfbf',
+    fontSize: 12,
+    fontWeight: '700',
   },
   strengthContainer: {
     marginTop: 12,

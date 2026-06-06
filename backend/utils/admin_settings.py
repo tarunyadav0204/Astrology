@@ -1,4 +1,4 @@
-from typing import Optional, Any, Set
+from typing import Optional, Any, Set, Dict
 
 # Allowed Gemini model IDs (with models/ prefix for API). Used by admin UI and as fallbacks.
 GEMINI_MODEL_OPTIONS = [
@@ -304,6 +304,71 @@ def chat_subject_gate_enabled_for_user(user_id: Optional[int]) -> bool:
         return int(user_id) in allowlist
     except (TypeError, ValueError):
         return False
+
+
+def _parse_int_setting(value: Optional[str], default: int, minimum: Optional[int] = None, maximum: Optional[int] = None) -> int:
+    try:
+        parsed = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        parsed = int(default)
+    if minimum is not None:
+        parsed = max(int(minimum), parsed)
+    if maximum is not None:
+        parsed = min(int(maximum), parsed)
+    return parsed
+
+
+def is_first_purchase_bonus_enabled() -> bool:
+    """Global feature flag for the post-free-question first credit purchase bonus."""
+    return _parse_bool_setting(get_setting("first_purchase_bonus_enabled"), default=False)
+
+
+def get_first_purchase_bonus_user_allowlist() -> Set[int]:
+    """Optional CSV/whitespace-separated user id allowlist. Empty set means all users."""
+    raw = (get_setting("first_purchase_bonus_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            user_ids.add(int(cleaned))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def first_purchase_bonus_enabled_for_user(user_id: Optional[int]) -> bool:
+    """Global ON + empty allowlist enables for all users; otherwise only listed users."""
+    if not is_first_purchase_bonus_enabled():
+        return False
+    allowlist = get_first_purchase_bonus_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
+def get_first_purchase_bonus_config() -> Dict[str, Any]:
+    """Admin-controlled values for the post-free-question first credit purchase bonus."""
+    percent = _parse_int_setting(get_setting("first_purchase_bonus_percent"), default=20, minimum=0, maximum=500)
+    fixed = _parse_int_setting(get_setting("first_purchase_bonus_fixed_credits"), default=0, minimum=0, maximum=100000)
+    max_bonus = _parse_int_setting(get_setting("first_purchase_bonus_max_bonus_credits"), default=1000, minimum=0, maximum=100000)
+    window_minutes = _parse_int_setting(get_setting("first_purchase_bonus_window_minutes"), default=30, minimum=1, maximum=10080)
+    # The first-purchase offer is intentionally one mode at a time.
+    # If legacy/admin data has both set, fixed credits wins because it is the explicit amount.
+    bonus_type = "fixed" if fixed > 0 else ("percent" if percent > 0 else "none")
+    return {
+        "percent": percent,
+        "fixed_credits": fixed,
+        "max_bonus_credits": max_bonus,
+        "window_minutes": window_minutes,
+        "bonus_type": bonus_type,
+    }
 
 
 def get_instant_chat_user_allowlist() -> Set[int]:

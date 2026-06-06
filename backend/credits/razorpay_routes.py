@@ -294,9 +294,18 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "credits_added": 0, "message": "Amount mismatch", "userid": userid}
 
     if credit_service.has_transaction_with_reference(userid, RAZORPAY_SOURCE, payment_id):
+        bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+            userid=userid,
+            purchased_credits=credits,
+            purchase_source=RAZORPAY_SOURCE,
+            purchase_reference_id=payment_id,
+            product_id=product_id,
+        )
         return {
             "success": True,
             "credits_added": 0,
+            "bonus_credits_added": int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0,
+            "first_purchase_bonus": bonus_result,
             "message": "Already credited",
             "userid": userid,
         }
@@ -329,7 +338,23 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
             "userid": userid,
         }
 
-    return {"success": True, "credits_added": credits, "message": "Credits added", "userid": userid}
+    bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+        userid=userid,
+        purchased_credits=credits,
+        purchase_source=RAZORPAY_SOURCE,
+        purchase_reference_id=payment_id,
+        product_id=product_id,
+    )
+    bonus_added = int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0
+    return {
+        "success": True,
+        "credits_added": credits + bonus_added,
+        "purchased_credits_added": credits,
+        "bonus_credits_added": bonus_added,
+        "first_purchase_bonus": bonus_result,
+        "message": "Credits added",
+        "userid": userid,
+    }
 
 
 def _fetch_payment(payment_id: str) -> Dict[str, Any]:

@@ -135,6 +135,32 @@ function getCreditPackDisplayPrice(product, iapProducts) {
   return null;
 }
 
+function getFirstPurchaseBonus(product) {
+  const bonus = product?.first_purchase_bonus || {};
+  const bonusCredits = Number(product?.bonus_credits ?? bonus.bonus_credits ?? 0);
+  const totalCredits = Number(product?.total_credits ?? bonus.total_credits ?? 0);
+  return {
+    eligible: Boolean(bonus.eligible && bonusCredits > 0),
+    bonusCredits,
+    totalCredits,
+    percent: Number(bonus.percent || 0),
+    fixedCredits: Number(bonus.fixed_credits || 0),
+    bonusType: String(bonus.bonus_type || '').toLowerCase(),
+    windowMinutes: Number(bonus.window_minutes || 0),
+  };
+}
+
+function formatFirstPurchaseBonusLabel(bonus) {
+  if (!bonus?.eligible) return '';
+  if (bonus.bonusType === 'fixed' && bonus.fixedCredits > 0) {
+    return `${bonus.fixedCredits} bonus credits`;
+  }
+  if (bonus.bonusType === 'percent' && bonus.percent > 0) {
+    return `${bonus.percent}% extra credits`;
+  }
+  return `${bonus.bonusCredits} bonus credits`;
+}
+
 // Lazy-load IAP only on Android to avoid iOS/build issues
 let RNIap = null;
 if (Platform.OS === 'android') {
@@ -1308,29 +1334,62 @@ const CreditScreen = ({ navigation }) => {
                 ) : googlePlayProducts.length === 0 ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noProducts')}</Text>
                 ) : (
-                  <View style={styles.buyProductGrid}>
-                    {googlePlayProducts.map((product) => (
-                      <TouchableOpacity
-                        key={product.product_id}
-                        style={[styles.creditPackCard, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}
-                        onPress={() => handleBuyCreditsPress(product)}
-                        disabled={purchasingProductId === product.product_id}
-                      >
-                        <Text style={[styles.creditPackCredits, { color: colors.text }]}>{t('credits.page.creditsCount', { count: product.credits })}</Text>
-                        {(() => {
-                          const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
-                          return displayPrice ? (
-                            <Text style={[styles.creditPackPrice, { color: colors.textSecondary }]}>{displayPrice}</Text>
-                          ) : null;
-                        })()}
-                        <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
-                          <Text style={styles.creditPackButtonText}>
-                            {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
+                  <>
+                    {(() => {
+                      const firstEligible = googlePlayProducts.map(getFirstPurchaseBonus).find((b) => b.eligible);
+                      return firstEligible ? (
+                        <View style={[styles.firstPurchaseBonusBanner, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)', borderColor: colors.primary }]}>
+                          <Ionicons name="flash-outline" size={18} color={colors.primary} />
+                          <Text style={[styles.firstPurchaseBonusText, { color: colors.text }]}>
+                            Limited offer: get {formatFirstPurchaseBonusLabel(firstEligible)} on your first pack.
                           </Text>
                         </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                      ) : null;
+                    })()}
+                    <View style={styles.buyProductGrid}>
+                      {googlePlayProducts.map((product) => {
+                        const bonus = getFirstPurchaseBonus(product);
+                        return (
+                          <TouchableOpacity
+                            key={product.product_id}
+                            style={[
+                              styles.creditPackCard,
+                              {
+                                backgroundColor: promoCardBg,
+                                borderColor: bonus.eligible ? colors.primary : colors.cardBorder,
+                              },
+                            ]}
+                            onPress={() => handleBuyCreditsPress(product)}
+                            disabled={purchasingProductId === product.product_id}
+                          >
+                            <View>
+                              <Text style={[styles.creditPackCredits, { color: colors.text }]}>
+                                {bonus.eligible
+                                  ? `${bonus.totalCredits} credits`
+                                  : t('credits.page.creditsCount', { count: product.credits })}
+                              </Text>
+                              {bonus.eligible ? (
+                                <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                  {product.credits} + {bonus.bonusCredits} bonus
+                                </Text>
+                              ) : null}
+                              {(() => {
+                                const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
+                                return displayPrice ? (
+                                  <Text style={[styles.creditPackPrice, { color: colors.textSecondary }]}>{displayPrice}</Text>
+                                ) : null;
+                              })()}
+                            </View>
+                            <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
+                              <Text style={styles.creditPackButtonText}>
+                                {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
                 )}
               </View>
             )}
@@ -1757,6 +1816,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     textAlign: 'center',
   },
+  firstPurchaseBonusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  firstPurchaseBonusText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
   creditPackCard: {
     width: (width - 52) / 2 - 6,
     borderRadius: 16,
@@ -1768,6 +1843,12 @@ const styles = StyleSheet.create({
   creditPackCredits: {
     fontSize: 18,
     fontWeight: '800',
+    marginBottom: 6,
+  },
+  creditPackBonus: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: -2,
     marginBottom: 6,
   },
   creditPackPrice: {

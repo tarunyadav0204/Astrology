@@ -2356,9 +2356,12 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             is_instant_chat_enabled,
             is_chat_subject_gate_enabled,
             get_chat_subject_gate_user_allowlist,
+            get_first_purchase_bonus_config,
+            get_first_purchase_bonus_user_allowlist,
             get_instant_chat_user_allowlist,
             is_speech_chat_enabled,
             get_speech_chat_user_allowlist,
+            is_first_purchase_bonus_enabled,
             get_setting,
         )
         with get_conn() as conn:
@@ -2400,6 +2403,11 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "chat_subject_gate_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_subject_gate_user_allowlist())
             ),
+            "first_purchase_bonus_enabled": is_first_purchase_bonus_enabled(),
+            "first_purchase_bonus_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_first_purchase_bonus_user_allowlist())
+            ),
+            "first_purchase_bonus_config": get_first_purchase_bonus_config(),
             "instant_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_instant_chat_user_allowlist())
             ),
