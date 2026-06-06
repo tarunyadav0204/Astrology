@@ -1342,8 +1342,9 @@ const AdminChatHistory = () => {
   };
 
   const formatLlmLabel = (s) => {
-    const prov = (s.chat_llm_provider || '').trim();
-    const mod = (s.chat_llm_model || '').trim();
+    if (!s || typeof s !== 'object') return null;
+    const prov = String(s.chat_llm_provider || '').trim();
+    const mod = String(s.chat_llm_model || '').trim();
     if (!mod && !prov) return null;
     if (prov && mod) return `${prov}: ${mod}`;
     return mod || prov || null;
@@ -1646,8 +1647,9 @@ const AdminChatHistory = () => {
     return displayedBlocks.find((block) => block.some(isAssistantAnswer)) || null;
   }, [displayedBlocks]);
 
+  const selectedSessionLlmLabel = formatLlmLabel(selectedSession);
   const hasSessionPricing =
-    Boolean(formatLlmLabel(selectedSession)) ||
+    Boolean(selectedSessionLlmLabel) ||
     Boolean(selectedSession?.cost_summary) ||
     selectedSession?.cost_summary?.input_usd_per_1m != null ||
     selectedSession?.cost_summary?.output_usd_per_1m != null;
@@ -1792,9 +1794,9 @@ const AdminChatHistory = () => {
                   </div>
                   {pricePanelExpanded && (
                   <div className="session-meta-chips">
-                    {formatLlmLabel(selectedSession) && (
+                    {selectedSessionLlmLabel && (
                       <span className="session-meta-chip" title="Provider and model ID from admin settings at answer time">
-                        {formatLlmLabel(selectedSession)}
+                        {selectedSessionLlmLabel}
                       </span>
                     )}
                     {typeof selectedSession?.cost_summary?.total_cost_inr_estimate === 'number' && (
