@@ -802,12 +802,6 @@ export default function ChatScreen({ navigation, route }) {
       setFirstPurchaseBonusOffer(null);
       return;
     }
-    if (
-      hydratedBonusOfferMessageIdRef.current === candidate.messageId &&
-      firstPurchaseBonusOffer?.messageId === candidate.messageId
-    ) {
-      return;
-    }
     hydratedBonusOfferMessageIdRef.current = candidate.messageId;
     try {
       const { data } = await creditAPI.getFirstPurchaseBonusStatus();
@@ -828,7 +822,7 @@ export default function ChatScreen({ navigation, route }) {
       console.log('[FirstPurchaseBonus] restore status failed', e?.message || e);
       setFirstPurchaseBonusOffer(null);
     }
-  }, [firstPurchaseBonusOffer?.messageId, showFirstPurchaseBonusOffer]);
+  }, [showFirstPurchaseBonusOffer]);
 
   const formatFirstPurchaseBonusCopy = useCallback((offer) => {
     if (!offer) {
@@ -3313,6 +3307,24 @@ export default function ChatScreen({ navigation, route }) {
                     },
                   },
                 ]);
+              }
+            } else if (!gatedNoCharge && firstPurchaseBonusOffer) {
+              try {
+                const { data } = await creditAPI.getFirstPurchaseBonusStatus();
+                console.log('[FirstPurchaseBonus] post-answer status', {
+                  messageId,
+                  enabled: data?.enabled,
+                  eligible: data?.eligible,
+                  reason: data?.reason,
+                  bonusCredits: data?.bonus_credits,
+                  windowMinutes: data?.window_minutes,
+                });
+                if (!data?.eligible) {
+                  setFirstPurchaseBonusOffer(null);
+                }
+              } catch (e) {
+                console.log('[FirstPurchaseBonus] post-answer status failed', e?.message || e);
+                setFirstPurchaseBonusOffer(null);
               }
             }
             const mt = status.message_type || 'answer';
