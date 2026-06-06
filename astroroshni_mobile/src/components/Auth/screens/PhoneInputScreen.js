@@ -7,11 +7,8 @@ import {
   StyleSheet,
   Animated,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Modal,
   FlatList,
-  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -24,6 +21,7 @@ import {
   isNationalPhoneValid,
 } from '../countryCodes';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
+import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 export default function PhoneInputScreen({ 
   formData, 
@@ -171,35 +169,51 @@ export default function PhoneInputScreen({
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigateToScreen('welcome', 'back')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.emoji}>📱</Text>
-            <Text style={styles.title}>
-              {isLogin ? "Welcome back!" : "What's your number?"}
+    <>
+      <AuthKeyboardScreen
+        emoji="📱"
+        title={isLogin ? 'Welcome back!' : "What's your number?"}
+        subtitle={isLogin ? 'Enter your phone number to sign in' : "We'll send a verification code to this phone"}
+        onBack={() => navigateToScreen('welcome', 'back')}
+        footer={(
+          <Text style={styles.footerText}>
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <Text
+              style={styles.footerLink}
+              onPress={() => navigateToScreen('welcome', 'back')}
+            >
+              {isLogin ? 'Create one' : 'Sign in'}
             </Text>
-            <Text style={styles.subtitle}>
-              {isLogin ? "Enter your phone number to sign in" : "We'll send a verification code to this phone"}
-            </Text>
-          </View>
-
+          </Text>
+        )}
+        action={(
           <Animated.View
+            style={[
+              styles.buttonContainer,
+              {
+                transform: [{ translateY: buttonAnim }],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[styles.continueButton, !isValid && styles.buttonDisabled]}
+              onPress={() => handleContinue()}
+              disabled={!isValid || loading}
+            >
+              <LinearGradient
+                colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+                style={styles.buttonGradient}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Checking...' : 'Continue'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      >
+        <Animated.View
             style={[
               styles.inputContainer,
               {
@@ -250,46 +264,8 @@ export default function PhoneInputScreen({
                 </Text>
               </View>
             )}
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.buttonContainer,
-              {
-                transform: [{ translateY: buttonAnim }],
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={[styles.continueButton, !isValid && styles.buttonDisabled]}
-              onPress={() => handleContinue()}
-              disabled={!isValid || loading}
-            >
-              <LinearGradient
-                colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-                style={styles.buttonGradient}
-              >
-                <Text style={styles.buttonText}>
-                  {loading ? 'Checking...' : 'Continue'}
-                </Text>
-                <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => navigateToScreen('welcome', 'back')}
-            >
-              {isLogin ? "Create one" : "Sign in"}
-            </Text>
-          </Text>
-        </View>
-      </ScrollView>
+        </Animated.View>
+      </AuthKeyboardScreen>
 
       <Modal
         visible={showCountryPicker}
@@ -334,55 +310,13 @@ export default function PhoneInputScreen({
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 160,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  emoji: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   inputContainer: {
-    marginBottom: 40,
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -487,7 +421,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   buttonContainer: {
-    marginBottom: 40,
+    marginBottom: 0,
   },
   continueButton: {
     borderRadius: 16,

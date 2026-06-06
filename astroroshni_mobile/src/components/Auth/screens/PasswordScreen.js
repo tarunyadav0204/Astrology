@@ -7,10 +7,7 @@ import {
   StyleSheet,
   Animated,
   Alert,
-  KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -21,6 +18,7 @@ import { trackAstrologyEvent } from '../../../utils/analytics';
 import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { useCredits } from '../../../credits/CreditContext';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 export default function PasswordScreen({ 
   formData, 
@@ -36,7 +34,6 @@ export default function PasswordScreen({
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
-  const scrollViewRef = useRef(null);
   const passwordInputRef = useRef(null);
 
   useEffect(() => {
@@ -107,29 +104,14 @@ export default function PasswordScreen({
     return Math.min(lengthScore + numberScore, 100);
   })();
 
-  useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      if (scrollViewRef.current && isLogin) {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      }
-    });
-
-    return () => {
-      keyboardDidShowListener?.remove();
-    };
-  }, [isLogin]);
-
   // Delay initial focus so keyboard avoidance/layout is ready first (fixes first-load overlap on Android)
   useEffect(() => {
     const timer = setTimeout(() => {
       passwordInputRef.current?.focus();
-      if (scrollViewRef.current && isLogin) {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      }
     }, 280);
 
     return () => clearTimeout(timer);
-  }, [isLogin]);
+  }, []);
 
   const handleContinue = async () => {
     if (!isValid) {
@@ -317,122 +299,12 @@ export default function PasswordScreen({
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView 
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() =>
-            navigateToScreen(
-              isLogin ? 'phone' : 'name',
-              'back'
-            )
-          }
-        >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>🔐</Text>
-          <Text style={styles.title}>
-            {isLogin ? "Enter your password" : "Create a password"}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isLogin 
-              ? "Welcome back to your cosmic journey" 
-              : "Choose a strong password to secure your account"
-            }
-          </Text>
-        </View>
-
-        <Animated.View
-          style={[
-            styles.inputContainer,
-            {
-              opacity: inputAnim,
-              transform: [
-                {
-                  translateY: inputAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <Ionicons name="lock-closed-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-            <TextInput
-              ref={passwordInputRef}
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={formData.password}
-              onChangeText={(value) => updateFormData('password', value)}
-              secureTextEntry={!showPassword}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeButton}
-            >
-              <Ionicons 
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-                size={20} 
-                color="rgba(255, 255, 255, 0.5)" 
-              />
-            </TouchableOpacity>
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-            )}
-          </View>
-          
-          {!isLogin && (
-            <View style={styles.strengthContainer}>
-              <View style={styles.strengthBar}>
-                <View 
-                  style={[
-                    styles.strengthFill,
-                    { 
-                      width: `${passwordStrengthProgress}%`,
-                      backgroundColor: passwordStrengthColor,
-                    }
-                  ]} 
-                />
-              </View>
-              <Text style={[styles.strengthText, { color: passwordStrengthColor }]}>
-                {passwordStrengthLabel}
-              </Text>
-              <View style={styles.passwordCriteriaList}>
-                {passwordCriteria.map((item) => (
-                  <View key={item.label} style={styles.passwordCriterionRow}>
-                    <Ionicons
-                      name={item.met ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={14}
-                      color={item.met ? '#4CAF50' : 'rgba(255, 255, 255, 0.45)'}
-                    />
-                    <Text style={[
-                      styles.passwordCriterionText,
-                      item.met && styles.passwordCriterionTextMet,
-                    ]}>
-                      {item.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </Animated.View>
-
+    <AuthKeyboardScreen
+      emoji="🔐"
+      title={isLogin ? 'Enter your password' : 'Create a password'}
+      subtitle={isLogin ? 'Welcome back to your cosmic journey' : 'Choose a strong password to secure your account'}
+      onBack={() => navigateToScreen(isLogin ? 'phone' : 'name', 'back')}
+      action={(
         <Animated.View
           style={[
             styles.buttonContainer,
@@ -457,6 +329,85 @@ export default function PasswordScreen({
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
+      )}
+    >
+      <Animated.View
+        style={[
+          styles.inputContainer,
+          {
+            opacity: inputAnim,
+            transform: [
+              {
+                translateY: inputAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
+          <Ionicons name="lock-closed-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+          <TextInput
+            ref={passwordInputRef}
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            value={formData.password}
+            onChangeText={(value) => updateFormData('password', value)}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.eyeButton}
+          >
+            <Ionicons
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color="rgba(255, 255, 255, 0.5)"
+            />
+          </TouchableOpacity>
+          {isValid && (
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+          )}
+        </View>
+
+        {!isLogin && (
+          <View style={styles.strengthContainer}>
+            <View style={styles.strengthBar}>
+              <View
+                style={[
+                  styles.strengthFill,
+                  {
+                    width: `${passwordStrengthProgress}%`,
+                    backgroundColor: passwordStrengthColor,
+                  }
+                ]}
+              />
+            </View>
+            <Text style={[styles.strengthText, { color: passwordStrengthColor }]}>
+              {passwordStrengthLabel}
+            </Text>
+            <View style={styles.passwordCriteriaList}>
+              {passwordCriteria.map((item) => (
+                <View key={item.label} style={styles.passwordCriterionRow}>
+                  <Ionicons
+                    name={item.met ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={14}
+                    color={item.met ? '#4CAF50' : 'rgba(255, 255, 255, 0.45)'}
+                  />
+                  <Text style={[
+                    styles.passwordCriterionText,
+                    item.met && styles.passwordCriterionTextMet,
+                  ]}>
+                    {item.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {isLogin && (
           <TouchableOpacity 
@@ -466,57 +417,14 @@ export default function PasswordScreen({
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
         )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </AuthKeyboardScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 160,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  emoji: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   inputContainer: {
-    marginBottom: 40,
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -580,7 +488,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   buttonContainer: {
-    marginBottom: 20,
+    marginBottom: 0,
   },
   continueButton: {
     borderRadius: 16,

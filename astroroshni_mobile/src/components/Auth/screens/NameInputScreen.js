@@ -6,14 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 export default function NameInputScreen({ 
   formData, 
@@ -58,65 +56,12 @@ export default function NameInputScreen({
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigateToScreen('email', 'back')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>👋</Text>
-          <Text style={styles.title}>What's your name?</Text>
-          <Text style={styles.subtitle}>
-            Help us personalize your cosmic experience
-          </Text>
-        </View>
-
-        <Animated.View
-          style={[
-            styles.inputContainer,
-            {
-              opacity: inputAnim,
-              transform: [
-                {
-                  translateY: inputAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <Ionicons name="person-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={formData.name}
-              onChangeText={(value) => updateFormData('name', value)}
-              autoFocus
-              autoCapitalize="words"
-            />
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-            )}
-          </View>
-        </Animated.View>
-
+    <AuthKeyboardScreen
+      emoji="👋"
+      title="What's your name?"
+      subtitle="Help us personalize your cosmic experience"
+      onBack={() => navigateToScreen('email', 'back')}
+      action={(
         <Animated.View
           style={[
             styles.buttonContainer,
@@ -139,57 +84,47 @@ export default function NameInputScreen({
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
+      )}
+    >
+      <Animated.View
+        style={[
+          styles.inputContainer,
+          {
+            opacity: inputAnim,
+            transform: [
+              {
+                translateY: inputAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
+          <Ionicons name="person-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+          <TextInput
+            style={styles.input}
+            placeholder="Full Name"
+            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            value={formData.name}
+            onChangeText={(value) => updateFormData('name', value)}
+            autoFocus
+            autoCapitalize="words"
+          />
+          {isValid && (
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+          )}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </AuthKeyboardScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 160,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  emoji: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   inputContainer: {
-    marginBottom: 40,
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -214,7 +149,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   buttonContainer: {
-    marginBottom: 40,
+    marginBottom: 0,
   },
   continueButton: {
     borderRadius: 16,

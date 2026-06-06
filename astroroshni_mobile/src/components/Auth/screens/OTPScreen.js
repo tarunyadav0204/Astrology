@@ -7,15 +7,13 @@ import {
   StyleSheet,
   Animated,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 export default function OTPScreen({ 
   formData, 
@@ -174,89 +172,18 @@ export default function OTPScreen({
   }, [formData.devOtpCode]);
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigateToScreen('phone', 'back')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>{otpSentToEmail ? '📧' : '📱'}</Text>
-          <Text style={styles.title}>Enter OTP</Text>
-          <Text style={styles.subtitle}>
-            We've sent a 6-digit code to{"\n"}
-            {otpDestination}
-          </Text>
-          {devOtpCode && (
+    <AuthKeyboardScreen
+      emoji={otpSentToEmail ? '📧' : '📱'}
+      title="Enter OTP"
+      subtitle={`We've sent a 6-digit code to ${otpDestination}`}
+      onBack={() => navigateToScreen('phone', 'back')}
+      headerExtra={devOtpCode ? (
             <View style={styles.devCodeContainer}>
               <Text style={styles.devCodeLabel}>Development OTP:</Text>
               <Text style={styles.devCodeText}>{devOtpCode}</Text>
             </View>
-          )}
-        </View>
-
-        <Animated.View
-          style={[
-            styles.inputContainer,
-            {
-              opacity: inputAnim,
-              transform: [
-                {
-                  translateY: inputAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter 6-digit OTP"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={formData.otpCode}
-              onChangeText={handleOtpChange}
-              keyboardType="number-pad"
-              inputMode="numeric"
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
-              autoFocus
-              maxLength={6}
-            />
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-            )}
-          </View>
-        </Animated.View>
-
-        <View style={styles.resendContainer}>
-          <TouchableOpacity 
-            onPress={handleResendOTP}
-            disabled={resendTimer > 0}
-            style={styles.resendButton}
-          >
-            <Text style={[styles.resendText, resendTimer > 0 && styles.resendDisabled]}>
-              {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-
-        
+      ) : null}
+      action={(
         <Animated.View
           style={[
             styles.buttonContainer,
@@ -281,55 +208,60 @@ export default function OTPScreen({
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
+      )}
+    >
+        <Animated.View
+          style={[
+            styles.inputContainer,
+            {
+              opacity: inputAnim,
+              transform: [
+                {
+                  translateY: inputAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
+            <TextInput
+              style={styles.input}
+              placeholder="6-digit code"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              value={formData.otpCode}
+              onChangeText={handleOtpChange}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              autoFocus
+              maxLength={6}
+            />
+            {isValid && (
+              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            )}
+          </View>
+        </Animated.View>
+
+        <View style={styles.resendContainer}>
+          <TouchableOpacity
+            onPress={handleResendOTP}
+            disabled={resendTimer > 0}
+            style={styles.resendButton}
+          >
+            <Text style={[styles.resendText, resendTimer > 0 && styles.resendDisabled]}>
+              {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </AuthKeyboardScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 160,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  emoji: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   inputContainer: {
     marginBottom: 20,
   },
@@ -354,7 +286,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: 8,
+    letterSpacing: 3,
   },
   resendContainer: {
     alignItems: 'center',
@@ -373,8 +305,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   buttonContainer: {
-    marginTop: 40,
-    marginBottom: 40,
+    marginTop: 0,
+    marginBottom: 0,
   },
   verifyButton: {
     borderRadius: 16,

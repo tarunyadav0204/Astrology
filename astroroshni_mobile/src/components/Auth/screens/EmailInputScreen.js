@@ -6,14 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
+import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 function validateEmail(value) {
   const email = String(value || '').trim().toLowerCase();
@@ -116,32 +114,36 @@ export default function EmailInputScreen({
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigateToScreen(backTarget, 'back')}
+    <AuthKeyboardScreen
+      emoji="📧"
+      title="What's your email?"
+      subtitle="We'll use this to keep your account secure"
+      onBack={() => navigateToScreen(backTarget, 'back')}
+      action={(
+        <Animated.View
+          style={[
+            styles.buttonContainer,
+            {
+              transform: [{ translateY: buttonAnim }],
+            },
+          ]}
         >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>📧</Text>
-          <Text style={styles.title}>What's your email?</Text>
-          <Text style={styles.subtitle}>
-            We'll use this to keep your account secure
-          </Text>
-        </View>
-
+          <TouchableOpacity
+            style={[styles.continueButton, !isValid && styles.buttonDisabled]}
+            onPress={handleContinue}
+            disabled={!isValid}
+          >
+            <LinearGradient
+              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+              style={styles.buttonGradient}
+            >
+              <Text style={styles.buttonText}>Continue</Text>
+              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    >
         <Animated.View
           style={[
             styles.inputContainer,
@@ -184,81 +186,13 @@ export default function EmailInputScreen({
             <Text style={styles.validationText}>{emailValidation.message}</Text>
           )}
         </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.buttonContainer,
-            {
-              transform: [{ translateY: buttonAnim }],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.continueButton, !isValid && styles.buttonDisabled]}
-            onPress={handleContinue}
-            disabled={!isValid}
-          >
-            <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.buttonText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-        </View>
-        <View style={styles.extraPadding} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </AuthKeyboardScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 160,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  emoji: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   inputContainer: {
-    marginBottom: 40,
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -289,7 +223,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   buttonContainer: {
-    marginBottom: 40,
+    marginBottom: 0,
   },
   continueButton: {
     borderRadius: 16,
@@ -314,8 +248,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
-  },
-  extraPadding: {
-    height: 120,
   },
 });
