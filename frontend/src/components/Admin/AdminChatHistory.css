@@ -1157,7 +1157,60 @@
   font-variant-numeric: tabular-nums;
 }
 
+.admin-chat-history .message-usage-details {
+  flex: 1 1 100%;
+  order: 10;
+  margin-top: 2px;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  background: #f8f9fa;
+  overflow: hidden;
+}
+
+.admin-chat-history .message-usage-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  padding: 6px 10px;
+  color: #495057;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-chat-history .message-usage-summary::marker,
+.admin-chat-history .message-usage-summary::-webkit-details-marker {
+  color: #f97316;
+}
+
+.admin-chat-history .message-usage-summary-cost {
+  color: #065f46;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-chat-history .message-usage-details[open] .message-usage-summary {
+  border-bottom: 1px solid #e9ecef;
+  background: #ffffff;
+}
+
+.admin-chat-history .message-usage-content {
+  padding: 8px 10px 10px;
+}
+
+.admin-chat-history .message-usage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+
 .admin-chat-history .message-time {
+  order: 20;
   font-size: 0.72rem;
   color: #868e96;
   font-variant-numeric: tabular-nums;
@@ -1168,7 +1221,7 @@
   flex-wrap: wrap;
   gap: 6px 8px;
   margin-top: 8px;
-  padding: 0 4px 2px;
+  padding: 0;
   align-items: flex-start;
 }
 
