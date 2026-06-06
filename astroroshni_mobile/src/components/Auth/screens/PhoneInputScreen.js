@@ -19,6 +19,7 @@ import {
   COUNTRY_CODES,
   getNationalPhoneMaxLength,
   isNationalPhoneValid,
+  registrationEmailRequiredForCountry,
 } from '../countryCodes';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
@@ -29,6 +30,7 @@ export default function PhoneInputScreen({
   navigateToScreen, 
   isLogin,
   setIsLogin,
+  navigation,
 }) {
   const [loading, setLoading] = useState(false);
   const [isValid, setIsValid] = useState(false);
@@ -37,6 +39,8 @@ export default function PhoneInputScreen({
   const [selectedCountry, setSelectedCountry] = useState(
     COUNTRY_CODES.find(c => c.code === formData.countryCode) || COUNTRY_CODES[2]
   );
+  const modeKnown = isLogin === true || isLogin === false;
+  const registrationUsesEmailOtp = isLogin === false && registrationEmailRequiredForCountry(selectedCountry.code);
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -45,7 +49,7 @@ export default function PhoneInputScreen({
   useEffect(() => {
     trackAcquisitionFunnelEvent(
       'auth_phone_screen_viewed',
-      { mode: isLogin ? 'login' : 'register', country_code: selectedCountry.code },
+      { mode: isLogin === true ? 'login' : (isLogin === false ? 'register' : 'auto'), country_code: selectedCountry.code },
       { screenName: 'PhoneInputScreen' },
     ).catch(() => {});
     Animated.parallel([
@@ -88,7 +92,7 @@ export default function PhoneInputScreen({
     console.log('  Full phone:', fullPhone);
     console.log('  Is login:', isLogin);
     
-    if (isLogin) {
+    if (isLogin === true) {
       updateFormData('countryCode', selectedCountry.code);
       updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
       trackAcquisitionFunnelEvent(
@@ -105,11 +109,49 @@ export default function PhoneInputScreen({
     try {
       updateFormData('countryCode', selectedCountry.code);
       updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
+
+      if (!modeKnown) {
+        trackAcquisitionFunnelEvent(
+          'auth_phone_resolve_submitted',
+          { country_code: selectedCountry.code },
+          { status: 'started', screenName: 'PhoneInputScreen' },
+        ).catch(() => {});
+        const resolved = await authAPI.resolvePhone(fullPhone);
+        const exists = Boolean(resolved?.data?.exists);
+        trackAcquisitionFunnelEvent(
+          exists ? 'phone_resolved_existing_user' : 'phone_resolved_new_user',
+          { country_code: selectedCountry.code, next: resolved?.data?.next || '' },
+          { status: 'success', screenName: 'PhoneInputScreen' },
+        ).catch(() => {});
+        if (exists) {
+          setIsLogin?.(true);
+          trackAcquisitionFunnelEvent(
+            'auth_phone_submitted',
+            { mode: 'login', country_code: selectedCountry.code, auto_resolved: true },
+            { status: 'accepted', screenName: 'PhoneInputScreen' },
+          ).catch(() => {});
+          navigateToScreen('password');
+          return;
+        }
+        setIsLogin?.(false);
+      }
+
       trackAcquisitionFunnelEvent(
         'auth_phone_submitted',
         { mode: 'register', country_code: selectedCountry.code },
         { status: 'accepted', screenName: 'PhoneInputScreen' },
       ).catch(() => {});
+
+      if (registrationEmailRequiredForCountry(selectedCountry.code)) {
+        trackAcquisitionFunnelEvent(
+          'registration_email_required',
+          { country_code: selectedCountry.code },
+          { status: 'routed', screenName: 'PhoneInputScreen' },
+        ).catch(() => {});
+        navigateToScreen('email');
+        return;
+      }
+
       trackAcquisitionFunnelEvent(
         'registration_otp_requested',
         { source: 'phone_screen' },
@@ -133,7 +175,7 @@ export default function PhoneInputScreen({
     } catch (error) {
       const message = apiErrorMessage(error, 'Unable to verify this phone number. Please try again.');
       trackAcquisitionFunnelEvent(
-        'registration_otp_requested',
+        modeKnown ? 'registration_otp_requested' : 'auth_phone_resolve_failed',
         {
           source: 'phone_screen',
           status_code: error?.response?.status || '',
@@ -142,7 +184,13 @@ export default function PhoneInputScreen({
         { status: 'failed', screenName: 'PhoneInputScreen' },
       ).catch(() => {});
       if (error?.response?.status === 409 || /already registered/i.test(message)) {
-        setPhoneError('This number is already registered.');
+        setIsLogin?.(true);
+        trackAcquisitionFunnelEvent(
+          'registration_existing_user_redirected',
+          { status_code: error?.response?.status || '', source: 'phone_screen' },
+          { status: 'redirected', screenName: 'PhoneInputScreen' },
+        ).catch(() => {});
+        navigateToScreen('password');
       } else {
         Alert.alert('Could not continue', message);
       }
@@ -159,7 +207,7 @@ export default function PhoneInputScreen({
     updateFormData('phone', nextPhone);
 
     const complete = isNationalPhoneValid(selectedCountry.code, nextPhone);
-    const autoKey = `${selectedCountry.code}${nextPhone}:${isLogin ? 'login' : 'register'}`;
+    const autoKey = `${selectedCountry.code}${nextPhone}:${isLogin === true ? 'login' : (isLogin === false ? 'register' : 'auto')}`;
     if (complete && !loading && lastAutoSubmitPhoneRef.current !== autoKey) {
       lastAutoSubmitPhoneRef.current = autoKey;
       setTimeout(() => {
@@ -172,20 +220,35 @@ export default function PhoneInputScreen({
     <>
       <AuthKeyboardScreen
         emoji="📱"
-        title={isLogin ? 'Welcome back!' : "What's your number?"}
-        subtitle={isLogin ? 'Enter your phone number to sign in' : "We'll send a verification code to this phone"}
-        onBack={() => navigateToScreen('welcome', 'back')}
-        footer={(
+        title={isLogin === true ? 'Welcome back!' : "What's your number?"}
+        subtitle={
+          isLogin === true
+            ? 'Enter your phone number to sign in'
+            : registrationUsesEmailOtp
+              ? "We'll use this number for your account, then verify your email"
+              : modeKnown
+                ? "We'll send a verification code to this phone"
+                : "Enter your phone number to continue"
+        }
+        onBack={() => {
+          if (typeof navigation?.canGoBack === 'function' && navigation.canGoBack()) {
+            navigation.goBack();
+          }
+        }}
+        footer={modeKnown ? (
           <Text style={styles.footerText}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            {isLogin === true ? "Don't have an account? " : "Already have an account? "}
             <Text
               style={styles.footerLink}
-              onPress={() => navigateToScreen('welcome', 'back')}
+              onPress={() => {
+                setIsLogin?.(null);
+                setPhoneError('');
+              }}
             >
-              {isLogin ? 'Create one' : 'Sign in'}
+              Continue with another number
             </Text>
           </Text>
-        )}
+        ) : null}
         action={(
           <Animated.View
             style={[
@@ -253,7 +316,7 @@ export default function PhoneInputScreen({
                 <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
               )}
             </View>
-            {!!phoneError && !isLogin && (
+            {!!phoneError && isLogin === false && (
               <View style={styles.inlineErrorRow}>
                 <Ionicons name="alert-circle" size={16} color="#ff6b6b" />
                 <Text style={styles.inlineErrorText}>

@@ -10,7 +10,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
+import { authAPI } from '../../../services/api';
+import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
+import { registrationEmailRequiredForCountry } from '../countryCodes';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 function validateEmail(value) {
@@ -57,10 +60,13 @@ export default function EmailInputScreen({
   navigateToScreen,
   isLogin,
 }) {
+  const [loading, setLoading] = React.useState(false);
+  const [sendError, setSendError] = React.useState('');
   const emailValidation = validateEmail(formData.email);
   const isValid = emailValidation.valid;
   const hasName = String(formData.name || '').trim().length >= 2;
-  const backTarget = isLogin ? 'password' : (hasName ? 'name' : 'otp');
+  const emailRequiredForRegistration = registrationEmailRequiredForCountry(formData.countryCode || '+91');
+  const backTarget = isLogin ? 'password' : (hasName ? 'name' : (formData.otpToken ? 'otp' : 'phone'));
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -102,22 +108,74 @@ export default function EmailInputScreen({
     }
 
     const email = String(formData.email || '').trim();
-    updateFormData('email', email);
     const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
+    setSendError('');
+    updateFormData('email', email);
     updateAcquisitionLeadContact({ phone: fullPhone, email }).catch(() => {});
-    trackAcquisitionFunnelEvent(
-      'auth_email_submitted',
-      { mode: 'register', sends_otp: false },
-      { status: 'accepted', screenName: 'EmailInputScreen' },
-    ).catch(() => {});
-    navigateToScreen(hasName ? 'password' : 'name');
+
+    if (!emailRequiredForRegistration) {
+      trackAcquisitionFunnelEvent(
+        'auth_email_submitted',
+        { mode: 'register', sends_otp: false },
+        { status: 'accepted', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
+      navigateToScreen(hasName ? 'password' : 'name');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      trackAcquisitionFunnelEvent(
+        'auth_email_submitted',
+        { mode: 'register', sends_otp: true },
+        { status: 'accepted', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        { source: 'email_screen', channel: 'email' },
+        { status: 'started', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
+      const response = await authAPI.sendRegistrationOtp({ phone: fullPhone, email });
+      updateFormData('otpDelivery', response?.data?.delivery || null);
+      if (response?.data?.dev_code) {
+        updateFormData('devOtpCode', response.data.dev_code);
+      }
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        {
+          source: 'email_screen',
+          channel: response?.data?.delivery?.registration_otp_channel || 'email',
+        },
+        { status: 'success', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
+      navigateToScreen('otp');
+    } catch (error) {
+      const message = apiErrorMessage(error, 'Could not send email OTP. Please check your email and try again.');
+      setSendError(message);
+      trackAcquisitionFunnelEvent(
+        'registration_otp_requested',
+        {
+          source: 'email_screen',
+          channel: 'email',
+          status_code: error?.response?.status || '',
+          reason: message.replace(/\s+/g, ' ').slice(0, 160),
+        },
+        { status: 'failed', screenName: 'EmailInputScreen' },
+      ).catch(() => {});
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <AuthKeyboardScreen
       emoji="📧"
       title="What's your email?"
-      subtitle="We'll use this to keep your account secure"
+      subtitle={
+        emailRequiredForRegistration
+          ? "We'll send your verification code to this email"
+          : "We'll use this to keep your account secure"
+      }
       onBack={() => navigateToScreen(backTarget, 'back')}
       action={(
         <Animated.View
@@ -131,13 +189,13 @@ export default function EmailInputScreen({
           <TouchableOpacity
             style={[styles.continueButton, !isValid && styles.buttonDisabled]}
             onPress={handleContinue}
-            disabled={!isValid}
+            disabled={!isValid || loading}
           >
             <LinearGradient
               colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
               style={styles.buttonGradient}
             >
-              <Text style={styles.buttonText}>Continue</Text>
+              <Text style={styles.buttonText}>{loading ? 'Sending OTP...' : 'Continue'}</Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
             </LinearGradient>
           </TouchableOpacity>
@@ -167,7 +225,10 @@ export default function EmailInputScreen({
               placeholder="Email Address"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={formData.email}
-              onChangeText={(value) => updateFormData('email', value)}
+              onChangeText={(value) => {
+                if (sendError) setSendError('');
+                updateFormData('email', value);
+              }}
               keyboardType="email-address"
               inputMode="email"
               autoCapitalize="none"
@@ -184,6 +245,12 @@ export default function EmailInputScreen({
           </View>
           {!!formData.email && !isValid && !!emailValidation.message && (
             <Text style={styles.validationText}>{emailValidation.message}</Text>
+          )}
+          {!!sendError && (
+            <View style={styles.inlineError}>
+              <Ionicons name="alert-circle-outline" size={15} color="#ffb4a2" />
+              <Text style={styles.inlineErrorText}>{sendError}</Text>
+            </View>
           )}
         </Animated.View>
     </AuthKeyboardScreen>
@@ -214,6 +281,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
     paddingHorizontal: 4,
+  },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 180, 162, 0.35)',
+  },
+  inlineErrorText: {
+    flex: 1,
+    color: '#ffcfbf',
+    fontSize: 12,
+    fontWeight: '700',
   },
   input: {
     flex: 1,

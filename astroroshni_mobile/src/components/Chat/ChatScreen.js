@@ -840,6 +840,28 @@ export default function ChatScreen({ navigation, route }) {
     return `Free question unlocked an offer: get ${bonusText}${timeText}.`;
   }, []);
 
+  const refreshFirstPurchaseBonusOffer = useCallback((sourceMessageId = null) => {
+    if (!firstPurchaseBonusOffer) return;
+    creditAPI.getFirstPurchaseBonusStatus()
+      .then(({ data }) => {
+        console.log('[FirstPurchaseBonus] refresh status', {
+          messageId: sourceMessageId,
+          enabled: data?.enabled,
+          eligible: data?.eligible,
+          reason: data?.reason,
+          bonusCredits: data?.bonus_credits,
+          windowMinutes: data?.window_minutes,
+        });
+        if (!data?.eligible) {
+          setFirstPurchaseBonusOffer(null);
+        }
+      })
+      .catch((e) => {
+        console.log('[FirstPurchaseBonus] refresh status failed', e?.message || e);
+        setFirstPurchaseBonusOffer(null);
+      });
+  }, [firstPurchaseBonusOffer]);
+
   useEffect(() => {
     setRenderedMessageCount(CHAT_RENDER_WINDOW_DEFAULT);
   }, [currentPersonId, sessionId, showGreeting]);
@@ -3309,23 +3331,7 @@ export default function ChatScreen({ navigation, route }) {
                 ]);
               }
             } else if (!gatedNoCharge && firstPurchaseBonusOffer) {
-              try {
-                const { data } = await creditAPI.getFirstPurchaseBonusStatus();
-                console.log('[FirstPurchaseBonus] post-answer status', {
-                  messageId,
-                  enabled: data?.enabled,
-                  eligible: data?.eligible,
-                  reason: data?.reason,
-                  bonusCredits: data?.bonus_credits,
-                  windowMinutes: data?.window_minutes,
-                });
-                if (!data?.eligible) {
-                  setFirstPurchaseBonusOffer(null);
-                }
-              } catch (e) {
-                console.log('[FirstPurchaseBonus] post-answer status failed', e?.message || e);
-                setFirstPurchaseBonusOffer(null);
-              }
+              refreshFirstPurchaseBonusOffer(messageId);
             }
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();

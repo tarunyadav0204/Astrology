@@ -25,6 +25,7 @@ export default function PasswordScreen({
   updateFormData, 
   navigateToScreen, 
   isLogin,
+  setIsLogin,
   navigation 
 }) {
   const { refreshCredits } = useCredits();
@@ -267,14 +268,16 @@ export default function PasswordScreen({
               (d) =>
                 typeof d?.msg === 'string' && d.msg.toLowerCase().includes('already registered'),
             );
-          if (error.response?.status === 400 && (already || alreadyFrom422)) {
+          if ((error.response?.status === 400 || error.response?.status === 409) && (already || alreadyFrom422)) {
             trackAcquisitionFunnelEvent(
               'registration_existing_user_redirected',
               { status_code: error.response?.status || '' },
               { status: 'redirected', screenName: 'PasswordScreen' },
             ).catch(() => {});
-            // User already exists, navigate to welcome screen
-            navigateToScreen('welcomeAfterRegistration');
+            setIsLogin?.(true);
+            setPasswordError('This number is already registered. Enter your password to sign in.');
+            updateFormData('password', '');
+            passwordInputRef.current?.focus();
           } else {
             trackAcquisitionFunnelEvent(
               'registration_failed',

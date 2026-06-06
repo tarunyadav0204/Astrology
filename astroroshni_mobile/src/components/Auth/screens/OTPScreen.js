@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import { registrationEmailRequiredForCountry } from '../countryCodes';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 export default function OTPScreen({ 
@@ -27,6 +28,7 @@ export default function OTPScreen({
   const [devOtpCode, setDevOtpCode] = useState(null);
   const otpChannel = formData?.otpDelivery?.registration_otp_channel || '';
   const otpSentToEmail = otpChannel === 'email';
+  const emailRequiredForRegistration = registrationEmailRequiredForCountry(formData.countryCode || '+91');
   const otpDestination = otpSentToEmail && formData.email
     ? formData.email
     : `${formData.countryCode} ${formData.phone}`;
@@ -95,8 +97,8 @@ export default function OTPScreen({
         { status: 'success', screenName: 'OTPScreen' },
       ).catch(() => {});
       
-      // Continue to email collection after the phone OTP has been verified.
-      navigateToScreen('email');
+      // India verifies by SMS and skips email. International users collected email before this screen.
+      navigateToScreen('name');
     } catch (error) {
       trackAcquisitionFunnelEvent(
         'registration_otp_verify_failed',
@@ -176,7 +178,7 @@ export default function OTPScreen({
       emoji={otpSentToEmail ? '📧' : '📱'}
       title="Enter OTP"
       subtitle={`We've sent a 6-digit code to ${otpDestination}`}
-      onBack={() => navigateToScreen('phone', 'back')}
+      onBack={() => navigateToScreen(emailRequiredForRegistration ? 'email' : 'phone', 'back')}
       headerExtra={devOtpCode ? (
             <View style={styles.devCodeContainer}>
               <Text style={styles.devCodeLabel}>Development OTP:</Text>

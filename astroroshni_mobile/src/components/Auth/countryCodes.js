@@ -35,9 +35,14 @@ export function isNationalPhoneValid(countryCode, nationalDigits) {
   return d.length >= min && d.length <= max;
 }
 
-/** Registration / reset: email is optional (backend may prefer email for non-India delivery). */
-export function otpEmailRequiredForCountry(_countryCode) {
-  return false;
+/** Registration: India uses SMS OTP and skips email; non-India uses email OTP. */
+export function registrationEmailRequiredForCountry(countryCode) {
+  return countryCode !== '+91';
+}
+
+/** Registration / reset: email is required for OTP when the selected country cannot use India SMS-first flow. */
+export function otpEmailRequiredForCountry(countryCode) {
+  return registrationEmailRequiredForCountry(countryCode);
 }
 
 /**
@@ -60,7 +65,7 @@ export function isIndiaPhoneForOtp(phone) {
   return false;
 }
 
-/** Registration: email optional (aligns with backend). */
-export function otpEmailRequiredForPhone(_phone) {
-  return false;
+/** Registration: email required unless the number is India SMS-first. */
+export function otpEmailRequiredForPhone(phone) {
+  return !isIndiaPhoneForOtp(phone);
 }

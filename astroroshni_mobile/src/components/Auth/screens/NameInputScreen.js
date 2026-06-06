@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import { registrationEmailRequiredForCountry } from '../countryCodes';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
 
 export default function NameInputScreen({ 
@@ -19,6 +20,7 @@ export default function NameInputScreen({
   navigateToScreen 
 }) {
   const isValid = formData.name.trim().length >= 2;
+  const emailRequiredForRegistration = registrationEmailRequiredForCountry(formData.countryCode || '+91');
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -51,7 +53,7 @@ export default function NameInputScreen({
         navigateToScreen('password');
         return;
       }
-      navigateToScreen('email');
+      navigateToScreen(emailRequiredForRegistration ? 'email' : 'password');
     }
   };
 
@@ -60,7 +62,7 @@ export default function NameInputScreen({
       emoji="👋"
       title="What's your name?"
       subtitle="Help us personalize your cosmic experience"
-      onBack={() => navigateToScreen('email', 'back')}
+      onBack={() => navigateToScreen('otp', 'back')}
       action={(
         <Animated.View
           style={[

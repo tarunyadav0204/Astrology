@@ -998,9 +998,32 @@ class SendResetCode(BaseModel):
     phone: str
     email: Optional[str] = None
 
+class ResolvePhoneRequest(BaseModel):
+    phone: str
+
 class VerifyResetCode(BaseModel):
     phone: str
     code: str
+
+@app.post("/api/auth/resolve-phone")
+async def resolve_auth_phone(request: ResolvePhoneRequest):
+    """
+    Phone-first auth router.
+    Returns whether the phone already belongs to an account so the client can choose
+    login vs registration without asking the user to pick a mode first.
+    """
+    phone = (request.phone or "").strip()
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number is required")
+    with get_conn() as conn:
+        existing_user = _find_user_row_by_phone_variants(conn, phone)
+    exists = bool(existing_user)
+    is_india = _is_india_number(phone)
+    return {
+        "exists": exists,
+        "next": "password" if exists else ("register_sms_otp" if is_india else "register_email_otp"),
+        "is_india": is_india,
+    }
 
 class ResetPasswordWithToken(BaseModel):
     token: str
@@ -1345,8 +1368,7 @@ async def register(user_data: UserCreate):
         if not otp_row:
             raise HTTPException(status_code=400, detail="Invalid or expired OTP verification")
 
-        cur = execute(conn, "SELECT phone FROM users WHERE phone = %s", (user_data.phone,))
-        if cur.fetchone():
+        if _find_user_row_by_phone_variants(conn, user_data.phone):
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
         email_clean = (user_data.email or "").strip()
@@ -1469,8 +1491,7 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             if not cur.fetchone():
                 raise HTTPException(status_code=400, detail="Invalid or expired OTP verification")
 
-        cur = execute(conn, "SELECT phone FROM users WHERE phone = %s", (user_data.phone,))
-        if cur.fetchone():
+        if _find_user_row_by_phone_variants(conn, user_data.phone):
             raise HTTPException(status_code=400, detail="Phone number already registered")
 
         email_clean = (user_data.email or "").strip()
@@ -1629,9 +1650,52 @@ def _delete_user_optional_savepoint(conn, savepoint: str, steps: list) -> None:
         cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
 
 
+def _anonymize_user_account_tx(conn, userid: int) -> None:
+    """
+    Scrub login/PII fields while preserving the user row for audit FKs.
+    The original phone is removed from users.phone so the same person can
+    register again with that number.
+    """
+    cur = execute(conn, "SELECT phone FROM users WHERE userid = %s", (userid,))
+    row = cur.fetchone()
+    if not row:
+        return
+    old_phone = (row[0] or "").strip()
+    if old_phone:
+        _delete_user_optional_savepoint(
+            conn,
+            "sp_del_pw_reset",
+            [("DELETE FROM password_reset_codes WHERE phone = %s", (old_phone,))],
+        )
+    rnd = secrets.token_hex(10)
+    new_phone = f"deleted_{userid}_{rnd}"
+    if len(new_phone) > 48:
+        new_phone = new_phone[:48]
+    dead_pw = hash_password(secrets.token_urlsafe(32))
+    execute(
+        conn,
+        """
+        UPDATE users
+        SET phone = %s,
+            name = 'Deleted',
+            email = NULL,
+            password = %s,
+            gender = NULL,
+            signup_client = NULL,
+            role = 'deleted'
+        WHERE userid = %s
+        """,
+        (new_phone, dead_pw, userid),
+    )
+
+
 def _hard_delete_user_tx(conn, userid: int) -> None:
     """
-    Delete all rows tied to userid in an order that respects foreign keys.
+    Delete/scrub personal data tied to userid in an order that respects foreign keys.
+    Payment/credit audit rows are intentionally retained:
+    - users row is anonymized, not deleted, so credit_transactions FK remains valid.
+    - users.phone is replaced with deleted_<userid>_<random>, so the original phone can register again.
+    - user_credits and credit_transactions are preserved for support/refund/audit.
     Must run inside a single transaction (caller commits).
     """
     session_subquery = "SELECT session_id FROM chat_sessions WHERE user_id = %s"
@@ -1700,8 +1764,6 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
     )
     execute(conn, "DELETE FROM chat_sessions WHERE user_id = %s", (userid,))
 
-    execute(conn, "DELETE FROM credit_transactions WHERE userid = %s", (userid,))
-    execute(conn, "DELETE FROM user_credits WHERE userid = %s", (userid,))
     _delete_user_optional_savepoint(
         conn,
         "sp_del_free_birth_hash_usage",
@@ -1726,46 +1788,15 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
 
     execute(conn, "DELETE FROM user_subscriptions WHERE userid = %s", (userid,))
     execute(conn, "DELETE FROM birth_charts WHERE userid = %s", (userid,))
-    execute(conn, "DELETE FROM users WHERE userid = %s", (userid,))
+    _anonymize_user_account_tx(conn, userid)
 
 
 def _anonymize_user_account(userid: int) -> None:
     """
-    If hard-delete cannot complete (e.g. unexpected FK), revoke login and scrub PII
-    so the account is effectively gone from the user's perspective.
+    Revoke login and scrub PII while preserving the user row for audit FKs.
     """
     with get_conn() as conn:
-        cur = execute(conn, "SELECT phone FROM users WHERE userid = %s", (userid,))
-        row = cur.fetchone()
-        if not row:
-            return
-        old_phone = (row[0] or "").strip()
-        if old_phone:
-            _delete_user_optional_savepoint(
-                conn,
-                "sp_del_pw_reset",
-                [("DELETE FROM password_reset_codes WHERE phone = %s", (old_phone,))],
-            )
-        rnd = secrets.token_hex(10)
-        new_phone = f"deleted_{userid}_{rnd}"
-        if len(new_phone) > 48:
-            new_phone = new_phone[:48]
-        dead_pw = hash_password(secrets.token_urlsafe(32))
-        execute(
-            conn,
-            """
-            UPDATE users
-            SET phone = %s,
-                name = 'Deleted',
-                email = NULL,
-                password = %s,
-                gender = NULL,
-                signup_client = NULL,
-                role = 'deleted'
-            WHERE userid = %s
-            """,
-            (new_phone, dead_pw, userid),
-        )
+        _anonymize_user_account_tx(conn, userid)
         _delete_user_optional_savepoint(
             conn,
             "sp_anon_tokens",
@@ -1776,7 +1807,8 @@ def _anonymize_user_account(userid: int) -> None:
 
 def delete_user_data(userid: int) -> None:
     """
-    Permanently delete all data linked to a given user id.
+    Delete/scrub personal data linked to a user id, then anonymize the user row.
+    Credit/payment audit rows are retained, so refunds and support remain possible.
     On any failure, fall back to anonymizing the user so they cannot sign in again.
     """
     with get_conn() as conn:
@@ -1795,7 +1827,7 @@ def delete_user_data(userid: int) -> None:
 @app.delete("/api/admin/users/{userid}")
 async def admin_delete_user(userid: int, current_user: User = Depends(get_current_user)):
     """
-    Hard-delete a user and all associated data from the system.
+    Delete/scrub a user and anonymize the account while retaining payment audit rows.
 
     NOTE: This endpoint is protected so that only admins can call it.
     """
@@ -1811,17 +1843,18 @@ async def admin_delete_user(userid: int, current_user: User = Depends(get_curren
         raise HTTPException(status_code=404, detail="User not found")
 
     delete_user_data(userid)
-    return {"status": "deleted", "userid": userid}
+    return {"status": "anonymized", "userid": userid}
 
 
 @app.delete("/api/user/account")
 async def delete_own_account(current_user: User = Depends(get_current_user)):
     """
-    Allow a logged-in user to delete their own account and all associated data.
+    Allow a logged-in user to delete/scrub their own account data.
+    Payment audit rows are retained against an anonymized account.
     Intended to be called from the mobile app's 'Delete account' flow.
     """
     delete_user_data(current_user.userid)
-    return {"status": "deleted"}
+    return {"status": "anonymized"}
 
 @app.post("/api/login")
 async def login(user_data: UserLogin):
@@ -5057,11 +5090,9 @@ async def get_admin_charts(
 async def delete_admin_user(user_id: int, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    with get_conn() as conn:
-        execute(conn, 'DELETE FROM users WHERE userid=%s', (user_id,))
-        conn.commit()
-    return {"message": "User deleted successfully"}
+
+    delete_user_data(user_id)
+    return {"message": "User anonymized successfully"}
 
 @app.delete("/api/admin/charts/{chart_id}")
 async def delete_admin_chart(chart_id: int, current_user: User = Depends(get_current_user)):

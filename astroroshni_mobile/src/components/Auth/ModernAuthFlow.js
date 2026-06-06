@@ -32,7 +32,7 @@ function resolveAuthHardwareBackTarget(currentScreen, isLogin, formData) {
     case 'welcome':
       return '__root_go_back__';
     case 'phone':
-      return 'welcome';
+      return '__root_go_back__';
     case 'password':
       return isLogin ? 'phone' : 'name';
     case 'forgotPassword':
@@ -41,12 +41,15 @@ function resolveAuthHardwareBackTarget(currentScreen, isLogin, formData) {
       if (isLogin) {
         return 'password';
       }
-      return 'otp';
+      if (formData?.name && String(formData.name).trim().length >= 2) {
+        return 'name';
+      }
+      return formData?.otpToken ? 'otp' : 'phone';
     }
     case 'otp':
       return 'phone';
     case 'name':
-      return 'email';
+      return 'otp';
     case 'chooseLanguage':
       return 'password';
     case 'welcomeAfterRegistration':
@@ -81,8 +84,8 @@ const INITIAL_FORM_DATA = {
 };
 
 export default function ModernAuthFlow({ navigation, route }) {
-  const [currentScreen, setCurrentScreen] = useState('welcome');
-  const [isLogin, setIsLogin] = useState(true);
+  const [currentScreen, setCurrentScreen] = useState('phone');
+  const [isLogin, setIsLogin] = useState(null);
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const restoredRef = useRef(false);
 

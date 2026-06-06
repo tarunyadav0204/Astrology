@@ -238,6 +238,7 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
+  resolvePhone: (phone) => api.post(getEndpoint('/auth/resolve-phone'), { phone }, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
   login: (credentials) => api.post(getEndpoint('/login'), credentials, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
   register: (userData) => api.post(getEndpoint('/register'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
   registerWithBirth: (userData) => api.post(getEndpoint('/register-with-birth'), userData, { timeout: AUTH_API_TIMEOUT_MS, ...AUTH_LOCAL_ERROR_CONFIG }),
