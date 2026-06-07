@@ -181,6 +181,12 @@ export const SEO_CONFIG = {
       keywords: "privacy policy, data protection, astrology app privacy"
     },
 
+    terms: {
+      title: "Terms and Conditions | AstroRoshni",
+      description: "Terms of use for AstroRoshni — AI astrology platform, wallet, refunds, conduct, liability, and DPDP-aligned data consent.",
+      keywords: "terms and conditions, terms of service, astroroshni legal, user agreement"
+    },
+
     calendar2026: {
       title: "Hindu Calendar 2026 — Festivals, Panchang & Muhurat | AstroRoshni",
       description: "Complete 2026 Hindu calendar with festivals, ekadashi, amavasya, and auspicious muhurat dates.",

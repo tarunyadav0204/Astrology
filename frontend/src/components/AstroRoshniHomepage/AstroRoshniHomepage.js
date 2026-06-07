@@ -2495,6 +2495,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <a href="#about" onClick={(e) => { e.preventDefault(); navigate('/about'); }}>About Us</a>
                 <a href="#contact" onClick={(e) => { e.preventDefault(); navigate('/contact'); }}>Contact Us</a>
                 <a href="#privacy" onClick={(e) => { e.preventDefault(); navigate('/policy'); }}>Privacy Policy</a>
+                <a href="#terms" onClick={(e) => { e.preventDefault(); navigate('/terms'); }}>Terms &amp; Conditions</a>
               </div>
             </div>
             <div className="footer-bottom">

@@ -56,6 +56,7 @@ async def generate_sitemap():
         ('/about', 'monthly', '0.5'),
         ('/contact', 'monthly', '0.5'),
         ('/policy', 'yearly', '0.3'),
+        ('/terms', 'yearly', '0.3'),
         ('/calendar-2026', 'monthly', '0.7'),
         ('/tools/ashtakavarga', 'monthly', '0.7'),
         ('/astrovastu', 'monthly', '0.6'),

@@ -42,6 +42,7 @@ import SubscriptionPage from './components/Subscription/SubscriptionPage';
 import OrderManagementPage from './components/OrderManagement/OrderManagementPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import PolicyPage from './components/Policy/PolicyPage';
+import TermsPage from './components/Policy/TermsPage';
 import DeleteAccountPage from './components/Policy/DeleteAccountPage';
 import ContactPage from './components/Contact/ContactPage';
 import AboutUs from './components/About/AboutUs';
@@ -1007,6 +1008,7 @@ function App() {
             }
           />
           <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route

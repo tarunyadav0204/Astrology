@@ -12,6 +12,7 @@ export const PUBLIC_APP_PATH_PREFIXES = [
   '/contact',
   '/about',
   '/policy',
+  '/terms',
   '/calendar-2026',
   '/beginners-guide',
   '/advanced-courses',

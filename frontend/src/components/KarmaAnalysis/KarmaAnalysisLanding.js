@@ -124,6 +124,7 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
         </p>
         <p>
           <Link to="/about">About AstroRoshni</Link> · <Link to="/policy">Privacy Policy</Link> ·{' '}
+          <Link to="/terms">Terms &amp; Conditions</Link>
           <Link to="/contact">Contact</Link>
         </p>
       </section>

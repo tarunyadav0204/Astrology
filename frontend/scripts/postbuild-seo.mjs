@@ -40,6 +40,7 @@ const STATIC_PRERENDER_PATHS = [
   '/about',
   '/contact',
   '/policy',
+  '/terms',
   '/calendar-2026',
   '/beginners-guide',
   '/advanced-courses',
