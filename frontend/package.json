@@ -21,16 +21,17 @@
   },
   "scripts": {
     "refresh:browserslist": "npx update-browserslist-db@latest",
-    "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build && npm run build:karma-next && node scripts/postbuild-seo.mjs",
+    "start": "PORT=3001 craco start",
+    "build": "craco build && npm run build:karma-next && node scripts/postbuild-seo.mjs",
     "build:karma-next": "cd ../frontend-next && npm install && npm run build && node scripts/copy-to-cra-build.mjs",
     "serve:build": "node scripts/serve-build.mjs",
-    "build:app": "react-scripts build",
+    "build:app": "craco build",
     "build:seo": "node scripts/postbuild-seo.mjs",
-    "build:dev": "NODE_ENV=development react-scripts build",
-    "build:prod": "NODE_ENV=production GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=true react-scripts build && npm run build:karma-next && node scripts/postbuild-seo.mjs"
+    "build:dev": "NODE_ENV=development craco build",
+    "build:prod": "NODE_ENV=production GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=true craco build && npm run build:karma-next && node scripts/postbuild-seo.mjs"
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
     "puppeteer": "^24.43.1"
   },
   "browserslist": {
