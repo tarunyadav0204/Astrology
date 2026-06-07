@@ -318,9 +318,10 @@ if [ "${needs_frontend_build}" = "true" ]; then
   export CI=true
   export GENERATE_SOURCEMAP=false
   export INLINE_RUNTIME_CHUNK=true
-  # SEO: prerender only the CRA homepage so / remains the real homepage but has crawlable HTML.
+  # SEO: prerender CRA routes (homepage + key public URLs) so crawlers get correct <link rel="canonical"> in first HTML.
+  # Omit PRERENDER_ROUTES to use the full list in frontend/scripts/postbuild-seo.mjs (STATIC + nakshatras + blog).
   export PRERENDER=true
-  export PRERENDER_ROUTES="/"
+  unset PRERENDER_ROUTES
   SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
   BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
   npm run build

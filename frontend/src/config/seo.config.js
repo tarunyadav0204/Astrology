@@ -229,6 +229,12 @@ export const SEO_CONFIG = {
       keywords: "astro vastu, vastu shastra, home remedies astrology"
     },
 
+    subscription: {
+      title: "Subscription & Plans — AstroRoshni",
+      description: "AstroRoshni subscription plans, credits, and premium Vedic astrology features.",
+      keywords: "astroroshni subscription, astrology plans, premium kundli"
+    },
+
     progenyAnalysis: {
       title: "Progeny & Children Analysis — Vedic Astrology | AstroRoshni",
       description: "Insights on children, conception timing, and parenting themes from your birth chart.",

@@ -44,6 +44,7 @@ export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs =
     '/astrovastu',
     '/marriage-analysis',
     '/career-guidance',
+    '/subscription',
     '/health-analysis',
     '/wealth-analysis',
   ];
@@ -85,15 +86,30 @@ export const PUBLIC_ROUTE_SEO_RULES = [
       });
     },
   },
+  /** Short URL /nakshatra/ashwini → canonical year URL (matches sitemap). */
+  {
+    path: '/nakshatra/:nakshatraName',
+    resolve: ({ nakshatraName }) => {
+      const year = new Date().getFullYear();
+      const name = String(nakshatraName || '').replace(/-/g, ' ');
+      const titleName = name.replace(/\b\w/g, (c) => c.toUpperCase());
+      return generatePageSEO('nakshatraDetail', {
+        path: `/nakshatra/${nakshatraName}/${year}`,
+        title: `${titleName} Nakshatra ${year} — Calendar & Predictions | AstroRoshni`,
+        description: `${titleName} nakshatra yearly calendar, auspicious dates, and Vedic insights for ${year}.`,
+        keywords: `${nakshatraName} nakshatra, nakshatra calendar, vedic astrology, ${year}`,
+      });
+    },
+  },
   { path: '/kundli-matching', pageKey: 'kundliMatching' },
   { path: '/karma-analysis', pageKey: 'karmaAnalysis' },
   { path: '/chat', pageKey: 'chatAstrologer' },
   { path: '/blog', pageKey: 'blogList' },
   {
     path: '/blog/:slug',
-    resolve: () =>
+    resolve: ({ slug }) =>
       generatePageSEO('blogPost', {
-        path: '/blog',
+        path: `/blog/${slug}`,
         title: 'Blog | AstroRoshni',
         description: 'Vedic astrology articles, guides, and insights from AstroRoshni.',
       }),
@@ -112,6 +128,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   { path: '/astrovastu', pageKey: 'astroVastu' },
   { path: '/marriage-analysis', pageKey: 'marriageAnalysis' },
   { path: '/career-guidance', pageKey: 'careerGuidance' },
+  { path: '/subscription', pageKey: 'subscription' },
   { path: '/health-analysis', pageKey: 'healthAnalysis' },
   { path: '/wealth-analysis', pageKey: 'wealthAnalysis' },
   { path: '/life-events', pageKey: 'lifeEvents', noIndex: true },

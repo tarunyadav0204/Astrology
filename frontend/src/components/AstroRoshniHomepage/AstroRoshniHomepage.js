@@ -174,6 +174,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [showChartModal, setShowChartModal] = useState(false);
   const [showBirthFormModal, setShowBirthFormModal] = useState(false);
   const [showWhatsappHomeBanner, setShowWhatsappHomeBanner] = useState(false);
+  /** If user already dismissed the WhatsApp promo, do not mount the modal at all (no image fetch, clearer than isOpen=false). */
+  const [waHomeBannerSuppressed, setWaHomeBannerSuppressed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return isWhatsappHomeBannerDismissed();
+  });
   const [chartRefHighlight, setChartRefHighlight] = useState(null);
   const [matchingData, setMatchingData] = useState({
     boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
@@ -309,6 +314,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (location.pathname !== '/') return;
+    if (waHomeBannerSuppressed) return;
     if (isWhatsappHomeBannerDismissed()) return;
     // Defer so the hero / life-path banner can become LCP first (WhatsApp overlay was stealing LCP in Lighthouse).
     let cancelled = false;
@@ -319,11 +325,12 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [location.pathname]);
+  }, [location.pathname, waHomeBannerSuppressed]);
 
   const dismissWhatsappHomeBanner = useCallback(() => {
     dismissWhatsappHomeBannerPersist();
     setShowWhatsappHomeBanner(false);
+    setWaHomeBannerSuppressed(true);
   }, []);
 
   const generateTodaysData = useCallback(() => {
@@ -3041,7 +3048,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
         </div>
       )}
-      <WhatsAppHomeBannerModal isOpen={showWhatsappHomeBanner} onDismiss={dismissWhatsappHomeBanner} />
+      {!waHomeBannerSuppressed && (
+        <WhatsAppHomeBannerModal isOpen={showWhatsappHomeBanner} onDismiss={dismissWhatsappHomeBanner} />
+      )}
     </div>
   );
 };

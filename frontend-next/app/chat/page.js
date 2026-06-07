@@ -24,7 +24,7 @@ export const metadata = {
     'Chart-aware Vedic astrology chat: single chart, partnership, and mundane modes with dasha, transit, yoga, event periods, voice chat, and podcast summaries.',
   keywords: KEYWORDS,
   alternates: {
-    canonical: '/chat',
+    canonical: 'https://astroroshni.com/chat',
   },
   openGraph: {
     title: 'AI Vedic Astrologer Chat | AstroRoshni',

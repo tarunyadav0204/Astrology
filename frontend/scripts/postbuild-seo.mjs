@@ -4,7 +4,7 @@
  * Env:
  *   SITEMAP_URL — fetch sitemap XML (default http://127.0.0.1:8001/sitemap.xml)
  *   PRERENDER — set to "false" to skip prerender
- *   PRERENDER_ROUTES — comma-separated routes to prerender (deploy uses "/" only)
+ *   PRERENDER_ROUTES — optional comma-separated routes; if unset, prerenders STATIC + nakshatras + blog slugs
  *   BLOG_API_URL — optional blog list for extra prerender paths
  */
 import fs from 'fs';
@@ -55,6 +55,7 @@ const STATIC_PRERENDER_PATHS = [
   '/career-guidance',
   '/health-analysis',
   '/wealth-analysis',
+  '/subscription',
 ];
 
 function fetchUrl(url) {
