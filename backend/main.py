@@ -2679,7 +2679,11 @@ async def api_health():
             user_count = cur.fetchone()[0]
         return {"status": "healthy", "message": "Astrology API is running", "users": user_count}
     except Exception as e:
-        return {"status": "unhealthy", "message": f"Database error: {str(e)}"}
+        # Non-2xx so load balancers / GCP HTTP health checks mark the backend unhealthy.
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "message": f"Database error: {str(e)}"},
+        )
 
 @app.get("/api/system-status")
 async def system_status():
