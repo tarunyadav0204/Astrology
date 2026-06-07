@@ -2,11 +2,28 @@ import React, { useEffect, useCallback } from 'react';
 import { APP_CONFIG } from '../../config/app.config';
 import './WhatsAppHomeBannerModal.css';
 
-const { imageSrc, ctaHref, storageDismissKey } = APP_CONFIG.whatsappHomeBanner;
+const { imageWebpSrcSet, imageFallback, imageSizes, ctaHref, storageDismissKey } = APP_CONFIG.whatsappHomeBanner;
+
+/** 9:16 art; WebP + small JPEG so the modal does not download a multi‑MB PNG. */
+function WhatsAppBannerImg({ alt }) {
+  return (
+    <picture>
+      <source type="image/webp" srcSet={imageWebpSrcSet} sizes={imageSizes} />
+      <img
+        className="whatsapp-home-banner-modal__img"
+        src={imageFallback}
+        alt={alt}
+        width={720}
+        height={1280}
+        loading="eager"
+        decoding="async"
+      />
+    </picture>
+  );
+}
 
 /**
  * One-time-per-dismissal (localStorage) promo for AstroRoshni on WhatsApp.
- * Expects a 9:16 portrait image at `public/images/whatsapp-home-banner.png`.
  */
 export default function WhatsAppHomeBannerModal({ isOpen, onDismiss }) {
   const handleBackdrop = useCallback(() => {
@@ -54,26 +71,10 @@ export default function WhatsAppHomeBannerModal({ isOpen, onDismiss }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <img
-                className="whatsapp-home-banner-modal__img"
-                src={imageSrc}
-                alt="AstroRoshni on WhatsApp — open in WhatsApp"
-                width={720}
-                height={1280}
-                loading="eager"
-                decoding="async"
-              />
+              <WhatsAppBannerImg alt="AstroRoshni on WhatsApp — open in WhatsApp" />
             </a>
           ) : (
-            <img
-              className="whatsapp-home-banner-modal__img"
-              src={imageSrc}
-              alt="AstroRoshni on WhatsApp"
-              width={720}
-              height={1280}
-              loading="eager"
-              decoding="async"
-            />
+            <WhatsAppBannerImg alt="AstroRoshni on WhatsApp" />
           )}
           <button
             type="button"

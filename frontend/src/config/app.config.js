@@ -70,11 +70,15 @@ export const APP_CONFIG = {
   },
   /**
    * Homepage WhatsApp promo (9:16 banner modal).
-   * Image file: place your asset at `frontend/public/images/whatsapp-home-banner.png` (see README in that folder).
+   * Uses compressed WebP + JPEG (see `public/images/README-WHATSAPP-BANNER.md`); do not ship multi‑MB PNGs as the primary URL.
    * Optional click-through: set REACT_APP_WHATSAPP_CHAT_URL (e.g. https://wa.me/15551234567) in `.env`.
    */
   whatsappHomeBanner: {
-    imageSrc: '/images/whatsapp-home-banner.png',
+    imageWebpSrcSet:
+      '/images/whatsapp-home-banner-480.webp 480w, /images/whatsapp-home-banner-720.webp 720w',
+    imageFallback: '/images/whatsapp-home-banner-720.jpg',
+    /** Matches modal frame: ~92vw on phones, ~380–420px on larger screens */
+    imageSizes: '(min-width: 769px) 380px, min(420px, 92vw)',
     ctaHref: (typeof process !== 'undefined' && process.env.REACT_APP_WHATSAPP_CHAT_URL) || '',
     storageDismissKey: 'ar_home_whatsapp_banner_dismissed_v1',
   },

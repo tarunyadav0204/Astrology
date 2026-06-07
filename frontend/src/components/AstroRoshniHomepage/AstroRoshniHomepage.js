@@ -2424,13 +2424,21 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
             <div className="app-mockup">
-              <img
-                className="app-homepage-screenshot"
-                src={`${process.env.PUBLIC_URL || ''}/images/AppHomepage.png`}
-                alt="AstroRoshni mobile app"
-                loading="lazy"
-                decoding="async"
-              />
+              <picture>
+                <source
+                  type="image/webp"
+                  srcSet={`${process.env.PUBLIC_URL || ''}/images/AppHomepage.webp`}
+                />
+                <img
+                  className="app-homepage-screenshot"
+                  src={`${process.env.PUBLIC_URL || ''}/images/AppHomepage.png`}
+                  alt="AstroRoshni mobile app"
+                  width={458}
+                  height={1024}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
             </div>
           </div>
         </div>
