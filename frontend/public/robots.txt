@@ -8,6 +8,7 @@ Sitemap: https://astroroshni.com/sitemap.xml
 Disallow: /admin/
 Disallow: /api/
 Disallow: /private/
+Disallow: /policy/
 
 # Allow important pages
 Allow: /marriage-analysis
@@ -23,3 +24,24 @@ Allow: /myths-vs-reality
 
 # Crawl delay (optional)
 Crawl-delay: 1
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OpenAI-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: MetaAI
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /

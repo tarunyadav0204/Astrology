@@ -4,6 +4,23 @@ import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
+/** Logo mark: WebP + small PNG fallback (Lighthouse: avoid 1024² icon for 22–44px display). */
+function BrandLogoIcon({ alt }) {
+  return (
+    <picture>
+      <source type="image/webp" srcSet="/images/astroroshni-icon-96.webp" />
+      <img
+        src="/images/astroroshni-icon-96.png"
+        alt={alt}
+        className="logo-icon-img"
+        width={96}
+        height={96}
+        decoding="async"
+      />
+    </picture>
+  );
+}
+
 /** Full hamburger list: nav destinations + account (compact chat/webview + main header). */
 function FullHamburgerMenuItems({
   navigate,
@@ -173,11 +190,11 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               </button>
               <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
                 <span className="logo-full">
-                  <img src="/images/astroroshni-icon.png" alt="AstroRoshni" className="logo-icon-img" />
+                  <BrandLogoIcon alt="AstroRoshni" />
                   AstroRoshni
                 </span>
                 <span className="logo-short">
-                  <img src="/images/astroroshni-icon.png" alt="AR" className="logo-icon-img" />
+                  <BrandLogoIcon alt="AR" />
                   AR
                 </span>
               </button>
@@ -375,11 +392,11 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           <div className="logo-section">
             <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
               <span className="logo-full">
-                <img src="/images/astroroshni-icon.png" alt="AstroRoshni" className="logo-icon-img" />
+                <BrandLogoIcon alt="AstroRoshni" />
                 AstroRoshni
               </span>
               <span className="logo-short">
-                <img src="/images/astroroshni-icon.png" alt="AR" className="logo-icon-img" />
+                <BrandLogoIcon alt="AR" />
                 AR
               </span>
             </button>

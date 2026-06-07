@@ -18,11 +18,17 @@ export const SEO_CONFIG = {
   },
   
   images: {
-    logo: "/images/astroroshni-icon.png",
+    /** 96px raster + WebP — header logo displays ~22–44px; avoids multi‑MB 1024² PNG. */
+    logo: "/images/astroroshni-icon-96.webp",
+    logoPngFallback: "/images/astroroshni-icon-96.png",
     ogDefault: "/images/astroroshni-og-image.jpg",
     twitterDefault: "/images/astroroshni-twitter-image.jpg",
     favicon: "/favicon.ico",
-    homeLifePathBanner: "/images/homepage-life-path-banner.png",
+    /** Responsive WebP built from source banner; PNG fallbacks for non‑WebP browsers. */
+    homeLifePathBanner: "/images/homepage-life-path-banner-1200.webp",
+    homeLifePathBannerSrcSetWebp:
+      "/images/homepage-life-path-banner-800.webp 800w, /images/homepage-life-path-banner-1200.webp 1200w",
+    homeLifePathBannerFallback: "/images/homepage-life-path-banner-1200.png",
   },
 
   /** Google Play listing — homepage life-path banner CTA */
@@ -32,7 +38,7 @@ export const SEO_CONFIG = {
       "https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share",
     homeBanner: {
       width: 1200,
-      height: 656,
+      height: 657,
       alt:
         "Discover Your Life Path -AstroRoshni Vedic Astrology",
       title:
@@ -239,7 +245,7 @@ export const SEO_CONFIG = {
       name: "Apeiron Logic LLP",
       alternateName: "AstroRoshni",
       url: "https://astroroshni.com",
-      logo: "https://astroroshni.com/images/astroroshni-icon.png",
+      logo: "https://astroroshni.com/images/astroroshni-icon-96.webp",
       description:
         "Professional Vedic Astrology Services & Creators of Tara, the world's most advanced AI Predictive Astrology Engine.",
       telephone: "+91-9560214006",

@@ -69,7 +69,7 @@ const AdminEventTimelineHistory = () => {
       }
       const logoSrc =
         typeof window !== 'undefined' && window.location?.origin
-          ? `${window.location.origin}/images/astroroshni-icon.png`
+          ? `${window.location.origin}/images/astroroshni-icon-96.png`
           : null;
       const native = data.native_name || row.native_name || '';
       const fileNameBase = `event_timeline_${year}_${native || 'user'}_${String(row.job_id).slice(0, 8)}`;

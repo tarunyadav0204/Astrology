@@ -1,5 +1,5 @@
 // Harmless touch to verify frontend deploy pipeline (no user-facing change).
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { HelmetProvider } from 'react-helmet-async';
@@ -7,59 +7,77 @@ import AnalyticsTracker from './components/Analytics/AnalyticsTracker';
 import RouteSEO from './components/SEO/RouteSEO';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/mobile-fixes.css';
-import BirthForm from './components/BirthForm/BirthForm';
-import BirthFormModal from './components/BirthForm/BirthFormModal';
-import Dashboard from './components/Dashboard/Dashboard';
-import PredictionsPage from './components/PredictionsPage/PredictionsPage';
 import LandingPage from './components/LandingPage/LandingPage';
 import AstroVishnuLanding from './components/AstroVishnu/AstroVishnuLanding';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AuthModalShell from './components/Auth/AuthModalShell';
-import ChartSelector from './components/ChartSelector/ChartSelector';
-import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
-
-import AstroRoshniHomepage from './components/AstroRoshniHomepage/AstroRoshniHomepage';
-import HoroscopePage from './components/Horoscope/HoroscopePage';
-import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
-import AnalysisDetailPage from './components/Analysis/AnalysisDetailPage';
-import PanchangPage from './components/Panchang/PanchangPage';
-import MuhuratFinderPage from './components/MuhuratFinder/MuhuratFinderPage';
-import AdminPanel from './components/Admin/AdminPanel';
-import ChatPage from './components/Chat/ChatPage';
-import SpeechChatPage from './components/Chat/SpeechChatPage';
-import MythsVsReality from './components/Education/MythsVsReality';
-import AdvancedCourses from './components/Education/AdvancedCourses';
-import BeginnersGuide from './components/Education/BeginnersGuide';
-import LessonPage from './components/Education/Lessons/LessonPage';
-import NakshatraPage from './components/Nakshatra/NakshatraPage';
-import NakshatraListPage from './components/Nakshatra/NakshatraListPage';
-import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPage';
-import FestivalsPage from './components/Festivals/FestivalsPage';
-import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
-import KarmaAnalysis from './components/KarmaAnalysis/KarmaAnalysis';
-import SubscriptionPage from './components/Subscription/SubscriptionPage';
-import OrderManagementPage from './components/OrderManagement/OrderManagementPage';
-import ProfilePage from './components/Profile/ProfilePage';
-import PolicyPage from './components/Policy/PolicyPage';
-import TermsPage from './components/Policy/TermsPage';
-import DeleteAccountPage from './components/Policy/DeleteAccountPage';
-import ContactPage from './components/Contact/ContactPage';
-import AboutUs from './components/About/AboutUs';
-import Calendar2026 from './components/Calendar2026/Calendar2026';
-import AstroVastuTool from './components/AstroVastu/AstroVastuTool';
-import KundliMatchingPage from './components/MarriageAnalysis/KundliMatchingPage';
-import EventsTimelinePage from './components/Events/EventsTimelinePage';
-import AshtakavargaToolPage from './components/Ashtakavarga/AshtakavargaToolPage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
-import BlogList from './components/Blog/BlogList';
-import BlogPost from './components/Blog/BlogPost';
-import BlogDashboard from './components/Blog/BlogDashboard';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
-import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/domains.config';
+import { getCurrentDomainConfig, getRedirectUrl } from './config/domains.config';
+
+/** Shown briefly while lazy route chunks load (code-splitting). */
+function RoutePageFallback() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '40vh',
+        padding: '24px',
+        color: '#666',
+        fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+        fontSize: '14px',
+      }}
+    >
+      Loading…
+    </div>
+  );
+}
+
+const AstroRoshniHomepage = lazy(() => import('./components/AstroRoshniHomepage/AstroRoshniHomepage'));
+const AdminPanel = lazy(() => import('./components/Admin/AdminPanel'));
+const ChartSelector = lazy(() => import('./components/ChartSelector/ChartSelector'));
+const BirthFormModal = lazy(() => import('./components/BirthForm/BirthFormModal'));
+const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'));
+const PredictionsPage = lazy(() => import('./components/PredictionsPage/PredictionsPage'));
+const PanchangPage = lazy(() => import('./components/Panchang/PanchangPage'));
+const HoroscopePage = lazy(() => import('./components/Horoscope/HoroscopePage'));
+const AstroRoshniPage = lazy(() => import('./components/AstroRoshni/AstroRoshniPage'));
+const AnalysisDetailPage = lazy(() => import('./components/Analysis/AnalysisDetailPage'));
+const MuhuratFinderPage = lazy(() => import('./components/MuhuratFinder/MuhuratFinderPage'));
+const ChatPage = lazy(() => import('./components/Chat/ChatPage'));
+const SpeechChatPage = lazy(() => import('./components/Chat/SpeechChatPage'));
+const MythsVsReality = lazy(() => import('./components/Education/MythsVsReality'));
+const AdvancedCourses = lazy(() => import('./components/Education/AdvancedCourses'));
+const BeginnersGuide = lazy(() => import('./components/Education/BeginnersGuide'));
+const LessonPage = lazy(() => import('./components/Education/Lessons/LessonPage'));
+const NakshatraPage = lazy(() => import('./components/Nakshatra/NakshatraPage'));
+const NakshatraListPage = lazy(() => import('./components/Nakshatra/NakshatraListPage'));
+const MonthlyPanchangPage = lazy(() => import('./components/MonthlyPanchang/MonthlyPanchangPage'));
+const FestivalsPage = lazy(() => import('./components/Festivals/FestivalsPage'));
+const MonthlyFestivalsPage = lazy(() => import('./components/Festivals/MonthlyFestivalsPage'));
+const KarmaAnalysis = lazy(() => import('./components/KarmaAnalysis/KarmaAnalysis'));
+const SubscriptionPage = lazy(() => import('./components/Subscription/SubscriptionPage'));
+const OrderManagementPage = lazy(() => import('./components/OrderManagement/OrderManagementPage'));
+const ProfilePage = lazy(() => import('./components/Profile/ProfilePage'));
+const PolicyPage = lazy(() => import('./components/Policy/PolicyPage'));
+const TermsPage = lazy(() => import('./components/Policy/TermsPage'));
+const DeleteAccountPage = lazy(() => import('./components/Policy/DeleteAccountPage'));
+const ContactPage = lazy(() => import('./components/Contact/ContactPage'));
+const AboutUs = lazy(() => import('./components/About/AboutUs'));
+const Calendar2026 = lazy(() => import('./components/Calendar2026/Calendar2026'));
+const AstroVastuTool = lazy(() => import('./components/AstroVastu/AstroVastuTool'));
+const KundliMatchingPage = lazy(() => import('./components/MarriageAnalysis/KundliMatchingPage'));
+const EventsTimelinePage = lazy(() => import('./components/Events/EventsTimelinePage'));
+const AshtakavargaToolPage = lazy(() => import('./components/Ashtakavarga/AshtakavargaToolPage'));
+const BlogList = lazy(() => import('./components/Blog/BlogList'));
+const BlogPost = lazy(() => import('./components/Blog/BlogPost'));
+const BlogDashboard = lazy(() => import('./components/Blog/BlogDashboard'));
 
 /** Hide “Ask Tara” FAB on full-page chat and dedicated tool pages (e.g. Ashtakavarga) where it overlaps the UI. */
 function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
@@ -347,7 +365,8 @@ function App() {
           <CreditProvider>
             <AnalyticsTracker user={user} />
             <RouteSEO />
-          <Routes>
+            <Suspense fallback={<RoutePageFallback />}>
+              <Routes>
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route
               path="/panchang"
@@ -1145,8 +1164,9 @@ function App() {
               )
             } />
             <Route path="/astroroshni" element={<AstroRoshniPage />} />
-          </Routes>
-          <ToastContainer />
+              </Routes>
+            </Suspense>
+            <ToastContainer />
           {(!user || currentView !== 'dashboard') && (
             <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
           )}

@@ -1107,17 +1107,24 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 aria-label={playStoreBanner.title}
                 title={playStoreBanner.title}
               >
-                <img
-                  src={SEO_CONFIG.images.homeLifePathBanner}
-                  alt={playStoreBanner.alt}
-                  title={playStoreBanner.title}
-                  className="life-path-banner"
-                  width={playStoreBanner.width}
-                  height={playStoreBanner.height}
-                  decoding="async"
-                  fetchPriority="high"
-                  loading="eager"
-                />
+                <picture>
+                  <source
+                    type="image/webp"
+                    srcSet={SEO_CONFIG.images.homeLifePathBannerSrcSetWebp}
+                    sizes="(max-width: 1200px) 100vw, 1200px"
+                  />
+                  <img
+                    src={SEO_CONFIG.images.homeLifePathBannerFallback}
+                    alt={playStoreBanner.alt}
+                    title={playStoreBanner.title}
+                    className="life-path-banner"
+                    width={playStoreBanner.width}
+                    height={playStoreBanner.height}
+                    decoding="async"
+                    fetchPriority="high"
+                    loading="eager"
+                  />
+                </picture>
               </a>
               <figcaption className="life-path-banner-caption">{playStoreBanner.caption}</figcaption>
             </figure>
