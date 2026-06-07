@@ -309,9 +309,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (location.pathname !== '/') return;
-    if (!isWhatsappHomeBannerDismissed()) {
-      setShowWhatsappHomeBanner(true);
-    }
+    if (isWhatsappHomeBannerDismissed()) return;
+    // Defer so the hero / life-path banner can become LCP first (WhatsApp overlay was stealing LCP in Lighthouse).
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      if (!cancelled) setShowWhatsappHomeBanner(true);
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [location.pathname]);
 
   const dismissWhatsappHomeBanner = useCallback(() => {

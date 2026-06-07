@@ -8,6 +8,7 @@ import http from 'http';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,9 +35,46 @@ const MIME = {
   '.map': 'application/json',
 };
 
-function send(res, status, body, contentType, extraHeaders = {}) {
+/** CRA hashes filenames under /static → safe to cache “forever” at browser + CDN. */
+const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
+/** Images use stable names; bump cache after asset changes or use deploy purge. */
+const CACHE_IMAGES = 'public, max-age=2592000'; // 30d
+/** HTML must revalidate so new JS/CSS chunk names are picked up after deploy. */
+const CACHE_HTML = 'no-cache';
+
+function shouldGzip(req, contentType, byteLength) {
+  if (byteLength < 900) return false;
+  const enc = String(req.headers['accept-encoding'] || '');
+  if (!enc.includes('gzip')) return false;
+  return /charset=utf-8|text\/|javascript|json|xml|svg\+xml|\/css/i.test(contentType);
+}
+
+function send(req, res, status, body, contentType, extraHeaders = {}) {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body), 'utf8');
+  if (req && shouldGzip(req, contentType, buf.length)) {
+    const gz = zlib.gzipSync(buf, { level: 6 });
+    res.writeHead(status, {
+      'Content-Type': contentType,
+      ...extraHeaders,
+      'Content-Encoding': 'gzip',
+      Vary: 'Accept-Encoding',
+    });
+    res.end(gz);
+    return;
+  }
   res.writeHead(status, { 'Content-Type': contentType, ...extraHeaders });
-  res.end(body);
+  res.end(buf);
+}
+
+function cacheControlForPath(pathname, ext) {
+  if (pathname.startsWith('/static/')) return CACHE_IMMUTABLE;
+  if (pathname.startsWith('/images/')) return CACHE_IMAGES;
+  if (ext === '.woff' || ext === '.woff2') return CACHE_IMMUTABLE;
+  if (ext === '.ico') return CACHE_IMAGES;
+  if (pathname === '/manifest.json' || pathname.endsWith('/manifest.json')) return 'public, max-age=86400';
+  if (pathname.startsWith('/.well-known/')) return 'public, max-age=86400';
+  if (ext === '.txt' || ext === '.xml') return 'public, max-age=3600';
+  return 'public, max-age=86400';
 }
 
 function safePath(urlPath) {
@@ -75,7 +113,7 @@ function proxyApi(req, res) {
   proxyReq.on('error', (err) => {
     console.error('[api proxy]', err.message);
     if (!res.headersSent) {
-      send(res, 502, JSON.stringify({ detail: 'API unavailable' }), 'application/json');
+      send(req, res, 502, JSON.stringify({ detail: 'API unavailable' }), 'application/json');
     } else {
       res.end();
     }
@@ -99,7 +137,10 @@ const server = http.createServer(async (req, res) => {
       const indexPath = path.join(BUILD, 'index.html');
       if (await exists(indexPath)) {
         const html = await readFile(indexPath);
-        return send(res, 200, html, MIME['.html'], headers);
+        return send(req, res, 200, html, MIME['.html'], {
+          'Cache-Control': CACHE_HTML,
+          ...headers,
+        });
       }
       return false;
     };
@@ -126,7 +167,7 @@ const server = http.createServer(async (req, res) => {
         const seoFile = path.join(BUILD, seoFileName);
         if (await exists(seoFile)) {
           const html = await readFile(seoFile);
-          return send(res, 200, html, MIME['.html']);
+          return send(req, res, 200, html, MIME['.html'], { 'Cache-Control': CACHE_HTML });
         }
       }
     }
@@ -141,17 +182,21 @@ const server = http.createServer(async (req, res) => {
       if (await exists(filePath)) {
         const ext = path.extname(filePath).toLowerCase();
         const body = await readFile(filePath);
-        return send(res, 200, body, MIME[ext] || 'application/octet-stream');
+        const rel = '/' + path.relative(BUILD, filePath).split(path.sep).join('/');
+        const cc = cacheControlForPath(rel, ext);
+        return send(req, res, 200, body, MIME[ext] || 'application/octet-stream', {
+          'Cache-Control': cc,
+        });
       }
     }
 
     // SPA fallback (CRA)
     return sendCraApp();
 
-    send(res, 404, 'Not found', 'text/plain');
+    send(req, res, 404, 'Not found', 'text/plain');
   } catch (err) {
     console.error(err);
-    send(res, 500, 'Server error', 'text/plain');
+    send(req, res, 500, 'Server error', 'text/plain');
   }
 });
 
