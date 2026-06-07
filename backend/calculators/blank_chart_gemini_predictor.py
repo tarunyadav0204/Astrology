@@ -302,7 +302,7 @@ GENERATE STUNNING PREDICTIONS:
 
 **4. Family & Relationships:**
 - Predict spouse's profession and appearance
-- Predict number of children and their genders
+- Predict number of children; do **not** predict sex or gender of unborn or future children
 - Predict relationship with parents and siblings
 
 **5. Career & Wealth:**

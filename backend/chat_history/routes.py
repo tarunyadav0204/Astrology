@@ -1425,6 +1425,43 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 "chart_insights": [],
         }
 
+    # Fetal / unborn sex determination: LLM classifier (multilingual), no keyword heuristics
+    from ai.fetal_sex_query_classifier import FETAL_SEX_REFUSAL_MESSAGE, should_refuse_fetal_sex_determination
+    try:
+        if await should_refuse_fetal_sex_determination(
+            question=sanitize_text(question),
+            language=str(language or "english"),
+        ):
+            print("🚫 Fetal sex determination question detected (LLM gate) - returning refusal without analysis")
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, message_type = %s, completed_at = %s
+                        WHERE message_id = %s
+                    """,
+                    (
+                        sanitize_text(FETAL_SEX_REFUSAL_MESSAGE),
+                        "completed",
+                        "answer",
+                        datetime.now(),
+                        assistant_message_id,
+                    ),
+                )
+                conn.commit()
+            return {
+                "user_message_id": user_message_id,
+                "message_id": assistant_message_id,
+                "status": "completed",
+                "message_type": "answer",
+                "chat_tier": effective_chat_tier,
+                "content": FETAL_SEX_REFUSAL_MESSAGE,
+                "chart_insights": [],
+            }
+    except Exception as exc:
+        logger.warning("fetal sex gate skipped after error: %s", exc)
+
     # Get chart insights from intent router BEFORE starting background task
     chart_insights = []
     try:
@@ -2422,7 +2459,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from chat.fact_extractor import FactExtractor
     from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
     from chat.instant_chat_pipeline import generate_instant_chat_response
-    
+
     try:
         effective_chat_tier = str(chat_tier or "standard").strip().lower()
         is_instant_chat = effective_chat_tier == "instant"

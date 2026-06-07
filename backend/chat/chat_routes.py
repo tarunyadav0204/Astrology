@@ -181,6 +181,23 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             # Import json at function level
             import json
             import re
+
+            qtxt = (request.question or "").strip()
+            from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE as DEATH_REFUSAL_MESSAGE
+            from ai.fetal_sex_query_classifier import FETAL_SEX_REFUSAL_MESSAGE, should_refuse_fetal_sex_determination
+
+            if is_death_related(qtxt):
+                yield f"data: {json.dumps({'status': 'complete', 'response': DEATH_REFUSAL_MESSAGE}, ensure_ascii=False)}\n\n"
+                return
+            try:
+                if await should_refuse_fetal_sex_determination(
+                    question=qtxt,
+                    language=str(request.language or "english"),
+                ):
+                    yield f"data: {json.dumps({'status': 'complete', 'response': FETAL_SEX_REFUSAL_MESSAGE}, ensure_ascii=False)}\n\n"
+                    return
+            except Exception as exc:
+                logger.warning("fetal sex LLM gate skipped in legacy /chat/ask: %s", exc)
             
             # Prepare birth data
             from types import SimpleNamespace

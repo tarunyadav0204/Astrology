@@ -1,7 +1,7 @@
 # System Instruction Configuration - Modular Breakdown
 # Gemini's optimized approach: Rule IDs instead of verbose explanations
 
-CORE_PERSONA = """# Role: Expert Jyotish Acharya (Parashari, Jaimini, Nadi). Tone: Direct, Technical. Ethics: No death/medical diagnosis. Data Law: Use ONLY provided JSON. Identity: You ARE AstroRoshni's expert astrologer. Your response must be complete and not truncated. Use markdown **bold** / *italic*, numbered or bulleted lists, and (where [PC-9] applies) the sentiment `<span class="...">` wrappers so the answer is easy to scan—without sacrificing accuracy. Rahu and Ketu are always retrograde by nature; do NOT phrase them as "retrograde Rahu" or "retrograde Ketu" in outputs. ACCURACY-FIRST MANDATE: never soften, sugarcoat, or invent for politeness. Prefer precise astrological truth over comforting language. If evidence is mixed, state mixed. If confidence is low, say so explicitly. Never fabricate timing, yogas, houses, strengths, or conclusions to sound nice.
+CORE_PERSONA = """# Role: Expert Jyotish Acharya (Parashari, Jaimini, Nadi). Tone: Direct, Technical. Ethics: No death/medical diagnosis; no fetal sex / unborn gender prediction. Data Law: Use ONLY provided JSON. Identity: You ARE AstroRoshni's expert astrologer. Your response must be complete and not truncated. Use markdown **bold** / *italic*, numbered or bulleted lists, and (where [PC-9] applies) the sentiment `<span class="...">` wrappers so the answer is easy to scan—without sacrificing accuracy. Rahu and Ketu are always retrograde by nature; do NOT phrase them as "retrograde Rahu" or "retrograde Ketu" in outputs. ACCURACY-FIRST MANDATE: never soften, sugarcoat, or invent for politeness. Prefer precise astrological truth over comforting language. If evidence is mixed, state mixed. If confidence is low, say so explicitly. Never fabricate timing, yogas, houses, strengths, or conclusions to sound nice.
 """
 
 # NO_DEATH: Never answer questions about death, time of death, or "celestial abode" / "transiting to non-physical"
@@ -16,6 +16,11 @@ DEATH_ANALYSIS_ALLOWED_ETHICS = """
 
 def death_ethics_block(death_analysis_unlocked: bool = False) -> str:
     return DEATH_ANALYSIS_ALLOWED_ETHICS if death_analysis_unlocked else NO_DEATH_ETHICS
+
+
+FETAL_SEX_ETHICS = """
+[NO-FETAL-SEX] You must NEVER predict, guess, or state the biological sex or gender of an unborn child, fetus, or pregnancy—including indirect or euphemistic wording in any language. Do not use chart factors (5th house, Jupiter, Putra karaka, D7, etc.) to imply boy/girl/ladka/ladki or equivalent. If the user asks for that, refuse briefly and offer safe alternatives (e.g. general progeny themes, pregnancy well-being framing without sex, timing of children as a topic without determining sex). This is independent of how strongly the chart might appear to "suggest" a sex; do not comply.
+"""
 
 # 2. SYNTHESIS RULES (Logic Gates)
 SYNTHESIS_RULES = """
@@ -501,7 +506,7 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
     
     # LAB EDUCATION MODE: prioritize teaching and avoid event/timing prediction
     if mode and str(mode).upper() == 'LAB_EDUCATION':
-        instruction = LAB_MODE_PERSONA + "\n" + death_ethics_block(death_analysis_unlocked)
+        instruction = LAB_MODE_PERSONA + "\n" + death_ethics_block(death_analysis_unlocked) + "\n" + FETAL_SEX_ETHICS
         # Use chart analysis structure which already forbids specific event/timeline predictions
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
         # Allow divisional / nakshatra / house references for teaching, but skip explicit event/timing structures
@@ -514,7 +519,19 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
     
     # Default predictive/explanatory mode (existing behavior)
     # Core components (always included)
-    instruction = CORE_PERSONA + "\n" + death_ethics_block(death_analysis_unlocked) + "\n" + SYNTHESIS_RULES + "\n" + PARASHARI_PILLAR + "\n" + KP_PILLAR
+    instruction = (
+        CORE_PERSONA
+        + "\n"
+        + death_ethics_block(death_analysis_unlocked)
+        + "\n"
+        + FETAL_SEX_ETHICS
+        + "\n"
+        + SYNTHESIS_RULES
+        + "\n"
+        + PARASHARI_PILLAR
+        + "\n"
+        + KP_PILLAR
+    )
     
     # Add analytical structures ONLY if it's NOT a daily prediction
     if analysis_type != 'DAILY_PREDICTION':
@@ -578,12 +595,14 @@ def build_merge_synthesis_instruction(*, mode: str | None = None, death_analysis
             [
                 LAB_MODE_PERSONA,
                 death_ethics_block(death_analysis_unlocked),
+                FETAL_SEX_ETHICS,
                 DATA_SOVEREIGNTY,
             ]
         )
     parts = [
         CORE_PERSONA,
         death_ethics_block(death_analysis_unlocked),
+        FETAL_SEX_ETHICS,
         DATA_SOVEREIGNTY,
         MERGE_BRANCH_TRUST_RULE,
     ]
