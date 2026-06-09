@@ -89,9 +89,9 @@ export default function NotificationEnableReminderModal({ homeActive }) {
     }
   };
 
-  const overlayBg = theme === 'dark' ? '#020617' : '#fff7ed';
-  const cardBg = theme === 'dark' ? '#1e293b' : '#ffffff';
-  const borderColor = theme === 'dark' ? '#334155' : '#e5e7eb';
+  const overlayBg = theme === 'dark' ? colors.background : '#fff7ed';
+  const cardBg = theme === 'dark' ? colors.backgroundSecondary : '#ffffff';
+  const borderColor = theme === 'dark' ? colors.cardBorder : '#e5e7eb';
 
   return (
     <Modal

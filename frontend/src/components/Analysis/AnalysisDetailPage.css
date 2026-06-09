@@ -209,3 +209,23 @@
 .analysis-detail-empty__cta:active {
   transform: translateY(0);
 }
+
+.analysis-detail-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.analysis-detail-empty__cta--secondary {
+  color: #c2185b;
+  background: #fff;
+  border: 2px solid #e91e63;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.analysis-detail-empty__cta--secondary:hover {
+  background: #fff5f8;
+  box-shadow: 0 6px 18px rgba(233, 30, 99, 0.2);
+}

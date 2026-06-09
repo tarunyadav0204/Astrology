@@ -92,9 +92,10 @@ Task: Decide whether the user's PRIMARY intent is to learn or predict the **biol
 Set fetal_sex_determination_request = true ONLY when the message is mainly asking for:
 - Whether the pregnancy is a boy or a girl / son or daughter
 - Sex or gender of the baby before birth / in the womb
-- Garbha / fetus gender, "ladka ya ladki", "pink or blue", ultrasound-style guessing from astrology, etc.
+- Garbha / fetus gender, "ladka ya ladki" **in a pregnancy or unborn-baby sense**, "pink or blue", ultrasound-style guessing from astrology, etc.
 
 Set fetal_sex_determination_request = false when:
+- **Another woman / third party / affair / extramarital involvement** (e.g. Hindi "mere aur mere pati/pati ke beech koi ladki hai", "koi aur aurat", "relationship mein koi aur hai") — words like ladki/aurat/ladka here refer to **people already born**, not fetal sex. These are relationship-trust questions, NOT fetal sex; always false here.
 - General children / progeny / pregnancy timing without asking for sex (e.g. "when will I conceive", "will I have kids")
 - Questions about **already-born** children (their life, health, education) even if words like "son" or "daughter" appear
 - Chart technique, houses of children, remedies, general family outlook

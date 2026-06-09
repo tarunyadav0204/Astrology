@@ -57,22 +57,29 @@ export default function ForgotPasswordScreen({
     };
   }, []);
 
+  const nationalDigits = (formData.phone || '').replace(/\D/g, '');
+  /** Align with backend: India (+91) SMS reset — email optional. */
+  const isIndiaSmsReset =
+    nationalDigits.length === 10 && /^[6-9]\d{9}$/.test(nationalDigits);
+  const apiPhone = isIndiaSmsReset ? `+91${nationalDigits}` : (formData.phone || '').trim();
+
   const handleSendCode = async () => {
-    if (!formData.phone) {
+    if (!nationalDigits) {
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
-    if (!(formData.email || '').trim()) {
+    if (!isIndiaSmsReset && !(formData.email || '').trim()) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await authAPI.sendResetCode({
-        phone: formData.phone,
-        email: formData.email.trim(),
-      });
+      const payload = { phone: apiPhone };
+      if (!isIndiaSmsReset) {
+        payload.email = formData.email.trim();
+      }
+      const response = await authAPI.sendResetCode(payload);
       Alert.alert('Success', response.data.message);
       setStep(2);
     } catch (error) {
@@ -91,7 +98,7 @@ export default function ForgotPasswordScreen({
     setLoading(true);
     try {
       const response = await authAPI.verifyResetCode({
-        phone: formData.phone,
+        phone: apiPhone,
         code: formData.resetCode
       });
       setResetToken(response.data.reset_token);
@@ -135,7 +142,11 @@ export default function ForgotPasswordScreen({
             <View style={styles.header}>
               <Text style={styles.emoji}>📱</Text>
               <Text style={styles.title}>Reset Password</Text>
-              <Text style={styles.subtitle}>Enter your phone number and email to receive a reset code</Text>
+              <Text style={styles.subtitle}>
+                {isIndiaSmsReset
+                  ? 'Enter your 10-digit Indian mobile number. We will send a reset code by SMS.'
+                  : 'Enter your phone number and email to receive a reset code'}
+              </Text>
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
@@ -153,20 +164,22 @@ export default function ForgotPasswordScreen({
               </View>
             </Animated.View>
 
-            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email Address"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                  value={formData.email}
-                  onChangeText={(value) => updateFormData('email', value)}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-            </Animated.View>
+            {!isIndiaSmsReset ? (
+              <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email Address"
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    value={formData.email}
+                    onChangeText={(value) => updateFormData('email', value)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </Animated.View>
+            ) : null}
 
             <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
               <TouchableOpacity
@@ -190,7 +203,11 @@ export default function ForgotPasswordScreen({
             <View style={styles.header}>
               <Text style={styles.emoji}>🔐</Text>
               <Text style={styles.title}>Enter Code</Text>
-              <Text style={styles.subtitle}>We've sent a 6-digit code to {formData.email || formData.phone}</Text>
+              <Text style={styles.subtitle}>
+                {isIndiaSmsReset
+                  ? `We've sent a 6-digit code by SMS to ${apiPhone}`
+                  : `We've sent a 6-digit code to ${(formData.email || '').trim() || apiPhone}`}
+              </Text>
             </View>
 
             <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>

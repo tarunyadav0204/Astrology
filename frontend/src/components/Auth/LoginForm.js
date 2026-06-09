@@ -100,10 +100,14 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      if (!(resetData.email || '').trim()) {
+      const isIndiaSmsReset = resetCountryCode === '+91';
+      if (!isIndiaSmsReset && !(resetData.email || '').trim()) {
         throw new Error('Email is required');
       }
-      const payload = { phone: fullPhone, email: resetData.email.trim() };
+      const payload = { phone: fullPhone };
+      if (!isIndiaSmsReset) {
+        payload.email = resetData.email.trim();
+      }
       const response = await authService.sendResetCode(payload);
       toast.success(response.message);
       // Show code if SMS service is unavailable (testing mode)
@@ -248,6 +252,11 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
         {resetStep === 1 ? (
           <form onSubmit={handleSendCode}>
+            <p style={{ textAlign: 'center', color: '#666', marginBottom: '1rem', fontSize: '0.95rem' }}>
+              {resetCountryCode === '+91'
+                ? 'We will send a reset code by SMS to your phone.'
+                : 'We will send a reset code to your email.'}
+            </p>
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{
                 display: 'block',
@@ -267,6 +276,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 disabled={loading}
               />
             </div>
+            {resetCountryCode !== '+91' ? (
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{
                 display: 'block',
@@ -292,6 +302,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 }}
               />
             </div>
+            ) : null}
             <button
               type="submit"
               disabled={loading}

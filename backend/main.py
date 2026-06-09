@@ -256,6 +256,34 @@ def _otp_email_required(phone: str) -> bool:
     return not _is_india_number(phone)
 
 
+def _validate_new_password_strength(password: str) -> Optional[str]:
+    """Align with mobile registration: min 8 characters, at least one digit."""
+    if not password or len(password) < 8:
+        return "Password must be at least 8 characters"
+    if not any(ch.isdigit() for ch in password):
+        return "Password must include at least one number"
+    return None
+
+
+def _normalize_account_gender_value(raw: str) -> Optional[str]:
+    """
+    Account-level users.gender (not birth chart).
+    Returns None to clear; otherwise one of: male, female, other, prefer_not_to_say.
+    """
+    s = (raw or "").strip().lower()
+    if not s:
+        return None
+    if s in ("m", "man", "male"):
+        return "male"
+    if s in ("f", "woman", "female"):
+        return "female"
+    if s in ("o", "other"):
+        return "other"
+    if s in ("prefer_not_to_say", "prefer not to say", "prefernottosay", "skip", "none", "n/a"):
+        return "prefer_not_to_say"
+    return None
+
+
 def _phone_lookup_variants(phone: Optional[str]) -> List[str]:
     """
     Build possible DB values for users.phone — legacy rows may store 10-digit local,
@@ -330,7 +358,7 @@ def _find_user_row_by_phone_variants(conn, phone: str):
     placeholders = ", ".join(["%s"] * len(variants))
     cur = execute(
         conn,
-        f"SELECT userid, name, phone, password, role, email, signup_client FROM users WHERE phone IN ({placeholders})",
+        f"SELECT userid, name, phone, password, role, email, signup_client, gender FROM users WHERE phone IN ({placeholders})",
         tuple(variants),
     )
     return cur.fetchone()
@@ -1028,6 +1056,29 @@ async def resolve_auth_phone(request: ResolvePhoneRequest):
 class ResetPasswordWithToken(BaseModel):
     token: str
     new_password: str
+
+
+class ChangeOwnPasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UpdateOwnEmailRequest(BaseModel):
+    """Empty / null email clears only for India-number accounts (SMS-first)."""
+
+    email: Optional[str] = None
+
+
+class UpdateOwnGenderRequest(BaseModel):
+    gender: str = ""
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def _strip_gender(cls, v):
+        if v is None:
+            return ""
+        return str(v).strip()
+
 
 class NumerologyRequest(BaseModel):
     name: str
@@ -1966,6 +2017,7 @@ async def login(user_data: UserLogin):
                 "role": user[4],
                 "email": user[5] if len(user) > 5 else None,
                 "signup_client": user[6] if len(user) > 6 else None,
+                "gender": user[7] if len(user) > 7 else None,
                 "subscriptions": user_subscriptions
             },
             "self_birth_chart": birth_chart_data
@@ -2025,6 +2077,119 @@ async def get_user_stats(current_user: User = Depends(get_current_user)):
         "total_birth_charts": total_birth_charts,
         "total_questions": total_questions,
     }
+
+
+@app.get("/api/user/account-details")
+async def get_user_account_details(current_user: User = Depends(get_current_user)):
+    """Email, account gender, phone, and whether the account is India SMS-first (affects clearing email)."""
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT email, gender, phone FROM users WHERE userid = %s",
+            (current_user.userid,),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    phone = (row[2] or "").strip()
+    return {
+        "email": (row[0] or "").strip(),
+        "gender": (row[1] or None) if row[1] else None,
+        "phone": phone,
+        "is_india": _is_india_number(phone),
+    }
+
+
+@app.put("/api/user/password")
+async def update_own_password(
+    body: ChangeOwnPasswordRequest,
+    current_user: User = Depends(get_current_user),
+):
+    pw_err = _validate_new_password_strength(body.new_password)
+    if pw_err:
+        raise HTTPException(status_code=400, detail=pw_err)
+    with get_conn() as conn:
+        cur = execute(conn, "SELECT password FROM users WHERE userid = %s", (current_user.userid,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not verify_password(body.current_password, row[0]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        hashed = hash_password(body.new_password)
+        execute(conn, "UPDATE users SET password = %s WHERE userid = %s", (hashed, current_user.userid))
+        conn.commit()
+    return {"message": "Password updated"}
+
+
+@app.put("/api/user/email")
+async def update_own_email(body: UpdateOwnEmailRequest, current_user: User = Depends(get_current_user)):
+    raw = (body.email if body.email is not None else "").strip()
+    phone = (current_user.phone or "").strip()
+
+    if not raw:
+        if not _is_india_number(phone):
+            raise HTTPException(
+                status_code=400,
+                detail="Email cannot be removed for international accounts. Add or keep an email for sign-in and password reset.",
+            )
+        with get_conn() as conn:
+            execute(conn, "UPDATE users SET email = NULL WHERE userid = %s", (current_user.userid,))
+            conn.commit()
+        return {"email": "", "is_india": True}
+
+    email_error = _registration_email_error(raw)
+    if email_error:
+        raise HTTPException(status_code=400, detail=email_error)
+    email_to_store = raw.strip()
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT userid FROM users
+                WHERE userid <> %s
+                  AND LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(%s))
+                LIMIT 1
+            """,
+            (current_user.userid, email_to_store),
+        )
+        if cur.fetchone():
+            raise HTTPException(status_code=409, detail="That email is already used by another account")
+
+        try:
+            execute(
+                conn,
+                "UPDATE users SET email = %s WHERE userid = %s",
+                (email_to_store, current_user.userid),
+            )
+            conn.commit()
+        except pg_errors.UniqueViolation:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise HTTPException(status_code=409, detail="That email is already used by another account")
+
+    return {"email": email_to_store, "is_india": _is_india_number(phone)}
+
+
+@app.put("/api/user/gender")
+async def update_own_gender(body: UpdateOwnGenderRequest, current_user: User = Depends(get_current_user)):
+    normalized = _normalize_account_gender_value(body.gender)
+    if (body.gender or "").strip() and normalized is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid gender. Use male, female, other, prefer_not_to_say, or leave blank to clear.",
+        )
+    with get_conn() as conn:
+        execute(
+            conn,
+            "UPDATE users SET gender = %s WHERE userid = %s",
+            (normalized, current_user.userid),
+        )
+        conn.commit()
+    return {"gender": normalized}
+
 
 @app.get("/api/admin/check-password-hashes")
 async def check_password_hashes():
@@ -4671,31 +4836,35 @@ async def get_admin_users(
                     key=lambda p: _plat_order.get(p, 99),
                 )
 
+        # One query for active subscriptions for this page (avoids N+1 per user).
+        subscriptions_by_user: dict = {uid: {} for uid in user_ids}
+        if user_ids:
+            _ph = ",".join(["?"] * len(user_ids))
+            cur = execute(
+                conn,
+                f"""
+                    SELECT us.userid, sp.platform, sp.plan_name, us.status, us.end_date
+                    FROM user_subscriptions us
+                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+                    WHERE us.userid IN ({_ph})
+                      AND us.status = 'active' AND us.end_date >= CURRENT_DATE
+                """,
+                user_ids,
+            )
+            for sub in cur.fetchall() or []:
+                uid, plat = sub[0], sub[1]
+                if uid not in subscriptions_by_user:
+                    continue
+                subscriptions_by_user[uid][plat] = {
+                    "plan_name": sub[2],
+                    "status": sub[3],
+                    "end_date": sub[4],
+                }
+
         users = []
         for row in rows:
+            # Only users.gender — no birth_chart fallback (avoids extra queries per row).
             user_gender = (row[7] or "").strip() if len(row) > 7 else ""
-            if not user_gender:
-                cur = execute(
-                    conn,
-                    """
-                        SELECT bc.gender
-                        FROM birth_charts bc
-                        WHERE bc.userid = %s
-                          AND (
-                            (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = %s) = 1
-                            OR LOWER(COALESCE(bc.relation, '')) = 'self'
-                          )
-                        ORDER BY
-                          CASE WHEN LOWER(COALESCE(bc.relation, '')) = 'self' THEN 0 ELSE 1 END,
-                          bc.created_at DESC
-                        LIMIT 1
-                    """,
-                    (row[0], row[0]),
-                )
-                chart_gender_row = cur.fetchone()
-                if chart_gender_row and chart_gender_row[0]:
-                    user_gender = str(chart_gender_row[0]).strip()
-
             normalized_gender = ""
             gender_l = user_gender.lower()
             if gender_l in ("male", "m", "man"):
@@ -4705,23 +4874,7 @@ async def get_admin_users(
             elif user_gender:
                 normalized_gender = user_gender
 
-            cur = execute(
-                conn,
-                """
-                    SELECT sp.platform, sp.plan_name, us.status, us.end_date
-                    FROM user_subscriptions us
-                    JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-                    WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= CURRENT_DATE
-                """,
-                (row[0],),
-            )
-            subscriptions = {}
-            for sub in (cur.fetchall() or []):
-                subscriptions[sub[0]] = {
-                    'plan_name': sub[1],
-                    'status': sub[2],
-                    'end_date': sub[3]
-                }
+            subscriptions = dict(subscriptions_by_user.get(row[0], {}))
             users.append({
                 'userid': row[0],
                 'name': row[1],
@@ -4792,12 +4945,20 @@ async def get_admin_users_summary(
 
         where_sql = " AND ".join(conditions) if conditions else "1=1"
 
+        # Single scan: totals + "created today" slice (half the work vs two full queries).
         summary_sql = f"""
             SELECT
-                COUNT(*) AS users_count,
-                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END) AS mobile_users_count,
-                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END) AS web_users_count,
-                SUM(CASE WHEN dt.userid IS NOT NULL THEN 1 ELSE 0 END) AS push_enabled_count
+                COUNT(*)::bigint AS users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END)::bigint AS mobile_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END)::bigint AS web_users_count,
+                SUM(CASE WHEN dt.userid IS NOT NULL THEN 1 ELSE 0 END)::bigint AS push_enabled_count,
+                COUNT(*) FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END)
+                    FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_mobile_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END)
+                    FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_web_users_count,
+                SUM(CASE WHEN dt.userid IS NOT NULL THEN 1 ELSE 0 END)
+                    FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_push_enabled_count
             FROM users u
             LEFT JOIN (
                 SELECT DISTINCT userid FROM device_tokens
@@ -4806,22 +4967,19 @@ async def get_admin_users_summary(
         """
 
         cur = execute(conn, summary_sql, params)
-        total_row = cur.fetchone() or [0, 0, 0, 0]
+        row = cur.fetchone() or [0, 0, 0, 0, 0, 0, 0, 0]
 
-        cur = execute(conn, summary_sql + " AND DATE(u.created_at) = CURRENT_DATE", params)
-        today_row = cur.fetchone() or [0, 0, 0, 0]
-
-        def _to_block(row):
+        def _to_block(start):
             return {
-                "users_count": int(row[0] or 0),
-                "mobile_users_count": int(row[1] or 0),
-                "web_users_count": int(row[2] or 0),
-                "push_enabled_count": int(row[3] or 0),
+                "users_count": int(row[start] or 0),
+                "mobile_users_count": int(row[start + 1] or 0),
+                "web_users_count": int(row[start + 2] or 0),
+                "push_enabled_count": int(row[start + 3] or 0),
             }
 
         return {
-            "today": _to_block(today_row),
-            "total": _to_block(total_row),
+            "total": _to_block(0),
+            "today": _to_block(4),
         }
 
 

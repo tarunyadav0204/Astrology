@@ -73,7 +73,7 @@ const PAGE_META = {
   }
 };
 
-const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogin }) => {
+const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogin, onOpenRegister }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
@@ -119,19 +119,33 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
         user={user}
         onAdminClick={handleAdminClick}
         onLogout={onLogout}
+        onLogin={!user ? onLogin : undefined}
+        showLoginButton={!user}
         birthData={birthData}
-        onChangeNative={(mode) => {
-          setBirthModalTab(mode === 'create' ? 'new' : 'saved');
-          setShowBirthModal(true);
-        }}
-        onCreateBirthChart={() => {
-          setBirthModalTab('new');
-          setShowBirthModal(true);
-        }}
-        onSelectBirthChart={() => {
-          setBirthModalTab('saved');
-          setShowBirthModal(true);
-        }}
+        onChangeNative={
+          !user
+            ? () => onLogin?.()
+            : (mode) => {
+                setBirthModalTab(mode === 'create' ? 'new' : 'saved');
+                setShowBirthModal(true);
+              }
+        }
+        onCreateBirthChart={
+          !user
+            ? () => onLogin?.()
+            : () => {
+                setBirthModalTab('new');
+                setShowBirthModal(true);
+              }
+        }
+        onSelectBirthChart={
+          !user
+            ? () => onLogin?.()
+            : () => {
+                setBirthModalTab('saved');
+                setShowBirthModal(true);
+              }
+        }
         onCreditsClick={() => setShowCreditsModal(true)}
       />
 
@@ -151,7 +165,30 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
         </header>
 
         <div className="analysis-detail-body">
-          {hasBirth ? (
+          {!user ? (
+            <div className="analysis-detail-empty">
+              <div className="analysis-detail-empty__card">
+                <span className="analysis-detail-empty__icon" aria-hidden>{meta.icon}</span>
+                <h2>Sign in to continue</h2>
+                <p>
+                  Sign in to save a birth chart on your account, then you can run this report—the same flow as
+                  our mobile app. New here? Create a free account.
+                </p>
+                <div className="analysis-detail-empty__actions">
+                  <button type="button" className="analysis-detail-empty__cta" onClick={() => onLogin?.()}>
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    className="analysis-detail-empty__cta analysis-detail-empty__cta--secondary"
+                    onClick={() => (onOpenRegister || onLogin)?.()}
+                  >
+                    Create account
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : hasBirth ? (
             <div className="analysis-detail-panel">
               <UniversalAIInsights
                 analysisType={analysisType}
@@ -183,14 +220,16 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
         </div>
       </main>
 
-      <BirthFormModal
-        isOpen={showBirthModal}
-        onClose={() => setShowBirthModal(false)}
-        onSubmit={() => setShowBirthModal(false)}
-        defaultActiveTab={birthModalTab}
-        title={`${meta.headline} — Birth details`}
-        description="Please provide your birth information to generate your personalized analysis."
-      />
+      {user ? (
+        <BirthFormModal
+          isOpen={showBirthModal}
+          onClose={() => setShowBirthModal(false)}
+          onSubmit={() => setShowBirthModal(false)}
+          defaultActiveTab={birthModalTab}
+          title={`${meta.headline} — Birth details`}
+          description="Please provide your birth information to generate your personalized analysis."
+        />
+      ) : null}
       <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );

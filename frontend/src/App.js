@@ -39,6 +39,66 @@ function RoutePageFallback() {
   );
 }
 
+/** Auth sheet for Vedic analysis routes when the guest taps Sign in / Create account on the tool page. */
+function AnalysisGuestAuthModal({ isOpen, onClose, authView, setAuthView, description, onAuthenticated }) {
+  return (
+    <AuthModalShell isOpen={isOpen} onClose={onClose}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in</h2>
+        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>{description}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+          <button
+            type="button"
+            onClick={() => setAuthView('login')}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              background: authView === 'login' ? '#e91e63' : 'transparent',
+              color: authView === 'login' ? 'white' : '#e91e63',
+              borderRadius: '25px 0 0 25px',
+              cursor: 'pointer',
+              borderRight: '1px solid #e91e63',
+            }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthView('register')}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              background: authView === 'register' ? '#e91e63' : 'transparent',
+              color: authView === 'register' ? 'white' : '#e91e63',
+              borderRadius: '0 25px 25px 0',
+              cursor: 'pointer',
+            }}
+          >
+            Sign Up
+          </button>
+        </div>
+      </div>
+      {authView === 'login' ? (
+        <LoginForm
+          onLogin={(userData) => {
+            onAuthenticated(userData);
+            onClose();
+          }}
+          onSwitchToRegister={() => setAuthView('register')}
+        />
+      ) : (
+        <RegisterForm
+          onRegister={(userData) => {
+            onAuthenticated(userData);
+            onClose();
+          }}
+          onSwitchToLogin={() => setAuthView('login')}
+        />
+      )}
+    </AuthModalShell>
+  );
+}
+
 const AstroRoshniHomepage = lazy(() => import('./components/AstroRoshniHomepage/AstroRoshniHomepage'));
 const AdminPanel = lazy(() => import('./components/Admin/AdminPanel'));
 const ChartSelector = lazy(() => import('./components/ChartSelector/ChartSelector'));
@@ -544,293 +604,109 @@ function App() {
             <Route path="/horoscope/:period" element={<HoroscopePage />} />
             <Route path="/horoscope" element={<HoroscopePage />} />
             <Route path="/marriage-analysis" element={
-              user ? (
+              <>
                 <AnalysisDetailPage
                   analysisType="marriage"
                   user={user}
-                  onLogout={handleLogout}
-                  onAdminClick={handleAdminClick}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
                 />
-              ) : (
-              <>
-                <AstroRoshniHomepage 
-                  user={null} 
-                  onLogin={() => setShowLoginModal(true)} 
-                  showLoginButton={true} 
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to add your saved birth chart and run your personalised marriage analysis."
+                  onAuthenticated={handleLogin}
                 />
-                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-                      <div style={{ marginBottom: '20px' }}>
-                        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
-                        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Marriage Analysis</p>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                          <button 
-                            onClick={() => setAuthView('login')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'login' ? '#e91e63' : 'transparent',
-                              color: authView === 'login' ? 'white' : '#e91e63',
-                              borderRadius: '25px 0 0 25px',
-                              cursor: 'pointer',
-                              borderRight: '1px solid #e91e63'
-                            }}
-                          >
-                            Sign In
-                          </button>
-                          <button 
-                            onClick={() => setAuthView('register')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'register' ? '#e91e63' : 'transparent',
-                              color: authView === 'register' ? 'white' : '#e91e63',
-                              borderRadius: '0 25px 25px 0',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Sign Up
-                          </button>
-                        </div>
-                      </div>
-                      {authView === 'login' ? (
-                        <LoginForm 
-                          onLogin={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/marriage-analysis';
-                          }} 
-                          onSwitchToRegister={() => setAuthView('register')} 
-                        />
-                      ) : (
-                        <RegisterForm 
-                          onRegister={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/marriage-analysis';
-                          }} 
-                          onSwitchToLogin={() => setAuthView('login')} 
-                        />
-                      )}
-                </AuthModalShell>
               </>
-              )
             } />
             <Route path="/career-guidance" element={
-              user ? (
+              <>
                 <AnalysisDetailPage
                   analysisType="career"
                   user={user}
-                  onLogout={handleLogout}
-                  onAdminClick={handleAdminClick}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
                 />
-              ) : (
-              <>
-                <AstroRoshniHomepage 
-                  user={null} 
-                  onLogin={() => setShowLoginModal(true)} 
-                  showLoginButton={true} 
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to add your saved birth chart and run your personalised career analysis."
+                  onAuthenticated={handleLogin}
                 />
-                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-                      <div style={{ marginBottom: '20px' }}>
-                        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
-                        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Career Guidance</p>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                          <button 
-                            onClick={() => setAuthView('login')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'login' ? '#e91e63' : 'transparent',
-                              color: authView === 'login' ? 'white' : '#e91e63',
-                              borderRadius: '25px 0 0 25px',
-                              cursor: 'pointer',
-                              borderRight: '1px solid #e91e63'
-                            }}
-                          >
-                            Sign In
-                          </button>
-                          <button 
-                            onClick={() => setAuthView('register')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'register' ? '#e91e63' : 'transparent',
-                              color: authView === 'register' ? 'white' : '#e91e63',
-                              borderRadius: '0 25px 25px 0',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Sign Up
-                          </button>
-                        </div>
-                      </div>
-                      {authView === 'login' ? (
-                        <LoginForm 
-                          onLogin={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/career-guidance';
-                          }} 
-                          onSwitchToRegister={() => setAuthView('register')} 
-                        />
-                      ) : (
-                        <RegisterForm 
-                          onRegister={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/career-guidance';
-                          }} 
-                          onSwitchToLogin={() => setAuthView('login')} 
-                        />
-                      )}
-                </AuthModalShell>
               </>
-              )
             } />
             <Route path="/muhurat-finder" element={<MuhuratFinderPage user={user} onLogout={user ? handleLogout : undefined} onAdminClick={user ? handleAdminClick : undefined} />} />
             <Route path="/health-analysis" element={
-              user ? (
+              <>
                 <AnalysisDetailPage
                   analysisType="health"
                   user={user}
-                  onLogout={handleLogout}
-                  onAdminClick={handleAdminClick}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
                 />
-              ) : (
-              <>
-                <AstroRoshniHomepage 
-                  user={null} 
-                  onLogin={() => setShowLoginModal(true)} 
-                  showLoginButton={true} 
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to add your saved birth chart and run your personalised health and wellness analysis."
+                  onAuthenticated={handleLogin}
                 />
-                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-                      <div style={{ marginBottom: '20px' }}>
-                        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
-                        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Health Analysis</p>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                          <button 
-                            onClick={() => setAuthView('login')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'login' ? '#e91e63' : 'transparent',
-                              color: authView === 'login' ? 'white' : '#e91e63',
-                              borderRadius: '25px 0 0 25px',
-                              cursor: 'pointer',
-                              borderRight: '1px solid #e91e63'
-                            }}
-                          >
-                            Sign In
-                          </button>
-                          <button 
-                            onClick={() => setAuthView('register')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'register' ? '#e91e63' : 'transparent',
-                              color: authView === 'register' ? 'white' : '#e91e63',
-                              borderRadius: '0 25px 25px 0',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Sign Up
-                          </button>
-                        </div>
-                      </div>
-                      {authView === 'login' ? (
-                        <LoginForm 
-                          onLogin={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/health-analysis';
-                          }} 
-                          onSwitchToRegister={() => setAuthView('register')} 
-                        />
-                      ) : (
-                        <RegisterForm 
-                          onRegister={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/health-analysis';
-                          }} 
-                          onSwitchToLogin={() => setAuthView('login')} 
-                        />
-                      )}
-                </AuthModalShell>
               </>
-              )
             } />
             <Route path="/wealth-analysis" element={
-              user ? (
+              <>
                 <AnalysisDetailPage
                   analysisType="wealth"
                   user={user}
-                  onLogout={handleLogout}
-                  onAdminClick={handleAdminClick}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
                 />
-              ) : (
-              <>
-                <AstroRoshniHomepage 
-                  user={null} 
-                  onLogin={() => setShowLoginModal(true)} 
-                  showLoginButton={true} 
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to add your saved birth chart and run your personalised wealth and finance analysis."
+                  onAuthenticated={handleLogin}
                 />
-                <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-                      <div style={{ marginBottom: '20px' }}>
-                        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
-                        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Wealth Analysis</p>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                          <button 
-                            onClick={() => setAuthView('login')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'login' ? '#e91e63' : 'transparent',
-                              color: authView === 'login' ? 'white' : '#e91e63',
-                              borderRadius: '25px 0 0 25px',
-                              cursor: 'pointer',
-                              borderRight: '1px solid #e91e63'
-                            }}
-                          >
-                            Sign In
-                          </button>
-                          <button 
-                            onClick={() => setAuthView('register')}
-                            style={{
-                              padding: '10px 20px',
-                              border: 'none',
-                              background: authView === 'register' ? '#e91e63' : 'transparent',
-                              color: authView === 'register' ? 'white' : '#e91e63',
-                              borderRadius: '0 25px 25px 0',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Sign Up
-                          </button>
-                        </div>
-                      </div>
-                      {authView === 'login' ? (
-                        <LoginForm 
-                          onLogin={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/wealth-analysis';
-                          }} 
-                          onSwitchToRegister={() => setAuthView('register')} 
-                        />
-                      ) : (
-                        <RegisterForm 
-                          onRegister={(userData) => {
-                            handleLogin(userData);
-                            setShowLoginModal(false);
-                            window.location.href = '/wealth-analysis';
-                          }} 
-                          onSwitchToLogin={() => setAuthView('login')} 
-                        />
-                      )}
-                </AuthModalShell>
               </>
-              )
             } />
             <Route path="/lesson/:lessonId" element={
               <LessonPage
@@ -1065,29 +941,57 @@ function App() {
             <Route
               path="/progeny-analysis"
               element={
-                user ? (
+                <>
                   <AnalysisDetailPage
                     analysisType="progeny"
                     user={user}
-                    onLogout={handleLogout}
-                    onAdminClick={handleAdminClick}
+                    onLogout={user ? handleLogout : undefined}
+                    onAdminClick={user ? handleAdminClick : undefined}
+                    onLogin={() => {
+                      setAuthView('login');
+                      setShowLoginModal(true);
+                    }}
+                    onOpenRegister={() => {
+                      setAuthView('register');
+                      setShowLoginModal(true);
+                    }}
                   />
-                ) : (
-                  <Navigate to="/" replace />
-                )
+                  <AnalysisGuestAuthModal
+                    isOpen={showLoginModal && !user}
+                    onClose={() => setShowLoginModal(false)}
+                    authView={authView}
+                    setAuthView={setAuthView}
+                    description="Sign in to add your saved birth chart and run your personalised progeny analysis."
+                    onAuthenticated={handleLogin}
+                  />
+                </>
               }
             />
             <Route path="/education" element={
-              user ? (
+              <>
                 <AnalysisDetailPage
                   analysisType="education"
                   user={user}
-                  onLogout={handleLogout}
-                  onAdminClick={handleAdminClick}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
                 />
-              ) : (
-                <Navigate to="/" replace />
-              )
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to add your saved birth chart and run your personalised education analysis."
+                  onAuthenticated={handleLogin}
+                />
+              </>
             } />
             {/* CRA route: SEO HTML at build/chat.html; ?app=1 loads this shell */}
             <Route

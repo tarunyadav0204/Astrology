@@ -362,6 +362,7 @@ class GeminiChatAnalyzer:
 
         from utils.admin_settings import (
             CHAT_LLM_DEEPSEEK,
+            CHAT_LLM_GEMMA,
             CHAT_LLM_OPENAI,
             get_chat_llm_provider,
             get_chat_llm_provider_premium,
@@ -369,6 +370,7 @@ class GeminiChatAnalyzer:
             get_deepseek_premium_model,
             get_gemini_chat_model,
             get_gemini_premium_model,
+            get_gemma_chat_generate_url,
             get_openai_chat_model,
             get_openai_premium_model,
         )
@@ -422,6 +424,36 @@ class GeminiChatAnalyzer:
                 )
                 response_text = (ds or {}).get("text")
                 token_usage = (ds or {}).get("usage") or token_usage
+            elif llm_provider == CHAT_LLM_GEMMA:
+                from ai.gemma_chat_client import post_gemma_generate_analysis
+
+                model_name = "gemma-http"
+                gem_url = get_gemma_chat_generate_url()
+                g_out = await asyncio.wait_for(
+                    post_gemma_generate_analysis(
+                        gem_url,
+                        {
+                            "chat_prompt": prompt,
+                            "question": "",
+                            "language": "english",
+                            "source": "generate_text_from_prompt",
+                        },
+                        timeout_s=timeout_s,
+                    ),
+                    timeout=timeout_s,
+                )
+                response_text = (g_out.get("text") or "").strip()
+                if g_out.get("error") and not response_text:
+                    raise RuntimeError(str(g_out.get("error")))
+                inp_est = max(1, len(prompt) // 4)
+                out_est = max(0, len(response_text) // 4)
+                token_usage = {
+                    "input_tokens": inp_est,
+                    "output_tokens": out_est,
+                    "cached_tokens": 0,
+                    "total_tokens": inp_est + out_est,
+                    "non_cached_input_tokens": inp_est,
+                }
             else:
                 model_name = (
                     (str(model_name_override).strip() if model_name_override else "")
@@ -542,12 +574,14 @@ class GeminiChatAnalyzer:
             get_chat_llm_provider_premium,
             CHAT_LLM_OPENAI,
             CHAT_LLM_DEEPSEEK,
+            CHAT_LLM_GEMMA,
             get_openai_chat_model,
             get_openai_premium_model,
             get_deepseek_chat_model,
             get_deepseek_premium_model,
             get_gemini_chat_model,
             get_gemini_premium_model,
+            get_gemma_chat_generate_url,
         )
 
         debug_logging = is_debug_logging_enabled()
@@ -729,6 +763,45 @@ class GeminiChatAnalyzer:
                 )
                 response_text = (ds or {}).get("text")
                 token_usage = (ds or {}).get("usage") or token_usage
+            elif llm_provider == CHAT_LLM_GEMMA:
+                from ai.gemma_chat_client import post_gemma_generate_analysis
+
+                model_name = "gemma-http"
+                gem_url = get_gemma_chat_generate_url()
+                print(f"🧠 Gemma HTTP chat: {gem_url} ({model_type}, premium_analysis={premium_analysis})")
+                payload = {
+                    "question": user_question,
+                    "language": language,
+                    "response_style": response_style,
+                    "premium_analysis": bool(premium_analysis),
+                    "mode": mode,
+                    "user_context": user_context or {},
+                    "astrological_context": pruned_context,
+                    "conversation_history": conversation_history or [],
+                    "chat_prompt": prompt,
+                }
+                g_out = await asyncio.wait_for(
+                    post_gemma_generate_analysis(gem_url, payload, timeout_s=600.0),
+                    timeout=600.0,
+                )
+                response_text = (g_out.get("text") or "").strip()
+                if g_out.get("error") and not response_text:
+                    return {
+                        "success": False,
+                        "response": f"Gemma service error: {g_out.get('error')}",
+                        "error": str(g_out.get("error")),
+                        "chat_llm_model": model_name,
+                        "timing": {"chat_llm_provider": llm_provider, "chat_llm_model": model_name},
+                    }
+                inp_est = max(1, len(prompt) // 4)
+                out_est = max(0, len(response_text) // 4)
+                token_usage = {
+                    "input_tokens": inp_est,
+                    "output_tokens": out_est,
+                    "cached_tokens": 0,
+                    "total_tokens": inp_est + out_est,
+                    "non_cached_input_tokens": inp_est,
+                }
             else:
                 # Resolve Gemini model from admin settings (no server restart needed)
                 model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
@@ -799,6 +872,8 @@ class GeminiChatAnalyzer:
                     tag = "OPENAI"
                 elif llm_provider == CHAT_LLM_DEEPSEEK:
                     tag = "DEEPSEEK"
+                elif llm_provider == CHAT_LLM_GEMMA:
+                    tag = "GEMMA"
                 else:
                     tag = "GEMINI"
                 print(f"\n{'='*80}")

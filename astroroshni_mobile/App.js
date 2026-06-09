@@ -24,6 +24,7 @@ import BirthProfileIntroScreen from './src/components/BirthProfileIntro/BirthPro
 import SelectNativeScreen from './src/components/Native/SelectNativeScreen';
 import CreditScreen from './src/credits/CreditScreen';
 import ProfileScreen from './src/components/Profile/ProfileScreen';
+import AccountSecurityScreen from './src/components/Profile/AccountSecurityScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
 import RelationshipMatchScreen from './src/components/Relationship/RelationshipMatchScreen';
@@ -662,6 +663,11 @@ export default function App() {
           <Stack.Screen 
             name="Profile" 
             component={ProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AccountSecurity"
+            component={AccountSecurityScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

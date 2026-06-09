@@ -254,6 +254,15 @@ export const authAPI = {
   },
   getSelfBirthChart: () => api.get(getEndpoint('/user/self-birth-chart')),
   getUserStats: () => api.get(getEndpoint('/user/stats')),
+  getAccountDetails: () => api.get(getEndpoint('/user/account-details')),
+  updateOwnPassword: (body) =>
+    api.put(getEndpoint('/user/password'), body, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  updateOwnEmail: (body) =>
+    api.put(getEndpoint('/user/email'), body, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  updateOwnGender: (body) =>
+    api.put(getEndpoint('/user/gender'), body, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+  deleteAccount: () =>
+    api.delete(getEndpoint('/user/account'), { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
 
 };
 

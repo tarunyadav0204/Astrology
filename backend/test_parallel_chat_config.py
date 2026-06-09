@@ -57,3 +57,19 @@ def test_parallel_chat_allowlist_invalid_ids_means_nobody(monkeypatch):
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT_USER_IDS", "not_a_number, also_bad")
     assert should_use_parallel_chat(ctx, user_id=1) is False
 
+
+def test_parallel_chat_skipped_when_gemma_vendor(monkeypatch):
+    import utils.admin_settings as ads
+
+    from ai.parallel_chat.config import should_use_parallel_chat
+
+    monkeypatch.setenv("ASTRO_PARALLEL_CHAT", "1")
+    ctx = {"analysis_type": "birth", "intent": {"mode": "birth", "category": "career"}}
+    monkeypatch.setattr(ads, "get_chat_llm_provider", lambda: ads.CHAT_LLM_GEMMA)
+    monkeypatch.setattr(ads, "get_chat_llm_provider_premium", lambda: ads.CHAT_LLM_GEMINI)
+    assert should_use_parallel_chat(ctx) is False
+
+    monkeypatch.setattr(ads, "get_chat_llm_provider", lambda: ads.CHAT_LLM_GEMINI)
+    monkeypatch.setattr(ads, "get_chat_llm_provider_premium", lambda: ads.CHAT_LLM_GEMMA)
+    assert should_use_parallel_chat(ctx) is False
+

@@ -84,9 +84,19 @@ def should_use_parallel_chat(context: dict, *, user_id: Optional[int] = None) ->
     Synastry, mundane, annual, prashna, and other modes keep the legacy single-call path.
 
     When ``ASTRO_PARALLEL_CHAT_USER_IDS`` is set, only listed ``user_id`` values pass (``user_id`` must be passed from routes).
+
+    Self-hosted Gemma (HTTP) is incompatible with this pipeline: branches expect vendor JSON/tooling
+    and fan out many specialist prompts; use the single-call ``generate_chat_response`` path instead.
     """
     if not parallel_chat_enabled():
         return False
+    try:
+        from utils.admin_settings import CHAT_LLM_GEMMA, get_chat_llm_provider, get_chat_llm_provider_premium
+
+        if get_chat_llm_provider() == CHAT_LLM_GEMMA or get_chat_llm_provider_premium() == CHAT_LLM_GEMMA:
+            return False
+    except Exception:
+        pass
     allow = parallel_chat_user_allowlist()
     if allow is not None:
         if not allow:
@@ -120,6 +130,13 @@ def should_use_parallel_relational_chat(context: dict, *, user_id: Optional[int]
     """
     if not parallel_relational_chat_enabled():
         return False
+    try:
+        from utils.admin_settings import CHAT_LLM_GEMMA, get_chat_llm_provider, get_chat_llm_provider_premium
+
+        if get_chat_llm_provider() == CHAT_LLM_GEMMA or get_chat_llm_provider_premium() == CHAT_LLM_GEMMA:
+            return False
+    except Exception:
+        pass
     allow = parallel_chat_user_allowlist()
     if allow is not None:
         if not allow:

@@ -55,7 +55,7 @@ export default function AboutScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme === 'dark' ? '#020617' : colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="#ff6b35" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -66,7 +66,7 @@ export default function AboutScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.card, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.9)' : colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.surface, borderColor: colors.cardBorder }]}>
           <View style={styles.logoRow}>
             <View style={[styles.logoBadge, { backgroundColor: '#f97316' }]}>
               <Text style={styles.logoText}>AR</Text>
@@ -84,7 +84,7 @@ export default function AboutScreen({ navigation }) {
           </Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.9)' : colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.surface, borderColor: colors.cardBorder }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('about.legalHeading', 'Legal & Policies')}</Text>
           <TouchableOpacity
             style={styles.rowItem}
@@ -102,7 +102,7 @@ export default function AboutScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.card, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.9)' : colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.surface, borderColor: colors.cardBorder }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('about.supportHeading', 'Support')}</Text>
           <TouchableOpacity
             style={styles.rowItem}
@@ -121,7 +121,7 @@ export default function AboutScreen({ navigation }) {
         </View>
 
         {__DEV__ ? (
-          <View style={[styles.card, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.9)' : colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.card, { backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.surface, borderColor: colors.cardBorder }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Developer</Text>
             <Text style={[styles.description, { color: colors.textSecondary, marginBottom: 12 }]}>
               Sends one test error to Sentry so you can confirm the Issues tab. Remove this block before shipping if you prefer.

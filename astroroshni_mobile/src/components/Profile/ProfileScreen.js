@@ -777,6 +777,21 @@ export default function ProfileScreen({ navigation, route }) {
                 {`⚙️ ${t('profile.settings', 'Settings')}`}
               </Text>
               <View style={[styles.settingsCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
+                <TouchableOpacity
+                  style={styles.settingItem}
+                  onPress={() => navigation.navigate('AccountSecurity')}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="shield-checkmark-outline" size={22} color="#22c55e" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.accountAndSecurity', 'Account & security')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+
                 <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
                   <View style={styles.settingLeft}>
                     <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color="#ffd700" />
@@ -884,77 +899,6 @@ export default function ProfileScreen({ navigation, route }) {
                 </TouchableOpacity>
               </View>
             </Animated.View>
-
-            <TouchableOpacity 
-              style={[
-                styles.logoutButton, 
-                { 
-                  backgroundColor: theme === 'dark' ? 'rgba(220, 38, 38, 0.2)' : 'rgba(248, 113, 113, 0.15)', 
-                  borderColor: theme === 'dark' ? 'rgba(248, 113, 113, 0.6)' : 'rgba(220, 38, 38, 0.5)' 
-                }
-              ]}
-              onPress={() => {
-                Alert.alert(
-                  t('profile.deleteAccountTitle', 'Delete Account'),
-                  t(
-                    'profile.deleteAccountConfirmBody',
-                    'This will permanently delete your account and associated data. This action cannot be undone.\n\nAre you sure you want to continue?'
-                  ),
-                  [
-                    { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-                    {
-                      text: t('common.delete', 'Delete'),
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          const { API_BASE_URL, getEndpoint } = require('../../utils/constants');
-                          const token = await storage.getAuthToken();
-                          const res = await fetch(`${API_BASE_URL}${getEndpoint('/user/account')}`, {
-                            method: 'DELETE',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                            },
-                          });
-                          if (!res.ok) {
-                            const text = await res.text();
-                            console.log('Delete account failed:', res.status, text);
-                            Alert.alert(
-                              t('common.error', 'Error'),
-                              t('profile.deleteAccountFailed', 'Failed to delete account. Please try again.')
-                            );
-                            return;
-                          }
-                          await storage.clearAll();
-                          navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Login' }],
-                          });
-                        } catch (err) {
-                          console.error('Delete account error', err);
-                          Alert.alert(
-                            t('common.error', 'Error'),
-                            t(
-                              'profile.deleteAccountUnexpectedError',
-                              'Something went wrong while deleting your account. Please try again.'
-                            )
-                          );
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
-            >
-              <Text
-                style={[
-                  styles.logoutText,
-                  { color: theme === 'dark' ? '#ffffff' : colors.error },
-                ]}
-              >
-                {`🗑️ ${t('profile.deleteAccountAndData', 'Delete Account & Data')}`}
-              </Text>
-            </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.logoutButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.2)' : 'rgba(255, 107, 53, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.5)' : 'rgba(255, 107, 53, 0.4)' }]}

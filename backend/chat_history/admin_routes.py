@@ -2336,6 +2336,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             CHAT_LLM_GEMINI,
             CHAT_LLM_OPENAI,
             CHAT_LLM_DEEPSEEK,
+            CHAT_LLM_GEMMA,
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
@@ -2371,7 +2372,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
         _raw_premium = (get_setting("chat_llm_provider_premium") or "").strip().lower()
         _premium_ui = (
             _raw_premium
-            if _raw_premium in (CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK)
+            if _raw_premium in (CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK, CHAT_LLM_GEMMA)
             else ""
         )
         return {
@@ -2394,6 +2395,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "openai_premium_model": get_openai_premium_model(),
             "deepseek_chat_model": get_deepseek_chat_model(),
             "deepseek_premium_model": get_deepseek_premium_model(),
+            "gemma_chat_generate_url": (get_setting("gemma_chat_generate_url") or "").strip(),
             "podcast_provider": get_podcast_provider(),
             "speech_tts_provider": get_speech_tts_provider(),
             "speech_tts_voice_en": get_speech_tts_voice("en"),

@@ -215,21 +215,26 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleSendCode = async () => {
-    if (!resetData.phone) {
+    const digits = (resetData.phone || '').replace(/\D/g, '');
+    const isIndiaSmsReset = digits.length === 10 && /^[6-9]\d{9}$/.test(digits);
+    const phoneForApi = isIndiaSmsReset ? `+91${digits}` : (resetData.phone || '').trim();
+
+    if (!digits && !phoneForApi) {
       Alert.alert('Error', 'Please enter phone number');
       return;
     }
-    if (!(resetData.email || '').trim()) {
+    if (!isIndiaSmsReset && !(resetData.email || '').trim()) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await authAPI.sendResetCode({
-        phone: resetData.phone,
-        email: resetData.email.trim(),
-      });
+      const payload = { phone: phoneForApi };
+      if (!isIndiaSmsReset) {
+        payload.email = resetData.email.trim();
+      }
+      const response = await authAPI.sendResetCode(payload);
       Alert.alert('Success', response.data.message);
       setResetStep(2);
     } catch (error) {
@@ -245,10 +250,14 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
+    const digits = (resetData.phone || '').replace(/\D/g, '');
+    const isIndiaSmsReset = digits.length === 10 && /^[6-9]\d{9}$/.test(digits);
+    const phoneForApi = isIndiaSmsReset ? `+91${digits}` : (resetData.phone || '').trim();
+
     setLoading(true);
     try {
       const response = await authAPI.verifyResetCode({
-        phone: resetData.phone,
+        phone: phoneForApi,
         code: resetData.code
       });
       setResetToken(response.data.reset_token);
@@ -537,6 +546,10 @@ export default function LoginScreen({ navigation }) {
   }
 
   if (showForgotPassword) {
+    const resetDigits = (resetData.phone || '').replace(/\D/g, '');
+    const resetIndiaForgot =
+      resetDigits.length === 10 && /^[6-9]\d{9}$/.test(resetDigits);
+
     return (
       <LinearGradient
         colors={[COLORS.gradientStart, COLORS.gradientEnd]}
@@ -560,7 +573,11 @@ export default function LoginScreen({ navigation }) {
                   <Text style={styles.logoEmoji}>🔐</Text>
                 </LinearGradient>
                 <Text style={styles.title}>Reset Password</Text>
-                <Text style={styles.subtitle}>Secure your cosmic journey</Text>
+                <Text style={styles.subtitle}>
+                  {resetIndiaForgot
+                    ? 'Enter your mobile number — we will send a code by SMS.'
+                    : 'Secure your cosmic journey'}
+                </Text>
               </View>
 
               {resetStep === 1 ? (
@@ -576,6 +593,7 @@ export default function LoginScreen({ navigation }) {
                       keyboardType="phone-pad"
                     />
                   </View>
+                  {!resetIndiaForgot ? (
                   <View style={styles.inputWrapper}>
                     <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
                     <TextInput
@@ -588,6 +606,7 @@ export default function LoginScreen({ navigation }) {
                       autoCapitalize="none"
                     />
                   </View>
+                  ) : null}
                   <TouchableOpacity
                     style={[styles.modernButton, loading && styles.buttonDisabled]}
                     onPress={handleSendCode}

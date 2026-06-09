@@ -168,6 +168,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deepseekModelOptions, setDeepseekModelOptions] = useState([]);
   const [deepseekChatModel, setDeepseekChatModel] = useState('');
   const [deepseekPremiumModel, setDeepseekPremiumModel] = useState('');
+  const [gemmaChatGenerateUrl, setGemmaChatGenerateUrl] = useState('');
   const [analysisLlmVendor, setAnalysisLlmVendor] = useState('gemini');
   const [timelineLlmVendor, setTimelineLlmVendor] = useState('gemini');
   const [deepseekAnalysisModel, setDeepseekAnalysisModel] = useState('');
@@ -384,6 +385,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setDeepseekModelOptions(data.deepseek_model_options || []);
       setDeepseekChatModel(data.deepseek_chat_model || '');
       setDeepseekPremiumModel(data.deepseek_premium_model || '');
+      setGemmaChatGenerateUrl(data.gemma_chat_generate_url || '');
       setAnalysisLlmVendor(data.analysis_llm_vendor || 'gemini');
       setTimelineLlmVendor(data.timeline_llm_vendor || 'gemini');
       setDeepseekAnalysisModel(data.deepseek_analysis_model || '');
@@ -458,6 +460,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         openaiPremiumRes,
         deepseekChatRes,
         deepseekPremiumRes,
+        gemmaUrlRes,
       ] = await Promise.all([
         fetch('/api/admin/settings/gemini_chat_model', {
           method: 'PUT',
@@ -537,7 +540,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'chat_llm_provider',
             value: chatLlmProvider,
-            description: 'Chat LLM vendor for standard (non-premium) chat: gemini, openai, or deepseek',
+            description: 'Chat LLM vendor for standard (non-premium) chat: gemini, openai, deepseek, or gemma',
           }),
         }),
         fetch('/api/admin/settings/chat_llm_provider_premium', {
@@ -546,7 +549,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'chat_llm_provider_premium',
             value: chatLlmProviderPremium,
-            description: 'Chat LLM vendor for premium chat; empty = same as standard',
+            description: 'Chat LLM vendor for premium chat; empty = same as standard (gemini, openai, deepseek, gemma)',
           }),
         }),
         fetch('/api/admin/settings/openai_chat_model', {
@@ -585,6 +588,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'DeepSeek model id for premium chat',
           }),
         }),
+        fetch('/api/admin/settings/gemma_chat_generate_url', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'gemma_chat_generate_url',
+            value: gemmaChatGenerateUrl.trim(),
+            description:
+              'Full URL for self-hosted Gemma chat POST (e.g. http://host:8000/generate-analysis). Empty = use built-in default; env GEMMA_CHAT_GENERATE_URL overrides when set.',
+          }),
+        }),
       ]);
       if (
         !chatRes.ok ||
@@ -600,7 +613,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         !openaiChatRes.ok ||
         !openaiPremiumRes.ok ||
         !deepseekChatRes.ok ||
-        !deepseekPremiumRes.ok
+        !deepseekPremiumRes.ok ||
+        !gemmaUrlRes.ok
       ) {
         const chatErr = await chatRes.json().catch(() => ({}));
         const premiumErr = await premiumRes.json().catch(() => ({}));
@@ -616,6 +630,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const oaPremErr = await openaiPremiumRes.json().catch(() => ({}));
         const dsChatErr = await deepseekChatRes.json().catch(() => ({}));
         const dsPremErr = await deepseekPremiumRes.json().catch(() => ({}));
+        const gemmaUrlErr = await gemmaUrlRes.json().catch(() => ({}));
         console.error(
           'Save failed:',
           chatErr,
@@ -631,7 +646,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           oaChatErr,
           oaPremErr,
           dsChatErr,
-          dsPremErr
+          dsPremErr,
+          gemmaUrlErr
         );
         alert(
           'Failed to save: ' +
@@ -649,12 +665,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               oaPremErr.detail ||
               dsChatErr.detail ||
               dsPremErr.detail ||
+              gemmaUrlErr.detail ||
               'check console')
         );
         return;
       }
       alert(
-        'Chat vendors, chat models, analysis/timeline vendors, Gemini & DeepSeek picks saved. New requests use them immediately.'
+        'Chat vendors, chat models, Gemma URL, analysis/timeline vendors, and model picks saved. New requests use them immediately.'
       );
     } catch (error) {
       console.error('Error saving Gemini models:', error);
@@ -1062,7 +1079,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const fetchSubscriptionPlans = async () => {
+  const fetchSubscriptionPlans = async (options = {}) => {
+    const force = options?.force === true;
+    if (!force && (subscriptionPlans?.length ?? 0) > 0) {
+      return;
+    }
     try {
       const data = await adminService.getSubscriptionPlans();
       const plans = data.plans || [];
@@ -1314,7 +1335,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       await adminService.updateSubscriptionPlan(planId, { discount_percent: value });
       setEditingPlanId(null);
       setEditingPlanDiscount('');
-      fetchSubscriptionPlans();
+      fetchSubscriptionPlans({ force: true });
     } catch (error) {
       console.error('Error updating plan discount:', error);
       alert(error.message || 'Failed to update discount');
@@ -1332,7 +1353,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setSavingPlanBenefitsId(planId);
     try {
       await adminService.updateSubscriptionPlan(planId, { features: value });
-      await fetchSubscriptionPlans();
+      await fetchSubscriptionPlans({ force: true });
       alert('Plan benefits updated');
     } catch (error) {
       console.error('Error updating plan benefits:', error);
@@ -1982,6 +2003,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const vendorLabel = (v) => {
     if (v === 'openai') return 'OpenAI';
     if (v === 'deepseek') return 'DeepSeek';
+    if (v === 'gemma') return 'self-hosted Gemma (HTTP)';
     return 'Google Gemini';
   };
   const premiumVendorEffective =
@@ -4138,7 +4160,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <div className="settings-section">
               <h3>Chat LLM vendors</h3>
               <p className="settings-hint">
-                Pick who runs each tier first. Model choices in the next section follow these vendors. Non-chat analysis and timelines use the <strong>Analysis &amp; event timeline models</strong> section below (same save). Set <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, and <code>DEEPSEEK_API_KEY</code> as needed.
+                Pick who runs each tier first. Model choices in the next section follow these vendors (Gemma uses a configurable HTTP URL instead). Non-chat analysis and timelines use the <strong>Analysis &amp; event timeline models</strong> section below (same save). Set <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, and <code>DEEPSEEK_API_KEY</code> as needed for those vendors.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
@@ -4153,6 +4175,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
                   <option value="deepseek">DeepSeek</option>
+                  <option value="gemma">Self-hosted Gemma (HTTP)</option>
                 </select>
               </div>
               <div className="setting-item">
@@ -4169,8 +4192,27 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
                   <option value="deepseek">DeepSeek</option>
+                  <option value="gemma">Self-hosted Gemma (HTTP)</option>
                 </select>
               </div>
+              {(chatLlmProvider === 'gemma' || premiumVendorEffective === 'gemma') && (
+                <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <div className="setting-info">
+                    <strong>Gemma generate URL</strong>
+                    <p>
+                      Full URL for <code>POST</code> (JSON body). Leave blank to use the server default; set env{' '}
+                      <code>GEMMA_CHAT_GENERATE_URL</code> to override everything for quick tests.
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={gemmaChatGenerateUrl}
+                    onChange={(e) => setGemmaChatGenerateUrl(e.target.value)}
+                    placeholder="http://8.231.104.209:8000/generate-analysis"
+                    style={{ width: '100%', maxWidth: '520px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="settings-section">
@@ -4221,6 +4263,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     ))}
                   </select>
                 )}
+                {chatLlmProvider === 'gemma' && (
+                  <p className="settings-hint" style={{ margin: 0 }}>
+                    No model id — answers come from the Gemma HTTP service (URL above).
+                  </p>
+                )}
               </div>
               <div className="setting-item">
                 <div className="setting-info">
@@ -4259,6 +4306,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <option key={`dsp-${opt.value}`} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
+                )}
+                {premiumVendorEffective === 'gemma' && (
+                  <p className="settings-hint" style={{ margin: 0 }}>
+                    No model id — premium tier uses the same Gemma HTTP endpoint.
+                  </p>
                 )}
               </div>
             </div>

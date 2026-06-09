@@ -217,9 +217,9 @@ export default function SupportScreen({ navigation }) {
     }
   };
 
-  const bg = theme === 'dark' ? '#020617' : colors.background;
-  const cardBg = theme === 'dark' ? 'rgba(15,23,42,0.95)' : colors.surface;
-  const borderCol = colors.border;
+  const bg = colors.background;
+  const cardBg = theme === 'dark' ? colors.backgroundSecondary : colors.surface;
+  const borderCol = colors.cardBorder;
 
   const renderList = () => (
     <ScrollView

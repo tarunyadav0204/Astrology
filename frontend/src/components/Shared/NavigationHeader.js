@@ -57,12 +57,12 @@ function FullHamburgerMenuItems({
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('select'); onClose(); }}>👤 Select birth chart</button>
 
     <div className="mobile-menu-section-label">Your Life</div>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/career-guidance') : onLogin && onLogin()); onClose(); }}>💼 Your Career</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/marriage-analysis') : onLogin && onLogin()); onClose(); }}>💍 Your Marriage</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/progeny-analysis') : onLogin && onLogin()); onClose(); }}>👶 Your Progeny</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/education') : onLogin && onLogin()); onClose(); }}>🎓 Your Education</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/health-analysis') : onLogin && onLogin()); onClose(); }}>🏥 Your Health</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/wealth-analysis') : onLogin && onLogin()); onClose(); }}>💰 Your Wealth</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/career-guidance'); onClose(); }}>💼 Your Career</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/marriage-analysis'); onClose(); }}>💍 Your Marriage</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/progeny-analysis'); onClose(); }}>👶 Your Progeny</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/education'); onClose(); }}>🎓 Your Education</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/health-analysis'); onClose(); }}>🏥 Your Health</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/wealth-analysis'); onClose(); }}>💰 Your Wealth</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { (user ? navigate('/life-events') : onLogin && onLogin()); onClose(); }}>📅 Life events</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/karma-analysis'); onClose(); }}>🕉️ Past life analysis</button>
     <button
@@ -274,12 +274,12 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
 
         {activeDropdown === 'yourlife' && (
           <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
-            <button onClick={() => { user ? navigate('/career-guidance') : onLogin(); setActiveDropdown(null); }}>💼 Your Career</button>
-            <button onClick={() => { user ? navigate('/marriage-analysis') : onLogin(); setActiveDropdown(null); }}>💍 Your Marriage</button>
-            <button onClick={() => { user ? navigate('/progeny-analysis') : onLogin(); setActiveDropdown(null); }}>👶 Your Progeny</button>
-            <button onClick={() => { user ? navigate('/education') : (onLogin && onLogin()); setActiveDropdown(null); }}>🎓 Your Education</button>
-            <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
-            <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
+            <button onClick={() => { navigate('/career-guidance'); setActiveDropdown(null); }}>💼 Your Career</button>
+            <button onClick={() => { navigate('/marriage-analysis'); setActiveDropdown(null); }}>💍 Your Marriage</button>
+            <button onClick={() => { navigate('/progeny-analysis'); setActiveDropdown(null); }}>👶 Your Progeny</button>
+            <button onClick={() => { navigate('/education'); setActiveDropdown(null); }}>🎓 Your Education</button>
+            <button onClick={() => { navigate('/health-analysis'); setActiveDropdown(null); }}>🏥 Your Health</button>
+            <button onClick={() => { navigate('/wealth-analysis'); setActiveDropdown(null); }}>💰 Your Wealth</button>
             <button onClick={() => { user ? navigate('/life-events') : onLogin(); setActiveDropdown(null); }}>📅 Life events</button>
             <button type="button" onClick={() => { navigate('/karma-analysis'); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
           </div>
@@ -489,12 +489,12 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
 
       {activeDropdown === 'yourlife' && (
         <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
-          <button onClick={() => { user ? navigate('/career-guidance') : onLogin(); setActiveDropdown(null); }}>💼 Your Career</button>
-          <button onClick={() => { user ? navigate('/marriage-analysis') : onLogin(); setActiveDropdown(null); }}>💍 Your Marriage</button>
-          <button onClick={() => { user ? navigate('/progeny-analysis') : onLogin(); setActiveDropdown(null); }}>👶 Your Progeny</button>
-          <button onClick={() => { user ? navigate('/education') : (onLogin && onLogin()); setActiveDropdown(null); }}>🎓 Your Education</button>
-          <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
-          <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
+          <button onClick={() => { navigate('/career-guidance'); setActiveDropdown(null); }}>💼 Your Career</button>
+          <button onClick={() => { navigate('/marriage-analysis'); setActiveDropdown(null); }}>💍 Your Marriage</button>
+          <button onClick={() => { navigate('/progeny-analysis'); setActiveDropdown(null); }}>👶 Your Progeny</button>
+          <button onClick={() => { navigate('/education'); setActiveDropdown(null); }}>🎓 Your Education</button>
+          <button onClick={() => { navigate('/health-analysis'); setActiveDropdown(null); }}>🏥 Your Health</button>
+          <button onClick={() => { navigate('/wealth-analysis'); setActiveDropdown(null); }}>💰 Your Wealth</button>
           <button onClick={() => { user ? navigate('/life-events') : onLogin(); setActiveDropdown(null); }}>📅 Life events</button>
           <button type="button" onClick={() => { navigate('/karma-analysis'); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
         </div>

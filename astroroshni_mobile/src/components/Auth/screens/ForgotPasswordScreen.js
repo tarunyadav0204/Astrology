@@ -40,6 +40,8 @@ export default function ForgotPasswordScreen({
   const nationalDigits = (formData.phone || '').replace(/[^0-9]/g, '');
   const fullPhone = `${selectedCountry.code}${nationalDigits}`;
   const isPhoneValid = isNationalPhoneValid(selectedCountry.code, nationalDigits);
+  /** India (+91): reset OTP is SMS-only; backend does not require email (see `send_reset_code`). */
+  const isIndiaSmsReset = selectedCountry.code === '+91';
 
   useEffect(() => {
     const match = COUNTRY_CODES.find((c) => c.code === formData.countryCode);
@@ -91,17 +93,20 @@ export default function ForgotPasswordScreen({
       );
       return;
     }
-    if (!formData.email) {
+    if (!isIndiaSmsReset && !(formData.email || '').trim()) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     setLoading(true);
     try {
-      const buildPayload = (phoneVal) => ({
-        phone: phoneVal,
-        email: (formData.email || '').trim(),
-      });
+      const buildPayload = (phoneVal) => {
+        const base = { phone: phoneVal };
+        if (!isIndiaSmsReset) {
+          base.email = (formData.email || '').trim();
+        }
+        return base;
+      };
       let response;
       try {
         response = await authAPI.sendResetCode(buildPayload(fullPhone));
@@ -118,9 +123,12 @@ export default function ForgotPasswordScreen({
         }
       }
       const okMsg = response?.data?.message;
+      const defaultOk = isIndiaSmsReset
+        ? 'Check your phone for the reset code (SMS).'
+        : 'Check your email for the reset code.';
       Alert.alert(
         'Success',
-        typeof okMsg === 'string' && okMsg.trim() ? okMsg.trim() : 'Check your email for the reset code.',
+        typeof okMsg === 'string' && okMsg.trim() ? okMsg.trim() : defaultOk,
       );
       setStep(2);
     } catch (error) {
@@ -184,7 +192,9 @@ export default function ForgotPasswordScreen({
               <Text style={styles.emoji}>📱</Text>
               <Text style={styles.title}>Reset Password</Text>
               <Text style={styles.subtitle}>
-                Enter your phone number and email. We will send a reset code to your email.
+                {isIndiaSmsReset
+                  ? 'Enter your phone number. We will send a reset code by SMS.'
+                  : 'Enter your phone number and email. We will send a reset code to your email.'}
               </Text>
             </View>
 
@@ -228,7 +238,8 @@ export default function ForgotPasswordScreen({
               </View>
             </Animated.View>
 
-            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
+            {!isIndiaSmsReset ? (
+              <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
                 <View style={styles.inputWrapper}>
                   <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
                   <TextInput
@@ -242,6 +253,7 @@ export default function ForgotPasswordScreen({
                   />
                 </View>
               </Animated.View>
+            ) : null}
 
             <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
               <TouchableOpacity
@@ -269,8 +281,9 @@ export default function ForgotPasswordScreen({
               <Text style={styles.emoji}>🔐</Text>
               <Text style={styles.title}>Enter Code</Text>
               <Text style={styles.subtitle}>
-                We've sent a 6-digit code to{'\n'}
-                {formData.email ? formData.email : fullPhone}
+                {isIndiaSmsReset
+                  ? `We've sent a 6-digit code by SMS to\n${fullPhone}`
+                  : `We've sent a 6-digit code to\n${(formData.email || '').trim() ? formData.email.trim() : fullPhone}`}
               </Text>
             </View>
 

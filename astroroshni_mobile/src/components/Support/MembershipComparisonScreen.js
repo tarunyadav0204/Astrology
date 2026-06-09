@@ -119,7 +119,7 @@ export default function MembershipComparisonScreen({ navigation }) {
   }, [pricing, pricingOriginal, tierDiscounts]);
 
   const isDark = theme === 'dark';
-  const cardBg = isDark ? 'rgba(15,23,42,0.95)' : colors.surface;
+  const cardBg = isDark ? colors.backgroundSecondary : colors.surface;
   const fallbackBodyHeight = Math.max(220, Math.min(540, windowHeight - 360));
   const tableBodyHeight =
     tableViewportHeight > 0 ? Math.max(220, tableViewportHeight - 42) : fallbackBodyHeight;

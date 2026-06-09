@@ -28,6 +28,10 @@ _GEMINI_31_FLASH_LITE_GA = "models/gemini-3.1-flash-lite"
 CHAT_LLM_GEMINI = "gemini"
 CHAT_LLM_OPENAI = "openai"
 CHAT_LLM_DEEPSEEK = "deepseek"
+CHAT_LLM_GEMMA = "gemma"
+
+# Self-hosted Gemma (or compatible) HTTP POST /generate-analysis — override via admin or GEMMA_CHAT_GENERATE_URL.
+DEFAULT_GEMMA_CHAT_GENERATE_URL = "http://8.231.104.209:8000/generate-analysis"
 
 # OpenAI model IDs for Chat Completions API (no `models/` prefix).
 OPENAI_CHAT_MODEL_OPTIONS = [
@@ -203,12 +207,14 @@ def get_deepseek_timeline_model() -> str:
 
 
 def get_chat_llm_provider() -> str:
-    """Which LLM vendor runs standard (non-premium) astrological chat: 'gemini', 'openai', or 'deepseek'."""
+    """Which LLM vendor runs standard (non-premium) astrological chat: 'gemini', 'openai', 'deepseek', or 'gemma'."""
     value = (get_setting("chat_llm_provider") or "").strip().lower()
     if value == CHAT_LLM_DEEPSEEK:
         return CHAT_LLM_DEEPSEEK
     if value == CHAT_LLM_OPENAI:
         return CHAT_LLM_OPENAI
+    if value == CHAT_LLM_GEMMA:
+        return CHAT_LLM_GEMMA
     return CHAT_LLM_GEMINI
 
 
@@ -221,7 +227,22 @@ def get_chat_llm_provider_premium() -> str:
         return CHAT_LLM_OPENAI
     if value == CHAT_LLM_GEMINI:
         return CHAT_LLM_GEMINI
+    if value == CHAT_LLM_GEMMA:
+        return CHAT_LLM_GEMMA
     return get_chat_llm_provider()
+
+
+def get_gemma_chat_generate_url() -> str:
+    """Full URL for POST /generate-analysis (Gemma GPU service). Env wins for quick ops tests."""
+    import os
+
+    env_url = (os.getenv("GEMMA_CHAT_GENERATE_URL") or "").strip()
+    if env_url:
+        return env_url
+    db_url = (get_setting("gemma_chat_generate_url") or "").strip()
+    if db_url:
+        return db_url
+    return DEFAULT_GEMMA_CHAT_GENERATE_URL
 
 
 def get_openai_chat_model() -> str:
