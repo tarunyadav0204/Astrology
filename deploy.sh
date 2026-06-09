@@ -31,6 +31,7 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
 FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-false}"
 FORCE_FRONTEND_DEPLOY="${FORCE_FRONTEND_DEPLOY:-false}"
+DEFER_FRONTEND_BUILD="${DEFER_FRONTEND_BUILD:-false}"
 FRONTEND_PREBUILT_ARCHIVE="${FRONTEND_PREBUILT_ARCHIVE:-}"
 case "$(printf '%s' "${FORCE_FULL_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) FORCE_FULL_DEPLOY=true ;;
@@ -39,6 +40,10 @@ esac
 case "$(printf '%s' "${FORCE_FRONTEND_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) FORCE_FRONTEND_DEPLOY=true ;;
   *) FORCE_FRONTEND_DEPLOY=false ;;
+esac
+case "$(printf '%s' "${DEFER_FRONTEND_BUILD}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes) DEFER_FRONTEND_BUILD=true ;;
+  *) DEFER_FRONTEND_BUILD=false ;;
 esac
 
 has_frontend_prebuilt=false
@@ -91,6 +96,16 @@ elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/|^frontend-next/'; then
   fi
 fi
 
+frontend_build_deferred=false
+if [ "${DEFER_FRONTEND_BUILD}" = "true" ] && [ "${FORCE_FRONTEND_DEPLOY}" != "true" ] && [ "${has_frontend_prebuilt}" != "true" ]; then
+  if [ "${needs_frontend_install}" = "true" ] || [ "${needs_frontend_build}" = "true" ]; then
+    echo "⏭️ Deferring frontend install/build for this run (DEFER_FRONTEND_BUILD=true)"
+    frontend_build_deferred=true
+    needs_frontend_install=false
+    needs_frontend_build=false
+  fi
+fi
+
 # Backend pip (default: rare — only when requirements change or first deploy).
 # Override: FORCE_BACKEND_PIP=true (env, e.g. GitHub "Run workflow" checkbox) or [pip] in commit message.
 # Skip:    SKIP_BACKEND_PIP=true or [skip-pip] in message — ignored if requirements.txt changed or first deploy.
@@ -107,7 +122,7 @@ case "$(printf '%s' "${SKIP_BACKEND_PIP}" | tr '[:upper:]' '[:lower:]')" in
 esac
 
 needs_backend_pip=false
-if [ -z "${PREV_HEAD}" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
+if [ ! -d "backend/venv" ] || [ -z "${PREV_HEAD}" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
   needs_backend_pip=true
 elif echo "${CHANGED_FILES}" | grep -qE '^backend/requirements\.txt$'; then
   needs_backend_pip=true
@@ -127,7 +142,7 @@ if [ "${SKIP_BACKEND_PIP}" = "true" ] && [ "${FORCE_BACKEND_PIP}" != "true" ]; t
   fi
 fi
 
-echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build} has_frontend_prebuilt=${has_frontend_prebuilt}"
+echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} DEFER_FRONTEND_BUILD=${DEFER_FRONTEND_BUILD} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build} frontend_build_deferred=${frontend_build_deferred} has_frontend_prebuilt=${has_frontend_prebuilt}"
 
 # Repo root (deploy.sh is always run from here)
 APP_ROOT="$(pwd)"
@@ -359,13 +374,24 @@ echo "✅ Frontend phase complete"
 
 # --- Phase 4: restart static server only when needed (new build or not listening) ---
 cd "${APP_ROOT}"
+frontend_build_available=false
+if [ -f "${APP_ROOT}/frontend/build/index.html" ]; then
+  frontend_build_available=true
+fi
 restart_frontend=false
 if [ "${needs_frontend_build}" = "true" ]; then
   restart_frontend=true
 fi
 if ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
-  echo "ℹ️ Nothing on 3001; will start frontend static server"
-  restart_frontend=true
+  if [ "${frontend_build_available}" = "true" ]; then
+    echo "ℹ️ Nothing on 3001; will start frontend static server"
+    restart_frontend=true
+  elif [ "${frontend_build_deferred}" = "true" ]; then
+    echo "⏭️ No frontend build present yet; skipping frontend startup because build is deferred"
+  else
+    echo "❌ Nothing is listening on 3001 and frontend/build/index.html is missing"
+    exit 1
+  fi
 fi
 
 if [ "${restart_frontend}" = "true" ]; then
@@ -439,6 +465,12 @@ else
   deploy_timing "frontend serve unchanged"
 fi
 
+verify_frontend_routes=true
+if ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
+  verify_frontend_routes=false
+fi
+
+if [ "${verify_frontend_routes}" = "true" ]; then
 echo "🔎 Verifying public SEO routes..."
 cd "${APP_ROOT}"
 # Next static export: clean URLs for tool landing pages.
@@ -489,6 +521,10 @@ verify_route_marker "/kundli-matching" "Kundli Matching" "Next SEO HTML (kundli)
 verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
 verify_homepage_prerender
 deploy_timing "frontend SEO route verification complete"
+else
+  echo "⏭️ Skipping frontend SEO route verification because frontend static server is not running in this deploy"
+  deploy_timing "frontend verification skipped"
+fi
 
 # --- Phase 5: keep local watchdog disabled; MIG autohealing is the single recovery owner ---
 echo "⏭️ Leaving local backend watchdog disabled (MIG autohealing owns recovery)"

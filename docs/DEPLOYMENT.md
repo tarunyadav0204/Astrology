@@ -36,6 +36,13 @@ bash deploy.sh
 - **systemd service** keeps backend running
 - **Logs** in `logs/`: `backend.log` (append), `restart.log`, `crash-snapshots.log` (last 500 lines before watchdog restart), `monitor.log`
 - Watchdog probes **`/api/keepalive`** (lightweight); deploy still verifies **`/api/health`** (includes DB)
+- **GCE MIG startup** should not use `FORCE_FULL_DEPLOY=true`. For replacement VMs, prefer:
+  ```bash
+  export SYNC_GCP_SECRETS=true
+  export DEFER_FRONTEND_BUILD=true
+  bash deploy.sh
+  ```
+  This brings the backend up quickly for MIG health checks and avoids a full frontend build during instance bootstrap.
 
 ## Services
 
