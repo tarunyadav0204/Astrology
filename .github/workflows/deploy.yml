@@ -54,6 +54,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
 
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
@@ -66,6 +68,60 @@ jobs:
       with:
         project_id: ${{ vars.GCP_PROJECT_ID }}
 
+    - name: Detect frontend artifact need
+      id: frontend_artifact
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      env:
+        FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
+        FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
+        BEFORE_SHA: ${{ github.event.before }}
+      run: |
+        set -euo pipefail
+        required=false
+        if [[ "${FORCE_FULL_DEPLOY}" == "true" || "${FORCE_FRONTEND_DEPLOY}" == "true" ]]; then
+          required=true
+        else
+          if [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+            if git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" | grep -E -q '^frontend/|^frontend-next/'; then
+              required=true
+            fi
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            if git diff --name-only HEAD^ HEAD | grep -E -q '^frontend/|^frontend-next/'; then
+              required=true
+            fi
+          fi
+        fi
+        echo "required=${required}" >> "${GITHUB_OUTPUT}"
+
+    - name: Set up Node.js
+      if: ${{ steps.frontend_artifact.outputs.required == 'true' }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: npm
+        cache-dependency-path: |
+          frontend/package-lock.json
+          frontend-next/package-lock.json
+
+    - name: Build frontend artifact once
+      if: ${{ steps.frontend_artifact.outputs.required == 'true' }}
+      shell: bash
+      env:
+        CI: 'true'
+        GENERATE_SOURCEMAP: 'false'
+        INLINE_RUNTIME_CHUNK: 'true'
+        PRERENDER: 'true'
+      run: |
+        set -euo pipefail
+        npm --prefix frontend ci
+        npm --prefix frontend-next ci
+        unset PRERENDER_ROUTES
+        SITEMAP_URL="https://astroroshni.com/sitemap.xml" \
+        BLOG_API_URL="https://astroroshni.com" \
+        npm --prefix frontend run build:ci
+        tar -czf "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" -C frontend build
+
     - name: Rolling app deploy on current MIG VMs
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       env:
@@ -77,6 +133,7 @@ jobs:
         FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
         FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
         FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
+        FRONTEND_ARTIFACT_REQUIRED: ${{ steps.frontend_artifact.outputs.required }}
       run: |
         set -euo pipefail
         echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
@@ -104,7 +161,24 @@ jobs:
             --zone "${GCP_MIG_ZONE}" \
             --tunnel-through-iap \
             --quiet \
-            --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' SYNC_GCP_SECRETS='true' && bash deploy.sh"
+            --command "for i in \$(seq 1 60); do [ -d /home/tarun_yadav/AstrologyApp ] && exit 0; sleep 5; done; echo 'AstrologyApp repo not ready on ${INSTANCE}'; exit 1"
+
+          FRONTEND_REMOTE_ARCHIVE=""
+          if [ "${FRONTEND_ARTIFACT_REQUIRED}" = "true" ]; then
+            FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
+            gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
+              --project "${GCP_PROJECT_ID}" \
+              --zone "${GCP_MIG_ZONE}" \
+              --tunnel-through-iap \
+              --quiet
+          fi
+
+          gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_MIG_ZONE}" \
+            --tunnel-through-iap \
+            --quiet \
+            --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
 
           echo "🔎 Waiting for ${INSTANCE} local app health"
           gcloud compute ssh "tarun_yadav@${INSTANCE}" \

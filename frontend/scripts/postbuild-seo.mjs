@@ -144,10 +144,14 @@ function waitForServer(port, maxAttempts = 40) {
 
 function startStaticServer(port) {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['serve', '-s', 'build', '-l', String(port)], {
+    const child = spawn(process.execPath, ['scripts/serve-build.mjs'], {
       cwd: path.resolve(__dirname, '..'),
+      env: {
+        ...process.env,
+        PORT: String(port),
+        API_TARGET: process.env.PRERENDER_API_TARGET || process.env.BLOG_API_URL || SITE_ORIGIN,
+      },
       stdio: 'ignore',
-      shell: true,
     });
     child.on('error', reject);
     resolve(child);

@@ -31,6 +31,7 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
 FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-false}"
 FORCE_FRONTEND_DEPLOY="${FORCE_FRONTEND_DEPLOY:-false}"
+FRONTEND_PREBUILT_ARCHIVE="${FRONTEND_PREBUILT_ARCHIVE:-}"
 case "$(printf '%s' "${FORCE_FULL_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) FORCE_FULL_DEPLOY=true ;;
   *) FORCE_FULL_DEPLOY=false ;;
@@ -39,6 +40,15 @@ case "$(printf '%s' "${FORCE_FRONTEND_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) FORCE_FRONTEND_DEPLOY=true ;;
   *) FORCE_FRONTEND_DEPLOY=false ;;
 esac
+
+has_frontend_prebuilt=false
+if [ -n "${FRONTEND_PREBUILT_ARCHIVE}" ]; then
+  if [ ! -f "${FRONTEND_PREBUILT_ARCHIVE}" ]; then
+    echo "❌ FRONTEND_PREBUILT_ARCHIVE not found: ${FRONTEND_PREBUILT_ARCHIVE}"
+    exit 1
+  fi
+  has_frontend_prebuilt=true
+fi
 
 # Pull latest changes
 echo "📥 Pulling latest changes from Git..."
@@ -117,7 +127,7 @@ if [ "${SKIP_BACKEND_PIP}" = "true" ] && [ "${FORCE_BACKEND_PIP}" != "true" ]; t
   fi
 fi
 
-echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build}"
+echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build} has_frontend_prebuilt=${has_frontend_prebuilt}"
 
 # Repo root (deploy.sh is always run from here)
 APP_ROOT="$(pwd)"
@@ -304,31 +314,46 @@ fi
 # --- Phase 3: frontend install/build (API already serving new code) ---
 echo "⚛️ Building frontend..."
 cd "${APP_ROOT}/frontend"
-if [ "${needs_frontend_install}" = "true" ]; then
-  echo "📦 Installing frontend dependencies..."
-  npm install
-  deploy_timing "npm install finished"
+frontend_stage_dir="${APP_ROOT}/frontend/.build-deploy-stage"
+staged_frontend_build=false
+if [ "${needs_frontend_build}" = "true" ] && [ "${has_frontend_prebuilt}" = "true" ]; then
+  echo "📦 Using prebuilt frontend artifact: ${FRONTEND_PREBUILT_ARCHIVE}"
+  rm -rf "${frontend_stage_dir}"
+  mkdir -p "${frontend_stage_dir}"
+  tar -xzf "${FRONTEND_PREBUILT_ARCHIVE}" -C "${frontend_stage_dir}"
+  if [ ! -f "${frontend_stage_dir}/build/index.html" ]; then
+    echo "❌ Prebuilt frontend artifact is missing build/index.html"
+    exit 1
+  fi
+  staged_frontend_build=true
+  deploy_timing "frontend artifact unpacked"
 else
-  echo "⏭️ Frontend dependencies unchanged; skipping npm install"
-  deploy_timing "npm install skipped"
-fi
+  if [ "${needs_frontend_install}" = "true" ]; then
+    echo "📦 Installing frontend dependencies..."
+    npm install
+    deploy_timing "npm install finished"
+  else
+    echo "⏭️ Frontend dependencies unchanged; skipping npm install"
+    deploy_timing "npm install skipped"
+  fi
 
-if [ "${needs_frontend_build}" = "true" ]; then
-  echo "🏗️ Frontend changed; building..."
-  export CI=true
-  export GENERATE_SOURCEMAP=false
-  export INLINE_RUNTIME_CHUNK=true
-  # SEO: prerender CRA routes (homepage + key public URLs) so crawlers get correct <link rel="canonical"> in first HTML.
-  # Omit PRERENDER_ROUTES to use the full list in frontend/scripts/postbuild-seo.mjs (STATIC + nakshatras + blog).
-  export PRERENDER=true
-  unset PRERENDER_ROUTES
-  SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
-  BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
-  npm run build
-  deploy_timing "npm run build finished (includes frontend-next karma export)"
-else
-  echo "⏭️ Frontend unchanged; skipping build"
-  deploy_timing "npm build skipped"
+  if [ "${needs_frontend_build}" = "true" ]; then
+    echo "🏗️ Frontend changed; building..."
+    export CI=true
+    export GENERATE_SOURCEMAP=false
+    export INLINE_RUNTIME_CHUNK=true
+    # SEO: prerender CRA routes (homepage + key public URLs) so crawlers get correct <link rel="canonical"> in first HTML.
+    # Omit PRERENDER_ROUTES to use the full list in frontend/scripts/postbuild-seo.mjs (STATIC + nakshatras + blog).
+    export PRERENDER=true
+    unset PRERENDER_ROUTES
+    SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
+    BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
+    npm run build
+    deploy_timing "npm run build finished (includes frontend-next karma export)"
+  else
+    echo "⏭️ Frontend unchanged; skipping build"
+    deploy_timing "npm build skipped"
+  fi
 fi
 echo "✅ Frontend phase complete"
 
@@ -358,6 +383,19 @@ if [ "${restart_frontend}" = "true" ]; then
   deploy_timing "frontend port cleared"
 
   cd "${APP_ROOT}/frontend"
+  frontend_build_dir="${APP_ROOT}/frontend/build"
+  frontend_backup_dir="${APP_ROOT}/frontend/build.previous"
+  if [ "${staged_frontend_build}" = "true" ]; then
+    echo "🔁 Swapping in staged frontend build..."
+    rm -rf "${frontend_backup_dir}"
+    if [ -d "${frontend_build_dir}" ]; then
+      mv "${frontend_build_dir}" "${frontend_backup_dir}"
+    fi
+    mv "${frontend_stage_dir}/build" "${frontend_build_dir}"
+    rm -rf "${frontend_stage_dir}"
+    deploy_timing "frontend build swapped"
+  fi
+
   nohup node scripts/serve-build.mjs > "${APP_ROOT}/logs/frontend.log" 2>&1 &
   FRONTEND_PID=$!
   echo "Frontend PID: ${FRONTEND_PID}"
@@ -377,11 +415,19 @@ if [ "${restart_frontend}" = "true" ]; then
   done
 
   if [ "${frontend_ready}" != "true" ]; then
+    if [ "${staged_frontend_build}" = "true" ] && [ -d "${frontend_backup_dir}" ]; then
+      echo "↩️ Restoring previous frontend build after failed startup..."
+      rm -rf "${frontend_build_dir}"
+      mv "${frontend_backup_dir}" "${frontend_build_dir}"
+      nohup node scripts/serve-build.mjs > "${APP_ROOT}/logs/frontend.log" 2>&1 &
+      sleep 2
+    fi
     echo "❌ Frontend static server did not become ready on port 3001"
     tail -80 "${APP_ROOT}/logs/frontend.log"
     exit 1
   fi
 
+  rm -rf "${frontend_backup_dir}" 2>/dev/null || true
   echo "✅ Frontend started on port 3001"
   deploy_timing "frontend static server started"
 else

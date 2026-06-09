@@ -1,4 +1,5 @@
 // deploy.sh: any change under frontend/ sets needs_frontend_build so the VM runs npm run build.
+// deploy.yml builds and ships the frontend artifact when files under frontend/ change.
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
