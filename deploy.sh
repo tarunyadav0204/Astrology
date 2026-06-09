@@ -382,12 +382,12 @@ restart_frontend=false
 if [ "${needs_frontend_build}" = "true" ]; then
   restart_frontend=true
 fi
-if ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
+if [ "${frontend_build_deferred}" = "true" ]; then
+  echo "⏭️ Frontend startup deferred for this deploy; skipping frontend static server changes"
+elif ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
   if [ "${frontend_build_available}" = "true" ]; then
     echo "ℹ️ Nothing on 3001; will start frontend static server"
     restart_frontend=true
-  elif [ "${frontend_build_deferred}" = "true" ]; then
-    echo "⏭️ No frontend build present yet; skipping frontend startup because build is deferred"
   else
     echo "❌ Nothing is listening on 3001 and frontend/build/index.html is missing"
     exit 1
@@ -466,7 +466,7 @@ else
 fi
 
 verify_frontend_routes=true
-if ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
+if [ "${frontend_build_deferred}" = "true" ] || ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
   verify_frontend_routes=false
 fi
 
@@ -522,7 +522,7 @@ verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
 verify_homepage_prerender
 deploy_timing "frontend SEO route verification complete"
 else
-  echo "⏭️ Skipping frontend SEO route verification because frontend static server is not running in this deploy"
+  echo "⏭️ Skipping frontend SEO route verification because frontend is deferred or not running in this deploy"
   deploy_timing "frontend verification skipped"
 fi
 
@@ -534,6 +534,10 @@ deploy_timing "watchdog disabled"
 TOTAL=$(( $(date +%s) - DEPLOY_T0 ))
 echo "🎉 Deployment completed successfully! (total wall time: ${TOTAL}s)"
 echo "📊 Backend: http://localhost:8001"
-echo "🌐 Frontend: http://localhost:3001"
+if [ "${frontend_build_deferred}" = "true" ]; then
+  echo "🌐 Frontend: deferred during this deploy"
+else
+  echo "🌐 Frontend: http://localhost:3001"
+fi
 echo "🔄 Watchdog: disabled (MIG health checks should use a lightweight endpoint)"
 echo "📋 Logs: logs/backend.log (append), logs/frontend.log"
