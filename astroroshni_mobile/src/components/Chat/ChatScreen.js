@@ -758,6 +758,12 @@ export default function ChatScreen({ navigation, route }) {
       ? messages.slice(-renderedMessageCount)
       : messages;
   const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
+  const showWelcomeSuggestionCards =
+    !loading &&
+    !showGreeting &&
+    suggestions.length > 0 &&
+    messages.length > 0 &&
+    messages.every((msg) => msg?.isWelcome);
 
   const openCreditsForFirstPurchaseBonus = useCallback(() => {
     navigation.navigate('Credits');
@@ -5090,6 +5096,55 @@ export default function ChatScreen({ navigation, route }) {
           paddingBottom: keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
         }}
         >
+        {showWelcomeSuggestionCards && (
+          <View style={styles.welcomeSuggestionSection}>
+            <View style={styles.welcomeSuggestionHeader}>
+              <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+              <Text style={[styles.welcomeSuggestionTitle, { color: colors.text }]}>
+                {t('chat.topicIdeas', 'Ideas')}
+              </Text>
+            </View>
+            <GHScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.welcomeSuggestionScrollContent}
+            >
+              {suggestions.map((item, index) => (
+                <TouchableOpacity
+                  key={`welcome-suggestion-${index}`}
+                  style={styles.welcomeSuggestionCard}
+                  activeOpacity={0.9}
+                  onPress={() => setInputText(item)}
+                >
+                  <LinearGradient
+                    colors={
+                      theme === 'dark'
+                        ? ['rgba(255, 107, 53, 0.20)', 'rgba(255, 107, 53, 0.08)']
+                        : ['rgba(255, 107, 53, 0.14)', 'rgba(255, 107, 53, 0.05)']
+                    }
+                    style={[
+                      styles.welcomeSuggestionCardGradient,
+                      {
+                        borderColor:
+                          theme === 'dark'
+                            ? 'rgba(255, 255, 255, 0.12)'
+                            : 'rgba(249, 115, 22, 0.18)',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.welcomeSuggestionCardText, { color: colors.text }]}
+                      numberOfLines={3}
+                    >
+                      {item}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ))}
+            </GHScrollView>
+          </View>
+        )}
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
         {!loading && !showGreeting && messages.length > 0 && showTopicIdeas && (
           <View style={styles.suggestionsContainer}>
@@ -7211,6 +7266,44 @@ const styles = StyleSheet.create({
   suggestionsContainer: {
     paddingVertical: 4,
     paddingHorizontal: 4,
+  },
+  welcomeSuggestionSection: {
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
+  welcomeSuggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  welcomeSuggestionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  welcomeSuggestionScrollContent: {
+    paddingHorizontal: 4,
+    paddingRight: 10,
+  },
+  welcomeSuggestionCard: {
+    width: Math.min(screenWidth * 0.62, 250),
+    marginRight: 10,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  welcomeSuggestionCardGradient: {
+    minHeight: 88,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  welcomeSuggestionCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   suggestionsContent: {
     paddingHorizontal: 4,
