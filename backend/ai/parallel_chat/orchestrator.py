@@ -747,35 +747,35 @@ async def run_parallel_chat_pipeline(
     branch_runtime = {
         "parashari": {
             "provider": premium_provider,
-            "model_name": get_parallel_branch_gemini_model("parashari") if premium_provider == "gemini" else premium_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("parashari", premium_gemini_model_name) if premium_provider == "gemini" else premium_gemini_model_name,
         },
         "jaimini": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("jaimini") if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("jaimini", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "nadi": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("nadi") if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("nadi", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "nakshatra": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("nakshatra") if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("nakshatra", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "kp": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("kp") if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("kp", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "ashtakavarga": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("ashtakavarga") if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("ashtakavarga", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "sudarshan": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("sudarshan") if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("sudarshan", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "merge": {
             "provider": premium_provider,
-            "model_name": get_parallel_branch_gemini_model("merge") if premium_provider == "gemini" else premium_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("merge", premium_gemini_model_name) if premium_provider == "gemini" else premium_gemini_model_name,
         },
     }
 

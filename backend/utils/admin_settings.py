@@ -207,16 +207,21 @@ def get_event_timeline_model() -> str:
     return get_gemini_premium_model()
 
 
-def get_parallel_branch_gemini_model(branch_label: str) -> str:
-    """Gemini model override for a parallel chat branch, with sensible existing-behavior fallbacks."""
+def get_parallel_branch_gemini_model(branch_label: str, fallback_model: Optional[str] = None) -> str:
+    """Gemini model override for a parallel chat branch.
+
+    When no explicit admin override is present, fall back to the caller-provided lane
+    model so standard chats stay on the standard lane and premium chats can opt into
+    the premium lane deliberately.
+    """
     normalized = str(branch_label or "").strip().lower()
     key = PARALLEL_BRANCH_GEMINI_MODEL_KEYS.get(normalized)
     if key:
         value = get_setting(key)
         if value and value.strip():
             return value.strip()
-    if normalized in {"parashari", "merge"}:
-        return get_gemini_premium_model()
+    if fallback_model and str(fallback_model).strip():
+        return str(fallback_model).strip()
     return get_gemini_chat_model()
 
 
