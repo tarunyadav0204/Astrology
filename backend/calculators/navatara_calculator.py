@@ -12,7 +12,7 @@ class NavataraCalculator:
         "Sadhana",    # 6th - Achievement (Good)
         "Naidhana",   # 7th - Death/Endings (Bad)
         "Mitra",      # 8th - Friend (Good)
-        "Parama Mitra" # 9th - Best Friend (Excellent)
+        "Ati Mitra"   # 9th - Best Friend / Extremely Friendly (Excellent)
     ]
     
     TARA_EFFECTS = {
@@ -24,7 +24,7 @@ class NavataraCalculator:
         5: {"name": "Sadhana", "effect": "good", "description": "Achievement and success"},
         6: {"name": "Naidhana", "effect": "bad", "description": "Endings and losses"},
         7: {"name": "Mitra", "effect": "good", "description": "Friendship and support"},
-        8: {"name": "Parama Mitra", "effect": "excellent", "description": "Best outcomes"}
+        8: {"name": "Ati Mitra", "effect": "excellent", "description": "Best outcomes"}
     }
     
     def __init__(self, birth_moon_nakshatra):
@@ -38,14 +38,16 @@ class NavataraCalculator:
         Calculate which Tara the transit nakshatra falls in
         Returns: dict with tara info
         """
-        # Calculate distance from birth nakshatra
-        distance = (transit_nakshatra - self.birth_nakshatra) % 27
-        
-        # Map to 9 Taras (each Tara covers 3 nakshatras)
-        tara_index = distance % 9
+        # Count forward including both birth and target stars.
+        distance = ((transit_nakshatra - self.birth_nakshatra) % 27) + 1
+
+        # Classical Navatara formula: ((distance - 1) % 9) + 1
+        tara_number = ((distance - 1) % 9) + 1
+        tara_index = tara_number - 1
         
         tara_info = self.TARA_EFFECTS[tara_index].copy()
-        tara_info['number'] = tara_index + 1  # Add 'number' field for consistency
+        tara_info['number'] = tara_number
+        tara_info['tara_number'] = tara_number
         tara_info['distance'] = distance
         
         return tara_info

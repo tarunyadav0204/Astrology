@@ -62,6 +62,33 @@ function formatDateTimeIST(value) {
   });
 }
 
+const PARALLEL_BRANCH_MODEL_CONFIG = [
+  { key: 'parashari', label: 'Parashari', fallbackLabel: 'Premium chat model' },
+  { key: 'jaimini', label: 'Jaimini', fallbackLabel: 'Standard chat model' },
+  { key: 'nadi', label: 'Nadi', fallbackLabel: 'Standard chat model' },
+  { key: 'nakshatra', label: 'Nakshatra', fallbackLabel: 'Standard chat model' },
+  { key: 'kp', label: 'KP', fallbackLabel: 'Standard chat model' },
+  { key: 'ashtakavarga', label: 'Ashtakavarga', fallbackLabel: 'Standard chat model' },
+  { key: 'sudarshan', label: 'Sudarshan', fallbackLabel: 'Standard chat model' },
+  { key: 'merge', label: 'Merge synthesis', fallbackLabel: 'Premium chat model' },
+];
+
+const DEFAULT_PARALLEL_BRANCH_MODELS = PARALLEL_BRANCH_MODEL_CONFIG.reduce((acc, branch) => {
+  acc[branch.key] = '';
+  return acc;
+}, {});
+
+const DEFAULT_PARALLEL_BRANCH_WORD_LIMITS = {
+  parashari: '650',
+  jaimini: '250',
+  nadi: '220',
+  nakshatra: '220',
+  kp: '220',
+  ashtakavarga: '220',
+  sudarshan: '220',
+  merge: '1200',
+};
+
 const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
   const navigate = useNavigate();
   
@@ -138,6 +165,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiInstantChatModel, setGeminiInstantChatModel] = useState('');
+  const [parallelBranchGeminiModels, setParallelBranchGeminiModels] = useState(DEFAULT_PARALLEL_BRANCH_MODELS);
+  const [parallelBranchPlannerEnabled, setParallelBranchPlannerEnabled] = useState(false);
+  const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
+  const [parallelBranchWordLimits, setParallelBranchWordLimits] = useState(DEFAULT_PARALLEL_BRANCH_WORD_LIMITS);
   const [eventTimelineModel, setEventTimelineModel] = useState('');
   const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
   const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
@@ -359,6 +390,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
       setGeminiInstantChatModel(data.gemini_instant_chat_model || '');
+      setParallelBranchGeminiModels({
+        ...DEFAULT_PARALLEL_BRANCH_MODELS,
+        ...(data.parallel_branch_gemini_models || {}),
+      });
+      setParallelBranchPlannerEnabled(Boolean(data.parallel_branch_planner_enabled));
+      setParallelBranchPlannerModel(data.parallel_branch_planner_model || data.gemini_instant_chat_model || '');
+      setParallelBranchWordLimits({
+        ...DEFAULT_PARALLEL_BRANCH_WORD_LIMITS,
+        ...Object.fromEntries(
+          Object.entries(data.parallel_branch_word_limits || {}).map(([key, value]) => [key, String(value ?? '')])
+        ),
+      });
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
@@ -445,6 +488,48 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setGeminiModelsSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const parallelBranchRequests = PARALLEL_BRANCH_MODEL_CONFIG.map((branch) =>
+        fetch(`/api/admin/settings/parallel_branch_gemini_model_${branch.key}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: `parallel_branch_gemini_model_${branch.key}`,
+            value: parallelBranchGeminiModels[branch.key],
+            description: `Gemini model override for parallel ${branch.label} branch`,
+          }),
+        })
+      );
+      const plannerSettingsRequests = [
+        fetch('/api/admin/settings/parallel_branch_planner_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'parallel_branch_planner_enabled',
+            value: parallelBranchPlannerEnabled ? 'true' : 'false',
+            description: 'Enable multilingual LLM planner that selects which parallel specialist branches to run',
+          }),
+        }),
+        fetch('/api/admin/settings/parallel_branch_planner_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'parallel_branch_planner_model',
+            value: parallelBranchPlannerModel,
+            description: 'Gemini model used for the parallel branch planner step',
+          }),
+        }),
+      ];
+      const parallelBranchWordLimitRequests = PARALLEL_BRANCH_MODEL_CONFIG.map((branch) =>
+        fetch(`/api/admin/settings/parallel_branch_word_limit_${branch.key}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: `parallel_branch_word_limit_${branch.key}`,
+            value: String(parallelBranchWordLimits[branch.key] || DEFAULT_PARALLEL_BRANCH_WORD_LIMITS[branch.key]),
+            description: `Target output word budget for parallel ${branch.label} branch`,
+          }),
+        })
+      );
       const [
         chatRes,
         premiumRes,
@@ -461,6 +546,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         deepseekChatRes,
         deepseekPremiumRes,
         gemmaUrlRes,
+        ...parallelSettingsResponses
       ] = await Promise.all([
         fetch('/api/admin/settings/gemini_chat_model', {
           method: 'PUT',
@@ -598,7 +684,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               'Full URL for self-hosted Gemma chat POST (e.g. http://host:8000/generate-analysis). Empty = use built-in default; env GEMMA_CHAT_GENERATE_URL overrides when set.',
           }),
         }),
+        ...parallelBranchRequests,
+        ...plannerSettingsRequests,
+        ...parallelBranchWordLimitRequests,
       ]);
+      const parallelBranchResponses = parallelSettingsResponses.slice(0, PARALLEL_BRANCH_MODEL_CONFIG.length);
+      const plannerResponses = parallelSettingsResponses.slice(PARALLEL_BRANCH_MODEL_CONFIG.length, PARALLEL_BRANCH_MODEL_CONFIG.length + 2);
+      const parallelBranchWordLimitResponses = parallelSettingsResponses.slice(PARALLEL_BRANCH_MODEL_CONFIG.length + 2);
       if (
         !chatRes.ok ||
         !premiumRes.ok ||
@@ -614,7 +706,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         !openaiPremiumRes.ok ||
         !deepseekChatRes.ok ||
         !deepseekPremiumRes.ok ||
-        !gemmaUrlRes.ok
+        !gemmaUrlRes.ok ||
+        parallelBranchResponses.some((response) => !response.ok) ||
+        plannerResponses.some((response) => !response.ok) ||
+        parallelBranchWordLimitResponses.some((response) => !response.ok)
       ) {
         const chatErr = await chatRes.json().catch(() => ({}));
         const premiumErr = await premiumRes.json().catch(() => ({}));
@@ -631,6 +726,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const dsChatErr = await deepseekChatRes.json().catch(() => ({}));
         const dsPremErr = await deepseekPremiumRes.json().catch(() => ({}));
         const gemmaUrlErr = await gemmaUrlRes.json().catch(() => ({}));
+        const parallelBranchErr = await (parallelBranchResponses.find((response) => !response.ok)?.json().catch(() => ({})) || Promise.resolve({}));
+        const plannerErr = await (plannerResponses.find((response) => !response.ok)?.json().catch(() => ({})) || Promise.resolve({}));
+        const parallelBranchWordLimitErr = await (parallelBranchWordLimitResponses.find((response) => !response.ok)?.json().catch(() => ({})) || Promise.resolve({}));
         console.error(
           'Save failed:',
           chatErr,
@@ -647,7 +745,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           oaPremErr,
           dsChatErr,
           dsPremErr,
-          gemmaUrlErr
+          gemmaUrlErr,
+          parallelBranchErr,
+          plannerErr,
+          parallelBranchWordLimitErr
         );
         alert(
           'Failed to save: ' +
@@ -666,12 +767,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               dsChatErr.detail ||
               dsPremErr.detail ||
               gemmaUrlErr.detail ||
+              parallelBranchErr.detail ||
+              plannerErr.detail ||
+              parallelBranchWordLimitErr.detail ||
               'check console')
         );
         return;
       }
       alert(
-        'Chat vendors, chat models, Gemma URL, analysis/timeline vendors, and model picks saved. New requests use them immediately.'
+        'Chat vendors, chat models, branch planner, parallel branch models, branch word limits, Gemma URL, analysis/timeline vendors, and model picks saved. New requests use them immediately.'
       );
     } catch (error) {
       console.error('Error saving Gemini models:', error);
@@ -4313,6 +4417,82 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </p>
                 )}
               </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Parallel branch Gemini models</h3>
+              <p className="settings-hint">
+                These are used only by the parallel astrology chat pipeline when the active branch provider is Gemini.
+                Leaving a branch on its current value preserves today&apos;s behavior: Parashari and merge follow the premium lane,
+                while the other specialist branches follow the standard lane.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable branch planner</strong>
+                  <p>
+                    Runs a small multilingual planning step after pregate and after intent router, before branch fan-out.
+                    It chooses the minimum specialist set needed for the current question. This is sequential, not parallel to intent routing.
+                  </p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={parallelBranchPlannerEnabled}
+                    onChange={(e) => setParallelBranchPlannerEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Planner model</strong>
+                  <p>
+                    Recommended: a lite Gemini model. This step is just multilingual reasoning for branch selection, not the final astrology answer.
+                  </p>
+                </div>
+                <select
+                  value={parallelBranchPlannerModel}
+                  onChange={(e) => setParallelBranchPlannerModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={`planner-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              {PARALLEL_BRANCH_MODEL_CONFIG.map((branch) => (
+                <div className="setting-item" key={`parallel-branch-${branch.key}`}>
+                  <div className="setting-info">
+                    <strong>{branch.label}</strong>
+                    <p>Fallback is {branch.fallbackLabel} if this setting is ever cleared later.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select
+                      value={parallelBranchGeminiModels[branch.key] || ''}
+                      onChange={(e) => setParallelBranchGeminiModels((prev) => ({ ...prev, [branch.key]: e.target.value }))}
+                      style={{ minWidth: '280px' }}
+                    >
+                      {geminiModelOptions.map((opt) => (
+                        <option key={`parallel-${branch.key}-${opt.value}`} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700 }}>Word limit</span>
+                      <input
+                        type="number"
+                        min="80"
+                        max="4000"
+                        value={parallelBranchWordLimits[branch.key] || ''}
+                        onChange={(e) => setParallelBranchWordLimits((prev) => ({ ...prev, [branch.key]: e.target.value }))}
+                        style={{ width: '100px', padding: '8px' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+              <p className="settings-hint" style={{ marginTop: '6px' }}>
+                These save together with the main chat vendor/model button below. Word limits are target budgets for branch outputs, not hard truncation.
+              </p>
             </div>
 
             <div className="settings-section">

@@ -18,6 +18,37 @@ DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite"
 DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
 DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite"
 DEFAULT_GEMINI_INSTANT_MODEL = "models/gemini-2.5-flash-lite"
+DEFAULT_PARALLEL_BRANCH_PLANNER_MODEL = DEFAULT_GEMINI_INSTANT_MODEL
+PARALLEL_BRANCH_GEMINI_MODEL_KEYS = {
+    "parashari": "parallel_branch_gemini_model_parashari",
+    "jaimini": "parallel_branch_gemini_model_jaimini",
+    "nadi": "parallel_branch_gemini_model_nadi",
+    "nakshatra": "parallel_branch_gemini_model_nakshatra",
+    "kp": "parallel_branch_gemini_model_kp",
+    "ashtakavarga": "parallel_branch_gemini_model_ashtakavarga",
+    "sudarshan": "parallel_branch_gemini_model_sudarshan",
+    "merge": "parallel_branch_gemini_model_merge",
+}
+PARALLEL_BRANCH_WORD_LIMIT_KEYS = {
+    "parashari": "parallel_branch_word_limit_parashari",
+    "jaimini": "parallel_branch_word_limit_jaimini",
+    "nadi": "parallel_branch_word_limit_nadi",
+    "nakshatra": "parallel_branch_word_limit_nakshatra",
+    "kp": "parallel_branch_word_limit_kp",
+    "ashtakavarga": "parallel_branch_word_limit_ashtakavarga",
+    "sudarshan": "parallel_branch_word_limit_sudarshan",
+    "merge": "parallel_branch_word_limit_merge",
+}
+DEFAULT_PARALLEL_BRANCH_WORD_LIMITS = {
+    "parashari": 650,
+    "jaimini": 250,
+    "nadi": 220,
+    "nakshatra": 220,
+    "kp": 220,
+    "ashtakavarga": 220,
+    "sudarshan": 220,
+    "merge": 1200,
+}
 
 # Deprecated May 2026 — replaced by GA id in DB + code.
 _DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW = "models/gemini-3.1-flash-lite-preview"
@@ -174,6 +205,47 @@ def get_event_timeline_model() -> str:
     if value and value.strip():
         return value.strip()
     return get_gemini_premium_model()
+
+
+def get_parallel_branch_gemini_model(branch_label: str) -> str:
+    """Gemini model override for a parallel chat branch, with sensible existing-behavior fallbacks."""
+    normalized = str(branch_label or "").strip().lower()
+    key = PARALLEL_BRANCH_GEMINI_MODEL_KEYS.get(normalized)
+    if key:
+        value = get_setting(key)
+        if value and value.strip():
+            return value.strip()
+    if normalized in {"parashari", "merge"}:
+        return get_gemini_premium_model()
+    return get_gemini_chat_model()
+
+
+def get_parallel_branch_word_limit(branch_label: str) -> int:
+    """Word-budget hint for a parallel branch or merge lane, with safe defaults."""
+    normalized = str(branch_label or "").strip().lower()
+    default = int(DEFAULT_PARALLEL_BRANCH_WORD_LIMITS.get(normalized, 250))
+    key = PARALLEL_BRANCH_WORD_LIMIT_KEYS.get(normalized)
+    if not key:
+        return default
+    value = get_setting(key)
+    if value is None:
+        return default
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(80, min(4000, parsed))
+
+
+def is_parallel_branch_planner_enabled() -> bool:
+    return _parse_bool_setting(get_setting("parallel_branch_planner_enabled"), False)
+
+
+def get_parallel_branch_planner_model() -> str:
+    value = get_setting("parallel_branch_planner_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_PARALLEL_BRANCH_PLANNER_MODEL
 
 
 def get_analysis_llm_vendor() -> str:

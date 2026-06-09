@@ -67,21 +67,80 @@ def _compact_row(pa: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in row.items() if v is not None}
 
 
+def _tara_quality(number: int) -> str:
+    if number in {2, 4, 6, 8, 9}:
+        return "supportive"
+    if number in {3, 5, 7}:
+        return "challenging"
+    return "neutral"
+
+
+def _build_current_dasha_tara(dynamic: Dict[str, Any], p1: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    cd = dynamic.get("current_dashas") or {}
+    if not isinstance(cd, dict):
+        return None
+    moon_index = cd.get("moon_nakshatra")
+    try:
+        moon_index = int(moon_index)
+    except (TypeError, ValueError):
+        return None
+    moon_name = (p1.get("Moon") or {}).get("nk")
+    out: Dict[str, Any] = {
+        "mn": moon_index,
+    }
+    if moon_name:
+        out["mk"] = moon_name
+    for level_key, short_key in (("mahadasha", "md"), ("antardasha", "ad"), ("pratyantardasha", "pd")):
+        row = cd.get(level_key)
+        if not isinstance(row, dict):
+            continue
+        planet = row.get("planet")
+        prow = p1.get(str(planet)) if planet is not None else None
+        target_index = (prow or {}).get("ni")
+        if target_index is None:
+            continue
+        try:
+            target_index = int(target_index) + 1
+        except (TypeError, ValueError):
+            continue
+        distance = ((target_index - moon_index) % 27) + 1
+        tara_number = ((distance - 1) % 9) + 1
+        out[short_key] = {
+            "p": planet,
+            "nk": (prow or {}).get("nk"),
+            "ni": target_index,
+            "tn": tara_number,
+            "tl": (
+                "Janma", "Sampat", "Vipat", "Kshema", "Pratyak", "Sadhana", "Naidhana", "Mitra", "Ati Mitra"
+            )[tara_number - 1],
+            "q": _tara_quality(tara_number),
+        }
+    return out if len(out) > 1 else None
+
+
 class NakshatraAgent(ContextAgent):
     agent_id = "nakshatra"
     schema_version = 1
 
     def build(self, ctx: AgentContext) -> Dict[str, Any]:
-        if ctx.precomputed_static is not None:
+        birth = ctx.birth_data or {}
+        if ctx.precomputed_static is not None and ctx.precomputed_dynamic is not None:
             static = ctx.precomputed_static
+            dynamic = ctx.precomputed_dynamic
         else:
-            birth = ctx.birth_data or {}
             builder = ChatContextBuilder()
             birth_hash = builder._create_birth_hash(birth)
             with open(os.devnull, "w", encoding="utf-8") as dn, redirect_stdout(dn), redirect_stderr(dn):
                 if birth_hash not in builder.static_cache:
                     builder.static_cache[birth_hash] = builder._build_static_context(birth)
                 static = builder.static_cache[birth_hash]
+                dynamic = builder._build_dynamic_context(
+                    birth,
+                    ctx.user_question or "",
+                    None,
+                    None,
+                    ctx.intent_result,
+                )
 
         pa = static.get("planetary_analysis") or {}
         d9 = static.get("d9_planetary_analysis") or {}
@@ -112,4 +171,7 @@ class NakshatraAgent(ContextAgent):
             out["NV"] = nav
         if pk:
             out["PK"] = pk
+        dasha_tara = _build_current_dasha_tara(dynamic, p1)
+        if dasha_tara:
+            out["DT"] = dasha_tara
         return out

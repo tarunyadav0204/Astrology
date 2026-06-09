@@ -23,6 +23,7 @@ import {
 } from '../countryCodes';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
+import AuthLegalNotice from '../AuthLegalNotice';
 
 export default function PhoneInputScreen({ 
   formData, 
@@ -236,19 +237,39 @@ export default function PhoneInputScreen({
           }
         }}
         footer={modeKnown ? (
-          <Text style={styles.footerText}>
-            {isLogin === true ? "Don't have an account? " : "Already have an account? "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => {
-                setIsLogin?.(null);
-                setPhoneError('');
-              }}
-            >
-              Continue with another number
+          isLogin === true ? (
+            <Text style={styles.footerText}>
+              {"Don't have an account? "}
+              <Text
+                style={styles.footerLink}
+                onPress={() => {
+                  setIsLogin?.(null);
+                  setPhoneError('');
+                }}
+              >
+                Continue with another number
+              </Text>
             </Text>
-          </Text>
-        ) : null}
+          ) : (
+            <View style={styles.registrationFooter}>
+              <Text style={styles.footerText}>
+                {'Already have an account? '}
+                <Text
+                  style={styles.footerLink}
+                  onPress={() => {
+                    setIsLogin?.(null);
+                    setPhoneError('');
+                  }}
+                >
+                  Continue with another number
+                </Text>
+              </Text>
+              <AuthLegalNotice compact />
+            </View>
+          )
+        ) : (
+          <AuthLegalNotice />
+        )}
         action={(
           <Animated.View
             style={[
@@ -513,6 +534,10 @@ const styles = StyleSheet.create({
   footer: {
     paddingBottom: 20,
     alignItems: 'center',
+  },
+  registrationFooter: {
+    alignItems: 'center',
+    gap: 8,
   },
   footerText: {
     color: 'rgba(255, 255, 255, 0.6)',

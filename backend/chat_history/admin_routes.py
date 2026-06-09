@@ -261,6 +261,18 @@ def _parallel_cache_setup_tokens(parallel_usage: Optional[Dict[str, Any]]) -> in
     totals = parallel_usage.get("totals")
     if not isinstance(totals, dict):
         return 0
+    cache_setup_targets = totals.get("cache_setup_targets")
+    if isinstance(cache_setup_targets, list) and cache_setup_targets:
+        total = 0
+        for target in cache_setup_targets:
+            if not isinstance(target, dict):
+                continue
+            try:
+                total += max(0, int(target.get("input_tokens") or 0))
+            except Exception:
+                continue
+        if total > 0:
+            return total
     try:
         return max(0, int(totals.get("cache_setup_input_tokens") or 0))
     except Exception:
@@ -302,19 +314,31 @@ def _parallel_stage_cost_breakdown_inr(
         output_cost_inr += (output_t / 1_000_000.0) * float(rates["output"]) * fx
 
     totals = parallel_usage.get("totals") if isinstance(parallel_usage.get("totals"), dict) else {}
-    standard_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_standard") or 0))
-    premium_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_premium") or 0))
     cache_setup_cost_inr = 0.0
-    if standard_setup_tokens > 0:
-        standard_model = (totals.get("cache_setup_llm_model_standard") or fallback_model_name or "").strip() or None
-        rates_standard = _resolve_model_rate(standard_model, standard_setup_tokens)
-        cache_setup_cost_inr += (standard_setup_tokens / 1_000_000.0) * float(rates_standard["input"]) * fx
-    if premium_setup_tokens > 0:
-        premium_model = (totals.get("cache_setup_llm_model_premium") or fallback_model_name or "").strip() or None
-        rates_premium = _resolve_model_rate(premium_model, premium_setup_tokens)
-        cache_setup_cost_inr += (premium_setup_tokens / 1_000_000.0) * float(rates_premium["input"]) * fx
+    cache_setup_targets = totals.get("cache_setup_targets")
+    if isinstance(cache_setup_targets, list) and cache_setup_targets:
+        for target in cache_setup_targets:
+            if not isinstance(target, dict):
+                continue
+            target_tokens = max(0, int(target.get("input_tokens") or 0))
+            if target_tokens <= 0:
+                continue
+            target_model = (target.get("llm_model") or fallback_model_name or "").strip() or None
+            rates_target = _resolve_model_rate(target_model, target_tokens)
+            cache_setup_cost_inr += (target_tokens / 1_000_000.0) * float(rates_target["input"]) * fx
+    else:
+        standard_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_standard") or 0))
+        premium_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_premium") or 0))
+        if standard_setup_tokens > 0:
+            standard_model = (totals.get("cache_setup_llm_model_standard") or fallback_model_name or "").strip() or None
+            rates_standard = _resolve_model_rate(standard_model, standard_setup_tokens)
+            cache_setup_cost_inr += (standard_setup_tokens / 1_000_000.0) * float(rates_standard["input"]) * fx
+        if premium_setup_tokens > 0:
+            premium_model = (totals.get("cache_setup_llm_model_premium") or fallback_model_name or "").strip() or None
+            rates_premium = _resolve_model_rate(premium_model, premium_setup_tokens)
+            cache_setup_cost_inr += (premium_setup_tokens / 1_000_000.0) * float(rates_premium["input"]) * fx
 
-    if standard_setup_tokens <= 0 and premium_setup_tokens <= 0:
+    if cache_setup_cost_inr <= 0:
         legacy_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens") or 0))
         if legacy_setup_tokens > 0:
             rates_legacy = _resolve_model_rate(fallback_model_name, legacy_setup_tokens)
@@ -2374,6 +2398,9 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_analysis_model,
             get_gemini_instant_model,
             get_event_timeline_model,
+            get_parallel_branch_gemini_model,
+            get_parallel_branch_planner_model,
+            get_parallel_branch_word_limit,
             get_analysis_llm_vendor,
             get_timeline_llm_vendor,
             get_deepseek_analysis_model,
@@ -2395,6 +2422,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             is_speech_chat_enabled,
             get_speech_chat_user_allowlist,
             is_first_purchase_bonus_enabled,
+            is_parallel_branch_planner_enabled,
             get_setting,
         )
         with get_conn() as conn:
@@ -2417,6 +2445,28 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_analysis_model": get_gemini_analysis_model(),
             "gemini_instant_chat_model": get_gemini_instant_model(),
             "event_timeline_model": get_event_timeline_model(),
+            "parallel_branch_gemini_models": {
+                "parashari": get_parallel_branch_gemini_model("parashari"),
+                "jaimini": get_parallel_branch_gemini_model("jaimini"),
+                "nadi": get_parallel_branch_gemini_model("nadi"),
+                "nakshatra": get_parallel_branch_gemini_model("nakshatra"),
+                "kp": get_parallel_branch_gemini_model("kp"),
+                "ashtakavarga": get_parallel_branch_gemini_model("ashtakavarga"),
+                "sudarshan": get_parallel_branch_gemini_model("sudarshan"),
+                "merge": get_parallel_branch_gemini_model("merge"),
+            },
+            "parallel_branch_planner_enabled": is_parallel_branch_planner_enabled(),
+            "parallel_branch_planner_model": get_parallel_branch_planner_model(),
+            "parallel_branch_word_limits": {
+                "parashari": get_parallel_branch_word_limit("parashari"),
+                "jaimini": get_parallel_branch_word_limit("jaimini"),
+                "nadi": get_parallel_branch_word_limit("nadi"),
+                "nakshatra": get_parallel_branch_word_limit("nakshatra"),
+                "kp": get_parallel_branch_word_limit("kp"),
+                "ashtakavarga": get_parallel_branch_word_limit("ashtakavarga"),
+                "sudarshan": get_parallel_branch_word_limit("sudarshan"),
+                "merge": get_parallel_branch_word_limit("merge"),
+            },
             "analysis_llm_vendor": get_analysis_llm_vendor(),
             "timeline_llm_vendor": get_timeline_llm_vendor(),
             "deepseek_analysis_model": get_deepseek_analysis_model(),

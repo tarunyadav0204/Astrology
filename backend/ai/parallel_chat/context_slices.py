@@ -583,6 +583,75 @@ _NAKSHATRA_SLICE_KEYS: Set[str] = {
     "pushkara_navamsa",
 }
 
+_NAKSHATRA_NAME_ORDER: List[str] = [
+    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha",
+    "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha",
+    "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada",
+    "Uttara Bhadrapada", "Revati",
+]
+_TARA_LABELS: List[str] = [
+    "Janma", "Sampat", "Vipat", "Kshema", "Pratyak", "Sadhana", "Naidhana", "Mitra", "Ati Mitra",
+]
+
+
+def _nak_name_to_index_1(name: Any) -> Optional[int]:
+    if not isinstance(name, str) or not name.strip():
+        return None
+    needle = name.strip().lower()
+    for i, item in enumerate(_NAKSHATRA_NAME_ORDER, start=1):
+        if item.lower() == needle:
+            return i
+    return None
+
+
+def _tara_quality(number: int) -> str:
+    if number in {2, 4, 6, 8, 9}:
+        return "supportive"
+    if number in {3, 5, 7}:
+        return "challenging"
+    return "neutral"
+
+
+def _compute_current_dasha_tara(context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    planetary = context.get("planetary_analysis") or {}
+    moon_row = planetary.get("Moon") if isinstance(planetary, dict) else None
+    moon_basic = moon_row.get("basic_info") if isinstance(moon_row, dict) else None
+    moon_nak = moon_basic.get("nakshatra") if isinstance(moon_basic, dict) else None
+    moon_index = _nak_name_to_index_1(moon_nak)
+    current_dashas = context.get("current_dashas") or {}
+    if moon_index is None or not isinstance(current_dashas, dict):
+        return None
+
+    result: Dict[str, Any] = {
+        "birth_moon_nakshatra": moon_nak,
+        "birth_moon_nakshatra_index": moon_index,
+    }
+    for level_key in ("mahadasha", "antardasha", "pratyantardasha"):
+        row = current_dashas.get(level_key)
+        if not isinstance(row, dict):
+            continue
+        planet = row.get("planet")
+        if not planet:
+            continue
+        planet_row = planetary.get(str(planet)) if isinstance(planetary, dict) else None
+        planet_basic = planet_row.get("basic_info") if isinstance(planet_row, dict) else None
+        nak_name = planet_basic.get("nakshatra") if isinstance(planet_basic, dict) else None
+        target_index = _nak_name_to_index_1(nak_name)
+        if target_index is None:
+            continue
+        distance = ((target_index - moon_index) % 27) + 1
+        tara_number = ((distance - 1) % 9) + 1
+        result[level_key] = {
+            "planet": planet,
+            "nakshatra": nak_name,
+            "nakshatra_index": target_index,
+            "tara_number": tara_number,
+            "tara_name": _TARA_LABELS[tara_number - 1],
+            "tara_quality": _tara_quality(tara_number),
+            "distance": distance,
+        }
+    return result if len(result) > 2 else None
+
 
 def build_nakshatra_slice(context: Dict[str, Any]) -> Dict[str, Any]:
     """D1/D9 per-graha nakshatra rows (thinned) + remedies + navatara / pushkara hints."""
@@ -597,6 +666,9 @@ def build_nakshatra_slice(context: Dict[str, Any]) -> Dict[str, Any]:
         base["d9_planetary_analysis"] = (
             _thin_planetary_for_nakshatra(d9) if isinstance(d9, dict) else copy.deepcopy(d9)
         )
+    current_dasha_tara = _compute_current_dasha_tara(context)
+    if current_dasha_tara is not None:
+        base["current_dasha_tara"] = current_dasha_tara
     return base
 
 

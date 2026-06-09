@@ -1353,6 +1353,64 @@ const AdminChatHistory = () => {
   /** Merge / final-call model for this assistant row (parallel pipeline stores it on stages, not session). */
   const MERGE_PARALLEL_STAGE_NAMES = new Set(['parallel_merge', 'parallel_relational_merge']);
 
+  const parallelModelSummary = (usage) => {
+    if (!usage || typeof usage !== 'object') return null;
+    const stages = Array.isArray(usage.stages) ? usage.stages : [];
+    if (!stages.length) return null;
+    const models = [];
+    const seen = new Set();
+    stages.forEach((st) => {
+      const prov = String(st?.llm_provider || '').trim();
+      const mod = String(st?.llm_model || '').trim();
+      const label = prov && mod ? `${prov}: ${mod}` : mod || prov;
+      if (!label || seen.has(label)) return;
+      seen.add(label);
+      models.push(label);
+    });
+    if (!models.length) return null;
+    return {
+      primary: models[0],
+      mixed: models.length > 1,
+      labels: models,
+    };
+  };
+
+  const parallelBranchPlanSummary = (usage) => {
+    if (!usage || typeof usage !== 'object') return null;
+    const plan = usage.branch_plan;
+    if (!plan || typeof plan !== 'object' || !plan.enabled) return null;
+    const planner = plan.planner && typeof plan.planner === 'object' ? plan.planner : {};
+    const selected = Array.isArray(plan.selected_branches) ? plan.selected_branches.filter(Boolean) : [];
+    const required = Array.isArray(planner.required_branches) ? planner.required_branches.filter(Boolean) : [];
+    const optional = Array.isArray(planner.optional_branches) ? planner.optional_branches.filter(Boolean) : [];
+    const reasoning = planner.reasoning && typeof planner.reasoning === 'object' ? planner.reasoning : {};
+    const scores = planner.branch_scores && typeof planner.branch_scores === 'object' ? planner.branch_scores : {};
+    const confidenceRaw = Number(planner.confidence);
+    const confidence = Number.isFinite(confidenceRaw) ? confidenceRaw : null;
+    const formatBranch = (b) => {
+      const s = String(b || '').trim();
+      if (!s) return '';
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    const entries = selected.map((branch) => ({
+      branch,
+      label: formatBranch(branch),
+      required: required.includes(branch),
+      optional: optional.includes(branch),
+      reasoning: String(reasoning[branch] || '').trim(),
+      score: Number.isFinite(Number(scores[branch])) ? Number(scores[branch]) : null,
+    }));
+    return {
+      selected,
+      entries,
+      confidence,
+      modelLabel: formatLlmLabel({
+        chat_llm_provider: planner.llm_provider,
+        chat_llm_model: planner.llm_model,
+      }),
+    };
+  };
+
   const llmSourceFromParallelUsage = (usage) => {
     if (!usage || typeof usage !== 'object') return null;
     const stages = Array.isArray(usage.stages) ? usage.stages : [];
@@ -1933,6 +1991,8 @@ const AdminChatHistory = () => {
                     : null;
 	                  const showPdfButton = role === 'assistant' && Array.isArray(exportBlock) && exportBlock.length > 0;
 	                  const isInstantUsage = message.parallel_llm_usage?.kind === 'instant_chat_usage';
+	                  const parallelModelInfo = hasParallelStages ? parallelModelSummary(message.parallel_llm_usage) : null;
+	                  const parallelBranchPlan = hasParallelStages ? parallelBranchPlanSummary(message.parallel_llm_usage) : null;
 	                  const answerModelLabel =
 	                    role === 'assistant'
 	                      ? formatLlmLabel(
@@ -2010,9 +2070,37 @@ const AdminChatHistory = () => {
 	                              {answerModelLabel && (
 	                                <span
 	                                  className="message-token-badge"
-	                                  title="Provider and model for this answer: merge stage from parallel usage when present, else session summary for this view"
+	                                  title={
+	                                    parallelModelInfo?.mixed
+	                                      ? `Final merge model for this answer. Branches used multiple models: ${parallelModelInfo.labels.join(' | ')}`
+	                                      : 'Provider and model for this answer: merge stage from parallel usage when present, else session summary for this view'
+	                                  }
 	                                >
-	                                  Model {answerModelLabel}
+	                                  {parallelModelInfo?.mixed ? `Merge ${answerModelLabel}` : `Model ${answerModelLabel}`}
+	                                </span>
+	                              )}
+	                              {parallelModelInfo?.mixed && (
+	                                <span
+	                                  className="message-token-badge"
+	                                  title={`Parallel branch models used in this run: ${parallelModelInfo.labels.join(' | ')}`}
+	                                >
+	                                  Mixed branch models {parallelModelInfo.labels.length}
+	                                </span>
+	                              )}
+	                              {parallelBranchPlan && parallelBranchPlan.selected.length > 0 && (
+	                                <span
+	                                  className="message-token-badge"
+	                                  title={`Planner selected branches: ${parallelBranchPlan.selected.join(', ')}`}
+	                                >
+	                                  Planned branches {parallelBranchPlan.selected.length}
+	                                </span>
+	                              )}
+	                              {parallelBranchPlan && parallelBranchPlan.confidence != null && (
+	                                <span
+	                                  className="message-token-badge"
+	                                  title="Planner confidence for the selected branch set"
+	                                >
+	                                  Confidence {(parallelBranchPlan.confidence * 100).toFixed(0)}%
 	                                </span>
 	                              )}
 	                              {message.native_name && (
@@ -2105,6 +2193,47 @@ const AdminChatHistory = () => {
 	                                </span>
 	                              )}
 	                            </div>
+	                            {parallelBranchPlan && parallelBranchPlan.selected.length > 0 && (
+	                              <details className="message-parallel-planner-details">
+	                                <summary className="message-parallel-planner-summary">
+	                                  <span>
+	                                    Planned branches: {parallelBranchPlan.entries.map((entry) => entry.label).join(', ')}
+	                                  </span>
+	                                  {parallelBranchPlan.confidence != null && (
+	                                    <span>
+	                                      · Confidence {(parallelBranchPlan.confidence * 100).toFixed(0)}%
+	                                    </span>
+	                                  )}
+	                                  {parallelBranchPlan.modelLabel && (
+	                                    <span>
+	                                      {' '}· Planner {parallelBranchPlan.modelLabel}
+	                                    </span>
+	                                  )}
+	                                </summary>
+	                                <div className="message-parallel-planner-content">
+	                                  {parallelBranchPlan.entries.map((entry) => (
+	                                    <div key={`planner-${message.message_id}-${entry.branch}`} className="message-parallel-planner-row">
+	                                      <div className="message-parallel-planner-row-head">
+	                                        <strong>{entry.label}</strong>
+	                                        <span className="message-parallel-planner-role">
+	                                          {entry.required ? 'Required' : entry.optional ? 'Optional' : 'Selected'}
+	                                        </span>
+	                                        {entry.score != null && (
+	                                          <span className="message-parallel-planner-score">
+	                                            score {(entry.score * 100).toFixed(0)}%
+	                                          </span>
+	                                        )}
+	                                      </div>
+	                                      {entry.reasoning && (
+	                                        <div className="message-parallel-planner-reason">
+	                                          {entry.reasoning}
+	                                        </div>
+	                                      )}
+	                                    </div>
+	                                  ))}
+	                                </div>
+	                              </details>
+	                            )}
 	                            {hasParallelStages && (
 	                      <div
 	                        className="message-parallel-stages"

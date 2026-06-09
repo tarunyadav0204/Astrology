@@ -19,6 +19,7 @@ import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { useCredits } from '../../../credits/CreditContext';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
+import AuthLegalNotice from '../AuthLegalNotice';
 
 export default function PasswordScreen({ 
   formData, 
@@ -341,6 +342,7 @@ export default function PasswordScreen({
           </TouchableOpacity>
         </Animated.View>
       )}
+      footer={!isLogin ? <AuthLegalNotice compact /> : null}
     >
       <Animated.View
         style={[

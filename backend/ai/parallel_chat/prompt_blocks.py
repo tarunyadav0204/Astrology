@@ -7,6 +7,8 @@ with legacy `build_system_instruction` — only layout and per-branch scope diff
 
 from __future__ import annotations
 
+from utils.admin_settings import get_parallel_branch_word_limit
+
 from chat.system_instruction_config import (
     ASHTAKAVARGA_FILTER,
     BHAVAM_BHAVESH_RULES,
@@ -42,35 +44,50 @@ from chat.system_instruction_config import (
 _BRANCH_JSON_FOOTER = """
 OUTPUT FORMAT (NON-NEGOTIABLE):
 Return a single JSON object only (no markdown fences, no prose before or after). Schema:
-{
+{{
   "branch": "<branch_id>",
-  "analysis": "<technical markdown for this school only — substantive depth>",
+  "analysis": "<plain technical text for this school only — substantive depth>",
   "bullets": ["<optional short fact bullets>"]
-}
-Keep "analysis" under 12000 characters. Use ONLY the variable JSON in the same message.
+}}
+Aim to keep "analysis" within about {word_limit} words. Use ONLY the variable JSON in the same message.
 ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or soften conclusions for politeness. Do not use motivational filler.
 DASHA MANDATE: If dasha/chara/yogini period labels or windows are present in the payload, explicitly cite them in "analysis" (do not replace with generic timing language).
 """
 
-_BRANCH_JSON_FOOTER_6000 = _BRANCH_JSON_FOOTER.replace(
-    'Keep "analysis" under 12000 characters.',
-    'Keep "analysis" under 6000 characters.',
-)
-
 _PARASHARI_JSON_FOOTER = """
 OUTPUT FORMAT (NON-NEGOTIABLE):
 Return a single JSON object only (no markdown fences, no prose before or after). Schema:
-{
+{{
   "branch": "parashari",
-  "analysis": "<technical markdown for this school only — substantive depth>",
+  "analysis": "<plain technical text for this school only — substantive depth>",
   "bullets": ["<optional short fact bullets>"]
-}
-Keep "analysis" under 12000 characters. Use ONLY the variable JSON in the same message.
+}}
+Aim to keep "analysis" within about {word_limit} words. Use ONLY the variable JSON in the same message.
 If `special_points.yogi_points` is present in VARIABLE_DATA_JSON (non-empty / populated), the markdown inside "analysis" MUST include a distinct subsection titled exactly #### Yogi & Avayogi Karma in which you explicitly list and interpret all four: **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** (lords and signs as given), each in relation to the user's question and relevant houses. Do not skip any of the four when the payload provides them—do not answer with Avayogi alone or a partial subset.
 If `special_points.yogi_points.avayogi_tithi_shunya_overlap.is_active=true`, treat that planet as a benefic override: Avayogi being the Tithi Shunya Adhipati modifies the obstruction and can give good results. Say this explicitly in the Yogi & Avayogi Karma subsection and apply it to the relevant houses/significations; do not interpret that Avayogi planet as purely harmful.
 ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or soften conclusions for politeness. Do not use motivational filler.
 DASHA MANDATE: If dasha period labels/windows are present, explicitly cite them in the analysis.
 """
+
+
+def _branch_json_footer(branch_id: str) -> str:
+    return _BRANCH_JSON_FOOTER.format(
+        branch_id=branch_id,
+        word_limit=get_parallel_branch_word_limit(branch_id),
+    )
+
+
+def _parashari_json_footer() -> str:
+    return _PARASHARI_JSON_FOOTER.format(
+        word_limit=get_parallel_branch_word_limit("parashari"),
+    )
+
+
+def build_merge_role_preamble() -> str:
+    return (
+        MERGE_ROLE_PREAMBLE
+        + f'\n- Aim to keep the final merged answer within about {get_parallel_branch_word_limit("merge")} words unless the question clearly requires more.'
+    )
 
 MERGE_ROLE_PREAMBLE = """
 # MERGE STEP (final writer only)
@@ -163,7 +180,7 @@ def build_parashari_branch_static(intent_category: str, death_analysis_unlocked:
         health_prompt_line,
         "When `special_points` is present, use `gandanta_analysis` if flagged and follow OUTPUT FORMAT rules for `yogi_points` below.",
         "Do NOT write the Jaimini View, Nadi Interpretation, KP technical pass, Ashtakavarga, deep Nakshatra-only analysis, or full Sudarshana triple-chakra synthesis — other passes cover them.",
-        _PARASHARI_JSON_FOOTER,
+        _parashari_json_footer(),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -183,7 +200,7 @@ def build_kp_branch_static(intent_category: str, death_analysis_unlocked: bool =
         "For every primary house cusp you analyze, follow KP_PILLAR order: **Cusp Sign Lord → Cusp Star Lord (NL) → Cusp Sub Lord (CSL)** before the 4-step chain; do not open with CSL alone.",
         "Apply 4-step sub-lord theory and dasha trigger after that cusp hierarchy. "
         "Do NOT repeat full Parashari divisional exposition, Jaimini, Nadi tables, Nakshatra mansion doctrine, or Ashtakavarga — other passes cover them.",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "kp"),
+        _branch_json_footer("kp"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -198,12 +215,13 @@ def build_nakshatra_branch_static(intent_category: str, death_analysis_unlocked:
         DATA_SOVEREIGNTY,
         PERSONAL_CONSULTATION_RULES,
         "\n# TASK (NAKSHATRA BRANCH ONLY)\n",
-        "Use ONLY the Nakshatra-context JSON: per-graha D1/D9 nakshatra fields, `nakshatra_remedies`, `navatara_warnings`, `pushkara_navamsa`, plus shared_kernel Vimshottari fields for Tara-from-Moon checks.",
+        "Use ONLY the Nakshatra-context JSON: per-graha D1/D9 nakshatra fields, `nakshatra_remedies`, `navatara_warnings`, `pushkara_navamsa`, `current_dasha_tara`, plus shared_kernel Vimshottari fields for Tara-from-Moon checks.",
         "Always include **relevant house lord(s)** (e.g. 7th lord for marriage) with full nakshatra+pada and **D9 / navamsa-sign implications**—not only karaka (Venus) or 7th-house occupants—see NAKSHATRA_PILLAR [NK-6]. "
         "Navatara / Tara and D9 own-sign claims MUST follow [NK-7] (math + sign lords)—never contradict `navatara_warnings` or classical sign ownership.",
+        "When `current_dasha_tara` is present, use its Mahadasha / Antardasha / Pratyantardasha Tara labels directly instead of recomputing them in prose.",
         "Tie lunar-mansion (nakshatra) themes, pada, Navatara quality, and Pushkara hints to the question. "
         "Do NOT repeat full Parashari divisional doctrine, Jaimini, Nadi linkage tables, or Ashtakavarga bindus — other passes cover them.",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "nakshatra"),
+        _branch_json_footer("nakshatra"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -221,7 +239,7 @@ def build_ashtakavarga_branch_static(death_analysis_unlocked: bool = False) -> s
         "`D1.S` / `D1.B` rows are **Aries→Pisces** (index 0–11), never house ordinals. "
         "Apply ASHTAKAVARGA_FILTER [AV-4..AV-8]: SAV bands, event-planet BAV delivery filter, and conflict phrasing.",
         "Do NOT repeat full Parashari, Jaimini, Nadi, Nakshatra, or KP doctrine — stay Ashtakavarga-only, but provide real interpretive judgment (not raw table dump).",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "ashtakavarga"),
+        _branch_json_footer("ashtakavarga"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -241,7 +259,7 @@ def build_sudarshan_branch_static(intent_category: str, death_analysis_unlocked:
         "Use ONLY `sudarshana_context` for raw chart mechanics when needed: `sudarshana_chakra` (lagna_chart, chandra_lagna, surya_lagna rotated houses + synthesis) and `sudarshana_dasha` when present. "
         "Apply Sudarshana rules with disciplined wording: compare event/house themes across Body (Lagna), Mind (Moon), Soul (Sun); state whether support is 3/3, 2/3, or mixed from `sx.topic.rows`, and for predictive/current questions also cite `sx.current.topic` or the relevant `sx.current.<topic>` block so the branch says whether the active periods are presently energizing that Sudarshana theme. Treat Sudarshana triggers as confirmation windows, not standalone guarantees. "
         "Do NOT repeat full Parashari divisional doctrine, Jaimini, Nadi tables, Nakshatra mansion analysis, KP cusp steps, or Ashtakavarga bindus — other branches cover them.",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "sudarshan"),
+        _branch_json_footer("sudarshan"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -260,7 +278,7 @@ def build_jaimini_branch_static(death_analysis_unlocked: bool = False) -> str:
         "Treat each sign as temporary Lagna, then add a short **Confluence/Conflict** conclusion; near-term priority goes to AD-Lagna when they differ.",
         "For marriage/partnership or 7th-house themes: thread **DK + UL + Darapada (A7)**. **A7 must be analyzed in depth** (sign + planets in that sign; GK or other grahas in A7’s sign = concrete friction or support in the physical/logistical reality of the union)—see JAIMINI_PILLAR [J-8]. Never stop at naming A7’s sign alone. Explicitly distinguish **partner nature (DK)**, **alliance/continuity (UL)**, and **lived manifestation (A7)**.",
         "For career/status questions: thread **AmK + KL + AL** and state separately whether the current frame shows work, authority, recognition, or only pressure without visible rise. Also distinguish vocation from public image: what the native is suited to do vs how visible or prestigious that work becomes.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "jaimini"),
+        _branch_json_footer("jaimini"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -283,7 +301,7 @@ def build_nadi_branch_static(intent_category: str = "", death_analysis_unlocked:
         "For health questions, do not name diseases or overstate outcomes; keep the Nadi read at the level of astrological pattern, sensitivity, irregularity, chronicity, or acute flare tendency."
         if _is_health_category(intent_category)
         else "",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "nadi"),
+        _branch_json_footer("nadi"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -351,7 +369,7 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         "Yoga lists, kota, and other legacy-only blocks may be absent from the bundle — work from what is present. "
         "Deep Sudarshana triple-chakra synthesis is handled by a dedicated parallel branch — do not expand full Sudarshana here.",
         "Do NOT write the Jaimini View, Nadi, KP, Ashtakavarga, Nakshatra, or Sudarshan specialist passes here — other branches cover them.",
-        _PARASHARI_JSON_FOOTER,
+        _parashari_json_footer(),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -371,7 +389,7 @@ def build_jaimini_branch_static_agent(death_analysis_unlocked: bool = False) -> 
         "When `jx` is present, use it to stay concrete: `jx.rf.UL/A7/AL/KL` gives MD/AD house positions from those lagnas; `jx.kr.AK/AmK/DK/GK` does the same for karakas; `jx.dk_asp` lists grahas aspecting DK sign; `jx.ul2`, `jx.al10`, and `jx.kl10` expose key manifestation/career signs with occupants. `jx.relationship` and `jx.career` are dedicated compact topic blocks.",
         "Career/status questions: include **AmK / KL / AL** explicitly and say whether the active Chara frame supports vocation, authority, visibility, or only workload without recognition. Use `jx.career` to distinguish vocation from status/image: `md`/`ad` = current support level from AmK frame, `img.al10` / `img.kl10` = image/vocation sign occupants.",
         "Marriage/partnership questions: use `jx.relationship` to stay concrete: `md`/`ad` = current A7 manifestation support, `gk_a7` = direct obstruction flag, `mal_a7` / `ben_a7` = A7 sign occupants by tone, `ul2_pp` = continuity filter.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "jaimini"),
+        _branch_json_footer("jaimini"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -398,7 +416,7 @@ def build_nadi_branch_static_agent(intent_category: str = "", death_analysis_unl
         "Marriage/relationship questions: use `nx.relationship`: `dom` = dominant relationship grahas, `flags` = support/delay/karmic/friction markers, `sig` = relationship signatures, `lead` = primary tone, `aa` / `aa_pl` = age-hit relationship grahas.",
         "Wealth questions: use `nx.wealth`: `dom`, `tags`, `sig`, `lead`, `aa` / `aa_pl` to say whether wealth is shown through advisory, commerce, client-facing, creative, or institutional channels.",
         health_prompt_line,
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "nadi"),
+        _branch_json_footer("nadi"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -418,7 +436,7 @@ def build_nakshatra_branch_static_agent(intent_category: str, death_analysis_unl
         "For any house-specific topic (e.g. marriage → 7th lord, career → 10th lord): the **house lord(s)** must appear in `analysis` with nakshatra+pada and **navamsa (D9) dignity** (debilitation/exaltation/own per pada mapping)—not only karaka or occupants—[NK-6]. "
         "Navatara/Tara and **own sign in D9** follow [NK-7]: verify against JSON; never claim Scorpio (e.g.) as Jupiter’s own sign.",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, KP, or Ashtakavarga — other passes cover them.",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "nakshatra"),
+        _branch_json_footer("nakshatra"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -437,7 +455,7 @@ def build_kp_branch_static_agent(intent_category: str, death_analysis_unlocked: 
         "Use ONLY `kp` and `vim_dasha` in VARIABLE_DATA_JSON. `kp` has `KP` (cusp/significators); `vim_dasha` has current MD/AD for the trigger step.",
         "For each relevant house cusp, state **Sign Lord → Star Lord (NL) → Sub Lord (CSL)** from the JSON before CSL-only or 4-step detail; never skip Sign/Star lords when the payload lists them.",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, Nakshatra, or Ashtakavarga — other passes cover them.",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "kp"),
+        _branch_json_footer("kp"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -455,7 +473,7 @@ def build_ashtakavarga_branch_static_agent(death_analysis_unlocked: bool = False
         "`ax` is the AV reasoning spine: `top`/`weak` = strongest/weakest lagna houses, `topic.rows` = question-relevant houses with SAV+filtered BAV, `dasha` = MD/AD/PD AV quality rows, `transit` = event-planet usability rows, `conflicts` = SAV/BAV paradox flags. Use it explicitly.",
         "If `topic.rows_d9` is present, add D9 AV house confirmation briefly (secondary layer only).",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, Nakshatra, or KP doctrine — remain Ashtakavarga-only with concrete SAV/BAV judgment.",
-        _BRANCH_JSON_FOOTER.replace("<branch_id>", "ashtakavarga"),
+        _branch_json_footer("ashtakavarga"),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -474,6 +492,6 @@ def build_sudarshan_branch_static_agent(intent_category: str, death_analysis_unl
         "Use `sx` as the Sudarshana reasoning spine and `sudarshana_context` only for raw backup: `sx.topic.rows` = relevant houses with 3-view agreement and support band, `sx.career` / `sx.relationship` / `sx.education` / `sx.health` = topic-specific Sudarshana blocks, `sx.current.topic` and `sx.current.<topic>` = current MD/AD/PD Sudarshana activation, `sx.dom` = dominant houses, `sx.patterns` = synthesis notes, `sx.triggers` = year-clock windows, `sx.D` = current dasha anchor. "
         "Rotate Lagna / Moon / Sun perspectives, but do not infer everything from scratch; prefer `sx` for disciplined reasoning, and for prediction/current questions explicitly say whether the active dasha planets are supporting or not supporting the Sudarshana topic. Treat triggers as confirmation windows rather than guaranteed events. "
         "Do NOT duplicate Parashari agent bundle, Jaimini, Nadi, Nakshatra, KP, or Ashtakavarga specialist passes — other branches cover them.",
-        _BRANCH_JSON_FOOTER_6000.replace("<branch_id>", "sudarshan"),
+        _branch_json_footer("sudarshan"),
     ]
     return "\n\n".join(p for p in parts if p)
