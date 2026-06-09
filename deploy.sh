@@ -490,21 +490,14 @@ verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
 verify_homepage_prerender
 deploy_timing "frontend SEO route verification complete"
 
-# --- Phase 5: auto-restart monitor (backend watchdog) ---
-echo "🔄 Starting auto-restart monitor..."
+# --- Phase 5: keep local watchdog disabled; MIG autohealing is the single recovery owner ---
+echo "⏭️ Leaving local backend watchdog disabled (MIG autohealing owns recovery)"
 cd "${APP_ROOT}"
-{
-  echo ""
-  echo "========== Monitor started $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-} >> logs/monitor.log
-nohup ./restart_server.sh >> logs/monitor.log 2>&1 &
-MONITOR_PID=$!
-echo "✅ Auto-restart monitor started with PID: $MONITOR_PID"
-deploy_timing "restart monitor started"
+deploy_timing "watchdog disabled"
 
 TOTAL=$(( $(date +%s) - DEPLOY_T0 ))
 echo "🎉 Deployment completed successfully! (total wall time: ${TOTAL}s)"
 echo "📊 Backend: http://localhost:8001"
 echo "🌐 Frontend: http://localhost:3001"
-echo "🔄 Monitor: PID $MONITOR_PID (logs/monitor.log, probe /api/keepalive)"
-echo "📋 Logs: logs/backend.log (append), logs/restart.log, logs/crash-snapshots.log (on watchdog restart)"
+echo "🔄 Watchdog: disabled (MIG health checks should use a lightweight endpoint)"
+echo "📋 Logs: logs/backend.log (append), logs/frontend.log"
