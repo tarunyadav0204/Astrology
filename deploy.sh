@@ -393,6 +393,10 @@ if [ "${restart_frontend}" = "true" ]; then
     fi
     mv "${frontend_stage_dir}/build" "${frontend_build_dir}"
     rm -rf "${frontend_stage_dir}"
+    if [ -d "${frontend_backup_dir}/static" ] && [ -d "${frontend_build_dir}/static" ]; then
+      echo "🧷 Preserving previous hashed /static assets for compatibility during rollout..."
+      cp -Rn "${frontend_backup_dir}/static/." "${frontend_build_dir}/static/" 2>/dev/null || true
+    fi
     deploy_timing "frontend build swapped"
   fi
 
