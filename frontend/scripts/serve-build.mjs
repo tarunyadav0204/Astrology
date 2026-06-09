@@ -190,6 +190,17 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // Hashed build assets must never fall through to the SPA HTML fallback.
+    // If a browser asks for a missing chunk, returning index.html makes it parse
+    // "<!doctype html>" as JavaScript and report the confusing
+    // "Unexpected token '<'" error instead of a clear missing asset.
+    if (pathname.startsWith('/static/')) {
+      const ext = path.extname(pathname).toLowerCase();
+      return send(req, res, 404, 'Not found', MIME[ext] || 'text/plain; charset=utf-8', {
+        'Cache-Control': 'no-store',
+      });
+    }
+
     // SPA fallback (CRA)
     return sendCraApp();
 
