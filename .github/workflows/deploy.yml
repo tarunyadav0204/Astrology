@@ -1,6 +1,13 @@
 # Push to main deploys the app on the current Managed Instance Group VMs one at
 # a time. VM names are discovered dynamically from the MIG, so autoscaling or
 # self-healing replacements do not require changing this workflow.
+#
+# ChunkLoadError / "Unexpected token '<'" during deploy: the HTTP(S) load balancer
+# can send HTML (from one VM) and a later /static/js/*.chunk.js request to another
+# VM that is still on the previous build (or missing that hashed file). Frontend
+# index.js includes a one-time reload recovery for that case. Mitigations: serve
+# hashed static assets from a single source (e.g. Cloud CDN + bucket), or session
+# affinity, or parallel same-artifact sync to all backends before traffic sees the new HTML.
 name: Deploy to GCP
 
 on:
@@ -31,6 +38,10 @@ on:
         required: false
         default: false
         type: boolean
+
+concurrency:
+  group: deploy-prod-main
+  cancel-in-progress: false
 
 permissions:
   contents: read

@@ -13,8 +13,21 @@ function installStaleChunkReloadRecovery() {
   if (typeof window === 'undefined') return;
   const KEY = '__astro_chunk_reload_ts';
   const COOLDOWN_MS = 8000;
-  const chunkFail = (msg) =>
-    /ChunkLoadError|Loading chunk \d+ failed|Importing a module script failed/i.test(String(msg || ''));
+  /** When a lazy chunk 404s, hosts often return index.html → parser sees '<' as first token. */
+  const chunkFail = (msg, filename) => {
+    const s = String(msg || '');
+    const f = String(filename || '');
+    if (/ChunkLoadError|Loading chunk \d+ failed|Importing a module script failed|dynamically imported module/i.test(s))
+      return true;
+    if (
+      s.includes("Unexpected token '<") ||
+      s.includes('Unexpected token "<') ||
+      s.includes('Unexpected token <')
+    )
+      return true;
+    if (/\.chunk\.js$/i.test(f)) return true;
+    return false;
+  };
 
   const tryReload = () => {
     try {
@@ -31,13 +44,13 @@ function installStaleChunkReloadRecovery() {
   window.addEventListener('unhandledrejection', (event) => {
     const r = event.reason;
     const msg = (r && r.message) || r || '';
-    if (chunkFail(msg)) {
+    if (chunkFail(msg, '')) {
       event.preventDefault();
       tryReload();
     }
   });
   window.addEventListener('error', (event) => {
-    if (chunkFail(event.message)) tryReload();
+    if (chunkFail(event.message, event.filename)) tryReload();
   });
 }
 
