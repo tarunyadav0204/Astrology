@@ -67,6 +67,7 @@ function send(req, res, status, body, contentType, extraHeaders = {}) {
 }
 
 function cacheControlForPath(pathname, ext) {
+  if (ext === '.html') return CACHE_HTML;
   if (pathname.startsWith('/static/')) return CACHE_IMMUTABLE;
   if (pathname.startsWith('/images/')) return CACHE_IMAGES;
   if (ext === '.woff' || ext === '.woff2') return CACHE_IMMUTABLE;
