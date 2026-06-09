@@ -1,4 +1,4 @@
-/* User profile tab — matches AdminPanel users-management / pink accent (#e91e63) */
+/* User profile tab — uses admin accent vars from .admin-panel */
 
 .admin-user-profile {
   padding: 0;
@@ -13,7 +13,7 @@
 }
 
 .admin-user-profile-lead code {
-  background: #fce4ec;
+  background: var(--admin-accent-soft);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 13px;
@@ -41,7 +41,7 @@
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.08);
+  box-shadow: 0 4px 12px rgba(91, 140, 184, 0.08);
 }
 
 .admin-user-profile-ambiguous h3 {
@@ -82,8 +82,8 @@
 }
 
 .admin-user-profile-match-btn:hover:not(:disabled) {
-  border-color: #e91e63;
-  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.15);
+  border-color: var(--admin-accent);
+  box-shadow: 0 2px 8px rgba(91, 140, 184, 0.15);
 }
 
 .admin-user-profile-match-btn:disabled {
@@ -103,8 +103,8 @@
 }
 
 .admin-user-profile-summary {
-  background: linear-gradient(180deg, #fce4ec 0%, #f8f9fa 48%);
-  border: 1px solid #f8bbd9;
+  background: linear-gradient(180deg, var(--admin-accent-soft) 0%, #f8f9fa 48%);
+  border: 1px solid var(--admin-accent-border);
   border-radius: 12px;
   padding: 20px 22px;
   margin-bottom: 24px;
@@ -114,7 +114,7 @@
 .admin-user-profile-summary > h3 {
   margin: 0 0 12px;
   font-size: 1.15rem;
-  color: #c2185b;
+  color: var(--admin-accent-hover);
 }
 
 .admin-user-profile-userline {
@@ -141,7 +141,7 @@
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.7);
   border-radius: 8px;
-  border: 1px solid #f8bbd9;
+  border: 1px solid var(--admin-accent-border);
 }
 
 .admin-user-profile-summary-credits-label {
@@ -195,7 +195,7 @@
 }
 
 .admin-user-profile-chevron {
-  color: #e91e63;
+  color: var(--admin-accent);
   font-size: 12px;
   width: 1.25rem;
   flex-shrink: 0;
@@ -303,7 +303,7 @@
 
 .admin-user-profile-journey-card {
   background: #fff;
-  border: 1px solid #f8bbd9;
+  border: 1px solid var(--admin-accent-border);
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -324,7 +324,7 @@
 }
 
 .admin-user-profile-journey-step {
-  background: #fce4ec;
+  background: var(--admin-accent-soft);
   color: #ad1457;
   border-radius: 999px;
   padding: 2px 8px;

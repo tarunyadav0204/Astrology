@@ -1,6 +1,13 @@
 .admin-panel {
+  /* Shared admin accent — softer dusty blue (less saturated than #2563eb) */
+  --admin-accent: #6b9dc9;
+  --admin-accent-hover: #5a8db8;
+  --admin-accent-soft: #f7fafc;
+  --admin-accent-soft-mid: #e8eef4;
+  --admin-accent-border: #cdd9e6;
+  --admin-accent-text: #3d556b;
   min-height: 100vh;
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
+  background: #fff;
 }
 
 .admin-content-wrapper {
@@ -398,11 +405,11 @@
   align-items: center;
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 2px solid #e91e63;
+  border-bottom: 2px solid var(--admin-accent);
 }
 
 .admin-header h1 {
-  color: #e91e63;
+  color: var(--admin-accent);
   margin: 0;
 }
 
@@ -420,7 +427,7 @@
   display: flex;
   gap: 0;
   margin-bottom: 20px;
-  border-bottom: 2px solid #e91e63;
+  border-bottom: 2px solid var(--admin-accent);
   position: relative;
   z-index: 10;
 }
@@ -440,9 +447,9 @@
 
 .tab.active,
 .tab:hover {
-  color: #e91e63;
-  border-bottom-color: #e91e63;
-  background: rgba(233, 30, 99, 0.05);
+  color: var(--admin-accent);
+  border-bottom-color: var(--admin-accent);
+  background: rgba(91, 140, 184, 0.05);
 }
 
 .admin-subtabs {
@@ -469,8 +476,8 @@
 
 .subtab.active,
 .subtab:hover {
-  color: #e91e63;
-  border-bottom-color: #e91e63;
+  color: var(--admin-accent);
+  border-bottom-color: var(--admin-accent);
 }
 
 .admin-content {
@@ -482,7 +489,7 @@
 
 .users-management h2,
 .charts-management h2 {
-  color: #e91e63;
+  color: var(--admin-accent);
   margin-bottom: 20px;
 }
 
@@ -524,7 +531,7 @@
 
 .charts-pagination-btn {
   padding: 6px 14px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 6px;
@@ -533,7 +540,7 @@
 }
 
 .charts-pagination-btn:hover:not(:disabled) {
-  background: #c2185b;
+  background: var(--admin-accent-hover);
 }
 
 .charts-pagination-btn:disabled {
@@ -593,7 +600,7 @@
 
 .users-search-btn {
   padding: 8px 20px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -604,7 +611,7 @@
 }
 
 .users-search-btn:hover {
-  background: #c2185b;
+  background: var(--admin-accent-hover);
 }
 
 .users-summary-grid {
@@ -687,7 +694,7 @@
 
 .users-pagination-btn {
   padding: 6px 14px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -696,7 +703,7 @@
 }
 
 .users-pagination-btn:hover:not(:disabled) {
-  background: #c2185b;
+  background: var(--admin-accent-hover);
 }
 
 .users-pagination-btn:disabled {
@@ -740,13 +747,13 @@ td {
 }
 
 th {
-  background: #e91e63;
-  color: white;
-  font-weight: bold;
+  background: var(--admin-accent-soft-mid);
+  color: var(--admin-accent-text);
+  font-weight: 600;
 }
 
 tr:hover {
-  background: rgba(233, 30, 99, 0.05);
+  background: rgba(91, 140, 184, 0.05);
 }
 
 .subscriptions {
@@ -1119,7 +1126,7 @@ select {
     margin-left: -20px;
     margin-right: -20px;
     padding: 0 20px 4px;
-    border-bottom: 2px solid #e91e63;
+    border-bottom: 2px solid var(--admin-accent);
     scroll-snap-type: x proximity;
     scroll-padding-left: 20px;
     scroll-padding-right: 20px;
@@ -1184,7 +1191,7 @@ select {
   }
 
   .admin-support-inbox h2 {
-    color: #e91e63;
+    color: var(--admin-accent);
     margin: 0 0 8px 0;
     font-size: 1.35rem;
   }
@@ -1249,9 +1256,9 @@ select {
 }
 
 .requests-table th {
-  background-color: #e91e63;
-  color: white;
-  font-weight: bold;
+  background-color: var(--admin-accent-soft-mid);
+  color: var(--admin-accent-text);
+  font-weight: 600;
 }
 
 .approval-form {
@@ -1358,7 +1365,7 @@ select {
 
 /* Support inbox: do not use .admin-settings (extra 20px padding); title styled here */
 .admin-support-inbox h2 {
-  color: #e91e63;
+  color: var(--admin-accent);
   margin: 0 0 14px 0;
 }
 
@@ -1593,7 +1600,7 @@ input:checked + .toggle-slider:before {
 
 .facts-search button {
   padding: 10px 20px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 6px;
@@ -1620,13 +1627,13 @@ input:checked + .toggle-slider:before {
 }
 
 .facts-table th {
-  background: #e91e63;
-  color: white;
-  font-weight: bold;
+  background: var(--admin-accent-soft-mid);
+  color: var(--admin-accent-text);
+  font-weight: 600;
 }
 
 .facts-table tr:hover {
-  background: rgba(233, 30, 99, 0.05);
+  background: rgba(91, 140, 184, 0.05);
 }
 
 .category-badge {
@@ -1642,9 +1649,9 @@ input:checked + .toggle-slider:before {
 .category-badge.family { background: #f3e5f5; color: #7b1fa2; }
 .category-badge.health { background: #ffebee; color: #c62828; }
 .category-badge.location { background: #e8f5e9; color: #388e3c; }
-.category-badge.preferences { background: #fff3e0; color: #f57c00; }
+.category-badge.preferences { background: #f1f5f9; color: #334155; }
 .category-badge.education { background: #e0f2f1; color: #00796b; }
-.category-badge.relationships { background: #fce4ec; color: #c2185b; }
+.category-badge.relationships { background: var(--admin-accent-soft); color: var(--admin-accent-hover); }
 .category-badge.major_events { background: #ede7f6; color: #512da8; }
 .category-badge.temporary_events { background: #fff9c4; color: #f57f17; }
 
@@ -1659,7 +1666,7 @@ input:checked + .toggle-slider:before {
 
 .pagination button {
   padding: 8px 16px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -1756,7 +1763,7 @@ input:checked + .toggle-slider:before {
 
 .notif-search-btn {
   padding: 8px 16px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 6px;
@@ -1766,7 +1773,7 @@ input:checked + .toggle-slider:before {
 }
 
 .notif-search-btn:hover {
-  background: #c2185b;
+  background: var(--admin-accent-hover);
 }
 
 .notif-pagination {
@@ -1785,7 +1792,7 @@ input:checked + .toggle-slider:before {
 
 .notif-pagination-btn {
   padding: 6px 14px;
-  background: #e91e63;
+  background: var(--admin-accent);
   color: white;
   border: none;
   border-radius: 6px;
@@ -1794,7 +1801,7 @@ input:checked + .toggle-slider:before {
 }
 
 .notif-pagination-btn:hover:not(:disabled) {
-  background: #c2185b;
+  background: var(--admin-accent-hover);
 }
 
 .notif-pagination-btn:disabled {
@@ -2257,7 +2264,7 @@ input:checked + .toggle-slider:before {
 }
 
 .dashboard-summary .summary-card.spent {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  background: linear-gradient(135deg, var(--admin-accent-soft) 0%, var(--admin-accent-soft-mid) 100%);
   color: #c62828;
 }
 

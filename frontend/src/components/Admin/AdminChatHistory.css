@@ -9,7 +9,7 @@
 
 .admin-chat-history-intro h2 {
   margin: 0 0 6px 0;
-  color: #c2185b;
+  color: var(--admin-accent-hover);
   font-size: 1.5rem;
   font-weight: 700;
 }
@@ -80,7 +80,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #c2185b;
+  color: var(--admin-accent-hover);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -123,8 +123,8 @@
 
 .sessions-search-input:focus {
   outline: none;
-  border-color: #e91e63;
-  box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.12);
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px rgba(91, 140, 184, 0.12);
 }
 
 .sessions-list {
@@ -284,8 +284,8 @@
 }
 
 .sessions-page-btn:hover:not(:disabled) {
-  border-color: #e91e63;
-  color: #c2185b;
+  border-color: var(--admin-accent);
+  color: var(--admin-accent-hover);
 }
 
 .sessions-page-btn:disabled {
@@ -331,12 +331,12 @@
 }
 
 .session-card:focus {
-  outline: 2px solid #e91e63;
+  outline: 2px solid var(--admin-accent);
   outline-offset: -2px;
 }
 
 .session-card.active {
-  background: linear-gradient(135deg, #ff6b35 0%, #e91e63 100%);
+  background: linear-gradient(135deg, var(--admin-accent) 0%, var(--admin-accent-hover) 100%);
   color: #fff;
   box-shadow: inset 3px 0 0 #fff;
 }
@@ -640,7 +640,7 @@
 
 .session-header-title {
   margin: 0;
-  color: #c2185b;
+  color: var(--admin-accent-hover);
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.3;
@@ -708,7 +708,7 @@
 .user-value-toggle {
   border: 1px solid #dbe4f0;
   background: #fff;
-  color: #c2185b;
+  color: var(--admin-accent-hover);
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 0.72rem;
@@ -788,9 +788,9 @@
 }
 
 .user-value-badge--paid-user {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #1d4ed8;
+  background: var(--admin-accent-soft);
+  border-color: var(--admin-accent-border);
+  color: var(--admin-accent-text);
 }
 
 .user-value-badge--high-intent {
@@ -890,7 +890,7 @@
 
 .user-value-details summary {
   cursor: pointer;
-  color: #c2185b;
+  color: var(--admin-accent-hover);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -1045,7 +1045,7 @@
 /* User bubbles stay conversational width; assistant uses full pane width for long answers */
 .admin-chat-history .message--user .message-content {
   max-width: min(560px, 92%);
-  background: linear-gradient(135deg, #ff6b35 0%, #e85d2c 100%);
+  background: linear-gradient(135deg, var(--admin-accent) 0%, var(--admin-accent-hover) 100%);
   color: #fff;
   border-bottom-right-radius: 4px;
   box-shadow: 0 2px 8px rgba(255, 107, 53, 0.25);
@@ -1055,14 +1055,14 @@
   background: #fff;
   color: #212529;
   border: 1px solid #e9ecef;
-  border-left: 4px solid #e91e63;
+  border-left: 4px solid var(--admin-accent);
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   max-width: min(960px, 100%);
 }
 
 .admin-chat-history .message-content h3 {
-  color: #c2185b;
+  color: var(--admin-accent-hover);
   margin: 18px 0 10px 0;
   font-size: 1.05rem;
   font-weight: 700;
@@ -1104,7 +1104,7 @@
 .admin-chat-history .message-native-badge {
   font-size: 0.72rem;
   color: #7c2d12;
-  background: rgba(233, 30, 99, 0.1);
+  background: rgba(91, 140, 184, 0.1);
   padding: 3px 10px;
   border-radius: 999px;
   font-weight: 600;
@@ -1530,7 +1530,7 @@
     height: 48px;
     padding: 0;
     background: #fff5f8;
-    color: #c2185b;
+    color: var(--admin-accent-hover);
     border: 1px solid #f8bbd9;
     border-radius: 12px;
     font-size: 1.25rem;
@@ -1727,7 +1727,7 @@
     max-width: 100%;
     width: 100%;
     border-left: none;
-    border-top: 3px solid #e91e63;
+    border-top: 3px solid var(--admin-accent);
     padding: 14px 16px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }

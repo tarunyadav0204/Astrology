@@ -528,7 +528,7 @@ const AdminExpenses = () => {
             </button>
           </form>
 
-          {error ? <p style={{ color: '#c2185b' }}>{error}</p> : null}
+          {error ? <p style={{ color: '#b91c1c' }}>{error}</p> : null}
 
           {loading ? (
             <div className="loading">Loading…</div>

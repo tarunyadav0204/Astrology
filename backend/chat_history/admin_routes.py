@@ -95,6 +95,18 @@ def _table_columns(conn, table_name: str) -> set[str]:
     return {str(r[0]) for r in (cur.fetchall() or [])}
 
 
+# chat_messages shape for admin thread SELECT — avoid information_schema on every request.
+_CHAT_MESSAGES_COLUMNS_CACHE: Optional[set[str]] = None
+
+
+def _chat_messages_columns_cached(conn) -> set[str]:
+    global _CHAT_MESSAGES_COLUMNS_CACHE
+    if _CHAT_MESSAGES_COLUMNS_CACHE is not None:
+        return _CHAT_MESSAGES_COLUMNS_CACHE
+    _CHAT_MESSAGES_COLUMNS_CACHE = _table_columns(conn, "chat_messages")
+    return _CHAT_MESSAGES_COLUMNS_CACHE
+
+
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         if value is None:
@@ -870,6 +882,7 @@ async def get_admin_chat_users(
         params: Tuple[Any, ...] = ()
         if search:
             pat = _build_ilike_pattern(search)
+            # Count query: still keyed off chat_sessions cs.
             search_clause = """
                 AND (
                     COALESCE(u.name, '') ILIKE %s
@@ -877,7 +890,17 @@ async def get_admin_chat_users(
                     OR COALESCE(cs.user_id::text, '') ILIKE %s
                 )
             """
+            search_clause_list = """
+                AND (
+                    COALESCE(u.name, '') ILIKE %s
+                    OR COALESCE(u.phone, '') ILIKE %s
+                    OR COALESCE(ur.user_id::text, '') ILIKE %s
+                )
+            """
             params = (pat, pat, pat)
+        else:
+            search_clause = ""
+            search_clause_list = ""
 
         base_where = """
             EXISTS (
@@ -887,40 +910,58 @@ async def get_admin_chat_users(
         """
 
         with get_conn() as conn:
+            # DISTINCT users with ≥1 qualifying session (same as prior GROUP BY subquery).
             cur = execute(
                 conn,
                 f"""
-                SELECT COUNT(*)
-                FROM (
-                    SELECT cs.user_id
-                    FROM chat_sessions cs
-                    LEFT JOIN users u ON cs.user_id = u.userid
-                    WHERE {base_where}
-                    {search_clause}
-                    GROUP BY cs.user_id
-                ) t
+                SELECT COUNT(DISTINCT cs.user_id)::bigint
+                FROM chat_sessions cs
+                LEFT JOIN users u ON cs.user_id = u.userid
+                WHERE {base_where}
+                {search_clause}
                 """,
                 params,
             )
             total_row = cur.fetchone()
             total = int(total_row[0] or 0) if total_row else 0
 
+            # Aggregate per session first, then per user — avoids joining every message row
+            # into sessions before GROUP BY (was O(sessions × messages) row explosion).
             cur = execute(
                 conn,
                 f"""
+                WITH eligible_sessions AS (
+                    SELECT cs.session_id, cs.user_id
+                    FROM chat_sessions cs
+                    WHERE {base_where}
+                ),
+                session_stats AS (
+                    SELECT m.session_id,
+                           MAX(m.timestamp) AS last_ts,
+                           COUNT(*)::bigint AS msg_count
+                    FROM chat_messages m
+                    INNER JOIN eligible_sessions es ON es.session_id = m.session_id
+                    GROUP BY m.session_id
+                ),
+                user_rollups AS (
+                    SELECT es.user_id,
+                           MAX(sms.last_ts) AS last_activity_at,
+                           SUM(sms.msg_count) AS message_count
+                    FROM eligible_sessions es
+                    INNER JOIN session_stats sms ON sms.session_id = es.session_id
+                    GROUP BY es.user_id
+                )
                 SELECT
-                    cs.user_id,
+                    ur.user_id,
                     COALESCE(u.name, 'Unknown User') AS user_name,
                     COALESCE(u.phone, '') AS user_phone,
-                    MAX(cm.timestamp) AS last_activity_at,
-                    COUNT(cm.message_id) AS message_count
-                FROM chat_sessions cs
-                LEFT JOIN users u ON cs.user_id = u.userid
-                LEFT JOIN chat_messages cm ON cm.session_id = cs.session_id
-                WHERE {base_where}
-                {search_clause}
-                GROUP BY cs.user_id, COALESCE(u.name, 'Unknown User'), COALESCE(u.phone, '')
-                ORDER BY MAX(cm.timestamp) DESC NULLS LAST
+                    ur.last_activity_at,
+                    ur.message_count
+                FROM user_rollups ur
+                LEFT JOIN users u ON ur.user_id = u.userid
+                WHERE 1=1
+                {search_clause_list}
+                ORDER BY ur.last_activity_at DESC NULLS LAST
                 LIMIT %s OFFSET %s
                 """,
                 params + (limit, offset),
@@ -988,16 +1029,7 @@ async def get_admin_chat_user_thread(
             total_row = cur.fetchone()
             total = int(total_row[0] or 0) if total_row else 0
 
-            cur = execute(
-                conn,
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'chat_messages'
-                """,
-                (),
-            )
-            msg_cols = {r[0] for r in (cur.fetchall() or [])}
+            msg_cols = _chat_messages_columns_cached(conn)
             has_llm_input_tokens = "llm_input_tokens" in msg_cols
             has_llm_output_tokens = "llm_output_tokens" in msg_cols
             has_llm_cached_input_tokens = "llm_cached_input_tokens" in msg_cols

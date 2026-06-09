@@ -367,7 +367,7 @@ const AdminAcquisition = () => {
                 <div style={{ fontWeight: 800 }}>{analytics.installs || 0}</div>
               </div>
               <div style={{ border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 10px', background: '#eff6ff' }}>
-                <div style={{ fontSize: 11, color: '#1d4ed8' }}>Existing/login users separated</div>
+                <div style={{ fontSize: 11, color: 'var(--admin-accent-hover)' }}>Existing/login users separated</div>
                 <div style={{ fontWeight: 800 }}>{analytics.existing_user_installs || 0}</div>
               </div>
               <div style={{ border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px', background: '#f0fdf4' }}>
@@ -463,7 +463,7 @@ const AdminAcquisition = () => {
       ) : null}
 
       {error ? (
-        <p style={{ color: '#c2185b' }}>{error}</p>
+        <p style={{ color: '#b91c1c' }}>{error}</p>
       ) : loading ? (
         <div className="loading">Loading…</div>
       ) : (
@@ -505,7 +505,7 @@ const AdminAcquisition = () => {
                             fontFamily: 'monospace',
                             fontSize: 12,
                             cursor: 'pointer',
-                            color: '#2563eb',
+                            color: 'var(--admin-accent)',
                           }}
                           onClick={() => openTimeline(row.installation_id)}
                         >
@@ -569,7 +569,7 @@ const AdminAcquisition = () => {
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             cursor: referrerPreview === '—' ? 'default' : 'pointer',
-                            color: referrerPreview === '—' ? 'inherit' : '#2563eb',
+                            color: referrerPreview === '—' ? 'inherit' : 'var(--admin-accent)',
                           }}
                           onClick={() => {
                             if (referrerPreview !== '—') {
@@ -692,7 +692,7 @@ const AdminAcquisition = () => {
                 {timelineModal.loading ? (
                   <div className="loading" style={{ marginTop: 20 }}>Loading…</div>
                 ) : timelineModal.error ? (
-                  <p style={{ color: '#c2185b' }}>{timelineModal.error}</p>
+                  <p style={{ color: '#b91c1c' }}>{timelineModal.error}</p>
                 ) : timelineModal.data ? (
                   <>
                     <div style={{ marginTop: 14, padding: 12, background: '#f8fafc', borderRadius: 8 }}>

@@ -15,7 +15,7 @@ import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminUserGrowthCharts.css';
 
 const COL_MALE = '#3498db';
-const COL_FEMALE = '#e91e63';
+const COL_FEMALE = '#7c3aed';
 const COL_UNKNOWN = '#95a5a6';
 const DEFAULT_BAR_LIMIT = 10;
 const MOBILE_BAR_LIMIT = 6;

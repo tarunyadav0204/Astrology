@@ -5102,7 +5102,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             minWidth: '400px',
             maxWidth: '500px'
           }}>
-            <h3 style={{ marginTop: 0, color: '#e91e63' }}>Approve Credit Request</h3>
+            <h3 style={{ marginTop: 0, color: 'var(--admin-accent)' }}>Approve Credit Request</h3>
             <div style={{ marginBottom: '15px' }}>
               <strong>User:</strong> {selectedRequest.user_name}<br/>
               <strong>Requested:</strong> {selectedRequest.requested_amount} credits<br/>
