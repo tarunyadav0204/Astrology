@@ -20,6 +20,17 @@ import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
 import { getCurrentDomainConfig, getRedirectUrl } from './config/domains.config';
 
+// When the static frontend is served from a GCS bucket/backend bucket, direct
+// deep links can arrive as "/path/index.html". Normalize those URLs before the
+// router mounts so React Router matches the clean application route.
+if (typeof window !== 'undefined') {
+  const { pathname, search, hash } = window.location;
+  if (pathname !== '/index.html' && pathname.endsWith('/index.html')) {
+    const normalizedPath = pathname.slice(0, -'/index.html'.length) || '/';
+    window.history.replaceState(null, '', `${normalizedPath}${search}${hash}`);
+  }
+}
+
 /** Shown briefly while lazy route chunks load (code-splitting). */
 function RoutePageFallback() {
   return (
