@@ -8,7 +8,7 @@ APP_DIR="/home/${APP_USER}/AstrologyApp"
 DEPLOY_BRANCH="main"
 GITHUB_KEY_SECRET="GITHUB_STARTUP_DEPLOY_KEY"
 LOG_FILE="/var/log/astroroshni-startup.log"
-FRONTEND_ARTIFACT_GCS_URI="${FRONTEND_ARTIFACT_GCS_URI:-}"
+FRONTEND_ARTIFACT_GCS_URI="${FRONTEND_ARTIFACT_GCS_URI:-gs://tradebest-465307-frontend-artifacts/prod/frontend-build-latest.tgz}"
 FRONTEND_ARTIFACT_LOCAL="/tmp/frontend-build-latest.tgz"
 
 exec > >(tee -a "${LOG_FILE}") 2>&1
