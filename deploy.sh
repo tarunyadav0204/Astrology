@@ -32,6 +32,7 @@ echo "📌 Deploying branch: ${DEPLOY_BRANCH}"
 FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-false}"
 FORCE_FRONTEND_DEPLOY="${FORCE_FRONTEND_DEPLOY:-false}"
 DEFER_FRONTEND_BUILD="${DEFER_FRONTEND_BUILD:-false}"
+SERVE_FRONTEND_LOCALLY="${SERVE_FRONTEND_LOCALLY:-true}"
 FRONTEND_PREBUILT_ARCHIVE="${FRONTEND_PREBUILT_ARCHIVE:-}"
 case "$(printf '%s' "${FORCE_FULL_DEPLOY}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) FORCE_FULL_DEPLOY=true ;;
@@ -44,6 +45,10 @@ esac
 case "$(printf '%s' "${DEFER_FRONTEND_BUILD}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) DEFER_FRONTEND_BUILD=true ;;
   *) DEFER_FRONTEND_BUILD=false ;;
+esac
+case "$(printf '%s' "${SERVE_FRONTEND_LOCALLY}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes) SERVE_FRONTEND_LOCALLY=true ;;
+  *) SERVE_FRONTEND_LOCALLY=false ;;
 esac
 
 has_frontend_prebuilt=false
@@ -84,20 +89,22 @@ fi
 
 needs_frontend_install=false
 needs_frontend_build=false
-if [ ! -d "frontend/node_modules" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
-  needs_frontend_install=true
-fi
-if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ "${FORCE_FRONTEND_DEPLOY}" = "true" ] || [ ! -d "frontend/build" ]; then
-  needs_frontend_build=true
-elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/|^frontend-next/'; then
-  needs_frontend_build=true
-  if echo "${CHANGED_FILES}" | grep -E -q '^frontend/package(-lock)?\.json$'; then
+if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ]; then
+  if [ ! -d "frontend/node_modules" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
     needs_frontend_install=true
+  fi
+  if [ "${FORCE_FULL_DEPLOY}" = "true" ] || [ "${FORCE_FRONTEND_DEPLOY}" = "true" ] || [ ! -d "frontend/build" ]; then
+    needs_frontend_build=true
+  elif echo "${CHANGED_FILES}" | grep -E -q '^frontend/|^frontend-next/'; then
+    needs_frontend_build=true
+    if echo "${CHANGED_FILES}" | grep -E -q '^frontend/package(-lock)?\.json$'; then
+      needs_frontend_install=true
+    fi
   fi
 fi
 
 frontend_build_deferred=false
-if [ "${DEFER_FRONTEND_BUILD}" = "true" ] && [ "${FORCE_FRONTEND_DEPLOY}" != "true" ] && [ "${has_frontend_prebuilt}" != "true" ]; then
+if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] && [ "${DEFER_FRONTEND_BUILD}" = "true" ] && [ "${FORCE_FRONTEND_DEPLOY}" != "true" ] && [ "${has_frontend_prebuilt}" != "true" ]; then
   if [ "${needs_frontend_install}" = "true" ] || [ "${needs_frontend_build}" = "true" ]; then
     echo "⏭️ Deferring frontend install/build for this run (DEFER_FRONTEND_BUILD=true)"
     frontend_build_deferred=true
@@ -142,7 +149,7 @@ if [ "${SKIP_BACKEND_PIP}" = "true" ] && [ "${FORCE_BACKEND_PIP}" != "true" ]; t
   fi
 fi
 
-echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} DEFER_FRONTEND_BUILD=${DEFER_FRONTEND_BUILD} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build} frontend_build_deferred=${frontend_build_deferred} has_frontend_prebuilt=${has_frontend_prebuilt}"
+echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACKEND_PIP} SKIP_BACKEND_PIP=${SKIP_BACKEND_PIP} FORCE_FRONTEND_DEPLOY=${FORCE_FRONTEND_DEPLOY} FORCE_FULL_DEPLOY=${FORCE_FULL_DEPLOY} DEFER_FRONTEND_BUILD=${DEFER_FRONTEND_BUILD} SERVE_FRONTEND_LOCALLY=${SERVE_FRONTEND_LOCALLY} needs_frontend_install=${needs_frontend_install} needs_frontend_build=${needs_frontend_build} frontend_build_deferred=${frontend_build_deferred} has_frontend_prebuilt=${has_frontend_prebuilt}"
 
 # Repo root (deploy.sh is always run from here)
 APP_ROOT="$(pwd)"
@@ -326,63 +333,70 @@ else
   deploy_timing "backend restart skipped (frontend-only deploy)"
 fi
 
-# --- Phase 3: frontend install/build (API already serving new code) ---
-echo "⚛️ Building frontend..."
-cd "${APP_ROOT}/frontend"
-frontend_stage_dir="${APP_ROOT}/frontend/.build-deploy-stage"
 staged_frontend_build=false
-if [ "${needs_frontend_build}" = "true" ] && [ "${has_frontend_prebuilt}" = "true" ]; then
-  echo "📦 Using prebuilt frontend artifact: ${FRONTEND_PREBUILT_ARCHIVE}"
-  rm -rf "${frontend_stage_dir}"
-  mkdir -p "${frontend_stage_dir}"
-  tar -xzf "${FRONTEND_PREBUILT_ARCHIVE}" -C "${frontend_stage_dir}"
-  if [ ! -f "${frontend_stage_dir}/build/index.html" ]; then
-    echo "❌ Prebuilt frontend artifact is missing build/index.html"
-    exit 1
-  fi
-  staged_frontend_build=true
-  deploy_timing "frontend artifact unpacked"
-else
-  if [ "${needs_frontend_install}" = "true" ]; then
-    echo "📦 Installing frontend dependencies..."
-    npm install
-    deploy_timing "npm install finished"
+if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ]; then
+  # --- Phase 3: frontend install/build (API already serving new code) ---
+  echo "⚛️ Building frontend..."
+  cd "${APP_ROOT}/frontend"
+  frontend_stage_dir="${APP_ROOT}/frontend/.build-deploy-stage"
+  if [ "${needs_frontend_build}" = "true" ] && [ "${has_frontend_prebuilt}" = "true" ]; then
+    echo "📦 Using prebuilt frontend artifact: ${FRONTEND_PREBUILT_ARCHIVE}"
+    rm -rf "${frontend_stage_dir}"
+    mkdir -p "${frontend_stage_dir}"
+    tar -xzf "${FRONTEND_PREBUILT_ARCHIVE}" -C "${frontend_stage_dir}"
+    if [ ! -f "${frontend_stage_dir}/build/index.html" ]; then
+      echo "❌ Prebuilt frontend artifact is missing build/index.html"
+      exit 1
+    fi
+    staged_frontend_build=true
+    deploy_timing "frontend artifact unpacked"
   else
-    echo "⏭️ Frontend dependencies unchanged; skipping npm install"
-    deploy_timing "npm install skipped"
-  fi
+    if [ "${needs_frontend_install}" = "true" ]; then
+      echo "📦 Installing frontend dependencies..."
+      npm install
+      deploy_timing "npm install finished"
+    else
+      echo "⏭️ Frontend dependencies unchanged; skipping npm install"
+      deploy_timing "npm install skipped"
+    fi
 
-  if [ "${needs_frontend_build}" = "true" ]; then
-    echo "🏗️ Frontend changed; building..."
-    export CI=true
-    export GENERATE_SOURCEMAP=false
-    export INLINE_RUNTIME_CHUNK=true
-    # SEO: prerender CRA routes (homepage + key public URLs) so crawlers get correct <link rel="canonical"> in first HTML.
-    # Omit PRERENDER_ROUTES to use the full list in frontend/scripts/postbuild-seo.mjs (STATIC + nakshatras + blog).
-    export PRERENDER=true
-    unset PRERENDER_ROUTES
-    SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
-    BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
-    npm run build
-    deploy_timing "npm run build finished (includes frontend-next karma export)"
-  else
-    echo "⏭️ Frontend unchanged; skipping build"
-    deploy_timing "npm build skipped"
+    if [ "${needs_frontend_build}" = "true" ]; then
+      echo "🏗️ Frontend changed; building..."
+      export CI=true
+      export GENERATE_SOURCEMAP=false
+      export INLINE_RUNTIME_CHUNK=true
+      # SEO: prerender CRA routes (homepage + key public URLs) so crawlers get correct <link rel="canonical"> in first HTML.
+      # Omit PRERENDER_ROUTES to use the full list in frontend/scripts/postbuild-seo.mjs (STATIC + nakshatras + blog).
+      export PRERENDER=true
+      unset PRERENDER_ROUTES
+      SITEMAP_URL="${SITEMAP_URL:-http://127.0.0.1:8001/sitemap.xml}" \
+      BLOG_API_URL="${BLOG_API_URL:-http://127.0.0.1:8001}" \
+      npm run build
+      deploy_timing "npm run build finished (includes frontend-next karma export)"
+    else
+      echo "⏭️ Frontend unchanged; skipping build"
+      deploy_timing "npm build skipped"
+    fi
   fi
+  echo "✅ Frontend phase complete"
+else
+  echo "⏭️ Local frontend serving disabled; skipping frontend build/deploy on this VM"
+  deploy_timing "frontend build skipped (external static hosting)"
 fi
-echo "✅ Frontend phase complete"
 
 # --- Phase 4: restart static server only when needed (new build or not listening) ---
 cd "${APP_ROOT}"
 frontend_build_available=false
-if [ -f "${APP_ROOT}/frontend/build/index.html" ]; then
+if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] && [ -f "${APP_ROOT}/frontend/build/index.html" ]; then
   frontend_build_available=true
 fi
 restart_frontend=false
-if [ "${needs_frontend_build}" = "true" ]; then
+if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] && [ "${needs_frontend_build}" = "true" ]; then
   restart_frontend=true
 fi
-if [ "${frontend_build_deferred}" = "true" ]; then
+if [ "${SERVE_FRONTEND_LOCALLY}" != "true" ]; then
+  echo "⏭️ Local frontend serving disabled; skipping frontend static server changes"
+elif [ "${frontend_build_deferred}" = "true" ]; then
   echo "⏭️ Frontend startup deferred for this deploy; skipping frontend static server changes"
 elif ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
   if [ "${frontend_build_available}" = "true" ]; then
@@ -466,7 +480,7 @@ else
 fi
 
 verify_frontend_routes=true
-if [ "${frontend_build_deferred}" = "true" ] || ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
+if [ "${SERVE_FRONTEND_LOCALLY}" != "true" ] || [ "${frontend_build_deferred}" = "true" ] || ! ss -ltn 2>/dev/null | grep -qE ':3001\s'; then
   verify_frontend_routes=false
 fi
 
@@ -522,7 +536,7 @@ verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
 verify_homepage_prerender
 deploy_timing "frontend SEO route verification complete"
 else
-  echo "⏭️ Skipping frontend SEO route verification because frontend is deferred or not running in this deploy"
+  echo "⏭️ Skipping frontend SEO route verification because frontend is externalized, deferred, or not running in this deploy"
   deploy_timing "frontend verification skipped"
 fi
 
@@ -536,6 +550,8 @@ echo "🎉 Deployment completed successfully! (total wall time: ${TOTAL}s)"
 echo "📊 Backend: http://localhost:8001"
 if [ "${frontend_build_deferred}" = "true" ]; then
   echo "🌐 Frontend: deferred during this deploy"
+elif [ "${SERVE_FRONTEND_LOCALLY}" != "true" ]; then
+  echo "🌐 Frontend: external static hosting (not served from this VM)"
 else
   echo "🌐 Frontend: http://localhost:3001"
 fi

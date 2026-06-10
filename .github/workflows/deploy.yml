@@ -143,6 +143,23 @@ jobs:
         echo "  ${VERSIONED_URI}"
         echo "  ${LATEST_URI}"
 
+    - name: Publish frontend site build to GCS
+      if: ${{ steps.frontend_artifact.outputs.required == 'true' && vars.GCP_FRONTEND_SITE_BUCKET != '' }}
+      shell: bash
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        GCP_FRONTEND_SITE_BUCKET: ${{ vars.GCP_FRONTEND_SITE_BUCKET }}
+      run: |
+        set -euo pipefail
+        gcloud config set project "${GCP_PROJECT_ID}"
+        gsutil -m rsync -r -d frontend/build "gs://${GCP_FRONTEND_SITE_BUCKET}"
+        gsutil -m setmeta -h "Cache-Control:no-cache" "gs://${GCP_FRONTEND_SITE_BUCKET}/**/*.html" || true
+        gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/static/**" || true
+        gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/_next/static/**" || true
+        gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/manifest.json" || true
+        gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/robots.txt" || true
+        gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/sitemap.xml" || true
+
     - name: Rolling app deploy on current MIG VMs
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       env:
@@ -155,6 +172,8 @@ jobs:
         FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
         FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
         FRONTEND_ARTIFACT_REQUIRED: ${{ steps.frontend_artifact.outputs.required }}
+        GCP_FRONTEND_SITE_BUCKET: ${{ vars.GCP_FRONTEND_SITE_BUCKET }}
+        SERVE_FRONTEND_LOCALLY: ${{ vars.SERVE_FRONTEND_LOCALLY || 'true' }}
       run: |
         set -euo pipefail
         echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
@@ -199,22 +218,33 @@ jobs:
             --zone "${GCP_MIG_ZONE}" \
             --tunnel-through-iap \
             --quiet \
-            --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
+            --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${SERVE_FRONTEND_LOCALLY}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
 
           echo "🔎 Waiting for ${INSTANCE} local app health"
-          gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_MIG_ZONE}" \
-            --tunnel-through-iap \
-            --quiet \
-            --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 5; done; echo 'health check failed on ${INSTANCE}'; exit 1"
+          if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ]; then
+            gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+              --project "${GCP_PROJECT_ID}" \
+              --zone "${GCP_MIG_ZONE}" \
+              --tunnel-through-iap \
+              --quiet \
+              --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 5; done; echo 'health check failed on ${INSTANCE}'; exit 1"
+          else
+            gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+              --project "${GCP_PROJECT_ID}" \
+              --zone "${GCP_MIG_ZONE}" \
+              --tunnel-through-iap \
+              --quiet \
+              --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"
+          fi
 
           echo "✅ ${INSTANCE} deployed and healthy"
         done
 
         echo "🔎 Final public health check"
         curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
-        curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
+        if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] || [ -n "${GCP_FRONTEND_SITE_BUCKET}" ]; then
+          curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
+        fi
         echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
 
     - name: Emergency rolling VM replacement

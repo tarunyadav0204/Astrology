@@ -48,6 +48,12 @@ bash deploy.sh
   - `gs://$GCP_FRONTEND_ARTIFACT_BUCKET/prod/frontend-build-$GITHUB_SHA.tgz`
   - `gs://$GCP_FRONTEND_ARTIFACT_BUCKET/prod/frontend-build-latest.tgz`
   Replacement VMs should read the `latest` object during startup.
+- **Option B (recommended intermediate architecture)**:
+  - set GitHub variable `GCP_FRONTEND_SITE_BUCKET` to the bucket serving the static site
+  - keep GitHub variable `SERVE_FRONTEND_LOCALLY=true` until the HTTPS load balancer is routing non-`/api/*` traffic to the frontend bucket
+  - after CDN/backend-bucket cutover is verified, switch `SERVE_FRONTEND_LOCALLY=false`
+  - from that point, prod VMs become backend-only and `deploy.sh` skips all local frontend build/serve work
+  - use the cutover runbook at [docs/OPTION_B_STATIC_FRONTEND_CUTOVER.md](/Users/tarunydv/Desktop/Code/AstrologyApp/docs/OPTION_B_STATIC_FRONTEND_CUTOVER.md)
 
 ## Services
 
