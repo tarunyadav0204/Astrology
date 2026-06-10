@@ -43,6 +43,11 @@ bash deploy.sh
   bash deploy.sh
   ```
   This brings the backend up quickly for MIG health checks and avoids a full frontend build during instance bootstrap.
+- **Preferred MIG startup** is to fetch a prebuilt frontend artifact from GCS and pass it to `deploy.sh` via `FRONTEND_PREBUILT_ARCHIVE`. A repo-owned template lives at [infra/gcp/astroroshni-mig-startup.sh](/Users/tarunydv/Desktop/Code/AstrologyApp/infra/gcp/astroroshni-mig-startup.sh).
+- **GitHub Actions** now expects a repository variable named `GCP_FRONTEND_ARTIFACT_BUCKET` and publishes:
+  - `gs://$GCP_FRONTEND_ARTIFACT_BUCKET/prod/frontend-build-$GITHUB_SHA.tgz`
+  - `gs://$GCP_FRONTEND_ARTIFACT_BUCKET/prod/frontend-build-latest.tgz`
+  Replacement VMs should read the `latest` object during startup.
 
 ## Services
 

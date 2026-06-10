@@ -122,6 +122,27 @@ jobs:
         npm --prefix frontend run build:ci
         tar -czf "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" -C frontend build
 
+    - name: Publish frontend artifact to GCS
+      if: ${{ steps.frontend_artifact.outputs.required == 'true' }}
+      shell: bash
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        GCP_FRONTEND_ARTIFACT_BUCKET: ${{ vars.GCP_FRONTEND_ARTIFACT_BUCKET }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${GCP_FRONTEND_ARTIFACT_BUCKET}" ]]; then
+          echo "❌ GCP_FRONTEND_ARTIFACT_BUCKET GitHub variable is required to publish frontend artifacts"
+          exit 1
+        fi
+        gcloud config set project "${GCP_PROJECT_ID}"
+        VERSIONED_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/frontend-build-${GITHUB_SHA}.tgz"
+        LATEST_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/frontend-build-latest.tgz"
+        gcloud storage cp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "${VERSIONED_URI}"
+        gcloud storage cp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "${LATEST_URI}"
+        echo "Published frontend artifact:"
+        echo "  ${VERSIONED_URI}"
+        echo "  ${LATEST_URI}"
+
     - name: Rolling app deploy on current MIG VMs
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       env:
