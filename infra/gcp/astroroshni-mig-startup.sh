@@ -8,8 +8,6 @@ APP_DIR="/home/${APP_USER}/AstrologyApp"
 DEPLOY_BRANCH="main"
 GITHUB_KEY_SECRET="GITHUB_STARTUP_DEPLOY_KEY"
 LOG_FILE="/var/log/astroroshni-startup.log"
-FRONTEND_ARTIFACT_GCS_URI="${FRONTEND_ARTIFACT_GCS_URI:-gs://tradebest-465307-frontend-artifacts/prod/frontend-build-latest.tgz}"
-FRONTEND_ARTIFACT_LOCAL="/tmp/frontend-build-latest.tgz"
 
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
@@ -74,30 +72,15 @@ if [ ! -d "${APP_DIR}/.git" ]; then
     git clone --branch "${DEPLOY_BRANCH}" git@github.com:tarunyadav0204/Astrology.git "${APP_DIR}"
 fi
 
-if [ -n "${FRONTEND_ARTIFACT_GCS_URI}" ]; then
-  rm -f "${FRONTEND_ARTIFACT_LOCAL}"
-  if gcloud storage cp "${FRONTEND_ARTIFACT_GCS_URI}" "${FRONTEND_ARTIFACT_LOCAL}"; then
-    chown "${APP_USER}:${APP_USER}" "${FRONTEND_ARTIFACT_LOCAL}"
-    chmod 600 "${FRONTEND_ARTIFACT_LOCAL}"
-    echo "✅ Downloaded frontend artifact: ${FRONTEND_ARTIFACT_GCS_URI}"
-  else
-    echo "⚠️ Failed to download frontend artifact: ${FRONTEND_ARTIFACT_GCS_URI}"
-  fi
-fi
-
 sudo -u "${APP_USER}" bash -lc "
   cd '${APP_DIR}'
   git remote set-url origin git@github.com:tarunyadav0204/Astrology.git
   export GIT_SSH_COMMAND='ssh -i /home/${APP_USER}/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes'
   export DEPLOY_BRANCH='${DEPLOY_BRANCH}'
+  export SERVE_FRONTEND_LOCALLY=false
   export SYNC_GCP_SECRETS=true
-  if [ -f '${FRONTEND_ARTIFACT_LOCAL}' ]; then
-    export FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_ARTIFACT_LOCAL}'
-  else
-    export DEFER_FRONTEND_BUILD=true
-  fi
+  export DEFER_FRONTEND_BUILD=true
   bash deploy.sh
-  rm -f '${FRONTEND_ARTIFACT_LOCAL}'
 "
 
 echo "========== AstroRoshni startup complete $(date -u) =========="

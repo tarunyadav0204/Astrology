@@ -38,16 +38,17 @@ bash deploy.sh
 - Watchdog probes **`/api/keepalive`** (lightweight); deploy still verifies **`/api/health`** (includes DB)
 - **GCE MIG startup** should not use `FORCE_FULL_DEPLOY=true`. For replacement VMs, prefer:
   ```bash
+  export SERVE_FRONTEND_LOCALLY=false
   export SYNC_GCP_SECRETS=true
   export DEFER_FRONTEND_BUILD=true
   bash deploy.sh
   ```
-  This brings the backend up quickly for MIG health checks and avoids a full frontend build during instance bootstrap.
-- **Preferred MIG startup** is to fetch a prebuilt frontend artifact from GCS and pass it to `deploy.sh` via `FRONTEND_PREBUILT_ARCHIVE`. A repo-owned template lives at [infra/gcp/astroroshni-mig-startup.sh](/Users/tarunydv/Desktop/Code/AstrologyApp/infra/gcp/astroroshni-mig-startup.sh).
+  This keeps replacement VMs backend-only, brings the backend up quickly for MIG health checks, and avoids frontend work during instance bootstrap.
+- **Repo-owned MIG startup template** lives at [infra/gcp/astroroshni-mig-startup.sh](/Users/tarunydv/Desktop/Code/AstrologyApp/infra/gcp/astroroshni-mig-startup.sh).
 - **GitHub Actions** now expects a repository variable named `GCP_FRONTEND_ARTIFACT_BUCKET` and publishes:
   - `gs://$GCP_FRONTEND_ARTIFACT_BUCKET/prod/frontend-build-$GITHUB_SHA.tgz`
   - `gs://$GCP_FRONTEND_ARTIFACT_BUCKET/prod/frontend-build-latest.tgz`
-  Replacement VMs should read the `latest` object during startup.
+  These frontend artifacts are CI release outputs and rollback points; production VMs no longer need to download them during boot in Option B.
 - **Option B (recommended intermediate architecture)**:
   - set GitHub variable `GCP_FRONTEND_SITE_BUCKET` to the bucket serving the static site
   - keep GitHub variable `SERVE_FRONTEND_LOCALLY=true` until the HTTPS load balancer is routing non-`/api/*` traffic to the frontend bucket
@@ -58,7 +59,7 @@ bash deploy.sh
 ## Services
 
 - **Backend**: Port 8001 (systemd: astrology-app)
-- **Frontend**: Port 3001 (served via deploy.sh)
+- **Frontend**: served from Cloud Storage / CDN through the HTTPS load balancer in Option B production
 
 ## Commands
 
@@ -68,7 +69,6 @@ sudo systemctl status astrology-app
 
 # View logs
 tail -f logs/backend.log
-tail -f logs/frontend.log
 tail -f logs/restart.log
 tail -f logs/crash-snapshots.log   # captured before each watchdog restart
 

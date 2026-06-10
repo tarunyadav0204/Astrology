@@ -204,7 +204,7 @@ jobs:
             --command "for i in \$(seq 1 60); do [ -d /home/tarun_yadav/AstrologyApp ] && exit 0; sleep 5; done; echo 'AstrologyApp repo not ready on ${INSTANCE}'; exit 1"
 
           FRONTEND_REMOTE_ARCHIVE=""
-          if [ "${FRONTEND_ARTIFACT_REQUIRED}" = "true" ]; then
+          if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] && [ "${FRONTEND_ARTIFACT_REQUIRED}" = "true" ]; then
             FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
             gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
               --project "${GCP_PROJECT_ID}" \
@@ -242,7 +242,7 @@ jobs:
 
         echo "🔎 Final public health check"
         curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
-        if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] || [ -n "${GCP_FRONTEND_SITE_BUCKET}" ]; then
+        if [ -n "${GCP_FRONTEND_SITE_BUCKET}" ] || [ "${SERVE_FRONTEND_LOCALLY}" = "true" ]; then
           curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
         fi
         echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
