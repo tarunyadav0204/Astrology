@@ -49,6 +49,7 @@ import { Image } from 'react-native';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+import AppAlertModal from '../Common/AppAlertModal';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
@@ -583,6 +584,8 @@ export default function ChatScreen({ navigation, route }) {
   const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
   /** Keeps suggestion chips off-screen until the user asks for them — saves vertical space for messages. */
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
+  /** Themed insufficient-credits popup when a suggestion card is tapped without enough balance. */
+  const [showInsufficientCreditsAlert, setShowInsufficientCreditsAlert] = useState(false);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -1845,7 +1848,18 @@ export default function ChatScreen({ navigation, route }) {
       const stored = await AsyncStorage.getItem(`chatMessages_${personId}`);
       if (stored) {
         const messages = JSON.parse(stored);
-        return sortMessagesForDisplay(messages);
+        // Older builds persisted a long bulleted welcome; rewrite stored welcome rows
+        // (any language) with the current short copy. Mundane welcomes (🌍) are kept.
+        const refreshed = messages.map((msg) => {
+          if (!msg?.isWelcome || typeof msg.content !== 'string' || msg.content.startsWith('🌍')) {
+            return msg;
+          }
+          return {
+            ...msg,
+            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: birthData?.name || 'there' }),
+          };
+        });
+        return sortMessagesForDisplay(refreshed);
       }
     } catch (error) {
       console.error('Error loading messages from storage:', error);
@@ -1943,6 +1957,16 @@ export default function ChatScreen({ navigation, route }) {
     !isInstantAnalysis &&
     !isPremiumAnalysis &&
     credits < effectiveChatCost;
+
+  /** Suggestion cards: if the selected mode is unaffordable, offer credits instead of a dead tap. */
+  const handleSuggestionPress = (question) => {
+    if (!freeQuestionNotificationGate && credits < effectiveChatCost) {
+      setShowInsufficientCreditsAlert(true);
+      return false;
+    }
+    setInputText(question);
+    return true;
+  };
 
   const openNotificationsForFreeQuestion = async () => {
     try {
@@ -2640,7 +2664,7 @@ export default function ChatScreen({ navigation, route }) {
         } else {
           welcomeMessage = {
             id: Date.now().toString(),
-            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
             role: 'assistant',
             isWelcome: true,
             timestamp: new Date().toISOString(),
@@ -2698,7 +2722,7 @@ export default function ChatScreen({ navigation, route }) {
     }
     return {
       id: Date.now().toString(),
-      content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+      content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
       role: 'assistant',
       isWelcome: true,
       timestamp: new Date().toISOString(),
@@ -4496,7 +4520,7 @@ export default function ChatScreen({ navigation, route }) {
     } else {
       welcomeMessage = {
         id: Date.now().toString(),
-        content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+        content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
         role: 'assistant',
         isWelcome: true,
         timestamp: new Date().toISOString(),
@@ -4995,6 +5019,64 @@ export default function ChatScreen({ navigation, route }) {
                 )}
               </>
             }
+            ListFooterComponent={
+              showWelcomeSuggestionCards ? (
+                <View style={styles.welcomeSuggestionSection}>
+                  <View style={styles.welcomeSuggestionHeader}>
+                    <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+                    <Text style={[styles.welcomeSuggestionTitle, { color: colors.text }]}>
+                      {t('chat.welcomeSuggestionsTitle', 'Try asking')}
+                    </Text>
+                  </View>
+                  {suggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={`welcome-suggestion-${index}`}
+                      style={styles.welcomeSuggestionCard}
+                      activeOpacity={0.85}
+                      onPress={() => handleSuggestionPress(item)}
+                      accessibilityRole="button"
+                      accessibilityLabel={item}
+                    >
+                      <LinearGradient
+                        colors={
+                          theme === 'dark'
+                            ? ['rgba(255, 107, 53, 0.20)', 'rgba(255, 107, 53, 0.06)']
+                            : ['rgba(255, 107, 53, 0.12)', 'rgba(255, 107, 53, 0.04)']
+                        }
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[
+                          styles.welcomeSuggestionCardGradient,
+                          {
+                            borderColor:
+                              theme === 'dark'
+                                ? 'rgba(255, 255, 255, 0.12)'
+                                : 'rgba(249, 115, 22, 0.18)',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.welcomeSuggestionCardText, { color: colors.text }]}>
+                          {item}
+                        </Text>
+                        <View
+                          style={[
+                            styles.welcomeSuggestionCardArrow,
+                            {
+                              backgroundColor:
+                                theme === 'dark'
+                                  ? 'rgba(255, 107, 53, 0.22)'
+                                  : 'rgba(249, 115, 22, 0.12)',
+                            },
+                          ]}
+                        >
+                          <Ionicons name="arrow-up" size={14} color={colors.primary} />
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null
+            }
             renderItem={({ item, index }) => {
               const isLastMessage = index === visibleMessages.length - 1;
 
@@ -5096,55 +5178,6 @@ export default function ChatScreen({ navigation, route }) {
           paddingBottom: keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
         }}
         >
-        {showWelcomeSuggestionCards && (
-          <View style={styles.welcomeSuggestionSection}>
-            <View style={styles.welcomeSuggestionHeader}>
-              <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
-              <Text style={[styles.welcomeSuggestionTitle, { color: colors.text }]}>
-                {t('chat.topicIdeas', 'Ideas')}
-              </Text>
-            </View>
-            <GHScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.welcomeSuggestionScrollContent}
-            >
-              {suggestions.map((item, index) => (
-                <TouchableOpacity
-                  key={`welcome-suggestion-${index}`}
-                  style={styles.welcomeSuggestionCard}
-                  activeOpacity={0.9}
-                  onPress={() => setInputText(item)}
-                >
-                  <LinearGradient
-                    colors={
-                      theme === 'dark'
-                        ? ['rgba(255, 107, 53, 0.20)', 'rgba(255, 107, 53, 0.08)']
-                        : ['rgba(255, 107, 53, 0.14)', 'rgba(255, 107, 53, 0.05)']
-                    }
-                    style={[
-                      styles.welcomeSuggestionCardGradient,
-                      {
-                        borderColor:
-                          theme === 'dark'
-                            ? 'rgba(255, 255, 255, 0.12)'
-                            : 'rgba(249, 115, 22, 0.18)',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.welcomeSuggestionCardText, { color: colors.text }]}
-                      numberOfLines={3}
-                    >
-                      {item}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))}
-            </GHScrollView>
-          </View>
-        )}
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
         {!loading && !showGreeting && messages.length > 0 && showTopicIdeas && (
           <View style={styles.suggestionsContainer}>
@@ -5158,7 +5191,7 @@ export default function ChatScreen({ navigation, route }) {
                 <TouchableOpacity
                   key={index}
                   style={styles.suggestionChip}
-                  onPress={() => setInputText(item)}
+                  onPress={() => handleSuggestionPress(item)}
                 >
                   <LinearGradient
                     colors={['rgba(255, 107, 53, 0.1)', 'rgba(255, 107, 53, 0.03)']}
@@ -6713,6 +6746,26 @@ export default function ChatScreen({ navigation, route }) {
 
       <NotificationEnableReminderModal homeActive={showGreeting} />
 
+      <AppAlertModal
+        visible={showInsufficientCreditsAlert}
+        variant="warning"
+        icon="wallet-outline"
+        title={t('chat.insufficientCreditsTitle', 'Not enough credits')}
+        message={t(
+          'chat.insufficientCreditsMessage',
+          'This question needs {{cost}} credits — you have {{balance}}. Add credits to continue your reading.',
+          { cost: effectiveChatCost, balance: credits }
+        )}
+        primaryText={t('chat.insufficientCreditsCta', 'Get credits')}
+        secondaryText={t('chat.insufficientCreditsLater', 'Not now')}
+        onPrimaryPress={() => {
+          setShowInsufficientCreditsAlert(false);
+          navigation.navigate('Credits');
+        }}
+        onSecondaryPress={() => setShowInsufficientCreditsAlert(false)}
+        onRequestClose={() => setShowInsufficientCreditsAlert(false)}
+      />
+
       <PodcastPromoModal
         visible={!showGreeting && podcastPromoVisible}
         podcastCost={podcastCost}
@@ -7282,28 +7335,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 6,
   },
-  welcomeSuggestionScrollContent: {
-    paddingHorizontal: 4,
-    paddingRight: 10,
-  },
   welcomeSuggestionCard: {
-    width: Math.min(screenWidth * 0.62, 250),
-    marginRight: 10,
-    borderRadius: 18,
+    marginBottom: 8,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   welcomeSuggestionCardGradient: {
-    minHeight: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 18,
+    paddingVertical: 13,
+    borderRadius: 14,
     borderWidth: 1,
-    justifyContent: 'center',
   },
   welcomeSuggestionCardText: {
+    flex: 1,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '700',
+    fontWeight: '600',
+    marginRight: 10,
+  },
+  welcomeSuggestionCardArrow: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   suggestionsContent: {
     paddingHorizontal: 4,

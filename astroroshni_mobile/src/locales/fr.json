@@ -341,7 +341,12 @@
   },
   "chat": {
     "chartEssence": "Essence du thème de {{name}}",
-    "welcomeMessage": "🌟 Bienvenue {{name}} ! Je suis ici pour vous aider à comprendre votre thème natal et vous fournir des analyses astrologiques.\\n\\nN'hésitez pas à me poser des questions sur :\\n\\n• Les traits de personnalité et caractéristiques\\n• Les conseils de carrière et professionnels\\n• Les relations et la compatibilité\\n• Les analyses de santé et de bien-être\\n• Le timing pour les décisions importantes\\n• Les transits planétaires actuels\\n• Vos forces et domaines de croissance\\n\\nQue souhaiteriez-vous explorer en premier ?",
+    "welcomeMessage": "🌟 Bienvenue {{name}} ! Je suis là pour vous aider à comprendre votre thème natal.\n\nTouchez une question ci-dessous, ou posez-moi votre propre question.",
+    "welcomeSuggestionsTitle": "Essayez de demander",
+    "insufficientCreditsTitle": "Crédits insuffisants",
+    "insufficientCreditsMessage": "Cette question nécessite {{cost}} crédits — vous en avez {{balance}}. Ajoutez des crédits pour continuer.",
+    "insufficientCreditsCta": "Obtenir des crédits",
+    "insufficientCreditsLater": "Pas maintenant",
     "betaNotice": "⚠️ BETA : Les prédictions temporelles sont expérimentales. Utilisez votre logique et discrétion.",
     "disclaimerNotice": "⚖️ AVERTISSEMENT : L'astrologie est un outil probabiliste de guidance. Elle ne remplace pas un avis médical, juridique, financier ou de santé mentale. Consultez des professionnels qualifiés pour les décisions importantes.",
     "verified": "AstroRoshni Vérifié",

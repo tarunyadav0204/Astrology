@@ -341,7 +341,12 @@
   },
   "chat": {
     "chartEssence": "{{name}}s Horoskop-Kern",
-    "welcomeMessage": "🌟 Willkommen {{name}}! Ich bin hier, um dir zu helfen, dein Geburtshoroskop zu verstehen und astrologische Einblicke zu geben.\\n\\nDu kannst mich alles fragen zu:\\n\\n• Persönlichkeitsmerkmale und Eigenschaften\\n• Karriere- und Berufsberatung\\n• Beziehungen und Kompatibilität\\n• Gesundheits- und Wellness-Einblicke\\n• Timing für wichtige Entscheidungen\\n• Aktuelle Planeten-Transite\\n• Stärken und Wachstumsbereiche\\n\\nWas möchtest du zuerst erkunden?",
+    "welcomeMessage": "🌟 Willkommen {{name}}! Ich helfe dir, dein Geburtshoroskop zu verstehen.\n\nTippe auf eine Frage unten oder stelle mir deine eigene Frage.",
+    "welcomeSuggestionsTitle": "Frag zum Beispiel",
+    "insufficientCreditsTitle": "Nicht genug Credits",
+    "insufficientCreditsMessage": "Diese Frage benötigt {{cost}} Credits — du hast {{balance}}. Füge Credits hinzu, um fortzufahren.",
+    "insufficientCreditsCta": "Credits holen",
+    "insufficientCreditsLater": "Jetzt nicht",
     "betaNotice": "⚠️ BETA: Zeitachsen-Vorhersagen sind experimentell. Nutze Logik und Diskretion.",
     "disclaimerNotice": "⚖️ HAFTUNGSAUSSCHLUSS: Astrologie ist ein probabilistisches Werkzeug zur Orientierung. Kein Ersatz für medizinische, rechtliche, finanzielle oder psychologische Beratung. Konsultiere Fachleute für wichtige Entscheidungen.",
     "verified": "AstroRoshni Verifiziert",

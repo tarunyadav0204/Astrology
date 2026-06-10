@@ -341,7 +341,12 @@
   },
   "chat": {
     "chartEssence": "{{name}} 的星盘核心",
-    "welcomeMessage": "🌟 欢迎 {{name}}！我在这里帮助您解读出生星盘并提供占星见解。\\n\\n您可以随时问我关于以下内容：\\n\\n• 人格特质与特征\\n• 职业与事业引导\\n• 关系与匹配度\\n• 健康与福祉见解\\n• 重大决定的时机选择\\n• 当前行星流年\\n• 优势与成长领域\\n\\n您想先探索什么？",
+    "welcomeMessage": "🌟 欢迎 {{name}}！我在这里帮助您解读出生星盘并提供占星见解。\n\n点击下方问题，或用您自己的话提问。",
+    "welcomeSuggestionsTitle": "试着问",
+    "insufficientCreditsTitle": "积分不足",
+    "insufficientCreditsMessage": "此问题需要 {{cost}} 积分 — 您目前有 {{balance}}。请充值以继续解读。",
+    "insufficientCreditsCta": "获取积分",
+    "insufficientCreditsLater": "暂不",
     "betaNotice": "⚠️ 测试版：时间线预测仅供参考。请运用逻辑和判断。",
     "disclaimerNotice": "⚖️ 免责声明：占星学是一种概率性的引导工具。它不能替代医疗、法律、财务或心理健康建议。重大决定请咨询专业人士。",
     "verified": "AstroRoshni 已认证",

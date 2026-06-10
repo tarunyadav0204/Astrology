@@ -881,6 +881,37 @@ def list_deliveries_for_date_admin(
     return list(cur.fetchall() or [])
 
 
+def summarize_deliveries_for_date_admin(conn, target_date: str) -> Dict[str, int]:
+    """
+    Whole-day channel counts for a sent_at date (unaffected by the list LIMIT).
+    whatsapp_template_continued = template recipients who tapped Continue and
+    received the personalized nudge (read_at set on consumption).
+    """
+    cur = execute(
+        conn,
+        """
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE channel = 'push') AS push,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp') AS whatsapp,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp_template') AS whatsapp_template,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_continued,
+               COUNT(*) FILTER (WHERE channel IS NULL OR TRIM(channel) = '' OR channel = 'stored') AS stored_only
+        FROM nudge_deliveries
+        WHERE sent_at = %s
+        """,
+        (target_date,),
+    )
+    row = cur.fetchone() or (0, 0, 0, 0, 0, 0)
+    return {
+        "total": int(row[0] or 0),
+        "push": int(row[1] or 0),
+        "whatsapp": int(row[2] or 0),
+        "whatsapp_template": int(row[3] or 0),
+        "whatsapp_template_continued": int(row[4] or 0),
+        "stored_only": int(row[5] or 0),
+    }
+
+
 def count_unread_deliveries(conn, userid: int) -> int:
     cur = execute(
         conn,

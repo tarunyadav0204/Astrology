@@ -239,6 +239,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifUserIdsWithTokens, setNotifUserIdsWithTokens] = useState([]); // userids who have accepted notifications
   const [notifSubTab, setNotifSubTab] = useState('custom'); // 'custom' | 'blog' | 'email_reminder' | 'nudge_triggers' | 'nudge_schedule' | 'sent_today'
   const [notifTodayRows, setNotifTodayRows] = useState([]);
+  const [notifTodaySummary, setNotifTodaySummary] = useState(null);
   const [notifTodayLoading, setNotifTodayLoading] = useState(false);
   const [notifTodayError, setNotifTodayError] = useState(null);
   const [notifHistoryDate, setNotifHistoryDate] = useState(
@@ -1304,8 +1305,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
       }
       setNotifTodayRows(Array.isArray(data.items) ? data.items : []);
+      setNotifTodaySummary(data.summary && typeof data.summary === 'object' ? data.summary : null);
     } catch (e) {
       setNotifTodayRows([]);
+      setNotifTodaySummary(null);
       setNotifTodayError(e.message || 'Failed to load deliveries');
     } finally {
       setNotifTodayLoading(false);
@@ -4212,6 +4215,34 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </button>
                 </div>
                 {notifTodayError && <div className="search-error">{notifTodayError}</div>}
+                {notifTodaySummary && (
+                  <div className="notif-day-summary">
+                    <div className="notif-day-summary-card">
+                      <strong>{notifTodaySummary.total}</strong>
+                      <span>Total sent</span>
+                    </div>
+                    <div className="notif-day-summary-card">
+                      <strong>{notifTodaySummary.push}</strong>
+                      <span>Push</span>
+                    </div>
+                    <div className="notif-day-summary-card">
+                      <strong>
+                        {(notifTodaySummary.whatsapp || 0) + (notifTodaySummary.whatsapp_template || 0)}
+                      </strong>
+                      <span>
+                        WhatsApp ({notifTodaySummary.whatsapp} direct, {notifTodaySummary.whatsapp_template} template)
+                      </span>
+                    </div>
+                    <div className="notif-day-summary-card">
+                      <strong>{notifTodaySummary.whatsapp_template_continued}</strong>
+                      <span>Clicked Continue → nudge sent</span>
+                    </div>
+                    <div className="notif-day-summary-card">
+                      <strong>{notifTodaySummary.stored_only}</strong>
+                      <span>Stored only (not delivered)</span>
+                    </div>
+                  </div>
+                )}
                 <div className="notif-user-list notif-user-list--full">
                   <table className="notif-user-table notif-user-table--history">
                     <thead>
@@ -4243,7 +4274,17 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             <td>{row.title || '—'}</td>
                             <td>{row.body || '—'}</td>
                             <td>{row.question || '—'}</td>
-                            <td>{row.status === 'sent_push' ? 'Sent (push)' : 'Stored only'}</td>
+                            <td>
+                              {row.channel === 'push'
+                                ? 'Sent (push)'
+                                : row.channel === 'whatsapp'
+                                ? 'Sent (WhatsApp)'
+                                : row.channel === 'whatsapp_template'
+                                ? row.read_at
+                                  ? 'WhatsApp template — Continue clicked'
+                                  : 'WhatsApp template sent'
+                                : 'Stored only'}
+                            </td>
                           </tr>
                         ))
                       )}

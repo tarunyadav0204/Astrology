@@ -532,7 +532,12 @@
   },
   "chat": {
     "chartEssence": "{{name}}'s Chart Essence",
-    "welcomeMessage": "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\\n\\nFeel free to ask me anything about:\\n\\n• Personality traits and characteristics\\n• Career and professional guidance\\n• Relationships and compatibility\\n• Health and wellness insights\\n• Timing for important decisions\\n• Current planetary transits\\n• Strengths and areas for growth\\n\\nWhat would you like to explore first?",
+    "welcomeMessage": "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.",
+    "welcomeSuggestionsTitle": "Try asking",
+    "insufficientCreditsTitle": "Not enough credits",
+    "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue your reading.",
+    "insufficientCreditsCta": "Get credits",
+    "insufficientCreditsLater": "Not now",
     "betaNotice": "⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.",
     "disclaimerNotice": "⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.",
     "verified": "AstroRoshni Verified",

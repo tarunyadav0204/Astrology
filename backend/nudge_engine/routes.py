@@ -2158,10 +2158,18 @@ async def admin_list_today_deliveries(
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             rows = db.list_deliveries_for_date_admin(conn, day.isoformat(), limit=int(limit))
+            summary = db.summarize_deliveries_for_date_admin(conn, day.isoformat())
         items: List[Dict[str, Any]] = []
         for r in rows:
             channel = (r[8] or "stored").strip()
-            status = "sent_push" if channel == "push" else "stored_only"
+            if channel == "push":
+                status = "sent_push"
+            elif channel == "whatsapp":
+                status = "sent_whatsapp"
+            elif channel == "whatsapp_template":
+                status = "sent_whatsapp_template"
+            else:
+                status = "stored_only"
             question = ""
             try:
                 payload_raw = r[11]
@@ -2188,7 +2196,13 @@ async def admin_list_today_deliveries(
                     "question": question,
                 }
             )
-        return {"ok": True, "target_date": day.isoformat(), "count": len(items), "items": items}
+        return {
+            "ok": True,
+            "target_date": day.isoformat(),
+            "count": len(items),
+            "summary": summary,
+            "items": items,
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid target_date: {e}") from e
     except Exception as e:
