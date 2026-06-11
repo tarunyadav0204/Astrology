@@ -11,6 +11,20 @@ const getJsonOrThrow = async (response, fallbackMessage) => {
   return data;
 };
 
+const formatSkipReasons = (skipReasons = {}) => {
+  return Object.entries(skipReasons)
+    .filter(([, count]) => Number(count) > 0)
+    .map(([reason, count]) => `${reason.replace(/_/g, ' ')}: ${count}`)
+    .join(', ');
+};
+
+const formatMap = (value = {}) => {
+  return Object.entries(value)
+    .filter(([, count]) => Number(count) > 0)
+    .map(([key, count]) => `${key}: ${count}`)
+    .join(', ');
+};
+
 function Stars({ rating }) {
   return <span className="admin-testimonial-stars">{'★'.repeat(Number(rating) || 0)}</span>;
 }
@@ -24,7 +38,10 @@ export default function AdminGooglePlayTestimonials() {
   const [message, setMessage] = useState('');
   const [drafts, setDrafts] = useState({});
   const [nextPageToken, setNextPageToken] = useState('');
+  const [nextStartIndex, setNextStartIndex] = useState(null);
+  const [googleTotalResults, setGoogleTotalResults] = useState(null);
   const [minRating, setMinRating] = useState(4);
+  const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState(null);
 
   const counts = useMemo(() => {
     return items.reduce(
@@ -72,7 +89,7 @@ export default function AdminGooglePlayTestimonials() {
     loadTestimonials();
   }, [loadTestimonials]);
 
-  const syncReviews = async ({ mode, pageToken = '', pages = 1 }) => {
+  const syncReviews = async ({ mode, pageToken = '', startIndex = null, pages = 1 }) => {
     setSyncing(true);
     setSyncMode(mode);
     setMessage('');
@@ -83,14 +100,27 @@ export default function AdminGooglePlayTestimonials() {
         body: JSON.stringify({
           max_results: 100,
           min_rating: Number(minRating) || 4,
+          source_mode: 'public',
           page_token: pageToken || null,
+          start_index: startIndex,
           pages,
         }),
       });
       const data = await getJsonOrThrow(response, 'Failed to fetch Google Play reviews');
       setNextPageToken(data.next_page_token || '');
+      setNextStartIndex(Number.isInteger(data.next_start_index) ? data.next_start_index : null);
+      setGoogleTotalResults(Number.isInteger(data.total_results) ? data.total_results : null);
+      setLastSyncDiagnostics({
+        source_mode: data.source_mode || 'unknown',
+        country: data.country || '',
+        language: data.language || '',
+        diagnostics: data.diagnostics || null,
+        skip_reasons: data.skip_reasons || null,
+      });
+      const skipReasonText = formatSkipReasons(data.skip_reasons);
+      const textCount = data.diagnostics?.with_text ?? data.fetched;
       setMessage(
-        `Fetched ${data.fetched} reviews across ${data.pages_fetched || 1} page(s): ${data.inserted} new, ${data.updated} updated, ${data.skipped} skipped.${data.next_page_token ? ' More reviews are available.' : ''}`
+        `Fetched ${data.fetched} Google Play ${data.source_mode === 'public' ? 'public' : 'publisher'} reviews across ${data.pages_fetched || 1} page(s), ${textCount} with text: ${data.inserted} new, ${data.updated} updated, ${data.skipped} skipped.${skipReasonText ? ` Skipped reasons: ${skipReasonText}.` : ''}${data.country ? ` Country: ${String(data.country).toUpperCase()}.` : ''}${Number.isInteger(data.total_results) ? ` Google reports ${data.total_results} total review result(s).` : ''}${data.next_page_token || Number.isInteger(data.next_start_index) ? ' More reviews are available.' : ''}`
       );
       await loadTestimonials();
     } catch (error) {
@@ -170,7 +200,7 @@ export default function AdminGooglePlayTestimonials() {
           <button
             type="button"
             className="admin-testimonials-sync-btn"
-            onClick={() => syncReviews({ mode: 'latest', pages: 1 })}
+            onClick={() => syncReviews({ mode: 'latest', pages: 1, startIndex: 0 })}
             disabled={syncing}
           >
             {syncing && syncMode === 'latest' ? 'Fetching...' : 'Fetch latest reviews'}
@@ -178,23 +208,43 @@ export default function AdminGooglePlayTestimonials() {
           <button
             type="button"
             className="admin-testimonials-sync-btn secondary"
-            onClick={() => syncReviews({ mode: 'more', pageToken: nextPageToken, pages: 1 })}
-            disabled={syncing || !nextPageToken}
-            title={nextPageToken ? 'Fetch the next Google Play reviews page' : 'Fetch latest reviews first'}
+            onClick={() => syncReviews({ mode: 'more', pageToken: nextPageToken, startIndex: nextStartIndex, pages: 1 })}
+            disabled={syncing || (!nextPageToken && !Number.isInteger(nextStartIndex))}
+            title={nextPageToken || Number.isInteger(nextStartIndex) ? 'Fetch the next Google Play reviews page' : 'Fetch latest reviews first'}
           >
             {syncing && syncMode === 'more' ? 'Fetching...' : 'Fetch more reviews'}
           </button>
           <button
             type="button"
             className="admin-testimonials-sync-btn secondary"
-            onClick={() => syncReviews({ mode: 'all', pageToken: nextPageToken, pages: 10 })}
+            onClick={() => syncReviews({ mode: 'all', pageToken: '', startIndex: 0, pages: 100 })}
             disabled={syncing}
-            title="Fetch up to 10 Google Play pages from the current position"
+            title="Fetch up to 100 Google Play pages from the beginning"
           >
             {syncing && syncMode === 'all' ? 'Fetching...' : 'Fetch all available'}
           </button>
         </div>
       </div>
+
+      <div className="admin-testimonials-sync-state">
+        Stored here: {counts.all} review(s)
+        {lastSyncDiagnostics?.source_mode ? ` • Last source: ${lastSyncDiagnostics.source_mode}` : ''}
+        {lastSyncDiagnostics?.country ? ` • Country: ${String(lastSyncDiagnostics.country).toUpperCase()}` : ''}
+        {lastSyncDiagnostics?.language ? ` • Language: ${lastSyncDiagnostics.language}` : ''}
+        {Number.isInteger(googleTotalResults) ? ` • Google total from last sync: ${googleTotalResults}` : ''}
+        {Number.isInteger(nextStartIndex) ? ` • Next start index: ${nextStartIndex}` : ''}
+      </div>
+
+      {lastSyncDiagnostics?.diagnostics && (
+        <div className="admin-testimonials-sync-state">
+          Last sync diagnostics: raw {lastSyncDiagnostics.diagnostics.raw_reviews || 0}, user comments{' '}
+          {lastSyncDiagnostics.diagnostics.with_user_comment || 0}, text {lastSyncDiagnostics.diagnostics.with_text || 0},
+          original text {lastSyncDiagnostics.diagnostics.with_original_text || 0}, missing text{' '}
+          {lastSyncDiagnostics.diagnostics.missing_text || 0}
+          {formatMap(lastSyncDiagnostics.diagnostics.ratings) ? ` • ratings ${formatMap(lastSyncDiagnostics.diagnostics.ratings)}` : ''}
+          {formatMap(lastSyncDiagnostics.skip_reasons) ? ` • skipped ${formatMap(lastSyncDiagnostics.skip_reasons)}` : ''}
+        </div>
+      )}
 
       <div className="admin-testimonials-toolbar">
         {STATUS_OPTIONS.map((option) => (

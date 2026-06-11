@@ -21,6 +21,7 @@ replicate==0.15.4
 # Optional: for Google Play in-app purchase verification
 google-api-python-client==2.108.0
 google-auth==2.25.2
+google-play-scraper==1.2.7
 praw==7.7.1
 google-cloud-texttospeech==2.16.4
 google-cloud-tasks==2.16.5

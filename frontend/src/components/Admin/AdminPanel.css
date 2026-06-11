@@ -2596,6 +2596,15 @@ input:checked + .toggle-slider:before {
   gap: 8px;
 }
 
+.admin-testimonials-sync-state {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475467;
+  font-size: 13px;
+}
+
 .admin-testimonials-filter {
   padding: 8px 12px;
   background: #f1f5f9;

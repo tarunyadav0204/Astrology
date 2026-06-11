@@ -87,6 +87,31 @@ def _first_utm_from_query(query: str) -> tuple[Optional[str], Optional[str], Opt
 def _parse_utm_from_referrer(referrer_raw: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[str]]:
     if not referrer_raw or not str(referrer_raw).strip():
         return None, None, None
+    raw = str(referrer_raw).strip()
+    try:
+        candidates = [raw]
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip().lower()
+            decoded_value = unquote_plus(value.strip())
+            if key in {"initial_url", "play_install_referrer", "install_referrer", "referrer", "referrer_raw"}:
+                candidates.append(decoded_value)
+            else:
+                candidates.append(line)
+
+        for candidate in candidates:
+            query = _query_from_candidate(candidate)
+            if not query:
+                continue
+            src, med, camp = _first_utm_from_query(query)
+            if src or med or camp:
+                return src, med, camp
+        return None, None, None
+    except Exception:
+        return None, None, None
 
 
 def _acquisition_filter_sql(
@@ -131,31 +156,6 @@ def _acquisition_filter_sql(
         params.append(app_build.strip())
 
     return " AND ".join(conditions), params
-    raw = str(referrer_raw).strip()
-    try:
-        candidates = [raw]
-        for line in raw.splitlines():
-            line = line.strip()
-            if not line or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip().lower()
-            decoded_value = unquote_plus(value.strip())
-            if key in {"initial_url", "play_install_referrer", "install_referrer", "referrer", "referrer_raw"}:
-                candidates.append(decoded_value)
-            else:
-                candidates.append(line)
-
-        for candidate in candidates:
-            query = _query_from_candidate(candidate)
-            if not query:
-                continue
-            src, med, camp = _first_utm_from_query(query)
-            if src or med or camp:
-                return src, med, camp
-        return None, None, None
-    except Exception:
-        return None, None, None
 
 
 class AcquisitionFirstOpenBody(BaseModel):
@@ -668,8 +668,189 @@ async def admin_acquisition_installations_analytics(
         alias="ai",
     )
 
-    with get_conn() as conn:
-        return _acquisition_analytics_payload(conn, where_sql=where_sql, params=params)
+    try:
+        with get_conn() as conn:
+            return _acquisition_analytics_payload(conn, where_sql=where_sql, params=params)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_acquisition_installations_analytics failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load install funnel analytics") from e
+
+
+@router.get("/admin/acquisition-installations/export")
+async def admin_acquisition_installations_export(
+    current_user: User = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    registered: Optional[str] = Query(None, description="yes | no | all"),
+    utm_campaign: Optional[str] = Query(None),
+    utm_source: Optional[str] = Query(None),
+    utm_medium: Optional[str] = Query(None),
+    app_build: Optional[str] = Query(None),
+):
+    """Export install funnel data for marketing: ZIP with four UTF-8 CSV files."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    where_sql, params = _acquisition_filter_sql(
+        date_from=date_from,
+        date_to=date_to,
+        registered=registered,
+        utm_campaign=utm_campaign,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        app_build=app_build,
+        alias="ai",
+    )
+    funnel_event_names = [name for name, _label in _FUNNEL_STEPS if name != "first_open"]
+    funnel_placeholders = ", ".join(["?"] * len(funnel_event_names))
+
+    try:
+        with get_conn() as conn:
+            analytics = _acquisition_analytics_payload(conn, where_sql=where_sql, params=params)
+
+            cur = execute(
+                conn,
+                f"SELECT COUNT(*) FROM app_installations ai WHERE {where_sql}",
+                params,
+            )
+            total = int((cur.fetchone() or [0])[0] or 0)
+            if total > _EXPORT_MAX_INSTALL_ROWS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Too many rows to export ({total}). Narrow the date range or filters "
+                        f"(max {_EXPORT_MAX_INSTALL_ROWS:,})."
+                    ),
+                )
+
+            classified_cte = _classified_cte_sql(where_sql)
+            cur = execute(
+                conn,
+                f"""
+                {classified_cte}
+                SELECT
+                    ai.installation_id::text,
+                    ai.platform,
+                    ai.app_version,
+                    ai.app_build,
+                    LEFT(COALESCE(ai.referrer_raw, ''), 500) AS referrer_preview,
+                    ai.utm_source,
+                    ai.utm_medium,
+                    ai.utm_campaign,
+                    ai.first_open_at,
+                    ai.last_open_at,
+                    ai.open_count,
+                    ai.userid,
+                    ai.registered_at,
+                    ai.lead_phone,
+                    ai.lead_email,
+                    u.phone AS user_phone,
+                    u.name AS user_name,
+                    le.event_name AS last_event_name,
+                    le.event_status AS last_event_status,
+                    le.screen_name AS last_event_screen,
+                    le.created_at AS last_event_at,
+                    c.existing_user_install,
+                    c.registration_flow_install
+                FROM app_installations ai
+                INNER JOIN classified c ON c.installation_id = ai.installation_id
+                LEFT JOIN users u ON u.userid = ai.userid
+                LEFT JOIN LATERAL (
+                    SELECT event_name, event_status, screen_name, created_at
+                    FROM app_installation_events aie
+                    WHERE aie.installation_id = ai.installation_id
+                    ORDER BY aie.created_at DESC
+                    LIMIT 1
+                ) le ON TRUE
+                ORDER BY ai.first_open_at DESC
+                LIMIT ?
+                """,
+                params + [_EXPORT_MAX_INSTALL_ROWS],
+            )
+            rows = cur.fetchall() or []
+
+            reached_by_install: dict[str, set[str]] = {}
+            if funnel_event_names:
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT aie.installation_id::text, aie.event_name
+                    FROM app_installation_events aie
+                    INNER JOIN app_installations ai ON ai.installation_id = aie.installation_id
+                    WHERE {where_sql}
+                      AND aie.event_name IN ({funnel_placeholders})
+                    GROUP BY aie.installation_id, aie.event_name
+                    """,
+                    params + funnel_event_names,
+                )
+                for iid, event_name in cur.fetchall() or []:
+                    if iid and event_name:
+                        reached_by_install.setdefault(str(iid), set()).add(str(event_name))
+
+        install_rows = []
+        for r in rows:
+            iid = r[0]
+            install_rows.append(
+                {
+                    "installation_id": iid,
+                    "platform": r[1],
+                    "app_version": r[2],
+                    "app_build": r[3],
+                    "referrer_preview": r[4],
+                    "utm_source": r[5],
+                    "utm_medium": r[6],
+                    "utm_campaign": r[7],
+                    "first_open_at": r[8],
+                    "last_open_at": r[9],
+                    "open_count": r[10],
+                    "userid": r[11],
+                    "registered_at": r[12],
+                    "lead_phone": r[13],
+                    "lead_email": r[14],
+                    "user_phone": r[15],
+                    "user_name": r[16],
+                    "last_event_name": r[17],
+                    "last_event_status": r[18],
+                    "last_event_screen": r[19],
+                    "last_event_at": r[20],
+                    "funnel_segment": _funnel_segment_label(
+                        userid=r[11],
+                        existing_user_install=bool(r[21]),
+                        registration_flow_install=bool(r[22]),
+                    ),
+                    "reached_steps": reached_by_install.get(str(iid), set()),
+                }
+            )
+
+        zip_bytes = _build_acquisition_export_zip(
+            analytics=analytics,
+            install_rows=install_rows,
+            filters={
+                "date_from": date_from,
+                "date_to": date_to,
+                "registered": registered or "all",
+                "utm_source": utm_source,
+                "utm_medium": utm_medium,
+                "utm_campaign": utm_campaign,
+                "app_build": app_build,
+            },
+        )
+
+        from_part = (date_from or "all").strip()
+        to_part = (date_to or "all").strip()
+        filename = f"install-funnel_{from_part}_to_{to_part}.zip"
+        return Response(
+            content=zip_bytes,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_acquisition_installations_export failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to export install funnel") from e
 
 
 @router.get("/admin/acquisition-installations/{installation_id}/events")
@@ -1136,173 +1317,3 @@ def _build_acquisition_export_zip(
         zf.writestr("04_installs.csv", installs_csv)
     return zip_buf.getvalue()
 
-
-@router.get("/admin/acquisition-installations/export")
-async def admin_acquisition_installations_export(
-    current_user: User = Depends(get_current_user),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    registered: Optional[str] = Query(None, description="yes | no | all"),
-    utm_campaign: Optional[str] = Query(None),
-    utm_source: Optional[str] = Query(None),
-    utm_medium: Optional[str] = Query(None),
-    app_build: Optional[str] = Query(None),
-):
-    """Export install funnel data for marketing: ZIP with four UTF-8 CSV files."""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-
-    where_sql, params = _acquisition_filter_sql(
-        date_from=date_from,
-        date_to=date_to,
-        registered=registered,
-        utm_campaign=utm_campaign,
-        utm_source=utm_source,
-        utm_medium=utm_medium,
-        app_build=app_build,
-        alias="ai",
-    )
-    funnel_event_names = [name for name, _label in _FUNNEL_STEPS if name != "first_open"]
-    funnel_placeholders = ", ".join(["?"] * len(funnel_event_names))
-
-    with get_conn() as conn:
-        analytics = _acquisition_analytics_payload(conn, where_sql=where_sql, params=params)
-
-        cur = execute(
-            conn,
-            f"SELECT COUNT(*) FROM app_installations ai WHERE {where_sql}",
-            params,
-        )
-        total = int((cur.fetchone() or [0])[0] or 0)
-        if total > _EXPORT_MAX_INSTALL_ROWS:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Too many rows to export ({total}). Narrow the date range or filters "
-                    f"(max {_EXPORT_MAX_INSTALL_ROWS:,})."
-                ),
-            )
-
-        classified_cte = _classified_cte_sql(where_sql)
-        cur = execute(
-            conn,
-            f"""
-            {classified_cte}
-            SELECT
-                ai.installation_id::text,
-                ai.platform,
-                ai.app_version,
-                ai.app_build,
-                LEFT(COALESCE(ai.referrer_raw, ''), 500) AS referrer_preview,
-                ai.utm_source,
-                ai.utm_medium,
-                ai.utm_campaign,
-                ai.first_open_at,
-                ai.last_open_at,
-                ai.open_count,
-                ai.userid,
-                ai.registered_at,
-                ai.lead_phone,
-                ai.lead_email,
-                u.phone AS user_phone,
-                u.name AS user_name,
-                le.event_name AS last_event_name,
-                le.event_status AS last_event_status,
-                le.screen_name AS last_event_screen,
-                le.created_at AS last_event_at,
-                c.existing_user_install,
-                c.registration_flow_install
-            FROM app_installations ai
-            LEFT JOIN users u ON u.userid = ai.userid
-            LEFT JOIN classified c ON c.installation_id = ai.installation_id
-            LEFT JOIN LATERAL (
-                SELECT event_name, event_status, screen_name, created_at
-                FROM app_installation_events aie
-                WHERE aie.installation_id = ai.installation_id
-                ORDER BY aie.created_at DESC
-                LIMIT 1
-            ) le ON TRUE
-            WHERE {where_sql}
-            ORDER BY ai.first_open_at DESC
-            LIMIT ?
-            """,
-            params + [_EXPORT_MAX_INSTALL_ROWS],
-        )
-        rows = cur.fetchall() or []
-
-        install_ids = [r[0] for r in rows if r and r[0]]
-        reached_by_install: dict[str, set[str]] = {iid: set() for iid in install_ids}
-        if install_ids and funnel_event_names:
-            id_placeholders = ", ".join(["?"] * len(install_ids))
-            cur = execute(
-                conn,
-                f"""
-                SELECT installation_id::text, event_name
-                FROM app_installation_events
-                WHERE installation_id IN ({id_placeholders})
-                  AND event_name IN ({funnel_placeholders})
-                GROUP BY installation_id, event_name
-                """,
-                install_ids + funnel_event_names,
-            )
-            for iid, event_name in cur.fetchall() or []:
-                if iid and event_name:
-                    reached_by_install.setdefault(str(iid), set()).add(str(event_name))
-
-    install_rows = []
-    for r in rows:
-        iid = r[0]
-        install_rows.append(
-            {
-                "installation_id": iid,
-                "platform": r[1],
-                "app_version": r[2],
-                "app_build": r[3],
-                "referrer_preview": r[4],
-                "utm_source": r[5],
-                "utm_medium": r[6],
-                "utm_campaign": r[7],
-                "first_open_at": r[8],
-                "last_open_at": r[9],
-                "open_count": r[10],
-                "userid": r[11],
-                "registered_at": r[12],
-                "lead_phone": r[13],
-                "lead_email": r[14],
-                "user_phone": r[15],
-                "user_name": r[16],
-                "last_event_name": r[17],
-                "last_event_status": r[18],
-                "last_event_screen": r[19],
-                "last_event_at": r[20],
-                "funnel_segment": _funnel_segment_label(
-                    userid=r[11],
-                    existing_user_install=bool(r[21]),
-                    registration_flow_install=bool(r[22]),
-                ),
-                "reached_steps": reached_by_install.get(str(iid), set()),
-            }
-        )
-
-    zip_bytes = _build_acquisition_export_zip(
-        analytics=analytics,
-        install_rows=install_rows,
-        filters={
-            "date_from": date_from,
-            "date_to": date_to,
-            "registered": registered or "all",
-            "utm_source": utm_source,
-            "utm_medium": utm_medium,
-            "utm_campaign": utm_campaign,
-            "app_build": app_build,
-        },
-    )
-
-    from_part = (date_from or "all").strip()
-    to_part = (date_to or "all").strip()
-    filename = f"install-funnel_{from_part}_to_{to_part}.zip"
-    return Response(
-        content=zip_bytes,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
