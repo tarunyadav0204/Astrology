@@ -1990,14 +1990,14 @@ const loadHomeData = async (nativeData = null) => {
                   <Text style={styles.sunTimeEmoji}>🌅</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunrise', 'Sunrise')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.sunrise && !isNaN(new Date(panchangData.sunrise).getTime()) ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:30 AM'}
+                    {panchangData.sunrise && !isNaN(new Date(panchangData.sunrise).getTime()) ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : t('common.notAvailable', 'Not available')}
                   </Text>
                 </View>
                 <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                   <Text style={styles.sunTimeEmoji}>🌇</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunset', 'Sunset')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.sunset && !isNaN(new Date(panchangData.sunset).getTime()) ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:45 PM'}
+                    {panchangData.sunset && !isNaN(new Date(panchangData.sunset).getTime()) ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : t('common.notAvailable', 'Not available')}
                   </Text>
                 </View>
               </View>
@@ -2007,14 +2007,14 @@ const loadHomeData = async (nativeData = null) => {
                   <Text style={styles.sunTimeEmoji}>🌙</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonrise', 'Moonrise')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || '7:53 AM'}
+                    {panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || t('common.notAvailable', 'Not available')}
                   </Text>
                 </View>
                 <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                   <Text style={styles.sunTimeEmoji}>🌚</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonset', 'Moonset')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || '6:06 PM'}
+                    {panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || t('common.notAvailable', 'Not available')}
                   </Text>
                 </View>
               </View>
@@ -2287,7 +2287,7 @@ const loadHomeData = async (nativeData = null) => {
                         {panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end && 
                          !isNaN(new Date(panchangData.brahma_muhurta_start).getTime()) ? 
                           `${new Date(panchangData.brahma_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.brahma_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                          '4:29 AM - 6:05 AM'
+                          t('common.notAvailable', 'Not available')
                         }
                       </Text>
                     </View>
@@ -2297,7 +2297,7 @@ const loadHomeData = async (nativeData = null) => {
                         {panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end &&
                          !isNaN(new Date(panchangData.abhijit_muhurta_start).getTime()) ? 
                           `${new Date(panchangData.abhijit_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.abhijit_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                          '11:36 AM - 12:24 PM'
+                          t('common.notAvailable', 'Not available')
                         }
                       </Text>
                     </View>

@@ -190,7 +190,7 @@ const BirthForm = ({
         id: chart.id
       };
       
-      setBirthData({
+      const selectedBirthData = {
         name: chart.name,
         date: chart.date,
         time: chart.time,
@@ -199,14 +199,15 @@ const BirthForm = ({
         longitude: chart.longitude,
         gender: chart.gender || '',
         chart_id: chart.id
-      });
+      };
+      setBirthData(selectedBirthData);
       
       setChartData(enhancedChartData);
       toast.success('Chart loaded successfully!');
       
       // Call onSubmit to trigger parent component logic
       if (onSubmit) {
-        onSubmit();
+        onSubmit(selectedBirthData);
       } else if (onClose) {
         onClose();
       }
@@ -387,10 +388,11 @@ const BirthForm = ({
         await apiService.updateChart(editingChart.id, formData);
 
         // Keep in-memory context synced with edited values (especially gender) for analysis pages.
-        setBirthData({
+        const editedBirthData = {
           ...formData,
           chart_id: editingChart.id,
-        });
+        };
+        setBirthData(editedBirthData);
         setChartData({
           ...chartData,
           id: editingChart.id,
@@ -401,7 +403,7 @@ const BirthForm = ({
 
         // Close modal after successful edit; do not reset form first.
         if (onSubmit) {
-          onSubmit();
+          onSubmit(editedBirthData);
         } else if (onClose) {
           onClose();
         }
@@ -424,7 +426,7 @@ const BirthForm = ({
         setBirthData(formData);
         setChartData(enhancedChartData);
         toast.success('Birth chart calculated successfully!');
-        onSubmit();
+        onSubmit(formData);
       }
     } catch (error) {
       setError(error.message);

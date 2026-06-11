@@ -302,15 +302,29 @@ async def calculate_moon_phase(request: MoonPhaseRequest):
 @router.post("/calculate-inauspicious-times")
 async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
     try:
-        # Use professional MonthlyPanchangCalculator instead of amateur calculations
+        from utils.timezone_service import get_timezone_from_coordinates
+        timezone = get_timezone_from_coordinates(request.latitude, request.longitude)
+
+        # Use local sunrise/sunset based MonthlyPanchangCalculator.
         daily_panchang = monthly_panchang_calc.calculate_daily_panchang(
             request.date,
             request.latitude,
             request.longitude,
-            "UTC+0"  # Default timezone for inauspicious times
+            timezone
         )
         
         special_times = daily_panchang.get('special_times', {})
+
+        def period_to_iso(period):
+            if not period.get('start') or not period.get('end'):
+                return None
+
+            start_dt = datetime.strptime(f"{request.date} {period.get('start')}", '%Y-%m-%d %I:%M %p')
+            end_dt = datetime.strptime(f"{request.date} {period.get('end')}", '%Y-%m-%d %I:%M %p')
+            return {
+                'start_time': start_dt.isoformat(),
+                'end_time': end_dt.isoformat()
+            }
         
         # Convert format to match frontend expectations
         dur_muhurta = []
@@ -337,9 +351,14 @@ async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
             })
         
         return {
+            'rahu_kaal': period_to_iso(special_times.get('rahu_kalam', {})),
+            'yamaganda': period_to_iso(special_times.get('yamaganda', {})),
+            'gulika': period_to_iso(special_times.get('gulikai_kalam', {})),
             'dur_muhurta': dur_muhurta,
             'varjyam': varjyam,
             'sunrise_time': daily_panchang['sunrise_sunset']['sunrise'],
+            'day_duration': daily_panchang['sunrise_sunset'].get('day_duration'),
+            'timezone': timezone,
             'weekday': datetime.strptime(request.date, '%Y-%m-%d').weekday()
         }
         

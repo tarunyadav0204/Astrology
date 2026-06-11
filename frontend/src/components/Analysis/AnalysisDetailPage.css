@@ -229,3 +229,351 @@
   background: #fff5f8;
   box-shadow: 0 6px 18px rgba(233, 30, 99, 0.2);
 }
+
+/* Career SEO page enrichment */
+.analysis-detail-page--career {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 42%, #fff7ed 100%);
+}
+
+.analysis-detail-page--marriage {
+  background: linear-gradient(180deg, #fff7fb 0%, #fdf2f8 45%, #fff7ed 100%);
+}
+
+.analysis-detail-page--health {
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfeff 45%, #fff7ed 100%);
+}
+
+.analysis-detail-page--education {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 45%, #fefce8 100%);
+}
+
+.analysis-detail-page--wealth {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 42%, #f8fafc 100%);
+}
+
+.analysis-detail-page--progeny {
+  background: linear-gradient(180deg, #fff7ed 0%, #fdf2f8 45%, #ecfeff 100%);
+}
+
+.analysis-detail-page--career .analysis-detail-hero,
+.analysis-detail-page--marriage .analysis-detail-hero,
+.analysis-detail-page--health .analysis-detail-hero,
+.analysis-detail-page--education .analysis-detail-hero,
+.analysis-detail-page--wealth .analysis-detail-hero,
+.analysis-detail-page--progeny .analysis-detail-hero {
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 64, 175, 0.82) 48%, rgba(190, 24, 93, 0.78) 100%),
+    var(--analysis-hero-image) right center / contain no-repeat;
+  border-bottom: none;
+}
+
+.analysis-detail-page--marriage .analysis-detail-hero {
+  background:
+    linear-gradient(135deg, rgba(80, 7, 36, 0.92) 0%, rgba(190, 24, 93, 0.84) 48%, rgba(124, 58, 237, 0.72) 100%),
+    var(--analysis-hero-image) right center / contain no-repeat;
+}
+
+.analysis-detail-page--health .analysis-detail-hero {
+  background:
+    linear-gradient(135deg, rgba(6, 78, 59, 0.92) 0%, rgba(14, 116, 144, 0.84) 48%, rgba(37, 99, 235, 0.72) 100%),
+    var(--analysis-hero-image) right center / contain no-repeat;
+}
+
+.analysis-detail-page--education .analysis-detail-hero {
+  background:
+    linear-gradient(135deg, rgba(49, 46, 129, 0.92) 0%, rgba(79, 70, 229, 0.84) 48%, rgba(202, 138, 4, 0.74) 100%),
+    var(--analysis-hero-image) right center / contain no-repeat;
+}
+
+.analysis-detail-page--wealth .analysis-detail-hero {
+  background:
+    linear-gradient(135deg, rgba(69, 26, 3, 0.92) 0%, rgba(180, 83, 9, 0.84) 48%, rgba(21, 128, 61, 0.72) 100%),
+    var(--analysis-hero-image) right center / contain no-repeat;
+}
+
+.analysis-detail-page--progeny .analysis-detail-hero {
+  background:
+    linear-gradient(135deg, rgba(83, 49, 9, 0.92) 0%, rgba(190, 24, 93, 0.82) 48%, rgba(13, 148, 136, 0.7) 100%),
+    var(--analysis-hero-image) right center / contain no-repeat;
+}
+
+.analysis-detail-page--career .analysis-detail-hero__inner,
+.analysis-detail-page--marriage .analysis-detail-hero__inner,
+.analysis-detail-page--health .analysis-detail-hero__inner,
+.analysis-detail-page--education .analysis-detail-hero__inner,
+.analysis-detail-page--wealth .analysis-detail-hero__inner,
+.analysis-detail-page--progeny .analysis-detail-hero__inner {
+  max-width: 920px;
+}
+
+.analysis-detail-page--career .analysis-detail-kicker,
+.analysis-detail-page--career .analysis-detail-title,
+.analysis-detail-page--career .analysis-detail-blurb,
+.analysis-detail-page--marriage .analysis-detail-kicker,
+.analysis-detail-page--marriage .analysis-detail-title,
+.analysis-detail-page--marriage .analysis-detail-blurb,
+.analysis-detail-page--health .analysis-detail-kicker,
+.analysis-detail-page--health .analysis-detail-title,
+.analysis-detail-page--health .analysis-detail-blurb,
+.analysis-detail-page--education .analysis-detail-kicker,
+.analysis-detail-page--education .analysis-detail-title,
+.analysis-detail-page--education .analysis-detail-blurb,
+.analysis-detail-page--wealth .analysis-detail-kicker,
+.analysis-detail-page--wealth .analysis-detail-title,
+.analysis-detail-page--wealth .analysis-detail-blurb,
+.analysis-detail-page--progeny .analysis-detail-kicker,
+.analysis-detail-page--progeny .analysis-detail-title,
+.analysis-detail-page--progeny .analysis-detail-blurb {
+  color: #fff;
+}
+
+.analysis-detail-page--career .analysis-detail-blurb,
+.analysis-detail-page--marriage .analysis-detail-blurb,
+.analysis-detail-page--health .analysis-detail-blurb,
+.analysis-detail-page--education .analysis-detail-blurb,
+.analysis-detail-page--wealth .analysis-detail-blurb,
+.analysis-detail-page--progeny .analysis-detail-blurb {
+  color: #e0e7ff;
+}
+
+.career-detail-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.career-detail-primary,
+.career-detail-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.career-detail-primary {
+  border: none;
+  background: #f97316;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.28);
+}
+
+.analysis-detail-page--marriage .career-detail-primary {
+  background: #be185d;
+  box-shadow: 0 10px 24px rgba(190, 24, 93, 0.28);
+}
+
+.analysis-detail-page--health .career-detail-primary {
+  background: #0f766e;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.28);
+}
+
+.analysis-detail-page--education .career-detail-primary {
+  background: #4f46e5;
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.28);
+}
+
+.analysis-detail-page--wealth .career-detail-primary {
+  background: #b45309;
+  box-shadow: 0 10px 24px rgba(180, 83, 9, 0.28);
+}
+
+.analysis-detail-page--progeny .career-detail-primary {
+  background: #c2410c;
+  box-shadow: 0 10px 24px rgba(194, 65, 12, 0.28);
+}
+
+.career-detail-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.career-detail-proof {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.career-detail-proof span {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.career-detail-intro,
+.career-detail-report-scope,
+.career-detail-seo-copy,
+.career-detail-faq {
+  max-width: 1080px;
+  margin: 0 auto 20px;
+}
+
+.career-detail-section-heading {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.career-detail-section-heading p,
+.career-detail-eyebrow {
+  margin: 0 0 8px;
+  color: #be123c;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.career-detail-section-heading h2,
+.career-detail-report-scope h2,
+.career-detail-seo-copy h2,
+.career-detail-faq h2 {
+  margin: 0;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.career-detail-method-grid,
+.career-detail-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.career-detail-method-grid article,
+.career-detail-faq article,
+.career-detail-seo-copy article {
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.career-detail-method-grid h3,
+.career-detail-faq h3 {
+  margin: 0 0 8px;
+  color: #172554;
+  font-size: 1rem;
+}
+
+.career-detail-method-grid p,
+.career-detail-report-scope p,
+.career-detail-seo-copy p,
+.career-detail-faq p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.career-detail-report-scope {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(280px, 1.1fr);
+  gap: 20px;
+  align-items: start;
+  padding: 22px;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+}
+
+.career-detail-report-scope ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.career-detail-report-scope li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font-weight: 700;
+  border: 1px solid #dbeafe;
+}
+
+.career-detail-seo-copy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.career-detail-seo-copy h2 {
+  margin-bottom: 10px;
+  font-size: 1.15rem;
+}
+
+.career-detail-faq h2 {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .career-detail-method-grid,
+  .career-detail-faq-grid,
+  .career-detail-report-scope,
+  .career-detail-seo-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-detail-page--career .analysis-detail-hero {
+    background:
+      linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 64, 175, 0.86) 58%, rgba(190, 24, 93, 0.76) 100%),
+      var(--analysis-hero-image) right bottom / 280px auto no-repeat;
+  }
+
+  .analysis-detail-page--marriage .analysis-detail-hero {
+    background:
+      linear-gradient(135deg, rgba(80, 7, 36, 0.94) 0%, rgba(190, 24, 93, 0.86) 58%, rgba(124, 58, 237, 0.74) 100%),
+      var(--analysis-hero-image) right bottom / 280px auto no-repeat;
+  }
+
+  .analysis-detail-page--health .analysis-detail-hero {
+    background:
+      linear-gradient(135deg, rgba(6, 78, 59, 0.94) 0%, rgba(14, 116, 144, 0.86) 58%, rgba(37, 99, 235, 0.74) 100%),
+      var(--analysis-hero-image) right bottom / 280px auto no-repeat;
+  }
+
+  .analysis-detail-page--education .analysis-detail-hero {
+    background:
+      linear-gradient(135deg, rgba(49, 46, 129, 0.94) 0%, rgba(79, 70, 229, 0.86) 58%, rgba(202, 138, 4, 0.74) 100%),
+      var(--analysis-hero-image) right bottom / 280px auto no-repeat;
+  }
+
+  .analysis-detail-page--wealth .analysis-detail-hero {
+    background:
+      linear-gradient(135deg, rgba(69, 26, 3, 0.94) 0%, rgba(180, 83, 9, 0.86) 58%, rgba(21, 128, 61, 0.74) 100%),
+      var(--analysis-hero-image) right bottom / 280px auto no-repeat;
+  }
+
+  .analysis-detail-page--progeny .analysis-detail-hero {
+    background:
+      linear-gradient(135deg, rgba(83, 49, 9, 0.94) 0%, rgba(190, 24, 93, 0.86) 58%, rgba(13, 148, 136, 0.72) 100%),
+      var(--analysis-hero-image) right bottom / 280px auto no-repeat;
+  }
+}
+
+@media (max-width: 520px) {
+  .career-detail-primary,
+  .career-detail-secondary {
+    width: 100%;
+  }
+
+  .career-detail-report-scope,
+  .career-detail-method-grid article,
+  .career-detail-faq article,
+  .career-detail-seo-copy article {
+    padding: 16px;
+  }
+}

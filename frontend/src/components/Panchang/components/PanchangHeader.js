@@ -11,6 +11,14 @@ const PanchangHeader = ({
   festivals,
   showMonthlyLink = false
 }) => {
+  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  const formattedLongDate = selectedDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
   const formatDateForCalendar = (date) => {
     return date.toISOString().split('T')[0];
   };
@@ -32,8 +40,23 @@ const PanchangHeader = ({
 
   return (
     <div className="panchang-header">
+      <div className="panchang-hero-copy">
+        <span className="panchang-eyebrow">Daily Hindu Calendar</span>
+        <h1>{isToday ? "Today's Panchang" : "Panchang"} for {formattedLongDate}</h1>
+        <p>
+          Check tithi, nakshatra, yoga, karana, sunrise, Rahu Kaal, Choghadiya,
+          Hora and auspicious muhurat windows for your selected place.
+        </p>
+        <div className="panchang-hero-tags" aria-label="Panchang highlights">
+          <span>Tithi</span>
+          <span>Nakshatra</span>
+          <span>Muhurat</span>
+          <span>Rahu Kaal</span>
+        </div>
+      </div>
+
       <div className="header-row">
-        <div className="date-navigation-container">
+        <div className="date-navigation-container" aria-label="Date navigation">
           <button className="nav-btn" onClick={() => navigateDate(-1)}>←</button>
           <input 
             type="date" 
@@ -52,23 +75,24 @@ const PanchangHeader = ({
           <option value={CALENDAR_SYSTEMS.GREGORIAN}>Gregorian</option>
         </select>
         <div className="location-info">
-          <span>📍 {location.name}</span>
+          <span className="location-name">📍 {location.name}</span>
           <button className="change-location-btn" onClick={onLocationChange}>Change</button>
         </div>
         {showMonthlyLink && (
           <a href="/monthly-panchang" className="monthly-panchang-link">
-            📅 View Monthly Panchang Calendar
+            Monthly Panchang
           </a>
         )}
       </div>
-      <div className="date-display">
-        <h1>{selectedDate.toDateString() === new Date().toDateString() ? "Today's" : ""} Panchang - {selectedDate.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        })}</h1>
-      </div>
+
+      {festivals?.length > 0 && (
+        <div className="festival-banner">
+          <span className="festival-icon">Festival</span>
+          <span className="festival-text">
+            {festivals.map((festival) => festival.name || festival.title || festival).join(', ')}
+          </span>
+        </div>
+      )}
     </div>
   );
 };

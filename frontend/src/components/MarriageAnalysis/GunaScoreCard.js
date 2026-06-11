@@ -20,7 +20,17 @@ const GunaScoreCard = ({ gunaMilan, overallScore }) => {
   return (
     <div className="guna-score-card">
       <div className="guna-breakdown">
-        <h4>Ashtakoot Guna Milan ({gunaMilan.total_score}/36)</h4>
+        <div className="guna-breakdown-heading">
+          <div>
+            <p className="kundli-result-eyebrow">Ashtakoot breakdown</p>
+            <h4>
+              Guna Milan ({gunaMilan.effective_total_score ?? gunaMilan.total_score}/36)
+            </h4>
+          </div>
+          {gunaMilan.effective_total_score != null && gunaMilan.effective_total_score !== gunaMilan.total_score && (
+            <span className="guna-effective-pill">Raw {gunaMilan.total_score}/36</span>
+          )}
+        </div>
         <div className="koots-grid">
           {Object.entries(gunaMilan.koots).map(([kootName, kootData]) => (
             <div key={kootName} className="koot-item">
@@ -40,6 +50,13 @@ const GunaScoreCard = ({ gunaMilan, overallScore }) => {
                     <p key={idx} className={line.startsWith('**') ? 'interpretation-header' : 'interpretation-text'}>
                       {line.replace(/\*\*/g, '')}
                     </p>
+                  ))}
+                </div>
+              )}
+              {gunaMilan.exceptions?.[kootName]?.applies && (
+                <div className="koot-exception">
+                  {(gunaMilan.exceptions[kootName].reasons || []).slice(0, 2).map((reason, index) => (
+                    <p key={`${kootName}_exception_${index}`}>{reason}</p>
                   ))}
                 </div>
               )}

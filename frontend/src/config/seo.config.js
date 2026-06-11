@@ -56,51 +56,51 @@ export const SEO_CONFIG = {
     },
     
     marriageAnalysis: {
-      title: "Marriage Analysis Report - Vedic Astrology Compatibility | AstroRoshni",
-      description: "Get detailed marriage analysis and compatibility report based on Vedic astrology. Discover spouse characteristics, marriage timing, and relationship insights.",
-      keywords: "marriage analysis, horoscope matching, kundli matching, marriage compatibility, spouse prediction, marriage astrology, vedic marriage analysis"
+      title: "Marriage Analysis by Date of Birth | D9 Navamsa & Marriage Timing | AstroRoshni",
+      description: "Get Vedic marriage analysis by date of birth with 7th house, D9 Navamsa, Darakaraka, Upapada Lagna, spouse nature, marriage timing, harmony, and delay guidance.",
+      keywords: "marriage analysis by date of birth, marriage astrology, marriage prediction by date of birth, D9 Navamsa marriage, 7th house marriage astrology, Darakaraka spouse prediction, Upapada Lagna marriage, spouse prediction astrology, marriage timing astrology, relationship astrology, vedic marriage analysis"
     },
     
     careerGuidance: {
-      title: "Career Guidance & Job Predictions - Vedic Astrology | AstroRoshni", 
-      description: "Professional career guidance based on Vedic astrology. Get insights about job prospects, business success, and career growth opportunities.",
-      keywords: "career astrology, job predictions, business astrology, career guidance, professional success, vedic career analysis"
+      title: "Career Analysis by Date of Birth | D10 Dashamsha & Job Predictions | AstroRoshni", 
+      description: "Get Vedic career analysis by date of birth with D10 Dashamsha, 10th house, Amatyakaraka, suitable profession, job vs business guidance, and career timing.",
+      keywords: "career analysis by date of birth, career astrology, job prediction by date of birth, D10 chart career analysis, Dashamsha career chart, suitable profession astrology, business astrology, Amatyakaraka career, 10th house career astrology, career timing astrology, vedic career guidance"
     },
     
     healthAnalysis: {
-      title: "Health Analysis & Medical Astrology Predictions | AstroRoshni",
-      description: "Comprehensive health analysis using Vedic medical astrology. Get insights about health issues, remedies, and wellness guidance.",
-      keywords: "medical astrology, health predictions, ayurvedic astrology, health analysis, wellness astrology, disease prediction"
+      title: "Health Analysis by Date of Birth | D30 Trimsamsa & Wellness Astrology | AstroRoshni",
+      description: "Get Vedic health analysis by date of birth with Lagna vitality, 6th/8th/12th houses, D30 Trimsamsa, stress and sleep patterns, health timing, and preventive wellness guidance.",
+      keywords: "health analysis by date of birth, health astrology, medical astrology, wellness astrology, D30 Trimsamsa health, Vedic health analysis, health prediction by date of birth, Lagna vitality, 6th house health astrology, stress sleep astrology, preventive wellness astrology"
     },
     
     wealthAnalysis: {
-      title: "Wealth & Finance Analysis - Money Predictions | AstroRoshni",
-      description: "Detailed wealth and finance analysis based on Vedic astrology. Discover money-making opportunities and financial growth prospects.",
-      keywords: "wealth astrology, finance predictions, money astrology, financial analysis, prosperity predictions, wealth creation"
+      title: "Wealth Analysis by Date of Birth | Dhana Yoga, Income & Money Timing | AstroRoshni",
+      description: "Get Vedic wealth analysis by date of birth with 2nd and 11th house wealth, Dhana yogas, income source, savings pattern, assets, risk, career-to-money links, and wealth timing.",
+      keywords: "wealth analysis by date of birth, wealth astrology, money prediction by date of birth, Dhana yoga analysis, income source astrology, 2nd house wealth, 11th house gains, savings astrology, asset building astrology, wealth timing astrology, finance astrology, vedic wealth analysis"
     },
 
     educationAnalysis: {
-      title: "Education Analysis - Academic Success & Learning Path | AstroRoshni",
-      description: "Discover your learning potential, academic strengths, and study success factors with Vedic astrology—educational guidance tailored to your birth chart.",
-      keywords: "education astrology, academic success, study guidance, learning path, exam timing, vedic education analysis"
+      title: "Education Analysis by Date of Birth | D24 Chart, Subject Fit & Exam Timing | AstroRoshni",
+      description: "Get Vedic education analysis by date of birth with 4th, 5th and 9th houses, D24 education chart, learning style, subject fit, higher studies, exam timing, and study guidance.",
+      keywords: "education analysis by date of birth, education astrology, D24 education chart, Siddhamsa chart, subject selection astrology, exam timing astrology, study guidance astrology, higher education astrology, academic success astrology, learning style astrology, vedic education analysis"
     },
 
     lifeEvents: {
-      title: "Life Events Timeline — Yearly & Monthly Vedic Predictions | AstroRoshni",
-      description: "Explore major life events, monthly story arcs, and optional one-month deep dives using Parashari, Nadi, and Jaimini methods—personalized to your saved birth chart.",
-      keywords: "life events astrology, yearly predictions, monthly forecast, vedic timeline, dasha events, transit predictions"
+      title: "Life Events Timeline by Date of Birth | Yearly & Monthly Vedic Predictions | AstroRoshni",
+      description: "Get a Vedic life events timeline by date of birth with yearly predictions, monthly chapters, one-month deep dives, dasha timing, transits, Parashari, Nadi, and Jaimini methods.",
+      keywords: "life events timeline by date of birth, life events astrology, yearly predictions astrology, monthly predictions astrology, vedic timeline, dasha events, transit predictions, Parashari timing, Nadi astrology timeline, Jaimini timing, major life events prediction, birth chart event timing"
     },
     
     panchang: {
-      title: "Daily Panchang - Hindu Calendar & Auspicious Times | AstroRoshni",
-      description: "Get today's Panchang with Tithi, Nakshatra, Yoga, Karana and auspicious muhurat times. Complete Hindu calendar information.",
-      keywords: "panchang, hindu calendar, tithi, nakshatra, muhurat times, auspicious times, vedic calendar"
+      title: "Today Panchang | Tithi, Nakshatra, Rahu Kaal & Muhurat Timings | AstroRoshni",
+      description: "Check today's Panchang by location with tithi, nakshatra, yoga, karana, sunrise, sunset, Rahu Kaal, Yamaganda, Choghadiya, Hora and auspicious muhurat timings.",
+      keywords: "today panchang, daily panchang, hindu calendar, tithi today, nakshatra today, rahu kaal today, choghadiya today, hora today, muhurat timings, vedic calendar, panchang by location"
     },
     
     muhuratFinder: {
-      title: "Muhurat Finder - Auspicious Times Calculator | AstroRoshni", 
-      description: "Find auspicious muhurat times for marriage, business, travel and other important events using Vedic astrology calculations.",
-      keywords: "muhurat finder, auspicious times, marriage muhurat, business muhurat, travel muhurat, vedic muhurat"
+      title: "Muhurat Finder | Marriage, Property, Vehicle & Griha Pravesh Timings | AstroRoshni", 
+      description: "Find auspicious muhurat timings by date and location for marriage, property purchase, vehicle purchase, and griha pravesh using Vedic Panchang calculations.",
+      keywords: "muhurat finder, auspicious muhurat, marriage muhurat, vivah muhurat, property purchase muhurat, vehicle purchase muhurat, griha pravesh muhurat, today muhurat, vedic panchang muhurat, auspicious timings"
     },
     
     dailyHoroscope: {
@@ -122,21 +122,21 @@ export const SEO_CONFIG = {
     },
 
     festivals: {
-      title: "Hindu Festivals Calendar — Dates & Significance | AstroRoshni",
-      description: "Upcoming Hindu festivals with dates, significance, and Panchang-based timings for India and worldwide locations.",
-      keywords: "hindu festivals, festival calendar, vrat dates, indian festivals astrology"
+      title: "Hindu Festivals Calendar | Today’s Vrat, Tithi & Panchang Dates | AstroRoshni",
+      description: "Check today’s Hindu festivals and vrats by date and location with Panchang context, tithi, nakshatra, parana timing, rituals, and festival significance.",
+      keywords: "hindu festivals calendar, today hindu festival, vrat today, tithi festival dates, panchang festivals, ekadashi vrat, pradosh vrat, hindu calendar, indian festivals, festival significance, parana time"
     },
 
     festivalsMonthly: {
-      title: "Monthly Hindu Festivals — This Month's Celebrations | AstroRoshni",
-      description: "Festivals falling this month with exact dates, tithi, and regional variations.",
-      keywords: "festivals this month, hindu festival dates, monthly festival list"
+      title: "Monthly Hindu Festivals Calendar | Vrat Dates, Ekadashi & Panchang | AstroRoshni",
+      description: "Browse monthly Hindu festivals and vrats with location-aware dates, Ekadashi, Pradosh, Purnima, Amavasya, tithi details, parana timing, and observance guidance.",
+      keywords: "monthly hindu festivals, hindu festival calendar month, vrat dates this month, ekadashi dates, pradosh dates, purnima amavasya calendar, panchang monthly festivals, indian festival calendar, hindu calendar month"
     },
 
     nakshatrasList: {
-      title: "27 Nakshatras — Names, Lords & Characteristics | AstroRoshni",
-      description: "Explore all 27 Nakshatras in Vedic astrology with lords, deities, padas, and yearly calendars.",
-      keywords: "27 nakshatras, nakshatra list, lunar mansions, vedic nakshatra"
+      title: "27 Nakshatras in Vedic Astrology | Names, Lords, Deities & Calendar | AstroRoshni",
+      description: "Explore the complete 27 Nakshatras list with names, planetary lords, deities, nature, zodiac ranges, padas, meanings, Janma Nakshatra guidance, and yearly nakshatra calendars.",
+      keywords: "27 nakshatras, nakshatra list, nakshatra names, nakshatra lord, nakshatra deity, Janma Nakshatra, nakshatra padas, lunar mansions, Vedic astrology nakshatra, nakshatra calendar, Moon nakshatra"
     },
 
     nakshatraDetail: {
@@ -236,9 +236,9 @@ export const SEO_CONFIG = {
     },
 
     progenyAnalysis: {
-      title: "Progeny & Children Analysis — Vedic Astrology | AstroRoshni",
-      description: "Insights on children, conception timing, and parenting themes from your birth chart.",
-      keywords: "progeny astrology, children prediction, saptamsa, fertility astrology"
+      title: "Progeny Analysis by Date of Birth | D7 Saptamsa & Children Timing | AstroRoshni",
+      description: "Vedic progeny analysis using D1 5th house, D7 Saptamsa, Jupiter, fertility sphuta, timing windows, remedies, and parenting guidance. Spiritual guidance only, not medical advice.",
+      keywords: "progeny analysis by date of birth, children prediction astrology, D7 Saptamsa, Saptamsa chart, fertility astrology, child birth timing astrology, family expansion astrology, 5th house children, Jupiter progeny astrology, parenting astrology, vedic progeny analysis"
     }
   },
   

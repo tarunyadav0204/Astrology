@@ -19,7 +19,6 @@ const SunriseSunsetInfo = ({ sunriseSunsetData, location }) => {
       return new Date(timeString).toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
         hour12: true
       });
     } catch {
@@ -36,6 +35,31 @@ const SunriseSunsetInfo = ({ sunriseSunsetData, location }) => {
     return `${h}h ${m}m`;
   };
 
+  const getDayNightDurations = () => {
+    const sunrise = new Date(sunriseSunsetData.sunrise);
+    const sunset = new Date(sunriseSunsetData.sunset);
+
+    if (Number.isNaN(sunrise.getTime()) || Number.isNaN(sunset.getTime())) {
+      return {
+        day: formatDuration(sunriseSunsetData.day_duration),
+        night: formatDuration(sunriseSunsetData.night_duration)
+      };
+    }
+
+    let daylightMs = sunset.getTime() - sunrise.getTime();
+    if (daylightMs < 0) {
+      daylightMs += 24 * 60 * 60 * 1000;
+    }
+
+    const dayHours = daylightMs / (60 * 60 * 1000);
+    const nightHours = 24 - dayHours;
+
+    return {
+      day: formatDuration(dayHours),
+      night: formatDuration(nightHours)
+    };
+  };
+
   const calculateDayProgress = () => {
     const now = new Date();
     const sunrise = new Date(sunriseSunsetData.sunrise);
@@ -49,6 +73,8 @@ const SunriseSunsetInfo = ({ sunriseSunsetData, location }) => {
     return (elapsed / totalDaylight) * 100;
   };
 
+  const durations = getDayNightDurations();
+
   return (
     <div className="sunrise-sunset-info">
 
@@ -56,48 +82,60 @@ const SunriseSunsetInfo = ({ sunriseSunsetData, location }) => {
         
         {/* Sunrise Information */}
         <div className="timing-card sunrise-card">
-          <div className="timing-icon">🌅</div>
-          <div className="timing-details">
+          <div className="timing-heading">
+            <div className="timing-icon">🌅</div>
             <h4>Sunrise</h4>
+          </div>
+          <div className="timing-details">
             <div className="main-time">{formatTime(sunriseSunsetData.sunrise)}</div>
             <div className="additional-info">
-              <span>Civil Twilight: {formatTime(sunriseSunsetData.civil_twilight_begin)}</span>
+              <span>Civil Twilight</span>
+              <strong>{formatTime(sunriseSunsetData.civil_twilight_begin)}</strong>
             </div>
           </div>
         </div>
 
         {/* Sunset Information */}
         <div className="timing-card sunset-card">
-          <div className="timing-icon">🌇</div>
-          <div className="timing-details">
+          <div className="timing-heading">
+            <div className="timing-icon">🌇</div>
             <h4>Sunset</h4>
+          </div>
+          <div className="timing-details">
             <div className="main-time">{formatTime(sunriseSunsetData.sunset)}</div>
             <div className="additional-info">
-              <span>Civil Twilight: {formatTime(sunriseSunsetData.civil_twilight_end)}</span>
+              <span>Civil Twilight</span>
+              <strong>{formatTime(sunriseSunsetData.civil_twilight_end)}</strong>
             </div>
           </div>
         </div>
 
         {/* Moonrise Information */}
         <div className="timing-card moonrise-card">
-          <div className="timing-icon">🌙</div>
-          <div className="timing-details">
+          <div className="timing-heading">
+            <div className="timing-icon">🌙</div>
             <h4>Moonrise</h4>
+          </div>
+          <div className="timing-details">
             <div className="main-time">{formatTime(sunriseSunsetData.moonrise)}</div>
             <div className="additional-info">
-              <span>Moon Phase: {sunriseSunsetData.moon_phase}</span>
+              <span>Moon Phase</span>
+              <strong>{sunriseSunsetData.moon_phase}</strong>
             </div>
           </div>
         </div>
 
         {/* Moonset Information */}
         <div className="timing-card moonset-card">
-          <div className="timing-icon">🌚</div>
-          <div className="timing-details">
+          <div className="timing-heading">
+            <div className="timing-icon">🌚</div>
             <h4>Moonset</h4>
+          </div>
+          <div className="timing-details">
             <div className="main-time">{formatTime(sunriseSunsetData.moonset)}</div>
             <div className="additional-info">
-              <span>Illumination: {sunriseSunsetData.moon_illumination}%</span>
+              <span>Illumination</span>
+              <strong>{sunriseSunsetData.moon_illumination}%</strong>
             </div>
           </div>
         </div>
@@ -108,12 +146,12 @@ const SunriseSunsetInfo = ({ sunriseSunsetData, location }) => {
       <div className="duration-info">
         <div className="duration-card">
           <h4>☀️ Day Duration</h4>
-          <div className="duration-value">{formatDuration(sunriseSunsetData.day_duration)}</div>
+          <div className="duration-value">{durations.day}</div>
         </div>
         
         <div className="duration-card">
           <h4>🌙 Night Duration</h4>
-          <div className="duration-value">{formatDuration(sunriseSunsetData.night_duration)}</div>
+          <div className="duration-value">{durations.night}</div>
         </div>
       </div>
 

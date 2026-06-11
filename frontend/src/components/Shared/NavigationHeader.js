@@ -221,15 +221,15 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
               <button onClick={() => navigate('/festivals')}>Festivals</button>
               <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
-              <button type="button" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button>
+              <button type="button" className="compact-menu__item compact-menu__item--wide" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button>
               {onAstrologyClick ? (
-                <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
+                <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => onAstrologyClick()}>Astrology</button>
               ) : (
-                <a href="/#astrology">Astrology</a>
+                <a href="/#astrology" className="compact-menu__item compact-menu__item--optional">Astrology</a>
               )}
-              <button type="button" onClick={() => navigate('/tools/ashtakavarga')}>Ashtakavarga</button>
-              <button type="button" onClick={() => navigate('/#numerology')}>Numerology</button>
-              <button onClick={() => navigate('/blog')}>Blogs</button>
+              <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => navigate('/tools/ashtakavarga')}>Ashtakavarga</button>
+              <button type="button" className="compact-menu__item compact-menu__item--optional compact-menu__item--low" onClick={() => navigate('/#numerology')}>Numerology</button>
+              <button className="compact-menu__item compact-menu__item--optional compact-menu__item--low" onClick={() => navigate('/blog')}>Blogs</button>
             </nav>
             
             <div className="compact-actions">

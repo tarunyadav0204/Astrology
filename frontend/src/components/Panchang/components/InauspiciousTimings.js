@@ -1,7 +1,63 @@
-import React from 'react';
-import { RAHU_KAAL_TIMINGS, YAMAGANDA_TIMINGS, GULIKA_TIMINGS } from '../config/panchangConfig';
+import React, { useEffect, useState } from 'react';
+import { panchangService } from '../services/panchangService';
 
-const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate }) => {
+const DAYLIGHT_SEGMENTS = {
+  rahuKaal: { 0: 7, 1: 1, 2: 6, 3: 4, 4: 5, 5: 3, 6: 2 },
+  yamaganda: { 0: 4, 1: 3, 2: 2, 3: 1, 4: 0, 5: 6, 6: 5 },
+  gulika: { 0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0 }
+};
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate, location }) => {
+  const [weeklyRahuKaal, setWeeklyRahuKaal] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWeeklyRahuKaal = async () => {
+      if (!selectedDate || !location?.latitude || !location?.longitude) {
+        setWeeklyRahuKaal([]);
+        return;
+      }
+
+      const weekStart = new Date(selectedDate);
+      weekStart.setDate(selectedDate.getDate() - selectedDate.getDay());
+
+      try {
+        const rows = await Promise.all(
+          DAY_NAMES.map(async (day, index) => {
+            const date = new Date(weekStart);
+            date.setDate(weekStart.getDate() + index);
+            const dateString = date.toISOString().split('T')[0];
+            const result = await panchangService.getRahuKaal(dateString, location.latitude, location.longitude);
+            return {
+              day,
+              date,
+              start_time: result?.rahu_kaal_start,
+              end_time: result?.rahu_kaal_end
+            };
+          })
+        );
+
+        if (isMounted) {
+          setWeeklyRahuKaal(rows);
+        }
+      } catch (error) {
+        console.error('Failed to load weekly Rahu Kaal:', error);
+        if (isMounted) {
+          setWeeklyRahuKaal([]);
+        }
+      }
+    };
+
+    loadWeeklyRahuKaal();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDate, location?.latitude, location?.longitude]);
+
   if (!inauspiciousData || !sunriseSunsetData) {
     return (
       <div className="inauspicious-timings">
@@ -27,10 +83,17 @@ const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate
     }
   };
 
-  const calculateTimingFromSunrise = (sunriseTime, startHour, duration) => {
+  const calculateDaylightSegment = (sunriseTime, sunsetTime, segmentIndex) => {
     const sunrise = new Date(sunriseTime);
-    const startTime = new Date(sunrise.getTime() + (startHour * 60 * 60 * 1000));
-    const endTime = new Date(startTime.getTime() + (duration * 60 * 60 * 1000));
+    const sunset = new Date(sunsetTime);
+
+    if (Number.isNaN(sunrise.getTime()) || Number.isNaN(sunset.getTime())) {
+      return { start: null, end: null };
+    }
+
+    const segmentDurationMs = (sunset.getTime() - sunrise.getTime()) / 8;
+    const startTime = new Date(sunrise.getTime() + (segmentIndex * segmentDurationMs));
+    const endTime = new Date(startTime.getTime() + segmentDurationMs);
     
     return {
       start: startTime.toISOString(),
@@ -50,25 +113,25 @@ const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate
   };
 
   const weekday = getWeekday(selectedDate);
+
+  const backendOrSegment = (backendPeriod, segmentType) => {
+    if (backendPeriod?.start_time && backendPeriod?.end_time) {
+      return {
+        start: backendPeriod.start_time,
+        end: backendPeriod.end_time
+      };
+    }
+
+    return calculateDaylightSegment(
+      sunriseSunsetData.sunrise,
+      sunriseSunsetData.sunset,
+      DAYLIGHT_SEGMENTS[segmentType][weekday]
+    );
+  };
   
-  // Calculate standard timings based on sunrise
-  const rahuKaalTiming = calculateTimingFromSunrise(
-    sunriseSunsetData.sunrise,
-    RAHU_KAAL_TIMINGS[weekday].start,
-    RAHU_KAAL_TIMINGS[weekday].duration
-  );
-  
-  const yamagandaTiming = calculateTimingFromSunrise(
-    sunriseSunsetData.sunrise,
-    YAMAGANDA_TIMINGS[weekday].start,
-    YAMAGANDA_TIMINGS[weekday].duration
-  );
-  
-  const gulikaTiming = calculateTimingFromSunrise(
-    sunriseSunsetData.sunrise,
-    GULIKA_TIMINGS[weekday].start,
-    GULIKA_TIMINGS[weekday].duration
-  );
+  const rahuKaalTiming = backendOrSegment(inauspiciousData.rahu_kaal, 'rahuKaal');
+  const yamagandaTiming = backendOrSegment(inauspiciousData.yamaganda, 'yamaganda');
+  const gulikaTiming = backendOrSegment(inauspiciousData.gulika, 'gulika');
 
   const inauspiciousTimings = [
     {
@@ -236,17 +299,24 @@ const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate
 
       {/* Weekly Pattern */}
       <div className="weekly-pattern">
-        <h4>📅 Weekly Rahu Kaal Pattern</h4>
+        <h4>📅 Weekly Rahu Kaal Timings</h4>
         <div className="pattern-grid">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => {
-            const timing = RAHU_KAAL_TIMINGS[index];
+          {DAY_NAMES.map((day, index) => {
             const isToday = index === weekday;
+            const apiTiming = weeklyRahuKaal[index];
+            const fallbackTiming = calculateDaylightSegment(
+              sunriseSunsetData.sunrise,
+              sunriseSunsetData.sunset,
+              DAYLIGHT_SEGMENTS.rahuKaal[index]
+            );
+            const startTime = apiTiming?.start_time || fallbackTiming.start;
+            const endTime = apiTiming?.end_time || fallbackTiming.end;
             
             return (
               <div key={day} className={`pattern-item ${isToday ? 'today' : ''}`}>
                 <div className="day-name">{day}</div>
                 <div className="timing-info">
-                  {timing.start}:00 - {timing.start + timing.duration}:00
+                  {formatTime(startTime)} - {formatTime(endTime)}
                 </div>
               </div>
             );

@@ -103,7 +103,11 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
     setChartPickerTarget(partner);
   };
 
-  const handleChartPick = (chart) => {
+  const handleNativeSelect = (chart) => {
+    if (!chart || !chartPickerTarget) {
+      setChartPickerTarget(null);
+      return;
+    }
     const data = chartToPartnerData(chart);
     if (chartPickerTarget === 'boy') {
       setBoyData(data);
@@ -195,19 +199,8 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
     girlData.latitude &&
     girlData.longitude;
 
-  const pickerTitle =
-    chartPickerTarget === 'boy'
-      ? "Select boy's chart"
-      : chartPickerTarget === 'girl'
-        ? "Select girl's chart"
-        : 'Select Saved Chart';
-
-  const pickerDescription =
-    chartPickerTarget === 'boy'
-      ? "Choose a saved birth chart for the boy's details."
-      : chartPickerTarget === 'girl'
-        ? "Choose a saved birth chart for the girl's details."
-        : 'Choose from your previously saved birth charts';
+  const pickerTitle = chartPickerTarget === 'boy' ? "Select boy's native" : "Select girl's native";
+  const pickerDescription = 'Choose a saved native or create a new birth chart.';
 
   return (
     <div className="partner-form">
@@ -379,8 +372,7 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
       <BirthFormModal
         isOpen={chartPickerTarget != null}
         onClose={() => setChartPickerTarget(null)}
-        onSubmit={() => setChartPickerTarget(null)}
-        onChartPick={handleChartPick}
+        onSubmit={handleNativeSelect}
         defaultActiveTab="saved"
         title={pickerTitle}
         description={pickerDescription}

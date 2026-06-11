@@ -28,6 +28,79 @@ const LOADING_MESSAGES = [
   { icon: '✅', text: 'Finalizing your predictions...' }
 ];
 
+const lifeEventsMethodCards = [
+  ['Vimshottari Dasha', 'Major and sub-periods that show which life themes are active in the selected year or month.'],
+  ['Transit Activation', 'Slow and fast planetary movements that trigger houses linked with career, marriage, wealth, health, travel, family, and study.'],
+  ['Parashari Timing', 'House lords, yogas, and dasha-transit links used to explain why a period feels supportive, mixed, or demanding.'],
+  ['Jaimini Support', 'Chara dasha and karaka-based confirmation for important shifts, milestones, and repeating life themes.'],
+  ['Nadi Patterns', 'Event signatures and timing clues that refine the month-by-month storyline.'],
+  ['Cached Readings', 'Completed yearly and monthly timelines are saved, so returning to an existing reading does not require a fresh run.']
+];
+
+const lifeEventsReportItems = [
+  'Yearly life events timeline with twelve monthly chapters',
+  'Optional single-month deep dive for focused planning',
+  'Macro themes for career, money, relationships, health, family, education, and travel',
+  'Supportive windows, caution periods, and practical reflection points',
+  'Dasha, transit, Parashari, Nadi, and Jaimini timing context',
+  'Expandable monthly sections with event themes and scenario guidance',
+  'Saved cached timelines for previously generated years or months',
+  'Follow-up path into Tara chat for deeper questions'
+];
+
+const lifeEventsFaqItems = [
+  {
+    question: 'What is a life events timeline in Vedic astrology?',
+    answer:
+      'A life events timeline studies your birth chart, dasha periods, and transits to describe the likely themes of a selected year or month, such as career movement, relationship shifts, family responsibilities, travel, money, study, health awareness, and personal change.'
+  },
+  {
+    question: 'How is this different from a daily horoscope?',
+    answer:
+      'A daily horoscope is broad and usually based on a sign. AstroRoshni life events are personalized to your saved birth chart, exact birth details, selected year or month, dasha timeline, and transit activations.'
+  },
+  {
+    question: 'What details are needed to generate life event predictions?',
+    answer:
+      'You need a saved birth chart with birth date, accurate birth time, birth place, latitude, longitude, and timezone. The page uses the saved chart id so the generated timeline can be cached securely in your account.'
+  },
+  {
+    question: 'What does the yearly timeline include?',
+    answer:
+      'The yearly mode gives the overall yearly vibe plus twelve monthly chapters. Each month can highlight active themes, supportive periods, caution points, and areas where choices or preparation matter.'
+  },
+  {
+    question: 'What is the monthly deep dive?',
+    answer:
+      'Monthly mode focuses on one selected month and gives more detailed scenarios for that period. It is useful when you want to understand a specific month for work, relationships, family, money, study, health routines, or travel planning.'
+  },
+  {
+    question: 'Does the report use Parashari, Nadi, and Jaimini methods?',
+    answer:
+      'Yes. The page is designed around Vedic timing methods, including dasha periods, transits, Parashari house logic, Nadi-style event signatures, and Jaimini confirmation where applicable.'
+  },
+  {
+    question: 'Are previous timelines saved?',
+    answer:
+      'Yes. Completed yearly timelines and monthly deep dives are cached for the selected saved birth chart. Cached years or months can be opened again without generating a fresh report.'
+  },
+  {
+    question: 'Are life event predictions guaranteed?',
+    answer:
+      'No. Event timing astrology should be used for spiritual reflection and planning, not as a guarantee. Real outcomes depend on free will, effort, health, family context, practical decisions, and external conditions.'
+  },
+  {
+    question: 'Can this replace medical, financial, or legal advice?',
+    answer:
+      'No. The life events timeline is astrological guidance only. Do not use it as a substitute for qualified medical, financial, legal, career, or mental health professionals.'
+  },
+  {
+    question: 'Can I ask follow-up questions after the timeline?',
+    answer:
+      'Yes. After generating a timeline, you can continue in Tara chat to ask follow-up questions about a specific month, decision, theme, or event window.'
+  }
+];
+
 function resolveBirthChartId(birthData, chartData) {
   if (birthData?.id != null) return Number(birthData.id);
   if (birthData?.chart_id != null) return Number(birthData.chart_id);
@@ -602,9 +675,57 @@ export default function EventsTimelinePage({
         canonical={seoData.canonical}
         structuredData={{
           '@context': 'https://schema.org',
-          '@type': 'WebPage',
-          name: 'Life events timeline',
-          description: seoData.description
+          '@graph': [
+            {
+              '@type': 'WebApplication',
+              name: 'AstroRoshni Life Events Timeline',
+              url: 'https://astroroshni.com/life-events',
+              applicationCategory: 'LifestyleApplication',
+              operatingSystem: 'Web',
+              description: seoData.description,
+              publisher: {
+                '@type': 'Organization',
+                name: 'AstroRoshni',
+                url: 'https://astroroshni.com'
+              }
+            },
+            {
+              '@type': 'Service',
+              name: 'Life Events Timeline by Date of Birth',
+              serviceType: 'Vedic life event timing report',
+              description: seoData.description,
+              provider: { '@type': 'Organization', name: 'AstroRoshni' },
+              areaServed: 'Worldwide'
+            },
+            {
+              '@type': 'FAQPage',
+              mainEntity: lifeEventsFaqItems.map((item) => ({
+                '@type': 'Question',
+                name: item.question,
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: item.answer
+                }
+              }))
+            },
+            {
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                {
+                  '@type': 'ListItem',
+                  position: 1,
+                  name: 'Home',
+                  item: 'https://astroroshni.com/'
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 2,
+                  name: 'Life Events Timeline',
+                  item: 'https://astroroshni.com/life-events'
+                }
+              ]
+            }
+          ]
         }}
       />
 
@@ -919,6 +1040,75 @@ export default function EventsTimelinePage({
             </button>
           </section>
         )}
+
+        <section className="events-timeline-seo" aria-label="Life events astrology guide">
+          <div className="events-timeline-seo__heading">
+            <p>Vedic life event timing</p>
+            <h2>Life Events Timeline by Date of Birth</h2>
+            <span>
+              AstroRoshni helps you explore yearly and monthly event patterns from your saved birth chart, using
+              dasha periods, transits, Parashari logic, Nadi signatures, and Jaimini timing support.
+            </span>
+          </div>
+
+          <div className="events-timeline-seo__method-grid">
+            {lifeEventsMethodCards.map(([title, body]) => (
+              <article key={title}>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="events-timeline-report-scope" aria-label="Life events timeline report sections">
+          <div>
+            <p className="events-timeline-seo__eyebrow">Personalised timeline</p>
+            <h2>Built for planning, reflection, and timing awareness</h2>
+            <p>
+              A useful life events astrology report should separate yearly themes from monthly triggers. This page
+              gives a broad annual timeline when you want the whole story, and a month deep dive when one period needs
+              closer attention.
+            </p>
+          </div>
+          <ul>
+            {lifeEventsReportItems.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="events-timeline-seo-copy" aria-label="Life events prediction method">
+          <article>
+            <h2>Yearly predictions with twelve monthly chapters</h2>
+            <p>
+              Yearly life events astrology is most useful when it shows how the whole year changes month by month.
+              AstroRoshni reads the selected year through your dasha sequence and transit activations, then organizes
+              the result into monthly chapters so you can see when career, relationships, money, family, study, health
+              routines, or travel themes become more active.
+            </p>
+          </article>
+          <article>
+            <h2>Monthly deep dive for focused event timing</h2>
+            <p>
+              Some decisions need a closer lens. The one-month deep dive studies a specific month with more detail,
+              helping you understand supportive windows, mixed periods, caution points, and practical preparation.
+              This is spiritual and astrological guidance, not a guarantee or professional advice.
+            </p>
+          </article>
+        </section>
+
+        <section className="events-timeline-faq" aria-label="Life events timeline FAQ">
+          <h2>Life Events Timeline FAQ</h2>
+          <div className="events-timeline-faq__grid">
+            {lifeEventsFaqItems.map((item) => (
+              <article key={item.question}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
 
       {showCreditModal && (

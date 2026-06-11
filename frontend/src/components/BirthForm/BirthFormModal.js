@@ -15,8 +15,8 @@ const BirthFormModal = ({
 }) => {
   if (!isOpen) return null;
 
-  const handleFormSubmit = () => {
-    onSubmit?.();
+  const handleFormSubmit = (selectedChart) => {
+    onSubmit?.(selectedChart);
     onClose();
   };
 

@@ -25,7 +25,7 @@ const personToPartnerInitial = (p) => {
   };
 };
 
-const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
+const CompatibilityAnalysis = ({ user, onLogin, onBuyCredits } = {}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { credits, marriageCost, partnershipCost, fetchBalance } = useCredits();
@@ -97,12 +97,12 @@ const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
     }
 
     if (!premiumReport && premiumReportCost > 0 && credits < premiumReportCost) {
-      setPremiumError(`You need ${premiumReportCost} credits for the AI Kundli matching report. Your balance is ${credits}.`);
+      setPremiumError(`You need ${premiumReportCost} credits for the detailed Kundli matching report. Your balance is ${credits}.`);
       return;
     }
 
     const action = forceRegenerate ? 'regenerate' : 'unlock';
-    if (!window.confirm(`This will ${action} the AI Kundli matching report for ${premiumReportCost} credits. Continue?`)) {
+    if (!window.confirm(`This will ${action} the detailed Kundli matching report for ${premiumReportCost} credits. Continue?`)) {
       return;
     }
 
@@ -124,7 +124,7 @@ const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to generate AI Kundli matching report');
+        throw new Error(data.detail || 'Failed to generate detailed Kundli matching report');
       }
       setPremiumReport(data.premium_report || null);
       fetchBalance && fetchBalance();
@@ -208,12 +208,154 @@ const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
     );
   }
 
+  const currentWindow = timingOverlay?.shared?.current_window || {};
+  const nextWindow = timingOverlay?.shared?.next_favorable_windows?.[0];
+  const evidenceSummary = compatibilityAnalysis.evidence_summary || {};
+  const evidenceObjects = compatibilityAnalysis.evidence_objects || {};
+  const positives = evidenceSummary.positive_factors || [];
+  const cautions = evidenceSummary.caution_factors || [];
+  const contradictions = evidenceSummary.contradictions || [];
+  const supportiveEvidence = evidenceObjects.supportive || [];
+  const challengingEvidence = evidenceObjects.challenging || [];
+  const neutralEvidence = evidenceObjects.neutral || [];
+  const crossChart = compatibilityAnalysis.relationship_indicators?.cross_chart || {};
+  const boyProfile = compatibilityAnalysis.profiles?.boy || compatibilityResult.boy_profile || {};
+  const girlProfile = compatibilityAnalysis.profiles?.girl || compatibilityResult.girl_profile || {};
+  const manglikStatus = compatibilityAnalysis.manglik_analysis?.compatibility?.status || '--';
+  const effectiveGuna =
+    compatibilityAnalysis.guna_milan?.effective_total_score ?? compatibilityAnalysis.guna_milan?.total_score;
+  const resultVerdict = verdictFromResult(compatibilityAnalysis, timingOverlay);
+
   return (
     <div className="compatibility-analysis">
       <div className="compatibility-header">
         <h3>💕 Compatibility Analysis</h3>
         <button onClick={handleReset} className="btn-new-analysis">New Analysis</button>
       </div>
+
+      <section className="kundli-result-hero">
+        <div className="kundli-result-hero-main">
+          <p className="kundli-result-eyebrow">Instant verdict</p>
+          <h2>{resultVerdict}</h2>
+          <p>
+            Based on classical compatibility, Manglik balance, deeper marriage support, and current timing climate.
+          </p>
+          <div className="kundli-result-hero-actions">
+            <button type="button" className="btn-premium-primary" onClick={() => handleUnlockPremiumReport(false)} disabled={premiumLoading}>
+              {premiumLoading ? 'Generating report...' : `Unlock detailed report (${premiumReportCost} credits)`}
+            </button>
+            <button type="button" className="btn-premium-secondary" onClick={handlePremiumChat}>
+              Ask follow-up ({premiumChatCost} credits)
+            </button>
+          </div>
+          {premiumError && (
+            <div className="kundli-premium-error kundli-premium-error--inline">
+              <p>{premiumError}</p>
+              {onBuyCredits && (
+                <button type="button" className="btn-premium-buy-credits" onClick={onBuyCredits}>
+                  Buy credits
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="kundli-result-score-block">
+          <strong>{compatibilityAnalysis.overall_score.percentage}%</strong>
+          <span>{compatibilityAnalysis.overall_score.grade}</span>
+        </div>
+      </section>
+
+      <section className="kundli-result-trust" aria-label="Kundli match evidence summary">
+        <article>
+          <span>Ashtakoot</span>
+          <strong>{effectiveGuna ?? '--'}/36</strong>
+          <p>Effective Guna Milan score</p>
+        </article>
+        <article>
+          <span>Manglik</span>
+          <strong>{manglikStatus}</strong>
+          <p>Pair-level compatibility</p>
+        </article>
+        <article>
+          <span>D1/D9</span>
+          <strong>{titleCase(crossChart.overall_relationship_quality?.band || 'Reviewed')}</strong>
+          <p>Marriage support synthesis</p>
+        </article>
+        <article>
+          <span>Timing</span>
+          <strong>{climateLabel(currentWindow.climate)}</strong>
+          <p>{scoreText(currentWindow.score)} current window</p>
+        </article>
+      </section>
+
+      <section className="kundli-result-grid">
+        <FactorList
+          title="Key strengths"
+          items={positives}
+          tone="supportive"
+          emptyText="No major supportive factors were highlighted in the free summary."
+        />
+        <FactorList
+          title="Caution areas"
+          items={cautions}
+          tone="challenging"
+          emptyText="No major caution factor was highlighted in the free summary."
+        />
+        <FactorList
+          title="Mixed signals"
+          items={contradictions}
+          tone="neutral"
+          emptyText="No major contradiction was found between surface score and deeper chart support."
+        />
+      </section>
+
+      <section className="kundli-timing-panel">
+        <div>
+          <p className="kundli-result-eyebrow">Timing guidance</p>
+          <h3>{climateLabel(currentWindow.climate)} current climate</h3>
+          <p>
+            {currentWindow.summary ||
+              compatibilityAnalysis.recommendation?.timing_note ||
+              'Current commitment timing is evaluated from the shared dasha and transit climate.'}
+          </p>
+        </div>
+        {nextWindow && (
+          <div className="kundli-next-window">
+            <span>Visible favorable window</span>
+            <strong>{formatWindowRange(nextWindow) || 'Available in report'}</strong>
+            <p>{climateLabel(nextWindow.climate)} climate</p>
+          </div>
+        )}
+      </section>
+
+      <section className="kundli-marriage-support">
+        <div className="kundli-section-heading">
+          <p className="kundli-result-eyebrow">Marriage support</p>
+          <h3>D1 and D9 stability signals</h3>
+        </div>
+        <div className="kundli-person-support-grid">
+          <MarriageSupportCard label={compatibilityResult.boy_details.name || 'Boy'} profile={boyProfile} />
+          <MarriageSupportCard label={compatibilityResult.girl_details.name || 'Girl'} profile={girlProfile} />
+        </div>
+      </section>
+
+      <section className="kundli-result-grid">
+        <EvidenceList
+          title="Supportive evidence"
+          items={supportiveEvidence}
+          emptyText="Supportive evidence will appear here when available from the matching engine."
+        />
+        <EvidenceList
+          title="Challenging evidence"
+          items={challengingEvidence}
+          emptyText="Challenging evidence will appear here when available from the matching engine."
+        />
+        <EvidenceList
+          title="Neutral evidence"
+          items={neutralEvidence}
+          emptyText="Neutral evidence will appear here when available from the matching engine."
+        />
+      </section>
       
       {/* Partner Details Summary at Top */}
       <div className="partners-summary-top">
@@ -270,12 +412,110 @@ const CompatibilityAnalysis = ({ user, onLogin } = {}) => {
         onUnlock={() => handleUnlockPremiumReport(false)}
         onRegenerate={() => handleUnlockPremiumReport(true)}
         onPremiumChat={handlePremiumChat}
+        onBuyCredits={onBuyCredits}
       />
     </div>
   );
 };
 
 const cleanReportText = (value) => String(value || '').replace(/\*\*/g, '').trim();
+
+const titleCase = (value = '') =>
+  String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const scoreText = (value, fallback = '--') =>
+  typeof value === 'number' ? `${Math.round(value)}%` : fallback;
+
+const combineScores = (...values) => {
+  const valid = values.filter((value) => typeof value === 'number');
+  if (!valid.length) return null;
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+};
+
+const climateLabel = (value = 'mixed') => titleCase(value || 'mixed');
+
+const formatWindowRange = (windowData) => {
+  if (!windowData?.start_date || !windowData?.end_date) return null;
+  const start = new Date(windowData.start_date);
+  const end = new Date(windowData.end_date);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const fmt = (date) => date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${fmt(start)} - ${fmt(end)}`;
+};
+
+const verdictFromResult = (analysis, timingOverlay) => {
+  const grade = analysis?.overall_score?.grade || 'Match';
+  const currentClimate = timingOverlay?.shared?.current_window?.climate;
+  const issues = analysis?.guna_milan?.critical_issues || [];
+  if (issues.length) return `${grade} match with ${issues.length} serious adjustment area${issues.length > 1 ? 's' : ''}`;
+  if (currentClimate && !['favorable', 'highly_favorable'].includes(currentClimate)) {
+    return `${grade} match, but timing needs attention`;
+  }
+  return `${grade} match with supportive compatibility signals`;
+};
+
+const FactorList = ({ title, items = [], tone = 'supportive', emptyText }) => (
+  <section className={`kundli-result-card kundli-result-card--${tone}`}>
+    <h4>{title}</h4>
+    {items.length ? (
+      <ul>
+        {items.slice(0, 3).map((item, index) => (
+          <li key={`${title}_${index}`}>{cleanReportText(item.summary || item)}</li>
+        ))}
+      </ul>
+    ) : (
+      <p>{emptyText}</p>
+    )}
+  </section>
+);
+
+const EvidenceList = ({ title, items = [], emptyText }) => (
+  <section className="kundli-result-card">
+    <h4>{title}</h4>
+    {items.length ? (
+      <div className="kundli-evidence-list">
+        {items.slice(0, 4).map((item, index) => (
+          <div key={`${title}_${index}`} className={`kundli-evidence-item polarity-${item.polarity || 'neutral'}`}>
+            <div>
+              <strong>{titleCase(item.category || 'Evidence')}</strong>
+              <p>{cleanReportText(item.summary || item)}</p>
+            </div>
+            {typeof item.weight === 'number' && <span>{Math.round(item.weight * 100)}%</span>}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p>{emptyText}</p>
+    )}
+  </section>
+);
+
+const MarriageSupportCard = ({ label, profile = {} }) => {
+  const seventh = profile.seventh_house || {};
+  const navamsa = profile.navamsa_synthesis || {};
+  const d9Score = combineScores(seventh?.d9_strength?.score, navamsa?.score);
+  return (
+    <article className="kundli-person-support">
+      <div>
+        <h4>{label}</h4>
+        <span>{profile.ascendant_sign_name || 'Chart'} ascendant</span>
+      </div>
+      <div className="kundli-person-metrics">
+        <div>
+          <strong>{scoreText(seventh?.d1_strength?.score)}</strong>
+          <span>D1 marriage</span>
+        </div>
+        <div>
+          <strong>{scoreText(d9Score)}</strong>
+          <span>D9 marriage</span>
+        </div>
+      </div>
+      <p>{titleCase(navamsa?.root_vs_fruit || 'consistent')} root-fruit pattern</p>
+    </article>
+  );
+};
 
 const PremiumCompatibilityReport = ({
   premiumReport,
@@ -285,14 +525,15 @@ const PremiumCompatibilityReport = ({
   chatCost,
   onUnlock,
   onRegenerate,
-  onPremiumChat
+  onPremiumChat,
+  onBuyCredits
 }) => {
   if (!premiumReport) {
     return (
       <section className="kundli-premium-card">
         <div className="kundli-premium-header">
           <div>
-            <p className="kundli-premium-eyebrow">AI compatibility report</p>
+            <p className="kundli-premium-eyebrow">Detailed compatibility report</p>
             <h3>Unlock detailed Kundli matching guidance</h3>
           </div>
           <span className="kundli-premium-cost">{cost} credits</span>
@@ -306,13 +547,22 @@ const PremiumCompatibilityReport = ({
           <li>Practical meaning for marriage and long-term partnership</li>
           <li>Priority actions and conversations before commitment</li>
         </ul>
-        {error && <div className="kundli-premium-error">{error}</div>}
+        {error && (
+          <div className="kundli-premium-error">
+            <p>{error}</p>
+            {onBuyCredits && (
+              <button type="button" className="btn-premium-buy-credits" onClick={onBuyCredits}>
+                Buy credits
+              </button>
+            )}
+          </div>
+        )}
         <div className="kundli-premium-actions">
           <button type="button" className="btn-premium-primary" onClick={onUnlock} disabled={loading}>
-            {loading ? 'Generating report...' : `Unlock AI report (${cost} credits)`}
+            {loading ? 'Generating report...' : `Unlock detailed report (${cost} credits)`}
           </button>
           <button type="button" className="btn-premium-secondary" onClick={onPremiumChat}>
-            Ask AI follow-up ({chatCost} credits)
+            Ask follow-up ({chatCost} credits)
           </button>
         </div>
       </section>
@@ -323,7 +573,7 @@ const PremiumCompatibilityReport = ({
     <section className="kundli-premium-card kundli-premium-card--unlocked">
       <div className="kundli-premium-header">
         <div>
-          <p className="kundli-premium-eyebrow">AI compatibility report</p>
+          <p className="kundli-premium-eyebrow">Detailed compatibility report</p>
           <h3>{cleanReportText(premiumReport.headline || 'Detailed Kundli matching report')}</h3>
         </div>
       </div>
@@ -379,10 +629,19 @@ const PremiumCompatibilityReport = ({
         </div>
       )}
 
-      {error && <div className="kundli-premium-error">{error}</div>}
+      {error && (
+        <div className="kundli-premium-error">
+          <p>{error}</p>
+          {onBuyCredits && (
+            <button type="button" className="btn-premium-buy-credits" onClick={onBuyCredits}>
+              Buy credits
+            </button>
+          )}
+        </div>
+      )}
       <div className="kundli-premium-actions">
         <button type="button" className="btn-premium-primary" onClick={onPremiumChat}>
-          Ask AI follow-up ({chatCost} credits)
+          Ask follow-up ({chatCost} credits)
         </button>
         <button type="button" className="btn-premium-secondary" onClick={onRegenerate} disabled={loading}>
           {loading ? 'Regenerating...' : `Regenerate (${cost} credits)`}

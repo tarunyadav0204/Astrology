@@ -79,6 +79,7 @@ class MonthlyPanchangCalculator:
     
     def _calculate_sunrise_sunset(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> Dict[str, Any]:
         """Calculate sunrise, sunset, moonrise, moonset with proper timezone handling using pytz"""
+        timezone = timezone or "UTC+0"
         
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 0.0)
@@ -112,7 +113,7 @@ class MonthlyPanchangCalculator:
             moonrise_jd = moonrise_result[1][0] if moonrise_result[0] == 0 else None
             moonset_jd = moonset_result[1][0] if moonset_result[0] == 0 else None
             
-            def jd_to_local_time(jd_val):
+            def jd_to_local_datetime(jd_val):
                 if not jd_val: return None
                 year, month, day, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
                 dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
@@ -129,14 +130,26 @@ class MonthlyPanchangCalculator:
                     except:
                         dt_local = dt_utc + timedelta(hours=tz_offset)
                 
-                return dt_local.strftime('%I:%M %p')
+                return dt_local.replace(tzinfo=None)
+
+            sunrise_local = jd_to_local_datetime(sunrise_jd)
+            sunset_local = jd_to_local_datetime(sunset_jd)
+            moonrise_local = jd_to_local_datetime(moonrise_jd)
+            moonset_local = jd_to_local_datetime(moonset_jd)
+
+            day_duration = None
+            if sunrise_local and sunset_local:
+                sunset_for_duration = sunset_local
+                if sunset_for_duration <= sunrise_local:
+                    sunset_for_duration += timedelta(days=1)
+                day_duration = (sunset_for_duration - sunrise_local).total_seconds() / 3600
             
             return {
-                'sunrise': jd_to_local_time(sunrise_jd),
-                'sunset': jd_to_local_time(sunset_jd),
-                'moonrise': jd_to_local_time(moonrise_jd),
-                'moonset': jd_to_local_time(moonset_jd),
-                'day_duration': (sunset_jd - sunrise_jd) * 24 if sunrise_jd and sunset_jd else None
+                'sunrise': sunrise_local.strftime('%I:%M %p') if sunrise_local else None,
+                'sunset': sunset_local.strftime('%I:%M %p') if sunset_local else None,
+                'moonrise': moonrise_local.strftime('%I:%M %p') if moonrise_local else None,
+                'moonset': moonset_local.strftime('%I:%M %p') if moonset_local else None,
+                'day_duration': day_duration
             }
             
         except Exception:
@@ -170,10 +183,11 @@ class MonthlyPanchangCalculator:
         # Each Rahu Kaal period is 1/8 of day duration (Drik standard)
         period_duration = day_duration / 8
         
-        # Rahu Kaal periods (0=Sunday, 1=Monday, etc.)
-        rahu_periods = {0: 7, 1: 0, 2: 5, 3: 3, 4: 2, 5: 4, 6: 1}  # Sunday to Saturday
-        gulikai_periods = {0: 6, 1: 4, 2: 2, 3: 0, 4: 6, 5: 2, 6: 4}
-        yamaganda_periods = {0: 4, 1: 2, 2: 0, 3: 6, 4: 4, 5: 0, 6: 2}
+        # Daylight is divided into 8 equal parts from local sunrise to local sunset.
+        # Values below are zero-based daylight segments, Sunday=0.
+        rahu_periods = {0: 7, 1: 1, 2: 6, 3: 4, 4: 5, 5: 3, 6: 2}
+        gulikai_periods = {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0}
+        yamaganda_periods = {0: 4, 1: 3, 2: 2, 3: 1, 4: 0, 5: 6, 6: 5}
         
         # Convert weekday (Monday=0) to (Sunday=0)
         sunday_weekday = (weekday + 1) % 7

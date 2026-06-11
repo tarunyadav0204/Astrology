@@ -1,25 +1,176 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
+import { generatePageSEO } from '../../config/seo.config';
 import './FestivalsPage.css';
 
-const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
-  const [todayFestivals, setTodayFestivals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const dateParam = urlParams.get('date');
-    return dateParam || new Date().toISOString().split('T')[0];
+const POPULAR_LOCATIONS = [
+  { name: 'Delhi, India', lat: 28.6139, lon: 77.2090 },
+  { name: 'Mumbai, India', lat: 19.0760, lon: 72.8777 },
+  { name: 'Bangalore, India', lat: 12.9716, lon: 77.5946 },
+  { name: 'Chennai, India', lat: 13.0827, lon: 80.2707 },
+  { name: 'Kolkata, India', lat: 22.5726, lon: 88.3639 },
+  { name: 'Hyderabad, India', lat: 17.3850, lon: 78.4867 },
+  { name: 'London, UK', lat: 51.5074, lon: -0.1278 },
+  { name: 'New York, USA', lat: 40.7128, lon: -74.0060 },
+  { name: 'Toronto, Canada', lat: 43.6532, lon: -79.3832 },
+];
+
+const FESTIVAL_FAQS = [
+  {
+    question: 'Why can Hindu festival dates change by location?',
+    answer: 'Festival observance depends on local sunrise, tithi, nakshatra and regional rules. The same lunar date can begin or end at different clock times in different cities.',
+  },
+  {
+    question: 'What is the difference between a festival and a vrat?',
+    answer: 'A festival usually marks a celebration or sacred event, while a vrat is a fast or observance connected to a deity, tithi or spiritual discipline.',
+  },
+  {
+    question: 'Should I check Panchang before observing a vrat?',
+    answer: 'Yes. Vrat timing often depends on tithi at sunrise, parana windows, moonrise and local Panchang conditions.',
+  },
+  {
+    question: 'Can I search for festival significance and rituals?',
+    answer: 'Yes. Use the search button to find festivals and vrats by name, deity, type or keyword when the festival is available in the database.',
+  },
+];
+
+const GUIDE_CARDS = [
+  ['Location-aware dates', 'Use local sunrise and tithi boundaries instead of a generic national date.'],
+  ['Vrat and parana context', 'See fast-breaking windows, moonrise and tithi information when the backend provides it.'],
+  ['Daily Panchang snapshot', 'Compare festival observance with sunrise, sunset, tithi, nakshatra and yoga.'],
+  ['Monthly planning', 'Jump to the month calendar when you want to plan observances ahead of time.'],
+];
+
+const todayIso = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDate = (dateStr, options = {}) => {
+  const date = new Date(`${dateStr}T12:00:00`);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    ...options,
   });
+};
+
+const eventTypeLabel = (type) => String(type || 'Festival').replace(/_/g, ' ');
+
+const getTypeIcon = (event = {}) => {
+  const name = String(event.name || '').toLowerCase();
+  const specific = [
+    ['diwali', '🪔'],
+    ['holi', '🌈'],
+    ['dussehra', '🏹'],
+    ['navratri', '💃'],
+    ['janmashtami', '🐄'],
+    ['shivratri', '🔱'],
+    ['ram navami', '🏹'],
+    ['hanuman', '🙏'],
+    ['karva', '🌙'],
+    ['teej', '🌿'],
+    ['ganesh', '🐘'],
+    ['guru purnima', '📚'],
+    ['makar sankranti', '🪁'],
+    ['ekadashi', '🌕'],
+    ['pradosh', '🔱'],
+    ['sankashti', '🐘'],
+  ];
+
+  const match = specific.find(([key]) => name.includes(key));
+  if (match) return match[1];
+
+  const fallback = {
+    major_festival: '🎉',
+    vrat: '🙏',
+    seasonal_festival: '🌾',
+    regional_festival: '🏛️',
+    spiritual_festival: '🕉️',
+    ancestral_period: '🪔',
+  };
+  return fallback[event.type] || '🎊';
+};
+
+const getTypeClass = (type) => {
+  if (type === 'vrat') return 'is-vrat';
+  if (type === 'seasonal_festival') return 'is-seasonal';
+  if (type === 'regional_festival') return 'is-regional';
+  if (type === 'spiritual_festival') return 'is-spiritual';
+  return 'is-festival';
+};
+
+const FestivalCard = ({ festival }) => {
+  const rituals = Array.isArray(festival.rituals)
+    ? festival.rituals
+    : festival.rituals
+      ? [festival.rituals]
+      : [];
+
+  return (
+    <article className={`festival-card ${getTypeClass(festival.type)}`}>
+      <div className="festival-card__header">
+        <span className="festival-card__icon" aria-hidden>{getTypeIcon(festival)}</span>
+        <div>
+          <span className="festival-card__type">{eventTypeLabel(festival.type)}</span>
+          <h3>{festival.name}</h3>
+        </div>
+      </div>
+
+      {festival.description && <p className="festival-card__description">{festival.description}</p>}
+      {festival.significance && (
+        <section className="festival-card__section">
+          <h4>Significance</h4>
+          <p>{festival.significance}</p>
+        </section>
+      )}
+      {rituals.length > 0 && (
+        <section className="festival-card__section">
+          <h4>Rituals and Observances</h4>
+          <ul>
+            {rituals.slice(0, 5).map((ritual, index) => (
+              <li key={`${festival.name}-ritual-${index}`}>{ritual}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="festival-card__timing">
+        {festival.tithi_at_sunrise && <span><strong>Tithi:</strong> {festival.tithi_at_sunrise}</span>}
+        {festival.tithi_end_time && <span><strong>Tithi ends:</strong> {festival.tithi_end_time}</span>}
+        {festival.parana_time && <span><strong>Parana:</strong> {festival.parana_time}</span>}
+        {festival.moonrise_time && <span><strong>Moonrise:</strong> {festival.moonrise_time}</span>}
+        {festival.paksha && <span><strong>Paksha:</strong> {festival.paksha === 'shukla' ? 'Shukla' : 'Krishna'}</span>}
+      </div>
+    </article>
+  );
+};
+
+const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+  const navigate = useNavigate();
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const dateParam = new URLSearchParams(window.location.search).get('date');
+    return dateParam || todayIso();
+  });
+  const [todayFestivals, setTodayFestivals] = useState([]);
+  const [panchangData, setPanchangData] = useState(null);
+  const [transits, setTransits] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showTransits, setShowTransits] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [location, setLocation] = useState({ lat: 28.6139, lon: 77.2090, name: 'Delhi, India' });
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [transits, setTransits] = useState([]);
-  const [showTransits, setShowTransits] = useState(false);
-  const [panchangData, setPanchangData] = useState(null);
-  const [userTimezone, setUserTimezone] = useState(() => {
+  const [location, setLocation] = useState(POPULAR_LOCATIONS[0]);
+  const [userTimezone] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
     } catch {
@@ -27,185 +178,115 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
     }
   });
 
-  useEffect(() => {
-    fetchTodayFestivals();
-    fetchTransits();
-    fetchPanchangData();
-  }, [selectedDate, location]);
+  const locationKey = `${location.lat},${location.lon}`;
+  const selectedDateLabel = formatDate(selectedDate);
+  const seoData = generatePageSEO('festivals', { path: '/festivals' });
+
+  const structuredData = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        name: seoData.title,
+        description: seoData.description,
+        url: seoData.canonical,
+        isPartOf: { '@type': 'WebSite', name: 'AstroRoshni', url: 'https://astroroshni.com' },
+      },
+      {
+        '@type': 'Dataset',
+        name: 'Hindu Festival Calendar',
+        description: 'Daily Hindu festival, vrat and Panchang observance data by date and location.',
+        creator: { '@type': 'Organization', name: 'AstroRoshni' },
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: FESTIVAL_FAQS.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: { '@type': 'Answer', text: item.answer },
+        })),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://astroroshni.com/' },
+          { '@type': 'ListItem', position: 2, name: 'Festivals', item: seoData.canonical },
+        ],
+      },
+    ],
+  }), [seoData.canonical, seoData.description, seoData.title]);
 
   useEffect(() => {
-    // Try to get user's location on first load
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lon: position.coords.longitude,
-            name: 'Your Location'
-          });
-        },
-        () => {
-          // Keep default Delhi location if geolocation fails
-        }
-      );
-    }
-  }, []);
+    const fetchPageData = async () => {
+      try {
+        setLoading(true);
+        const date = new Date(`${selectedDate}T12:00:00`);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
 
-  const fetchTodayFestivals = async () => {
-    try {
-      setLoading(true);
-      const date = new Date(selectedDate);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      
-      const response = await fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${userTimezone}`, {
-        headers: {
-          'Content-Type': 'application/json'
+        const [festivalResponse, panchangResponse, transitResponse] = await Promise.all([
+          fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${encodeURIComponent(userTimezone)}`),
+          fetch(`/api/panchang/today?date=${selectedDate}&latitude=${location.lat}&longitude=${location.lon}&timezone=${encodeURIComponent(userTimezone)}`),
+          fetch(`/api/transits/monthly/${year}/${month}`),
+        ]);
+
+        if (festivalResponse.ok) {
+          const data = await festivalResponse.json();
+          const allFestivals = [...(data.festivals || []), ...(data.vrats || [])];
+          setTodayFestivals(allFestivals.filter((festival) => festival.date === selectedDate));
+        } else {
+          setTodayFestivals([]);
         }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // Filter festivals for the selected date
-        const allFestivals = [...(data.festivals || []), ...(data.vrats || [])];
-        const selectedDateStr = selectedDate;
-        const dayFestivals = allFestivals.filter(f => f.date === selectedDateStr);
-        console.log('Selected date:', selectedDateStr);
-        console.log('All festivals:', allFestivals);
-        console.log('Filtered festivals:', dayFestivals);
-        setTodayFestivals(dayFestivals);
-      } else {
-        console.error('API response error:', response.status, response.statusText);
+
+        if (panchangResponse.ok) {
+          setPanchangData(await panchangResponse.json());
+        } else {
+          setPanchangData(null);
+        }
+
+        if (transitResponse.ok) {
+          const data = await transitResponse.json();
+          setTransits(data.transits || []);
+        } else {
+          setTransits([]);
+        }
+      } catch (error) {
+        console.error('Error fetching festival page data:', error);
         setTodayFestivals([]);
+        setPanchangData(null);
+        setTransits([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching festivals:', error);
-      setTodayFestivals([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchPanchangData = async () => {
-    try {
-      const date = new Date(selectedDate);
-      const response = await fetch(`/api/panchang/today?date=${selectedDate}&latitude=${location.lat}&longitude=${location.lon}&timezone=${userTimezone}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setPanchangData(data);
-      }
-    } catch (error) {
-      console.error('Error fetching panchang data:', error);
-    }
-  };
-
-  const fetchTransits = async () => {
-    try {
-      const date = new Date(selectedDate);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      
-      const response = await fetch(`/api/transits/monthly/${year}/${month}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTransits(data.transits || []);
-      }
-    } catch (error) {
-      console.error('Error fetching transits:', error);
-    }
-  };
-
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getTypeIcon = (event) => {
-    // Specific festival icons
-    const festivalIcons = {
-      'diwali': '🪔',
-      'holi': '🌈', 
-      'dussehra': '🏹',
-      'navratri': '💃',
-      'janmashtami': '🐄',
-      'maha_shivratri': '🔱',
-      'ram_navami': '🏹',
-      'hanuman_jayanti': '🐒',
-      'karva_chauth': '🌙',
-      'teej': '🌿',
-      'ganesh_chaturthi': '🐘',
-      'guru_purnima': '📚',
-      'makar_sankranti': '🪁',
-      'onam': '🌺',
-      'durga_puja': '⚔️'
     };
-    
-    // Vrat specific icons
-    const vratIcons = {
-      'ekadashi': '🌕',
-      'pradosh': '🔱',
-      'sankashti': '🐘',
-      'shivaratri': '🌙'
-    };
-    
-    // Check for specific festival/vrat name
-    const name = event.name?.toLowerCase() || '';
-    
-    for (const [key, icon] of Object.entries(festivalIcons)) {
-      if (name.includes(key)) return icon;
-    }
-    
-    for (const [key, icon] of Object.entries(vratIcons)) {
-      if (name.includes(key)) return icon;
-    }
-    
-    // Fallback to type icons
-    const typeIcons = {
-      'major_festival': '🎉',
-      'vrat': '🙏',
-      'seasonal_festival': '🌾',
-      'regional_festival': '🏛️',
-      'spiritual_festival': '🕉️',
-      'ancestral_period': '👴'
-    };
-    
-    return typeIcons[event.type] || '🎊';
-  };
 
-  const getTypeColor = (type) => {
-    const colors = {
-      'major_festival': '#ff6b35',
-      'vrat': '#8e44ad',
-      'seasonal_festival': '#27ae60',
-      'regional_festival': '#3498db',
-      'spiritual_festival': '#f39c12',
-      'ancestral_period': '#95a5a6'
-    };
-    return colors[type] || '#e74c3c';
-  };
+    fetchPageData();
+  }, [selectedDate, locationKey, userTimezone, location.lat, location.lon]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          name: 'Your Location',
+        });
+      },
+      () => {}
+    );
+  }, []);
 
   const searchFestivals = async () => {
     if (!searchTerm.trim()) return;
-    
+
     try {
       setSearchLoading(true);
-      const response = await fetch(`/api/festivals/search?q=${encodeURIComponent(searchTerm)}`, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
+      const response = await fetch(`/api/festivals/search?q=${encodeURIComponent(searchTerm)}`);
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.festivals || []);
       } else {
-        console.error('Search API error:', response.status);
         setSearchResults([]);
       }
     } catch (error) {
@@ -216,370 +297,265 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
     }
   };
 
+  const panchangItems = [
+    ['Sunrise', panchangData?.sunrise],
+    ['Sunset', panchangData?.sunset],
+    ['Moonrise', panchangData?.moonrise],
+    ['Tithi', panchangData?.tithi?.name],
+    ['Nakshatra', panchangData?.nakshatra?.name],
+    ['Yoga', panchangData?.yoga?.name],
+  ];
+
   return (
     <div className="festivals-page">
-      <NavigationHeader 
-        compact={true}
+      <SEOHead {...seoData} structuredData={structuredData} />
+      <NavigationHeader
+        compact
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
         onLogin={onLogin}
         showLoginButton={showLoginButton}
       />
-      <div className="festivals-header">
-        <div className="header-left">
-          <button 
-            className="header-btn monthly-btn"
-            onClick={() => window.location.href = '/festivals/monthly'}
-          >
-            📅 Monthly Calendar
-          </button>
-          <button 
-            className="header-btn search-btn"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            🔍 Search Festivals
-          </button>
-          <button 
-            className="header-btn location-btn"
-            onClick={() => setShowLocationPicker(!showLocationPicker)}
-          >
-            📍 {location.name}
-          </button>
-          <button 
-            className="header-btn transit-btn"
-            onClick={() => setShowTransits(!showTransits)}
-          >
-            🪐 Planetary Transits
-          </button>
-        </div>
-        <div className="header-content">
-          <h1>🎊 Today's Festivals</h1>
-          <p>Sacred days and spiritual observances • {formatDate(selectedDate)}</p>
-        </div>
-        <div className="date-selector">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="date-input"
-          />
-        </div>
-      </div>
 
-      <div className="festivals-content">
+      <main className="festivals-shell">
+        <section className="festivals-hero">
+          <div className="festivals-hero__copy">
+            <span className="festivals-eyebrow">Hindu Festival Calendar</span>
+            <h1>Today’s Hindu Festivals, Vrats and Panchang Observances</h1>
+            <p>
+              Check sacred observances for the selected date with location-aware tithi, Panchang context,
+              vrat timings and festival significance.
+            </p>
+            <div className="festivals-hero__actions">
+              <button type="button" className="festival-btn festival-btn--primary" onClick={() => navigate('/festivals/monthly')}>
+                Monthly Calendar
+              </button>
+              <button type="button" className="festival-btn festival-btn--secondary" onClick={() => setShowSearch(true)}>
+                Search Festivals
+              </button>
+            </div>
+          </div>
+          <div className="festivals-hero__panel">
+            <span>Selected Date</span>
+            <strong>{selectedDateLabel}</strong>
+            <p>{location.name}</p>
+            <div className="festivals-hero__count">
+              <strong>{todayFestivals.length}</strong>
+              <span>{todayFestivals.length === 1 ? 'observance' : 'observances'}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="festival-controls" aria-label="Festival filters">
+          <label className="festival-field">
+            <span>Date</span>
+            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+          </label>
+          <div className="festival-field">
+            <span>Location</span>
+            <button type="button" className="festival-location" onClick={() => setShowLocationPicker(true)}>
+              {location.name}
+            </button>
+          </div>
+          <button type="button" className="festival-btn festival-btn--ghost" onClick={() => setShowTransits((value) => !value)}>
+            {showTransits ? 'Hide Transits' : 'Show Transits'}
+          </button>
+        </section>
+
         {showTransits && (
-          <div className="transits-section">
-            <h2>🪐 Current Planetary Transits</h2>
+          <section className="festival-panel">
+            <div className="festival-panel__header">
+              <span className="festivals-eyebrow">Planetary Transits</span>
+              <h2>Monthly transit notes</h2>
+            </div>
             {transits.length > 0 ? (
-              <div className="transits-grid">
+              <div className="festival-transits">
                 {transits.map((transit, index) => (
-                  <div key={index} className="transit-card">
-                    <div className="transit-header">
-                      <span className="planet-name">{transit.planet}</span>
-                      <span className="transit-arrow">→</span>
-                      <span className="sign-name">{transit.sign}</span>
-                    </div>
-                    <div className="transit-date">{new Date(transit.date).toLocaleDateString()}</div>
-                  </div>
+                  <article className="festival-transit" key={`${transit.planet}-${transit.date}-${index}`}>
+                    <strong>{transit.planet}</strong>
+                    <span>{transit.sign}</span>
+                    <small>{transit.date ? new Date(transit.date).toLocaleDateString('en-GB') : 'This month'}</small>
+                  </article>
                 ))}
               </div>
             ) : (
-              <p>No major transits this month</p>
+              <p className="festival-muted">No major transits found for this month.</p>
             )}
-          </div>
+          </section>
         )}
 
-        <div className="today-section">
-          {panchangData && (
-            <div className="panchang-card">
-              <h2>📅 Daily Panchang - {formatDate(selectedDate)}</h2>
-              <div className="panchang-grid">
-                <div className="panchang-item">
-                  <span className="panchang-label">🌅 Sunrise:</span>
-                  <span className="panchang-value">{panchangData.sunrise || 'N/A'}</span>
-                </div>
-                <div className="panchang-item">
-                  <span className="panchang-label">🌇 Sunset:</span>
-                  <span className="panchang-value">{panchangData.sunset || 'N/A'}</span>
-                </div>
-                <div className="panchang-item">
-                  <span className="panchang-label">🌙 Moonrise:</span>
-                  <span className="panchang-value">{panchangData.moonrise || 'N/A'}</span>
-                </div>
-                <div className="panchang-item">
-                  <span className="panchang-label">🌟 Tithi:</span>
-                  <span className="panchang-value">{panchangData.tithi?.name || 'N/A'}</span>
-                </div>
-                <div className="panchang-item">
-                  <span className="panchang-label">⭐ Nakshatra:</span>
-                  <span className="panchang-value">{panchangData.nakshatra?.name || 'N/A'}</span>
-                </div>
-                <div className="panchang-item">
-                  <span className="panchang-label">🕉️ Yoga:</span>
-                  <span className="panchang-value">{panchangData.yoga?.name || 'N/A'}</span>
-                </div>
-              </div>
+        {panchangData && (
+          <section className="festival-panel">
+            <div className="festival-panel__header">
+              <span className="festivals-eyebrow">Daily Panchang</span>
+              <h2>Panchang for {selectedDateLabel}</h2>
             </div>
-          )}
+            <div className="festival-panchang-grid">
+              {panchangItems.map(([label, value]) => (
+                <div className="festival-panchang-item" key={label}>
+                  <span>{label}</span>
+                  <strong>{value || 'Not available'}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="festival-panel">
+          <div className="festival-panel__header festival-panel__header--split">
+            <div>
+              <span className="festivals-eyebrow">Observances</span>
+              <h2>{todayFestivals.length > 0 ? 'Festivals and vrats for this date' : 'No major observance found'}</h2>
+            </div>
+            <button type="button" className="festival-btn festival-btn--secondary" onClick={() => navigate('/festivals/monthly')}>
+              View Month
+            </button>
+          </div>
 
           {loading ? (
-            <div className="loading">
-              <div className="spinner"></div>
-              <p>Loading festivals...</p>
+            <div className="festival-loading">
+              <div className="festival-spinner" />
+              <p>Loading festival calendar...</p>
             </div>
           ) : todayFestivals.length > 0 ? (
             <div className="festivals-grid">
               {todayFestivals.map((festival, index) => (
-                <div 
-                  key={`${festival.name}-${festival.date}-${index}`} 
-                  className="festival-card"
-                  style={{ borderLeftColor: getTypeColor(festival.type || 'festival') }}
-                >
-                  <div className="festival-header">
-                    <span className="festival-icon">{getTypeIcon(festival)}</span>
-                    <div className="festival-title">
-                      <h3>{festival.name}</h3>
-                      <span className="festival-type">{festival.type?.replace('_', ' ') || 'Festival'}</span>
-                    </div>
-                  </div>
-                  
-                  {festival.description && (
-                    <div className="festival-description">
-                      <p>{festival.description}</p>
-                    </div>
-                  )}
-
-                  {festival.significance && (
-                    <div className="festival-significance">
-                      <h4>🌟 Significance</h4>
-                      <p>{festival.significance}</p>
-                    </div>
-                  )}
-
-                  {festival.rituals && festival.rituals.length > 0 && (
-                    <div className="festival-rituals">
-                      <h4>🕯️ Rituals & Observances</h4>
-                      <ul>
-                        {festival.rituals.map((ritual, idx) => (
-                          <li key={idx}>{ritual}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  <div className="festival-timing">
-                    <h4>⏰ Timing Details</h4>
-                    <div className="timing-info">
-                      {festival.tithi_at_sunrise && (
-                        <p><strong>Tithi at Sunrise:</strong> {festival.tithi_at_sunrise}</p>
-                      )}
-                      {festival.tithi_end_time && (
-                        <p><strong>Tithi Ends:</strong> {festival.tithi_end_time}</p>
-                      )}
-                      {festival.parana_time && (
-                        <p style={{ 
-                          background: '#e8f5e8', 
-                          padding: '8px', 
-                          borderRadius: '5px', 
-                          border: '2px solid #4caf50',
-                          fontWeight: 'bold',
-                          color: '#2e7d32'
-                        }}>
-                          <strong>🍽️ Parana (Break-fast) Time:</strong> {festival.parana_time}
-                        </p>
-                      )}
-                      {festival.moonrise_time && (
-                        <p><strong>Moonrise Time:</strong> {festival.moonrise_time}</p>
-                      )}
-                      {festival.paksha && (
-                        <p><strong>Paksha:</strong> {festival.paksha === 'shukla' ? 'Shukla (Bright)' : 'Krishna (Dark)'}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <FestivalCard festival={festival} key={`${festival.name}-${festival.date}-${index}`} />
               ))}
             </div>
           ) : (
-            <div className="no-festivals">
-              <div className="no-festivals-icon">🌸</div>
-              <h3>No Special Observances Today</h3>
-              <p>Every day is sacred in its own way. Use this time for personal reflection and spiritual practice.</p>
+            <div className="festival-empty">
+              <span aria-hidden>🌸</span>
+              <h3>No special festivals or vrats on this date</h3>
+              <p>Use the monthly calendar to browse upcoming Ekadashi, Pradosh, Purnima, Amavasya and major festivals.</p>
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="quick-actions">
-          <button 
-            className="action-btn monthly-btn"
-            onClick={() => window.location.href = '/festivals/monthly'}
-          >
-            📅 Monthly Calendar
-          </button>
-          <button 
-            className="action-btn search-btn"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            🔍 Search Festivals
-          </button>
-        </div>
+        <section className="festival-seo-section">
+          <div className="festival-panel__header">
+            <span className="festivals-eyebrow">Festival Guide</span>
+            <h2>Plan Hindu festivals with date, location and Panchang context</h2>
+            <p>
+              AstroRoshni’s festival calendar is designed for practical observance planning. It keeps the
+              focus on the exact day, vrat rules, tithi support and local Panchang factors that matter in daily use.
+            </p>
+          </div>
+          <div className="festival-guide-grid">
+            {GUIDE_CARDS.map(([title, body]) => (
+              <article className="festival-guide-card" key={title}>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="festival-faq-section">
+          <div className="festival-panel__header">
+            <span className="festivals-eyebrow">Questions</span>
+            <h2>Hindu Festival Calendar FAQs</h2>
+          </div>
+          <div className="festival-faq-grid">
+            {FESTIVAL_FAQS.map((item) => (
+              <article className="festival-faq-card" key={item.question}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </main>
 
       {showLocationPicker && (
-        <div className="search-modal-overlay">
-          <div className="search-modal">
-            <div className="search-header">
-              <h3>📍 Select Location</h3>
-              <button 
-                className="close-search"
-                onClick={() => setShowLocationPicker(false)}
-              >
-                ×
-              </button>
+        <div className="festival-modal-overlay">
+          <div className="festival-modal" role="dialog" aria-modal="true" aria-label="Select location">
+            <div className="festival-modal__header">
+              <h3>Select Location</h3>
+              <button type="button" onClick={() => setShowLocationPicker(false)} aria-label="Close location picker">×</button>
             </div>
-            <div className="location-content">
-              <button 
-                className="location-option"
-                onClick={() => {
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        setLocation({
-                          lat: position.coords.latitude,
-                          lon: position.coords.longitude,
-                          name: 'Your Location'
-                        });
-                        setShowLocationPicker(false);
-                      },
-                      () => alert('Unable to get your location')
-                    );
-                  }
-                }}
-              >
-                📍 Use My Current Location
-              </button>
-              
-              <div className="popular-locations">
-                <h4>Popular Locations</h4>
-                {[
-                  { name: 'Delhi, India', lat: 28.6139, lon: 77.2090 },
-                  { name: 'Mumbai, India', lat: 19.0760, lon: 72.8777 },
-                  { name: 'Bangalore, India', lat: 12.9716, lon: 77.5946 },
-                  { name: 'Chennai, India', lat: 13.0827, lon: 80.2707 },
-                  { name: 'Kolkata, India', lat: 22.5726, lon: 88.3639 },
-                  { name: 'Hyderabad, India', lat: 17.3850, lon: 78.4867 },
-                  { name: 'London, UK', lat: 51.5074, lon: -0.1278 },
-                  { name: 'New York, USA', lat: 40.7128, lon: -74.0060 },
-                  { name: 'Toronto, Canada', lat: 43.6532, lon: -79.3832 }
-                ].map((loc, idx) => (
-                  <button
-                    key={idx}
-                    className="location-option"
-                    onClick={() => {
-                      setLocation(loc);
-                      setShowLocationPicker(false);
-                    }}
-                  >
-                    {loc.name}
-                  </button>
-                ))}
-              </div>
+            <button
+              type="button"
+              className="festival-modal__option festival-modal__option--strong"
+              onClick={() => {
+                if (!navigator.geolocation) return;
+                navigator.geolocation.getCurrentPosition((position) => {
+                  setLocation({
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    name: 'Your Location',
+                  });
+                  setShowLocationPicker(false);
+                });
+              }}
+            >
+              Use my current location
+            </button>
+            <div className="festival-modal__grid">
+              {POPULAR_LOCATIONS.map((loc) => (
+                <button
+                  type="button"
+                  className="festival-modal__option"
+                  key={loc.name}
+                  onClick={() => {
+                    setLocation(loc);
+                    setShowLocationPicker(false);
+                  }}
+                >
+                  {loc.name}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       )}
-      
+
       {showSearch && (
-        <div className="search-modal-overlay">
-          <div className="search-modal">
-            <div className="search-header">
-              <h3>🔍 Search Festivals & Vrats</h3>
-              <button 
-                className="close-search"
-                onClick={() => setShowSearch(false)}
-              >
-                ×
-              </button>
+        <div className="festival-modal-overlay">
+          <div className="festival-modal festival-modal--wide" role="dialog" aria-modal="true" aria-label="Search festivals">
+            <div className="festival-modal__header">
+              <h3>Search Festivals and Vrats</h3>
+              <button type="button" onClick={() => setShowSearch(false)} aria-label="Close search">×</button>
             </div>
-            <div className="search-input-container">
+            <div className="festival-search-row">
               <input
                 type="text"
-                placeholder="Search by festival name, deity, or type..."
+                placeholder="Search by festival name, deity or type"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchFestivals()}
-                className="search-input"
+                onChange={(event) => setSearchTerm(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') searchFestivals();
+                }}
               />
-              <button 
-                className="search-submit-btn"
-                onClick={searchFestivals}
-                disabled={!searchTerm.trim()}
-              >
+              <button type="button" className="festival-btn festival-btn--primary" disabled={!searchTerm.trim()} onClick={searchFestivals}>
                 Search
               </button>
             </div>
-            
-            <div className="search-content">
+
+            <div className="festival-modal__content">
               {searchLoading ? (
-                <div className="loading">
-                  <div className="spinner"></div>
+                <div className="festival-loading">
+                  <div className="festival-spinner" />
                   <p>Searching festivals...</p>
                 </div>
               ) : searchResults.length > 0 ? (
-                <div className="search-results">
-                  <h4>Search Results ({searchResults.length} found)</h4>
-                  <div className="festivals-grid">
-                    {searchResults.map((festival, index) => (
-                      <div 
-                        key={index} 
-                        className="festival-card"
-                        style={{ borderLeftColor: getTypeColor(festival.type || 'festival') }}
-                      >
-                        <div className="festival-header">
-                          <span className="festival-icon">{getTypeIcon(festival)}</span>
-                          <div className="festival-title">
-                            <h3>{festival.name}</h3>
-                            <span className="festival-type">{festival.type?.replace('_', ' ')}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="festival-description">
-                          <p>{festival.description}</p>
-                        </div>
-
-                        <div className="festival-significance">
-                          <h4>🌟 Significance</h4>
-                          <p>{festival.significance}</p>
-                        </div>
-
-                        {festival.rituals && (
-                          <div className="festival-rituals">
-                            <h4>🕯️ Rituals & Observances</h4>
-                            <ul>
-                              {Array.isArray(festival.rituals) ? 
-                                festival.rituals.map((ritual, idx) => (
-                                  <li key={idx}>{ritual}</li>
-                                )) :
-                                <li>{festival.rituals}</li>
-                              }
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                <div className="festivals-grid festivals-grid--modal">
+                  {searchResults.map((festival, index) => (
+                    <FestivalCard festival={festival} key={`${festival.name}-search-${index}`} />
+                  ))}
                 </div>
-              ) : searchTerm && !searchLoading ? (
-                <div className="no-results">
-                  <div className="no-results-icon">🔍</div>
+              ) : searchTerm ? (
+                <div className="festival-empty">
+                  <span aria-hidden>🔎</span>
                   <h3>No festivals found</h3>
-                  <p>Try searching with different keywords like "Diwali", "Ekadashi", or "Shiva"</p>
+                  <p>Try another keyword such as Diwali, Ekadashi, Shiva, Navratri or Pradosh.</p>
                 </div>
               ) : null}
             </div>
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 };

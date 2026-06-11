@@ -16,6 +16,48 @@ import { CALENDAR_SYSTEMS } from './config/panchangConfig';
 import { generatePageSEO } from '../../config/seo.config';
 import './PanchangPage.css';
 
+const PANCHANG_GUIDE_CARDS = [
+  {
+    title: 'Five Panchang limbs',
+    body: 'Read tithi, vara, nakshatra, yoga and karana together instead of relying on only one daily calendar factor.'
+  },
+  {
+    title: 'Location based timings',
+    body: 'Sunrise, sunset, Rahu Kaal, Yamaganda, Gulika and Choghadiya depend on the selected city and date.'
+  },
+  {
+    title: 'Auspicious windows',
+    body: 'Use Choghadiya, Hora and special muhurat periods to plan worship, travel, business tasks and important starts.'
+  },
+  {
+    title: 'Festival context',
+    body: 'Combine daily Panchang with festivals and lunar phase details for a clearer Hindu calendar view.'
+  }
+];
+
+const PANCHANG_FAQS = [
+  {
+    question: 'What is Panchang?',
+    answer: 'Panchang is the traditional Hindu calendar that combines five Vedic time factors: tithi, vara, nakshatra, yoga and karana. It is used to understand the quality of a day and choose suitable timings.'
+  },
+  {
+    question: 'Why does Panchang change by location?',
+    answer: 'Panchang timings depend on sunrise, sunset and local astronomical calculations. The same date can have different Rahu Kaal, Choghadiya, tithi ending time or nakshatra ending time in different cities.'
+  },
+  {
+    question: 'Which Panchang details are useful for daily planning?',
+    answer: 'For daily use, check tithi, nakshatra, weekday, sunrise, sunset, Rahu Kaal, Yamaganda, Gulika, Choghadiya and Hora. For ceremonies, also compare muhurat quality and avoid inauspicious periods.'
+  },
+  {
+    question: 'Can I use this Panchang outside India?',
+    answer: 'Yes. Select your city or coordinates so the Panchang can use local sunrise and sunset based calculations for your place.'
+  },
+  {
+    question: 'What is the difference between Panchang and Muhurat?',
+    answer: 'Panchang describes the daily Vedic calendar factors. Muhurat is the process of choosing a specific favorable time window using Panchang, weekday, nakshatra, planetary strength and the purpose of the activity.'
+  }
+];
+
 const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
   const urlLocation = useLocation();
@@ -157,63 +199,58 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
     }
   };
 
-  if (loading) {
-    return (
-      <div className="panchang-page">
-        <NavigationHeader 
-          showZodiacSelector={false}
-          user={user}
-          onAdminClick={handleAdminClick}
-          onLogout={onLogout || (() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setUser(null);
-            navigate('/');
-          })}
-          onLogin={onLogin || (() => navigate('/'))}
-          showLoginButton={showLoginButton}
-        />
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <div className="loading-text">Loading Panchang data...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="panchang-page">
-        <NavigationHeader 
-          showZodiacSelector={false}
-          user={user}
-          onAdminClick={handleAdminClick}
-          onLogout={onLogout || (() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setUser(null);
-            navigate('/');
-          })}
-          onLogin={onLogin || (() => navigate('/'))}
-          showLoginButton={showLoginButton}
-        />
-        <div className="error-container">
-          <div className="error-message">
-            <h3>Error Loading Panchang</h3>
-            <p>{error}</p>
-            <button 
-              className="retry-btn"
-              onClick={loadPanchangData}
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const seoData = generatePageSEO('panchang', { path: '/panchang' });
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "name": "Daily Panchang Calculator",
+        "description": "Location based Hindu Panchang with tithi, nakshatra, yoga, karana, sunrise, sunset, Rahu Kaal, Choghadiya, Hora and muhurat timings.",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Web",
+        "url": seoData.canonical
+      },
+      {
+        "@type": "Service",
+        "name": "Today Panchang and Muhurat Timings",
+        "provider": {
+          "@type": "Organization",
+          "name": "AstroRoshni"
+        },
+        "areaServed": "Worldwide",
+        "serviceType": "Hindu calendar and Vedic Panchang calculation"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": PANCHANG_FAQS.map((item) => ({
+          "@type": "Question",
+          "name": item.question,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": item.answer
+          }
+        }))
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://astroroshni.com/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Daily Panchang",
+            "item": seoData.canonical
+          }
+        ]
+      }
+    ]
+  };
 
   return (
     <div className="panchang-page">
@@ -222,14 +259,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
         description={seoData.description}
         keywords={seoData.keywords}
         canonical={seoData.canonical}
-        structuredData={{
-          "@context": "https://schema.org",
-          "@type": "WebApplication",
-          "name": "Daily Panchang",
-          "description": "Complete Hindu calendar with Tithi, Nakshatra, Yoga, Karana and muhurat times",
-          "applicationCategory": "LifestyleApplication",
-          "operatingSystem": "Web"
-        }}
+        structuredData={structuredData}
       />
       <NavigationHeader 
         compact={true}
@@ -260,9 +290,24 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
             showMonthlyLink={true}
           />
 
+          {loading && (
+            <div className="panchang-inline-loading" role="status">
+              <div className="loading-spinner"></div>
+              <span>Loading live Panchang timings for {location.name}...</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="panchang-inline-error">
+              <span>{error}</span>
+              <button className="retry-btn" onClick={loadPanchangData}>Retry</button>
+            </div>
+          )}
+
           <div className="panchang-section">
             <div className="section-header">
-              <h2>🕐 Core Panchang Elements</h2>
+              <span>Daily Calendar</span>
+              <h2>Core Panchang Elements</h2>
             </div>
             <div className="section-content">
               <CorePanchangElements panchangData={panchangData} />
@@ -272,7 +317,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
           <div className="timing-grid">
             
             <div className="timing-card">
-              <h3>🌅 Sunrise & Sunset</h3>
+              <h3>Sunrise & Sunset</h3>
               <SunriseSunsetInfo 
                 sunriseSunsetData={sunriseSunsetData}
                 location={location}
@@ -280,7 +325,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
             </div>
 
             <div className="timing-card">
-              <h3>🌙 Lunar Information</h3>
+              <h3>Lunar Information</h3>
               <LunarInformation 
                 lunarData={lunarData}
                 panchangData={panchangData}
@@ -288,11 +333,12 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
             </div>
 
             <div className="timing-card">
-              <h3>🚫 Inauspicious Times</h3>
+              <h3>Inauspicious Times</h3>
               <InauspiciousTimings 
                 inauspiciousData={inauspiciousData}
                 sunriseSunsetData={sunriseSunsetData}
                 selectedDate={selectedDate}
+                location={location}
               />
             </div>
 
@@ -300,7 +346,8 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
 
           <div className="panchang-section">
             <div className="section-header">
-              <h2>✨ Auspicious Times</h2>
+              <span>Muhurat Planning</span>
+              <h2>Auspicious Times</h2>
             </div>
             <div className="section-content">
               <AuspiciousTimings 
@@ -314,12 +361,70 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
 
           <div className="panchang-section">
             <div className="section-header">
-              <h2>⭐ Planetary Positions</h2>
+              <span>Transit Snapshot</span>
+              <h2>Planetary Positions</h2>
             </div>
             <div className="section-content">
               <PlanetaryPositions planetaryData={planetaryData} />
             </div>
           </div>
+
+          <section className="panchang-seo-section" aria-labelledby="panchang-guide-title">
+            <div className="panchang-seo-intro">
+              <span className="panchang-eyebrow">Panchang Guide</span>
+              <h2 id="panchang-guide-title">Daily Panchang for tithi, nakshatra, muhurat and Hindu calendar planning</h2>
+              <p>
+                AstroRoshni Panchang is built for practical daily decisions: checking the current lunar day,
+                understanding the Moon nakshatra, avoiding difficult periods, and finding cleaner windows
+                for worship, travel, purchases, meetings and new beginnings.
+              </p>
+            </div>
+
+            <div className="panchang-guide-grid">
+              {PANCHANG_GUIDE_CARDS.map((card) => (
+                <article className="panchang-guide-card" key={card.title}>
+                  <h3>{card.title}</h3>
+                  <p>{card.body}</p>
+                </article>
+              ))}
+            </div>
+
+            <div className="panchang-copy-grid">
+              <article>
+                <h3>How to read today Panchang</h3>
+                <p>
+                  Start with sunrise because the Vedic day is anchored to local sunrise. Then read the
+                  tithi for lunar energy, nakshatra for the Moon's active star field, yoga for the day
+                  quality and karana for action suitability. The strongest Panchang reading comes from
+                  combining these factors with the purpose of the activity.
+                </p>
+              </article>
+              <article>
+                <h3>Choosing a better time today</h3>
+                <p>
+                  Avoid Rahu Kaal, Yamaganda and Gulika for important launches whenever possible. For
+                  everyday work, Choghadiya and Hora provide quick timing guidance. For major life events,
+                  use a dedicated muhurat because marriage, property, vehicle, griha pravesh and business
+                  starts each require different astrological checks.
+                </p>
+              </article>
+            </div>
+          </section>
+
+          <section className="panchang-faq-section" aria-labelledby="panchang-faq-title">
+            <div className="panchang-seo-intro">
+              <span className="panchang-eyebrow">Questions</span>
+              <h2 id="panchang-faq-title">Daily Panchang FAQs</h2>
+            </div>
+            <div className="panchang-faq-grid">
+              {PANCHANG_FAQS.map((item) => (
+                <article className="panchang-faq-card" key={item.question}>
+                  <h3>{item.question}</h3>
+                  <p>{item.answer}</p>
+                </article>
+              ))}
+            </div>
+          </section>
 
         </div>
       </div>

@@ -42,11 +42,14 @@ export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs =
     '/horoscope',
     '/tools/ashtakavarga',
     '/astrovastu',
+    '/life-events',
     '/marriage-analysis',
     '/career-guidance',
     '/subscription',
     '/health-analysis',
     '/wealth-analysis',
+    '/education',
+    '/progeny-analysis',
   ];
 
   HOROSCOPE_PERIODS.forEach((p) => paths.push(`/horoscope/${p}`));
@@ -131,9 +134,9 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   { path: '/subscription', pageKey: 'subscription' },
   { path: '/health-analysis', pageKey: 'healthAnalysis' },
   { path: '/wealth-analysis', pageKey: 'wealthAnalysis' },
-  { path: '/life-events', pageKey: 'lifeEvents', noIndex: true },
-  { path: '/education', pageKey: 'educationAnalysis', noIndex: true },
-  { path: '/progeny-analysis', pageKey: 'progenyAnalysis', noIndex: true },
+  { path: '/life-events', pageKey: 'lifeEvents' },
+  { path: '/education', pageKey: 'educationAnalysis' },
+  { path: '/progeny-analysis', pageKey: 'progenyAnalysis' },
   { path: '/speech-chat', noIndex: true },
   { path: '/profile', noIndex: true },
   { path: '/admin/blog', noIndex: true },

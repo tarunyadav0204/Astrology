@@ -1624,3 +1624,823 @@
     font-size: 1rem;
   }
 }
+
+/* Refined Panchang layout */
+.panchang-page {
+  --panchang-ink: #211817;
+  --panchang-muted: #675b58;
+  --panchang-soft: #fff8f2;
+  --panchang-panel: rgba(255, 255, 255, 0.94);
+  --panchang-line: rgba(106, 66, 42, 0.14);
+  --panchang-rust: #b94717;
+  --panchang-rose: #9d174d;
+  --panchang-gold: #d99a21;
+  --panchang-green: #2f7d66;
+  --panchang-shadow: 0 18px 50px rgba(80, 48, 26, 0.12);
+  background:
+    radial-gradient(circle at 14% 8%, rgba(217, 154, 33, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 4%, rgba(157, 23, 77, 0.12), transparent 34%),
+    linear-gradient(180deg, #fffaf4 0%, #f8efe6 46%, #fffaf6 100%);
+  color: var(--panchang-ink);
+  padding-top: 78px;
+}
+
+.panchang-page .panchang-content {
+  padding: 28px 0 72px;
+}
+
+.panchang-page .container {
+  max-width: 1180px;
+  padding: 0 24px;
+}
+
+.panchang-header {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  margin-bottom: 22px;
+  padding: 34px;
+  border: 1px solid var(--panchang-line);
+  border-radius: 18px;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 238, 0.9)),
+    linear-gradient(135deg, rgba(185, 71, 23, 0.1), rgba(47, 125, 102, 0.08));
+  box-shadow: var(--panchang-shadow);
+}
+
+.panchang-header::after {
+  content: "";
+  position: absolute;
+  inset: auto -80px -120px auto;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(217, 154, 33, 0.18), transparent 68%);
+  pointer-events: none;
+}
+
+.panchang-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 820px;
+}
+
+.panchang-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-bottom: 10px;
+  color: var(--panchang-rust);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.panchang-hero-copy h1,
+.panchang-seo-intro h2 {
+  margin: 0;
+  color: var(--panchang-ink);
+  letter-spacing: 0;
+}
+
+.panchang-hero-copy h1 {
+  max-width: 760px;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 1.04;
+}
+
+.panchang-hero-copy p,
+.panchang-seo-intro p,
+.panchang-copy-grid p,
+.panchang-guide-card p,
+.panchang-faq-card p {
+  color: var(--panchang-muted);
+  line-height: 1.72;
+}
+
+.panchang-hero-copy p {
+  max-width: 720px;
+  margin: 14px 0 0;
+  font-size: 1.05rem;
+}
+
+.panchang-hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.panchang-hero-tags span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 1px solid rgba(185, 71, 23, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #69321d;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.header-row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: max-content max-content max-content minmax(220px, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.date-navigation-container {
+  height: 46px;
+  border: 1px solid var(--panchang-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(80, 48, 26, 0.08);
+}
+
+.date-navigation-container:hover {
+  border-color: rgba(185, 71, 23, 0.32);
+  box-shadow: 0 10px 28px rgba(80, 48, 26, 0.1);
+}
+
+.nav-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--panchang-rust);
+  font-size: 1.15rem;
+}
+
+.nav-btn:hover {
+  background: rgba(185, 71, 23, 0.08);
+  color: #8d3513;
+  transform: none;
+}
+
+.date-input {
+  min-width: 160px;
+  height: 44px;
+  padding: 9px 12px;
+  color: var(--panchang-ink);
+  font-weight: 700;
+}
+
+.today-btn,
+.calendar-select,
+.change-location-btn,
+.monthly-panchang-link {
+  min-height: 44px;
+  border-radius: 12px;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.today-btn {
+  border: 1px solid rgba(185, 71, 23, 0.22);
+  background: #fff;
+  color: var(--panchang-rust);
+  padding: 0 18px;
+}
+
+.today-btn:hover {
+  background: var(--panchang-rust);
+  color: white;
+}
+
+.calendar-select {
+  border: 1px solid var(--panchang-line);
+  background: #fff;
+  color: var(--panchang-ink);
+  padding: 0 38px 0 14px;
+}
+
+.location-info {
+  min-width: 0;
+  height: 46px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 6px 5px 14px;
+  border: 1px solid var(--panchang-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.location-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--panchang-ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-location-btn {
+  min-height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  background: rgba(47, 125, 102, 0.1);
+  color: var(--panchang-green);
+  padding: 0 12px;
+}
+
+.change-location-btn:hover {
+  background: var(--panchang-green);
+  color: white;
+}
+
+.monthly-panchang-link {
+  justify-content: center;
+  border: 0;
+  background: var(--panchang-ink);
+  color: #fff;
+  padding: 0 18px;
+}
+
+.monthly-panchang-link:hover {
+  background: #3a2925;
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+
+.festival-banner {
+  position: relative;
+  z-index: 1;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(217, 154, 33, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 250, 234, 0.9);
+  color: #7a4b02;
+  animation: none;
+}
+
+.festival-icon {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.festival-text {
+  overflow-wrap: anywhere;
+}
+
+.panchang-section,
+.timing-card,
+.panchang-seo-section,
+.panchang-faq-section {
+  border: 1px solid var(--panchang-line);
+  border-radius: 16px;
+  background: var(--panchang-panel);
+  box-shadow: 0 14px 38px rgba(80, 48, 26, 0.08);
+}
+
+.panchang-inline-loading,
+.panchang-inline-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--panchang-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--panchang-muted);
+  font-weight: 700;
+}
+
+.panchang-inline-loading .loading-spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 3px;
+  border-color: rgba(185, 71, 23, 0.18);
+  border-left-color: var(--panchang-rust);
+}
+
+.panchang-inline-error {
+  justify-content: space-between;
+  border-color: rgba(157, 23, 77, 0.22);
+  color: var(--panchang-rose);
+}
+
+.panchang-section {
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 20px 24px 10px;
+  background: transparent !important;
+  color: var(--panchang-ink) !important;
+}
+
+.section-header span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--panchang-rust);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.section-header h2,
+.panchang-section .section-header h2,
+.section-header h2:hover,
+.panchang-section .section-header h2:hover,
+.section-header:hover,
+.panchang-section .section-header:hover,
+.panchang-section .section-header:hover h2 {
+  background: transparent !important;
+  color: var(--panchang-ink) !important;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  letter-spacing: 0;
+}
+
+.panchang-page .section-header:hover,
+.panchang-page .section-header h2:hover,
+.panchang-page .panchang-section .section-header:hover,
+.panchang-page .panchang-section .section-header h2:hover,
+.panchang-page .element-header:hover,
+.panchang-page .element-header h3:hover,
+.panchang-page .timing-card h3:hover,
+.panchang-page .timing-section h4:hover {
+  background: transparent !important;
+  color: var(--panchang-ink) !important;
+}
+
+.section-content {
+  padding: 18px 24px 24px;
+}
+
+.panchang-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.panchang-element {
+  border: 1px solid rgba(106, 66, 42, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.panchang-element:hover {
+  border-color: rgba(185, 71, 23, 0.3);
+  box-shadow: 0 12px 26px rgba(80, 48, 26, 0.08);
+}
+
+.element-header h3,
+.timing-card h3,
+.timing-section h4,
+.choghadiya-sections h5,
+.hora-sections h5 {
+  color: var(--panchang-ink) !important;
+  letter-spacing: 0;
+}
+
+.element-number,
+.progress-fill,
+.pada-fill {
+  background: var(--panchang-rust);
+}
+
+.main-value {
+  color: var(--panchang-ink);
+  line-height: 1.18;
+}
+
+.timing-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.timing-card {
+  padding: 22px;
+}
+
+.timing-card h3 {
+  margin: 0 0 16px;
+  font-size: 1.12rem;
+}
+
+.timing-item,
+.hora-item,
+.time-slot {
+  border-color: rgba(106, 66, 42, 0.12);
+  border-radius: 10px;
+  background: #fffaf6;
+}
+
+.timing-item:hover,
+.hora-item:hover {
+  border-color: rgba(185, 71, 23, 0.25);
+  background: #fff;
+}
+
+.timing-name,
+.time-name,
+.choghadiya-name,
+.hora-planet,
+.planet-name,
+.sign-name {
+  color: var(--panchang-ink);
+}
+
+.timing-duration,
+.twilight-time,
+.hora-time,
+.choghadiya-time {
+  color: var(--panchang-rust);
+}
+
+.active-auspicious,
+.auspicious-times {
+  border-color: rgba(47, 125, 102, 0.18);
+  background: rgba(47, 125, 102, 0.06);
+}
+
+.inauspicious-times,
+.weekly-pattern {
+  border-color: rgba(157, 23, 77, 0.14);
+  background: rgba(157, 23, 77, 0.05);
+}
+
+.planets-grid {
+  grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.planetary-positions .planet-card {
+  height: 64px !important;
+  max-height: 64px !important;
+  border-radius: 10px !important;
+  border-color: rgba(106, 66, 42, 0.12) !important;
+  box-shadow: none !important;
+}
+
+.planet-card:hover {
+  border-color: rgba(185, 71, 23, 0.3);
+}
+
+.sunrise-sunset-info > .timing-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.sunrise-sunset-info > .timing-grid > .timing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.sunrise-sunset-info .timing-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sunrise-sunset-info .timing-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(185, 71, 23, 0.08);
+  font-size: 1.25rem;
+}
+
+.sunrise-sunset-info .timing-details {
+  min-width: 0;
+  width: 100%;
+}
+
+.sunrise-sunset-info .timing-heading h4,
+.sunrise-sunset-info .day-progress h4,
+.sunrise-sunset-info .duration-card h4 {
+  margin: 0;
+  color: var(--panchang-ink);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.sunrise-sunset-info .timing-heading h4 {
+  font-size: 1rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.sunrise-sunset-info .main-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  margin-top: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(185, 71, 23, 0.1);
+  color: var(--panchang-rust);
+  font-size: clamp(0.86rem, 1.35vw, 1.02rem);
+  font-weight: 900;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.sunrise-sunset-info .additional-info {
+  display: grid;
+  gap: 3px;
+  margin-top: 9px;
+  color: var(--panchang-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.sunrise-sunset-info .additional-info strong {
+  color: var(--panchang-ink);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.sunrise-sunset-info .duration-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 16px;
+}
+
+.sunrise-sunset-info .duration-card {
+  padding: 14px 16px;
+  border: 1px solid rgba(106, 66, 42, 0.12);
+  border-radius: 14px;
+  background: #fffaf6;
+}
+
+.sunrise-sunset-info .duration-value {
+  margin-top: 8px;
+  color: var(--panchang-rust);
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.sunrise-sunset-info .day-progress {
+  margin: 6px 0 18px;
+  padding: 16px;
+  border: 1px solid rgba(106, 66, 42, 0.12);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.sunrise-sunset-info .progress-container {
+  margin: 12px 0 0;
+}
+
+.sunrise-sunset-info .progress-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  color: var(--panchang-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.sunrise-sunset-info .progress-labels span:last-child {
+  text-align: right;
+}
+
+.panchang-seo-section,
+.panchang-faq-section {
+  margin-top: 24px;
+  padding: 30px;
+}
+
+.panchang-seo-intro {
+  max-width: 850px;
+  margin-bottom: 22px;
+}
+
+.panchang-seo-intro h2 {
+  font-size: clamp(1.55rem, 3vw, 2.5rem);
+  line-height: 1.12;
+}
+
+.panchang-seo-intro p {
+  margin: 12px 0 0;
+}
+
+.panchang-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.panchang-guide-card,
+.panchang-copy-grid article,
+.panchang-faq-card {
+  border: 1px solid rgba(106, 66, 42, 0.12);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.panchang-guide-card {
+  padding: 18px;
+}
+
+.panchang-guide-card h3,
+.panchang-copy-grid h3,
+.panchang-faq-card h3 {
+  margin: 0;
+  color: var(--panchang-ink);
+  letter-spacing: 0;
+}
+
+.panchang-guide-card h3 {
+  font-size: 1rem;
+}
+
+.panchang-guide-card p,
+.panchang-faq-card p {
+  margin: 9px 0 0;
+  font-size: 0.94rem;
+}
+
+.panchang-copy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.panchang-copy-grid article {
+  padding: 22px;
+  background: linear-gradient(180deg, #fff, #fff9f4);
+}
+
+.panchang-copy-grid h3,
+.panchang-faq-card h3 {
+  font-size: 1.08rem;
+}
+
+.panchang-copy-grid p {
+  margin: 10px 0 0;
+}
+
+.panchang-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.panchang-faq-card {
+  padding: 20px;
+}
+
+@media (max-width: 1100px) {
+  .header-row {
+    grid-template-columns: max-content max-content max-content minmax(260px, 1fr);
+  }
+
+  .monthly-panchang-link {
+    grid-column: 1 / -1;
+    width: fit-content;
+  }
+
+  .panchang-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .timing-grid,
+  .panchang-guide-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .panchang-page {
+    padding-top: 142px;
+  }
+
+  .panchang-page .panchang-content {
+    padding-top: 18px;
+  }
+
+  .panchang-page .container {
+    padding: 0 14px;
+  }
+
+  .panchang-header {
+    padding: 24px 18px;
+    border-radius: 14px;
+  }
+
+  .panchang-hero-copy h1 {
+    font-size: 2rem;
+  }
+
+  .header-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .date-navigation-container {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .date-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .today-btn,
+  .calendar-select,
+  .location-info,
+  .monthly-panchang-link {
+    width: 100%;
+  }
+
+  .monthly-panchang-link {
+    grid-column: auto;
+  }
+
+  .panchang-grid,
+  .timing-grid,
+  .panchang-guide-grid,
+  .panchang-copy-grid,
+  .panchang-faq-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .panchang-seo-section,
+  .panchang-faq-section,
+  .section-content,
+  .timing-card {
+    padding: 18px;
+  }
+
+  .section-header {
+    padding: 18px 18px 4px;
+  }
+
+  .planets-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .planetary-positions .planet-card {
+    height: 60px !important;
+    max-height: 60px !important;
+  }
+
+  .sunrise-sunset-info > .timing-grid,
+  .sunrise-sunset-info .duration-info {
+    grid-template-columns: 1fr;
+  }
+
+  .sunrise-sunset-info > .timing-grid > .timing-card {
+    gap: 12px;
+  }
+
+  .sunrise-sunset-info .timing-heading {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1300px) {
+  .sunrise-sunset-info > .timing-grid > .timing-card {
+    gap: 10px;
+  }
+
+  .sunrise-sunset-info .timing-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .sunrise-sunset-info .main-time {
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+}
