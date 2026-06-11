@@ -4,14 +4,20 @@ Admin: list installs with attribution and registration status.
 """
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import re
 import json
 import hashlib
+import zipfile
+from datetime import datetime, timezone
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote_plus, urlparse
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
@@ -20,6 +26,9 @@ from db import execute, get_conn
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["acquisition"])
+
+IST_TZ = ZoneInfo("Asia/Kolkata")
+_EXPORT_MAX_INSTALL_ROWS = 50_000
 
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -660,171 +669,7 @@ async def admin_acquisition_installations_analytics(
     )
 
     with get_conn() as conn:
-        classified_cte = f"""
-            WITH filtered AS (
-                SELECT ai.installation_id, ai.userid
-                FROM app_installations ai
-                WHERE {where_sql}
-            ),
-            signals AS (
-                SELECT
-                    f.installation_id,
-                    f.userid,
-                    EXISTS (
-                        SELECT 1
-                        FROM app_installation_events e
-                        WHERE e.installation_id = f.installation_id
-                          AND (
-                            e.event_name IN (
-                                'login_submitted',
-                                'login_completed',
-                                'login_failed',
-                                'registration_existing_user_redirected'
-                            )
-                            OR (
-                                e.event_name = 'auth_mode_selected'
-                                AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'login'
-                            )
-                          )
-                    ) AS existing_user_install,
-                    EXISTS (
-                        SELECT 1
-                        FROM app_installation_events e
-                        WHERE e.installation_id = f.installation_id
-                          AND (
-                            e.event_name IN (
-                                'registration_otp_requested',
-                                'registration_otp_screen_viewed',
-                                'registration_otp_verified',
-                                'registration_name_submitted',
-                                'registration_submitted',
-                                'registration_completed',
-                                'registration_failed',
-                                'registration_existing_user_redirected'
-                            )
-                            OR (
-                                e.event_name = 'auth_mode_selected'
-                                AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'register'
-                            )
-                          )
-                    ) AS registration_flow_install
-                FROM filtered f
-            ),
-            classified AS (
-                SELECT
-                    installation_id,
-                    userid,
-                    (
-                        existing_user_install
-                        OR (userid IS NOT NULL AND NOT registration_flow_install)
-                    ) AS existing_user_install,
-                    registration_flow_install
-                FROM signals
-            )
-        """
-
-        cur = execute(
-            conn,
-            f"""
-            {classified_cte}
-            SELECT
-                COUNT(*)::int AS installs,
-                COUNT(*) FILTER (WHERE userid IS NOT NULL)::int AS linked,
-                COUNT(*) FILTER (WHERE existing_user_install)::int AS existing_user_installs,
-                COUNT(*) FILTER (WHERE NOT existing_user_install)::int AS new_user_candidate_installs,
-                COUNT(*) FILTER (WHERE registration_flow_install)::int AS registration_flow_installs
-            FROM classified
-            """,
-            params,
-        )
-        base = cur.fetchone() or (0, 0, 0, 0, 0)
-        installs = int(base[0] or 0)
-        linked = int(base[1] or 0)
-        existing_user_installs = int(base[2] or 0)
-        new_user_candidate_installs = int(base[3] or 0)
-        registration_flow_installs = int(base[4] or 0)
-        unknown_anonymous_installs = max(0, new_user_candidate_installs - registration_flow_installs)
-
-        funnel: list[dict[str, Any]] = []
-        previous = new_user_candidate_installs
-        for event_name, label in _FUNNEL_STEPS:
-            if event_name == "first_open":
-                count = new_user_candidate_installs
-            else:
-                reached_events = _reached_funnel_events(event_name)
-                placeholders = ", ".join(["?"] * len(reached_events))
-                cur = execute(
-                    conn,
-                    f"""
-                    {classified_cte}
-                    SELECT COUNT(DISTINCT aie.installation_id)::int
-                    FROM app_installation_events aie
-                    JOIN classified c ON c.installation_id = aie.installation_id
-                    WHERE NOT c.existing_user_install AND aie.event_name IN ({placeholders})
-                    """,
-                    params + reached_events,
-                )
-                count = int((cur.fetchone() or [0])[0] or 0)
-            funnel.append(
-                {
-                    "event_name": event_name,
-                    "label": label,
-                    "count": count,
-                    "conversion_from_previous": round(count / previous, 4) if previous else 0.0,
-                    "conversion_from_install": round(count / new_user_candidate_installs, 4) if new_user_candidate_installs else 0.0,
-                    "drop_from_previous": max(0, previous - count),
-                }
-            )
-            previous = count
-
-        cur = execute(
-            conn,
-            f"""
-            SELECT
-                COALESCE(le.event_name, 'first_open_only') AS event_name,
-                COALESCE(le.event_status, 'none') AS event_status,
-                COALESCE(le.screen_name, '') AS screen_name,
-                COUNT(*)::int AS installs
-            FROM app_installations ai
-            LEFT JOIN LATERAL (
-                SELECT event_name, event_status, screen_name
-                FROM app_installation_events aie
-                WHERE aie.installation_id = ai.installation_id
-                ORDER BY aie.created_at DESC
-                LIMIT 1
-            ) le ON TRUE
-            WHERE {where_sql} AND ai.userid IS NULL
-            GROUP BY 1, 2, 3
-            ORDER BY installs DESC, event_name ASC
-            LIMIT 50
-            """,
-            params,
-        )
-        dropoff_rows = cur.fetchall() or []
-
-    unlinked = max(0, installs - linked)
-    dropoff = [
-        {
-            "event_name": r[0],
-            "event_status": r[1],
-            "screen_name": r[2],
-            "installs": int(r[3] or 0),
-            "share_of_unlinked": round(int(r[3] or 0) / unlinked, 4) if unlinked else 0.0,
-        }
-        for r in dropoff_rows
-    ]
-
-    return {
-        "installs": installs,
-        "linked": linked,
-        "unlinked": unlinked,
-        "existing_user_installs": existing_user_installs,
-        "new_user_candidate_installs": new_user_candidate_installs,
-        "registration_flow_installs": registration_flow_installs,
-        "unknown_anonymous_installs": unknown_anonymous_installs,
-        "funnel": funnel,
-        "dropoff": dropoff,
-    }
+        return _acquisition_analytics_payload(conn, where_sql=where_sql, params=params)
 
 
 @router.get("/admin/acquisition-installations/{installation_id}/events")
@@ -903,3 +748,561 @@ async def admin_acquisition_installation_events(
             for r in events
         ],
     }
+
+
+def _format_ts_ist(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        dt = value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(IST_TZ).strftime("%Y-%m-%d %H:%M:%S IST")
+    raw = str(value).strip()
+    if not raw:
+        return ""
+    try:
+        normalized = raw.replace(" ", "T")
+        if not re.search(r"(?:Z|[+-]\d{2}:?\d{2})$", normalized, re.IGNORECASE):
+            normalized += "Z"
+        dt = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(IST_TZ).strftime("%Y-%m-%d %H:%M:%S IST")
+    except Exception:
+        return raw
+
+
+def _csv_bytes(rows: list[list[Any]], headers: list[str]) -> bytes:
+    buf = io.StringIO()
+    buf.write("\ufeff")
+    writer = csv.writer(buf)
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow(row)
+    return buf.getvalue().encode("utf-8")
+
+
+def _classified_cte_sql(where_sql: str) -> str:
+    return f"""
+        WITH filtered AS (
+            SELECT ai.installation_id, ai.userid
+            FROM app_installations ai
+            WHERE {where_sql}
+        ),
+        signals AS (
+            SELECT
+                f.installation_id,
+                f.userid,
+                EXISTS (
+                    SELECT 1
+                    FROM app_installation_events e
+                    WHERE e.installation_id = f.installation_id
+                      AND (
+                        e.event_name IN (
+                            'login_submitted',
+                            'login_completed',
+                            'login_failed',
+                            'registration_existing_user_redirected'
+                        )
+                        OR (
+                            e.event_name = 'auth_mode_selected'
+                            AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'login'
+                        )
+                      )
+                ) AS existing_user_install,
+                EXISTS (
+                    SELECT 1
+                    FROM app_installation_events e
+                    WHERE e.installation_id = f.installation_id
+                      AND (
+                        e.event_name IN (
+                            'registration_otp_requested',
+                            'registration_otp_screen_viewed',
+                            'registration_otp_verified',
+                            'registration_name_submitted',
+                            'registration_submitted',
+                            'registration_completed',
+                            'registration_failed',
+                            'registration_existing_user_redirected'
+                        )
+                        OR (
+                            e.event_name = 'auth_mode_selected'
+                            AND LOWER(COALESCE(e.metadata->>'mode', '')) = 'register'
+                        )
+                      )
+                ) AS registration_flow_install
+            FROM filtered f
+        ),
+        classified AS (
+            SELECT
+                installation_id,
+                userid,
+                (
+                    existing_user_install
+                    OR (userid IS NOT NULL AND NOT registration_flow_install)
+                ) AS existing_user_install,
+                registration_flow_install
+            FROM signals
+        )
+    """
+
+
+def _acquisition_analytics_payload(
+    conn,
+    *,
+    where_sql: str,
+    params: list[Any],
+) -> dict[str, Any]:
+    classified_cte = _classified_cte_sql(where_sql)
+
+    cur = execute(
+        conn,
+        f"""
+        {classified_cte}
+        SELECT
+            COUNT(*)::int AS installs,
+            COUNT(*) FILTER (WHERE userid IS NOT NULL)::int AS linked,
+            COUNT(*) FILTER (WHERE existing_user_install)::int AS existing_user_installs,
+            COUNT(*) FILTER (WHERE NOT existing_user_install)::int AS new_user_candidate_installs,
+            COUNT(*) FILTER (WHERE registration_flow_install)::int AS registration_flow_installs
+        FROM classified
+        """,
+        params,
+    )
+    base = cur.fetchone() or (0, 0, 0, 0, 0)
+    installs = int(base[0] or 0)
+    linked = int(base[1] or 0)
+    existing_user_installs = int(base[2] or 0)
+    new_user_candidate_installs = int(base[3] or 0)
+    registration_flow_installs = int(base[4] or 0)
+    unknown_anonymous_installs = max(0, new_user_candidate_installs - registration_flow_installs)
+
+    funnel: list[dict[str, Any]] = []
+    previous = new_user_candidate_installs
+    for event_name, label in _FUNNEL_STEPS:
+        if event_name == "first_open":
+            count = new_user_candidate_installs
+        else:
+            reached_events = _reached_funnel_events(event_name)
+            placeholders = ", ".join(["?"] * len(reached_events))
+            cur = execute(
+                conn,
+                f"""
+                {classified_cte}
+                SELECT COUNT(DISTINCT aie.installation_id)::int
+                FROM app_installation_events aie
+                JOIN classified c ON c.installation_id = aie.installation_id
+                WHERE NOT c.existing_user_install AND aie.event_name IN ({placeholders})
+                """,
+                params + reached_events,
+            )
+            count = int((cur.fetchone() or [0])[0] or 0)
+        funnel.append(
+            {
+                "event_name": event_name,
+                "label": label,
+                "count": count,
+                "conversion_from_previous": round(count / previous, 4) if previous else 0.0,
+                "conversion_from_install": round(count / new_user_candidate_installs, 4) if new_user_candidate_installs else 0.0,
+                "drop_from_previous": max(0, previous - count),
+            }
+        )
+        previous = count
+
+    cur = execute(
+        conn,
+        f"""
+        SELECT
+            COALESCE(le.event_name, 'first_open_only') AS event_name,
+            COALESCE(le.event_status, 'none') AS event_status,
+            COALESCE(le.screen_name, '') AS screen_name,
+            COUNT(*)::int AS installs
+        FROM app_installations ai
+        LEFT JOIN LATERAL (
+            SELECT event_name, event_status, screen_name
+            FROM app_installation_events aie
+            WHERE aie.installation_id = ai.installation_id
+            ORDER BY aie.created_at DESC
+            LIMIT 1
+        ) le ON TRUE
+        WHERE {where_sql} AND ai.userid IS NULL
+        GROUP BY 1, 2, 3
+        ORDER BY installs DESC, event_name ASC
+        LIMIT 50
+        """,
+        params,
+    )
+    dropoff_rows = cur.fetchall() or []
+
+    unlinked = max(0, installs - linked)
+    dropoff = [
+        {
+            "event_name": r[0],
+            "event_status": r[1],
+            "screen_name": r[2],
+            "installs": int(r[3] or 0),
+            "share_of_unlinked": round(int(r[3] or 0) / unlinked, 4) if unlinked else 0.0,
+        }
+        for r in dropoff_rows
+    ]
+
+    return {
+        "installs": installs,
+        "linked": linked,
+        "unlinked": unlinked,
+        "existing_user_installs": existing_user_installs,
+        "new_user_candidate_installs": new_user_candidate_installs,
+        "registration_flow_installs": registration_flow_installs,
+        "unknown_anonymous_installs": unknown_anonymous_installs,
+        "funnel": funnel,
+        "dropoff": dropoff,
+    }
+
+
+def _funnel_segment_label(
+    *,
+    userid: Any,
+    existing_user_install: bool,
+    registration_flow_install: bool,
+) -> str:
+    if existing_user_install:
+        return "existing_user"
+    if registration_flow_install:
+        return "new_user_registration"
+    if userid is not None:
+        return "linked_other"
+    return "new_user_unknown"
+
+
+def _build_acquisition_export_zip(
+    *,
+    analytics: dict[str, Any],
+    install_rows: list[dict[str, Any]],
+    filters: dict[str, Any],
+) -> bytes:
+    now_ist = datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S IST")
+    summary_rows = [[
+        now_ist,
+        filters.get("date_from") or "",
+        filters.get("date_to") or "",
+        filters.get("registered") or "all",
+        filters.get("utm_source") or "",
+        filters.get("utm_medium") or "",
+        filters.get("utm_campaign") or "",
+        filters.get("app_build") or "",
+        analytics.get("installs", 0),
+        analytics.get("linked", 0),
+        analytics.get("unlinked", 0),
+        round((analytics.get("linked", 0) / analytics.get("installs", 1)) * 100, 2) if analytics.get("installs") else 0,
+        analytics.get("existing_user_installs", 0),
+        analytics.get("new_user_candidate_installs", 0),
+        analytics.get("registration_flow_installs", 0),
+        analytics.get("unknown_anonymous_installs", 0),
+        len(install_rows),
+    ]]
+    summary_csv = _csv_bytes(
+        summary_rows,
+        [
+            "export_generated_at_ist",
+            "filter_date_from",
+            "filter_date_to",
+            "filter_linked_user",
+            "filter_utm_source_contains",
+            "filter_utm_medium_contains",
+            "filter_utm_campaign_contains",
+            "filter_app_build",
+            "total_first_opens",
+            "linked_users",
+            "not_linked",
+            "registration_rate_pct",
+            "existing_user_installs",
+            "new_user_funnel_base",
+            "registration_flow_installs",
+            "unknown_anonymous_installs",
+            "install_rows_exported",
+        ],
+    )
+
+    funnel_rows = []
+    for idx, step in enumerate(analytics.get("funnel") or [], start=1):
+        funnel_rows.append([
+            idx,
+            step.get("event_name") or "",
+            step.get("label") or "",
+            step.get("count") or 0,
+            round((step.get("conversion_from_previous") or 0) * 100, 2),
+            round((step.get("conversion_from_install") or 0) * 100, 2),
+            step.get("drop_from_previous") or 0,
+        ])
+    funnel_csv = _csv_bytes(
+        funnel_rows,
+        [
+            "step_order",
+            "event_name",
+            "step_label",
+            "install_count",
+            "conversion_from_previous_pct",
+            "conversion_from_funnel_start_pct",
+            "drop_from_previous",
+        ],
+    )
+
+    dropoff_rows = []
+    for row in analytics.get("dropoff") or []:
+        dropoff_rows.append([
+            row.get("event_name") or "",
+            row.get("event_status") or "",
+            row.get("screen_name") or "",
+            row.get("installs") or 0,
+            round((row.get("share_of_unlinked") or 0) * 100, 2),
+        ])
+    dropoff_csv = _csv_bytes(
+        dropoff_rows,
+        [
+            "last_event_name",
+            "last_event_status",
+            "last_screen_name",
+            "installs",
+            "share_of_unlinked_pct",
+        ],
+    )
+
+    step_headers = [f"reached_{name}" for name, _label in _FUNNEL_STEPS if name != "first_open"]
+    install_csv_rows = []
+    for row in install_rows:
+        reached = row.get("reached_steps") or set()
+        install_csv_rows.append([
+            row.get("installation_id") or "",
+            _format_ts_ist(row.get("first_open_at")),
+            _format_ts_ist(row.get("last_open_at")),
+            row.get("platform") or "",
+            row.get("app_version") or "",
+            row.get("app_build") or "",
+            row.get("utm_source") or "",
+            row.get("utm_medium") or "",
+            row.get("utm_campaign") or "",
+            row.get("open_count") or 0,
+            "yes" if row.get("userid") is not None else "no",
+            row.get("userid") or "",
+            row.get("user_phone") or "",
+            row.get("user_name") or "",
+            row.get("lead_phone") or "",
+            row.get("lead_email") or "",
+            _format_ts_ist(row.get("registered_at")),
+            row.get("last_event_name") or "",
+            row.get("last_event_status") or "",
+            row.get("last_event_screen") or "",
+            _format_ts_ist(row.get("last_event_at")),
+            row.get("funnel_segment") or "",
+            *[("yes" if step in reached else "no") for step, _label in _FUNNEL_STEPS if step != "first_open"],
+            row.get("referrer_preview") or "",
+        ])
+    installs_csv = _csv_bytes(
+        install_csv_rows,
+        [
+            "installation_id",
+            "first_open_at_ist",
+            "last_open_at_ist",
+            "platform",
+            "app_version",
+            "app_build",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "open_count",
+            "is_linked",
+            "userid",
+            "user_phone",
+            "user_name",
+            "lead_phone",
+            "lead_email",
+            "linked_at_ist",
+            "last_event_name",
+            "last_event_status",
+            "last_event_screen",
+            "last_event_at_ist",
+            "funnel_segment",
+            *step_headers,
+            "referrer_preview",
+        ],
+    )
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("01_summary.csv", summary_csv)
+        zf.writestr("02_funnel_steps.csv", funnel_csv)
+        zf.writestr("03_dropoff.csv", dropoff_csv)
+        zf.writestr("04_installs.csv", installs_csv)
+    return zip_buf.getvalue()
+
+
+@router.get("/admin/acquisition-installations/export")
+async def admin_acquisition_installations_export(
+    current_user: User = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    registered: Optional[str] = Query(None, description="yes | no | all"),
+    utm_campaign: Optional[str] = Query(None),
+    utm_source: Optional[str] = Query(None),
+    utm_medium: Optional[str] = Query(None),
+    app_build: Optional[str] = Query(None),
+):
+    """Export install funnel data for marketing: ZIP with four UTF-8 CSV files."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    where_sql, params = _acquisition_filter_sql(
+        date_from=date_from,
+        date_to=date_to,
+        registered=registered,
+        utm_campaign=utm_campaign,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        app_build=app_build,
+        alias="ai",
+    )
+    funnel_event_names = [name for name, _label in _FUNNEL_STEPS if name != "first_open"]
+    funnel_placeholders = ", ".join(["?"] * len(funnel_event_names))
+
+    with get_conn() as conn:
+        analytics = _acquisition_analytics_payload(conn, where_sql=where_sql, params=params)
+
+        cur = execute(
+            conn,
+            f"SELECT COUNT(*) FROM app_installations ai WHERE {where_sql}",
+            params,
+        )
+        total = int((cur.fetchone() or [0])[0] or 0)
+        if total > _EXPORT_MAX_INSTALL_ROWS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Too many rows to export ({total}). Narrow the date range or filters "
+                    f"(max {_EXPORT_MAX_INSTALL_ROWS:,})."
+                ),
+            )
+
+        classified_cte = _classified_cte_sql(where_sql)
+        cur = execute(
+            conn,
+            f"""
+            {classified_cte}
+            SELECT
+                ai.installation_id::text,
+                ai.platform,
+                ai.app_version,
+                ai.app_build,
+                LEFT(COALESCE(ai.referrer_raw, ''), 500) AS referrer_preview,
+                ai.utm_source,
+                ai.utm_medium,
+                ai.utm_campaign,
+                ai.first_open_at,
+                ai.last_open_at,
+                ai.open_count,
+                ai.userid,
+                ai.registered_at,
+                ai.lead_phone,
+                ai.lead_email,
+                u.phone AS user_phone,
+                u.name AS user_name,
+                le.event_name AS last_event_name,
+                le.event_status AS last_event_status,
+                le.screen_name AS last_event_screen,
+                le.created_at AS last_event_at,
+                c.existing_user_install,
+                c.registration_flow_install
+            FROM app_installations ai
+            LEFT JOIN users u ON u.userid = ai.userid
+            LEFT JOIN classified c ON c.installation_id = ai.installation_id
+            LEFT JOIN LATERAL (
+                SELECT event_name, event_status, screen_name, created_at
+                FROM app_installation_events aie
+                WHERE aie.installation_id = ai.installation_id
+                ORDER BY aie.created_at DESC
+                LIMIT 1
+            ) le ON TRUE
+            WHERE {where_sql}
+            ORDER BY ai.first_open_at DESC
+            LIMIT ?
+            """,
+            params + [_EXPORT_MAX_INSTALL_ROWS],
+        )
+        rows = cur.fetchall() or []
+
+        install_ids = [r[0] for r in rows if r and r[0]]
+        reached_by_install: dict[str, set[str]] = {iid: set() for iid in install_ids}
+        if install_ids and funnel_event_names:
+            id_placeholders = ", ".join(["?"] * len(install_ids))
+            cur = execute(
+                conn,
+                f"""
+                SELECT installation_id::text, event_name
+                FROM app_installation_events
+                WHERE installation_id IN ({id_placeholders})
+                  AND event_name IN ({funnel_placeholders})
+                GROUP BY installation_id, event_name
+                """,
+                install_ids + funnel_event_names,
+            )
+            for iid, event_name in cur.fetchall() or []:
+                if iid and event_name:
+                    reached_by_install.setdefault(str(iid), set()).add(str(event_name))
+
+    install_rows = []
+    for r in rows:
+        iid = r[0]
+        install_rows.append(
+            {
+                "installation_id": iid,
+                "platform": r[1],
+                "app_version": r[2],
+                "app_build": r[3],
+                "referrer_preview": r[4],
+                "utm_source": r[5],
+                "utm_medium": r[6],
+                "utm_campaign": r[7],
+                "first_open_at": r[8],
+                "last_open_at": r[9],
+                "open_count": r[10],
+                "userid": r[11],
+                "registered_at": r[12],
+                "lead_phone": r[13],
+                "lead_email": r[14],
+                "user_phone": r[15],
+                "user_name": r[16],
+                "last_event_name": r[17],
+                "last_event_status": r[18],
+                "last_event_screen": r[19],
+                "last_event_at": r[20],
+                "funnel_segment": _funnel_segment_label(
+                    userid=r[11],
+                    existing_user_install=bool(r[21]),
+                    registration_flow_install=bool(r[22]),
+                ),
+                "reached_steps": reached_by_install.get(str(iid), set()),
+            }
+        )
+
+    zip_bytes = _build_acquisition_export_zip(
+        analytics=analytics,
+        install_rows=install_rows,
+        filters={
+            "date_from": date_from,
+            "date_to": date_to,
+            "registered": registered or "all",
+            "utm_source": utm_source,
+            "utm_medium": utm_medium,
+            "utm_campaign": utm_campaign,
+            "app_build": app_build,
+        },
+    )
+
+    from_part = (date_from or "all").strip()
+    to_part = (date_to or "all").strip()
+    filename = f"install-funnel_{from_part}_to_{to_part}.zip"
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

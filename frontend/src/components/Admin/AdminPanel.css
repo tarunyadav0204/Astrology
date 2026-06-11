@@ -2555,6 +2555,36 @@ input:checked + .toggle-slider:before {
   white-space: nowrap;
 }
 
+.admin-testimonials-fetch-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-testimonials-min-rating {
+  display: grid;
+  gap: 4px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-testimonials-min-rating select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  color: #1f2937;
+  background: white;
+}
+
+.admin-testimonials-sync-btn.secondary {
+  background: #eef2f7;
+  color: #334155;
+}
+
 .admin-testimonials-sync-btn:disabled {
   opacity: 0.65;
   cursor: not-allowed;

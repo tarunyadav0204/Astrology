@@ -67,6 +67,8 @@ def ensure_testimonials_table() -> None:
 class SyncTestimonialsRequest(BaseModel):
     max_results: int = Field(default=50, ge=1, le=100)
     min_rating: int = Field(default=4, ge=1, le=5)
+    page_token: Optional[str] = None
+    pages: int = Field(default=1, ge=1, le=10)
     package_name: Optional[str] = None
 
 
@@ -170,7 +172,12 @@ def _ensure_play_env_loaded() -> None:
         logger.warning("Google Play testimonials: could not load .env: %s", exc)
 
 
-def _fetch_google_play_reviews(package_name: str, max_results: int) -> list[dict[str, Any]]:
+def _fetch_google_play_reviews(
+    package_name: str,
+    max_results: int,
+    page_token: Optional[str] = None,
+    pages: int = 1,
+) -> dict[str, Any]:
     import requests
     from google.auth.transport.requests import AuthorizedSession
 
@@ -183,15 +190,34 @@ def _fetch_google_play_reviews(package_name: str, max_results: int) -> list[dict
 
     session = AuthorizedSession(credentials)
     url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/reviews"
-    response = session.get(url, params={"maxResults": max_results}, timeout=30)
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as exc:
-        logger.error("Google Play testimonials sync failed: %s %s", response.status_code, response.text[:500])
-        raise HTTPException(status_code=502, detail="Google Play reviews fetch failed") from exc
+    all_reviews: list[dict[str, Any]] = []
+    next_page_token = (page_token or "").strip() or None
+    pages_fetched = 0
 
-    data = response.json() or {}
-    return data.get("reviews") or []
+    for _ in range(max(1, pages)):
+        params: dict[str, Any] = {"maxResults": max_results}
+        if next_page_token:
+            params["token"] = next_page_token
+
+        response = session.get(url, params=params, timeout=30)
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            logger.error("Google Play testimonials sync failed: %s %s", response.status_code, response.text[:500])
+            raise HTTPException(status_code=502, detail="Google Play reviews fetch failed") from exc
+
+        data = response.json() or {}
+        all_reviews.extend(data.get("reviews") or [])
+        pages_fetched += 1
+        next_page_token = ((data.get("tokenPagination") or {}).get("nextPageToken") or "").strip() or None
+        if not next_page_token:
+            break
+
+    return {
+        "reviews": all_reviews,
+        "next_page_token": next_page_token,
+        "pages_fetched": pages_fetched,
+    }
 
 
 def _extract_user_comment(review: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -323,9 +349,17 @@ async def admin_sync_testimonials(
     current_user: User = Depends(_require_admin),
 ):
     package_name = (body.package_name or os.getenv("GOOGLE_PLAY_PACKAGE_NAME") or DEFAULT_PACKAGE_NAME).strip()
-    reviews = _fetch_google_play_reviews(package_name, body.max_results)
+    fetched = _fetch_google_play_reviews(package_name, body.max_results, body.page_token, body.pages)
+    reviews = fetched["reviews"]
     result = _upsert_reviews(reviews, body.min_rating)
-    return {"ok": True, "fetched": len(reviews), "package_name": package_name, **result}
+    return {
+        "ok": True,
+        "fetched": len(reviews),
+        "package_name": package_name,
+        "next_page_token": fetched["next_page_token"],
+        "pages_fetched": fetched["pages_fetched"],
+        **result,
+    }
 
 
 @router.patch("/admin/testimonials/{testimonial_id}")

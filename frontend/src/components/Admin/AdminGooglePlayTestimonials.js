@@ -20,8 +20,11 @@ export default function AdminGooglePlayTestimonials() {
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncMode, setSyncMode] = useState('');
   const [message, setMessage] = useState('');
   const [drafts, setDrafts] = useState({});
+  const [nextPageToken, setNextPageToken] = useState('');
+  const [minRating, setMinRating] = useState(4);
 
   const counts = useMemo(() => {
     return items.reduce(
@@ -69,24 +72,32 @@ export default function AdminGooglePlayTestimonials() {
     loadTestimonials();
   }, [loadTestimonials]);
 
-  const syncLatest = async () => {
+  const syncReviews = async ({ mode, pageToken = '', pages = 1 }) => {
     setSyncing(true);
+    setSyncMode(mode);
     setMessage('');
     try {
       const response = await fetch('/api/admin/testimonials/sync', {
         method: 'POST',
         headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ max_results: 100, min_rating: 4 }),
+        body: JSON.stringify({
+          max_results: 100,
+          min_rating: Number(minRating) || 4,
+          page_token: pageToken || null,
+          pages,
+        }),
       });
       const data = await getJsonOrThrow(response, 'Failed to fetch Google Play reviews');
+      setNextPageToken(data.next_page_token || '');
       setMessage(
-        `Fetched ${data.fetched} reviews: ${data.inserted} new, ${data.updated} updated, ${data.skipped} skipped.`
+        `Fetched ${data.fetched} reviews across ${data.pages_fetched || 1} page(s): ${data.inserted} new, ${data.updated} updated, ${data.skipped} skipped.${data.next_page_token ? ' More reviews are available.' : ''}`
       );
       await loadTestimonials();
     } catch (error) {
       setMessage(error.message || 'Failed to fetch Google Play reviews');
     } finally {
       setSyncing(false);
+      setSyncMode('');
     }
   };
 
@@ -145,9 +156,44 @@ export default function AdminGooglePlayTestimonials() {
           <h2>Google Play Testimonials</h2>
           <p>Fetch latest Google Play reviews, approve selected ones, and control how they appear on the homepage.</p>
         </div>
-        <button type="button" className="admin-testimonials-sync-btn" onClick={syncLatest} disabled={syncing}>
-          {syncing ? 'Fetching...' : 'Fetch latest reviews'}
-        </button>
+        <div className="admin-testimonials-fetch-actions">
+          <label className="admin-testimonials-min-rating">
+            Min rating
+            <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} disabled={syncing}>
+              <option value={5}>5★</option>
+              <option value={4}>4★+</option>
+              <option value={3}>3★+</option>
+              <option value={2}>2★+</option>
+              <option value={1}>1★+</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="admin-testimonials-sync-btn"
+            onClick={() => syncReviews({ mode: 'latest', pages: 1 })}
+            disabled={syncing}
+          >
+            {syncing && syncMode === 'latest' ? 'Fetching...' : 'Fetch latest reviews'}
+          </button>
+          <button
+            type="button"
+            className="admin-testimonials-sync-btn secondary"
+            onClick={() => syncReviews({ mode: 'more', pageToken: nextPageToken, pages: 1 })}
+            disabled={syncing || !nextPageToken}
+            title={nextPageToken ? 'Fetch the next Google Play reviews page' : 'Fetch latest reviews first'}
+          >
+            {syncing && syncMode === 'more' ? 'Fetching...' : 'Fetch more reviews'}
+          </button>
+          <button
+            type="button"
+            className="admin-testimonials-sync-btn secondary"
+            onClick={() => syncReviews({ mode: 'all', pageToken: nextPageToken, pages: 10 })}
+            disabled={syncing}
+            title="Fetch up to 10 Google Play pages from the current position"
+          >
+            {syncing && syncMode === 'all' ? 'Fetching...' : 'Fetch all available'}
+          </button>
+        </div>
       </div>
 
       <div className="admin-testimonials-toolbar">

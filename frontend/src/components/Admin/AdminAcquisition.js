@@ -95,6 +95,8 @@ const AdminAcquisition = () => {
   });
   const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
   const [timelineModal, setTimelineModal] = useState({ visible: false, loading: false, error: '', data: null });
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState('');
 
   const applyUtmAndSearch = useCallback(() => {
     setUtmSourceFilter(utmSourceInput.trim());
@@ -174,6 +176,22 @@ const AdminAcquisition = () => {
       setTimelineModal({ visible: true, loading: false, error: '', data });
     } catch (e) {
       setTimelineModal({ visible: true, loading: false, error: e?.message || 'Failed to load timeline', data: null });
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportMsg('');
+    try {
+      const result = await adminService.exportAcquisitionInstallations({
+        ...activeFilterParams(),
+        registered,
+      });
+      setExportMsg(`Exported ${result.filename}`);
+    } catch (e) {
+      setExportMsg(e?.message || 'Export failed');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -328,7 +346,22 @@ const AdminAcquisition = () => {
         >
           Refresh
         </button>
+        <button
+          type="button"
+          className="users-search-btn"
+          onClick={handleExport}
+          disabled={loading || exporting}
+          title="Download ZIP with funnel summary, drop-off, and install-level CSVs"
+        >
+          {exporting ? 'Exporting…' : 'Export for marketing'}
+        </button>
       </div>
+
+      {exportMsg ? (
+        <p style={{ margin: '0 0 16px', fontSize: 13, color: exportMsg.toLowerCase().includes('failed') || exportMsg.includes('Too many') ? '#b91c1c' : '#166534' }}>
+          {exportMsg}
+        </p>
+      ) : null}
 
       <div className="users-summary-grid" style={{ marginBottom: 20 }}>
         <div className="users-summary-card">

@@ -348,6 +348,45 @@ export const adminService = {
     return response.json();
   },
 
+  async exportAcquisitionInstallations(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
+    if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    if (params.registered != null && params.registered !== '' && params.registered !== 'all') {
+      sp.set('registered', params.registered);
+    }
+    if (params.utm_campaign != null && params.utm_campaign !== '') sp.set('utm_campaign', params.utm_campaign);
+    if (params.utm_source != null && params.utm_source !== '') sp.set('utm_source', params.utm_source);
+    if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
+    if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/acquisition-installations/export') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAdminAuthHeaders() });
+    if (!response.ok) {
+      let detail = 'Failed to export install funnel';
+      try {
+        const body = await response.json();
+        detail = body.detail || detail;
+      } catch (_) {
+        // ignore non-JSON error bodies
+      }
+      throw new Error(detail);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'install-funnel-export.zip';
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+    return { ok: true, filename };
+  },
+
   async getAdminExpenses(params = {}) {
     const sp = new URLSearchParams();
     if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
