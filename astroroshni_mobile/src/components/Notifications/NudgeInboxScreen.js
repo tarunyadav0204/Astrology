@@ -126,9 +126,11 @@ export default function NudgeInboxScreen({ navigation }) {
     }
     if (cta === 'astroroshni://chat' || landingScreen === 'chat' || String(item.trigger_id || '') === 'admin') {
       const q = d.question != null ? String(d.question).trim() : '';
+      const nudgeId = d.nudge_id != null ? String(d.nudge_id).trim() : '';
       navigation.navigate('Home', {
         startChat: true,
         ...(q ? { initialMessage: q } : {}),
+        ...(nudgeId ? { nudgeId } : {}),
       });
       return;
     }

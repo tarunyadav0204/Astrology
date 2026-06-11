@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -158,6 +159,36 @@ class MarkNudgesReadRequest(BaseModel):
     ids: Optional[List[int]] = None
 
 
+class CampaignUpsertRequest(BaseModel):
+    """Admin-defined multi-channel nudge campaign."""
+
+    name: str
+    title_template: str
+    body_template: str
+    question_template: str = ""
+    channel_policy: str = "waterfall"  # "waterfall" or "blast"
+    channels: List[str] = Field(default_factory=lambda: ["push", "whatsapp", "email"])
+    ai_personalize: bool = False
+    ai_base_prompt: str = ""
+    audience_filter: Dict[str, Any] = Field(default_factory=lambda: {"type": "all"})
+    landing_screen: str = "chat"
+    scheduled_at: Optional[str] = None  # ISO datetime (IST assumed when no offset)
+    status: str = "draft"  # "draft" or "scheduled"
+
+
+class CampaignPreviewRequest(BaseModel):
+    title_template: str
+    body_template: str
+    question_template: str = ""
+    ai_personalize: bool = False
+    ai_base_prompt: str = ""
+    user_id: Optional[int] = None  # sample user; defaults to current admin
+
+
+class CampaignTestSendRequest(BaseModel):
+    user_id: Optional[int] = None  # defaults to current admin
+
+
 class TriggerDefinitionUpdateRequest(BaseModel):
     """Admin-editable copy (templates) and JSON config for a registered nudge trigger."""
 
@@ -297,6 +328,8 @@ async def admin_send_notification(
         raise HTTPException(status_code=400, detail="title and body required")
     landing_screen = _normalize_landing_screen(body.landing_screen)
     try:
+        from .delivery import new_delivery_group_id
+
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             tokens = db.get_device_tokens_for_user(conn, body.user_id)
@@ -305,6 +338,8 @@ async def admin_send_notification(
                 question=body.question,
                 native_id=body.native_id,
             )
+            group_id = new_delivery_group_id()
+            push_data["nudge_id"] = group_id
             sent = 0
             if tokens:
                 for token, platform in tokens:
@@ -326,6 +361,8 @@ async def admin_send_notification(
                 event_params="{}",
                 channel=channel,
                 data_payload=push_data,
+                delivery_group_id=group_id,
+                send_status="sent" if sent > 0 else "stored",
             )
             conn.commit()
         logger.info(
@@ -414,11 +451,16 @@ def _run_admin_bulk_notification_job(
             )
             conn.commit()
 
+        from .delivery import new_delivery_group_id
+
         push_data = _admin_notification_push_data(
             landing_screen=landing_screen,
             question=question,
             native_id=None,
         )
+        group_id_by_user: Dict[int, str] = {
+            int(uid): new_delivery_group_id() for uid in target_user_ids
+        }
         token_messages: List[Dict[str, Any]] = []
         token_user_ids: List[int] = []
         for uid in target_user_ids:
@@ -428,7 +470,7 @@ def _run_admin_bulk_notification_job(
                     "title": title,
                     "body": body_text,
                     "sound": "default",
-                    "data": push_data,
+                    "data": {**push_data, "nudge_id": group_id_by_user[int(uid)]},
                 })
                 token_user_ids.append(int(uid))
 
@@ -455,10 +497,13 @@ def _run_admin_bulk_notification_job(
                 conn.commit()
 
         sent_at_iso = date.today().isoformat()
-        data_json = json.dumps(push_data, ensure_ascii=False)[:8000]
         delivery_rows = []
         for uid in target_user_ids:
             channel = "push" if sent_by_user.get(int(uid), 0) > 0 else "stored"
+            gid = group_id_by_user[int(uid)]
+            data_json = json.dumps(
+                {**push_data, "nudge_id": gid}, ensure_ascii=False
+            )[:8000]
             delivery_rows.append((
                 int(uid),
                 "admin",
@@ -468,6 +513,8 @@ def _run_admin_bulk_notification_job(
                 sent_at_iso,
                 channel,
                 data_json,
+                gid,
+                "sent" if channel == "push" else "stored",
             ))
 
         for delivery_chunk in _chunked(delivery_rows, 1000):
@@ -1402,6 +1449,12 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                 except Exception:
                     data_json = ""
 
+                from .delivery import new_delivery_group_id
+
+                group_id_by_user: Dict[int, str] = {
+                    int(uid): new_delivery_group_id() for uid in all_user_ids
+                }
+
                 # One Expo HTTP request per 100 devices (avoids gateway timeouts on large user bases).
                 expo_messages: List[Dict[str, Any]] = []
                 message_uid: List[int] = []
@@ -1417,7 +1470,7 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                                 "title": title[:100],
                                 "body": body_text[:200],
                                 "sound": "default",
-                                "data": payload,
+                                "data": {**payload, "nudge_id": group_id_by_user[uid_int]},
                             }
                         )
                         message_uid.append(uid_int)
@@ -1435,6 +1488,10 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                 for uid in all_user_ids:
                     uid_int = int(uid)
                     ch = "push" if push_ok_by_uid.get(uid_int) else "stored"
+                    gid = group_id_by_user[uid_int]
+                    user_data_json = json.dumps(
+                        {**payload, "nudge_id": gid}, ensure_ascii=False
+                    )[:8000]
                     batch_rows.append(
                         (
                             uid_int,
@@ -1444,7 +1501,9 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                             event_params,
                             sent_at_iso,
                             ch,
-                            data_json or "",
+                            user_data_json,
+                            gid,
+                            "sent" if ch == "push" else "stored",
                         )
                     )
                 db.insert_deliveries_batch(conn, batch_rows)
@@ -1531,6 +1590,8 @@ def _process_broadcast_schedule_batch(
                 "push_sent": 0,
             }
 
+        from .delivery import new_delivery_group_id
+
         payload = {
             "trigger_id": "broadcast_schedule",
             "cta": "astroroshni://chat",
@@ -1542,7 +1603,9 @@ def _process_broadcast_schedule_batch(
             {"schedule_id": int(schedule_id), "category": category},
             ensure_ascii=False,
         )
-        data_json = json.dumps(payload, ensure_ascii=False)[:8000]
+        group_id_by_user: Dict[int, str] = {
+            int(uid): new_delivery_group_id() for uid in target_user_ids
+        }
 
         token_rows = db.get_device_tokens_for_users(conn, target_user_ids)
         tokens_by_user: Dict[int, List[str]] = defaultdict(list)
@@ -1560,7 +1623,7 @@ def _process_broadcast_schedule_batch(
                     "title": title,
                     "body": body_text,
                     "sound": "default",
-                    "data": payload,
+                    "data": {**payload, "nudge_id": group_id_by_user[int(uid)]},
                 })
                 token_user_ids.append(int(uid))
 
@@ -1577,6 +1640,10 @@ def _process_broadcast_schedule_batch(
         delivery_rows: List[tuple] = []
         for uid in target_user_ids:
             channel = "push" if push_ok_by_uid.get(int(uid)) else "stored"
+            gid = group_id_by_user[int(uid)]
+            user_data_json = json.dumps(
+                {**payload, "nudge_id": gid}, ensure_ascii=False
+            )[:8000]
             delivery_rows.append((
                 int(uid),
                 "broadcast_schedule",
@@ -1585,7 +1652,9 @@ def _process_broadcast_schedule_batch(
                 event_params,
                 sent_at_iso,
                 channel,
-                data_json,
+                user_data_json,
+                gid,
+                "sent" if channel == "push" else "stored",
             ))
 
         db.insert_deliveries_batch(conn, delivery_rows)
@@ -1697,11 +1766,15 @@ def _process_recent_chat_followup_user(
     if not title or not body_text:
         return {"ok": False, "error": "empty_generated_nudge", "user_id": int(uid), "message_id": int(message_id)}
 
+    from .delivery import new_delivery_group_id
+
+    group_id = new_delivery_group_id()
     push_data: Dict[str, Any] = {
         "trigger_id": "chat_hourly_followup",
         "cta": "astroroshni://chat",
         "question": question,
         "source_message_id": str(message_id),
+        "nudge_id": group_id,
     }
 
     tokens = db.get_device_tokens_for_user(conn, int(uid))
@@ -1744,6 +1817,8 @@ def _process_recent_chat_followup_user(
         event_params=event_params,
         channel=channel,
         data_payload=push_data,
+        delivery_group_id=group_id,
+        send_status="sent" if channel in ("push", "whatsapp", "whatsapp_template") else "stored",
     )
     return {
         "ok": True,
@@ -2208,3 +2283,454 @@ async def admin_list_today_deliveries(
     except Exception as e:
         logger.exception("admin_list_today_deliveries failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to fetch deliveries") from e
+
+
+# ---------------------------------------------------------------------------
+# Multi-channel nudge campaigns
+# ---------------------------------------------------------------------------
+
+def _require_admin(current_user: User) -> None:
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+
+def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
+    """Validate and normalize a campaign create/update payload."""
+    from .campaigns import (
+        ALLOWED_AUDIENCE_TYPES,
+        ALLOWED_CHANNELS,
+        ALLOWED_POLICIES,
+        LANDING_SCREEN_TO_CTA,
+    )
+    from .param_resolver import CAMPAIGN_PLACEHOLDERS
+
+    name = (body.name or "").strip()[:200]
+    title_t = (body.title_template or "").strip()
+    body_t = (body.body_template or "").strip()
+    question_t = (body.question_template or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    if not title_t or not body_t:
+        raise HTTPException(status_code=400, detail="title_template and body_template are required")
+    if len(title_t) > 200 or len(body_t) > 600 or len(question_t) > 900:
+        raise HTTPException(
+            status_code=400,
+            detail="Template length exceeds limits (title 200, body 600, question 900).",
+        )
+    try:
+        validate_templates(title_t, body_t, question_t or None, CAMPAIGN_PLACEHOLDERS)
+    except TemplateRenderError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    policy = (body.channel_policy or "waterfall").strip().lower()
+    if policy not in ALLOWED_POLICIES:
+        raise HTTPException(status_code=400, detail="channel_policy must be 'waterfall' or 'blast'")
+
+    channels: List[str] = []
+    for ch in body.channels or []:
+        c = str(ch or "").strip().lower()
+        if c in ALLOWED_CHANNELS and c not in channels:
+            channels.append(c)
+    if not channels:
+        raise HTTPException(status_code=400, detail="At least one channel is required")
+
+    landing = str(body.landing_screen or "chat").strip().lower().replace("-", "_").replace(" ", "_")
+    if landing not in LANDING_SCREEN_TO_CTA:
+        raise HTTPException(status_code=400, detail="Invalid landing_screen")
+
+    audience = body.audience_filter or {"type": "all"}
+    atype = str(audience.get("type") or "all").strip().lower()
+    if atype not in ALLOWED_AUDIENCE_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid audience type: {atype}")
+    if atype == "user_ids" and not (audience.get("user_ids") or []):
+        raise HTTPException(status_code=400, detail="audience user_ids must be non-empty")
+
+    status = (body.status or "draft").strip().lower()
+    if status not in ("draft", "scheduled"):
+        raise HTTPException(status_code=400, detail="status must be 'draft' or 'scheduled'")
+
+    scheduled_at = None
+    if body.scheduled_at and str(body.scheduled_at).strip():
+        try:
+            scheduled_at = datetime.fromisoformat(str(body.scheduled_at).strip().replace("Z", "+00:00"))
+            if scheduled_at.tzinfo is None:
+                scheduled_at = scheduled_at.replace(tzinfo=IST_TZ)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid scheduled_at: {e}") from e
+    if status == "scheduled" and scheduled_at is None:
+        raise HTTPException(status_code=400, detail="scheduled_at is required when status is 'scheduled'")
+
+    return {
+        "name": name,
+        "title_template": title_t,
+        "body_template": body_t,
+        "question_template": question_t,
+        "channel_policy": policy,
+        "channels_json": json.dumps(channels, ensure_ascii=False),
+        "ai_personalize": bool(body.ai_personalize),
+        "ai_base_prompt": (body.ai_base_prompt or "").strip()[:2000],
+        "audience_filter_json": json.dumps(audience, ensure_ascii=False)[:20000],
+        "landing_screen": landing,
+        "scheduled_at": scheduled_at,
+        "status": status,
+    }
+
+
+def _campaign_dto(conn, campaign: Dict[str, Any], include_stats: bool = False) -> Dict[str, Any]:
+    out = dict(campaign)
+    out.pop("channels_json", None)
+    out.pop("audience_filter_json", None)
+    if include_stats:
+        try:
+            out["stats"] = db.campaign_stats(conn, int(campaign["id"]))
+        except Exception as e:
+            logger.warning("campaign stats failed id=%s: %s", campaign.get("id"), e)
+            out["stats"] = None
+    return out
+
+
+@router.get("/admin/campaigns")
+async def admin_list_campaigns(
+    limit: int = Query(200, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            items = [_campaign_dto(conn, c) for c in db.list_campaigns(conn, limit=limit)]
+        from .param_resolver import CAMPAIGN_PLACEHOLDERS
+
+        return {"items": items, "allowed_placeholders": sorted(CAMPAIGN_PLACEHOLDERS)}
+    except Exception as e:
+        logger.exception("admin_list_campaigns failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load campaigns") from e
+
+
+@router.post("/admin/campaigns")
+async def admin_create_campaign(
+    body: CampaignUpsertRequest,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    fields = _validate_campaign_payload(body)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            campaign_id = db.create_campaign(conn, created_by=current_user.userid, **fields)
+            conn.commit()
+            campaign = db.get_campaign(conn, int(campaign_id))
+        return {"ok": True, "campaign": _campaign_dto(None, campaign)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_create_campaign failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create campaign") from e
+
+
+@router.get("/admin/campaigns/{campaign_id}")
+async def admin_get_campaign(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            campaign = db.get_campaign(conn, int(campaign_id))
+            if not campaign:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            dto = _campaign_dto(conn, campaign, include_stats=True)
+        return dto
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_get_campaign failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load campaign") from e
+
+
+@router.put("/admin/campaigns/{campaign_id}")
+async def admin_update_campaign(
+    campaign_id: int,
+    body: CampaignUpsertRequest,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    fields = _validate_campaign_payload(body)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            existing = db.get_campaign(conn, int(campaign_id))
+            if not existing:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            if existing.get("status") in ("sending", "sent"):
+                raise HTTPException(status_code=409, detail="Cannot edit a campaign that has been dispatched")
+            db.update_campaign(conn, int(campaign_id), **fields)
+            conn.commit()
+            campaign = db.get_campaign(conn, int(campaign_id))
+        return {"ok": True, "campaign": _campaign_dto(None, campaign)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_update_campaign failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to update campaign") from e
+
+
+@router.delete("/admin/campaigns/{campaign_id}")
+async def admin_delete_campaign(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            deleted = db.delete_campaign(conn, int(campaign_id))
+            conn.commit()
+        if not deleted:
+            raise HTTPException(
+                status_code=409,
+                detail="Campaign not found or already dispatched (cannot delete)",
+            )
+        return {"ok": True, "deleted": deleted}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_delete_campaign failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to delete campaign") from e
+
+
+@router.post("/admin/campaigns/preview")
+async def admin_preview_campaign(
+    body: CampaignPreviewRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Render campaign templates against a sample user's resolved parameters."""
+    _require_admin(current_user)
+    from .campaigns import render_campaign_for_user, needed_placeholders
+    from .param_resolver import CAMPAIGN_PLACEHOLDERS, default_params, resolve_params_for_users
+
+    title_t = (body.title_template or "").strip()
+    body_t = (body.body_template or "").strip()
+    question_t = (body.question_template or "").strip()
+    if not title_t or not body_t:
+        raise HTTPException(status_code=400, detail="title_template and body_template are required")
+    try:
+        validate_templates(title_t, body_t, question_t or None, CAMPAIGN_PLACEHOLDERS)
+    except TemplateRenderError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    sample_uid = int(body.user_id) if body.user_id else int(current_user.userid)
+    pseudo_campaign = {
+        "title_template": title_t,
+        "body_template": body_t,
+        "question_template": question_t,
+        "ai_personalize": bool(body.ai_personalize),
+        "ai_base_prompt": (body.ai_base_prompt or "").strip(),
+    }
+    try:
+        def _work():
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                params = resolve_params_for_users(
+                    conn, [sample_uid], needed=needed_placeholders(pseudo_campaign)
+                ).get(sample_uid) or default_params()
+            copy = render_campaign_for_user(pseudo_campaign, params)
+            return params, copy
+
+        params, copy = await run_in_threadpool(_work)
+        return {"ok": True, "user_id": sample_uid, "params": params, "rendered": copy}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_preview_campaign failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to preview campaign") from e
+
+
+@router.post("/admin/campaigns/{campaign_id}/test-send")
+async def admin_test_send_campaign(
+    campaign_id: int,
+    body: CampaignTestSendRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Send a single personalized copy of the campaign to one user (default: yourself)."""
+    _require_admin(current_user)
+    from .campaigns import send_campaign_test
+
+    target_uid = int(body.user_id) if body.user_id else int(current_user.userid)
+    try:
+        def _work():
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                campaign = db.get_campaign(conn, int(campaign_id))
+                if not campaign:
+                    return None
+                result = send_campaign_test(conn, campaign, target_uid)
+                conn.commit()
+                return result
+
+        result = await run_in_threadpool(_work)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        return {"ok": True, "user_id": target_uid, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_test_send_campaign failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to test-send campaign") from e
+
+
+@router.post("/admin/campaigns/{campaign_id}/send-now")
+async def admin_send_campaign_now(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .campaigns import dispatch_campaign_now
+
+    try:
+        result = await run_in_threadpool(dispatch_campaign_now, int(campaign_id))
+        if not result.get("ok"):
+            raise HTTPException(status_code=409, detail=result.get("error") or "Dispatch failed")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_send_campaign_now failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to dispatch campaign") from e
+
+
+@router.post("/admin/campaigns/dispatch-due")
+async def admin_dispatch_due_campaigns(
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .campaigns import dispatch_due_campaigns
+
+    return await run_in_threadpool(dispatch_due_campaigns, limit)
+
+
+@router.post("/cron/campaign/dispatch-due")
+async def cron_dispatch_due_campaigns(
+    limit: int = Query(20, ge=1, le=100),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+):
+    """
+    Cron-safe campaign dispatch secured by static secret header:
+      X-Cron-Secret: <NUDGE_CRON_SECRET>
+    """
+    _verify_cron_secret(x_cron_secret)
+    from .campaigns import dispatch_due_campaigns
+
+    return await run_in_threadpool(dispatch_due_campaigns, limit)
+
+
+@router.post("/internal/tasks/campaign-batch")
+async def internal_campaign_batch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: render + deliver one campaign recipient batch."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    from .campaigns import process_campaign_batch
+
+    try:
+        campaign_id = int(body.get("campaign_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="campaign_id is required")
+    user_ids_raw = body.get("user_ids") or []
+    if not isinstance(user_ids_raw, list):
+        raise HTTPException(status_code=400, detail="user_ids must be a list")
+    try:
+        result = await run_in_threadpool(
+            process_campaign_batch,
+            campaign_id=campaign_id,
+            user_ids=user_ids_raw,
+        )
+        return result
+    except Exception as e:
+        logger.exception("campaign batch task failed campaign_id=%s: %s", campaign_id, e)
+        raise HTTPException(status_code=500, detail="campaign batch task failed") from e
+
+
+# ---------------------------------------------------------------------------
+# Attribution: email CTA redirect + analytics endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/r/{delivery_group_id}")
+async def nudge_cta_redirect(delivery_group_id: str):
+    """
+    Email/CTA tracking link: log the click against the delivery group, then
+    redirect to the chat web page (deep links into the app when installed).
+    """
+    gid = (delivery_group_id or "").strip()
+    if gid and len(gid) <= 64 and gid.isalnum():
+        try:
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                db.mark_delivery_clicked(conn, gid)
+                conn.commit()
+        except Exception as e:
+            logger.warning("nudge click log failed group=%s: %s", gid, e)
+    target = (os.getenv("NUDGE_EMAIL_CTA_REDIRECT_URL") or "https://astroroshni.com/chat").strip()
+    sep = "&" if "?" in target else "?"
+    return RedirectResponse(url=f"{target}{sep}nudge={gid}", status_code=302)
+
+
+@router.get("/admin/campaigns/{campaign_id}/stats")
+async def admin_campaign_stats(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    try:
+        def _work():
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                campaign = db.get_campaign(conn, int(campaign_id))
+                if not campaign:
+                    return None
+                return _campaign_dto(None, campaign), db.campaign_stats(conn, int(campaign_id))
+
+        result = await run_in_threadpool(_work)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        campaign, stats = result
+        return {"ok": True, "campaign": campaign, "stats": stats}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_campaign_stats failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load campaign stats") from e
+
+
+@router.get("/admin/stats/overview")
+async def admin_nudge_stats_overview(
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD; default 7 days ago (IST)"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD; default today (IST)"),
+    current_user: User = Depends(get_current_user),
+):
+    """Cross-channel nudge dashboard: sends, conversions, and time-to-question."""
+    _require_admin(current_user)
+    try:
+        today = datetime.now(IST_TZ).date()
+        end = date.fromisoformat(end_date) if end_date else today
+        start = date.fromisoformat(start_date) if start_date else end - timedelta(days=7)
+        if start > end:
+            raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+
+        def _work():
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                return db.overview_stats(conn, start.isoformat(), end.isoformat())
+
+        stats = await run_in_threadpool(_work)
+        return {"ok": True, **stats}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {e}") from e
+    except Exception as e:
+        logger.exception("admin_nudge_stats_overview failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to load nudge stats") from e

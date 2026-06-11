@@ -223,7 +223,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     { title: 'Education Report', price: '₹169', desc: 'Academic success guidance', icon: '🎓' }
   ];
 
-  const testimonials = [
+  const fallbackTestimonials = [
     { name: 'Priya Sharma', location: 'Mumbai', rating: 5, text: 'I haven\'t seen any Astrology product like AstroRoshni.com. Most predictions are so accurate that its unbelievable.', image: 'https://images.unsplash.com/photo-1494790108755-2616c9c0e8e0?w=80&h=80&fit=crop&crop=face' },
     { name: 'Rajesh Kumar', location: 'Delhi', rating: 5, text: 'Being an astrologer I love AstroRoshni because it predicts using multi-layered prediction engine which uses all divisional charts, Vimshottari dasha with Char, Yogini confirmation. This is humanly not possible.', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face' },
     { name: 'Anita Patel', location: 'Ahmedabad', rating: 5, text: 'The AI-powered Tara gives instant answers with Swiss Ephemeris precision. Real-time transit analysis and Nakshatra predictions are incredibly detailed. This combines ancient Vedic wisdom with modern technology perfectly.', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face' }
@@ -255,6 +255,25 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [birthFormContext, setBirthFormContext] = useState('chart');
   const [showDestinyModal, setShowDestinyModal] = useState(false);
   const [destinyReading, setDestinyReading] = useState(null);
+  const [playTestimonials, setPlayTestimonials] = useState([]);
+  const testimonials = playTestimonials.length > 0 ? playTestimonials : fallbackTestimonials;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/testimonials?limit=12')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load testimonials'))))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.testimonials)) {
+          setPlayTestimonials(data.testimonials);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPlayTestimonials([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -2344,8 +2363,23 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Testimonials */}
       <section className="testimonials-section">
         <div className="container">
-          <h2>What Our Customers Say</h2>
-          <div className="testimonials-grid">
+          <div className="testimonials-section-header">
+            <div>
+              <h2>What Our Customers Say</h2>
+              <p>{playTestimonials.length > 0 ? 'Selected reviews from Google Play' : 'Loved by AstroRoshni users'}</p>
+            </div>
+            {playTestimonials.length > 0 && (
+              <a
+                className="testimonials-play-link"
+                href="https://play.google.com/store/apps/details?id=com.astroroshni.mobile"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Google Play
+              </a>
+            )}
+          </div>
+          <div className="testimonials-carousel" aria-label="Customer testimonials">
             {testimonials.map((testimonial, index) => (
               <div key={index} className="testimonial-card">
                 <div className="testimonial-header">
@@ -2353,7 +2387,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   <div className="testimonial-info">
                     <h4>{testimonial.name}</h4>
                     <p>{testimonial.location}</p>
-                    <div className="rating">{'⭐'.repeat(testimonial.rating)}</div>
+                    <div className="rating">{'⭐'.repeat(Number(testimonial.rating) || 5)}</div>
                   </div>
                 </div>
                 <p className="testimonial-text">"{testimonial.text}"</p>

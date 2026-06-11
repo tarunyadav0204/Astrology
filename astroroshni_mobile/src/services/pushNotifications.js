@@ -190,6 +190,8 @@ async function processNotificationResponse(response, navigationRef) {
   const slug = data?.slug != null ? String(data.slug).trim() : null;
   const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
   const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
+  // Delivery group id for nudge → question conversion attribution.
+  const nudgeId = data?.nudge_id && String(data.nudge_id).trim() ? String(data.nudge_id).trim() : undefined;
   const notificationTitle = response?.notification?.request?.content?.title ?? '';
   const notificationBody = response?.notification?.request?.content?.body ?? '';
   const { storage } = require('./storage');
@@ -318,6 +320,7 @@ async function processNotificationResponse(response, navigationRef) {
         startChat: true,
         ...(question && { initialMessage: question }),
         ...(sessionId && { responseReadySessionId: sessionId }),
+        ...(nudgeId && { nudgeId }),
       });
     }
   } catch (e) {

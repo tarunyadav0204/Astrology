@@ -250,6 +250,88 @@ def init_nudge_tables(conn) -> None:
             conn,
             "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS data_json TEXT",
         )
+        # Multi-channel campaign columns:
+        # - campaign_id: nudge_campaigns.id when sent by a campaign
+        # - delivery_group_id: one logical nudge that may produce several channel rows
+        # - send_status: 'sent' | 'failed' | 'stored' (legacy rows have NULL = sent)
+        # - is_primary: the single row per group shown in the in-app inbox
+        # - clicked_at: email/CTA tracking-link click time
+        for _ddl in (
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS campaign_id INTEGER",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS delivery_group_id TEXT",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS send_status TEXT",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ",
+        ):
+            _safe_execute_nudge_ddl(conn, _ddl)
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_campaign "
+            "ON nudge_deliveries(campaign_id) WHERE campaign_id IS NOT NULL",
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_group "
+            "ON nudge_deliveries(delivery_group_id) WHERE delivery_group_id IS NOT NULL",
+        )
+
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_campaigns (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'draft',
+                title_template TEXT NOT NULL,
+                body_template TEXT NOT NULL,
+                question_template TEXT,
+                channel_policy TEXT NOT NULL DEFAULT 'waterfall',
+                channels_json TEXT NOT NULL DEFAULT '["push","whatsapp","email"]',
+                ai_personalize BOOLEAN NOT NULL DEFAULT FALSE,
+                ai_base_prompt TEXT,
+                audience_filter_json TEXT NOT NULL DEFAULT '{"type":"all"}',
+                landing_screen TEXT NOT NULL DEFAULT 'chat',
+                scheduled_at TIMESTAMPTZ,
+                dispatched_at TIMESTAMPTZ,
+                total_targeted INTEGER NOT NULL DEFAULT 0,
+                created_by INTEGER,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_campaigns_status_sched "
+            "ON nudge_campaigns(status, scheduled_at)",
+        )
+
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_conversions (
+                id SERIAL PRIMARY KEY,
+                delivery_group_id TEXT NOT NULL UNIQUE,
+                campaign_id INTEGER,
+                userid INTEGER NOT NULL,
+                trigger_id TEXT,
+                question TEXT,
+                converted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                seconds_since_sent INTEGER,
+                attribution TEXT NOT NULL DEFAULT 'tap'
+            )
+            """,
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_conversions_campaign "
+            "ON nudge_conversions(campaign_id) WHERE campaign_id IS NOT NULL",
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_conversions_converted "
+            "ON nudge_conversions(converted_at)",
+        )
 
         execute(
             conn,
@@ -777,8 +859,12 @@ def insert_delivery(
     event_params: str = "",
     channel: str = "stored",
     data_payload: Optional[Dict[str, Any]] = None,
-) -> None:
-    """Insert one row into nudge_deliveries (in-app inbox + audit)."""
+    campaign_id: Optional[int] = None,
+    delivery_group_id: Optional[str] = None,
+    send_status: Optional[str] = None,
+    is_primary: bool = True,
+) -> Optional[int]:
+    """Insert one row into nudge_deliveries (in-app inbox + audit). Returns the row id."""
     data_json = ""
     if data_payload:
         try:
@@ -786,15 +872,23 @@ def insert_delivery(
         except Exception:
             data_json = ""
     try:
-        execute(
+        cur = execute(
             conn,
             """
             INSERT INTO nudge_deliveries
-            (userid, trigger_id, title, body, event_params, sent_at, channel, data_json)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''))
+            (userid, trigger_id, title, body, event_params, sent_at, channel, data_json,
+             campaign_id, delivery_group_id, send_status, is_primary)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''), %s, %s, %s, %s)
+            RETURNING id
             """,
-            (userid, trigger_id, title, body, event_params or "", sent_at.isoformat(), channel, data_json or None),
+            (
+                userid, trigger_id, title, body, event_params or "", sent_at.isoformat(),
+                channel, data_json or None,
+                campaign_id, delivery_group_id, send_status, bool(is_primary),
+            ),
         )
+        row = cur.fetchone()
+        return int(row[0]) if row else None
     except Exception as e:
         logger.exception("Failed to insert nudge delivery for user %s: %s", userid, e)
         raise
@@ -807,18 +901,26 @@ def insert_deliveries_batch(
     """
     Bulk insert nudge_deliveries. Each row tuple:
     (userid, trigger_id, title, body, event_params, sent_at_iso, channel, data_json_or_empty)
+    optionally followed by (delivery_group_id, send_status).
     """
     if not rows:
         return
+    normalized: List[Tuple[Any, ...]] = []
+    for row in rows:
+        if len(row) == 8:
+            normalized.append(tuple(row) + (None, None))
+        else:
+            normalized.append(tuple(row))
     try:
         executemany(
             conn,
             """
             INSERT INTO nudge_deliveries
-            (userid, trigger_id, title, body, event_params, sent_at, channel, data_json)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''))
+            (userid, trigger_id, title, body, event_params, sent_at, channel, data_json,
+             delivery_group_id, send_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''), %s, %s)
             """,
-            rows,
+            normalized,
         )
     except Exception as e:
         logger.exception("Failed batch insert nudge deliveries (%s rows): %s", len(rows), e)
@@ -837,7 +939,7 @@ def list_deliveries_for_user(
         SELECT id, trigger_id, title, body, event_params, data_json, sent_at::text, channel,
                created_at, read_at
         FROM nudge_deliveries
-        WHERE userid = %s
+        WHERE userid = %s AND COALESCE(is_primary, TRUE)
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
@@ -890,25 +992,30 @@ def summarize_deliveries_for_date_admin(conn, target_date: str) -> Dict[str, int
     cur = execute(
         conn,
         """
-        SELECT COUNT(*) AS total,
-               COUNT(*) FILTER (WHERE channel = 'push') AS push,
-               COUNT(*) FILTER (WHERE channel = 'whatsapp') AS whatsapp,
-               COUNT(*) FILTER (WHERE channel = 'whatsapp_template') AS whatsapp_template,
+        SELECT COUNT(DISTINCT COALESCE(delivery_group_id, id::text)) AS total,
+               COUNT(*) FILTER (WHERE channel = 'push' AND COALESCE(send_status, 'sent') = 'sent') AS push,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp_template,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_continued,
-               COUNT(*) FILTER (WHERE channel IS NULL OR TRIM(channel) = '' OR channel = 'stored') AS stored_only
+               COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
+               COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
+               COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
+                                AND (channel IS NULL OR TRIM(channel) = '' OR channel = 'stored')) AS stored_only
         FROM nudge_deliveries
         WHERE sent_at = %s
         """,
         (target_date,),
     )
-    row = cur.fetchone() or (0, 0, 0, 0, 0, 0)
+    row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0)
     return {
         "total": int(row[0] or 0),
         "push": int(row[1] or 0),
         "whatsapp": int(row[2] or 0),
         "whatsapp_template": int(row[3] or 0),
         "whatsapp_template_continued": int(row[4] or 0),
-        "stored_only": int(row[5] or 0),
+        "email": int(row[5] or 0),
+        "failed_attempts": int(row[6] or 0),
+        "stored_only": int(row[7] or 0),
     }
 
 
@@ -917,7 +1024,7 @@ def count_unread_deliveries(conn, userid: int) -> int:
         conn,
         """
         SELECT COUNT(*) FROM nudge_deliveries
-        WHERE userid = %s AND read_at IS NULL
+        WHERE userid = %s AND read_at IS NULL AND COALESCE(is_primary, TRUE)
         """,
         (userid,),
     )
@@ -1196,6 +1303,460 @@ def insert_cron_run(conn, job_key: str, status: str, summary_json: str) -> Optio
     )
     row = cur.fetchone()
     return int(row[0]) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Campaigns (multi-channel nudge campaigns defined in the admin UI)
+# ---------------------------------------------------------------------------
+
+_CAMPAIGN_COLUMNS = (
+    "id", "name", "status", "title_template", "body_template", "question_template",
+    "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
+    "audience_filter_json", "landing_screen", "scheduled_at", "dispatched_at",
+    "total_targeted", "created_by", "created_at", "updated_at",
+)
+
+
+def _campaign_row_to_dict(row: Tuple[Any, ...]) -> Dict[str, Any]:
+    out = dict(zip(_CAMPAIGN_COLUMNS, row))
+    for key in ("scheduled_at", "dispatched_at", "created_at", "updated_at"):
+        if hasattr(out.get(key), "isoformat"):
+            out[key] = out[key].isoformat()
+    try:
+        out["channels"] = json.loads(out.get("channels_json") or "[]")
+    except Exception:
+        out["channels"] = []
+    try:
+        out["audience_filter"] = json.loads(out.get("audience_filter_json") or "{}")
+    except Exception:
+        out["audience_filter"] = {}
+    out["ai_personalize"] = bool(out.get("ai_personalize"))
+    return out
+
+
+def create_campaign(
+    conn,
+    *,
+    name: str,
+    title_template: str,
+    body_template: str,
+    question_template: str,
+    channel_policy: str,
+    channels_json: str,
+    ai_personalize: bool,
+    ai_base_prompt: str,
+    audience_filter_json: str,
+    landing_screen: str,
+    scheduled_at: Optional[Any],
+    status: str,
+    created_by: Optional[int],
+) -> Optional[int]:
+    cur = execute(
+        conn,
+        """
+        INSERT INTO nudge_campaigns
+            (name, status, title_template, body_template, question_template,
+             channel_policy, channels_json, ai_personalize, ai_base_prompt,
+             audience_filter_json, landing_screen, scheduled_at, created_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (
+            name, status, title_template, body_template, question_template or None,
+            channel_policy, channels_json, bool(ai_personalize), ai_base_prompt or None,
+            audience_filter_json, landing_screen, scheduled_at, created_by,
+        ),
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row else None
+
+
+def update_campaign(conn, campaign_id: int, **fields: Any) -> int:
+    allowed = {
+        "name", "status", "title_template", "body_template", "question_template",
+        "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
+        "audience_filter_json", "landing_screen", "scheduled_at", "dispatched_at",
+        "total_targeted",
+    }
+    updates = []
+    params: List[Any] = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        updates.append(f"{key} = %s")
+        params.append(value)
+    if not updates:
+        return 0
+    updates.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(int(campaign_id))
+    cur = execute(
+        conn,
+        f"UPDATE nudge_campaigns SET {', '.join(updates)} WHERE id = %s",
+        tuple(params),
+    )
+    return int(cur.rowcount or 0)
+
+
+def get_campaign(conn, campaign_id: int) -> Optional[Dict[str, Any]]:
+    cur = execute(
+        conn,
+        f"SELECT {', '.join(_CAMPAIGN_COLUMNS)} FROM nudge_campaigns WHERE id = %s",
+        (int(campaign_id),),
+    )
+    row = cur.fetchone()
+    return _campaign_row_to_dict(row) if row else None
+
+
+def list_campaigns(conn, limit: int = 200) -> List[Dict[str, Any]]:
+    lim = max(1, min(int(limit), 500))
+    cur = execute(
+        conn,
+        f"""
+        SELECT {', '.join(_CAMPAIGN_COLUMNS)}
+        FROM nudge_campaigns
+        ORDER BY created_at DESC, id DESC
+        LIMIT %s
+        """,
+        (lim,),
+    )
+    return [_campaign_row_to_dict(r) for r in (cur.fetchall() or [])]
+
+
+def delete_campaign(conn, campaign_id: int) -> int:
+    cur = execute(
+        conn,
+        "DELETE FROM nudge_campaigns WHERE id = %s AND status IN ('draft', 'scheduled', 'cancelled')",
+        (int(campaign_id),),
+    )
+    return int(cur.rowcount or 0)
+
+
+def acquire_due_campaigns(conn, now_dt: Any, limit: int = 20) -> List[Dict[str, Any]]:
+    """Lock and return campaigns due for dispatch (status=scheduled, scheduled_at <= now)."""
+    lim = max(1, min(int(limit), 100))
+    cur = execute(
+        conn,
+        f"""
+        SELECT {', '.join(_CAMPAIGN_COLUMNS)}
+        FROM nudge_campaigns
+        WHERE status = 'scheduled'
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at <= %s
+        ORDER BY scheduled_at ASC, id ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT %s
+        """,
+        (now_dt, lim),
+    )
+    return [_campaign_row_to_dict(r) for r in (cur.fetchall() or [])]
+
+
+def get_campaign_delivery_user_ids(conn, *, campaign_id: int, userids: List[int]) -> Set[int]:
+    """Users who already have a delivery row for this campaign (worker retry dedupe)."""
+    ids = [int(u) for u in userids if str(u).isdigit()]
+    if not ids:
+        return set()
+    cur = execute(
+        conn,
+        """
+        SELECT DISTINCT userid
+        FROM nudge_deliveries
+        WHERE campaign_id = %s AND userid = ANY(%s)
+        """,
+        (int(campaign_id), ids),
+    )
+    return {int(r[0]) for r in (cur.fetchall() or [])}
+
+
+# ---------------------------------------------------------------------------
+# Conversions (nudge → user asked a chat question)
+# ---------------------------------------------------------------------------
+
+def find_primary_delivery_by_group(conn, delivery_group_id: str) -> Optional[Dict[str, Any]]:
+    cur = execute(
+        conn,
+        """
+        SELECT id, userid, campaign_id, trigger_id, created_at
+        FROM nudge_deliveries
+        WHERE delivery_group_id = %s
+        ORDER BY (COALESCE(is_primary, TRUE)) DESC, id ASC
+        LIMIT 1
+        """,
+        (str(delivery_group_id).strip(),),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "id": int(row[0]),
+        "userid": int(row[1]),
+        "campaign_id": int(row[2]) if row[2] is not None else None,
+        "trigger_id": row[3] or "",
+        "created_at": row[4],
+    }
+
+
+def insert_conversion(
+    conn,
+    *,
+    delivery_group_id: str,
+    campaign_id: Optional[int],
+    userid: int,
+    trigger_id: str,
+    question: str,
+    seconds_since_sent: Optional[int],
+    attribution: str = "tap",
+) -> bool:
+    """Record the first chat question attributed to a nudge group. Idempotent per group."""
+    cur = execute(
+        conn,
+        """
+        INSERT INTO nudge_conversions
+            (delivery_group_id, campaign_id, userid, trigger_id, question,
+             seconds_since_sent, attribution)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (delivery_group_id) DO NOTHING
+        """,
+        (
+            str(delivery_group_id).strip(),
+            campaign_id,
+            int(userid),
+            (trigger_id or "")[:120],
+            (question or "")[:2000],
+            seconds_since_sent,
+            (attribution or "tap")[:40],
+        ),
+    )
+    return bool(cur.rowcount)
+
+
+def mark_delivery_clicked(conn, delivery_group_id: str) -> int:
+    cur = execute(
+        conn,
+        """
+        UPDATE nudge_deliveries
+        SET clicked_at = COALESCE(clicked_at, CURRENT_TIMESTAMP)
+        WHERE delivery_group_id = %s
+        """,
+        (str(delivery_group_id).strip(),),
+    )
+    return int(cur.rowcount or 0)
+
+
+# ---------------------------------------------------------------------------
+# Analytics / dashboard aggregates
+# ---------------------------------------------------------------------------
+
+_TIME_BUCKETS_SQL = """
+    COUNT(*) FILTER (WHERE seconds_since_sent IS NOT NULL AND seconds_since_sent < 300) AS under_5m,
+    COUNT(*) FILTER (WHERE seconds_since_sent >= 300 AND seconds_since_sent < 3600) AS under_1h,
+    COUNT(*) FILTER (WHERE seconds_since_sent >= 3600 AND seconds_since_sent < 21600) AS under_6h,
+    COUNT(*) FILTER (WHERE seconds_since_sent >= 21600 AND seconds_since_sent < 86400) AS under_24h,
+    COUNT(*) FILTER (WHERE seconds_since_sent >= 86400) AS over_24h,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY seconds_since_sent) AS median_seconds
+"""
+
+
+def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> Dict[str, int]:
+    cur = execute(
+        conn,
+        f"""
+        SELECT COUNT(DISTINCT COALESCE(delivery_group_id, id::text)) AS targeted,
+               COUNT(*) FILTER (WHERE channel = 'push' AND COALESCE(send_status, 'sent') = 'sent') AS push,
+               COUNT(*) FILTER (WHERE channel IN ('whatsapp', 'whatsapp_template') AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp,
+               COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
+               COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
+               COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
+                                AND (channel IS NULL OR TRIM(channel) = '' OR channel = 'stored')) AS stored_only,
+               COUNT(*) FILTER (WHERE clicked_at IS NOT NULL) AS clicked
+        FROM nudge_deliveries
+        WHERE {where_sql}
+        """,
+        params,
+    )
+    row = cur.fetchone() or (0,) * 7
+    keys = ("targeted", "push", "whatsapp", "email", "failed_attempts", "stored_only", "clicked")
+    return {k: int(v or 0) for k, v in zip(keys, row)}
+
+
+def _conversion_summary(conn, where_sql: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
+    cur = execute(
+        conn,
+        f"""
+        SELECT COUNT(*) AS conversions,
+               {_TIME_BUCKETS_SQL}
+        FROM nudge_conversions
+        WHERE {where_sql}
+        """,
+        params,
+    )
+    row = cur.fetchone() or (0, 0, 0, 0, 0, 0, None)
+    return {
+        "conversions": int(row[0] or 0),
+        "time_buckets": {
+            "under_5m": int(row[1] or 0),
+            "under_1h": int(row[2] or 0),
+            "under_6h": int(row[3] or 0),
+            "under_24h": int(row[4] or 0),
+            "over_24h": int(row[5] or 0),
+        },
+        "median_seconds": float(row[6]) if row[6] is not None else None,
+    }
+
+
+def _conversions_by_channel(conn, where_sql: str, params: Tuple[Any, ...]) -> Dict[str, int]:
+    try:
+        cur = execute(
+            conn,
+            f"""
+            SELECT COALESCE(d.channel, 'stored') AS channel, COUNT(*)
+            FROM nudge_conversions c
+            JOIN nudge_deliveries d
+              ON d.delivery_group_id = c.delivery_group_id
+             AND COALESCE(d.is_primary, TRUE)
+            WHERE {where_sql}
+            GROUP BY 1
+            """,
+            params,
+        )
+        return {str(r[0]): int(r[1] or 0) for r in (cur.fetchall() or [])}
+    except Exception as e:
+        logger.warning("conversions-by-channel query failed: %s", e)
+        return {}
+
+
+def count_window_conversions(
+    conn, where_sql: str, params: Tuple[Any, ...], window_hours: int = 24
+) -> int:
+    """
+    Time-window attribution fallback: nudge groups with no tap conversion where the
+    user still asked a chat question within `window_hours` of the nudge.
+    """
+    try:
+        cur = execute(
+            conn,
+            f"""
+            SELECT COUNT(DISTINCT COALESCE(d.delivery_group_id, d.id::text))
+            FROM nudge_deliveries d
+            WHERE {where_sql}
+              AND COALESCE(d.is_primary, TRUE)
+              AND (d.delivery_group_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM nudge_conversions c
+                    WHERE c.delivery_group_id = d.delivery_group_id
+              ))
+              AND EXISTS (
+                    SELECT 1
+                    FROM chat_messages cm
+                    JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                    WHERE cs.user_id = d.userid
+                      AND cm.sender = 'user'
+                      AND cm.timestamp >= d.created_at
+                      AND cm.timestamp <= d.created_at + (%s || ' hours')::interval
+              )
+            """,
+            params + (str(int(window_hours)),),
+        )
+        row = cur.fetchone()
+        return int(row[0] or 0) if row else 0
+    except Exception as e:
+        logger.warning("window-conversion query failed: %s", e)
+        return 0
+
+
+def campaign_stats(conn, campaign_id: int) -> Dict[str, Any]:
+    cid = int(campaign_id)
+    sends = _delivery_channel_counts(conn, "campaign_id = %s", (cid,))
+    conv = _conversion_summary(conn, "campaign_id = %s", (cid,))
+    conv_by_channel = _conversions_by_channel(conn, "c.campaign_id = %s", (cid,))
+    window_conversions = count_window_conversions(conn, "d.campaign_id = %s", (cid,))
+    targeted = sends.get("targeted") or 0
+    conversions = conv.get("conversions") or 0
+    return {
+        "campaign_id": cid,
+        "sends": sends,
+        "conversions": conversions,
+        "window_conversions": window_conversions,
+        "conversion_rate": round(conversions / targeted, 4) if targeted else 0.0,
+        "conversions_by_channel": conv_by_channel,
+        "time_buckets": conv.get("time_buckets"),
+        "median_seconds_to_question": conv.get("median_seconds"),
+    }
+
+
+def overview_stats(conn, start_date: str, end_date: str) -> Dict[str, Any]:
+    sends = _delivery_channel_counts(
+        conn, "sent_at >= %s AND sent_at <= %s", (start_date, end_date)
+    )
+    conv = _conversion_summary(
+        conn,
+        "converted_at::date >= %s AND converted_at::date <= %s",
+        (start_date, end_date),
+    )
+    conv_by_channel = _conversions_by_channel(
+        conn,
+        "c.converted_at::date >= %s AND c.converted_at::date <= %s",
+        (start_date, end_date),
+    )
+    # Per-trigger/campaign breakdown of sends in range.
+    cur = execute(
+        conn,
+        """
+        SELECT d.trigger_id,
+               d.campaign_id,
+               COUNT(DISTINCT COALESCE(d.delivery_group_id, d.id::text)) AS targeted,
+               COUNT(*) FILTER (WHERE d.channel = 'push' AND COALESCE(d.send_status, 'sent') = 'sent') AS push,
+               COUNT(*) FILTER (WHERE d.channel IN ('whatsapp','whatsapp_template') AND COALESCE(d.send_status, 'sent') = 'sent') AS whatsapp,
+               COUNT(*) FILTER (WHERE d.channel = 'email' AND COALESCE(d.send_status, 'sent') = 'sent') AS email
+        FROM nudge_deliveries d
+        WHERE d.sent_at >= %s AND d.sent_at <= %s
+        GROUP BY 1, 2
+        ORDER BY 3 DESC
+        LIMIT 100
+        """,
+        (start_date, end_date),
+    )
+    by_source = [
+        {
+            "trigger_id": r[0] or "",
+            "campaign_id": int(r[1]) if r[1] is not None else None,
+            "targeted": int(r[2] or 0),
+            "push": int(r[3] or 0),
+            "whatsapp": int(r[4] or 0),
+            "email": int(r[5] or 0),
+        }
+        for r in (cur.fetchall() or [])
+    ]
+    # Conversions per trigger in range.
+    cur = execute(
+        conn,
+        """
+        SELECT COALESCE(trigger_id, ''), campaign_id, COUNT(*)
+        FROM nudge_conversions
+        WHERE converted_at::date >= %s AND converted_at::date <= %s
+        GROUP BY 1, 2
+        """,
+        (start_date, end_date),
+    )
+    conv_index: Dict[Tuple[str, Optional[int]], int] = {}
+    for r in cur.fetchall() or []:
+        conv_index[(str(r[0] or ""), int(r[1]) if r[1] is not None else None)] = int(r[2] or 0)
+    for item in by_source:
+        item["conversions"] = conv_index.get(
+            (item["trigger_id"], item["campaign_id"]), 0
+        )
+    targeted = sends.get("targeted") or 0
+    conversions = conv.get("conversions") or 0
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "sends": sends,
+        "conversions": conversions,
+        "conversion_rate": round(conversions / targeted, 4) if targeted else 0.0,
+        "conversions_by_channel": conv_by_channel,
+        "time_buckets": conv.get("time_buckets"),
+        "median_seconds_to_question": conv.get("median_seconds"),
+        "by_source": by_source,
+    }
 
 
 def list_cron_runs(conn, job_key: str, limit: int = 20) -> List[Tuple]:

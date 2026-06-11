@@ -495,6 +495,8 @@ export default function ChatScreen({ navigation, route }) {
   const subjectGateMemoryRef = useRef([]);
   /** True after chart/session 409 → new session; second /chat-v2/ask attempt uses this for admin log gating. */
   const pendingChartMismatchSecondAttemptRef = useRef(false);
+  /** Delivery group id from a tapped nudge (push/inbox); attached to the next /chat-v2/ask for conversion attribution. */
+  const pendingNudgeIdRef = useRef(null);
   const chatModeIntroShownKeyRef = useRef(null);
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
   const modeIntroSuppressOpenUntilRef = useRef(0);
@@ -1532,7 +1534,11 @@ export default function ChatScreen({ navigation, route }) {
     if (route.params?.startChat) {
       const initialMsg = route.params?.initialMessage;
       const responseReadySessionId = route.params?.responseReadySessionId;
-      navigation.setParams({ startChat: undefined, initialMessage: undefined, responseReadySessionId: undefined });
+      const nudgeId = route.params?.nudgeId;
+      if (nudgeId) {
+        pendingNudgeIdRef.current = String(nudgeId);
+      }
+      navigation.setParams({ startChat: undefined, initialMessage: undefined, responseReadySessionId: undefined, nudgeId: undefined });
       (async () => {
         await checkBirthData();
         if (responseReadySessionId) {
@@ -3706,6 +3712,7 @@ export default function ChatScreen({ navigation, route }) {
           }),
           ...(subjectGateMemoryRef.current.length > 0 ? { subject_gate_memory: subjectGateMemoryRef.current.slice(-8) } : {}),
           ...(subjectGateOverride ? { subject_gate_override: subjectGateOverride } : {}),
+          ...(pendingNudgeIdRef.current ? { nudge_id: pendingNudgeIdRef.current } : {}),
           client_request_id: clientRequestId,
         };
 
@@ -3783,6 +3790,8 @@ export default function ChatScreen({ navigation, route }) {
         }
 
         pendingChartMismatchSecondAttemptRef.current = false;
+        // Attribute only the first question after a nudge tap.
+        pendingNudgeIdRef.current = null;
 
         const result = await response.json();
         const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights, chat_tier } = result;

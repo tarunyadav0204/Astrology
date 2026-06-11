@@ -73,3 +73,33 @@ def render_all(
     if question_t is not None and question_t.strip():
         question = render_template(question_t, facts, allowed)
     return title, body, question
+
+
+def render_template_lenient(
+    template: str,
+    facts: Mapping[str, Any],
+    allowed: FrozenSet[str],
+    defaults: Optional[Mapping[str, Any]] = None,
+) -> str:
+    """
+    Like render_template, but a missing fact falls back to defaults[name] (or "")
+    instead of raising. Used for campaign sends where one user's missing value
+    must not fail the whole batch.
+    """
+    names = extract_placeholders(template)
+    out = template
+    for name in sorted(names, key=len, reverse=True):
+        if name not in allowed:
+            raise TemplateRenderError(f"Disallowed placeholder: {{{name}}}")
+        value = facts.get(name)
+        if value is None or str(value) == "":
+            value = (defaults or {}).get(name, "")
+        out = out.replace("{" + name + "}", str(value))
+    return out
+
+
+def campaign_placeholders() -> FrozenSet[str]:
+    """Placeholders allowed in admin campaign templates (profile/behavior/wallet)."""
+    from .param_resolver import CAMPAIGN_PLACEHOLDERS
+
+    return CAMPAIGN_PLACEHOLDERS

@@ -484,6 +484,50 @@ CREATE TABLE "nudge_deliveries" (
     "sent_at" TIMESTAMP NOT NULL,
     "channel" TEXT DEFAULT 'stored',
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "read_at" TIMESTAMP,
+    "data_json" TEXT,
+    "campaign_id" INTEGER,
+    "delivery_group_id" TEXT,
+    "send_status" TEXT,
+    "is_primary" BOOLEAN DEFAULT TRUE,
+    "clicked_at" TIMESTAMP,
+    PRIMARY KEY ("id")
+);
+
+DROP TABLE IF EXISTS "nudge_campaigns" CASCADE;
+CREATE TABLE "nudge_campaigns" (
+    "id" SERIAL,
+    "name" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'draft',
+    "title_template" TEXT NOT NULL,
+    "body_template" TEXT NOT NULL,
+    "question_template" TEXT,
+    "channel_policy" TEXT NOT NULL DEFAULT 'waterfall',
+    "channels_json" TEXT NOT NULL DEFAULT '["push","whatsapp","email"]',
+    "ai_personalize" BOOLEAN NOT NULL DEFAULT FALSE,
+    "ai_base_prompt" TEXT,
+    "audience_filter_json" TEXT NOT NULL DEFAULT '{"type":"all"}',
+    "landing_screen" TEXT NOT NULL DEFAULT 'chat',
+    "scheduled_at" TIMESTAMPTZ,
+    "dispatched_at" TIMESTAMPTZ,
+    "total_targeted" INTEGER NOT NULL DEFAULT 0,
+    "created_by" INTEGER,
+    "created_at" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id")
+);
+
+DROP TABLE IF EXISTS "nudge_conversions" CASCADE;
+CREATE TABLE "nudge_conversions" (
+    "id" SERIAL,
+    "delivery_group_id" TEXT NOT NULL UNIQUE,
+    "campaign_id" INTEGER,
+    "userid" INTEGER NOT NULL,
+    "trigger_id" TEXT,
+    "question" TEXT,
+    "converted_at" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "seconds_since_sent" INTEGER,
+    "attribution" TEXT NOT NULL DEFAULT 'tap',
     PRIMARY KEY ("id")
 );
 
@@ -809,6 +853,31 @@ CREATE TABLE "message_feedback" (
     FOREIGN KEY ("message_id") REFERENCES "chat_messages" ("message_id") ON DELETE CASCADE
 );
 
+DROP TABLE IF EXISTS "app_testimonials" CASCADE;
+CREATE TABLE "app_testimonials" (
+    "id" SERIAL,
+    "source" TEXT NOT NULL DEFAULT 'google_play',
+    "external_review_id" TEXT NOT NULL UNIQUE,
+    "author_name" TEXT,
+    "rating" INTEGER NOT NULL CHECK ("rating" BETWEEN 1 AND 5),
+    "review_text" TEXT NOT NULL,
+    "language" TEXT,
+    "app_version_name" TEXT,
+    "review_created_at" TIMESTAMPTZ,
+    "review_updated_at" TIMESTAMPTZ,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "display_name" TEXT,
+    "display_location" TEXT,
+    "display_order" INTEGER NOT NULL DEFAULT 0,
+    "approved_at" TIMESTAMPTZ,
+    "approved_by_userid" INTEGER,
+    "fetched_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "raw_review" JSONB,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id")
+);
+
 
 -- Indexes
 
@@ -850,6 +919,18 @@ CREATE INDEX idx_category_key ON prompt_category_config(category_key);
 
 CREATE INDEX idx_nudge_deliveries_user_sent ON nudge_deliveries(userid, sent_at);
 
+CREATE INDEX idx_nudge_deliveries_campaign ON nudge_deliveries(campaign_id) WHERE campaign_id IS NOT NULL;
+
+CREATE INDEX idx_nudge_deliveries_group ON nudge_deliveries(delivery_group_id) WHERE delivery_group_id IS NOT NULL;
+
+CREATE INDEX idx_nudge_campaigns_status_sched ON nudge_campaigns(status, scheduled_at);
+
+CREATE INDEX idx_nudge_conversions_campaign ON nudge_conversions(campaign_id) WHERE campaign_id IS NOT NULL;
+
+CREATE INDEX idx_nudge_conversions_converted ON nudge_conversions(converted_at);
+
 CREATE INDEX idx_podcast_history_userid ON podcast_history(userid);
 
 CREATE INDEX idx_podcast_history_created_at ON podcast_history(created_at DESC);
+
+CREATE INDEX idx_app_testimonials_status_order ON app_testimonials(status, display_order, review_updated_at DESC);

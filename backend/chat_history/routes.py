@@ -39,6 +39,24 @@ def coerce_chat_birth_details(bd):
     return out
 
 
+def _record_nudge_conversion_safe(conn, *, nudge_id: str, userid: int, question: str) -> None:
+    """Best-effort nudge → question attribution; never blocks the chat flow."""
+    if not nudge_id:
+        return
+    try:
+        from nudge_engine.conversions import record_nudge_conversion
+
+        record_nudge_conversion(
+            conn,
+            delivery_group_id=nudge_id,
+            userid=int(userid),
+            question=question or "",
+            attribution="tap",
+        )
+    except Exception as e:
+        logger.warning("nudge conversion record failed nudge_id=%s: %s", nudge_id, e)
+
+
 def _birth_chart_id_from_birth_details(bd) -> int | None:
     """Integer birth chart id from client birth_details, if present (mobile sends `id`)."""
     if not bd or not isinstance(bd, dict):
@@ -992,6 +1010,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     birth_details = request.get("birth_details")
     client_request_id = request.get("client_request_id")
     mode = request.get("mode")  # e.g. "lab" for Chart Lab (educational) mode
+    # Nudge attribution: delivery_group_id from a tapped push/WhatsApp/email nudge
+    nudge_id = str(request.get("nudge_id") or request.get("nudgeId") or "").strip()[:64]
     delivery_channel = str(request.get("delivery_channel") or request.get("deliveryChannel") or "").strip().lower()
     render_target = str(request.get("render_target") or request.get("renderTarget") or "").strip().lower()
     subject_gate_override = str(
@@ -1195,6 +1215,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                         (session_id, "user", sanitize_text(question), "completed", datetime.now()),
                     )
                     user_message_id = cur.fetchone()[0]
+                    _record_nudge_conversion_safe(
+                        conn,
+                        nudge_id=nudge_id,
+                        userid=current_user.userid,
+                        question=sanitize_text(question),
+                    )
                     cur = execute(
                         conn,
                         """
@@ -1384,6 +1410,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         )
         user_message_id = cur.fetchone()[0]
         print(f"💾 User message saved with ID: {user_message_id}")
+        _record_nudge_conversion_safe(
+            conn,
+            nudge_id=nudge_id,
+            userid=current_user.userid,
+            question=sanitize_text(question),
+        )
 
         # Create processing assistant message (track client_request_id for idempotency)
         cur = execute(

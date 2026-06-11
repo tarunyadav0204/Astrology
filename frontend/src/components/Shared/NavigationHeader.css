@@ -179,6 +179,25 @@
   }
 }
 
+@media (min-width: 969px) and (max-width: 1180px) {
+  .compact-nav .container {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  }
+
+  .compact-menu {
+    display: none;
+  }
+
+  .compact-actions {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .compact-actions .native-selector-chip {
+    max-width: min(180px, 22vw);
+  }
+}
+
 .compact-actions .auth-btn {
   background: transparent;
   border: 2px solid #fff;
@@ -530,6 +549,35 @@
 
   .top-bar .profile-btn__name {
     max-width: 7rem;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1180px) {
+  .top-bar .container,
+  .main-nav .container {
+    max-width: 100%;
+  }
+
+  .navigation {
+    display: none;
+  }
+
+  .main-nav .search-bar-container {
+    max-width: min(360px, 42vw);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1040px) {
+  .top-links {
+    display: none;
+  }
+
+  .top-bar .container {
+    justify-content: flex-end;
+  }
+
+  .top-bar .profile-btn__name {
+    max-width: 6rem;
   }
 }
 

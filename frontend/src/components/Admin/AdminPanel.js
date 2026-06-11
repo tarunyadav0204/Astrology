@@ -27,6 +27,9 @@ import AdminSupportInbox from './AdminSupportInbox';
 import BlogDashboard from '../Blog/BlogDashboard';
 import AdminNudgeTriggerDefinitions from './AdminNudgeTriggerDefinitions';
 import AdminNudgeScheduler from './AdminNudgeScheduler';
+import AdminNudgeCampaigns from './AdminNudgeCampaigns';
+import AdminNudgeAnalytics from './AdminNudgeAnalytics';
+import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
@@ -2258,6 +2261,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Blog
         </button>
+        <button
+          className={`tab ${activeTab === 'testimonials' ? 'active' : ''}`}
+          onClick={() => setActiveTab('testimonials')}
+        >
+          Testimonials
+        </button>
         <button 
           className={`tab ${activeTab === 'notifications' ? 'active' : ''}`}
           onClick={() => setActiveTab('notifications')}
@@ -3533,6 +3542,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <BlogDashboard embeddedInAdmin />
         )}
 
+        {activeTab === 'testimonials' && (
+          <AdminGooglePlayTestimonials />
+        )}
+
         {activeTab === 'notifications' && (
           <div className="notifications-admin">
             <div className="notifications-tabs">
@@ -3570,6 +3583,20 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 onClick={() => setNotifSubTab('nudge_schedule')}
               >
                 Nudge planner
+              </button>
+              <button
+                type="button"
+                className={`sub-tab ${notifSubTab === 'nudge_campaigns' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('nudge_campaigns')}
+              >
+                Campaigns
+              </button>
+              <button
+                type="button"
+                className={`sub-tab ${notifSubTab === 'nudge_analytics' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('nudge_analytics')}
+              >
+                Analytics
               </button>
               <button
                 type="button"
@@ -4195,6 +4222,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
             {notifSubTab === 'nudge_triggers' && <AdminNudgeTriggerDefinitions />}
             {notifSubTab === 'nudge_schedule' && <AdminNudgeScheduler />}
+            {notifSubTab === 'nudge_campaigns' && <AdminNudgeCampaigns />}
+            {notifSubTab === 'nudge_analytics' && <AdminNudgeAnalytics />}
             {notifSubTab === 'sent_today' && (
               <div className="notifications-form notifications-form--wide">
                 <div className="form-buttons notif-generate-row">

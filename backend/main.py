@@ -135,6 +135,7 @@ from kota_chakra.routes import router as kota_chakra_router
 from user_facts.routes import router as user_facts_router
 from nudge_engine.routes import router as nudge_engine_router
 from nudge_engine import db as nudge_db
+from testimonials_routes import router as testimonials_router, ensure_testimonials_table
 try:
     from activity.middleware import ActivityMiddleware
     _activity_middleware_available = True
@@ -557,6 +558,11 @@ async def lifespan(app: FastAPI):
             print("Nudge engine tables (device_tokens, nudge_deliveries) initialized")
     except Exception as e:
         print(f"Warning: Could not initialize nudge engine tables: {e}")
+    try:
+        ensure_testimonials_table()
+        print("App testimonials table initialized")
+    except Exception as e:
+        print(f"Warning: Could not initialize app testimonials table: {e}")
     yield
     # Shutdown (if needed later)
     pass
@@ -761,6 +767,7 @@ app.include_router(acquisition_router, prefix="/api")
 app.include_router(admin_expense_router, prefix="/api")
 app.include_router(admin_expense_master_router, prefix="/api")
 app.include_router(order_management_router, prefix="/api/order-management")
+app.include_router(testimonials_router, prefix="/api")
 
 
 
