@@ -25,10 +25,6 @@ import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
 import AuthModalShell from '../Auth/AuthModalShell';
-import WhatsAppHomeBannerModal, {
-  dismissWhatsappHomeBannerPersist,
-  isWhatsappHomeBannerDismissed,
-} from '../WhatsAppBanner/WhatsAppHomeBannerModal';
 import { showToast } from '../../utils/toast';
 import TrustBanner from '../TrustBanner/TrustBanner';
 import './AstroRoshniHomepage.css';
@@ -173,12 +169,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [authView, setAuthView] = useState('login');
   const [showChartModal, setShowChartModal] = useState(false);
   const [showBirthFormModal, setShowBirthFormModal] = useState(false);
-  const [showWhatsappHomeBanner, setShowWhatsappHomeBanner] = useState(false);
-  /** If user already dismissed the WhatsApp promo, do not mount the modal at all (no image fetch, clearer than isOpen=false). */
-  const [waHomeBannerSuppressed, setWaHomeBannerSuppressed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return isWhatsappHomeBannerDismissed();
-  });
   const [chartRefHighlight, setChartRefHighlight] = useState(null);
   const [matchingData, setMatchingData] = useState({
     boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
@@ -360,28 +350,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     }, 80);
     return () => window.clearTimeout(t);
   }, [location.hash]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (location.pathname !== '/') return;
-    if (waHomeBannerSuppressed) return;
-    if (isWhatsappHomeBannerDismissed()) return;
-    // Defer so the hero / life-path banner can become LCP first (WhatsApp overlay was stealing LCP in Lighthouse).
-    let cancelled = false;
-    const t = window.setTimeout(() => {
-      if (!cancelled) setShowWhatsappHomeBanner(true);
-    }, 2000);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [location.pathname, waHomeBannerSuppressed]);
-
-  const dismissWhatsappHomeBanner = useCallback(() => {
-    dismissWhatsappHomeBannerPersist();
-    setShowWhatsappHomeBanner(false);
-    setWaHomeBannerSuppressed(true);
-  }, []);
 
   const generateTodaysData = useCallback(() => {
     const today = new Date();
@@ -1205,15 +1173,15 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
           <div className="native-selector-callout">
             <div className="native-selector-callout__left">
+              <span className="native-selector-callout__eyebrow">Chart workspace</span>
               <div className="native-selector-callout__title-row">
-                <span className="native-selector-callout__icon">👤</span>
-                <h4>Your predictions depend on selected native</h4>
+                <h4>Work with one selected native across reports and predictions</h4>
               </div>
               <p>
-                AstroRoshni works on the native's birth chart. Please select an existing native
-                or add a new one before exploring analysis modules.
+                Choose the person whose birth chart you want to use, then move across life events,
+                reports, matching, and remedies without resetting context.
               </p>
-              <div className="native-selector-callout__status">
+              <div className="native-selector-callout__status native-selector-callout__status--primary">
                 {birthData && birthData.name ? (
                   <>Current native: <strong>{birthData.name}</strong></>
                 ) : (
@@ -1221,19 +1189,36 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 )}
               </div>
             </div>
-            <button
-              className="native-selector-callout__btn"
-              onClick={() => {
-                if (!user) {
-                  onLogin();
-                  return;
-                }
-                setBirthFormContext('changeNative');
-                setShowBirthFormModal(true);
-              }}
-            >
-              {birthData && birthData.name ? 'Change Native' : 'Select / Add Native'}
-            </button>
+            <div className="native-selector-callout__actions">
+              <button
+                className="native-selector-callout__btn native-selector-callout__btn--primary"
+                onClick={() => {
+                  if (!user) {
+                    onLogin();
+                    return;
+                  }
+                  setBirthFormContext('changeNative');
+                  setShowBirthFormModal(true);
+                }}
+              >
+                {birthData && birthData.name ? 'Change Native' : 'Select Native'}
+              </button>
+              {!birthData?.name && (
+                <button
+                  className="native-selector-callout__btn native-selector-callout__btn--secondary"
+                  onClick={() => {
+                    if (!user) {
+                      onLogin();
+                      return;
+                    }
+                    setBirthFormContext('chart');
+                    setShowBirthFormModal(true);
+                  }}
+                >
+                  Add New Chart
+                </button>
+              )}
+            </div>
           </div>
 
           <button
@@ -1628,10 +1613,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <span className="vedic-symbol vedic-symbol-4">☸️</span>
             <span className="vedic-symbol vedic-symbol-5">🪔</span>
             <span className="vedic-symbol vedic-symbol-6">🌸</span>
+            <p className="vedic-tools-eyebrow">Core tools</p>
             <h2 id="vedic-astrology-tools-heading" className="vedic-tools-title">
-              📊 Vedic Astrology Tools
+              Vedic astrology tools
             </h2>
-            <p className="vedic-tools-subtitle">Discover your destiny with authentic Vedic calculations</p>
+            <p className="vedic-tools-subtitle">Work with matching, nakshatras, and daily Panchang from one clean starting point.</p>
             <div className="vedic-tools-divider"></div>
           </div>
           <div className="vedic-tools-featured">
@@ -1697,72 +1683,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               />
             </div>
 
-            {/* Column 2 - Chart Widget (20%) */}
-            <div className="form-card birth-chart-widget">
-              <div className="birth-chart-content">
-                <h3>📊 Birth Chart</h3>
-                <p>Generate your complete Vedic birth chart</p>
-                <div className="chart-features">
-                  <div className="feature-item">🌟 Lagna Chart</div>
-                  <div className="feature-item">🌙 Navamsa Chart</div>
-                  <div className="feature-item">⏰ Dasha Periods</div>
-                  <div className="feature-item">🎯 Predictions</div>
-                </div>
-                {birthData && birthData.name ? (
-                  <div style={{ marginBottom: '10px' }}>
-                    <button 
-                      onClick={() => user ? setShowBirthFormModal(true) : onLogin()}
-                      style={{
-                        background: 'rgba(233, 30, 99, 0.1)',
-                        border: '1px solid #e91e63',
-                        color: '#e91e63',
-                        padding: '8px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        marginBottom: '8px',
-                        display: 'block',
-                        width: '100%'
-                      }}
-                    >
-                      👤 {birthData.name} (Click to change)
-                    </button>
-                  </div>
-                ) : null}
-                <button 
-                  className="chart-btn"
-                  onClick={() => {
-                    if (!user) {
-                      onLogin();
-                      return;
-                    }
-                    
-                    // Check if chart data already exists (same logic as Ask Question Now)
-                    if (birthData && chartData) {
-                      // Chart already exists, show it directly
-                      setShowChartModal(true);
-                    } else {
-                      // No chart data, show birth form modal
-                      setBirthFormContext('chart');
-                      setShowBirthFormModal(true);
-                    }
-                  }}
-                >
-                  {birthData && chartData ? 'View Chart' : 'Generate Chart'}
-                </button>
-              </div>
-            </div>
-
-            {/* Column 3 - Nakshatra Widget (20%) */}
+            {/* Column 2 - Nakshatra Widget */}
             <div className="form-card nakshatra-widget">
-              <h3>⭐ Nakshatra Guide</h3>
+              <h3>Nakshatra guide</h3>
               <div className="nakshatra-content">
                 <p>Discover your birth star and its profound influence on your life</p>
                 <div className="nakshatra-features">
-                  <div className="feature-item">🌟 Birth Star</div>
-                  <div className="feature-item">🔮 Personality Traits</div>
-                  <div className="feature-item">🎯 Life Purpose</div>
-                  <div className="feature-item">🌈 Compatibility</div>
+                  <div className="feature-item">Birth star</div>
+                  <div className="feature-item">Personality traits</div>
+                  <div className="feature-item">Life purpose</div>
+                  <div className="feature-item">Compatibility</div>
                 </div>
                 <div className="nakshatra-info">
                   <p><strong>System:</strong> 27 Vedic Nakshatras</p>
@@ -1777,7 +1707,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
 
-            {/* Column 4 - Panchang (20%) */}
+            {/* Column 3 - Panchang */}
             <PanchangWidget />
           </div>
 
@@ -1952,18 +1882,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Horoscope Section */}
       <section className="horoscope-section">
         <div className="container">
-          <header
-            className="section-intro section-intro--card section-intro--tone-cool section-intro--accent-indigo section-intro--lead-narrow"
-            aria-labelledby="western-horoscope-heading"
-          >
-            <p className="section-intro__eyebrow">Sun signs &amp; timing</p>
-            <h2 id="western-horoscope-heading" className="section-intro__title">
-              <span className="section-intro__title-line">Western horoscopes</span>
-              <span className="section-intro__title-sub">Daily, weekly, monthly &amp; yearly</span>
-            </h2>
-            <p className="section-intro__lead">
-              Choose your zodiac and period for an ephemeris-based tropical forecast across love, career, health, and finance—then open the full reading anytime.
-            </p>
+          <header className="horoscope-section__header" aria-labelledby="western-horoscope-heading">
+            <div>
+              <p className="horoscope-section__eyebrow">Sun signs &amp; timing</p>
+              <h2 id="western-horoscope-heading">Western horoscopes</h2>
+              <p className="horoscope-section__lead">
+                Tropical transit forecasts for each zodiac sign, with a quick daily-to-yearly view and a clear path to deeper reading.
+              </p>
+            </div>
           </header>
           <div className="horoscope-grid">
             <div className="horoscope-content">
@@ -2026,17 +1952,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                       <button 
                         className="view-full-btn"
                         onClick={() => navigate(`/horoscope?period=${selectedPeriod}&sign=${selectedZodiac}`)}
-                        style={{
-                          marginTop: '15px',
-                          padding: '10px 20px',
-                          background: 'linear-gradient(135deg, #e91e63, #f06292)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '25px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 'bold'
-                        }}
                       >
                         View Full {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope →
                       </button>
@@ -2046,19 +1961,33 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
 
-            <div className="festivals-sidebar">
-              <h3>Festivals & Nakshatras</h3>
-              <div className="festival-tabs">
-                <button className="tab active" onClick={() => navigate('/festivals')}>Festivals</button>
-                <button className="tab" onClick={() => navigate('/nakshatras')}>Nakshatras</button>
+            <aside className="horoscope-sidebar">
+              <div className="horoscope-sidebar__panel">
+                <p className="horoscope-sidebar__eyebrow">Explore next</p>
+                <h3>Festival timing and nakshatra tools</h3>
+                <p>
+                  Move from broad sun-sign guidance into calendar timing, lunar context, and deeper Vedic reference pages.
+                </p>
+                <div className="horoscope-sidebar__links">
+                  <button type="button" className="horoscope-sidebar__link" onClick={() => navigate('/festivals')}>
+                    <span>Daily Festivals</span>
+                    <span aria-hidden>→</span>
+                  </button>
+                  <button type="button" className="horoscope-sidebar__link" onClick={() => navigate('/festivals/monthly')}>
+                    <span>Monthly Festival Calendar</span>
+                    <span aria-hidden>→</span>
+                  </button>
+                  <button type="button" className="horoscope-sidebar__link" onClick={() => navigate('/nakshatras')}>
+                    <span>Nakshatra Guide</span>
+                    <span aria-hidden>→</span>
+                  </button>
+                  <button type="button" className="horoscope-sidebar__link" onClick={() => navigate('/nakshatra/ashwini/2025')}>
+                    <span>Sample Nakshatra Year Reading</span>
+                    <span aria-hidden>→</span>
+                  </button>
+                </div>
               </div>
-              <div className="festival-list">
-                <a href="/festivals">🎊 Daily Festivals</a>
-                <a href="/festivals/monthly">📅 Monthly Calendar</a>
-                <a href="/nakshatras">⭐ Nakshatra Guide</a>
-                <a href="/nakshatra/ashwini/2025">🌟 2025 Predictions</a>
-              </div>
-            </div>
+            </aside>
           </div>
         </div>
       </section>
@@ -3129,9 +3058,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
           </div>
         </div>
-      )}
-      {!waHomeBannerSuppressed && (
-        <WhatsAppHomeBannerModal isOpen={showWhatsappHomeBanner} onDismiss={dismissWhatsappHomeBanner} />
       )}
     </div>
   );
