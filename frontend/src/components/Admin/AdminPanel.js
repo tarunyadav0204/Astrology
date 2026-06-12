@@ -293,9 +293,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       if (activeSubTab === 'management') {
         fetchUsers();
         fetchSubscriptionPlans();
+      } else if (activeSubTab === 'birthCharts') {
+        fetchCharts();
       }
-    } else if (activeTab === 'charts') {
-      fetchCharts();
     } else if (activeTab === 'credits') {
       if (activeSubTab === 'management') {
         fetchPromoCodes();
@@ -2193,37 +2193,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           Users
         </button>
         <button 
-          className={`tab ${activeTab === 'charts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('charts')}
-        >
-          Charts
-        </button>
-        <button 
           className={`tab ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveTab('chat')}
+          onClick={() => {
+            setActiveTab('chat');
+            setActiveSubTab('history');
+          }}
         >
-          Chat History
-        </button>
-        <button
-          className={`tab ${activeTab === 'eventTimeline' ? 'active' : ''}`}
-          onClick={() => setActiveTab('eventTimeline')}
-        >
-          Event Timeline Usage
+          Chat
         </button>
         <button 
           className={`tab ${activeTab === 'support' ? 'active' : ''}`}
           onClick={() => setActiveTab('support')}
         >
           Support
-        </button>
-        <button 
-          className={`tab ${activeTab === 'performance' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('performance');
-            setActiveSubTab('list');
-          }}
-        >
-          Chat Performance
         </button>
         <button 
           className={`tab ${activeTab === 'credits' ? 'active' : ''}`}
@@ -2235,25 +2217,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           Credits
         </button>
         <button 
-          className={`tab ${activeTab === 'analysis' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('analysis');
-            setActiveSubTab('feedback');
-          }}
-        >
-          Analysis
-        </button>
-        <button 
           className={`tab ${activeTab === 'terms' ? 'active' : ''}`}
           onClick={() => setActiveTab('terms')}
         >
           Terms
-        </button>
-        <button 
-          className={`tab ${activeTab === 'errors' ? 'active' : ''}`}
-          onClick={() => setActiveTab('errors')}
-        >
-          Errors
         </button>
         <button 
           className={`tab ${activeTab === 'blog' ? 'active' : ''}`}
@@ -2400,10 +2367,17 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </button>
           <button
             type="button"
+            className={`subtab ${activeSubTab === 'birthCharts' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('birthCharts')}
+          >
+            Birth charts
+          </button>
+          <button
+            type="button"
             className={`subtab ${activeSubTab === 'userCharts' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('userCharts')}
           >
-            Charts
+            Growth charts
           </button>
           <button
             type="button"
@@ -2417,38 +2391,81 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         </div>
       )}
 
-      {/* Analysis Sub-tabs */}
-      {activeTab === 'analysis' && (
+      {/* Chat Sub-tabs */}
+      {activeTab === 'chat' && (
         <div className="admin-subtabs">
-          <button 
-            className={`subtab ${activeSubTab === 'feedback' ? 'active' : ''}`}
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('history')}
+          >
+            History
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'list' || activeSubTab === 'charts' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('list')}
+          >
+            Performance
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'errors' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('errors')}
+          >
+            Errors
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'feedback' || activeSubTab === 'chatAnalysis' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('feedback')}
           >
-            Chat Feedback
+            Analysis
           </button>
-          <button 
-            className={`subtab ${activeSubTab === 'chatAnalysis' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('chatAnalysis')}
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'eventTimeline' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('eventTimeline')}
           >
-            Chat Analysis
+            Event timeline
           </button>
         </div>
       )}
 
-      {/* Chat Performance Sub-tabs */}
-      {activeTab === 'performance' && (
-        <div className="admin-subtabs">
-          <button 
+      {activeTab === 'chat' && (activeSubTab === 'list' || activeSubTab === 'charts') && (
+        <div className="admin-subtabs admin-subtabs--nested">
+          <button
+            type="button"
             className={`subtab ${activeSubTab === 'list' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('list')}
           >
             List
           </button>
-          <button 
+          <button
+            type="button"
             className={`subtab ${activeSubTab === 'charts' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('charts')}
           >
             Charts
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'chat' && (activeSubTab === 'feedback' || activeSubTab === 'chatAnalysis') && (
+        <div className="admin-subtabs admin-subtabs--nested">
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'feedback' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('feedback')}
+          >
+            Chat Feedback
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'chatAnalysis' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('chatAnalysis')}
+          >
+            Chat Analysis
           </button>
         </div>
       )}
@@ -2880,7 +2897,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         )}
 
-        {activeTab === 'charts' && (
+        {activeTab === 'users' && activeSubTab === 'birthCharts' && (
           <div className="charts-management">
             <h2>Birth Charts Management</h2>
             <div className="charts-filters">
@@ -2996,11 +3013,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         )}
 
-        {activeTab === 'chat' && (
+        {activeTab === 'chat' && activeSubTab === 'history' && (
           <AdminChatHistory />
         )}
 
-        {activeTab === 'eventTimeline' && (
+        {activeTab === 'chat' && activeSubTab === 'eventTimeline' && (
           <AdminEventTimelineHistory />
         )}
 
@@ -3515,22 +3532,22 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         )}
 
-        {activeTab === 'analysis' && activeSubTab === 'feedback' && (
+        {activeTab === 'chat' && activeSubTab === 'feedback' && (
           <ChatFeedback />
         )}
 
-        {activeTab === 'analysis' && activeSubTab === 'chatAnalysis' && (
+        {activeTab === 'chat' && activeSubTab === 'chatAnalysis' && (
           <AdminChatAnalysis />
         )}
 
-        {activeTab === 'errors' && (
+        {activeTab === 'chat' && activeSubTab === 'errors' && (
           <ChatErrors />
         )}
 
-        {activeTab === 'performance' && activeSubTab === 'list' && (
+        {activeTab === 'chat' && activeSubTab === 'list' && (
           <AdminChatPerformance />
         )}
-        {activeTab === 'performance' && activeSubTab === 'charts' && (
+        {activeTab === 'chat' && activeSubTab === 'charts' && (
           <AdminChatPerformanceCharts />
         )}
 

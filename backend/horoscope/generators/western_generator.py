@@ -190,6 +190,10 @@ class WesternHoroscopeGenerator:
         else:
             return 'neutral'
 
+    def _sign_trait(self, sign: str, trait: str) -> str:
+        possessive = f"{sign}'" if sign.endswith('s') else f"{sign}'s"
+        return f"{possessive} {trait}"
+
     def _generate_predictions_from_aspects(self, sun_sign: str, aspects: List[Dict], period: str, planets: Dict, date: datetime) -> Dict:
         """Generate predictions based on actual aspects"""
         
@@ -451,29 +455,29 @@ class WesternHoroscopeGenerator:
         
         # Sign romantic styles
         sign_romance = {
-            'Aries': {'style': 'direct bold moves', 'action': 'text that person'},
-            'Taurus': {'style': 'sensual steady approach', 'action': 'plan a romantic dinner'},
-            'Gemini': {'style': 'playful communication', 'action': 'text that person'},
-            'Cancer': {'style': 'nurturing emotional connection', 'action': 'plan a cozy date'},
-            'Leo': {'style': 'grand romantic gestures', 'action': 'plan a special date'},
-            'Virgo': {'style': 'thoughtful practical romance', 'action': 'plan a meaningful activity'},
-            'Libra': {'style': 'harmonious balanced approach', 'action': 'plan a beautiful date'},
-            'Scorpio': {'style': 'intense passionate connection', 'action': 'text that person'},
-            'Sagittarius': {'style': 'adventurous spontaneous dates', 'action': 'plan an adventure'},
-            'Capricorn': {'style': 'traditional committed approach', 'action': 'plan a serious conversation'},
-            'Aquarius': {'style': 'unique friendship-first romance', 'action': 'text that person'},
-            'Pisces': {'style': 'dreamy intuitive timing', 'action': 'trust your intuition'}
+            'Aries': {'style': 'direct romantic style', 'action': 'text that person'},
+            'Taurus': {'style': 'steady and sensual approach to love', 'action': 'plan a romantic dinner'},
+            'Gemini': {'style': 'playful communication style', 'action': 'text that person'},
+            'Cancer': {'style': 'nurturing emotional style', 'action': 'plan a cozy date'},
+            'Leo': {'style': 'expressive romantic style', 'action': 'plan a special date'},
+            'Virgo': {'style': 'thoughtful practical style in love', 'action': 'plan a meaningful activity'},
+            'Libra': {'style': 'balanced relationship style', 'action': 'plan a beautiful date'},
+            'Scorpio': {'style': 'deep and passionate relationship style', 'action': 'text that person'},
+            'Sagittarius': {'style': 'adventurous dating style', 'action': 'plan an adventure'},
+            'Capricorn': {'style': 'serious and committed relationship style', 'action': 'plan a serious conversation'},
+            'Aquarius': {'style': 'friendship-first romantic style', 'action': 'text that person'},
+            'Pisces': {'style': 'intuitive romantic style', 'action': 'trust your intuition'}
         }
         
         # Day ruler effects on romance
         day_effects = {
-            'Venus': 'enhances all romantic activities',
+            'Venus': 'supports warmth, attraction, and social ease',
             'Mars': 'adds passion but may be too aggressive',
-            'Moon': 'perfect for emotional connection',
-            'Mercury': 'great for romantic communication',
-            'Jupiter': 'favors commitment and expansion',
-            'Saturn': 'better for serious relationship talks',
-            'Sun': 'good for confident romantic expression'
+            'Moon': 'supports emotional connection',
+            'Mercury': 'helps romantic communication',
+            'Jupiter': 'supports commitment and openness',
+            'Saturn': 'supports serious relationship talks',
+            'Sun': 'supports confident romantic expression'
         }
         
         romance_info = sign_romance.get(sign, {'style': 'authentic expression', 'action': 'follow your heart'})
@@ -482,27 +486,27 @@ class WesternHoroscopeGenerator:
         if venus_aspects:
             aspect = venus_aspects[0]
             if aspect['nature'] == 'harmonious':
-                return f"{romance_info['action'].title()} - Venus {aspect['aspect']} {day_effects.get(day_ruler, 'supports')} your {sign} {romance_info['style']}"
+                return f"Venus {aspect['aspect']} supports {self._sign_trait(sign, romance_info['style'])}. {day_ruler}'s day influence {day_effects.get(day_ruler, 'supports connection')}, so keep affection warm and direct."
             else:
-                return f"Give space - Venus {aspect['aspect']} creates tension, avoid pushing your {sign} {romance_info['style']} today"
+                return f"Venus {aspect['aspect']} can create relationship tension for {self._sign_trait(sign, romance_info['style'])}. Give people space and avoid forcing a response today."
         elif moon_aspects:
             aspect = moon_aspects[0]
             if aspect['nature'] == 'harmonious':
-                return f"{romance_info['action'].title()} - Moon {aspect['aspect']} supports emotional connection with your {sign} {romance_info['style']}"
+                return f"Moon {aspect['aspect']} supports emotional connection for {self._sign_trait(sign, romance_info['style'])}. Honest, simple communication works better than grand gestures."
             else:
-                return f"Give space - Moon {aspect['aspect']} may cause emotional instability, pause your {sign} {romance_info['style']}"
+                return f"Moon {aspect['aspect']} may make emotions uneven for {self._sign_trait(sign, romance_info['style'])}. Pause before reacting and give conversations room to breathe."
         else:
             # No Venus/Moon aspects, use day ruler + sign combination
             if day_ruler == 'Venus':
-                return f"{romance_info['action'].title()} - Venus day {day_effects['Venus']} your {sign} {romance_info['style']}"
+                return f"Venus day {day_effects['Venus']} for {self._sign_trait(sign, romance_info['style'])}. A direct but gentle message is favored."
             elif day_ruler == 'Mars' and sign in ['Aries', 'Leo', 'Sagittarius', 'Scorpio']:
-                return f"{romance_info['action'].title()} - Mars day adds passion to your {sign} {romance_info['style']}"
+                return f"Mars day adds passion to {self._sign_trait(sign, romance_info['style'])}. Move confidently, but avoid rushing the other person."
             elif day_ruler == 'Mars':
-                return f"Give space - Mars day may be too aggressive for your {sign} {romance_info['style']}"
+                return f"Give space - Mars day may be too aggressive for {self._sign_trait(sign, romance_info['style'])}"
             elif day_ruler == 'Moon':
-                return f"{romance_info['action'].title()} - Moon day {day_effects['Moon']} your {sign} {romance_info['style']}"
+                return f"Moon day {day_effects['Moon']} for {self._sign_trait(sign, romance_info['style'])}. Lead with emotional honesty."
             else:
-                return f"{romance_info['action'].title()} - {day_ruler} day {day_effects.get(day_ruler, 'supports')} your {sign} {romance_info['style']}"
+                return f"{day_ruler} day {day_effects.get(day_ruler, 'supports')} for {self._sign_trait(sign, romance_info['style'])}. Keep expectations realistic and communication clear."
 
     def _calculate_career_guidance(self, sign: str, aspects: List[Dict], date: datetime) -> str:
         """Calculate career guidance using real planetary positions and aspects"""
@@ -553,34 +557,34 @@ class WesternHoroscopeGenerator:
             
             if aspect['nature'] == 'harmonious':
                 if planet == 'Mars':
-                    return f"{career_info['action'].title()} - Mars {aspect['aspect']} energizes your {sign} {career_info['style']}, perfect for taking initiative"
+                    return f"Mars {aspect['aspect']} energizes {self._sign_trait(sign, career_info['style'])}. Take initiative on one clear priority and avoid scattering effort."
                 elif planet == 'Jupiter':
-                    return f"{career_info['action'].title()} - Jupiter {aspect['aspect']} expands opportunities for your {sign} {career_info['style']}"
+                    return f"Jupiter {aspect['aspect']} can expand opportunities around {self._sign_trait(sign, career_info['style'])}. Stay open to guidance, learning, and wider networks."
                 elif planet == 'Saturn':
-                    return f"{career_info['action'].title()} - Saturn {aspect['aspect']} rewards your {sign} {career_info['style']} with lasting results"
+                    return f"Saturn {aspect['aspect']} supports disciplined progress in {self._sign_trait(sign, career_info['style'])}. Focus on durable results rather than quick wins."
                 elif planet == 'Mercury':
-                    return f"{career_info['action'].title()} - Mercury {aspect['aspect']} enhances communication in your {sign} {career_info['style']}"
+                    return f"Mercury {aspect['aspect']} highlights communication in {self._sign_trait(sign, career_info['style'])}. Write, explain, and negotiate with extra clarity."
             else:  # challenging
                 if planet == 'Mars':
-                    return f"Avoid conflicts - Mars {aspect['aspect']} may make your {sign} {career_info['style']} too aggressive today"
+                    return f"Avoid conflicts - Mars {aspect['aspect']} may make {self._sign_trait(sign, career_info['style'])} too aggressive today"
                 elif planet == 'Jupiter':
-                    return f"Stay realistic - Jupiter {aspect['aspect']} may cause overconfidence in your {sign} {career_info['style']}"
+                    return f"Stay realistic - Jupiter {aspect['aspect']} may cause overconfidence in {self._sign_trait(sign, career_info['style'])}"
                 elif planet == 'Saturn':
-                    return f"Be patient - Saturn {aspect['aspect']} tests your {sign} {career_info['style']} with obstacles"
+                    return f"Be patient - Saturn {aspect['aspect']} tests {self._sign_trait(sign, career_info['style'])} with obstacles"
                 elif planet == 'Mercury':
-                    return f"Double-check details - Mercury {aspect['aspect']} may cause miscommunication in your {sign} {career_info['style']}"
+                    return f"Double-check details - Mercury {aspect['aspect']} may cause miscommunication in {self._sign_trait(sign, career_info['style'])}"
         
         # No career aspects, use day ruler + sign combination
         if day_ruler == 'Mars' and sign in ['Aries', 'Leo', 'Sagittarius', 'Capricorn']:
-            return f"{career_info['action'].title()} - Mars day {day_effects['Mars']} your {sign} {career_info['style']}"
+            return f"Mars day {day_effects['Mars']} for {self._sign_trait(sign, career_info['style'])}. Use the momentum without turning every issue into a contest."
         elif day_ruler == 'Jupiter':
-            return f"{career_info['action'].title()} - Jupiter day {day_effects['Jupiter']} your {sign} {career_info['style']}"
+            return f"Jupiter day {day_effects['Jupiter']} for {self._sign_trait(sign, career_info['style'])}. Good conversations may open useful doors."
         elif day_ruler == 'Saturn':
-            return f"{career_info['action'].title()} - Saturn day {day_effects['Saturn']} your {sign} {career_info['style']}"
+            return f"Saturn day {day_effects['Saturn']} for {self._sign_trait(sign, career_info['style'])}. Handle responsibilities methodically."
         elif day_ruler == 'Mercury':
-            return f"{career_info['action'].title()} - Mercury day {day_effects['Mercury']} your {sign} {career_info['style']}"
+            return f"Mercury day {day_effects['Mercury']} for {self._sign_trait(sign, career_info['style'])}. Meetings, writing, and planning deserve priority."
         else:
-            return f"{career_info['action'].title()} - {day_ruler} day {day_effects.get(day_ruler, 'supports')} your {sign} {career_info['style']}"
+            return f"{day_ruler} day {day_effects.get(day_ruler, 'supports')} for {self._sign_trait(sign, career_info['style'])}. Keep the day practical and focused."
 
     def _calculate_health_guidance(self, sign: str, aspects: List[Dict], date: datetime) -> str:
         """Calculate health guidance using real planetary positions and aspects"""
@@ -631,34 +635,34 @@ class WesternHoroscopeGenerator:
             
             if aspect['nature'] == 'harmonious':
                 if planet == 'Mars':
-                    return f"{health_info['action'].title()} - Mars {aspect['aspect']} energizes your {sign} {health_info['focus']}, perfect for physical activity"
+                    return f"Mars {aspect['aspect']} supports active movement for {self._sign_trait(sign, health_info['focus'])}. Exercise is favored, but keep intensity sensible."
                 elif planet == 'Moon':
-                    return f"{health_info['action'].title()} - Moon {aspect['aspect']} supports your {sign} {health_info['focus']} through emotional wellness"
+                    return f"Moon {aspect['aspect']} supports {self._sign_trait(sign, health_info['focus'])} through emotional steadiness. Rest, hydration, and regular meals help."
                 elif planet == 'Saturn':
-                    return f"{health_info['action'].title()} - Saturn {aspect['aspect']} strengthens your {sign} {health_info['focus']} with discipline"
+                    return f"Saturn {aspect['aspect']} favors structured routines for {self._sign_trait(sign, health_info['focus'])}. Pace exercise and protect recovery time."
                 elif planet == 'Sun':
-                    return f"{health_info['action'].title()} - Sun {aspect['aspect']} vitalizes your {sign} {health_info['focus']} naturally"
+                    return f"Sun {aspect['aspect']} supports vitality around {self._sign_trait(sign, health_info['focus'])}. Choose steady movement and sunlight where possible."
             else:  # challenging
                 if planet == 'Mars':
-                    return f"Avoid overexertion - Mars {aspect['aspect']} may stress your {sign} {health_info['focus']} today"
+                    return f"Avoid overexertion - Mars {aspect['aspect']} may stress {self._sign_trait(sign, health_info['focus'])} today"
                 elif planet == 'Moon':
-                    return f"Manage stress - Moon {aspect['aspect']} may affect your {sign} {health_info['focus']} emotionally"
+                    return f"Manage stress - Moon {aspect['aspect']} may affect {self._sign_trait(sign, health_info['focus'])} emotionally"
                 elif planet == 'Saturn':
-                    return f"Be gentle - Saturn {aspect['aspect']} may create tension in your {sign} {health_info['focus']}"
+                    return f"Be gentle - Saturn {aspect['aspect']} may create tension in {self._sign_trait(sign, health_info['focus'])}"
                 elif planet == 'Sun':
-                    return f"Conserve energy - Sun {aspect['aspect']} may drain your {sign} {health_info['focus']} vitality"
+                    return f"Conserve energy - Sun {aspect['aspect']} may drain {self._sign_trait(sign, health_info['focus'])} vitality"
         
         # No health aspects, use day ruler + sign combination
         if day_ruler == 'Mars':
-            return f"{health_info['action'].title()} - Mars day {day_effects['Mars']} your {sign} {health_info['focus']}"
+            return f"Mars day {day_effects['Mars']} for {self._sign_trait(sign, health_info['focus'])}. Move your body, but avoid overexertion."
         elif day_ruler == 'Moon':
-            return f"{health_info['action'].title()} - Moon day {day_effects['Moon']} your {sign} {health_info['focus']}"
+            return f"Moon day {day_effects['Moon']} for {self._sign_trait(sign, health_info['focus'])}. Emotional balance supports physical balance."
         elif day_ruler == 'Saturn':
-            return f"{health_info['action'].title()} - Saturn day {day_effects['Saturn']} your {sign} {health_info['focus']}"
+            return f"Saturn day {day_effects['Saturn']} for {self._sign_trait(sign, health_info['focus'])}. Keep routines simple and consistent."
         elif day_ruler == 'Sun':
-            return f"{health_info['action'].title()} - Sun day {day_effects['Sun']} your {sign} {health_info['focus']}"
+            return f"Sun day {day_effects['Sun']} for {self._sign_trait(sign, health_info['focus'])}. Support vitality without burning through energy."
         else:
-            return f"{health_info['action'].title()} - {day_ruler} day {day_effects.get(day_ruler, 'supports overall wellness')} your {sign} {health_info['focus']}"
+            return f"{day_ruler} day {day_effects.get(day_ruler, 'supports overall wellness')} for {self._sign_trait(sign, health_info['focus'])}. Listen to your body and keep routines balanced."
 
     def _calculate_finance_guidance(self, sign: str, aspects: List[Dict], date: datetime) -> str:
         """Calculate finance guidance using real planetary positions and aspects"""
@@ -709,34 +713,34 @@ class WesternHoroscopeGenerator:
             
             if aspect['nature'] == 'harmonious':
                 if planet == 'Jupiter':
-                    return f"{finance_info['action'].title()} - Jupiter {aspect['aspect']} expands your {sign} {finance_info['style']}, perfect for growth investments"
+                    return f"Jupiter {aspect['aspect']} supports broader thinking around {self._sign_trait(sign, finance_info['style'])}. Review opportunities carefully before expanding."
                 elif planet == 'Venus':
-                    return f"{finance_info['action'].title()} - Venus {aspect['aspect']} attracts money through your {sign} {finance_info['style']}"
+                    return f"Venus {aspect['aspect']} supports value, relationships, and creative judgment around {self._sign_trait(sign, finance_info['style'])}."
                 elif planet == 'Saturn':
-                    return f"{finance_info['action'].title()} - Saturn {aspect['aspect']} rewards your {sign} {finance_info['style']} with lasting wealth"
+                    return f"Saturn {aspect['aspect']} favors disciplined planning for {self._sign_trait(sign, finance_info['style'])}. Review commitments before taking risks."
                 elif planet == 'Mars':
-                    return f"{finance_info['action'].title()} - Mars {aspect['aspect']} energizes your {sign} {finance_info['style']}, act on opportunities"
+                    return f"Mars {aspect['aspect']} energizes {self._sign_trait(sign, finance_info['style'])}. Act only after checking the numbers."
             else:  # challenging
                 if planet == 'Jupiter':
-                    return f"Avoid overconfidence - Jupiter {aspect['aspect']} may cause overextension in your {sign} {finance_info['style']}"
+                    return f"Avoid overconfidence - Jupiter {aspect['aspect']} may cause overextension in {self._sign_trait(sign, finance_info['style'])}"
                 elif planet == 'Venus':
-                    return f"Control spending - Venus {aspect['aspect']} may tempt overspending on your {sign} {finance_info['style']}"
+                    return f"Control spending - Venus {aspect['aspect']} may tempt overspending around {self._sign_trait(sign, finance_info['style'])}"
                 elif planet == 'Saturn':
-                    return f"Be patient - Saturn {aspect['aspect']} tests your {sign} {finance_info['style']} with restrictions"
+                    return f"Be patient - Saturn {aspect['aspect']} tests {self._sign_trait(sign, finance_info['style'])} with restrictions"
                 elif planet == 'Mars':
-                    return f"Avoid impulsive decisions - Mars {aspect['aspect']} may rush your {sign} {finance_info['style']}"
+                    return f"Avoid impulsive decisions - Mars {aspect['aspect']} may rush {self._sign_trait(sign, finance_info['style'])}"
         
         # No finance aspects, use day ruler + sign combination
         if day_ruler == 'Jupiter':
-            return f"{finance_info['action'].title()} - Jupiter day {day_effects['Jupiter']} your {sign} {finance_info['style']}"
+            return f"Jupiter day {day_effects['Jupiter']} for {self._sign_trait(sign, finance_info['style'])}. Explore growth, but keep assumptions realistic."
         elif day_ruler == 'Venus':
-            return f"{finance_info['action'].title()} - Venus day {day_effects['Venus']} your {sign} {finance_info['style']}"
+            return f"Venus day {day_effects['Venus']} for {self._sign_trait(sign, finance_info['style'])}. Spend with taste, not impulse."
         elif day_ruler == 'Saturn':
-            return f"{finance_info['action'].title()} - Saturn day {day_effects['Saturn']} your {sign} {finance_info['style']}"
+            return f"Saturn day {day_effects['Saturn']} for {self._sign_trait(sign, finance_info['style'])}. Budgeting and long-term review are favored."
         elif day_ruler == 'Mars':
-            return f"{finance_info['action'].title()} - Mars day {day_effects['Mars']} your {sign} {finance_info['style']}"
+            return f"Mars day {day_effects['Mars']} for {self._sign_trait(sign, finance_info['style'])}. Avoid rushed spending or speculative moves."
         else:
-            return f"{finance_info['action'].title()} - {day_ruler} day {day_effects.get(day_ruler, 'supports financial awareness')} your {sign} {finance_info['style']}"
+            return f"{day_ruler} day {day_effects.get(day_ruler, 'supports financial awareness')} for {self._sign_trait(sign, finance_info['style'])}. Keep decisions grounded."
 
     def _calculate_education_guidance(self, sign: str, aspects: List[Dict], date: datetime) -> str:
         """Calculate education guidance using real planetary positions and aspects"""

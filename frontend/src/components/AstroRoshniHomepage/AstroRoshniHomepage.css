@@ -1565,6 +1565,13 @@
   border-left: 4px solid #ff6b6b;
 }
 
+.horoscope-source-note {
+  margin: 10px 0 0;
+  color: #6b5f63;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .horoscope-categories {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

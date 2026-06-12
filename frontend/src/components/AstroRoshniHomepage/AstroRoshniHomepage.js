@@ -543,7 +543,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     const initializeData = async () => {
       try {
         await Promise.all([
-          fetchHoroscopes(),
           fetchPlanetaryPositions(),
           fetchMuhuratTimes()
         ]);
@@ -855,16 +854,24 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       const API_BASE_URL = process.env.NODE_ENV === 'production' 
         ? APP_CONFIG.api.prod 
         : APP_CONFIG.api.dev;
-      const endpoint = `${API_BASE_URL}/api/horoscope/all-signs`;
+      const endpoint = `${API_BASE_URL}/api/horoscope/all-signs?period=${encodeURIComponent(selectedPeriod)}`;
       const response = await fetch(endpoint);
+      if (!response.ok) {
+        throw new Error(`Horoscope fetch failed with ${response.status}`);
+      }
       const data = await response.json();
       setHoroscopeData(data);
     } catch (error) {
       console.error('Error fetching horoscopes:', error);
+      setHoroscopeData({});
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedPeriod]);
+
+  useEffect(() => {
+    fetchHoroscopes();
+  }, [fetchHoroscopes]);
 
   const fetchNumerologyData = useCallback(async () => {
     if (!user || !birthData) return;
@@ -928,11 +935,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     if (!horoscopeData[selectedZodiac]) {
       return {
         prediction: {
-          overall: 'Loading your personalized horoscope...',
-          love: 'Love predictions loading...',
-          career: 'Career insights loading...',
+          overall: 'Loading your zodiac forecast...',
+          love: 'Love forecast loading...',
+          career: 'Career forecast loading...',
           health: 'Health guidance loading...',
-          finance: 'Financial outlook loading...'
+          finance: 'Financial forecast loading...'
         },
         lucky_number: '...',
         lucky_color: '...',
@@ -1955,16 +1962,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <span className="section-intro__title-sub">Daily, weekly, monthly &amp; yearly</span>
             </h2>
             <p className="section-intro__lead">
-              Choose your zodiac and period for at-a-glance love, career, health, and finance—then open the full reading anytime.
+              Choose your zodiac and period for an ephemeris-based tropical forecast across love, career, health, and finance—then open the full reading anytime.
             </p>
           </header>
           <div className="horoscope-grid">
             <div className="horoscope-content">
               <div className="horoscope-tabs">
                 <button className={`tab ${selectedPeriod === 'daily' ? 'active' : ''}`} onClick={() => setSelectedPeriod('daily')}>Daily</button>
-                <button className={`tab ${selectedPeriod === 'weekly' ? 'active' : ''}`} onClick={() => { setSelectedPeriod('weekly'); navigate(`/horoscope?period=weekly&sign=${selectedZodiac}`); }}>Weekly</button>
-                <button className={`tab ${selectedPeriod === 'monthly' ? 'active' : ''}`} onClick={() => { setSelectedPeriod('monthly'); navigate(`/horoscope?period=monthly&sign=${selectedZodiac}`); }}>Monthly</button>
-                <button className={`tab ${selectedPeriod === 'yearly' ? 'active' : ''}`} onClick={() => { setSelectedPeriod('yearly'); navigate(`/horoscope?period=yearly&sign=${selectedZodiac}`); }}>Yearly</button>
+                <button className={`tab ${selectedPeriod === 'weekly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('weekly')}>Weekly</button>
+                <button className={`tab ${selectedPeriod === 'monthly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('monthly')}>Monthly</button>
+                <button className={`tab ${selectedPeriod === 'yearly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('yearly')}>Yearly</button>
               </div>
               
               <div className="zodiac-grid">
@@ -1983,11 +1990,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <div className="horoscope-content-area">
                 <h3>{selectedZodiac.charAt(0).toUpperCase() + selectedZodiac.slice(1)} {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope</h3>
                 {loading ? (
-                  <div className="horoscope-loading">Loading your personalized horoscope...</div>
+                  <div className="horoscope-loading">Loading your zodiac forecast...</div>
                 ) : (
                   <div className="horoscope-details">
                     <div className="horoscope-main">
                       <p><strong>Overall:</strong> {getCurrentHoroscope().prediction?.overall}</p>
+                      <p className="horoscope-source-note">
+                        Based on current tropical planetary transits for your sun sign. For personal predictions, use your birth chart with date, time, and place.
+                      </p>
                     </div>
                     <div className="horoscope-categories">
                       <div className="category">

@@ -4731,7 +4731,7 @@ async def get_yearly_horoscope(zodiac_sign: str, date: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/horoscope/all-signs")
-async def get_all_daily_horoscopes(date: Optional[str] = None):
+async def get_all_daily_horoscopes(date: Optional[str] = None, period: str = "daily"):
     try:
         zodiac_signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                        'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
@@ -4743,7 +4743,7 @@ async def get_all_daily_horoscopes(date: Optional[str] = None):
             
         horoscopes = {}
         for sign in zodiac_signs:
-            horoscopes[sign.lower()] = horoscope_api.get_daily_horoscope(sign, date_obj)
+            horoscopes[sign.lower()] = horoscope_api.get_horoscope(sign, period, date_obj)
             
         return horoscopes
     except Exception as e:
