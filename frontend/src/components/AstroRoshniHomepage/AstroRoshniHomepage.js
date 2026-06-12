@@ -229,20 +229,31 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     { name: 'Anita Patel', location: 'Ahmedabad', rating: 5, text: 'The AI-powered Tara gives instant answers with Swiss Ephemeris precision. Real-time transit analysis and Nakshatra predictions are incredibly detailed. This combines ancient Vedic wisdom with modern technology perfectly.', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face' }
   ];
 
-  const liveOffers = [
+  const fallbackBlogPosts = [
     {
-      title: 'First Consultation FREE',
-      desc: 'Limited time offer for new users',
-      timer: '23:45:12',
-      color: '#f44336',
-      linkToChat: true
+      title: 'How to Read Your Daily Panchang',
+      slug: null,
+      category: 'Panchang',
+      excerpt: 'Learn how tithi, nakshatra, yoga and karana shape the quality of a day in Vedic astrology.',
+      featured_image: '/images/astroroshni-og-image.jpg',
+      created_at: new Date().toISOString(),
     },
     {
-      title: '50% Off Every Consultation This Month',
-      desc: 'Limited time — discount applies to each session',
-      timer: '11:23:45',
-      color: '#ff9800'
-    }
+      title: 'What Your Moon Nakshatra Reveals',
+      slug: null,
+      category: 'Nakshatra',
+      excerpt: 'Your Janma Nakshatra is a powerful key for temperament, timing, compatibility and dasha analysis.',
+      featured_image: '/images/astroroshni-og-image.jpg',
+      created_at: new Date().toISOString(),
+    },
+    {
+      title: 'Kundli Matching Beyond Guna Milan',
+      slug: null,
+      category: 'Marriage',
+      excerpt: 'Compatibility is stronger when Ashtakoot is read with D9 Navamsa, 7th house, Venus, Jupiter and timing.',
+      featured_image: '/images/astroroshni-og-image.jpg',
+      created_at: new Date().toISOString(),
+    },
   ];
 
   const [planetaryPositions, setPlanetaryPositions] = useState([]);
@@ -256,7 +267,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [showDestinyModal, setShowDestinyModal] = useState(false);
   const [destinyReading, setDestinyReading] = useState(null);
   const [playTestimonials, setPlayTestimonials] = useState([]);
+  const [homepageBlogs, setHomepageBlogs] = useState([]);
   const testimonials = playTestimonials.length > 0 ? playTestimonials : fallbackTestimonials;
+  const blogPosts = homepageBlogs.length > 0 ? homepageBlogs : fallbackBlogPosts;
 
   useEffect(() => {
     let cancelled = false;
@@ -270,6 +283,24 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       .catch(() => {
         if (!cancelled) setPlayTestimonials([]);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/blog/posts?status=published')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load blog posts'))))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setHomepageBlogs(data.slice(0, 8));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHomepageBlogs([]);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -2024,38 +2055,45 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
 
 
-      {/* Live Offers Banner */}
-      <section className="live-offers">
+      {/* Blog Carousel */}
+      <section className="homepage-blog-carousel" aria-labelledby="homepage-blog-carousel-title">
         <div className="container">
-          <div className="offers-scroll">
-            {liveOffers.map((offer, index) => {
-              const goChat = () => {
-                if (user) navigate('/chat?app=1');
-                else if (onLogin) onLogin();
-              };
-              const onClaim = (e) => {
-                e.stopPropagation();
-                if (offer.linkToChat) goChat();
-                else setShowCreditsModal(true);
-              };
+          <div className="homepage-blog-carousel__header">
+            <div>
+              <span className="homepage-blog-carousel__eyebrow">Astrology Articles</span>
+              <h2 id="homepage-blog-carousel-title">Latest From the AstroRoshni Blog</h2>
+              <p>Practical Vedic astrology guides for Panchang, Kundli, nakshatras, timing, relationships and everyday decisions.</p>
+            </div>
+            <Link to="/blog" className="homepage-blog-carousel__view-all">View all blogs</Link>
+          </div>
+
+          <div className="homepage-blog-carousel__track" aria-label="Latest blog posts">
+            {blogPosts.map((post) => {
+              const cleanExcerpt = post.excerpt || String(post.content || '').replace(/[#*[\]()]/g, '').slice(0, 150);
+              const blogPath = post.slug ? `/blog/${post.slug}` : '/blog';
               return (
-                <div
-                  key={index}
-                  className={`offer-banner${offer.linkToChat ? ' offer-banner--clickable' : ''}`}
-                  style={{ borderColor: offer.color }}
-                  {...(offer.linkToChat ? { onClick: goChat } : {})}
-                >
-                  <div className="offer-content">
-                    <h3>{offer.title}</h3>
-                    <p>{offer.desc}</p>
-                    <div className="timer" style={{ color: offer.color }}>
-                      ⏰ {offer.timer}
+                <article className="homepage-blog-card" key={post.id || post.slug || post.title}>
+                  {post.featured_image && (
+                    <Link to={blogPath} className="homepage-blog-card__image" aria-label={`Read ${post.title}`}>
+                      <img src={post.featured_image} alt="" loading="lazy" />
+                    </Link>
+                  )}
+                  <div className="homepage-blog-card__body">
+                    <div className="homepage-blog-card__meta">
+                      {post.category && <span>{post.category}</span>}
+                      {post.created_at && (
+                        <time dateTime={post.created_at}>
+                          {new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </time>
+                      )}
                     </div>
+                    <h3>
+                      <Link to={blogPath}>{post.title}</Link>
+                    </h3>
+                    <p>{cleanExcerpt.length > 150 ? `${cleanExcerpt.slice(0, 150)}...` : cleanExcerpt}</p>
+                    <Link to={blogPath} className="homepage-blog-card__link">Read article</Link>
                   </div>
-                  <button type="button" className="claim-btn" style={{ background: offer.color }} onClick={onClaim}>
-                    CLAIM NOW
-                  </button>
-                </div>
+                </article>
               );
             })}
           </div>
