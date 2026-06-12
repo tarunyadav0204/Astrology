@@ -15,6 +15,20 @@ NAKSHATRA_YEAR_CACHE: OrderedDict = OrderedDict()
 NAKSHATRA_YEAR_CACHE_MAX = 100
 
 
+def _normalize_nakshatra_name(raw_name: str, valid_names: List[str]) -> str:
+    """Accept canonical names and SEO slugs such as purva-phalguni."""
+    normalized = " ".join(str(raw_name or "").strip().replace("-", " ").replace("_", " ").split())
+    lookup = {name.lower(): name for name in valid_names}
+    canonical = lookup.get(normalized.lower())
+    if not canonical:
+        raise HTTPException(status_code=404, detail=f"Nakshatra '{raw_name}' not found")
+    return canonical
+
+
+def _nakshatra_slug(name: str) -> str:
+    return str(name or "").strip().lower().replace(" ", "-")
+
+
 def _nakshatra_year_cache_key(year: int, latitude: float, longitude: float, ayanamsa_correction: float) -> Tuple:
     return (NAKSHATRA_YEAR_RESPONSE_VERSION, year, round(float(latitude), 4), round(float(longitude), 4), round(float(ayanamsa_correction), 4))
 
@@ -116,10 +130,7 @@ async def get_nakshatra_year_data(
     
     try:
         calculator = AnnualNakshatraCalculator()
-        
-        # Validate nakshatra name
-        if nakshatra_name.title() not in calculator.NAKSHATRA_NAMES:
-            raise HTTPException(status_code=404, detail=f"Nakshatra '{nakshatra_name}' not found")
+        canonical_nakshatra = _normalize_nakshatra_name(nakshatra_name, calculator.NAKSHATRA_NAMES)
         
         # Validate year
         current_year = datetime.now().year
@@ -130,13 +141,13 @@ async def get_nakshatra_year_data(
         
         # Calculate annual periods
         nakshatra_data = calculator.calculate_annual_nakshatra_periods(
-            nakshatra_name.title(), year, latitude, longitude, ayanamsa_correction_degrees=ayan_corr
+            canonical_nakshatra, year, latitude, longitude, ayanamsa_correction_degrees=ayan_corr
         )
         
         # Add dynamic auspiciousness to each period based on multiple factors
         for period in nakshatra_data['periods']:
             period['auspiciousness'] = calculator.calculate_period_auspiciousness(
-                nakshatra_name.title(), period['start_datetime']
+                canonical_nakshatra, period['start_datetime']
             )
         
         # Get detailed nakshatra info from database
@@ -149,7 +160,7 @@ async def get_nakshatra_year_data(
                 FROM nakshatras
                 WHERE LOWER(name) = LOWER(%s)
                 """,
-                (nakshatra_name.title(),),
+                (canonical_nakshatra,),
             )
             db_result = cur.fetchone()
         
@@ -168,13 +179,14 @@ async def get_nakshatra_year_data(
             })
         
         # Get navigation info (previous/next nakshatras)
-        current_index = calculator.NAKSHATRA_NAMES.index(nakshatra_name.title())
+        current_index = calculator.NAKSHATRA_NAMES.index(canonical_nakshatra)
         prev_nakshatra = calculator.NAKSHATRA_NAMES[current_index - 1] if current_index > 0 else calculator.NAKSHATRA_NAMES[-1]
         next_nakshatra = calculator.NAKSHATRA_NAMES[current_index + 1] if current_index < 26 else calculator.NAKSHATRA_NAMES[0]
         
         return {
             'success': True,
-            'nakshatra': nakshatra_name.title(),
+            'nakshatra': canonical_nakshatra,
+            'slug': _nakshatra_slug(canonical_nakshatra),
             'year': year,
             'location': {
                 'name': location_name,
@@ -186,15 +198,19 @@ async def get_nakshatra_year_data(
             'total_periods': nakshatra_data['total_periods'],
             'navigation': {
                 'previous': prev_nakshatra,
-                'next': next_nakshatra
+                'previous_slug': _nakshatra_slug(prev_nakshatra),
+                'next': next_nakshatra,
+                'next_slug': _nakshatra_slug(next_nakshatra)
             },
             'seo': {
-                'title': f"{nakshatra_name.title()} Nakshatra {year} - Timings and Dates",
-                'description': f"Complete {nakshatra_name.title()} nakshatra calendar for {year}. Find all {nakshatra_name.title()} nakshatra dates, timings, and astrological significance.",
-                'keywords': f"{nakshatra_name.lower()} nakshatra, {year}, vedic astrology, nakshatra calendar, moon phases"
+                'title': f"{canonical_nakshatra} Nakshatra {year} - Timings and Dates",
+                'description': f"Complete {canonical_nakshatra} nakshatra calendar for {year}. Find all {canonical_nakshatra} nakshatra dates, timings, and astrological significance.",
+                'keywords': f"{canonical_nakshatra.lower()} nakshatra, {year}, vedic astrology, nakshatra calendar, moon phases"
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating nakshatra data: {str(e)}")
 
@@ -260,9 +276,7 @@ async def get_nakshatra_info(nakshatra_name: str):
     
     try:
         calculator = AnnualNakshatraCalculator()
-        
-        if nakshatra_name.title() not in calculator.NAKSHATRA_NAMES:
-            raise HTTPException(status_code=404, detail=f"Nakshatra '{nakshatra_name}' not found")
+        canonical_nakshatra = _normalize_nakshatra_name(nakshatra_name, calculator.NAKSHATRA_NAMES)
         
         # Get from database
         with get_db_connection() as conn:
@@ -274,7 +288,7 @@ async def get_nakshatra_info(nakshatra_name: str):
                 FROM nakshatras
                 WHERE name = %s
                 """,
-                (nakshatra_name.title(),),
+                (canonical_nakshatra,),
             )
             result = cur.fetchone()
         
@@ -282,7 +296,7 @@ async def get_nakshatra_info(nakshatra_name: str):
             raise HTTPException(status_code=404, detail=f"Detailed info for '{nakshatra_name}' not found")
         
         # Get navigation info
-        current_index = calculator.NAKSHATRA_NAMES.index(nakshatra_name.title())
+        current_index = calculator.NAKSHATRA_NAMES.index(canonical_nakshatra)
         prev_nakshatra = calculator.NAKSHATRA_NAMES[current_index - 1] if current_index > 0 else calculator.NAKSHATRA_NAMES[-1]
         next_nakshatra = calculator.NAKSHATRA_NAMES[current_index + 1] if current_index < 26 else calculator.NAKSHATRA_NAMES[0]
         
@@ -307,14 +321,18 @@ async def get_nakshatra_info(nakshatra_name: str):
             'nakshatra': nakshatra_info,
             'navigation': {
                 'previous': prev_nakshatra,
-                'next': next_nakshatra
+                'previous_slug': _nakshatra_slug(prev_nakshatra),
+                'next': next_nakshatra,
+                'next_slug': _nakshatra_slug(next_nakshatra)
             },
             'seo': {
-                'title': f"{nakshatra_name.title()} Nakshatra - Meaning, Characteristics & Significance",
-                'description': f"Learn about {nakshatra_name.title()} nakshatra in Vedic astrology. Discover its lord, deity, characteristics, career options, and compatibility.",
+                'title': f"{canonical_nakshatra} Nakshatra - Meaning, Characteristics & Significance",
+                'description': f"Learn about {canonical_nakshatra} nakshatra in Vedic astrology. Discover its lord, deity, characteristics, career options, and compatibility.",
                 'keywords': f"{nakshatra_name.lower()} nakshatra, vedic astrology, {result[1].lower()}, {result[2].lower()}, nakshatra meaning"
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching nakshatra info: {str(e)}")

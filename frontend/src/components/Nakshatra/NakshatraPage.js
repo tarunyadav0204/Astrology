@@ -7,6 +7,9 @@ import './NakshatraPage.css';
 
 const SITE_ORIGIN = 'https://astroroshni.com';
 
+const slugifyNakshatra = (name) => String(name || '').trim().toLowerCase().replace(/\s+/g, '-');
+const titleizeNakshatra = (name) => String(name || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+
 const NakshatraPage = () => {
   const { nakshatraName, year } = useParams();
   const navigate = useNavigate();
@@ -21,7 +24,9 @@ const NakshatraPage = () => {
 
   const canonicalYear =
     Number.isFinite(yearFromUrl) && yearFromUrl < currentYear ? currentYear : selectedYear;
-  const canonicalUrl = `${SITE_ORIGIN}/nakshatra/${nakshatraName}/${canonicalYear}`;
+  const canonicalSlug = slugifyNakshatra(nakshatraData?.slug || nakshatraName);
+  const displayName = nakshatraData?.nakshatra || titleizeNakshatra(nakshatraName);
+  const canonicalUrl = `${SITE_ORIGIN}/nakshatra/${canonicalSlug}/${canonicalYear}`;
 
   // Old year URLs (e.g. /2025) were in sitemap earlier; consolidate to current year for Google.
   useEffect(() => {
@@ -38,10 +43,12 @@ const NakshatraPage = () => {
   const fetchNakshatraData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/nakshatra/${nakshatraName}/${selectedYear}`);
+      setError(null);
+      const response = await fetch(`/api/nakshatra/${encodeURIComponent(nakshatraName)}/${selectedYear}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch nakshatra data');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to fetch nakshatra data');
       }
       
       const data = await response.json();
@@ -63,11 +70,11 @@ const NakshatraPage = () => {
     return (
       <div className="nakshatra-page">
         <SEOHead
-          title={`${nakshatraName} Nakshatra ${selectedYear} | AstroRoshni`}
-          description={`${nakshatraName} nakshatra calendar and Vedic insights for ${selectedYear}.`}
+          title={`${displayName} Nakshatra ${selectedYear} | AstroRoshni`}
+          description={`${displayName} nakshatra calendar and Vedic insights for ${selectedYear}.`}
           canonical={canonicalUrl}
         />
-        <div className="loading">Loading {nakshatraName} nakshatra data...</div>
+        <div className="loading">Loading {displayName} nakshatra data...</div>
       </div>
     );
   }
@@ -100,7 +107,7 @@ const NakshatraPage = () => {
       
       <div className="nakshatra-navigation">
         <button 
-          onClick={() => navigate(`/nakshatra/${nakshatraData.navigation.previous}/${selectedYear}`)}
+          onClick={() => navigate(`/nakshatra/${nakshatraData.navigation.previous_slug || slugifyNakshatra(nakshatraData.navigation.previous)}/${selectedYear}`)}
           className="nav-button prev"
         >
           « {nakshatraData.navigation.previous}
@@ -120,7 +127,7 @@ const NakshatraPage = () => {
           </button>
         </div>
         <button 
-          onClick={() => navigate(`/nakshatra/${nakshatraData.navigation.next}/${selectedYear}`)}
+          onClick={() => navigate(`/nakshatra/${nakshatraData.navigation.next_slug || slugifyNakshatra(nakshatraData.navigation.next)}/${selectedYear}`)}
           className="nav-button next"
         >
           {nakshatraData.navigation.next} »
