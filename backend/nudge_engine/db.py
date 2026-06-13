@@ -1564,6 +1564,13 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
         SELECT COUNT(DISTINCT COALESCE(delivery_group_id, id::text)) AS targeted,
                COUNT(*) FILTER (WHERE channel = 'push' AND COALESCE(send_status, 'sent') = 'sent') AS push,
                COUNT(*) FILTER (WHERE channel IN ('whatsapp', 'whatsapp_template') AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
+                                AND COALESCE(data_json, '') NOT LIKE '%"from_template_continue": true%') AS whatsapp_direct,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp_template,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND clicked_at IS NOT NULL) AS whatsapp_template_clicked,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_message_sent,
+               COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
+                                AND COALESCE(data_json, '') LIKE '%"from_template_continue": true%') AS whatsapp_after_continue,
                COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
@@ -1574,8 +1581,21 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
         """,
         params,
     )
-    row = cur.fetchone() or (0,) * 7
-    keys = ("targeted", "push", "whatsapp", "email", "failed_attempts", "stored_only", "clicked")
+    row = cur.fetchone() or (0,) * 12
+    keys = (
+        "targeted",
+        "push",
+        "whatsapp",
+        "whatsapp_direct",
+        "whatsapp_template",
+        "whatsapp_template_clicked",
+        "whatsapp_template_message_sent",
+        "whatsapp_after_continue",
+        "email",
+        "failed_attempts",
+        "stored_only",
+        "clicked",
+    )
     return {k: int(v or 0) for k, v in zip(keys, row)}
 
 

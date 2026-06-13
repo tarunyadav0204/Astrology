@@ -2424,7 +2424,7 @@ async def admin_list_campaigns(
     try:
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
-            items = [_campaign_dto(conn, c) for c in db.list_campaigns(conn, limit=limit)]
+            items = [_campaign_dto(conn, c, include_stats=True) for c in db.list_campaigns(conn, limit=limit)]
         from .param_resolver import CAMPAIGN_PLACEHOLDERS
 
         return {"items": items, "allowed_placeholders": sorted(CAMPAIGN_PLACEHOLDERS)}

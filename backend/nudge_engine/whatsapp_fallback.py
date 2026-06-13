@@ -250,17 +250,16 @@ def pop_pending_whatsapp_template_nudge(
         cur = execute(
             conn,
             """
-            SELECT id, title, body, data_json
+            SELECT id, title, body, data_json, trigger_id, campaign_id, delivery_group_id, event_params, sent_at
             FROM nudge_deliveries
             WHERE userid = %s
-              AND trigger_id = %s
               AND channel = %s
               AND created_at >= %s
-              AND read_at IS NULL
+              AND clicked_at IS NULL
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             """,
-            (int(uid), "chat_hourly_followup", "whatsapp_template", since_dt),
+            (int(uid), "whatsapp_template", since_dt),
         )
         row = cur.fetchone()
         if not row:
@@ -283,6 +282,11 @@ def pop_pending_whatsapp_template_nudge(
                 "title": str(row[1] or ""),
                 "body": str(row[2] or ""),
                 "question": str(payload.get("question") or ""),
+                "trigger_id": str(row[4] or ""),
+                "campaign_id": int(row[5]) if row[5] is not None else None,
+                "delivery_group_id": str(row[6] or "").strip() or None,
+                "event_params": str(row[7] or ""),
+                "sent_at": row[8],
             },
         }
     except Exception as e:
@@ -290,11 +294,22 @@ def pop_pending_whatsapp_template_nudge(
         return {"userid": uid, "nudge": None}
 
 
+def mark_whatsapp_template_nudge_clicked(conn, delivery_id: int) -> None:
+    try:
+        execute(
+            conn,
+            "UPDATE nudge_deliveries SET clicked_at = COALESCE(clicked_at, CURRENT_TIMESTAMP) WHERE id = %s",
+            (int(delivery_id),),
+        )
+    except Exception as e:
+        logger.warning("WhatsApp template nudge clicked marker failed delivery_id=%s: %s", delivery_id, e)
+
+
 def mark_whatsapp_template_nudge_consumed(conn, delivery_id: int) -> None:
     try:
         execute(
             conn,
-            "UPDATE nudge_deliveries SET read_at = CURRENT_TIMESTAMP WHERE id = %s",
+            "UPDATE nudge_deliveries SET read_at = CURRENT_TIMESTAMP, clicked_at = COALESCE(clicked_at, CURRENT_TIMESTAMP) WHERE id = %s",
             (int(delivery_id),),
         )
     except Exception as e:

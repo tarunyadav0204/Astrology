@@ -899,6 +899,17 @@ export default function AdminNudgeCampaigns() {
                     : 'This campaign has already been dispatched. You can still test it to yourself for a quick check.'}
               </div>
 
+              {campaign.stats?.sends ? (
+                <div className="nudge-campaign-card__facts" style={{ marginTop: '12px' }}>
+                  <div><span>Push sent</span><strong>{campaign.stats.sends.push || 0}</strong></div>
+                  <div><span>WhatsApp direct</span><strong>{campaign.stats.sends.whatsapp_direct || 0}</strong></div>
+                  <div><span>WhatsApp template</span><strong>{campaign.stats.sends.whatsapp_template || 0}</strong></div>
+                  <div><span>Continue clicked</span><strong>{campaign.stats.sends.whatsapp_template_clicked || 0}</strong></div>
+                  <div><span>Msg after continue</span><strong>{campaign.stats.sends.whatsapp_after_continue || 0}</strong></div>
+                  <div><span>Email sent</span><strong>{campaign.stats.sends.email || 0}</strong></div>
+                </div>
+              ) : null}
+
               <div className="nudge-campaign-card__actions">
                 {(campaign.status === 'draft' || campaign.status === 'scheduled' || campaign.status === 'paused') && (
                   <button type="button" className="notif-search-btn" onClick={() => handleEdit(campaign)}>

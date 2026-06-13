@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from .models import NudgeEvent
 from . import db
 from . import push as push_module
-from .whatsapp_fallback import send_whatsapp_nudge
+from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,12 @@ def _attempt_push(conn, userid: int, title: str, body: str, push_data: Dict[str,
     return False
 
 
-def _attempt_whatsapp(conn, userid: int, title: str, body: str, question: Optional[str]) -> bool:
-    return bool(
-        send_whatsapp_nudge(conn, userid=userid, title=title, body=body, question=question)
-    )
+def _attempt_whatsapp(conn, userid: int, title: str, body: str, question: Optional[str]) -> Optional[str]:
+    if send_whatsapp_nudge(conn, userid=userid, title=title, body=body, question=question):
+        return "whatsapp"
+    if send_whatsapp_nudge_template(conn, userid=userid):
+        return "whatsapp_template"
+    return None
 
 
 def _attempt_email(
@@ -108,13 +110,16 @@ def deliver_nudge(
     for channel in requested:
         if channel == "push":
             ok = _attempt_push(conn, userid, title, body, push_data)
+            actual_channel = "push"
         elif channel == "whatsapp":
-            ok = _attempt_whatsapp(conn, userid, title, body, q or None)
+            actual_channel = _attempt_whatsapp(conn, userid, title, body, q or None) or "whatsapp"
+            ok = actual_channel in {"whatsapp", "whatsapp_template"}
         elif channel == "email":
             ok = _attempt_email(conn, userid, title, body, q or None, group_id)
+            actual_channel = "email"
         else:
             continue
-        attempts.append((channel, ok))
+        attempts.append((actual_channel, ok))
         if ok and policy != "blast":
             break
 

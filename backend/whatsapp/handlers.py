@@ -36,9 +36,11 @@ from .schema import ensure_whatsapp_schema
 from nudge_engine.whatsapp_fallback import (
     WHATSAPP_NUDGE_CONTINUE_BUTTON_ID,
     build_whatsapp_nudge_body,
+    mark_whatsapp_template_nudge_clicked,
     mark_whatsapp_template_nudge_consumed,
     pop_pending_whatsapp_template_nudge,
 )
+from nudge_engine import db as nudge_db
 
 if TYPE_CHECKING:
     from charts.routes import BirthData
@@ -261,6 +263,8 @@ def _handle_nudge_continue_reply(conn, wa_id: str, phone_number_id: str, body: s
         return True
     nudge = out.get("nudge")
     if nudge:
+        if nudge.get("delivery_id"):
+            mark_whatsapp_template_nudge_clicked(conn, int(nudge["delivery_id"]))
         ok = send_whatsapp_text(
             to_wa_id=wa_id,
             phone_number_id=phone_number_id,
@@ -272,6 +276,35 @@ def _handle_nudge_continue_reply(conn, wa_id: str, phone_number_id: str, body: s
         )
         if ok and nudge.get("delivery_id"):
             mark_whatsapp_template_nudge_consumed(conn, int(nudge["delivery_id"]))
+            try:
+                sent_at = nudge.get("sent_at")
+                if hasattr(sent_at, "isoformat"):
+                    sent_at_value = sent_at
+                else:
+                    from datetime import date as _date
+
+                    sent_at_value = _date.today()
+                nudge_db.insert_delivery(
+                    conn,
+                    userid=int(out.get("userid") or 0),
+                    trigger_id=str(nudge.get("trigger_id") or ""),
+                    title=str(nudge.get("title") or ""),
+                    body=str(nudge.get("body") or ""),
+                    sent_at=sent_at_value,
+                    event_params=str(nudge.get("event_params") or ""),
+                    channel="whatsapp",
+                    data_payload={
+                        "question": str(nudge.get("question") or ""),
+                        "from_template_continue": True,
+                        "template_delivery_id": int(nudge.get("delivery_id")),
+                    },
+                    campaign_id=nudge.get("campaign_id"),
+                    delivery_group_id=nudge.get("delivery_group_id"),
+                    send_status="sent",
+                    is_primary=False,
+                )
+            except Exception:
+                logger.exception("Failed to record WhatsApp continued nudge delivery")
         try:
             conn.commit()
         except Exception:
