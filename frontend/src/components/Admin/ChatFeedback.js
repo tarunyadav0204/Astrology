@@ -1,89 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getAdminAuthHeaders } from '../../services/adminService';
 import './ChatFeedback.css';
+
+const PAGE_LIMIT = 10;
 
 const ChatFeedback = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({});
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchUsername, setSearchUsername] = useState('');
   const [searchRating, setSearchRating] = useState('');
   const [appliedFilters, setAppliedFilters] = useState({ username: '', rating: '' });
 
+  const fetchFeedbacks = useCallback(async (signal) => {
+    try {
+      setLoading(true);
+
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_LIMIT),
+      });
+
+      if (appliedFilters.username.trim()) {
+        params.append('username', appliedFilters.username.trim());
+      }
+
+      if (appliedFilters.rating) {
+        params.append('rating', appliedFilters.rating);
+      }
+
+      const response = await fetch(`/api/chat/feedback/stats?${params}`, {
+        headers: getAdminAuthHeaders(),
+        signal,
+      });
+
+      if (!response.ok) {
+        setError(`Failed to fetch feedback data: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+      if (signal.aborted) return;
+
+      setFeedbacks(data.feedback || []);
+      setStats({
+        total_feedback: data.total_feedback,
+        average_rating: data.average_rating,
+        rating_distribution: data.rating_distribution,
+      });
+
+      const rowTotal = Number(data.pagination?.total) || 0;
+      const pages = Number(data.pagination?.pages) || (rowTotal > 0 ? Math.ceil(rowTotal / PAGE_LIMIT) : 0);
+      setTotal(rowTotal);
+      setTotalPages(pages);
+      setError(null);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      setError('Error loading feedback data: ' + err.message);
+    } finally {
+      if (!signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [page, appliedFilters]);
+
   useEffect(() => {
-    // Check if user is admin
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role !== 'admin') {
       setError('Admin access required');
       setLoading(false);
-      return;
+      return undefined;
     }
-    
-    fetchFeedbacks();
-  }, [pagination.page, appliedFilters]);
 
-  const fetchFeedbacks = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString()
-      });
-      
-      if (appliedFilters.username.trim()) {
-        params.append('username', appliedFilters.username.trim());
-      }
-      
-      if (appliedFilters.rating) {
-        params.append('rating', appliedFilters.rating);
-      }
-      
-      const response = await fetch(`/api/chat/feedback/stats?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setFeedbacks(data.feedback || []);
-        setStats({
-          total_feedback: data.total_feedback,
-          average_rating: data.average_rating,
-          rating_distribution: data.rating_distribution
-        });
-        setPagination(prev => ({
-          ...prev,
-          total: data.pagination.total,
-          pages: data.pagination.pages
-        }));
-      } else {
-        setError(`Failed to fetch feedback data: ${response.status} ${response.statusText}`);
-      }
-    } catch (err) {
-      setError('Error loading feedback data: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const controller = new AbortController();
+    fetchFeedbacks(controller.signal);
+    return () => controller.abort();
+  }, [fetchFeedbacks]);
 
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    if (newPage < 1 || (totalPages > 0 && newPage > totalPages)) return;
+    setPage(newPage);
   };
 
   const handleSearch = () => {
     setAppliedFilters({ username: searchUsername, rating: searchRating });
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPage(1);
   };
 
   const clearFilters = () => {
     setSearchUsername('');
     setSearchRating('');
     setAppliedFilters({ username: '', rating: '' });
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPage(1);
   };
 
   const renderStars = (rating) => {
@@ -94,8 +106,13 @@ const ChatFeedback = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  if (loading && pagination.page === 1) return <div className="loading">Loading feedback data...</div>;
+  if (loading && page === 1 && feedbacks.length === 0) {
+    return <div className="loading">Loading feedback data...</div>;
+  }
   if (error) return <div className="error">{error}</div>;
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_LIMIT + 1;
+  const rangeEnd = Math.min(page * PAGE_LIMIT, total);
 
   return (
     <div className="chat-feedback-container">
@@ -153,73 +170,79 @@ const ChatFeedback = () => {
         <div className="table-header">
           <h3>Feedback Results</h3>
           <div className="pagination-info">
-            Showing {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+            Showing {rangeStart}-{rangeEnd} of {total}
           </div>
         </div>
-        
-        <table className="feedback-table">
-          <thead>
-            <tr>
-              <th>User Name</th>
-              <th>Rating</th>
-              <th>Comment</th>
-              <th>Created Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {feedbacks.length > 0 ? (
-              feedbacks.map((feedback, index) => (
-                <tr key={index}>
-                  <td>{feedback.user_name || 'Anonymous'}</td>
-                  <td className="rating-cell">
-                    <span className="stars">{renderStars(feedback.rating)}</span>
-                    <span className="rating-number">({feedback.rating}/5)</span>
-                  </td>
-                  <td className="comment-cell">
-                    {feedback.comment || 'No comment'}
-                  </td>
-                  <td>{formatDate(feedback.created_at)}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="no-data">No feedback data available</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
 
-        {pagination.pages > 1 && (
+        {loading && page > 1 ? (
+          <div className="loading">Loading page…</div>
+        ) : (
+          <table className="feedback-table">
+            <thead>
+              <tr>
+                <th>User Name</th>
+                <th>Rating</th>
+                <th>Comment</th>
+                <th>Created Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {feedbacks.length > 0 ? (
+                feedbacks.map((feedback, index) => (
+                  <tr key={index}>
+                    <td>{feedback.user_name || 'Anonymous'}</td>
+                    <td className="rating-cell">
+                      <span className="stars">{renderStars(feedback.rating)}</span>
+                      <span className="rating-number">({feedback.rating}/5)</span>
+                    </td>
+                    <td className="comment-cell">
+                      {feedback.comment || 'No comment'}
+                    </td>
+                    <td>{formatDate(feedback.created_at)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="no-data">No feedback data available</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {totalPages > 1 && (
           <div className="pagination">
-            <button 
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page === 1}
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || loading}
               className="page-btn"
             >
               Previous
             </button>
-            
-            {[...Array(pagination.pages)].map((_, i) => {
-              const page = i + 1;
-              if (page === 1 || page === pagination.pages || (page >= pagination.page - 2 && page <= pagination.page + 2)) {
+
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1;
+              if (pageNum === 1 || pageNum === totalPages || (pageNum >= page - 2 && pageNum <= page + 2)) {
                 return (
                   <button
-                    key={page}
-                    onClick={() => handlePageChange(page)}
-                    className={`page-btn ${page === pagination.page ? 'active' : ''}`}
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    disabled={loading}
+                    className={`page-btn ${pageNum === page ? 'active' : ''}`}
                   >
-                    {page}
+                    {pageNum}
                   </button>
                 );
-              } else if (page === pagination.page - 3 || page === pagination.page + 3) {
-                return <span key={page} className="page-ellipsis">...</span>;
+              }
+              if (pageNum === page - 3 || pageNum === page + 3) {
+                return <span key={pageNum} className="page-ellipsis">...</span>;
               }
               return null;
             })}
-            
-            <button 
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page === pagination.pages}
+
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page === totalPages || loading}
               className="page-btn"
             >
               Next

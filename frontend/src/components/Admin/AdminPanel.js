@@ -29,6 +29,7 @@ import AdminNudgeTriggerDefinitions from './AdminNudgeTriggerDefinitions';
 import AdminNudgeScheduler from './AdminNudgeScheduler';
 import AdminNudgeCampaigns from './AdminNudgeCampaigns';
 import AdminNudgeAnalytics from './AdminNudgeAnalytics';
+import AdminIssues from './AdminIssues';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
@@ -2241,6 +2242,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           Notifications
         </button>
         <button
+          className={`tab ${activeTab === 'issues' ? 'active' : ''}`}
+          onClick={() => setActiveTab('issues')}
+        >
+          Issues
+        </button>
+        <button
           className={`tab ${activeTab === 'expenses' ? 'active' : ''}`}
           onClick={() => setActiveTab('expenses')}
         >
@@ -3026,6 +3033,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'expenses' && <AdminExpenses />}
+
+        {activeTab === 'issues' && <AdminIssues />}
 
         {activeTab === 'credits' && activeSubTab === 'management' && (
           <div className="credits-management">

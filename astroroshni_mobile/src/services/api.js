@@ -330,6 +330,10 @@ export const chatAPI = {
     }),
 };
 
+export const mundaneAPI = {
+  getCountries: () => api.get(getEndpoint('/mundane/countries'), BACKGROUND_REQUEST_CONFIG),
+};
+
 export const speechAPI = {
   transcribeAudio: (audioFile, language = 'english') => {
     const form = new FormData();

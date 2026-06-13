@@ -173,7 +173,7 @@ class CampaignUpsertRequest(BaseModel):
     audience_filter: Dict[str, Any] = Field(default_factory=lambda: {"type": "all"})
     landing_screen: str = "chat"
     scheduled_at: Optional[str] = None  # ISO datetime (IST assumed when no offset)
-    status: str = "draft"  # "draft" or "scheduled"
+    status: str = "draft"  # "draft", "scheduled", or "paused"
 
 
 class CampaignPreviewRequest(BaseModel):
@@ -187,6 +187,14 @@ class CampaignPreviewRequest(BaseModel):
 
 class CampaignTestSendRequest(BaseModel):
     user_id: Optional[int] = None  # defaults to current admin
+
+
+class CampaignAudienceEstimateRequest(BaseModel):
+    audience_filter: Dict[str, Any] = Field(default_factory=lambda: {"type": "all"})
+
+
+class CampaignStatusUpdateRequest(BaseModel):
+    status: str
 
 
 class TriggerDefinitionUpdateRequest(BaseModel):
@@ -2344,10 +2352,28 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Invalid audience type: {atype}")
     if atype == "user_ids" and not (audience.get("user_ids") or []):
         raise HTTPException(status_code=400, detail="audience user_ids must be non-empty")
+    criteria = dict(audience.get("criteria") or {})
+    if not isinstance(criteria, dict):
+        raise HTTPException(status_code=400, detail="audience criteria must be an object")
+    for numeric_key in (
+        "min_days_since_last_chat",
+        "max_days_since_last_chat",
+        "min_questions_asked",
+        "max_questions_asked",
+        "min_credits_balance",
+        "max_credits_balance",
+    ):
+        if criteria.get(numeric_key) in (None, ""):
+            continue
+        try:
+            criteria[numeric_key] = int(criteria[numeric_key])
+        except (TypeError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=f"{numeric_key} must be an integer") from e
+    audience["criteria"] = criteria
 
     status = (body.status or "draft").strip().lower()
-    if status not in ("draft", "scheduled"):
-        raise HTTPException(status_code=400, detail="status must be 'draft' or 'scheduled'")
+    if status not in ("draft", "scheduled", "paused"):
+        raise HTTPException(status_code=400, detail="status must be 'draft', 'scheduled', or 'paused'")
 
     scheduled_at = None
     if body.scheduled_at and str(body.scheduled_at).strip():
@@ -2500,6 +2526,46 @@ async def admin_delete_campaign(
         raise HTTPException(status_code=500, detail="Failed to delete campaign") from e
 
 
+@router.post("/admin/campaigns/{campaign_id}/status")
+async def admin_update_campaign_status(
+    campaign_id: int,
+    body: CampaignStatusUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    target_status = (body.status or "").strip().lower()
+    if target_status not in ("draft", "scheduled", "paused"):
+        raise HTTPException(status_code=400, detail="status must be 'draft', 'scheduled', or 'paused'")
+
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            existing = db.get_campaign(conn, int(campaign_id))
+            if not existing:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            if existing.get("status") in ("sending", "sent"):
+                raise HTTPException(status_code=409, detail="Dispatched campaigns cannot be changed")
+
+            updates: Dict[str, Any] = {"status": target_status}
+            if target_status == "draft":
+                updates["scheduled_at"] = None
+            elif target_status == "scheduled" and not existing.get("scheduled_at"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot resume as scheduled because this campaign has no saved schedule time",
+                )
+
+            db.update_campaign(conn, int(campaign_id), **updates)
+            conn.commit()
+            campaign = db.get_campaign(conn, int(campaign_id))
+        return {"ok": True, "campaign": _campaign_dto(None, campaign)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_update_campaign_status failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to update campaign status") from e
+
+
 @router.post("/admin/campaigns/preview")
 async def admin_preview_campaign(
     body: CampaignPreviewRequest,
@@ -2545,6 +2611,38 @@ async def admin_preview_campaign(
     except Exception as e:
         logger.exception("admin_preview_campaign failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to preview campaign") from e
+
+
+@router.post("/admin/campaigns/audience-estimate")
+async def admin_campaign_audience_estimate(
+    body: CampaignAudienceEstimateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .campaigns import estimate_campaign_audience
+
+    try:
+        pseudo = CampaignUpsertRequest(
+            name="estimate",
+            title_template="estimate",
+            body_template="estimate",
+            audience_filter=body.audience_filter or {"type": "all"},
+        )
+        fields = _validate_campaign_payload(pseudo)
+        audience_filter = json.loads(fields["audience_filter_json"])
+
+        def _work():
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                return estimate_campaign_audience(conn, audience_filter)
+
+        result = await run_in_threadpool(_work)
+        return {"ok": True, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_campaign_audience_estimate failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to estimate campaign audience") from e
 
 
 @router.post("/admin/campaigns/{campaign_id}/test-send")

@@ -2327,8 +2327,12 @@ async def get_branch_analysis_for_message(
 
 
 @router.get("/admin/chat/analysis-stats")
-async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
-    """Get category counts and FAQ (canonical_question) counts for chat analysis dashboard (admin only)."""
+async def get_chat_analysis_stats(
+    current_user: dict = Depends(require_admin),
+    faq_page: int = Query(1, ge=1),
+    faq_limit: int = Query(25, ge=1, le=100),
+):
+    """Get category counts and paginated FAQ (canonical_question) counts for chat analysis dashboard (admin only)."""
     try:
         with get_conn() as conn:
             # Post-migration safety: older DBs may miss these columns.
@@ -2347,6 +2351,12 @@ async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
 
             by_category = []
             by_faq = []
+            faq_pagination = {
+                "page": faq_page,
+                "limit": faq_limit,
+                "total": 0,
+                "total_pages": 0,
+            }
 
             if has_category:
                 cur = execute(
@@ -2366,16 +2376,41 @@ async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
                 cur = execute(
                     conn,
                     """
+                    SELECT COUNT(*)::int
+                    FROM (
+                        SELECT canonical_question
+                        FROM chat_messages
+                        WHERE sender = 'user'
+                          AND canonical_question IS NOT NULL
+                          AND trim(canonical_question) != ''
+                        GROUP BY canonical_question
+                    ) faq_groups
+                    """,
+                    (),
+                )
+                faq_total = int((cur.fetchone() or [0])[0] or 0)
+                faq_total_pages = (faq_total + faq_limit - 1) // faq_limit if faq_limit else 0
+                faq_pagination = {
+                    "page": faq_page,
+                    "limit": faq_limit,
+                    "total": faq_total,
+                    "total_pages": faq_total_pages,
+                }
+                faq_offset = (faq_page - 1) * faq_limit
+                cur = execute(
+                    conn,
+                    """
                     SELECT canonical_question, COUNT(*) AS count
                     FROM chat_messages
                     WHERE sender = 'user' AND canonical_question IS NOT NULL AND trim(canonical_question) != ''
                     GROUP BY canonical_question
                     ORDER BY count DESC
+                    LIMIT ? OFFSET ?
                     """,
-                    (),
+                    (faq_limit, faq_offset),
                 )
                 by_faq = [{"canonical_question": row[0], "count": row[1]} for row in (cur.fetchall() or [])]
-        return {"by_category": by_category, "by_faq": by_faq}
+        return {"by_category": by_category, "by_faq": by_faq, "faq_pagination": faq_pagination}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching chat analysis stats: {str(e)}")
 

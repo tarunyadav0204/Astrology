@@ -533,4 +533,79 @@ export const adminService = {
     }
     return response.json();
   },
+
+  async getAdminIssues(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.status) sp.set('status', params.status);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const url = getEndpoint('/admin/issues') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch issues');
+    }
+    return response.json();
+  },
+
+  async getAdminIssue(issueId) {
+    const response = await fetch(getEndpoint(`/admin/issues/${issueId}`), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch issue');
+    }
+    return response.json();
+  },
+
+  async createAdminIssue(formData) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(getEndpoint('/admin/issues'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-Device-Id': getDeviceId(),
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const d = err.detail;
+      const msg = typeof d === 'string' ? d : d ? JSON.stringify(d) : 'Failed to create issue';
+      throw new Error(msg);
+    }
+    return response.json();
+  },
+
+  async updateAdminIssue(issueId, body) {
+    const response = await fetch(getEndpoint(`/admin/issues/${issueId}`), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update issue');
+    }
+    return response.json();
+  },
+
+  async addAdminIssueComment(issueId, body) {
+    const response = await fetch(getEndpoint(`/admin/issues/${issueId}/comments`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ body }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to add comment');
+    }
+    return response.json();
+  },
+
+  getAdminIssueScreenshotUrl(issueId) {
+    return getEndpoint(`/admin/issues/${issueId}/screenshot`);
+  },
 };

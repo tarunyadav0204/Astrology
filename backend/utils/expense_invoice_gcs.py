@@ -56,30 +56,61 @@ def parse_gs_uri(uri: str) -> Optional[Tuple[str, str]]:
     return m.group(1), m.group(2)
 
 
-def upload_invoice_bytes(
+def upload_bucket_attachment_bytes(
     content: bytes,
     *,
     object_suffix: str,
     content_type: str,
+    folder: str,
 ) -> str:
     """
-    Upload to gs://{bucket}/admin-expenses/YYYY/MM/{object_suffix}.
-    Object is private (no make_public). Returns gs:// URI stored in DB.
+    Upload to gs://{bucket}/{folder}/YYYY/MM/{object_suffix}.
+    Object is private. Returns gs:// URI stored in DB.
     """
     bucket_name = expense_invoice_bucket_name()
     if not bucket_name:
         raise RuntimeError("EXPENSE_INVOICE_GCS_BUCKET is not set")
 
     date_path = datetime.now(timezone.utc).strftime("%Y/%m")
-    object_name = f"admin-expenses/{date_path}/{object_suffix}"
+    object_name = f"{folder.strip('/')}/{date_path}/{object_suffix}"
 
     client = _get_storage_client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(object_name)
     blob.upload_from_string(content, content_type=content_type)
     uri = f"gs://{bucket_name}/{object_name}"
-    logger.info("Uploaded expense invoice to %s (%s bytes)", uri, len(content))
+    logger.info("Uploaded %s attachment to %s (%s bytes)", folder, uri, len(content))
     return uri
+
+
+def upload_invoice_bytes(
+    content: bytes,
+    *,
+    object_suffix: str,
+    content_type: str,
+) -> str:
+    """Upload to gs://{bucket}/admin-expenses/YYYY/MM/{object_suffix}."""
+    return upload_bucket_attachment_bytes(
+        content,
+        object_suffix=object_suffix,
+        content_type=content_type,
+        folder="admin-expenses",
+    )
+
+
+def upload_issue_screenshot_bytes(
+    content: bytes,
+    *,
+    object_suffix: str,
+    content_type: str,
+) -> str:
+    """Upload to gs://{bucket}/admin-issues/YYYY/MM/{object_suffix} (same bucket as invoices)."""
+    return upload_bucket_attachment_bytes(
+        content,
+        object_suffix=object_suffix,
+        content_type=content_type,
+        folder="admin-issues",
+    )
 
 
 def download_invoice_bytes(gs_uri: str) -> Tuple[bytes, str]:

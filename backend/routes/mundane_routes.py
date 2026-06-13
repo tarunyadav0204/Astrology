@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
+import json
 from auth import get_current_user
 from calculators.mundane.mundane_context_builder import MundaneContextBuilder
 from ai.gemini_chat_analyzer import GeminiChatAnalyzer
@@ -10,17 +12,33 @@ from db import get_conn, execute
 router = APIRouter()
 
 
+def _load_mundane_countries():
+    path = Path(__file__).resolve().parents[1] / "data" / "mundane_countries.json"
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return []
+
+
 class MundaneRequest(BaseModel):
     session_id: str
     country: str
     year: Optional[int] = None
     latitude: float
     longitude: float
+    venue_name: Optional[str] = None
+    venue_latitude: Optional[float] = None
+    venue_longitude: Optional[float] = None
     question: str
     category: Optional[str] = "general" # e.g., "sports", "markets", "wars", "general"
     event_date: Optional[str] = None    # YYYY-MM-DD
     event_time: Optional[str] = None    # HH:MM:SS
     entities: Optional[list[str]] = None # list of countries/teams/indices
+
+
+@router.get("/api/mundane/countries")
+async def list_mundane_countries(current_user = Depends(get_current_user)):
+    return {"items": _load_mundane_countries()}
 
 @router.post("/api/mundane/session")
 async def create_mundane_session(request: dict, current_user = Depends(get_current_user)):
@@ -103,7 +121,8 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
         process_mundane_response,
         message_id, request.session_id, request.question, request.country, year,
         request.latitude, request.longitude, current_user.userid, chat_cost,
-        request.category, request.event_date, request.event_time, request.entities
+        request.category, request.event_date, request.event_time, request.entities,
+        request.venue_name, request.venue_latitude, request.venue_longitude
     )
     
     return {
@@ -115,7 +134,8 @@ async def analyze_mundane(request: MundaneRequest, background_tasks: BackgroundT
 async def process_mundane_response(
     message_id: int, session_id: str, question: str, country: str, year: int,
     latitude: float, longitude: float, user_id: int, chat_cost: int,
-    category: str = "general", event_date: str = None, event_time: str = None, entities: list = None
+    category: str = "general", event_date: str = None, event_time: str = None, entities: list = None,
+    venue_name: str = None, venue_latitude: float = None, venue_longitude: float = None
 ):
     """Background task to process mundane analysis"""
     try:
@@ -172,7 +192,10 @@ async def process_mundane_response(
             category=category,
             event_date=event_date,
             event_time=event_time,
-            entities=entities
+            entities=entities,
+            venue_name=venue_name,
+            venue_latitude=venue_latitude,
+            venue_longitude=venue_longitude,
         )
         context['analysis_type'] = 'mundane'
         

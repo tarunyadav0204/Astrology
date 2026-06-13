@@ -2181,6 +2181,10 @@ input:checked + .toggle-slider:before {
   gap: 12px;
 }
 
+.nudge-scheduler-row--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .nudge-scheduler-filter {
   margin-top: 18px;
   margin-bottom: 14px;
@@ -2196,6 +2200,452 @@ input:checked + .toggle-slider:before {
 
 .nudge-scheduler-list {
   max-height: 520px;
+}
+
+.nudge-console-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.nudge-console-eyebrow,
+.nudge-section-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--admin-accent-text);
+  margin-bottom: 6px;
+}
+
+.nudge-console-title,
+.nudge-builder-section__title {
+  margin: 0;
+  color: #1f2937;
+}
+
+.nudge-console-title {
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.nudge-console-description {
+  max-width: 720px;
+  margin-bottom: 0;
+}
+
+.nudge-console-legend {
+  min-width: 260px;
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid #ead7cf;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffaf7 0%, #fff 100%);
+  color: #5f4b43;
+  font-size: 13px;
+}
+
+.nudge-lifecycle-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.nudge-lifecycle-card {
+  padding: 16px;
+  border: 1px solid #ecd9cf;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fff7f1 100%);
+  box-shadow: 0 8px 20px rgba(145, 92, 53, 0.06);
+}
+
+.nudge-lifecycle-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #2f2a27;
+}
+
+.nudge-lifecycle-card p {
+  margin: 0;
+  color: #6b5b54;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.nudge-campaign-builder {
+  gap: 20px;
+}
+
+.nudge-builder-section {
+  padding: 20px;
+  border: 1px solid #eadfd6;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.nudge-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.nudge-section-tip {
+  margin: 0;
+  max-width: 420px;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.nudge-channel-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.nudge-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid #eadfd6;
+  border-radius: 12px;
+  background: #fcfaf8;
+}
+
+.nudge-channel-order {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f3e2d8;
+  color: #7c4a2d;
+  font-weight: 700;
+}
+
+.nudge-channel-name {
+  min-width: 90px;
+  font-weight: 600;
+  color: #1f2937;
+  text-transform: capitalize;
+}
+
+.nudge-channel-actions,
+.nudge-channel-add,
+.nudge-builder-toolbar,
+.nudge-campaign-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.nudge-channel-actions {
+  margin-left: auto;
+}
+
+.nudge-toolbar-hint {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.nudge-campaign-builder .notif-inline-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #eadfd6;
+  border-radius: 12px;
+  background: #fcfaf8;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.nudge-campaign-builder .notif-inline-checkbox input {
+  width: auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  margin: 3px 0 0;
+  flex: 0 0 auto;
+}
+
+.nudge-campaign-builder .notif-inline-checkbox span {
+  display: block;
+}
+
+.nudge-advanced-block {
+  margin-top: 8px;
+  border: 1px solid #eadfd6;
+  border-radius: 14px;
+  background: #fcfbfa;
+  overflow: hidden;
+}
+
+.nudge-advanced-block summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  list-style: none;
+}
+
+.nudge-advanced-block summary::-webkit-details-marker {
+  display: none;
+}
+
+.nudge-advanced-block__body {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.nudge-split-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nudge-estimate-card,
+.nudge-preview-card {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #d9eadb;
+  background: #f6fcf7;
+  color: #234b2f;
+}
+
+.nudge-estimate-card strong,
+.nudge-preview-card strong {
+  color: #17381f;
+}
+
+.nudge-estimate-metrics {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nudge-estimate-metrics div {
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #dceede;
+}
+
+.nudge-estimate-metrics span,
+.nudge-campaign-card__facts span {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.nudge-estimate-metrics strong {
+  font-size: 18px;
+}
+
+.nudge-estimate-sample {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #386344;
+}
+
+.nudge-placeholder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.nudge-placeholder-list .notif-search-btn,
+.nudge-channel-actions .notif-search-btn,
+.nudge-channel-add .notif-search-btn,
+.nudge-campaign-card__actions .notif-search-btn,
+.nudge-campaign-card__actions .create-btn,
+.nudge-campaign-card__actions .delete-btn {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.nudge-preview-card details {
+  margin-top: 10px;
+}
+
+.nudge-preview-card pre {
+  margin: 10px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #1f2937;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nudge-preview-action {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.nudge-preview-action .notif-search-btn {
+  width: 100%;
+}
+
+.nudge-campaign-list {
+  margin-top: 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.nudge-campaign-card {
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid #eadfd6;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.nudge-campaign-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.nudge-campaign-card__id {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--admin-accent-text);
+  margin-bottom: 6px;
+}
+
+.nudge-campaign-card__meta h4 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.nudge-campaign-card__meta p,
+.nudge-campaign-card__copy {
+  margin: 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.nudge-campaign-card__facts {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nudge-campaign-card__facts div {
+  padding: 12px;
+  border-radius: 12px;
+  background: #fcfaf8;
+  border: 1px solid #efe2da;
+}
+
+.nudge-campaign-card__copy {
+  margin-top: 14px;
+}
+
+.nudge-campaign-card__actions {
+  margin-top: 16px;
+}
+
+.nudge-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.nudge-status-pill--neutral {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.nudge-status-pill--info {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.nudge-status-pill--warn {
+  background: #fff3cd;
+  color: #8a5400;
+}
+
+.nudge-status-pill--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.nudge-empty-state {
+  padding: 22px;
+  border: 1px dashed #d8c8bb;
+  border-radius: 16px;
+  background: #fffcfa;
+  color: #6b7280;
+}
+
+@media (max-width: 1200px) {
+  .nudge-lifecycle-grid,
+  .nudge-estimate-metrics,
+  .nudge-campaign-card__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nudge-scheduler-row--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .nudge-scheduler-row,
+  .nudge-scheduler-row--3,
+  .nudge-lifecycle-grid,
+  .nudge-estimate-metrics,
+  .nudge-campaign-card__facts,
+  .nudge-split-inputs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nudge-builder-section,
+  .nudge-campaign-card {
+    padding: 16px;
+  }
+
+  .nudge-channel-actions {
+    margin-left: 0;
+  }
 }
 
 /* Credits Dashboard */
@@ -2488,6 +2938,81 @@ input:checked + .toggle-slider:before {
 }
 .admin-chat-analysis-error {
   color: #c00;
+}
+
+.admin-chat-analysis-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-chat-analysis-pagination-info,
+.admin-chat-analysis-pagination-page {
+  font-size: 13px;
+  color: #666;
+}
+
+.admin-chat-analysis-pagination-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.admin-chat-analysis-pagination-btn:hover:not(:disabled) {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.admin-chat-analysis-pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-issues-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.admin-issues-create {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 8px;
+}
+
+.admin-issues-detail {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  min-height: 200px;
+}
+
+.admin-issues-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-issues-comment {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+@media (max-width: 960px) {
+  .admin-issues-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .notif-chat-suggest-toggle .notif-inline-checkbox {

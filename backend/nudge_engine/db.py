@@ -1425,7 +1425,7 @@ def list_campaigns(conn, limit: int = 200) -> List[Dict[str, Any]]:
 def delete_campaign(conn, campaign_id: int) -> int:
     cur = execute(
         conn,
-        "DELETE FROM nudge_campaigns WHERE id = %s AND status IN ('draft', 'scheduled', 'cancelled')",
+        "DELETE FROM nudge_campaigns WHERE id = %s AND status IN ('draft', 'scheduled', 'paused', 'cancelled')",
         (int(campaign_id),),
     )
     return int(cur.rowcount or 0)

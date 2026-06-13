@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Alert,
   Animated,
   Dimensions,
   TextInput,
@@ -23,6 +24,9 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COUNTRIES } from '../../utils/mundaneConstants';
+import { mundaneAPI } from '../../services/api';
+import locationCache from '../../services/locationCache';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
@@ -77,10 +81,14 @@ export default function MundaneHubScreen({ navigation }) {
   const { t } = useTranslation();
 
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [mundaneCountries, setMundaneCountries] = useState(COUNTRIES);
   const [formData, setFormData] = useState({
     country: COUNTRIES[0],
     teamACountry: COUNTRIES[0],
     teamBCountry: COUNTRIES[1] || COUNTRIES[0],
+    venue_name: '',
+    venue_latitude: null,
+    venue_longitude: null,
     selectedEntities: [], // Array of country objects
     event_name: '',
     entities: '', // Comma separated (for non-sports labels)
@@ -93,6 +101,9 @@ export default function MundaneHubScreen({ navigation }) {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [countryPickerTarget, setCountryPickerTarget] = useState('location'); // 'location' | 'teamA' | 'teamB'
+  const [venueSearch, setVenueSearch] = useState('');
+  const [venueSuggestions, setVenueSuggestions] = useState([]);
+  const [showVenuePicker, setShowVenuePicker] = useState(false);
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -112,6 +123,143 @@ export default function MundaneHubScreen({ navigation }) {
     ]).start();
   }, [selectedCategory]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadMundaneCountries = async () => {
+      try {
+        const response = await mundaneAPI.getCountries();
+        const items = Array.isArray(response?.data?.items) ? response.data.items : [];
+        if (!cancelled && items.length > 0) {
+          setMundaneCountries(items);
+          setFormData((prev) => ({
+            ...prev,
+            country: items.find((c) => c.name === prev.country?.name) || items[0],
+            teamACountry: items.find((c) => c.name === prev.teamACountry?.name) || items[0],
+            teamBCountry: items.find((c) => c.name === prev.teamBCountry?.name) || items[1] || items[0],
+            selectedEntities: (prev.selectedEntities || [])
+              .map((entry) => items.find((c) => c.name === entry?.name))
+              .filter(Boolean),
+          }));
+        }
+      } catch (error) {
+        console.log('[MundaneHub] Falling back to bundled country list:', error?.message || error);
+      }
+    };
+    loadMundaneCountries();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleVenueSearch = async (query) => {
+    const queryTrimmed = (query || '').trim();
+    setVenueSearch(query);
+
+    if (queryTrimmed.length < 2) {
+      setVenueSuggestions([]);
+      return;
+    }
+
+    const photonFallback = async (q) => {
+      try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const features = Array.isArray(data?.features) ? data.features : [];
+        const timestamp = Date.now();
+        return features.map((feature, index) => {
+          const coords = feature?.geometry?.coordinates || [];
+          const properties = feature?.properties || {};
+          const parts = [];
+          const city = properties.city || properties.name;
+          const state = properties.state;
+          const country = properties.country;
+          if (city) parts.push(city);
+          if (state && state !== city) parts.push(state);
+          if (country) parts.push(country);
+          return {
+            id: `venue_photon_${timestamp}_${index}`,
+            name: parts.length > 0 ? parts.join(', ') : properties.name || 'Unknown',
+            latitude: coords[1],
+            longitude: coords[0],
+          };
+        }).filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
+      } catch (error) {
+        console.warn('[MundaneHub] Photon venue search failed:', error?.message || error);
+        return [];
+      }
+    };
+
+    try {
+      const [googleSuggestions, cacheResults] = await Promise.all([
+        (async () => {
+          try {
+            const autocompleteUrl = `${API_BASE_URL}${getEndpoint('/places/autocomplete')}?q=${encodeURIComponent(queryTrimmed)}`;
+            const res = await fetch(autocompleteUrl, { method: 'GET' });
+            if (!res.ok) return [];
+            const data = await res.json();
+            const list = data.suggestions || [];
+            const ts = Date.now();
+            return list.map((s, i) => ({
+              id: `venue_google_${ts}_${i}`,
+              name: s.description || '',
+              place_id: s.place_id,
+              latitude: null,
+              longitude: null,
+            })).filter((item) => item.name);
+          } catch (e) {
+            console.warn('[MundaneHub] Places autocomplete failed:', e?.message || e);
+            return [];
+          }
+        })(),
+        locationCache.searchLocations(queryTrimmed, photonFallback),
+      ]);
+
+      const combined = [...googleSuggestions];
+      for (const place of cacheResults) {
+        if (!combined.some((c) => (c.name || '').trim() === (place.name || '').trim())) {
+          combined.push(place);
+        }
+        if (combined.length >= 15) break;
+      }
+      setVenueSuggestions(combined.slice(0, 15));
+    } catch (error) {
+      console.warn('[MundaneHub] Venue search failed:', error?.message || error);
+      setVenueSuggestions([]);
+    }
+  };
+
+  const handleVenueSelect = async (place) => {
+    let selected = place;
+    if (place.place_id && (place.latitude == null || place.longitude == null)) {
+      try {
+        const detailsUrl = `${API_BASE_URL}${getEndpoint('/places/details')}?place_id=${encodeURIComponent(place.place_id)}`;
+        const res = await fetch(detailsUrl, { method: 'GET' });
+        if (res.ok) {
+          const data = await res.json();
+          selected = {
+            ...place,
+            name: data.name || data.formattedAddress || place.name,
+            latitude: data.latitude,
+            longitude: data.longitude,
+          };
+        }
+      } catch (e) {
+        console.warn('[MundaneHub] Place details failed:', e?.message || e);
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      venue_name: selected.name,
+      venue_latitude: selected.latitude,
+      venue_longitude: selected.longitude,
+    }));
+    setVenueSearch(selected.name || '');
+    setVenueSuggestions([]);
+    setShowVenuePicker(false);
+  };
+
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
     // Reset animations for the form
@@ -120,6 +268,14 @@ export default function MundaneHubScreen({ navigation }) {
   };
 
   const handleStartAnalysis = () => {
+    if (
+      selectedCategory?.id === 'sports' &&
+      (!Number.isFinite(formData.venue_latitude) || !Number.isFinite(formData.venue_longitude))
+    ) {
+      Alert.alert('Venue required', 'Please select the actual match venue so we can cast the event chart from the right city.');
+      return;
+    }
+
     let entityList = [];
     if (selectedCategory.id === 'sports') {
       entityList = [
@@ -144,6 +300,9 @@ export default function MundaneHubScreen({ navigation }) {
       country: formData.country.name,
       latitude: formData.country.lat,
       longitude: formData.country.lng,
+      venue_name: formData.venue_name || null,
+      venue_latitude: formData.venue_latitude,
+      venue_longitude: formData.venue_longitude,
       event_name: formData.event_name,
       entities: entityList,
       event_date: formData.event_date.toISOString().split('T')[0],
@@ -248,6 +407,23 @@ export default function MundaneHubScreen({ navigation }) {
                   : 'This sets the nation whose mundane chart and dashas will be used.'}
               </Text>
             </View>
+
+            {cat.id === 'sports' && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Venue city / stadium area</Text>
+                <TouchableOpacity
+                  onPress={() => setShowVenuePicker(true)}
+                  style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center' }]}
+                >
+                  <Text style={{ color: formData.venue_name ? colors.text : colors.textTertiary }}>
+                    {formData.venue_name || 'Search actual match venue'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.helperText, { color: colors.textTertiary }]}>
+                  We use this venue’s latitude and longitude for the event chart. Timezone will be derived on the backend.
+                </Text>
+              </View>
+            )}
 
             {cat.fields.includes('event_name') && (
               <View style={styles.inputGroup}>
@@ -529,7 +705,7 @@ export default function MundaneHubScreen({ navigation }) {
               </View>
 
               <FlatList
-                data={COUNTRIES.filter(c => c.name.toLowerCase().includes(countrySearch.toLowerCase()))}
+                data={mundaneCountries.filter(c => c.name.toLowerCase().includes(countrySearch.toLowerCase()))}
                 keyExtractor={(item) => item.name}
                 renderItem={({ item }) => {
                   let isSelected = false;
@@ -580,6 +756,64 @@ export default function MundaneHubScreen({ navigation }) {
                     </TouchableOpacity>
                   );
                 }}
+              />
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={showVenuePicker}
+          animationType="slide"
+          transparent={true}
+        >
+          <View style={[styles.modalOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)' }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Select Venue</Text>
+                <TouchableOpacity onPress={() => { setShowVenuePicker(false); setVenueSuggestions([]); }}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.searchBar, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                <Ionicons name="search" size={20} color={colors.textTertiary} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.text }]}
+                  placeholder="Search city or stadium area..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={venueSearch}
+                  onChangeText={handleVenueSearch}
+                />
+              </View>
+
+              <FlatList
+                data={venueSuggestions}
+                keyExtractor={(item) => item.id || item.name}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.countryItem, { borderBottomColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                    onPress={() => handleVenueSelect(item)}
+                  >
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                      <Text style={[styles.countryText, { color: colors.text }]}>{item.name}</Text>
+                      {(item.latitude != null && item.longitude != null) && (
+                        <Text style={[styles.helperText, { color: colors.textTertiary, marginTop: 2 }]}>
+                          {Number(item.latitude).toFixed(3)}, {Number(item.longitude).toFixed(3)}
+                        </Text>
+                      )}
+                    </View>
+                    {formData.venue_name === item.name && (
+                      <Ionicons name="checkmark" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  venueSearch.trim().length >= 2 ? (
+                    <Text style={[styles.helperText, { color: colors.textTertiary, paddingVertical: 20 }]}>
+                      No venue results yet. Try a nearby city or stadium area.
+                    </Text>
+                  ) : null
+                }
               />
             </View>
           </View>

@@ -19,7 +19,17 @@ from db import execute
 
 logger = logging.getLogger(__name__)
 
-PROFILE_PLACEHOLDERS: FrozenSet[str] = frozenset({"name", "sun_sign", "moon_sign", "current_dasha"})
+PROFILE_PLACEHOLDERS: FrozenSet[str] = frozenset(
+    {
+        "name",
+        "sun_sign",
+        "moon_sign",
+        "ascendant_sign",
+        "current_dasha",
+        "mahadasha",
+        "antardasha",
+    }
+)
 BEHAVIOR_PLACEHOLDERS: FrozenSet[str] = frozenset(
     {"last_question_topic", "days_since_last_chat", "questions_asked"}
 )
@@ -27,7 +37,9 @@ WALLET_PLACEHOLDERS: FrozenSet[str] = frozenset({"credits_balance", "free_questi
 
 CAMPAIGN_PLACEHOLDERS: FrozenSet[str] = PROFILE_PLACEHOLDERS | BEHAVIOR_PLACEHOLDERS | WALLET_PLACEHOLDERS
 
-_ASTRO_PLACEHOLDERS: FrozenSet[str] = frozenset({"sun_sign", "moon_sign", "current_dasha"})
+_ASTRO_PLACEHOLDERS: FrozenSet[str] = frozenset(
+    {"sun_sign", "moon_sign", "ascendant_sign", "current_dasha", "mahadasha", "antardasha"}
+)
 
 _SIGN_NAMES = (
     "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -38,7 +50,10 @@ _DEFAULTS: Dict[str, str] = {
     "name": "there",
     "sun_sign": "",
     "moon_sign": "",
+    "ascendant_sign": "",
     "current_dasha": "",
+    "mahadasha": "",
+    "antardasha": "",
     "last_question_topic": "your life path",
     "days_since_last_chat": "a few",
     "questions_asked": "0",
@@ -225,7 +240,20 @@ def _natal_sign(planet_id: int, birth_jd: float) -> str:
     return _SIGN_NAMES[int(lon // 30.0) % 12]
 
 
-def _current_dasha_label(chart: Dict[str, Any]) -> str:
+def _ascendant_sign_name(birth_jd: float, lat: float, lon: float) -> str:
+    import swisseph as swe
+
+    try:
+        ayanamsa = swe.get_ayanamsa_ut(birth_jd)
+        _cusps, ascmc = swe.houses_ex(birth_jd, lat, lon, b"P")
+        asc_tropical = float(ascmc[0] or 0.0)
+        asc_sidereal = (asc_tropical - ayanamsa) % 360.0
+        return _SIGN_NAMES[int(asc_sidereal // 30.0) % 12]
+    except Exception:
+        return ""
+
+
+def _current_dasha_parts(chart: Dict[str, Any]) -> Dict[str, str]:
     from shared.dasha_calculator import DashaCalculator
 
     birth_data = {
@@ -239,9 +267,11 @@ def _current_dasha_label(chart: Dict[str, Any]) -> str:
     d = DashaCalculator().calculate_current_dashas(birth_data, datetime.now())
     md = (d.get("mahadasha") or {}).get("planet") or ""
     ad = (d.get("antardasha") or {}).get("planet") or ""
-    if md and ad:
-        return f"{md}-{ad}"
-    return md or ""
+    return {
+        "mahadasha": str(md or "").strip(),
+        "antardasha": str(ad or "").strip(),
+        "current_dasha": f"{md}-{ad}" if md and ad else str(md or "").strip(),
+    }
 
 
 def _resolve_astro(conn, ids: List[int], params: Dict[int, Dict[str, str]], needed: Set[str]) -> None:
@@ -261,11 +291,18 @@ def _resolve_astro(conn, ids: List[int], params: Dict[int, Dict[str, str]], need
                 p["sun_sign"] = _natal_sign(swe.SUN, jd)
             if "moon_sign" in needed:
                 p["moon_sign"] = _natal_sign(swe.MOON, jd)
+            if "ascendant_sign" in needed:
+                p["ascendant_sign"] = _ascendant_sign_name(
+                    jd, float(chart["latitude"]), float(chart["longitude"])
+                )
         except Exception as e:
             logger.debug("Sign computation failed for user %s: %s", uid, e)
-        if "current_dasha" in needed:
+        if needed & {"current_dasha", "mahadasha", "antardasha"}:
             try:
-                p["current_dasha"] = _current_dasha_label(chart)
+                dasha_parts = _current_dasha_parts(chart)
+                for key in ("current_dasha", "mahadasha", "antardasha"):
+                    if key in needed:
+                        p[key] = dasha_parts.get(key, "")
             except Exception as e:
                 logger.debug("Dasha computation failed for user %s: %s", uid, e)
 

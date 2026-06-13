@@ -38,7 +38,7 @@ import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
-import { chatAPI, creditAPI } from '../../services/api';
+import { chatAPI, creditAPI, mundaneAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { buildQueryContext } from '../../utils/queryContext';
@@ -468,6 +468,7 @@ export default function ChatScreen({ navigation, route }) {
   const mundaneContextRef = useRef(null);
   useEffect(() => { mundaneContextRef.current = mundaneContext; }, [mundaneContext]);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+  const [mundaneCountries, setMundaneCountries] = useState(COUNTRIES);
   const [selectedYear, setSelectedYear] = useState(YEARS[0]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearchQuery, setCountrySearchQuery] = useState('');
@@ -797,6 +798,26 @@ export default function ChatScreen({ navigation, route }) {
       bonusType: String(data.bonus_type || '').toLowerCase(),
       bonusCredits: Number(data.bonus_credits || 0),
     });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMundaneCountries = async () => {
+      try {
+        const response = await mundaneAPI.getCountries();
+        const items = Array.isArray(response?.data?.items) ? response.data.items : [];
+        if (!cancelled && items.length > 0) {
+          setMundaneCountries(items);
+          setSelectedCountry((prev) => items.find((c) => c.name === prev?.name) || items[0] || prev);
+        }
+      } catch (error) {
+        console.log('[Mundane] Falling back to bundled country list:', error?.message || error);
+      }
+    };
+    loadMundaneCountries();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const restoreFirstPurchaseBonusOfferFromMessages = useCallback(async (messageList) => {
@@ -1617,7 +1638,7 @@ export default function ChatScreen({ navigation, route }) {
         
         // Sync selected country if provided in context
         if (route.params.mundaneContext.country) {
-          const countryMatch = COUNTRIES.find(c => c.name === route.params.mundaneContext.country);
+          const countryMatch = mundaneCountries.find(c => c.name === route.params.mundaneContext.country);
           if (countryMatch) {
             setSelectedCountry(countryMatch);
           }
@@ -2846,7 +2867,8 @@ export default function ChatScreen({ navigation, route }) {
     const payload = await fetchSessionMessagesFromServer(targetSessionId);
     if (!payload) return false;
 
-    const activeBirthChartId = birthData?.id ?? birthData?.birth_chart_id ?? null;
+    const activeBirth = partnershipMode ? nativeChart : birthData;
+    const activeBirthChartId = activeBirth?.id ?? activeBirth?.birth_chart_id ?? null;
     const payloadBirthChartId = payload?.birthChartId ?? null;
     if (
       activeBirthChartId != null &&
@@ -2917,14 +2939,16 @@ export default function ChatScreen({ navigation, route }) {
   const createSession = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
+      const sessionBirth = partnershipMode ? nativeChart : birthData;
+      const sessionBirthChartId = sessionBirth?.id ?? sessionBirth?.birth_chart_id ?? null;
       
       // Different endpoint for mundane vs personal
       const endpoint = isMundane ? '/mundane/session' : '/chat-v2/session';
       const body = isMundane
         ? { query_context: buildQueryContext() }
-        : { birth_chart_id: birthData?.id, query_context: buildQueryContext() };
+        : { birth_chart_id: sessionBirthChartId, query_context: buildQueryContext() };
       
-      if (!isMundane && !birthData?.id) {
+      if (!isMundane && !sessionBirthChartId) {
         Alert.alert(
           t('chat.sessionNeedsProfile', 'Profile required'),
           t(
@@ -2951,10 +2975,12 @@ export default function ChatScreen({ navigation, route }) {
         
         if (!isMundane) {
           // Track session for personal chat only
-          const sessionKey = chatPersonStorageKey(birthData);
-          const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${sessionKey}`) || '[]');
-          personSessions.push(newSessionId);
-          await AsyncStorage.setItem(`chatSessions_${sessionKey}`, JSON.stringify(personSessions));
+          const sessionKey = chatPersonStorageKey(sessionBirth);
+          if (sessionKey) {
+            const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${sessionKey}`) || '[]');
+            personSessions.push(newSessionId);
+            await AsyncStorage.setItem(`chatSessions_${sessionKey}`, JSON.stringify(personSessions));
+          }
         }
         
         return newSessionId;
@@ -4303,6 +4329,9 @@ export default function ChatScreen({ navigation, route }) {
           category: mundaneContext?.category || 'general',
           event_date: mundaneContext?.event_date,
           event_time: mundaneContext?.event_time,
+          venue_name: mundaneContext?.venue_name,
+          venue_latitude: mundaneContext?.venue_latitude,
+          venue_longitude: mundaneContext?.venue_longitude,
           // Ref fallback: state can lag one frame behind route params when starting from MundaneHub
           entities: mundaneContext?.entities ?? mundaneContextRef.current?.entities,
         };
@@ -6688,7 +6717,7 @@ export default function ChatScreen({ navigation, route }) {
                 )}
               </View>
               <GHScrollView style={styles.chartPickerList} keyboardShouldPersistTaps="handled">
-                {COUNTRIES.filter(c => {
+                {mundaneCountries.filter(c => {
                   const q = countrySearchQuery.trim().toLowerCase();
                   if (!q) return true;
                   return (c.name && c.name.toLowerCase().includes(q)) || (c.capital && c.capital.toLowerCase().includes(q));

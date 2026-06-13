@@ -33,6 +33,8 @@ ALLOWED_AUDIENCE_TYPES = (
     "user_ids",
 )
 
+REACHABILITY_CHANNELS = ("push", "whatsapp", "email")
+
 LANDING_SCREEN_TO_CTA: Dict[str, str] = {
     "chat": "astroroshni://chat",
     "information": "astroroshni://information",
@@ -55,6 +57,37 @@ def _chunked(items: List[Any], size: int) -> List[List[Any]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
+def _boolish(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    raw = str(value or "").strip().lower()
+    if raw in {"1", "true", "yes", "y", "on"}:
+        return True
+    if raw in {"0", "false", "no", "n", "off"}:
+        return False
+    return None
+
+
+def _normalized_text_set(values: Any) -> Set[str]:
+    out: Set[str] = set()
+    if isinstance(values, (list, tuple, set)):
+        items = values
+    else:
+        items = []
+    for item in items:
+        text = str(item or "").strip()
+        if text:
+            out.add(text.lower())
+    return out
+
+
+def _coerce_int(value: Any, default: Optional[int] = None) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 # ---------------------------------------------------------------------------
 # Audience
 # ---------------------------------------------------------------------------
@@ -62,17 +95,17 @@ def _chunked(items: List[Any], size: int) -> List[List[Any]]:
 def resolve_campaign_audience(conn, audience_filter: Dict[str, Any]) -> List[int]:
     """Return target user ids for a campaign audience filter."""
     ftype = str((audience_filter or {}).get("type") or "all").strip().lower()
+    base_ids: List[int]
     if ftype == "user_ids":
-        ids = [
+        base_ids = [
             int(u)
             for u in (audience_filter.get("user_ids") or [])
             if isinstance(u, int) or str(u).isdigit()
         ]
-        return sorted(set(ids))
-    if ftype == "has_device_token":
+    elif ftype == "has_device_token":
         cur = execute(conn, "SELECT DISTINCT userid FROM device_tokens ORDER BY userid")
-        return [int(r[0]) for r in (cur.fetchall() or [])]
-    if ftype == "no_device_token":
+        base_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+    elif ftype == "no_device_token":
         cur = execute(
             conn,
             """
@@ -83,8 +116,8 @@ def resolve_campaign_audience(conn, audience_filter: Dict[str, Any]) -> List[int
             ORDER BY u.userid
             """,
         )
-        return [int(r[0]) for r in (cur.fetchall() or [])]
-    if ftype in ("active_chat_days", "inactive_chat_days"):
+        base_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+    elif ftype in ("active_chat_days", "inactive_chat_days"):
         days = max(1, min(int(audience_filter.get("days") or 7), 365))
         since = datetime.utcnow() - timedelta(days=days)
         if ftype == "active_chat_days":
@@ -115,9 +148,246 @@ def resolve_campaign_audience(conn, audience_filter: Dict[str, Any]) -> List[int
                 """,
                 (since,),
             )
-        return [int(r[0]) for r in (cur.fetchall() or [])]
-    # default: all users
-    return db.get_all_user_ids(conn)
+        base_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+    else:
+        base_ids = db.get_all_user_ids(conn)
+    return filter_campaign_audience(conn, sorted(set(base_ids)), audience_filter or {})
+
+
+def filter_campaign_audience(conn, user_ids: List[int], audience_filter: Dict[str, Any]) -> List[int]:
+    """Apply flexible criteria on top of a base audience list."""
+    clean_ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit()})
+    if not clean_ids:
+        return []
+
+    criteria = dict((audience_filter or {}).get("criteria") or {})
+    for key in (
+        "require_self_chart",
+        "has_email",
+        "has_whatsapp",
+        "has_device_token",
+        "free_question_available",
+        "min_days_since_last_chat",
+        "max_days_since_last_chat",
+        "min_questions_asked",
+        "max_questions_asked",
+        "min_credits_balance",
+        "max_credits_balance",
+        "sun_signs",
+        "moon_signs",
+        "ascendant_signs",
+        "mahadashas",
+        "antardashas",
+        "current_dasha_contains",
+        "signup_clients",
+    ):
+        if key in audience_filter and key not in criteria:
+            criteria[key] = audience_filter.get(key)
+
+    keep: Set[int] = set(clean_ids)
+
+    def _apply_sql_ids(sql: str, params: tuple[Any, ...]) -> Set[int]:
+        cur = execute(conn, sql, params)
+        return {int(r[0]) for r in (cur.fetchall() or [])}
+
+    require_self_chart = _boolish(criteria.get("require_self_chart"))
+    if require_self_chart is True:
+        keep &= _apply_sql_ids(
+            """
+            SELECT DISTINCT userid
+            FROM birth_charts
+            WHERE userid = ANY(%s) AND LOWER(COALESCE(relation, '')) = 'self'
+            """,
+            (clean_ids,),
+        )
+
+    for flag_key, sql in (
+        (
+            "has_email",
+            """
+            SELECT userid
+            FROM users
+            WHERE userid = ANY(%s)
+              AND COALESCE(NULLIF(TRIM(email), ''), '') <> ''
+            """,
+        ),
+        (
+            "has_whatsapp",
+            """
+            SELECT userid
+            FROM users
+            WHERE userid = ANY(%s)
+              AND COALESCE(NULLIF(TRIM(whatsapp_wa_id), ''), '') <> ''
+            """,
+        ),
+        (
+            "has_device_token",
+            """
+            SELECT DISTINCT userid
+            FROM device_tokens
+            WHERE userid = ANY(%s)
+            """,
+        ),
+    ):
+        flag = _boolish(criteria.get(flag_key))
+        if flag is None:
+            continue
+        matched = _apply_sql_ids(sql, (clean_ids,))
+        keep &= matched if flag else (set(clean_ids) - matched)
+
+    signup_clients = _normalized_text_set(criteria.get("signup_clients"))
+    if signup_clients:
+        cur = execute(
+            conn,
+            """
+            SELECT userid
+            FROM users
+            WHERE userid = ANY(%s)
+              AND LOWER(COALESCE(signup_client, '')) = ANY(%s)
+            """,
+            (clean_ids, list(signup_clients)),
+        )
+        keep &= {int(r[0]) for r in (cur.fetchall() or [])}
+
+    needs_param_filters = any(
+        criteria.get(key) not in (None, "", [], ())
+        for key in (
+            "min_days_since_last_chat",
+            "max_days_since_last_chat",
+            "min_questions_asked",
+            "max_questions_asked",
+            "min_credits_balance",
+            "max_credits_balance",
+            "free_question_available",
+            "sun_signs",
+            "moon_signs",
+            "ascendant_signs",
+            "mahadashas",
+            "antardashas",
+            "current_dasha_contains",
+        )
+    )
+    if not needs_param_filters:
+        return sorted(keep)
+
+    needed_params: Set[str] = set()
+    numeric_param_map = {
+        "min_days_since_last_chat": "days_since_last_chat",
+        "max_days_since_last_chat": "days_since_last_chat",
+        "min_questions_asked": "questions_asked",
+        "max_questions_asked": "questions_asked",
+        "min_credits_balance": "credits_balance",
+        "max_credits_balance": "credits_balance",
+    }
+    for key, placeholder in numeric_param_map.items():
+        if criteria.get(key) not in (None, ""):
+            needed_params.add(placeholder)
+    if criteria.get("free_question_available") not in (None, ""):
+        needed_params.add("free_question_available")
+    sign_filters = {
+        "sun_signs": "sun_sign",
+        "moon_signs": "moon_sign",
+        "ascendant_signs": "ascendant_sign",
+        "mahadashas": "mahadasha",
+        "antardashas": "antardasha",
+        "current_dasha_contains": "current_dasha",
+    }
+    for key, placeholder in sign_filters.items():
+        if criteria.get(key) not in (None, "", [], ()):
+            needed_params.add(placeholder)
+
+    params_by_user = resolve_params_for_users(conn, sorted(keep), needed=needed_params)
+    filtered: List[int] = []
+    sun_signs = _normalized_text_set(criteria.get("sun_signs"))
+    moon_signs = _normalized_text_set(criteria.get("moon_signs"))
+    ascendant_signs = _normalized_text_set(criteria.get("ascendant_signs"))
+    mahadashas = _normalized_text_set(criteria.get("mahadashas"))
+    antardashas = _normalized_text_set(criteria.get("antardashas"))
+    dasha_contains = str(criteria.get("current_dasha_contains") or "").strip().lower()
+    free_question_filter = _boolish(criteria.get("free_question_available"))
+    min_days = _coerce_int(criteria.get("min_days_since_last_chat"))
+    max_days = _coerce_int(criteria.get("max_days_since_last_chat"))
+    min_questions = _coerce_int(criteria.get("min_questions_asked"))
+    max_questions = _coerce_int(criteria.get("max_questions_asked"))
+    min_credits = _coerce_int(criteria.get("min_credits_balance"))
+    max_credits = _coerce_int(criteria.get("max_credits_balance"))
+
+    for uid in sorted(keep):
+        params = params_by_user.get(uid) or default_params()
+        try:
+            days = _coerce_int(params.get("days_since_last_chat"), 0) or 0
+            questions = _coerce_int(params.get("questions_asked"), 0) or 0
+            credits = _coerce_int(params.get("credits_balance"), 0) or 0
+        except Exception:
+            continue
+        if min_days is not None and days < min_days:
+            continue
+        if max_days is not None and days > max_days:
+            continue
+        if min_questions is not None and questions < min_questions:
+            continue
+        if max_questions is not None and questions > max_questions:
+            continue
+        if min_credits is not None and credits < min_credits:
+            continue
+        if max_credits is not None and credits > max_credits:
+            continue
+        if free_question_filter is not None:
+            is_free = str(params.get("free_question_available") or "").strip().lower() == "yes"
+            if is_free != free_question_filter:
+                continue
+        if sun_signs and str(params.get("sun_sign") or "").strip().lower() not in sun_signs:
+            continue
+        if moon_signs and str(params.get("moon_sign") or "").strip().lower() not in moon_signs:
+            continue
+        if ascendant_signs and str(params.get("ascendant_sign") or "").strip().lower() not in ascendant_signs:
+            continue
+        if mahadashas and str(params.get("mahadasha") or "").strip().lower() not in mahadashas:
+            continue
+        if antardashas and str(params.get("antardasha") or "").strip().lower() not in antardashas:
+            continue
+        if dasha_contains and dasha_contains not in str(params.get("current_dasha") or "").strip().lower():
+            continue
+        filtered.append(uid)
+    return filtered
+
+
+def estimate_campaign_audience(conn, audience_filter: Dict[str, Any]) -> Dict[str, Any]:
+    user_ids = resolve_campaign_audience(conn, audience_filter or {"type": "all"})
+    if not user_ids:
+        return {
+            "total_users": 0,
+            "reachable": {"push": 0, "whatsapp": 0, "email": 0},
+            "has_self_chart": 0,
+            "sample_user_ids": [],
+        }
+    ids = sorted(set(user_ids))
+    reach = {"push": 0, "whatsapp": 0, "email": 0}
+    queries = {
+        "push": "SELECT COUNT(DISTINCT userid) FROM device_tokens WHERE userid = ANY(%s)",
+        "whatsapp": "SELECT COUNT(*) FROM users WHERE userid = ANY(%s) AND COALESCE(NULLIF(TRIM(whatsapp_wa_id), ''), '') <> ''",
+        "email": "SELECT COUNT(*) FROM users WHERE userid = ANY(%s) AND COALESCE(NULLIF(TRIM(email), ''), '') <> ''",
+    }
+    for channel, sql in queries.items():
+        cur = execute(conn, sql, (ids,))
+        row = cur.fetchone()
+        reach[channel] = int((row[0] if row else 0) or 0)
+    cur = execute(
+        conn,
+        """
+        SELECT COUNT(DISTINCT userid)
+        FROM birth_charts
+        WHERE userid = ANY(%s) AND LOWER(COALESCE(relation, '')) = 'self'
+        """,
+        (ids,),
+    )
+    row = cur.fetchone()
+    return {
+        "total_users": len(ids),
+        "reachable": reach,
+        "has_self_chart": int((row[0] if row else 0) or 0),
+        "sample_user_ids": ids[:10],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +558,18 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
         logger.warning("nudge task queue unavailable; campaign runs inline: %s", e)
         enqueue_nudge_task = None
         tasks_enabled = False
+
+    require_tasks = (os.getenv("NUDGE_CAMPAIGN_REQUIRE_TASKS") or "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    inline_max_users = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_INLINE_MAX_USERS", "100")), 1000))
+    if not tasks_enabled and (require_tasks or len(audience) > inline_max_users or campaign.get("ai_personalize")):
+        raise RuntimeError(
+            "Campaign dispatch requires Cloud Tasks configuration for this audience size/personalization mode."
+        )
 
     batch_size = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_BATCH_SIZE", "250")), 2000))
     batches = _chunked(audience, batch_size)

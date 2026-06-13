@@ -127,6 +127,7 @@ from support_routes import router as support_router, admin_router as support_adm
 from acquisition_routes import router as acquisition_router
 from admin_expense_routes import router as admin_expense_router
 from admin_expense_master_routes import router as admin_expense_master_router
+from admin_issue_routes import router as admin_issue_router
 from order_management_routes import router as order_management_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from yoga_routes import router as yoga_router
@@ -524,6 +525,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: admin_company_expenses schema check failed: {e}")
     try:
+        from admin_issue_schema import ensure_admin_issues_schema
+
+        ensure_admin_issues_schema()
+        print("admin_issues schema ready (issue/enhancement tracker)")
+    except Exception as e:
+        print(f"Warning: admin_issues schema check failed: {e}")
+    try:
         prediction_engine = DailyPredictionEngine()
         prediction_engine.reset_prediction_rules()
         print("Daily prediction engine initialized with updated rules")
@@ -766,6 +774,7 @@ app.include_router(support_admin_router, prefix="/api")
 app.include_router(acquisition_router, prefix="/api")
 app.include_router(admin_expense_router, prefix="/api")
 app.include_router(admin_expense_master_router, prefix="/api")
+app.include_router(admin_issue_router, prefix="/api")
 app.include_router(order_management_router, prefix="/api/order-management")
 app.include_router(testimonials_router, prefix="/api")
 
