@@ -453,19 +453,46 @@ def first_purchase_bonus_enabled_for_user(user_id: Optional[int]) -> bool:
 
 def get_first_purchase_bonus_config() -> Dict[str, Any]:
     """Admin-controlled values for the post-free-question first credit purchase bonus."""
+    import json
+
     percent = _parse_int_setting(get_setting("first_purchase_bonus_percent"), default=20, minimum=0, maximum=500)
     fixed = _parse_int_setting(get_setting("first_purchase_bonus_fixed_credits"), default=0, minimum=0, maximum=100000)
     max_bonus = _parse_int_setting(get_setting("first_purchase_bonus_max_bonus_credits"), default=1000, minimum=0, maximum=100000)
     window_minutes = _parse_int_setting(get_setting("first_purchase_bonus_window_minutes"), default=30, minimum=1, maximum=10080)
+    raw_pack_overrides = (get_setting("first_purchase_bonus_pack_overrides") or "").strip()
     # The first-purchase offer is intentionally one mode at a time.
     # If legacy/admin data has both set, fixed credits wins because it is the explicit amount.
     bonus_type = "fixed" if fixed > 0 else ("percent" if percent > 0 else "none")
+    pack_overrides: Dict[str, Dict[str, Any]] = {}
+    if raw_pack_overrides:
+        try:
+            decoded = json.loads(raw_pack_overrides)
+            if isinstance(decoded, dict):
+                for key, value in decoded.items():
+                    product_id = str(key or "").strip()
+                    if not product_id or not isinstance(value, dict):
+                        continue
+                    override_percent = max(0, min(500, int(value.get("percent") or 0)))
+                    override_fixed = max(0, min(100000, int(value.get("fixed_credits") or 0)))
+                    override_cap = max(0, min(100000, int(value.get("max_bonus_credits") or 0)))
+                    override_type = str(value.get("bonus_type") or "").strip().lower()
+                    if override_type not in {"percent", "fixed", "none"}:
+                        override_type = "fixed" if override_fixed > 0 else ("percent" if override_percent > 0 else "none")
+                    pack_overrides[product_id] = {
+                        "percent": override_percent,
+                        "fixed_credits": override_fixed,
+                        "max_bonus_credits": override_cap,
+                        "bonus_type": override_type,
+                    }
+        except Exception:
+            pack_overrides = {}
     return {
         "percent": percent,
         "fixed_credits": fixed,
         "max_bonus_credits": max_bonus,
         "window_minutes": window_minutes,
         "bonus_type": bonus_type,
+        "pack_overrides": pack_overrides,
     }
 
 

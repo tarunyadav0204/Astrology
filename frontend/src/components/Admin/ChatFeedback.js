@@ -211,11 +211,12 @@ const ChatFeedback = () => {
         )}
 
         {totalPages > 1 && (
-          <div className="pagination">
+          <div className="chat-feedback-pagination" role="navigation" aria-label="Chat feedback pages">
             <button
+              type="button"
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1 || loading}
-              className="page-btn"
+              className="chat-feedback-page-btn"
             >
               Previous
             </button>
@@ -225,25 +226,27 @@ const ChatFeedback = () => {
               if (pageNum === 1 || pageNum === totalPages || (pageNum >= page - 2 && pageNum <= page + 2)) {
                 return (
                   <button
+                    type="button"
                     key={pageNum}
                     onClick={() => handlePageChange(pageNum)}
                     disabled={loading}
-                    className={`page-btn ${pageNum === page ? 'active' : ''}`}
+                    className={`chat-feedback-page-btn ${pageNum === page ? 'active' : ''}`}
                   >
                     {pageNum}
                   </button>
                 );
               }
               if (pageNum === page - 3 || pageNum === page + 3) {
-                return <span key={pageNum} className="page-ellipsis">...</span>;
+                return <span key={pageNum} className="chat-feedback-page-ellipsis">...</span>;
               }
               return null;
             })}
 
             <button
+              type="button"
               onClick={() => handlePageChange(page + 1)}
               disabled={page === totalPages || loading}
-              className="page-btn"
+              className="chat-feedback-page-btn"
             >
               Next
             </button>

@@ -693,7 +693,11 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
         for product in products:
             try:
                 credits = int(product.get("credits") or 0)
-                status = credit_service.get_first_purchase_bonus_status(current_user.userid, credits)
+                status = credit_service.get_first_purchase_bonus_status(
+                    current_user.userid,
+                    credits,
+                    product_id=str(product.get("product_id") or "").strip() or None,
+                )
                 product["first_purchase_bonus"] = status
                 if status.get("eligible") and int(status.get("bonus_credits") or 0) > 0:
                     product["bonus_credits"] = int(status.get("bonus_credits") or 0)
@@ -715,10 +719,15 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
 @router.get("/first-purchase-bonus/status")
 async def get_first_purchase_bonus_status(
     purchased_credits: Optional[int] = Query(default=None),
+    product_id: Optional[str] = Query(default=None),
     current_user: User = Depends(get_current_user),
 ):
     """Preview the gated post-free-question first purchase bonus for the current user."""
-    return credit_service.get_first_purchase_bonus_status(current_user.userid, purchased_credits)
+    return credit_service.get_first_purchase_bonus_status(
+        current_user.userid,
+        purchased_credits,
+        product_id=(product_id or "").strip() or None,
+    )
 
 
 @router.post("/google-play/verify")

@@ -1939,8 +1939,14 @@ class CreditService:
             return cursor.fetchone() is not None
 
     @staticmethod
-    def calculate_first_purchase_bonus_credits(purchased_credits: int, config: Optional[Dict[str, Any]] = None) -> int:
-        """Calculate extra credits from admin settings. One active mode: fixed OR percent, capped by max_bonus_credits."""
+    def calculate_first_purchase_bonus_credits(
+        self,
+        purchased_credits: int,
+        config: Optional[Dict[str, Any]] = None,
+        *,
+        product_id: Optional[str] = None,
+    ) -> int:
+        """Calculate extra credits from admin settings with optional product-specific overrides."""
         if config is None:
             from utils.admin_settings import get_first_purchase_bonus_config
 
@@ -1949,10 +1955,24 @@ class CreditService:
             base = max(0, int(purchased_credits))
         except (TypeError, ValueError):
             return 0
-        percent = max(0, int(config.get("percent") or 0))
-        fixed = max(0, int(config.get("fixed_credits") or 0))
-        max_bonus = max(0, int(config.get("max_bonus_credits") or 0))
-        bonus_type = str(config.get("bonus_type") or "").strip().lower()
+        product_key = str(product_id or "").strip()
+        effective_config = dict(config or {})
+        pack_overrides = config.get("pack_overrides") if isinstance(config, dict) else None
+        if product_key and isinstance(pack_overrides, dict):
+            override = pack_overrides.get(product_key)
+            if isinstance(override, dict):
+                effective_config.update(
+                    {
+                        "percent": override.get("percent", effective_config.get("percent")),
+                        "fixed_credits": override.get("fixed_credits", effective_config.get("fixed_credits")),
+                        "max_bonus_credits": override.get("max_bonus_credits", effective_config.get("max_bonus_credits")),
+                        "bonus_type": override.get("bonus_type", effective_config.get("bonus_type")),
+                    }
+                )
+        percent = max(0, int(effective_config.get("percent") or 0))
+        fixed = max(0, int(effective_config.get("fixed_credits") or 0))
+        max_bonus = max(0, int(effective_config.get("max_bonus_credits") or 0))
+        bonus_type = str(effective_config.get("bonus_type") or "").strip().lower()
         if bonus_type == "fixed" or (fixed > 0 and bonus_type not in {"percent", "none"}):
             bonus = fixed
         elif bonus_type == "percent" or percent > 0:
@@ -2033,6 +2053,7 @@ class CreditService:
         userid: int,
         purchased_credits: Optional[int] = None,
         *,
+        product_id: Optional[str] = None,
         current_source: Optional[str] = None,
         current_reference_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -2044,7 +2065,11 @@ class CreditService:
         )
 
         config = get_first_purchase_bonus_config()
-        bonus = self.calculate_first_purchase_bonus_credits(purchased_credits or 0, config) if purchased_credits else 0
+        bonus = self.calculate_first_purchase_bonus_credits(
+            purchased_credits or 0,
+            config,
+            product_id=product_id,
+        ) if purchased_credits else 0
         feature_enabled = is_first_purchase_bonus_enabled()
         user_allowed = first_purchase_bonus_enabled_for_user(userid)
         free_used = self.get_free_chat_question_used(userid)
@@ -2058,15 +2083,34 @@ class CreditService:
             "eligible": False,
             "bonus_credits": bonus,
             "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
+            "product_id": str(product_id or "").strip() or None,
             **config,
         }
+        if status.get("product_id") and isinstance(config.get("pack_overrides"), dict):
+            override = config["pack_overrides"].get(status["product_id"])
+            if isinstance(override, dict):
+                status["resolved_bonus_config"] = {
+                    "percent": int(override.get("percent") or 0),
+                    "fixed_credits": int(override.get("fixed_credits") or 0),
+                    "max_bonus_credits": int(override.get("max_bonus_credits") or 0),
+                    "bonus_type": str(override.get("bonus_type") or "none"),
+                    "source": "pack_override",
+                }
+            else:
+                status["resolved_bonus_config"] = {
+                    "percent": int(config.get("percent") or 0),
+                    "fixed_credits": int(config.get("fixed_credits") or 0),
+                    "max_bonus_credits": int(config.get("max_bonus_credits") or 0),
+                    "bonus_type": str(config.get("bonus_type") or "none"),
+                    "source": "default",
+                }
 
         def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
             try:
                 logger.info(
                     "first_purchase_bonus_status userid=%s eligible=%s reason=%s "
                     "enabled=%s user_allowed=%s free_used=%s prior_purchase=%s "
-                    "purchased_credits=%s bonus_credits=%s window_minutes=%s extra=%s",
+                    "purchased_credits=%s product_id=%s bonus_credits=%s window_minutes=%s extra=%s",
                     userid,
                     bool(status.get("eligible")),
                     reason,
@@ -2075,6 +2119,7 @@ class CreditService:
                     free_used,
                     prior_purchase,
                     purchased_credits,
+                    status.get("product_id"),
                     status.get("bonus_credits"),
                     config.get("window_minutes"),
                     extra or {},
@@ -2151,6 +2196,7 @@ class CreditService:
         status = self.get_first_purchase_bonus_status(
             userid,
             purchased_credits,
+            product_id=product_id,
             current_source=purchase_source,
             current_reference_id=purchase_reference_id,
         )
@@ -2177,6 +2223,7 @@ class CreditService:
                 "percent": status.get("percent"),
                 "fixed_credits": status.get("fixed_credits"),
                 "max_bonus_credits": status.get("max_bonus_credits"),
+                "resolved_bonus_config": status.get("resolved_bonus_config"),
                 "window_minutes": status.get("window_minutes"),
                 "free_question_transaction_id": status.get("free_question_transaction_id"),
             }

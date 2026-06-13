@@ -93,6 +93,39 @@ const DEFAULT_PARALLEL_BRANCH_WORD_LIMITS = {
   merge: '1200',
 };
 
+const FIRST_PURCHASE_BONUS_PACKS = [50, 100, 250, 500, 999];
+
+function createDefaultFirstPurchasePackOverrides() {
+  return FIRST_PURCHASE_BONUS_PACKS.reduce((acc, pack) => {
+    acc[`credits_${pack}`] = {
+      bonus_type: 'default',
+      percent: '',
+      fixed_credits: '',
+      max_bonus_credits: '',
+    };
+    return acc;
+  }, {});
+}
+
+function normalizeFirstPurchasePackOverrides(rawOverrides) {
+  const defaults = createDefaultFirstPurchasePackOverrides();
+  if (!rawOverrides || typeof rawOverrides !== 'object') return defaults;
+  const next = { ...defaults };
+  Object.entries(defaults).forEach(([productId, fallback]) => {
+    const incoming = rawOverrides[productId];
+    if (!incoming || typeof incoming !== 'object') return;
+    next[productId] = {
+      bonus_type: ['default', 'none', 'percent', 'fixed'].includes(String(incoming.bonus_type || '').trim().toLowerCase())
+        ? String(incoming.bonus_type).trim().toLowerCase()
+        : fallback.bonus_type,
+      percent: incoming.percent === '' || incoming.percent == null ? '' : String(incoming.percent),
+      fixed_credits: incoming.fixed_credits === '' || incoming.fixed_credits == null ? '' : String(incoming.fixed_credits),
+      max_bonus_credits: incoming.max_bonus_credits === '' || incoming.max_bonus_credits == null ? '' : String(incoming.max_bonus_credits),
+    };
+  });
+  return next;
+}
+
 const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
   const navigate = useNavigate();
   
@@ -105,6 +138,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
   const [activeTab, setActiveTab] = useState('users');
   const [activeSubTab, setActiveSubTab] = useState('management');
+  const [settingsSubTab, setSettingsSubTab] = useState('chat');
   const [users, setUsers] = useState([]);
   const [usersSearchPhone, setUsersSearchPhone] = useState('');
   const [usersSearchName, setUsersSearchName] = useState('');
@@ -183,6 +217,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [firstPurchaseBonusFixedCredits, setFirstPurchaseBonusFixedCredits] = useState('0');
   const [firstPurchaseBonusMaxCredits, setFirstPurchaseBonusMaxCredits] = useState('1000');
   const [firstPurchaseBonusWindowMinutes, setFirstPurchaseBonusWindowMinutes] = useState('30');
+  const [firstPurchaseBonusPackOverrides, setFirstPurchaseBonusPackOverrides] = useState(createDefaultFirstPurchasePackOverrides);
   const [firstPurchaseBonusSaving, setFirstPurchaseBonusSaving] = useState(false);
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
@@ -417,6 +452,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setFirstPurchaseBonusFixedCredits(String(firstBonusConfig.fixed_credits ?? '0'));
       setFirstPurchaseBonusMaxCredits(String(firstBonusConfig.max_bonus_credits ?? '1000'));
       setFirstPurchaseBonusWindowMinutes(String(firstBonusConfig.window_minutes ?? '30'));
+      setFirstPurchaseBonusPackOverrides(
+        normalizeFirstPurchasePackOverrides(firstBonusConfig.pack_overrides || {})
+      );
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
@@ -911,13 +949,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setFirstPurchaseBonusSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const serializedPackOverrides = Object.entries(firstPurchaseBonusPackOverrides || {}).reduce((acc, [productId, config]) => {
+        const mode = String(config?.bonus_type || 'default').trim().toLowerCase();
+        if (!productId || mode === 'default') return acc;
+        acc[productId] = {
+          bonus_type: mode,
+          percent: Math.max(0, Number(config?.percent) || 0),
+          fixed_credits: Math.max(0, Number(config?.fixed_credits) || 0),
+          max_bonus_credits: Math.max(0, Number(config?.max_bonus_credits) || 0),
+        };
+        return acc;
+      }, {});
       const settingsToSave = [
         ['first_purchase_bonus_enabled', firstPurchaseBonusEnabled ? 'true' : 'false', 'Feature flag for extra credits on the first credit purchase after a free chat question'],
         ['first_purchase_bonus_user_allowlist', firstPurchaseBonusUserAllowlist, 'Optional CSV user allowlist for first purchase bonus. Empty = all users when enabled.'],
-        ['first_purchase_bonus_percent', firstPurchaseBonusPercent, 'Percent extra credits on eligible first purchase packs. Used only when fixed extra credits is 0.'],
-        ['first_purchase_bonus_fixed_credits', firstPurchaseBonusFixedCredits, 'Fixed extra credits on eligible first purchase packs. If greater than 0, this takes priority over percentage.'],
-        ['first_purchase_bonus_max_bonus_credits', firstPurchaseBonusMaxCredits, 'Maximum bonus credits for one eligible first purchase'],
+        ['first_purchase_bonus_percent', firstPurchaseBonusPercent, 'Default percentage extra credits on eligible first purchase packs. Used only when fixed extra credits is 0 and a pack override is not set.'],
+        ['first_purchase_bonus_fixed_credits', firstPurchaseBonusFixedCredits, 'Default fixed extra credits on eligible first purchase packs. If greater than 0, this takes priority over percentage unless a pack override is set.'],
+        ['first_purchase_bonus_max_bonus_credits', firstPurchaseBonusMaxCredits, 'Default maximum bonus credits for one eligible first purchase. Pack overrides can set their own cap.'],
         ['first_purchase_bonus_window_minutes', firstPurchaseBonusWindowMinutes, 'Minutes after the free answer during which the first purchase bonus is available'],
+        ['first_purchase_bonus_pack_overrides', JSON.stringify(serializedPackOverrides), 'JSON map of product_id to first-purchase bonus override settings.'],
       ];
       const responses = await Promise.all(
         settingsToSave.map(([key, value, description]) =>
@@ -942,6 +992,46 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } finally {
       setFirstPurchaseBonusSaving(false);
     }
+  };
+
+  const updateFirstPurchaseBonusPackOverride = (productId, field, value) => {
+    setFirstPurchaseBonusPackOverrides((prev) => ({
+      ...prev,
+      [productId]: {
+        ...(prev?.[productId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const getFirstPurchaseBonusPreviewForPack = (pack) => {
+    const productId = `credits_${pack}`;
+    const override = firstPurchaseBonusPackOverrides?.[productId] || {};
+    const globalPercent = Math.max(0, Number(firstPurchaseBonusPercent) || 0);
+    const globalFixed = Math.max(0, Number(firstPurchaseBonusFixedCredits) || 0);
+    const globalCap = Math.max(0, Number(firstPurchaseBonusMaxCredits) || 0);
+    const overrideMode = String(override.bonus_type || 'default').trim().toLowerCase();
+    const effectiveMode = overrideMode === 'default'
+      ? (globalFixed > 0 ? 'fixed' : (globalPercent > 0 ? 'percent' : 'none'))
+      : overrideMode;
+    const effectivePercent = overrideMode === 'percent' ? Math.max(0, Number(override.percent) || 0) : globalPercent;
+    const effectiveFixed = overrideMode === 'fixed' ? Math.max(0, Number(override.fixed_credits) || 0) : globalFixed;
+    const effectiveCap = overrideMode !== 'default' && override.max_bonus_credits !== ''
+      ? Math.max(0, Number(override.max_bonus_credits) || 0)
+      : globalCap;
+    const rawBonus = effectiveMode === 'fixed'
+      ? effectiveFixed
+      : (effectiveMode === 'percent' ? Math.floor((pack * effectivePercent) / 100) : 0);
+    const bonus = effectiveCap > 0 ? Math.min(rawBonus, effectiveCap) : rawBonus;
+    return {
+      mode: effectiveMode,
+      percent: effectivePercent,
+      fixed_credits: effectiveFixed,
+      max_bonus_credits: effectiveCap,
+      bonus,
+      total: pack + bonus,
+      source: overrideMode === 'default' ? 'default' : 'pack override',
+    };
   };
 
   const handleSaveDeathQueryUnlockKeyword = async () => {
@@ -2122,67 +2212,84 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       ? String(chatLlmProviderPremium).trim()
       : chatLlmProvider;
 
-  return (
-    <div className="admin-panel">
-      <NavigationHeader 
-        compact={true}
-        showZodiacSelector={false}
-        user={user}
-        onAdminClick={onAdminClick}
-        onLogout={onLogout || (() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          handleHomeClick();
-        })}
-        onLogin={onLogin || (() => handleHomeClick())}
-        showLoginButton={showLoginButton}
-        onHomeClick={handleHomeClick}
-      />
-      <div
-        className={`admin-content-wrapper${
-          activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
-        }`}
-      >
-      {deviceAccessStatus === 'pending' && (
-        <div className="admin-device-check">
-          <p>Checking access…</p>
-        </div>
-      )}
-      {deviceAccessStatus === 'blocked' && (
-        <div className="admin-device-blocked">
-          <h2>Admin access restricted</h2>
-          {blockedUserId != null && (
-            <p className="admin-device-blocked-id">
-              <strong>User ID:</strong> <code>{blockedUserId}</code>
-              <button
-                type="button"
-                className="copy-device-id-btn"
-                onClick={() => {
-                  navigator.clipboard?.writeText(String(blockedUserId)).then(() => alert('Copied.')).catch(() => alert('Copy failed.'));
-                }}
-              >
-                Copy
-              </button>
-            </p>
+  const navigationHeaderNode = (
+    <NavigationHeader 
+      compact={true}
+      showZodiacSelector={false}
+      user={user}
+      onAdminClick={onAdminClick}
+      onLogout={onLogout || (() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        handleHomeClick();
+      })}
+      onLogin={onLogin || (() => handleHomeClick())}
+      showLoginButton={showLoginButton}
+      onHomeClick={handleHomeClick}
+    />
+  );
+
+  if (deviceAccessStatus !== 'allowed') {
+    return (
+      <div className="admin-panel">
+        {navigationHeaderNode}
+        <div
+          className={`admin-content-wrapper${
+            activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
+          }`}
+        >
+          {deviceAccessStatus === 'pending' && (
+            <div className="admin-device-check">
+              <p>Checking access…</p>
+            </div>
           )}
-          <p className="admin-device-blocked-id">
-            <strong>Device ID:</strong>{' '}
-            <code>{blockedDeviceId || getDeviceId()}</code>
-            <button
-              type="button"
-              className="copy-device-id-btn"
-              onClick={() => {
-                const id = blockedDeviceId || getDeviceId();
-                navigator.clipboard?.writeText(id).then(() => alert('Copied.')).catch(() => alert('Copy failed.'));
-              }}
-            >
-              Copy
-            </button>
-          </p>
+          {deviceAccessStatus === 'blocked' && (
+            <div className="admin-device-blocked">
+              <h2>Admin access restricted</h2>
+              {blockedUserId != null && (
+                <p className="admin-device-blocked-id">
+                  <strong>User ID:</strong> <code>{blockedUserId}</code>
+                  <button
+                    type="button"
+                    className="copy-device-id-btn"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(String(blockedUserId)).then(() => alert('Copied.')).catch(() => alert('Copy failed.'));
+                    }}
+                  >
+                    Copy
+                  </button>
+                </p>
+              )}
+              <p className="admin-device-blocked-id">
+                <strong>Device ID:</strong>{' '}
+                <code>{blockedDeviceId || getDeviceId()}</code>
+                <button
+                  type="button"
+                  className="copy-device-id-btn"
+                  onClick={() => {
+                    const id = blockedDeviceId || getDeviceId();
+                    navigator.clipboard?.writeText(id).then(() => alert('Copied.')).catch(() => alert('Copy failed.'));
+                  }}
+                >
+                  Copy
+                </button>
+              </p>
+            </div>
+          )}
         </div>
-      )}
-      {deviceAccessStatus === 'allowed' && (
-      <>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="admin-panel">
+        {navigationHeaderNode}
+        <div
+          className={`admin-content-wrapper${
+            activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
+          }`}
+        >
       <div className="admin-tabs">
         <button 
           className={`tab ${activeTab === 'users' ? 'active' : ''}`}
@@ -2255,7 +2362,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         </button>
         <button 
           className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
+          onClick={() => {
+            setActiveTab('settings');
+            setSettingsSubTab('chat');
+          }}
         >
           Settings
         </button>
@@ -4356,7 +4466,29 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'settings' && (
           <div className="admin-settings">
             <h2>System Settings</h2>
+            <div className="admin-subtabs admin-subtabs--nested" style={{ marginBottom: '18px' }}>
+              <button
+                className={`subtab ${settingsSubTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('chat')}
+              >
+                Chat
+              </button>
+              <button
+                className={`subtab ${settingsSubTab === 'firstPurchaseBonus' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('firstPurchaseBonus')}
+              >
+                First Purchase Bonus
+              </button>
+              <button
+                className={`subtab ${settingsSubTab === 'operations' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('operations')}
+              >
+                Operations
+              </button>
+            </div>
 
+            {settingsSubTab === 'chat' && (
+              <div className="settings-subtab-group">
             <div className="settings-section">
               <h3>Chat LLM vendors</h3>
               <p className="settings-hint">
@@ -4636,7 +4768,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </button>
               </div>
             </div>
+              </div>
+            )}
 
+            {settingsSubTab === 'firstPurchaseBonus' && (
             <div className="settings-section">
               <h3>First purchase bonus</h3>
               <p className="settings-hint">
@@ -4672,12 +4807,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div className="setting-info">
-                  <strong>Bonus values</strong>
-                  <p>Choose one bonus mode. Fixed credits and percentage are not combined. If fixed credits is greater than 0, fixed mode is active; otherwise percentage mode is used.</p>
+                  <strong>Default bonus values</strong>
+                  <p>These values apply to any pack that does not have its own override. Fixed credits and percentage are not combined. If fixed credits is greater than 0, fixed mode is active; otherwise percentage mode is used.</p>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', width: '100%', maxWidth: '760px' }}>
                   <label>
-                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Percentage extra</span>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Default percentage</span>
                     <input
                       type="number"
                       min="0"
@@ -4691,7 +4826,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     />
                   </label>
                   <label>
-                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Fixed extra credits</span>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Default fixed credits</span>
                     <input
                       type="number"
                       min="0"
@@ -4704,7 +4839,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     />
                   </label>
                   <label>
-                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Max bonus cap</span>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Default max cap</span>
                     <input type="number" min="0" value={firstPurchaseBonusMaxCredits} onChange={(e) => setFirstPurchaseBonusMaxCredits(e.target.value)} style={{ width: '100%', padding: '8px' }} />
                   </label>
                   <label>
@@ -4715,20 +4850,105 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div className="setting-info">
+                  <strong>Per-pack bonus rules</strong>
+                  <p>Override the default for specific credit packs. Set a pack to none for 0 bonus, or give it a custom percent/fixed bonus and optional cap.</p>
+                </div>
+                <div style={{ width: '100%', maxWidth: '980px', display: 'grid', gap: '10px' }}>
+                  {FIRST_PURCHASE_BONUS_PACKS.map((pack) => {
+                    const productId = `credits_${pack}`;
+                    const row = firstPurchaseBonusPackOverrides?.[productId] || {};
+                    const preview = getFirstPurchaseBonusPreviewForPack(pack);
+                    const rowMode = String(row.bonus_type || 'default').trim().toLowerCase();
+                    return (
+                      <div
+                        key={productId}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(90px, 110px) minmax(140px, 180px) repeat(3, minmax(120px, 1fr)) minmax(180px, 220px)',
+                          gap: '10px',
+                          alignItems: 'end',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          background: '#fff',
+                        }}
+                      >
+                        <div>
+                          <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Pack</span>
+                          <strong>{pack} credits</strong>
+                        </div>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Mode</span>
+                          <select
+                            value={rowMode}
+                            onChange={(e) => updateFirstPurchaseBonusPackOverride(productId, 'bonus_type', e.target.value)}
+                            style={{ width: '100%', padding: '8px' }}
+                          >
+                            <option value="default">Use default</option>
+                            <option value="none">No bonus</option>
+                            <option value="percent">Percent bonus</option>
+                            <option value="fixed">Fixed bonus</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Percent</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="500"
+                            disabled={rowMode !== 'percent'}
+                            value={row.percent ?? ''}
+                            onChange={(e) => updateFirstPurchaseBonusPackOverride(productId, 'percent', e.target.value)}
+                            placeholder={rowMode === 'default' ? firstPurchaseBonusPercent : '0'}
+                            style={{ width: '100%', padding: '8px' }}
+                          />
+                        </label>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Fixed credits</span>
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={rowMode !== 'fixed'}
+                            value={row.fixed_credits ?? ''}
+                            onChange={(e) => updateFirstPurchaseBonusPackOverride(productId, 'fixed_credits', e.target.value)}
+                            placeholder={rowMode === 'default' ? firstPurchaseBonusFixedCredits : '0'}
+                            style={{ width: '100%', padding: '8px' }}
+                          />
+                        </label>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Cap</span>
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={rowMode === 'default'}
+                            value={row.max_bonus_credits ?? ''}
+                            onChange={(e) => updateFirstPurchaseBonusPackOverride(productId, 'max_bonus_credits', e.target.value)}
+                            placeholder={rowMode === 'default' ? firstPurchaseBonusMaxCredits : '0 = no cap'}
+                            style={{ width: '100%', padding: '8px' }}
+                          />
+                        </label>
+                        <div style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '10px', background: '#f8fafc', padding: '10px 12px' }}>
+                          <span style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{preview.source}</span>
+                          <span style={{ fontSize: '14px' }}>
+                            {pack} + {preview.bonus} <small style={{ color: '#6b7280' }}>({preview.mode})</small> = <strong>{preview.total}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
                   <strong>Pack preview</strong>
-                  <p>Using current admin values. A cap of 0 means no cap.</p>
+                  <p>Resolved preview after combining the default rule with any pack-specific override. A cap of 0 means no cap.</p>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxWidth: '760px' }}>
-                  {[50, 100, 250, 500, 1000, 4999].map((pack) => {
-                    const pct = Math.max(0, Number(firstPurchaseBonusPercent) || 0);
-                    const fixed = Math.max(0, Number(firstPurchaseBonusFixedCredits) || 0);
-                    const cap = Math.max(0, Number(firstPurchaseBonusMaxCredits) || 0);
-                    const mode = fixed > 0 ? 'fixed' : (pct > 0 ? 'percent' : 'none');
-                    const rawBonus = mode === 'fixed' ? fixed : (mode === 'percent' ? Math.floor((pack * pct) / 100) : 0);
-                    const bonus = cap > 0 ? Math.min(rawBonus, cap) : rawBonus;
+                  {FIRST_PURCHASE_BONUS_PACKS.map((pack) => {
+                    const preview = getFirstPurchaseBonusPreviewForPack(pack);
                     return (
                       <span key={pack} style={{ border: '1px solid #e5e7eb', borderRadius: '999px', padding: '7px 10px', background: '#fff', fontSize: '13px' }}>
-                        {pack} + {bonus} <small style={{ color: '#6b7280' }}>({mode})</small> = <strong>{pack + bonus}</strong>
+                        {pack} + {preview.bonus} <small style={{ color: '#6b7280' }}>({preview.mode})</small> = <strong>{preview.total}</strong>
                       </span>
                     );
                   })}
@@ -4745,7 +4965,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </button>
               </div>
             </div>
+            )}
 
+            {settingsSubTab === 'chat' && (
+              <div className="settings-subtab-group">
             <div className="settings-section">
               <h3>Death-question unlock</h3>
               <p className="settings-hint">
@@ -5158,7 +5381,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </button>
               </div>
             </div>
+              </div>
+            )}
 
+            {settingsSubTab === 'operations' && (
+              <div className="settings-subtab-group">
             <div className="settings-section">
               <h3>Debug & Logging</h3>
               <div className="setting-item">
@@ -5351,14 +5578,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </>
               )}
             </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
-      </>
-      )}
-      </div>
-      
-      {showApprovalModal && selectedRequest && (
+          {showApprovalModal && selectedRequest && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -5509,7 +5733,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         </div>
       )}
-    </div>
+        </div>
+      </div>
+      </div>
+    </>
   );
 };
 

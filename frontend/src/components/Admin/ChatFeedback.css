@@ -214,7 +214,7 @@
   padding: 40px;
 }
 
-.pagination {
+.chat-feedback-pagination {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -222,9 +222,12 @@
   padding: 20px;
   background: #f8f9fa;
   border-top: 1px solid #dee2e6;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
 }
 
-.page-btn {
+.chat-feedback-page-btn {
   padding: 8px 12px;
   border: 1px solid #ddd;
   background: white;
@@ -233,26 +236,29 @@
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 4;
+  pointer-events: auto;
 }
 
-.page-btn:hover:not(:disabled) {
+.chat-feedback-page-btn:hover:not(:disabled) {
   background: #ff6b35;
   color: white;
   border-color: #ff6b35;
 }
 
-.page-btn.active {
+.chat-feedback-page-btn.active {
   background: #ff6b35;
   color: white;
   border-color: #ff6b35;
 }
 
-.page-btn:disabled {
+.chat-feedback-page-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.page-ellipsis {
+.chat-feedback-page-ellipsis {
   padding: 8px 4px;
   color: #666;
 }
@@ -307,7 +313,7 @@
     min-width: 600px;
   }
   
-  .pagination {
+  .chat-feedback-pagination {
     flex-wrap: wrap;
   }
 }
