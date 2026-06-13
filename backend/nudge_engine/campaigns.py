@@ -551,15 +551,30 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
     conn.commit()
 
     try:
-        from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
+        from .task_queue import (
+            enqueue_nudge_task,
+            nudge_tasks_are_isolated,
+            nudge_tasks_enabled,
+            nudge_tasks_target_base_url,
+        )
 
         tasks_enabled = nudge_tasks_enabled()
+        tasks_isolated = nudge_tasks_are_isolated()
+        tasks_target = nudge_tasks_target_base_url()
     except Exception as e:
         logger.warning("nudge task queue unavailable; campaign runs inline: %s", e)
         enqueue_nudge_task = None
         tasks_enabled = False
+        tasks_isolated = False
+        tasks_target = ""
 
     require_tasks = (os.getenv("NUDGE_CAMPAIGN_REQUIRE_TASKS") or "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    require_isolated = (os.getenv("NUDGE_CAMPAIGN_REQUIRE_ISOLATED_WORKERS") or "true").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -570,8 +585,13 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
         raise RuntimeError(
             "Campaign dispatch requires Cloud Tasks configuration for this audience size/personalization mode."
         )
+    if tasks_enabled and require_isolated and not tasks_isolated:
+        raise RuntimeError(
+            "Campaign dispatch is blocked because NUDGE_TASKS_TARGET_BASE_URL still points at the public API host. "
+            f"Configure an isolated worker target before sending campaigns. Current target: {tasks_target or '<unset>'}"
+        )
 
-    batch_size = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_BATCH_SIZE", "250")), 2000))
+    batch_size = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_BATCH_SIZE", "50")), 500))
     batches = _chunked(audience, batch_size)
 
     enqueued = 0

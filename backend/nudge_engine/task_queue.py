@@ -28,7 +28,14 @@ def _location() -> str:
     return (os.getenv("NUDGE_TASKS_LOCATION") or os.getenv("CHAT_TASKS_LOCATION") or "asia-south1").strip()
 
 
-def _queue_name() -> str:
+def _queue_name(task_kind: Optional[str] = None) -> str:
+    task_kind_s = str(task_kind or "").strip().lower()
+    if task_kind_s == "campaign-batch":
+        return (
+            os.getenv("NUDGE_CAMPAIGN_TASKS_QUEUE")
+            or os.getenv("NUDGE_TASKS_QUEUE")
+            or "nudge-campaign-queue"
+        ).strip()
     return (os.getenv("NUDGE_TASKS_QUEUE") or "nudge-standard-queue").strip()
 
 
@@ -39,6 +46,36 @@ def _target_base_url() -> str:
         or os.getenv("PUBLIC_API_BASE_URL")
         or "https://astroroshni.com"
     ).strip().rstrip("/")
+
+
+def _public_api_base_url() -> str:
+    return (
+        os.getenv("PUBLIC_API_BASE_URL")
+        or "https://astroroshni.com"
+    ).strip().rstrip("/")
+
+
+def _normalize_host(value: str) -> str:
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return ""
+    raw = raw.split("://", 1)[-1]
+    raw = raw.split("/", 1)[0]
+    return raw
+
+
+def nudge_tasks_target_base_url() -> str:
+    return _target_base_url()
+
+
+def nudge_tasks_are_isolated() -> bool:
+    """
+    Returns True when campaign/background tasks are configured to hit a host
+    that is different from the public API host.
+    """
+    task_host = _normalize_host(_target_base_url())
+    public_host = _normalize_host(_public_api_base_url())
+    return bool(task_host and public_host and task_host != public_host)
 
 
 def nudge_task_secret() -> str:
@@ -58,7 +95,7 @@ def enqueue_nudge_task(
 
     project = _project_id()
     location = _location()
-    queue = _queue_name()
+    queue = _queue_name(task_kind)
     target = _target_base_url()
     secret = nudge_task_secret()
     if not all([project, location, queue, target, secret]):
