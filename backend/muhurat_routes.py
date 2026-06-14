@@ -8,8 +8,15 @@ from utils.timezone_service import parse_timezone_offset
 import swisseph as swe
 
 router = APIRouter(prefix="/muhurat", tags=["muhurat"])
-calculator = MuhuratCalculator()
+_calculator = None
 credit_service = CreditService()
+
+
+def get_muhurat_calculator():
+    global _calculator
+    if _calculator is None:
+        _calculator = MuhuratCalculator()
+    return _calculator
 
 # --- REQUEST MODELS ---
 class ChildbirthMuhuratRequest(BaseModel):
@@ -107,21 +114,25 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
 
 @router.post("/childbirth-planner")
 async def get_childbirth_muhurat(request: ChildbirthMuhuratRequest, current_user: User = Depends(get_current_user)):
+    calculator = get_muhurat_calculator()
     return await _process_muhurat(request, current_user, "childbirth_planner", calculator.calculate_childbirth_muhurat)
 
 @router.post("/vehicle-purchase")
 async def get_vehicle_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    calculator = get_muhurat_calculator()
     return await _process_muhurat(request, current_user, "vehicle_purchase", calculator.calculate_vehicle_muhurat)
 
 @router.post("/griha-pravesh")
 async def get_property_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    calculator = get_muhurat_calculator()
     return await _process_muhurat(request, current_user, "griha_pravesh", calculator.calculate_griha_pravesh_muhurat)
 
 @router.post("/gold-purchase")
 async def get_gold_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    calculator = get_muhurat_calculator()
     return await _process_muhurat(request, current_user, "gold_purchase", calculator.calculate_gold_muhurat)
 
 @router.post("/business-opening")
 async def get_business_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    calculator = get_muhurat_calculator()
     return await _process_muhurat(request, current_user, "business_opening", calculator.calculate_business_muhurat)
-
