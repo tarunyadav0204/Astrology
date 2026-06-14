@@ -2047,16 +2047,35 @@ class CreditService:
         except Exception:
             return True
 
-    def get_first_purchase_bonus_status(
+    def _build_resolved_bonus_config(self, config: Dict[str, Any], product_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        normalized_product_id = str(product_id or "").strip() or None
+        if not normalized_product_id:
+            return None
+        if isinstance(config.get("pack_overrides"), dict):
+            override = config["pack_overrides"].get(normalized_product_id)
+            if isinstance(override, dict):
+                return {
+                    "percent": int(override.get("percent") or 0),
+                    "fixed_credits": int(override.get("fixed_credits") or 0),
+                    "max_bonus_credits": int(override.get("max_bonus_credits") or 0),
+                    "bonus_type": str(override.get("bonus_type") or "none"),
+                    "source": "pack_override",
+                }
+        return {
+            "percent": int(config.get("percent") or 0),
+            "fixed_credits": int(config.get("fixed_credits") or 0),
+            "max_bonus_credits": int(config.get("max_bonus_credits") or 0),
+            "bonus_type": str(config.get("bonus_type") or "none"),
+            "source": "default",
+        }
+
+    def _first_purchase_bonus_base_status(
         self,
         userid: int,
-        purchased_credits: Optional[int] = None,
         *,
-        product_id: Optional[str] = None,
         current_source: Optional[str] = None,
         current_reference_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Return current eligibility and preview values for the post-free-question purchase bonus."""
         from utils.admin_settings import (
             first_purchase_bonus_enabled_for_user,
             get_first_purchase_bonus_config,
@@ -2064,11 +2083,6 @@ class CreditService:
         )
 
         config = get_first_purchase_bonus_config()
-        bonus = self.calculate_first_purchase_bonus_credits(
-            purchased_credits or 0,
-            config,
-            product_id=product_id,
-        ) if purchased_credits else 0
         feature_enabled = is_first_purchase_bonus_enabled()
         user_allowed = first_purchase_bonus_enabled_for_user(userid)
         free_used = self.get_free_chat_question_used(userid)
@@ -2080,72 +2094,24 @@ class CreditService:
         status: Dict[str, Any] = {
             "enabled": feature_enabled,
             "eligible": False,
-            "bonus_credits": bonus,
-            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
-            "product_id": str(product_id or "").strip() or None,
             **config,
         }
-        if status.get("product_id") and isinstance(config.get("pack_overrides"), dict):
-            override = config["pack_overrides"].get(status["product_id"])
-            if isinstance(override, dict):
-                status["resolved_bonus_config"] = {
-                    "percent": int(override.get("percent") or 0),
-                    "fixed_credits": int(override.get("fixed_credits") or 0),
-                    "max_bonus_credits": int(override.get("max_bonus_credits") or 0),
-                    "bonus_type": str(override.get("bonus_type") or "none"),
-                    "source": "pack_override",
-                }
-            else:
-                status["resolved_bonus_config"] = {
-                    "percent": int(config.get("percent") or 0),
-                    "fixed_credits": int(config.get("fixed_credits") or 0),
-                    "max_bonus_credits": int(config.get("max_bonus_credits") or 0),
-                    "bonus_type": str(config.get("bonus_type") or "none"),
-                    "source": "default",
-                }
-
-        def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
-            try:
-                logger.info(
-                    "first_purchase_bonus_status userid=%s eligible=%s reason=%s "
-                    "enabled=%s user_allowed=%s free_used=%s prior_purchase=%s "
-                    "purchased_credits=%s product_id=%s bonus_credits=%s window_minutes=%s extra=%s",
-                    userid,
-                    bool(status.get("eligible")),
-                    reason,
-                    feature_enabled,
-                    user_allowed,
-                    free_used,
-                    prior_purchase,
-                    purchased_credits,
-                    status.get("product_id"),
-                    status.get("bonus_credits"),
-                    config.get("window_minutes"),
-                    extra or {},
-                )
-            except Exception:
-                pass
-
         if not user_allowed:
             status["reason"] = "feature_disabled_or_user_not_allowed"
-            _log_status(status["reason"])
             return status
         if not free_used:
             status["reason"] = "free_question_not_used"
-            _log_status(status["reason"])
             return status
         if prior_purchase:
             status["reason"] = "prior_purchase_exists"
-            _log_status(status["reason"])
             return status
         free_row = self._recent_free_chat_question_row(userid, config["window_minutes"])
         if not free_row:
             status["reason"] = "outside_bonus_window"
-            _log_status(status["reason"])
             return status
         if self.has_first_purchase_bonus(userid):
             status["reason"] = "bonus_already_granted"
-            _log_status(status["reason"], {"free_question_transaction_id": free_row.get("id")})
+            status["free_question_transaction_id"] = free_row.get("id")
             return status
         status["eligible"] = True
         status["reason"] = "eligible"
@@ -2156,10 +2122,119 @@ class CreditService:
                 status["expires_at"] = (created_at + timedelta(minutes=int(config["window_minutes"]))).isoformat()
             except Exception:
                 pass
+        return status
+
+    def _purchase_discount_base_status(
+        self,
+        userid: int,
+        *,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        from datetime import datetime, timedelta, timezone
+        from utils.admin_settings import (
+            get_purchase_discount_config,
+            get_purchase_discount_window_started_at,
+            is_purchase_discount_enabled,
+            purchase_discount_enabled_for_user,
+        )
+
+        config = get_purchase_discount_config()
+        feature_enabled = is_purchase_discount_enabled()
+        user_allowed = purchase_discount_enabled_for_user(userid)
+        status: Dict[str, Any] = {
+            "enabled": feature_enabled,
+            "eligible": False,
+            **config,
+        }
+        if not user_allowed:
+            status["reason"] = "feature_disabled_or_user_not_allowed"
+            return status
+
+        window_minutes = int(config.get("window_minutes") or 0)
+        if window_minutes > 0:
+            started_at = get_purchase_discount_window_started_at()
+            if not started_at:
+                status["reason"] = "campaign_window_not_started"
+                return status
+            expires_at = started_at + timedelta(minutes=window_minutes)
+            status["expires_at"] = expires_at.isoformat()
+            now = datetime.now(timezone.utc)
+            if started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if now > expires_at:
+                status["reason"] = "outside_campaign_window"
+                return status
+
+        if current_source and current_reference_id:
+            reference_id = f"{current_source}:{current_reference_id}"
+            if self.has_transaction_with_reference(userid, "purchase_discount", reference_id):
+                status["reason"] = "discount_already_granted_for_purchase"
+                return status
+
+        status["eligible"] = True
+        status["reason"] = "eligible"
+        return status
+
+    def get_first_purchase_bonus_status(
+        self,
+        userid: int,
+        purchased_credits: Optional[int] = None,
+        *,
+        product_id: Optional[str] = None,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return current eligibility and preview values for the post-free-question purchase bonus."""
+        status = self._first_purchase_bonus_base_status(
+            userid,
+            current_source=current_source,
+            current_reference_id=current_reference_id,
+        )
+        config = dict(status)
+        bonus = self.calculate_first_purchase_bonus_credits(
+            purchased_credits or 0,
+            config,
+            product_id=product_id,
+        ) if purchased_credits else 0
+        status = {
+            **status,
+            "bonus_credits": bonus,
+            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
+            "product_id": str(product_id or "").strip() or None,
+        }
+        resolved_bonus_config = self._build_resolved_bonus_config(config, status.get("product_id"))
+        if resolved_bonus_config is not None:
+            status["resolved_bonus_config"] = resolved_bonus_config
+
+        def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
+            try:
+                logger.info(
+                    "first_purchase_bonus_status userid=%s eligible=%s reason=%s "
+                    "enabled=%s user_allowed=%s free_used=%s prior_purchase=%s "
+                    "purchased_credits=%s product_id=%s bonus_credits=%s window_minutes=%s extra=%s",
+                    userid,
+                    bool(status.get("eligible")),
+                    reason,
+                    status.get("enabled"),
+                    None,
+                    None,
+                    None,
+                    purchased_credits,
+                    status.get("product_id"),
+                    status.get("bonus_credits"),
+                    config.get("window_minutes"),
+                    extra or {},
+                )
+            except Exception:
+                pass
+
         _log_status(
             status["reason"],
             {
-                "free_question_transaction_id": free_row.get("id"),
+                "free_question_transaction_id": status.get("free_question_transaction_id"),
                 "expires_at": status.get("expires_at"),
             },
         )
@@ -2249,75 +2324,26 @@ class CreditService:
         current_reference_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Return eligibility for the open purchase discount campaign (any user, no free-question gate)."""
-        from datetime import datetime, timedelta, timezone
-        from utils.admin_settings import (
-            get_purchase_discount_config,
-            get_purchase_discount_window_started_at,
-            is_purchase_discount_enabled,
-            purchase_discount_enabled_for_user,
+        status = self._purchase_discount_base_status(
+            userid,
+            current_source=current_source,
+            current_reference_id=current_reference_id,
         )
-
-        config = get_purchase_discount_config()
+        config = dict(status)
         bonus = self.calculate_first_purchase_bonus_credits(
             purchased_credits or 0,
             config,
             product_id=product_id,
         ) if purchased_credits else 0
-        feature_enabled = is_purchase_discount_enabled()
-        user_allowed = purchase_discount_enabled_for_user(userid)
-        status: Dict[str, Any] = {
-            "enabled": feature_enabled,
-            "eligible": False,
+        status = {
+            **status,
             "bonus_credits": bonus,
             "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
             "product_id": str(product_id or "").strip() or None,
-            **config,
         }
-        if status.get("product_id") and isinstance(config.get("pack_overrides"), dict):
-            override = config["pack_overrides"].get(status["product_id"])
-            if isinstance(override, dict):
-                status["resolved_bonus_config"] = {
-                    "percent": int(override.get("percent") or 0),
-                    "fixed_credits": int(override.get("fixed_credits") or 0),
-                    "max_bonus_credits": int(override.get("max_bonus_credits") or 0),
-                    "bonus_type": str(override.get("bonus_type") or "none"),
-                    "source": "pack_override",
-                }
-            else:
-                status["resolved_bonus_config"] = {
-                    "percent": int(config.get("percent") or 0),
-                    "fixed_credits": int(config.get("fixed_credits") or 0),
-                    "max_bonus_credits": int(config.get("max_bonus_credits") or 0),
-                    "bonus_type": str(config.get("bonus_type") or "none"),
-                    "source": "default",
-                }
-
-        if not user_allowed:
-            status["reason"] = "feature_disabled_or_user_not_allowed"
-            return status
-
-        window_minutes = int(config.get("window_minutes") or 0)
-        if window_minutes > 0:
-            started_at = get_purchase_discount_window_started_at()
-            if not started_at:
-                status["reason"] = "campaign_window_not_started"
-                return status
-            expires_at = started_at + timedelta(minutes=window_minutes)
-            status["expires_at"] = expires_at.isoformat()
-            now = datetime.now(timezone.utc)
-            if started_at.tzinfo is None:
-                started_at = started_at.replace(tzinfo=timezone.utc)
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if now > expires_at:
-                status["reason"] = "outside_campaign_window"
-                return status
-
-        if purchased_credits and current_source and current_reference_id:
-            reference_id = f"{current_source}:{current_reference_id}"
-            if self.has_transaction_with_reference(userid, "purchase_discount", reference_id):
-                status["reason"] = "discount_already_granted_for_purchase"
-                return status
+        resolved_bonus_config = self._build_resolved_bonus_config(config, status.get("product_id"))
+        if resolved_bonus_config is not None:
+            status["resolved_bonus_config"] = resolved_bonus_config
 
         if bonus <= 0:
             status["reason"] = "zero_bonus"

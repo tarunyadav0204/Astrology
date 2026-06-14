@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110
 DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210
 GOOGLE_PLAY_HTTP_TIMEOUT_SECONDS = float(os.getenv("GOOGLE_PLAY_HTTP_TIMEOUT_SECONDS", "3.0"))
-GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS", "300"))
-GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS", "900"))
+GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS", "86400"))
+GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS", "86400"))
 GOOGLE_PLAY_PRODUCTS_CACHE_MAX = 8
 GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX = 32
 
@@ -765,21 +765,51 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
     """List credit products from Google Play (active in-app products with id convention credits_N)."""
     try:
         products = _list_google_play_products(PACKAGE_NAME)
+        first_purchase_base_status = credit_service._first_purchase_bonus_base_status(current_user.userid)
+        purchase_discount_base_status = credit_service._purchase_discount_base_status(current_user.userid)
         for product in products:
             try:
                 credits = int(product.get("credits") or 0)
                 product_id = str(product.get("product_id") or "").strip() or None
-                status = credit_service.get_first_purchase_bonus_status(
-                    current_user.userid,
+                status = {
+                    **first_purchase_base_status,
+                    "bonus_credits": 0,
+                    "total_credits": credits if credits else None,
+                    "product_id": product_id,
+                }
+                bonus_credits = credit_service.calculate_first_purchase_bonus_credits(
                     credits,
+                    first_purchase_base_status,
                     product_id=product_id,
                 )
+                status["bonus_credits"] = bonus_credits
+                status["total_credits"] = credits + bonus_credits
+                resolved_bonus_config = credit_service._build_resolved_bonus_config(first_purchase_base_status, product_id)
+                if resolved_bonus_config is not None:
+                    status["resolved_bonus_config"] = resolved_bonus_config
+                if bonus_credits <= 0 and status.get("eligible"):
+                    status["eligible"] = False
+                    status["reason"] = "zero_bonus"
                 product["first_purchase_bonus"] = status
-                discount_status = credit_service.get_purchase_discount_status(
-                    current_user.userid,
+                discount_status = {
+                    **purchase_discount_base_status,
+                    "bonus_credits": 0,
+                    "total_credits": credits if credits else None,
+                    "product_id": product_id,
+                }
+                discount_bonus_credits = credit_service.calculate_first_purchase_bonus_credits(
                     credits,
+                    purchase_discount_base_status,
                     product_id=product_id,
                 )
+                discount_status["bonus_credits"] = discount_bonus_credits
+                discount_status["total_credits"] = credits + discount_bonus_credits
+                resolved_discount_config = credit_service._build_resolved_bonus_config(purchase_discount_base_status, product_id)
+                if resolved_discount_config is not None:
+                    discount_status["resolved_bonus_config"] = resolved_discount_config
+                if discount_bonus_credits <= 0 and discount_status.get("eligible"):
+                    discount_status["eligible"] = False
+                    discount_status["reason"] = "zero_bonus"
                 product["purchase_discount"] = discount_status
                 bonus_total = 0
                 if status.get("eligible") and int(status.get("bonus_credits") or 0) > 0:
