@@ -606,7 +606,7 @@ def _credit_verified_google_play_purchase(
         pass
 
     if credit_service.has_transaction_with_reference(userid, GOOGLE_PLAY_SOURCE, order_id):
-        bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+        extras = credit_service.apply_purchase_extras(
             userid=userid,
             purchased_credits=amount,
             purchase_source=GOOGLE_PLAY_SOURCE,
@@ -618,8 +618,11 @@ def _credit_verified_google_play_purchase(
             "message": "Already credited",
             "credits_added": 0,
             "order_id": order_id,
-            "first_purchase_bonus": bonus_result,
-            "bonus_credits_added": int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0,
+            "first_purchase_bonus": extras.get("first_purchase_bonus"),
+            "purchase_discount": extras.get("purchase_discount"),
+            "bonus_credits_added": int(extras.get("bonus_credits_added") or 0),
+            "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
+            "discount_credits_added": int(extras.get("discount_credits_added") or 0),
         }
 
     purchase_metadata = json.dumps({
@@ -666,21 +669,24 @@ def _credit_verified_google_play_purchase(
             "order_id": order_id,
         },
     )
-    bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+    extras = credit_service.apply_purchase_extras(
         userid=userid,
         purchased_credits=amount,
         purchase_source=GOOGLE_PLAY_SOURCE,
         purchase_reference_id=order_id,
         product_id=product_id,
     )
-    bonus_added = int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0
+    bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
         "success": True,
         "message": "Credits added",
         "credits_added": amount + bonus_added,
         "purchased_credits_added": amount,
         "bonus_credits_added": bonus_added,
-        "first_purchase_bonus": bonus_result,
+        "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
+        "discount_credits_added": int(extras.get("discount_credits_added") or 0),
+        "first_purchase_bonus": extras.get("first_purchase_bonus"),
+        "purchase_discount": extras.get("purchase_discount"),
         "order_id": order_id,
     }
 
@@ -693,15 +699,27 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
         for product in products:
             try:
                 credits = int(product.get("credits") or 0)
+                product_id = str(product.get("product_id") or "").strip() or None
                 status = credit_service.get_first_purchase_bonus_status(
                     current_user.userid,
                     credits,
-                    product_id=str(product.get("product_id") or "").strip() or None,
+                    product_id=product_id,
                 )
                 product["first_purchase_bonus"] = status
+                discount_status = credit_service.get_purchase_discount_status(
+                    current_user.userid,
+                    credits,
+                    product_id=product_id,
+                )
+                product["purchase_discount"] = discount_status
+                bonus_total = 0
                 if status.get("eligible") and int(status.get("bonus_credits") or 0) > 0:
-                    product["bonus_credits"] = int(status.get("bonus_credits") or 0)
-                    product["total_credits"] = int(status.get("total_credits") or credits)
+                    bonus_total += int(status.get("bonus_credits") or 0)
+                if discount_status.get("eligible") and int(discount_status.get("bonus_credits") or 0) > 0:
+                    bonus_total += int(discount_status.get("bonus_credits") or 0)
+                if bonus_total > 0:
+                    product["bonus_credits"] = bonus_total
+                    product["total_credits"] = credits + bonus_total
             except Exception:
                 pass
         return {"products": products}
@@ -714,6 +732,20 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
     except Exception as e:
         logger.warning("Google Play products unavailable: %s", e, exc_info=True)
         return {"products": []}
+
+
+@router.get("/purchase-discount/status")
+async def get_purchase_discount_status(
+    purchased_credits: Optional[int] = Query(default=None),
+    product_id: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    """Preview the open purchase discount campaign for the current user."""
+    return credit_service.get_purchase_discount_status(
+        current_user.userid,
+        purchased_credits,
+        product_id=(product_id or "").strip() or None,
+    )
 
 
 @router.get("/first-purchase-bonus/status")
@@ -1238,6 +1270,10 @@ async def get_credit_balance(current_user: User = Depends(get_current_user)):
     }
     try:
         result["first_purchase_bonus"] = credit_service.get_first_purchase_bonus_status(current_user.userid)
+    except Exception:
+        pass
+    try:
+        result["purchase_discount"] = credit_service.get_purchase_discount_status(current_user.userid)
     except Exception:
         pass
     # Optional: subscription tier for app to show "VIP Silver" etc. (backward compat: new keys)

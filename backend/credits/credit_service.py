@@ -2239,6 +2239,179 @@ class CreditService:
             return {"applied": False, **status, "eligible": False, "reason": "bonus_write_failed"}
         return {"applied": True, **status}
 
+    def get_purchase_discount_status(
+        self,
+        userid: int,
+        purchased_credits: Optional[int] = None,
+        *,
+        product_id: Optional[str] = None,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return eligibility for the open purchase discount campaign (any user, no free-question gate)."""
+        from datetime import datetime, timedelta, timezone
+        from utils.admin_settings import (
+            get_purchase_discount_config,
+            get_purchase_discount_window_started_at,
+            is_purchase_discount_enabled,
+            purchase_discount_enabled_for_user,
+        )
+
+        config = get_purchase_discount_config()
+        bonus = self.calculate_first_purchase_bonus_credits(
+            purchased_credits or 0,
+            config,
+            product_id=product_id,
+        ) if purchased_credits else 0
+        feature_enabled = is_purchase_discount_enabled()
+        user_allowed = purchase_discount_enabled_for_user(userid)
+        status: Dict[str, Any] = {
+            "enabled": feature_enabled,
+            "eligible": False,
+            "bonus_credits": bonus,
+            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
+            "product_id": str(product_id or "").strip() or None,
+            **config,
+        }
+        if status.get("product_id") and isinstance(config.get("pack_overrides"), dict):
+            override = config["pack_overrides"].get(status["product_id"])
+            if isinstance(override, dict):
+                status["resolved_bonus_config"] = {
+                    "percent": int(override.get("percent") or 0),
+                    "fixed_credits": int(override.get("fixed_credits") or 0),
+                    "max_bonus_credits": int(override.get("max_bonus_credits") or 0),
+                    "bonus_type": str(override.get("bonus_type") or "none"),
+                    "source": "pack_override",
+                }
+            else:
+                status["resolved_bonus_config"] = {
+                    "percent": int(config.get("percent") or 0),
+                    "fixed_credits": int(config.get("fixed_credits") or 0),
+                    "max_bonus_credits": int(config.get("max_bonus_credits") or 0),
+                    "bonus_type": str(config.get("bonus_type") or "none"),
+                    "source": "default",
+                }
+
+        if not user_allowed:
+            status["reason"] = "feature_disabled_or_user_not_allowed"
+            return status
+
+        window_minutes = int(config.get("window_minutes") or 0)
+        if window_minutes > 0:
+            started_at = get_purchase_discount_window_started_at()
+            if not started_at:
+                status["reason"] = "campaign_window_not_started"
+                return status
+            expires_at = started_at + timedelta(minutes=window_minutes)
+            status["expires_at"] = expires_at.isoformat()
+            now = datetime.now(timezone.utc)
+            if started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if now > expires_at:
+                status["reason"] = "outside_campaign_window"
+                return status
+
+        if purchased_credits and current_source and current_reference_id:
+            reference_id = f"{current_source}:{current_reference_id}"
+            if self.has_transaction_with_reference(userid, "purchase_discount", reference_id):
+                status["reason"] = "discount_already_granted_for_purchase"
+                return status
+
+        if bonus <= 0:
+            status["reason"] = "zero_bonus"
+            return status
+
+        status["eligible"] = True
+        status["reason"] = "eligible"
+        return status
+
+    def maybe_apply_purchase_discount(
+        self,
+        *,
+        userid: int,
+        purchased_credits: int,
+        purchase_source: str,
+        purchase_reference_id: str,
+        product_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Award the open purchase discount for an eligible verified purchase."""
+        status = self.get_purchase_discount_status(
+            userid,
+            purchased_credits,
+            product_id=product_id,
+            current_source=purchase_source,
+            current_reference_id=purchase_reference_id,
+        )
+        if not status.get("eligible"):
+            return {"applied": False, **status}
+
+        bonus = int(status.get("bonus_credits") or 0)
+        if bonus <= 0:
+            return {"applied": False, **status, "eligible": False, "reason": "zero_bonus"}
+
+        reference_id = f"{purchase_source}:{purchase_reference_id}"
+        metadata = json.dumps(
+            {
+                "purchase_source": purchase_source,
+                "purchase_reference_id": purchase_reference_id,
+                "product_id": product_id,
+                "purchased_credits": int(purchased_credits),
+                "percent": status.get("percent"),
+                "fixed_credits": status.get("fixed_credits"),
+                "max_bonus_credits": status.get("max_bonus_credits"),
+                "resolved_bonus_config": status.get("resolved_bonus_config"),
+                "window_minutes": status.get("window_minutes"),
+                "window_started_at": status.get("window_started_at"),
+            }
+        )
+        ok = self.add_credits(
+            userid,
+            bonus,
+            "purchase_discount",
+            reference_id=reference_id,
+            description=f"Purchase discount: +{bonus} credits",
+            metadata=metadata,
+        )
+        if not ok:
+            return {"applied": False, **status, "eligible": False, "reason": "discount_write_failed"}
+        return {"applied": True, **status}
+
+    def apply_purchase_extras(
+        self,
+        *,
+        userid: int,
+        purchased_credits: int,
+        purchase_source: str,
+        purchase_reference_id: str,
+        product_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Apply first-purchase bonus and open purchase discount for a verified purchase."""
+        first_result = self.maybe_apply_first_purchase_bonus(
+            userid=userid,
+            purchased_credits=purchased_credits,
+            purchase_source=purchase_source,
+            purchase_reference_id=purchase_reference_id,
+            product_id=product_id,
+        )
+        discount_result = self.maybe_apply_purchase_discount(
+            userid=userid,
+            purchased_credits=purchased_credits,
+            purchase_source=purchase_source,
+            purchase_reference_id=purchase_reference_id,
+            product_id=product_id,
+        )
+        first_added = int(first_result.get("bonus_credits") or 0) if first_result.get("applied") else 0
+        discount_added = int(discount_result.get("bonus_credits") or 0) if discount_result.get("applied") else 0
+        return {
+            "first_purchase_bonus": first_result,
+            "purchase_discount": discount_result,
+            "first_purchase_bonus_credits_added": first_added,
+            "discount_credits_added": discount_added,
+            "bonus_credits_added": first_added + discount_added,
+        }
+
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:
         """Add credits to user account. metadata: optional JSON (e.g. Google Play purchase_token, purchase_time for support)."""
         from db import get_conn, execute

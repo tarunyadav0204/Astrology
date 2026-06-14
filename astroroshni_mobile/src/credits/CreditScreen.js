@@ -172,16 +172,23 @@ function getCreditPackDisplayPrice(product, iapProducts) {
 
 function getFirstPurchaseBonus(product) {
   const bonus = product?.first_purchase_bonus || {};
-  const bonusCredits = Number(product?.bonus_credits ?? bonus.bonus_credits ?? 0);
-  const totalCredits = Number(product?.total_credits ?? bonus.total_credits ?? 0);
+  const discount = product?.purchase_discount || {};
+  const firstBonusCredits = bonus.eligible ? Number(bonus.bonus_credits || 0) : 0;
+  const discountCredits = discount.eligible ? Number(discount.bonus_credits || 0) : 0;
+  const bonusCredits = Number(product?.bonus_credits ?? (firstBonusCredits + discountCredits));
+  const packCredits = Number(product?.credits) || 0;
+  const totalCredits = Number(product?.total_credits ?? (packCredits + bonusCredits));
+  const activeOffer = discount.eligible && discountCredits > 0 ? discount : bonus;
   return {
-    eligible: Boolean(bonus.eligible && bonusCredits > 0),
+    eligible: Boolean((bonus.eligible && firstBonusCredits > 0) || (discount.eligible && discountCredits > 0)),
     bonusCredits,
     totalCredits,
-    percent: Number(bonus.percent || 0),
-    fixedCredits: Number(bonus.fixed_credits || 0),
-    bonusType: String(bonus.bonus_type || '').toLowerCase(),
-    windowMinutes: Number(bonus.window_minutes || 0),
+    percent: Number(activeOffer.percent || 0),
+    fixedCredits: Number(activeOffer.fixed_credits || 0),
+    bonusType: String(activeOffer.bonus_type || '').toLowerCase(),
+    windowMinutes: Number(activeOffer.window_minutes || 0),
+    firstPurchaseBonus: bonus,
+    purchaseDiscount: discount,
   };
 }
 

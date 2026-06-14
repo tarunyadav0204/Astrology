@@ -496,6 +496,105 @@ def get_first_purchase_bonus_config() -> Dict[str, Any]:
     }
 
 
+def is_purchase_discount_enabled() -> bool:
+    """Global feature flag for extra credits on any eligible credit purchase."""
+    return _parse_bool_setting(get_setting("purchase_discount_enabled"), default=False)
+
+
+def get_purchase_discount_user_allowlist() -> Set[int]:
+    """Optional CSV/whitespace-separated user id allowlist. Empty set means all users."""
+    raw = (get_setting("purchase_discount_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            user_ids.add(int(cleaned))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def purchase_discount_enabled_for_user(user_id: Optional[int]) -> bool:
+    """Global ON + empty allowlist enables for all users; otherwise only listed users."""
+    if not is_purchase_discount_enabled():
+        return False
+    allowlist = get_purchase_discount_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
+def get_purchase_discount_window_started_at():
+    """Campaign start timestamp for the purchase discount window."""
+    from datetime import datetime, timezone
+
+    raw = (get_setting("purchase_discount_window_started_at") or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except Exception:
+        return None
+
+
+def get_purchase_discount_config() -> Dict[str, Any]:
+    """Admin-controlled values for the open purchase discount campaign."""
+    import json
+
+    percent = _parse_int_setting(get_setting("purchase_discount_percent"), default=0, minimum=0, maximum=500)
+    fixed = _parse_int_setting(get_setting("purchase_discount_fixed_credits"), default=0, minimum=0, maximum=100000)
+    max_bonus = _parse_int_setting(get_setting("purchase_discount_max_bonus_credits"), default=0, minimum=0, maximum=100000)
+    window_minutes = _parse_int_setting(get_setting("purchase_discount_window_minutes"), default=0, minimum=0, maximum=10080)
+    raw_pack_overrides = (get_setting("purchase_discount_pack_overrides") or "").strip()
+    bonus_type = "fixed" if fixed > 0 else ("percent" if percent > 0 else "none")
+    pack_overrides: Dict[str, Dict[str, Any]] = {}
+    if raw_pack_overrides:
+        try:
+            decoded = json.loads(raw_pack_overrides)
+            if isinstance(decoded, dict):
+                for key, value in decoded.items():
+                    product_id = str(key or "").strip()
+                    if not product_id or not isinstance(value, dict):
+                        continue
+                    override_percent = max(0, min(500, int(value.get("percent") or 0)))
+                    override_fixed = max(0, min(100000, int(value.get("fixed_credits") or 0)))
+                    override_cap = max(0, min(100000, int(value.get("max_bonus_credits") or 0)))
+                    override_type = str(value.get("bonus_type") or "").strip().lower()
+                    if override_type not in {"percent", "fixed", "none"}:
+                        override_type = "fixed" if override_fixed > 0 else ("percent" if override_percent > 0 else "none")
+                    pack_overrides[product_id] = {
+                        "percent": override_percent,
+                        "fixed_credits": override_fixed,
+                        "max_bonus_credits": override_cap,
+                        "bonus_type": override_type,
+                    }
+        except Exception:
+            pack_overrides = {}
+    return {
+        "percent": percent,
+        "fixed_credits": fixed,
+        "max_bonus_credits": max_bonus,
+        "window_minutes": window_minutes,
+        "bonus_type": bonus_type,
+        "pack_overrides": pack_overrides,
+        "window_started_at": (
+            get_purchase_discount_window_started_at().isoformat()
+            if get_purchase_discount_window_started_at()
+            else None
+        ),
+    }
+
+
 def get_instant_chat_user_allowlist() -> Set[int]:
     """Optional CSV/whitespace-separated user id allowlist. Empty set means all users."""
     raw = (get_setting("instant_chat_user_allowlist") or "").strip()

@@ -2453,10 +2453,13 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_chat_subject_gate_user_allowlist,
             get_first_purchase_bonus_config,
             get_first_purchase_bonus_user_allowlist,
+            get_purchase_discount_config,
+            get_purchase_discount_user_allowlist,
             get_instant_chat_user_allowlist,
             is_speech_chat_enabled,
             get_speech_chat_user_allowlist,
             is_first_purchase_bonus_enabled,
+            is_purchase_discount_enabled,
             is_parallel_branch_planner_enabled,
             get_setting,
         )
@@ -2527,6 +2530,11 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
                 str(uid) for uid in sorted(get_first_purchase_bonus_user_allowlist())
             ),
             "first_purchase_bonus_config": get_first_purchase_bonus_config(),
+            "purchase_discount_enabled": is_purchase_discount_enabled(),
+            "purchase_discount_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_purchase_discount_user_allowlist())
+            ),
+            "purchase_discount_config": get_purchase_discount_config(),
             "instant_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_instant_chat_user_allowlist())
             ),

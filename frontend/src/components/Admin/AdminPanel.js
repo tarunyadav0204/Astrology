@@ -93,10 +93,11 @@ const DEFAULT_PARALLEL_BRANCH_WORD_LIMITS = {
   merge: '1200',
 };
 
-const FIRST_PURCHASE_BONUS_PACKS = [24, 50, 100, 250, 500, 999];
+const CREDIT_PACKS = [24, 50, 100, 250, 500, 999];
+const FIRST_PURCHASE_BONUS_PACKS = CREDIT_PACKS;
 
-function createDefaultFirstPurchasePackOverrides() {
-  return FIRST_PURCHASE_BONUS_PACKS.reduce((acc, pack) => {
+function createDefaultPackOverrides() {
+  return CREDIT_PACKS.reduce((acc, pack) => {
     acc[`credits_${pack}`] = {
       bonus_type: 'default',
       percent: '',
@@ -107,8 +108,12 @@ function createDefaultFirstPurchasePackOverrides() {
   }, {});
 }
 
-function normalizeFirstPurchasePackOverrides(rawOverrides) {
-  const defaults = createDefaultFirstPurchasePackOverrides();
+function createDefaultFirstPurchasePackOverrides() {
+  return createDefaultPackOverrides();
+}
+
+function normalizePackOverrides(rawOverrides) {
+  const defaults = createDefaultPackOverrides();
   if (!rawOverrides || typeof rawOverrides !== 'object') return defaults;
   const next = { ...defaults };
   Object.entries(defaults).forEach(([productId, fallback]) => {
@@ -124,6 +129,40 @@ function normalizeFirstPurchasePackOverrides(rawOverrides) {
     };
   });
   return next;
+}
+
+function normalizeFirstPurchasePackOverrides(rawOverrides) {
+  return normalizePackOverrides(rawOverrides);
+}
+
+function getPackBonusPreviewForPack(pack, packOverrides, globalPercent, globalFixed, globalCap) {
+  const productId = `credits_${pack}`;
+  const override = packOverrides?.[productId] || {};
+  const globalPercentNum = Math.max(0, Number(globalPercent) || 0);
+  const globalFixedNum = Math.max(0, Number(globalFixed) || 0);
+  const globalCapNum = Math.max(0, Number(globalCap) || 0);
+  const overrideMode = String(override.bonus_type || 'default').trim().toLowerCase();
+  const effectiveMode = overrideMode === 'default'
+    ? (globalFixedNum > 0 ? 'fixed' : (globalPercentNum > 0 ? 'percent' : 'none'))
+    : overrideMode;
+  const effectivePercent = overrideMode === 'percent' ? Math.max(0, Number(override.percent) || 0) : globalPercentNum;
+  const effectiveFixed = overrideMode === 'fixed' ? Math.max(0, Number(override.fixed_credits) || 0) : globalFixedNum;
+  const effectiveCap = overrideMode !== 'default' && override.max_bonus_credits !== ''
+    ? Math.max(0, Number(override.max_bonus_credits) || 0)
+    : globalCapNum;
+  const rawBonus = effectiveMode === 'fixed'
+    ? effectiveFixed
+    : (effectiveMode === 'percent' ? Math.floor((pack * effectivePercent) / 100) : 0);
+  const bonus = effectiveCap > 0 ? Math.min(rawBonus, effectiveCap) : rawBonus;
+  return {
+    mode: effectiveMode,
+    percent: effectivePercent,
+    fixed_credits: effectiveFixed,
+    max_bonus_credits: effectiveCap,
+    bonus,
+    total: pack + bonus,
+    source: overrideMode === 'default' ? 'default' : 'pack override',
+  };
 }
 
 const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
@@ -219,6 +258,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [firstPurchaseBonusWindowMinutes, setFirstPurchaseBonusWindowMinutes] = useState('30');
   const [firstPurchaseBonusPackOverrides, setFirstPurchaseBonusPackOverrides] = useState(createDefaultFirstPurchasePackOverrides);
   const [firstPurchaseBonusSaving, setFirstPurchaseBonusSaving] = useState(false);
+  const [purchaseDiscountEnabled, setPurchaseDiscountEnabled] = useState(false);
+  const [purchaseDiscountUserAllowlist, setPurchaseDiscountUserAllowlist] = useState('');
+  const [purchaseDiscountPercent, setPurchaseDiscountPercent] = useState('0');
+  const [purchaseDiscountFixedCredits, setPurchaseDiscountFixedCredits] = useState('0');
+  const [purchaseDiscountMaxCredits, setPurchaseDiscountMaxCredits] = useState('0');
+  const [purchaseDiscountWindowMinutes, setPurchaseDiscountWindowMinutes] = useState('0');
+  const [purchaseDiscountPackOverrides, setPurchaseDiscountPackOverrides] = useState(createDefaultPackOverrides);
+  const [purchaseDiscountSaving, setPurchaseDiscountSaving] = useState(false);
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
@@ -454,6 +501,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setFirstPurchaseBonusWindowMinutes(String(firstBonusConfig.window_minutes ?? '30'));
       setFirstPurchaseBonusPackOverrides(
         normalizeFirstPurchasePackOverrides(firstBonusConfig.pack_overrides || {})
+      );
+      const purchaseDiscountConfig = data.purchase_discount_config || {};
+      setPurchaseDiscountEnabled(Boolean(data.purchase_discount_enabled));
+      setPurchaseDiscountUserAllowlist(data.purchase_discount_user_allowlist || '');
+      setPurchaseDiscountPercent(String(purchaseDiscountConfig.percent ?? '0'));
+      setPurchaseDiscountFixedCredits(String(purchaseDiscountConfig.fixed_credits ?? '0'));
+      setPurchaseDiscountMaxCredits(String(purchaseDiscountConfig.max_bonus_credits ?? '0'));
+      setPurchaseDiscountWindowMinutes(String(purchaseDiscountConfig.window_minutes ?? '0'));
+      setPurchaseDiscountPackOverrides(
+        normalizePackOverrides(purchaseDiscountConfig.pack_overrides || {})
       );
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
@@ -1004,35 +1061,87 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }));
   };
 
-  const getFirstPurchaseBonusPreviewForPack = (pack) => {
-    const productId = `credits_${pack}`;
-    const override = firstPurchaseBonusPackOverrides?.[productId] || {};
-    const globalPercent = Math.max(0, Number(firstPurchaseBonusPercent) || 0);
-    const globalFixed = Math.max(0, Number(firstPurchaseBonusFixedCredits) || 0);
-    const globalCap = Math.max(0, Number(firstPurchaseBonusMaxCredits) || 0);
-    const overrideMode = String(override.bonus_type || 'default').trim().toLowerCase();
-    const effectiveMode = overrideMode === 'default'
-      ? (globalFixed > 0 ? 'fixed' : (globalPercent > 0 ? 'percent' : 'none'))
-      : overrideMode;
-    const effectivePercent = overrideMode === 'percent' ? Math.max(0, Number(override.percent) || 0) : globalPercent;
-    const effectiveFixed = overrideMode === 'fixed' ? Math.max(0, Number(override.fixed_credits) || 0) : globalFixed;
-    const effectiveCap = overrideMode !== 'default' && override.max_bonus_credits !== ''
-      ? Math.max(0, Number(override.max_bonus_credits) || 0)
-      : globalCap;
-    const rawBonus = effectiveMode === 'fixed'
-      ? effectiveFixed
-      : (effectiveMode === 'percent' ? Math.floor((pack * effectivePercent) / 100) : 0);
-    const bonus = effectiveCap > 0 ? Math.min(rawBonus, effectiveCap) : rawBonus;
-    return {
-      mode: effectiveMode,
-      percent: effectivePercent,
-      fixed_credits: effectiveFixed,
-      max_bonus_credits: effectiveCap,
-      bonus,
-      total: pack + bonus,
-      source: overrideMode === 'default' ? 'default' : 'pack override',
-    };
+  const handleSavePurchaseDiscountSettings = async () => {
+    setPurchaseDiscountSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const serializedPackOverrides = Object.entries(purchaseDiscountPackOverrides || {}).reduce((acc, [productId, config]) => {
+        const mode = String(config?.bonus_type || 'default').trim().toLowerCase();
+        if (!productId || mode === 'default') return acc;
+        acc[productId] = {
+          bonus_type: mode,
+          percent: Math.max(0, Number(config?.percent) || 0),
+          fixed_credits: Math.max(0, Number(config?.fixed_credits) || 0),
+          max_bonus_credits: Math.max(0, Number(config?.max_bonus_credits) || 0),
+        };
+        return acc;
+      }, {});
+      const settingsToSave = [
+        ['purchase_discount_enabled', purchaseDiscountEnabled ? 'true' : 'false', 'Feature flag for extra credits on eligible credit purchases for any user'],
+        ['purchase_discount_user_allowlist', purchaseDiscountUserAllowlist, 'Optional CSV user allowlist for purchase discount. Empty = all users when enabled.'],
+        ['purchase_discount_percent', purchaseDiscountPercent, 'Default percentage extra credits on eligible purchase packs. Used only when fixed extra credits is 0 and a pack override is not set.'],
+        ['purchase_discount_fixed_credits', purchaseDiscountFixedCredits, 'Default fixed extra credits on eligible purchase packs. If greater than 0, this takes priority over percentage unless a pack override is set.'],
+        ['purchase_discount_max_bonus_credits', purchaseDiscountMaxCredits, 'Default maximum bonus credits for one eligible purchase. Pack overrides can set their own cap.'],
+        ['purchase_discount_window_minutes', purchaseDiscountWindowMinutes, 'Campaign window minutes from save time. 0 = no expiry while enabled.'],
+        ['purchase_discount_pack_overrides', JSON.stringify(serializedPackOverrides), 'JSON map of product_id to purchase-discount override settings.'],
+      ];
+      if (purchaseDiscountEnabled) {
+        settingsToSave.push([
+          'purchase_discount_window_started_at',
+          new Date().toISOString(),
+          'Campaign start timestamp for purchase discount window',
+        ]);
+      }
+      const responses = await Promise.all(
+        settingsToSave.map(([key, value, description]) =>
+          fetch(`/api/admin/settings/${key}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ key, value: String(value ?? ''), description }),
+          })
+        )
+      );
+      const failed = responses.find((res) => !res.ok);
+      if (failed) {
+        const err = await failed.json().catch(() => ({}));
+        alert('Failed to save purchase discount settings: ' + (err.detail || 'check console'));
+        return;
+      }
+      alert('Purchase discount settings saved. New eligibility checks use them immediately.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving purchase discount settings:', error);
+      alert('Failed to save purchase discount settings.');
+    } finally {
+      setPurchaseDiscountSaving(false);
+    }
   };
+
+  const updatePurchaseDiscountPackOverride = (productId, field, value) => {
+    setPurchaseDiscountPackOverrides((prev) => ({
+      ...prev,
+      [productId]: {
+        ...(prev?.[productId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const getFirstPurchaseBonusPreviewForPack = (pack) => getPackBonusPreviewForPack(
+    pack,
+    firstPurchaseBonusPackOverrides,
+    firstPurchaseBonusPercent,
+    firstPurchaseBonusFixedCredits,
+    firstPurchaseBonusMaxCredits,
+  );
+
+  const getPurchaseDiscountPreviewForPack = (pack) => getPackBonusPreviewForPack(
+    pack,
+    purchaseDiscountPackOverrides,
+    purchaseDiscountPercent,
+    purchaseDiscountFixedCredits,
+    purchaseDiscountMaxCredits,
+  );
 
   const handleSaveDeathQueryUnlockKeyword = async () => {
     setDeathQueryUnlockSaving(true);
@@ -4480,6 +4589,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 First Purchase Bonus
               </button>
               <button
+                className={`subtab ${settingsSubTab === 'purchaseDiscount' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('purchaseDiscount')}
+              >
+                Purchase Discount
+              </button>
+              <button
                 className={`subtab ${settingsSubTab === 'operations' ? 'active' : ''}`}
                 onClick={() => setSettingsSubTab('operations')}
               >
@@ -4962,6 +5077,203 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={firstPurchaseBonusSaving}
                 >
                   {firstPurchaseBonusSaving ? 'Saving…' : 'Save first purchase bonus'}
+                </button>
+              </div>
+            </div>
+            )}
+
+            {settingsSubTab === 'purchaseDiscount' && (
+            <div className="settings-section">
+              <h3>Purchase discount</h3>
+              <p className="settings-hint">
+                Extra credits for any eligible user on credit pack purchases while this campaign is active.
+                Unlike first purchase bonus, users do not need to have asked a free question first.
+                Saving while enabled restarts the campaign window from now.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable purchase discount</strong>
+                  <p>When off, only the normal pack credits and any separate first-purchase bonus apply.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={purchaseDiscountEnabled}
+                    onChange={(e) => setPurchaseDiscountEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={purchaseDiscountUserAllowlist}
+                  onChange={(e) => setPurchaseDiscountUserAllowlist(e.target.value)}
+                  placeholder="e.g. 1755, 1688"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Default discount values</strong>
+                  <p>These values apply to any pack without its own override. Fixed credits and percentage are not combined.</p>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', width: '100%', maxWidth: '760px' }}>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Default percentage</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="500"
+                      value={purchaseDiscountPercent}
+                      onChange={(e) => {
+                        setPurchaseDiscountPercent(e.target.value);
+                        if (Number(e.target.value) > 0) setPurchaseDiscountFixedCredits('0');
+                      }}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Default fixed credits</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={purchaseDiscountFixedCredits}
+                      onChange={(e) => {
+                        setPurchaseDiscountFixedCredits(e.target.value);
+                        if (Number(e.target.value) > 0) setPurchaseDiscountPercent('0');
+                      }}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Default max cap</span>
+                    <input type="number" min="0" value={purchaseDiscountMaxCredits} onChange={(e) => setPurchaseDiscountMaxCredits(e.target.value)} style={{ width: '100%', padding: '8px' }} />
+                  </label>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Campaign window minutes</span>
+                    <input type="number" min="0" value={purchaseDiscountWindowMinutes} onChange={(e) => setPurchaseDiscountWindowMinutes(e.target.value)} style={{ width: '100%', padding: '8px' }} />
+                  </label>
+                </div>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Per-pack discount rules</strong>
+                  <p>Override the default for specific credit packs. Set a pack to none for 0 discount.</p>
+                </div>
+                <div style={{ width: '100%', maxWidth: '980px', display: 'grid', gap: '10px' }}>
+                  {CREDIT_PACKS.map((pack) => {
+                    const productId = `credits_${pack}`;
+                    const row = purchaseDiscountPackOverrides?.[productId] || {};
+                    const preview = getPurchaseDiscountPreviewForPack(pack);
+                    const rowMode = String(row.bonus_type || 'default').trim().toLowerCase();
+                    return (
+                      <div
+                        key={`discount-${productId}`}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(90px, 110px) minmax(140px, 180px) repeat(3, minmax(120px, 1fr)) minmax(180px, 220px)',
+                          gap: '10px',
+                          alignItems: 'end',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          background: '#fff',
+                        }}
+                      >
+                        <div>
+                          <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Pack</span>
+                          <strong>{pack} credits</strong>
+                        </div>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Mode</span>
+                          <select
+                            value={rowMode}
+                            onChange={(e) => updatePurchaseDiscountPackOverride(productId, 'bonus_type', e.target.value)}
+                            style={{ width: '100%', padding: '8px' }}
+                          >
+                            <option value="default">Use default</option>
+                            <option value="none">No discount</option>
+                            <option value="percent">Percent discount</option>
+                            <option value="fixed">Fixed discount</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Percent</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="500"
+                            disabled={rowMode !== 'percent'}
+                            value={row.percent ?? ''}
+                            onChange={(e) => updatePurchaseDiscountPackOverride(productId, 'percent', e.target.value)}
+                            placeholder={rowMode === 'default' ? purchaseDiscountPercent : '0'}
+                            style={{ width: '100%', padding: '8px' }}
+                          />
+                        </label>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Fixed credits</span>
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={rowMode !== 'fixed'}
+                            value={row.fixed_credits ?? ''}
+                            onChange={(e) => updatePurchaseDiscountPackOverride(productId, 'fixed_credits', e.target.value)}
+                            placeholder={rowMode === 'default' ? purchaseDiscountFixedCredits : '0'}
+                            style={{ width: '100%', padding: '8px' }}
+                          />
+                        </label>
+                        <label>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Cap</span>
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={rowMode === 'default'}
+                            value={row.max_bonus_credits ?? ''}
+                            onChange={(e) => updatePurchaseDiscountPackOverride(productId, 'max_bonus_credits', e.target.value)}
+                            placeholder={rowMode === 'default' ? purchaseDiscountMaxCredits : '0 = no cap'}
+                            style={{ width: '100%', padding: '8px' }}
+                          />
+                        </label>
+                        <div style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '10px', background: '#f8fafc', padding: '10px 12px' }}>
+                          <span style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{preview.source}</span>
+                          <span style={{ fontSize: '14px' }}>
+                            {pack} + {preview.bonus} <small style={{ color: '#6b7280' }}>({preview.mode})</small> = <strong>{preview.total}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Pack preview</strong>
+                  <p>Resolved preview after combining the default rule with any pack-specific override.</p>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxWidth: '760px' }}>
+                  {CREDIT_PACKS.map((pack) => {
+                    const preview = getPurchaseDiscountPreviewForPack(pack);
+                    return (
+                      <span key={`discount-preview-${pack}`} style={{ border: '1px solid #e5e7eb', borderRadius: '999px', padding: '7px 10px', background: '#fff', fontSize: '13px' }}>
+                        {pack} + {preview.bonus} <small style={{ color: '#6b7280' }}>({preview.mode})</small> = <strong>{preview.total}</strong>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSavePurchaseDiscountSettings}
+                  disabled={purchaseDiscountSaving}
+                >
+                  {purchaseDiscountSaving ? 'Saving…' : 'Save purchase discount'}
                 </button>
               </div>
             </div>

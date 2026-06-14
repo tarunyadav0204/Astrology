@@ -295,7 +295,7 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "credits_added": 0, "message": "Amount mismatch", "userid": userid}
 
     if credit_service.has_transaction_with_reference(userid, RAZORPAY_SOURCE, payment_id):
-        bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+        extras = credit_service.apply_purchase_extras(
             userid=userid,
             purchased_credits=credits,
             purchase_source=RAZORPAY_SOURCE,
@@ -305,8 +305,11 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
             "credits_added": 0,
-            "bonus_credits_added": int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0,
-            "first_purchase_bonus": bonus_result,
+            "bonus_credits_added": int(extras.get("bonus_credits_added") or 0),
+            "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
+            "discount_credits_added": int(extras.get("discount_credits_added") or 0),
+            "first_purchase_bonus": extras.get("first_purchase_bonus"),
+            "purchase_discount": extras.get("purchase_discount"),
             "message": "Already credited",
             "userid": userid,
         }
@@ -339,20 +342,23 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
             "userid": userid,
         }
 
-    bonus_result = credit_service.maybe_apply_first_purchase_bonus(
+    extras = credit_service.apply_purchase_extras(
         userid=userid,
         purchased_credits=credits,
         purchase_source=RAZORPAY_SOURCE,
         purchase_reference_id=payment_id,
         product_id=product_id,
     )
-    bonus_added = int(bonus_result.get("bonus_credits") or 0) if bonus_result.get("applied") else 0
+    bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
         "success": True,
         "credits_added": credits + bonus_added,
         "purchased_credits_added": credits,
         "bonus_credits_added": bonus_added,
-        "first_purchase_bonus": bonus_result,
+        "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
+        "discount_credits_added": int(extras.get("discount_credits_added") or 0),
+        "first_purchase_bonus": extras.get("first_purchase_bonus"),
+        "purchase_discount": extras.get("purchase_discount"),
         "message": "Credits added",
         "userid": userid,
     }
