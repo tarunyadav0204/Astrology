@@ -541,6 +541,8 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
 def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
     """Fan out one due campaign: resolve audience, enqueue batches (or run inline)."""
     campaign_id = int(campaign["id"])
+    previous_status = str(campaign.get("status") or "draft").strip().lower() or "draft"
+    previous_scheduled_at = campaign.get("scheduled_at")
     audience = resolve_campaign_audience(conn, campaign.get("audience_filter") or {})
     db.update_campaign(
         conn,
@@ -591,54 +593,75 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
             f"Configure an isolated worker target before sending campaigns. Current target: {tasks_target or '<unset>'}"
         )
 
-    batch_size = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_BATCH_SIZE", "50")), 500))
-    batches = _chunked(audience, batch_size)
+    try:
+        batch_size = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_BATCH_SIZE", "50")), 500))
+        batches = _chunked(audience, batch_size)
 
-    enqueued = 0
-    enqueue_failed = 0
-    inline_summaries: List[Dict[str, Any]] = []
-    if tasks_enabled and enqueue_nudge_task:
-        for batch_index, chunk in enumerate(batches):
-            ok = enqueue_nudge_task(
-                task_kind="campaign-batch",
-                task_id=f"{campaign_id}-{batch_index}",
-                payload={
-                    "campaign_id": campaign_id,
-                    "batch_index": batch_index,
-                    "user_ids": [int(u) for u in chunk],
-                },
+        enqueued = 0
+        enqueue_failed = 0
+        inline_summaries: List[Dict[str, Any]] = []
+        if tasks_enabled and enqueue_nudge_task:
+            for batch_index, chunk in enumerate(batches):
+                ok = enqueue_nudge_task(
+                    task_kind="campaign-batch",
+                    task_id=f"{campaign_id}-{batch_index}",
+                    payload={
+                        "campaign_id": campaign_id,
+                        "batch_index": batch_index,
+                        "user_ids": [int(u) for u in chunk],
+                    },
+                )
+                if ok:
+                    enqueued += 1
+                else:
+                    enqueue_failed += 1
+            if batches and enqueued == 0:
+                raise RuntimeError("Campaign dispatch could not enqueue any worker tasks.")
+        else:
+            for chunk in batches:
+                inline_summaries.append(
+                    process_campaign_batch(campaign_id=campaign_id, user_ids=chunk)
+                )
+
+        db.update_campaign(
+            conn,
+            campaign_id,
+            status="sent",
+            dispatched_at=datetime.now(IST_TZ),
+            total_targeted=len(audience),
+        )
+        conn.commit()
+
+        out: Dict[str, Any] = {
+            "campaign_id": campaign_id,
+            "users_targeted": len(audience),
+            "batches": len(batches),
+            "queued": bool(tasks_enabled and enqueue_nudge_task),
+            "tasks_enqueued": enqueued,
+            "enqueue_failed": enqueue_failed,
+        }
+        if inline_summaries:
+            out["delivered"] = sum(int(s.get("delivered") or 0) for s in inline_summaries)
+            out["failed"] = sum(int(s.get("failed") or 0) for s in inline_summaries)
+        return out
+    except Exception:
+        rollback_status = "scheduled" if previous_status == "scheduled" and previous_scheduled_at else "draft"
+        try:
+            db.update_campaign(
+                conn,
+                campaign_id,
+                status=rollback_status,
+                dispatched_at=None,
+                total_targeted=len(audience),
             )
-            if ok:
-                enqueued += 1
-            else:
-                enqueue_failed += 1
-    else:
-        for chunk in batches:
-            inline_summaries.append(
-                process_campaign_batch(campaign_id=campaign_id, user_ids=chunk)
-            )
-
-    db.update_campaign(
-        conn,
-        campaign_id,
-        status="sent",
-        dispatched_at=datetime.now(IST_TZ),
-        total_targeted=len(audience),
-    )
-    conn.commit()
-
-    out: Dict[str, Any] = {
-        "campaign_id": campaign_id,
-        "users_targeted": len(audience),
-        "batches": len(batches),
-        "queued": bool(tasks_enabled and enqueue_nudge_task),
-        "tasks_enqueued": enqueued,
-        "enqueue_failed": enqueue_failed,
-    }
-    if inline_summaries:
-        out["delivered"] = sum(int(s.get("delivered") or 0) for s in inline_summaries)
-        out["failed"] = sum(int(s.get("failed") or 0) for s in inline_summaries)
-    return out
+            conn.commit()
+        except Exception:
+            logger.exception("failed to roll back campaign status after dispatch error id=%s", campaign_id)
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        raise
 
 
 def dispatch_due_campaigns(limit: int = 20) -> Dict[str, Any]:

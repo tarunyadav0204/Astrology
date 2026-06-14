@@ -1610,7 +1610,8 @@ def _conversion_summary(conn, where_sql: str, params: Tuple[Any, ...]) -> Dict[s
         """,
         params,
     )
-    row = cur.fetchone() or (0, 0, 0, 0, 0, 0, None)
+    row = cur.fetchone() or ()
+    row = tuple(row) + (0, 0, 0, 0, 0, 0, None)
     return {
         "conversions": int(row[0] or 0),
         "time_buckets": {
