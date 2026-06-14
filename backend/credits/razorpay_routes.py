@@ -1,6 +1,6 @@
 """
 Razorpay Checkout for web credit purchases (INR).
-Packs match mobile Google Play: credits_50 … credits_999 (see ALLOWED_CREDITS).
+Packs match mobile Google Play credit pack product IDs (see ALLOWED_CREDITS).
 
 Security:
 - Amounts and credit counts are server-defined only.
@@ -36,9 +36,10 @@ credit_service = CreditService()
 RAZORPAY_SOURCE = "razorpay"
 RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 
-ALLOWED_CREDITS: Tuple[int, ...] = (50, 100, 250, 500, 999)
+ALLOWED_CREDITS: Tuple[int, ...] = (24, 50, 100, 250, 500, 999)
 
 _DEFAULT_PRICE_PAISE: Dict[int, int] = {
+    24: 2500,
     50: 4900,
     100: 9900,
     250: 22900,
@@ -178,7 +179,7 @@ def create_razorpay_credit_payment_link(
 
 
 class CreateOrderBody(BaseModel):
-    credits: int = Field(..., description="One of 50, 100, 250, 500, 999")
+    credits: int = Field(..., description="One of 24, 50, 100, 250, 500, 999")
     google_play_external_transaction_token: Optional[str] = Field(
         default=None,
         description="User Choice billing token from Play Billing; stored on the order for Play reporting after payment.",
@@ -436,7 +437,7 @@ async def razorpay_catalog(current_user: User = Depends(get_current_user)):
 @router.post("/razorpay/create-order")
 async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depends(get_current_user)):
     if body.credits not in ALLOWED_CREDITS:
-        raise HTTPException(status_code=400, detail="credits must be one of: 50, 100, 250, 500, 999")
+        raise HTTPException(status_code=400, detail="credits must be one of: 24, 50, 100, 250, 500, 999")
 
     amount = _price_paise(body.credits)
     auth = _auth()

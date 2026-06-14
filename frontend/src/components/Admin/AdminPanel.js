@@ -93,7 +93,7 @@ const DEFAULT_PARALLEL_BRANCH_WORD_LIMITS = {
   merge: '1200',
 };
 
-const FIRST_PURCHASE_BONUS_PACKS = [50, 100, 250, 500, 999];
+const FIRST_PURCHASE_BONUS_PACKS = [24, 50, 100, 250, 500, 999];
 
 function createDefaultFirstPurchasePackOverrides() {
   return FIRST_PURCHASE_BONUS_PACKS.reduce((acc, pack) => {

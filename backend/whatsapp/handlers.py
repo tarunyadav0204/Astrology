@@ -336,7 +336,7 @@ def _credit_pack_from_reply(raw: str) -> Optional[int]:
     if not text.isdigit():
         return None
     credits = int(text)
-    return credits if credits in {50, 100, 250, 500, 999} else None
+    return credits if credits in {24, 50, 100, 250, 500, 999} else None
 
 
 def _support_ticket_id_from_reply(raw: str) -> Optional[int]:
