@@ -39,7 +39,7 @@ RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 ALLOWED_CREDITS: Tuple[int, ...] = (24, 50, 100, 250, 500, 999)
 
 _DEFAULT_PRICE_PAISE: Dict[int, int] = {
-    24: 2500,
+    24: 2400,
     50: 4900,
     100: 9900,
     250: 22900,
