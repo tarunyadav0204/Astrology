@@ -118,6 +118,41 @@ function getSubscriptionDisplayPrice(plan, iapSubscriptions) {
   return iap.localizedPrice ?? iap.price ?? plan.price;
 }
 
+function formatBillingPeriodLabel(period) {
+  const raw = String(period || '').trim().toUpperCase();
+  if (!raw) return '';
+  const m = raw.match(/^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?$/);
+  if (!m) return '';
+  const years = parseInt(m[1] || '0', 10);
+  const months = parseInt(m[2] || '0', 10);
+  const weeks = parseInt(m[3] || '0', 10);
+  const days = parseInt(m[4] || '0', 10);
+  if (years > 0) return years === 1 ? 'year' : `${years} years`;
+  if (months > 0) return months === 1 ? 'month' : `${months} months`;
+  if (weeks > 0) return weeks === 1 ? 'week' : `${weeks} weeks`;
+  if (days > 0) return days === 1 ? 'day' : `${days} days`;
+  return '';
+}
+
+function getSubscriptionOfferInfo(plan, iapSubscriptions) {
+  const productId = plan.google_play_product_id || plan.productId;
+  if (!productId || !Array.isArray(iapSubscriptions)) return null;
+  const iap = iapSubscriptions.find((s) => (s.productId || s.product_id) === productId);
+  if (!iap) return null;
+  const offers = iap.subscriptionOfferDetails || iap.subscriptionOfferDetailsList;
+  const firstOffer = Array.isArray(offers) ? offers[0] : null;
+  const phases = firstOffer?.pricingPhases?.pricingPhaseList ?? firstOffer?.pricingPhaseList;
+  const phaseList = Array.isArray(phases) ? phases : [];
+  if (!phaseList.length) return null;
+  const freeTrialPhase = phaseList.find((phase) => parseInt(phase?.priceAmountMicros || '0', 10) === 0);
+  const paidPhase = phaseList.find((phase) => parseInt(phase?.priceAmountMicros || '0', 10) > 0) || phaseList[0];
+  return {
+    freeTrialPeriod: formatBillingPeriodLabel(freeTrialPhase?.billingPeriod),
+    paidPeriod: formatBillingPeriodLabel(paidPhase?.billingPeriod),
+    recurrenceMode: paidPhase?.recurrenceMode,
+  };
+}
+
 /** One-time credit pack price: prefer IAP localized price, fallback to backend fields if available. */
 function getCreditPackDisplayPrice(product, iapProducts) {
   const productId = product?.product_id || product?.id;
@@ -1463,11 +1498,25 @@ const CreditScreen = ({ navigation }) => {
                           <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noSubscriptionPlansStore')}</Text>
                         ) : null
                       ) : (
-                        subscriptionPlansFromPlay.map((plan) => {
+                        <>
+                          <Text style={[styles.vipPlanComplianceIntro, { color: colors.textSecondary }]}>
+                            {t('credits.page.subscriptionOptionalNotice')}
+                          </Text>
+                          {subscriptionPlansFromPlay.map((plan) => {
                           const productId = plan.google_play_product_id;
                           const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
                           const isPurchasing = purchasingSubscriptionId === productId;
                           const displayPrice = getSubscriptionDisplayPrice(plan, iapSubscriptions);
+                          const offerInfo = getSubscriptionOfferInfo(plan, iapSubscriptions);
+                          const priceWithPeriod = offerInfo?.paidPeriod
+                            ? t('credits.page.subscriptionPriceWithPeriod', { price: displayPrice || t('credits.page.vipFallback'), period: offerInfo.paidPeriod })
+                            : displayPrice;
+                          const renewsText = offerInfo?.paidPeriod
+                            ? t('credits.page.subscriptionAutoRenewNotice', { period: offerInfo.paidPeriod })
+                            : t('credits.page.subscriptionAutoRenewGeneric');
+                          const trialText = offerInfo?.freeTrialPeriod
+                            ? t('credits.page.subscriptionTrialNotice', { period: offerInfo.freeTrialPeriod, price: displayPrice || t('credits.page.vipFallback'), paid_period: offerInfo.paidPeriod || t('credits.page.subscriptionGenericPeriod') })
+                            : null;
                           return (
                             <TouchableOpacity
                               key={plan.plan_id ?? productId}
@@ -1479,7 +1528,18 @@ const CreditScreen = ({ navigation }) => {
                                 <Text style={[styles.vipPlanRowTitle, { color: colors.text }]}>{plan.tier_name || t('credits.page.vipFallback')}</Text>
                                 <Text style={[styles.vipPlanRowMeta, { color: colors.textSecondary }]}>
                                   {t('credits.page.offPercent', { percent: plan.discount_percent ?? 0 })}
-                                  {displayPrice ? ` • ${displayPrice}` : ''}
+                                  {priceWithPeriod ? ` • ${priceWithPeriod}` : ''}
+                                </Text>
+                                {!!trialText && (
+                                  <Text style={[styles.vipPlanRowTerms, { color: colors.textSecondary }]}>
+                                    {trialText}
+                                  </Text>
+                                )}
+                                <Text style={[styles.vipPlanRowTerms, { color: colors.textSecondary }]}>
+                                  {renewsText}
+                                </Text>
+                                <Text style={[styles.vipPlanRowTerms, { color: colors.textSecondary }]}>
+                                  {t('credits.page.subscriptionOptionalShort')}
                                 </Text>
                               </View>
                               <View style={[styles.vipPlanRowButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
@@ -1489,7 +1549,8 @@ const CreditScreen = ({ navigation }) => {
                               </View>
                             </TouchableOpacity>
                           );
-                        })
+                        })}
+                        </>
                       )}
                     </View>
                   ) : null}
@@ -1939,6 +2000,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     gap: 10,
   },
+  vipPlanComplianceIntro: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
   vipPlanRow: {
     borderWidth: 1,
     borderRadius: 14,
@@ -1958,6 +2023,11 @@ const styles = StyleSheet.create({
   vipPlanRowMeta: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  vipPlanRowTerms: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
   },
   vipPlanRowButton: {
     borderRadius: 999,

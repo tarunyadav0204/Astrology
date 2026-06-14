@@ -1940,7 +1940,6 @@ class CreditService:
 
     @staticmethod
     def calculate_first_purchase_bonus_credits(
-        self,
         purchased_credits: int,
         config: Optional[Dict[str, Any]] = None,
         *,
