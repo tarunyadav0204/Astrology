@@ -6,6 +6,9 @@ import base64
 import logging
 import os
 import re
+import time
+from collections import OrderedDict
+from threading import Lock
 from auth import get_current_user, User
 from .credit_service import CreditService
 from .admin.promo_manager import PromoCodeManager
@@ -22,10 +25,41 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110
 DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210
+GOOGLE_PLAY_HTTP_TIMEOUT_SECONDS = float(os.getenv("GOOGLE_PLAY_HTTP_TIMEOUT_SECONDS", "3.0"))
+GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS", "300"))
+GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS", "900"))
+GOOGLE_PLAY_PRODUCTS_CACHE_MAX = 8
+GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX = 32
 
 # Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback.
 # Keep trying fallback values if the preferred env points at a missing file.
 PLAY_CREDENTIAL_ENV_KEYS = ("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "GOOGLE_SERVICE_ACCOUNT_KEY")
+_GOOGLE_PLAY_PRODUCTS_CACHE: OrderedDict = OrderedDict()
+_GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE: OrderedDict = OrderedDict()
+_GOOGLE_PLAY_CACHE_LOCK = Lock()
+
+
+def _cache_get(cache: OrderedDict, key):
+    now = time.monotonic()
+    with _GOOGLE_PLAY_CACHE_LOCK:
+        entry = cache.get(key)
+        if not entry:
+            return None
+        expires_at, value = entry
+        if expires_at <= now:
+            cache.pop(key, None)
+            return None
+        cache.move_to_end(key)
+        return value
+
+
+def _cache_set(cache: OrderedDict, key, value, ttl_seconds: int, max_entries: int):
+    expires_at = time.monotonic() + max(1, int(ttl_seconds))
+    with _GOOGLE_PLAY_CACHE_LOCK:
+        cache[key] = (expires_at, value)
+        cache.move_to_end(key)
+        while len(cache) > max_entries:
+            cache.popitem(last=False)
 
 
 def _get_play_credentials_candidates():
@@ -356,6 +390,10 @@ def _get_subscription_price_from_play(package_name: str, product_id: str) -> Opt
     Fetch subscription product from Google Play (monetization.subscriptions.get) and return
     a formatted price string from the first base plan's first regional config (or otherRegionsConfig).
     """
+    cache_key = (package_name, product_id)
+    cached = _cache_get(_GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE, cache_key)
+    if cached is not None:
+        return cached
     try:
         from google.auth.transport.requests import AuthorizedSession
 
@@ -365,7 +403,7 @@ def _get_subscription_price_from_play(package_name: str, product_id: str) -> Opt
         session = AuthorizedSession(credentials)
         url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/subscriptions/{product_id}"
         logger.info("Google Play: fetching subscription price GET %s", url)
-        resp = session.get(url)
+        resp = session.get(url, timeout=GOOGLE_PLAY_HTTP_TIMEOUT_SECONDS)
         if resp.status_code != 200:
             logger.warning(
                 "Google Play subscription get %s/%s: status=%s body=%s",
@@ -406,6 +444,13 @@ def _get_subscription_price_from_play(package_name: str, product_id: str) -> Opt
                         amount, currency = parsed
                         formatted = _format_amount_currency(amount, currency)
                         logger.info("Google Play subscription price %s: %s (region %s)", product_id, formatted, region_code)
+                        _cache_set(
+                            _GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE,
+                            cache_key,
+                            formatted,
+                            GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS,
+                            GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX,
+                        )
                         return formatted
             # Fallback: first regional config
             for rc in regional:
@@ -414,6 +459,13 @@ def _get_subscription_price_from_play(package_name: str, product_id: str) -> Opt
                     amount, currency = parsed
                     formatted = _format_amount_currency(amount, currency)
                     logger.info("Google Play subscription price %s: %s (from regionalConfig)", product_id, formatted)
+                    _cache_set(
+                        _GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE,
+                        cache_key,
+                        formatted,
+                        GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS,
+                        GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX,
+                    )
                     return formatted
             other = bp.get("otherRegionsConfig") or {}
             for key in ("usdPrice", "eurPrice"):
@@ -422,6 +474,13 @@ def _get_subscription_price_from_play(package_name: str, product_id: str) -> Opt
                     amount, currency = parsed
                     formatted = _format_amount_currency(amount, currency or ("USD" if key == "usdPrice" else "EUR"))
                     logger.info("Google Play subscription price %s: %s (from %s)", product_id, formatted, key)
+                    _cache_set(
+                        _GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE,
+                        cache_key,
+                        formatted,
+                        GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS,
+                        GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX,
+                    )
                     return formatted
         logger.info("Google Play subscription price %s: no price found in basePlans", product_id)
         return None
@@ -436,6 +495,9 @@ def _list_google_play_products(package_name: str) -> List[dict]:
     Uses the new monetization.onetimeproducts.list endpoint and includes only
     one-time products whose productId matches credits_N; credits are derived from N.
     """
+    cached = _cache_get(_GOOGLE_PLAY_PRODUCTS_CACHE, package_name)
+    if cached is not None:
+        return [dict(product) for product in cached]
     try:
         # Use google-auth directly because the installed google-api-python-client
         # may not yet expose monetization.onetimeproducts on the discovery stub.
@@ -461,7 +523,7 @@ def _list_google_play_products(package_name: str) -> List[dict]:
             params = {}
             if page_token:
                 params["pageToken"] = page_token
-            resp = session.get(base_url, params=params)
+            resp = session.get(base_url, params=params, timeout=GOOGLE_PLAY_HTTP_TIMEOUT_SECONDS)
             if resp.status_code != 200:
                 logger.error(
                     "Google Play oneTimeProducts list: status=%s body=%s",
@@ -516,6 +578,13 @@ def _list_google_play_products(package_name: str) -> List[dict]:
 
         sorted_products = sorted(all_products, key=lambda x: x["credits"])
         logger.info("Google Play: listed %d credit products via monetization.onetimeproducts.list", len(sorted_products))
+        _cache_set(
+            _GOOGLE_PLAY_PRODUCTS_CACHE,
+            package_name,
+            [dict(product) for product in sorted_products],
+            GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS,
+            GOOGLE_PLAY_PRODUCTS_CACHE_MAX,
+        )
         return sorted_products
     except HTTPException:
         raise
