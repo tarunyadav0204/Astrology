@@ -201,7 +201,7 @@ jobs:
             --zone "${GCP_MIG_ZONE}" \
             --tunnel-through-iap \
             --quiet \
-            --command "for i in \$(seq 1 60); do [ -d /home/tarun_yadav/AstrologyApp ] && exit 0; sleep 5; done; echo 'AstrologyApp repo not ready on ${INSTANCE}'; exit 1"
+            --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"
 
           FRONTEND_REMOTE_ARCHIVE=""
           if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] && [ "${FRONTEND_ARTIFACT_REQUIRED}" = "true" ]; then
