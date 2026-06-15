@@ -1,0 +1,27 @@
+logging:
+  receivers:
+    astroroshni_backend:
+      type: files
+      include_paths:
+        - /home/tarun_yadav/AstrologyApp/logs/backend.log
+      record_log_file_path: true
+    astroroshni_restart_monitor:
+      type: files
+      include_paths:
+        - /home/tarun_yadav/AstrologyApp/logs/restart.log
+        - /home/tarun_yadav/AstrologyApp/logs/crash-snapshots.log
+      record_log_file_path: true
+    astroroshni_syslog:
+      type: files
+      include_paths:
+        - /var/log/syslog
+      record_log_file_path: true
+
+  service:
+    pipelines:
+      astroroshni_backend_pipeline:
+        receivers: [astroroshni_backend]
+      astroroshni_restart_monitor_pipeline:
+        receivers: [astroroshni_restart_monitor]
+      astroroshni_syslog_pipeline:
+        receivers: [astroroshni_syslog]

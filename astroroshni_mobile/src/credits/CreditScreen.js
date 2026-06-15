@@ -289,6 +289,34 @@ const CreditScreen = ({ navigation }) => {
    */
   const iapDisconnectBeforeNextConnectRef = useRef(true);
 
+  const fetchProducts = async ({ silent = false } = {}) => {
+    if (Platform.OS !== 'android') return;
+    if (!silent) setProductsLoading(true);
+    try {
+      const { data } = await creditAPI.getGooglePlayProducts();
+      setGooglePlayProducts(Array.isArray(data?.products) ? data.products : []);
+    } catch (e) {
+      setGooglePlayProducts([]);
+      console.warn('Failed to load Google Play products:', e?.message);
+    } finally {
+      if (!silent) setProductsLoading(false);
+    }
+  };
+
+  const fetchPlans = async ({ silent = false } = {}) => {
+    if (Platform.OS !== 'android') return;
+    if (!silent) setSubscriptionPlansLoading(true);
+    try {
+      const { data } = await creditAPI.getSubscriptionPlans();
+      setSubscriptionPlans(Array.isArray(data?.plans) ? data.plans : []);
+    } catch (e) {
+      setSubscriptionPlans([]);
+      console.warn('Failed to load subscription plans:', e?.message);
+    } finally {
+      if (!silent) setSubscriptionPlansLoading(false);
+    }
+  };
+
   /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
   const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
     if (!purchaseToken || !productId || !orderId) return;
@@ -434,6 +462,10 @@ const CreditScreen = ({ navigation }) => {
     // On Android, sync one-time purchases/subscriptions with Google Play first so missed callbacks recover.
     const unsubscribe = navigation.addListener('focus', () => {
       fetchBalance();
+      if (Platform.OS === 'android') {
+        fetchProducts({ silent: true });
+        fetchPlans({ silent: true });
+      }
       if (Platform.OS === 'android' && iapReady && productIds.length > 0 && RNIap) {
         syncOneTimePurchasesWithPlay().then(fetchHistory).catch(() => fetchHistory());
       } else {
@@ -455,38 +487,12 @@ const CreditScreen = ({ navigation }) => {
   // Fetch Google Play products from backend (Android only)
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    let mounted = true;
-    const fetchProducts = async () => {
-      setProductsLoading(true);
-      try {
-        const { data } = await creditAPI.getGooglePlayProducts();
-        if (mounted && Array.isArray(data?.products)) setGooglePlayProducts(data.products);
-      } catch (e) {
-        if (mounted) setGooglePlayProducts([]);
-        console.warn('Failed to load Google Play products:', e?.message);
-      } finally {
-        if (mounted) setProductsLoading(false);
-      }
-    };
     fetchProducts();
   }, []);
 
   // Fetch subscription plans (Android only)
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    let mounted = true;
-    const fetchPlans = async () => {
-      setSubscriptionPlansLoading(true);
-      try {
-        const { data } = await creditAPI.getSubscriptionPlans();
-        if (mounted && Array.isArray(data?.plans)) setSubscriptionPlans(data.plans);
-      } catch (e) {
-        if (mounted) setSubscriptionPlans([]);
-        console.warn('Failed to load subscription plans:', e?.message);
-      } finally {
-        if (mounted) setSubscriptionPlansLoading(false);
-      }
-    };
     fetchPlans();
   }, []);
 
@@ -1114,6 +1120,12 @@ const CreditScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    if (Platform.OS === 'android') {
+      await Promise.all([
+        fetchProducts({ silent: true }),
+        fetchPlans({ silent: true }),
+      ]);
+    }
     if (Platform.OS === 'android' && iapReady && productIds.length > 0 && RNIap) {
       await syncOneTimePurchasesWithPlay();
     }

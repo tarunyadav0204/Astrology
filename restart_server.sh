@@ -25,10 +25,6 @@ snapshot_before_restart() {
     else
       echo "(no logs/backend.log)"
     fi
-    if [ -f "$APP_DIR/backend/server_shutdown.log" ]; then
-      echo "--- server_shutdown.log (last 100 lines) ---"
-      tail -100 "$APP_DIR/backend/server_shutdown.log"
-    fi
   } >> "$SNAPSHOT_FILE"
 }
 
@@ -62,6 +58,7 @@ while true; do
   cd "$APP_DIR/backend" || exit 1
   # shellcheck source=/dev/null
   source venv/bin/activate
+  export PYTHONUNBUFFERED=1
   echo "$(date -u): Starting backend (append to logs/backend.log)" >> "$LOG_FILE"
   nohup python main.py >> "$APP_DIR/logs/backend.log" 2>&1 &
   BACKEND_PID=$!

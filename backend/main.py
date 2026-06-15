@@ -1,6 +1,7 @@
 import asyncio
 import secrets
 import uuid
+import socket
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -158,16 +159,50 @@ except ValueError as e:
     print(f"WARNING: Encryption not configured: {e}")
     encryptor = None
 
-# Configure logging for shutdown events
+# Configure logging to stdout so VM/service/runtime collectors can ship a
+# durable stream to centralized logging. Local file capture should happen
+# outside the process when needed.
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('server_shutdown.log'),
-        logging.StreamHandler()
+        logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+def _instance_identity() -> str:
+    return (
+        os.getenv("INSTANCE_NAME")
+        or os.getenv("HOSTNAME")
+        or socket.gethostname()
+        or "unknown-instance"
+    )
+
+
+def _app_version() -> str:
+    return (
+        os.getenv("APP_COMMIT_SHA")
+        or os.getenv("GIT_COMMIT")
+        or os.getenv("SOURCE_VERSION")
+        or "unknown-version"
+    )
+
+
+def log_lifecycle_event(event: str, level: int = logging.INFO, **fields):
+    payload = {
+        "event": event,
+        "service": "astroroshni-api",
+        "instance": _instance_identity(),
+        "version": _app_version(),
+        "pid": os.getpid(),
+        **fields,
+    }
+    try:
+        logger.log(level, json.dumps(payload, default=str, sort_keys=True))
+    except Exception:
+        logger.log(level, "lifecycle_event=%s fields=%s", event, fields)
 
 
 def _is_us_number(phone: str) -> bool:
@@ -378,16 +413,20 @@ def _send_otp_email(to_email: str, code: str) -> bool:
     return send_plain_text_email(to_email, "Your AstroRoshni OTP Code", body)
 
 def log_shutdown(reason):
-    logger.critical(f"SERVER SHUTDOWN: {reason}")
     mem_mb = None
     conn_count = None
     try:
         mem_mb = psutil.Process().memory_info().rss / 1024 / 1024
-        logger.critical(f"Memory: {mem_mb:.2f}MB")
         conn_count = len(psutil.Process().connections())
-        logger.critical(f"Connections: {conn_count}")
     except Exception:
         pass
+    log_lifecycle_event(
+        "shutdown_begin",
+        level=logging.CRITICAL,
+        reason=reason,
+        memory_mb=round(mem_mb, 2) if mem_mb is not None else None,
+        connections=conn_count,
+    )
     try:
         from utils.instrument_sentry import capture_message
 
@@ -396,6 +435,8 @@ def log_shutdown(reason):
             level="fatal",
             memory_mb=mem_mb,
             connections=conn_count,
+            instance=_instance_identity(),
+            version=_app_version(),
         )
     except Exception:
         pass
@@ -407,7 +448,7 @@ def signal_handler(signum, frame):
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
-atexit.register(lambda: logger.critical("Server shutdown completed"))
+atexit.register(lambda: log_lifecycle_event("shutdown_complete", level=logging.CRITICAL))
 
 
 # Load environment variables explicitly (CWD first, then backend/.env so it works when run from repo root)
@@ -498,91 +539,95 @@ def ensure_users_userid_default() -> None:
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
     credits_settings_poll_task = None
+    log_lifecycle_event("startup_begin")
+
+    def _startup_step(name: str, fn, success_message: str):
+        try:
+            fn()
+            log_lifecycle_event("startup_step_ok", step=name, message=success_message)
+        except Exception as e:
+            log_lifecycle_event("startup_step_failed", level=logging.WARNING, step=name, error=str(e))
+
     # Startup
-    try:
-        ensure_users_userid_default()
-    except Exception as e:
-        print(f"Warning: users.userid default sequence check failed: {e}")
-    try:
-        ensure_users_signup_client_column()
-    except Exception as e:
-        print(f"Warning: signup_client schema check failed: {e}")
-    try:
-        ensure_users_gender_column()
-    except Exception as e:
-        print(f"Warning: users.gender schema check failed: {e}")
-    try:
-        from acquisition_schema import ensure_app_installations_schema
-
-        ensure_app_installations_schema()
-        print("app_installations schema ready (acquisition funnel)")
-    except Exception as e:
-        print(f"Warning: app_installations schema check failed: {e}")
-    try:
-        from admin_expense_schema import ensure_admin_company_expenses_schema
-
-        ensure_admin_company_expenses_schema()
-        print("admin_company_expenses schema ready (internal expenses)")
-    except Exception as e:
-        print(f"Warning: admin_company_expenses schema check failed: {e}")
-    try:
-        from admin_issue_schema import ensure_admin_issues_schema
-
-        ensure_admin_issues_schema()
-        print("admin_issues schema ready (issue/enhancement tracker)")
-    except Exception as e:
-        print(f"Warning: admin_issues schema check failed: {e}")
-    try:
-        prediction_engine = DailyPredictionEngine()
-        prediction_engine.reset_prediction_rules()
-        print("Daily prediction engine initialized with updated rules")
-    except Exception as e:
-        print(f"Warning: Could not initialize prediction engine: {e}")
-    try:
-        init_house_combinations_db()
-        print("House combinations database initialized")
-    except Exception as e:
-        print(f"Warning: Could not initialize house combinations database: {e}")
-    try:
-        init_chat_tables()
-        print("Chat history database initialized")
-    except Exception as e:
-        print(f"Warning: Could not initialize chat history database: {e}")
-    try:
-        from subscription_tier_migration import ensure_subscription_tier_schema
-        ensure_subscription_tier_schema()
-        print("Subscription tier schema ready")
-    except Exception as e:
-        print(f"Warning: Subscription tier migration skipped: {e}")
+    _startup_step("ensure_users_userid_default", ensure_users_userid_default, "users.userid default sequence ensured")
+    _startup_step("ensure_users_signup_client_column", ensure_users_signup_client_column, "users.signup_client ensured")
+    _startup_step("ensure_users_gender_column", ensure_users_gender_column, "users.gender ensured")
+    _startup_step(
+        "ensure_app_installations_schema",
+        lambda: __import__("acquisition_schema", fromlist=["ensure_app_installations_schema"]).ensure_app_installations_schema(),
+        "app_installations schema ready",
+    )
+    _startup_step(
+        "ensure_admin_company_expenses_schema",
+        lambda: __import__("admin_expense_schema", fromlist=["ensure_admin_company_expenses_schema"]).ensure_admin_company_expenses_schema(),
+        "admin_company_expenses schema ready",
+    )
+    _startup_step(
+        "ensure_admin_issues_schema",
+        lambda: __import__("admin_issue_schema", fromlist=["ensure_admin_issues_schema"]).ensure_admin_issues_schema(),
+        "admin_issues schema ready",
+    )
+    _startup_step(
+        "daily_prediction_engine_init",
+        lambda: DailyPredictionEngine().reset_prediction_rules(),
+        "daily prediction engine initialized",
+    )
+    _startup_step("init_house_combinations_db", init_house_combinations_db, "house combinations database initialized")
+    _startup_step("init_chat_tables", init_chat_tables, "chat history database initialized")
+    _startup_step(
+        "ensure_subscription_tier_schema",
+        lambda: __import__("subscription_tier_migration", fromlist=["ensure_subscription_tier_schema"]).ensure_subscription_tier_schema(),
+        "subscription tier schema ready",
+    )
     try:
         from utils.admin_settings import migrate_deprecated_gemini_model_ids_on_startup
         from utils.admin_settings import poll_credits_settings_version_forever
 
         migrate_deprecated_gemini_model_ids_on_startup()
         credits_settings_poll_task = asyncio.create_task(poll_credits_settings_version_forever())
-        print("Admin settings: checked deprecated Gemini 3.1 Flash Lite preview model ids")
+        log_lifecycle_event(
+            "startup_step_ok",
+            step="admin_settings_migration_and_poll",
+            message="admin settings migrations complete",
+        )
     except Exception as e:
-        print(f"Warning: Gemini admin_settings migration skipped: {e}")
+        log_lifecycle_event(
+            "startup_step_failed",
+            level=logging.WARNING,
+            step="admin_settings_migration_and_poll",
+            error=str(e),
+        )
     try:
         with nudge_db.get_conn() as conn:
             nudge_db.init_nudge_tables(conn)
-            print("Nudge engine tables (device_tokens, nudge_deliveries) initialized")
+            log_lifecycle_event(
+                "startup_step_ok",
+                step="init_nudge_tables",
+                message="nudge engine tables initialized",
+            )
     except Exception as e:
-        print(f"Warning: Could not initialize nudge engine tables: {e}")
+        log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="init_nudge_tables", error=str(e))
     try:
         ensure_testimonials_table()
-        print("App testimonials table initialized")
+        log_lifecycle_event(
+            "startup_step_ok",
+            step="ensure_testimonials_table",
+            message="app testimonials table initialized",
+        )
     except Exception as e:
-        print(f"Warning: Could not initialize app testimonials table: {e}")
+        log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="ensure_testimonials_table", error=str(e))
     try:
+        log_lifecycle_event("startup_complete")
         yield
     finally:
+        log_lifecycle_event("shutdown_lifespan_begin")
         if credits_settings_poll_task is not None:
             credits_settings_poll_task.cancel()
             try:
                 await credits_settings_poll_task
             except asyncio.CancelledError:
                 pass
+        log_lifecycle_event("shutdown_lifespan_complete")
 
 
 # Deploy/restart marker only — no runtime behavior change (2026-04-17).

@@ -160,10 +160,15 @@ SYNC_GCP_SECRETS="${SYNC_GCP_SECRETS:-true}"
 APP_ENV_SECRET_NAME="${APP_ENV_SECRET_NAME:-APP_ENV_FILE}"
 WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME="${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME:-WHATSAPP_FLOW_PRIVATE_KEY_FILE}"
 WHATSAPP_FLOW_PRIVATE_KEY_PATH="${WHATSAPP_FLOW_PRIVATE_KEY_PATH:-/home/tarun_yadav/AstrologyApp/backend/flow_endpoint_private.pem}"
+INSTALL_GCP_OPS_AGENT="${INSTALL_GCP_OPS_AGENT:-true}"
 
 case "$(printf '%s' "${SYNC_GCP_SECRETS}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) SYNC_GCP_SECRETS=true ;;
   *) SYNC_GCP_SECRETS=false ;;
+esac
+case "$(printf '%s' "${INSTALL_GCP_OPS_AGENT}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes) INSTALL_GCP_OPS_AGENT=true ;;
+  *) INSTALL_GCP_OPS_AGENT=false ;;
 esac
 
 sync_gcp_secret_to_file() {
@@ -210,6 +215,14 @@ if [ "${SYNC_GCP_SECRETS}" = "true" ]; then
   deploy_timing "gcp secret sync finished"
 else
   echo "⏭️ Skipping Google Secret Manager sync (SYNC_GCP_SECRETS=false)"
+fi
+
+if [ "${INSTALL_GCP_OPS_AGENT}" = "true" ]; then
+  echo "🛰️ Ensuring Google Cloud Ops Agent is installed and configured..."
+  APP_ROOT="${APP_ROOT}" "${APP_ROOT}/scripts/install_ops_agent.sh"
+  deploy_timing "ops agent install/apply finished"
+else
+  echo "⏭️ Skipping Ops Agent install/apply (INSTALL_GCP_OPS_AGENT=false)"
 fi
 
 # --- Phase 1: backend dependencies (venv, pip, encryption) ---
@@ -290,6 +303,8 @@ if [ "${restart_backend}" = "true" ]; then
   if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}" ] && [ -f "${DEFAULT_PLAY_BILLING_KEY}" ]; then
     export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${DEFAULT_PLAY_BILLING_KEY}"
   fi
+  export APP_COMMIT_SHA="${NEW_HEAD}"
+  export PYTHONUNBUFFERED=1
 
   echo "Starting backend (appending to logs/backend.log)..."
   {

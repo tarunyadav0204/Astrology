@@ -48,19 +48,22 @@ Do not rely on local VM files as the primary incident source.
 
 ### Phase 1: Durable Logging
 
+- [x] Switch backend logging to stdout-first so VM/runtime collectors can forward a durable stream
+- [x] Include deploy commit SHA in backend process env (`APP_COMMIT_SHA`)
+- [x] Make backend startup output unbuffered (`PYTHONUNBUFFERED=1`) during deploy/restart scripts
 - [ ] Confirm backend stdout/stderr is being captured into GCP Cloud Logging
 - [ ] Confirm VM startup-script logs are captured into Cloud Logging
 - [ ] Confirm system/service logs relevant to process death and restart are visible in Cloud Logging
-- [ ] Stop treating local `server_shutdown.log` as the primary incident record
+- [x] Stop treating local `server_shutdown.log` as the primary incident record
 
 ### Phase 2: Lifecycle Signals
 
-- [ ] Add structured `startup_begin` log
-- [ ] Add structured per-step startup logs for major initialization blocks
-- [ ] Add structured `startup_complete` log
-- [ ] Add structured `shutdown_begin` log
-- [ ] Add structured shutdown reason log for signal/manual termination
-- [ ] Include instance identity and commit/version metadata in lifecycle logs
+- [x] Add structured `startup_begin` log
+- [x] Add structured per-step startup logs for major initialization blocks
+- [x] Add structured `startup_complete` log
+- [x] Add structured `shutdown_begin` log
+- [x] Add structured shutdown reason log for signal/manual termination
+- [x] Include instance identity and commit/version metadata in lifecycle logs
 
 ### Phase 3: Slow Request Observability
 
@@ -144,6 +147,23 @@ Examples of event names to standardize:
 - Google Play metadata caching and bonus/status-path optimizations have already been started separately.
 - Admin settings caching with invalidation and version polling has also been introduced separately.
 - Observability work is still needed even if those fixes reduce outage frequency.
+- Backend now emits structured lifecycle events to stdout with:
+  - `event`
+  - `instance`
+  - `version`
+  - `pid`
+- Deploy/restart scripts now export `APP_COMMIT_SHA` and `PYTHONUNBUFFERED=1`.
+- Remaining Phase 1 work is GCP-side verification:
+  - confirm stdout/stderr arrives in Cloud Logging
+  - confirm startup-script/system logs are visible centrally
+- Live verification on `astroroshni-mig-zmc9` showed:
+  - startup-script logs exist in `google-startup-scripts.service` journal
+  - no `google-cloud-ops-agent` unit was installed
+  - Cloud Logging queries for backend/startup markers returned no results
+- Because backend is still launched with `nohup ... >> logs/backend.log`, centralized logging needs an agent that tails files unless process launch is later moved under a journal-aware supervisor.
+- Added repo-side Ops Agent assets:
+  - `/ops-agent/config.yaml`
+  - `/scripts/install_ops_agent.sh`
 
 ## Next Recommended Implementation Steps
 
