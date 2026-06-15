@@ -67,28 +67,33 @@ Do not rely on local VM files as the primary incident source.
 
 ### Phase 3: Slow Request Observability
 
-- [ ] Replace noisy all-request logging with threshold-based slow request logging
-- [ ] Log requests slower than 2s as warning
-- [ ] Log requests slower than 5s as error
-- [ ] Include path, method, latency, instance, and request category
-- [ ] Add special logging around credits / Google Play endpoints
+- [x] Replace noisy all-request logging with threshold-based slow request logging
+- [x] Log requests slower than 2s as warning
+- [x] Log requests slower than 5s as error
+- [x] Include path, method, latency, instance, and request category
+- [x] Add special logging around credits / Google Play endpoints
 
 ### Phase 4: Sentry Hardening
 
-- [ ] Tag Sentry events with instance name
-- [ ] Tag Sentry events with environment
-- [ ] Tag Sentry events with backend version / commit SHA if available
+- [x] Tag Sentry events with instance name
+- [x] Tag Sentry events with environment
+- [x] Tag Sentry events with backend version / commit SHA if available
 - [ ] Capture startup failures explicitly
 - [ ] Capture shutdown reasons explicitly
-- [ ] Capture degraded health / repeated slowness messages as Sentry events where useful
+- [x] Capture degraded health / repeated slowness messages as Sentry events where useful
 
 ### Phase 5: Logging Cleanup
 
-- [ ] Audit `print(...)` usage in production backend code
-- [ ] Convert important lifecycle and failure prints to `logger.*`
+- [x] Audit `print(...)` usage in production backend code
+- [~] Convert important lifecycle and failure prints to `logger.*`
 - [ ] Gate deep debug logs behind a feature flag or debug mode
-- [ ] Reduce noisy request-level chatter
+- [x] Reduce noisy request-level chatter
 - [ ] Remove or tame especially verbose astrology calculation debug output in production paths
+
+Recent progress:
+- login/auth failure prints converted to structured lifecycle logs in `backend/main.py`
+- chat routing/context/delete hot-path prints converted to structured logger events in `backend/chat_history/routes.py`
+- deep astrology diagnostics in dasha/jaimini/context-builder are still pending and should likely be gated behind a debug flag instead of staying always-on in prod
 
 ### Phase 6: Alerting
 
@@ -164,6 +169,15 @@ Examples of event names to standardize:
 - Added repo-side Ops Agent assets:
   - `/ops-agent/config.yaml`
   - `/scripts/install_ops_agent.sh`
+- Replaced noisy all-request middleware logging with threshold-based `slow_request` events.
+- Default thresholds:
+  - warning at `2.0s` via `SLOW_REQUEST_WARN_SECONDS`
+  - error at `5.0s` via `SLOW_REQUEST_ERROR_SECONDS`
+- Slow `credits` and `health` requests now also emit a Sentry message at error threshold.
+- Sentry now tags events with:
+  - `instance`
+  - `version`
+  - `environment_name`
 
 ## Next Recommended Implementation Steps
 

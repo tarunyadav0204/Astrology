@@ -190,6 +190,13 @@ def _app_version() -> str:
     )
 
 
+def _mask_phone(phone: str | None) -> str:
+    raw = (phone or "").strip()
+    if len(raw) <= 4:
+        return raw or "unknown"
+    return f"{raw[:2]}***{raw[-2:]}"
+
+
 def log_lifecycle_event(event: str, level: int = logging.INFO, **fields):
     payload = {
         "event": event,
@@ -459,20 +466,20 @@ try:
     _env_path = os.path.join(_backend_dir, ".env")
     if os.path.isfile(_env_path):
         load_dotenv(_env_path)
-        print("Loaded environment variables from .env file")
+        logger.info("Loaded environment variables from .env file")
     else:
-        print("Loaded environment variables from .env file")
+        logger.info("python-dotenv loaded; backend/.env file not found, using current environment")
 except ImportError:
-    print("python-dotenv not installed, using system environment variables")
+    logger.warning("python-dotenv not installed, using system environment variables")
 except Exception as e:
-    print(f"Warning loading environment variables: {e}")
+    logger.warning("Warning loading environment variables: %s", e)
     pass
 
 # Install psutil if not available
 try:
     import psutil
 except ImportError:
-    print("Installing psutil for memory monitoring...")
+    logger.warning("psutil not available; attempting runtime install for memory monitoring")
     import subprocess
     subprocess.check_call(["pip", "install", "psutil"])
     import psutil
@@ -482,7 +489,7 @@ try:
 
     init_sentry()
 except Exception as _sentry_boot_err:
-    print(f"WARNING: Sentry bootstrap skipped: {_sentry_boot_err}")
+    logger.warning("Sentry bootstrap skipped: %s", _sentry_boot_err)
 
 
 # App version gating – defaults from environment, but can be overridden from admin settings.
@@ -637,8 +644,14 @@ horoscope_api = HoroscopeAPI()
 # Add validation error handler
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    print(f"❌ VALIDATION ERROR on {request.method} {request.url.path}:")
-    print(f"🔍 Validation errors: {exc.errors()}")
+    log_lifecycle_event(
+        "request_validation_error",
+        level=logging.WARNING,
+        method=request.method,
+        path=request.url.path,
+        client_ip=request.client.host if request.client else "unknown",
+        errors=exc.errors(),
+    )
     return JSONResponse(
         status_code=422,
         content={"detail": exc.errors()}
@@ -707,22 +720,70 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         import time
         import gc
+        from utils.instrument_sentry import capture_message
+
+        slow_warn_seconds = float(os.getenv("SLOW_REQUEST_WARN_SECONDS", "2.0"))
+        slow_error_seconds = float(os.getenv("SLOW_REQUEST_ERROR_SECONDS", "5.0"))
         start_time = time.time()
-        
-        # Log incoming request
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {request.method} {request.url.path} - Client: {request.client.host if request.client else 'unknown'}")
-        
-        response = await call_next(request)
-        
-        # Log response and cleanup
+        client_ip = request.client.host if request.client else "unknown"
+        path = request.url.path
+        method = request.method
+
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            process_time = time.time() - start_time
+            log_lifecycle_event(
+                "request_exception",
+                level=logging.ERROR,
+                method=method,
+                path=path,
+                client_ip=client_ip,
+                duration_ms=round(process_time * 1000, 2),
+                category=_request_category(path),
+                error=str(exc),
+            )
+            raise
+
         process_time = time.time() - start_time
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Response: {response.status_code} - Time: {process_time:.2f}s")
-        
+        duration_ms = round(process_time * 1000, 2)
+        category = _request_category(path)
+        slow_fields = {
+            "method": method,
+            "path": path,
+            "client_ip": client_ip,
+            "status_code": response.status_code,
+            "duration_ms": duration_ms,
+            "category": category,
+        }
+
+        if process_time >= slow_error_seconds:
+            log_lifecycle_event("slow_request", level=logging.ERROR, severity="error", **slow_fields)
+            if category in {"credits", "health"}:
+                capture_message(
+                    "slow_request",
+                    level="error",
+                    **slow_fields,
+                )
+        elif process_time >= slow_warn_seconds:
+            log_lifecycle_event("slow_request", level=logging.WARNING, severity="warning", **slow_fields)
+
         # Force garbage collection after heavy requests
         if process_time > 5.0 or request.url.path in ["/api/calculate-chart", "/api/chat", "/api/ai-insights"]:
             gc.collect()
         
         return response
+
+
+def _request_category(path: str) -> str:
+    normalized = str(path or "")
+    if normalized.startswith("/api/credits") or normalized.startswith("/api/subscription"):
+        return "credits"
+    if normalized.startswith("/api/health") or normalized.startswith("/api/keepalive"):
+        return "health"
+    if normalized.startswith("/api/chat") or normalized.startswith("/api/ai-insights"):
+        return "chat"
+    return "general"
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
@@ -1984,15 +2045,25 @@ async def login(user_data: UserLogin):
             user = _find_user_row_by_phone_variants(conn, user_data.phone)
         
         if not user:
-            print(f"User not found for phone: {user_data.phone}")
+            log_lifecycle_event(
+                "login_failed",
+                level=logging.WARNING,
+                reason="user_not_found",
+                phone=_mask_phone(user_data.phone),
+            )
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
         password_valid = verify_password(user_data.password, user[3])
         
         if not password_valid:
-            print(f"CRITICAL: Password verification failed for user: {user_data.phone}")
-            print(f"Hash: {user[3][:20]}...")
-            print(f"Hash format valid: {user[3].startswith('$2b$')}")
+            log_lifecycle_event(
+                "login_failed",
+                level=logging.WARNING,
+                reason="invalid_password",
+                phone=_mask_phone(user_data.phone),
+                userid=user[0],
+                hash_format_valid=bool(user[3] and user[3].startswith('$2b$')),
+            )
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         with get_conn() as conn:
@@ -2077,6 +2148,14 @@ async def login(user_data: UserLogin):
         # sub = canonical DB phone; login may match +91… to a 10-digit row — sub must be user[2] not typed phone.
         access_token = create_access_token(data={"sub": user[2], "userid": user[0], "name": user[1]})
 
+        log_lifecycle_event(
+            "login_succeeded",
+            userid=user[0],
+            role=user[4],
+            has_self_birth_chart=bool(birth_chart_data),
+            subscription_platforms=list(user_subscriptions.keys()),
+        )
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -2096,17 +2175,19 @@ async def login(user_data: UserLogin):
         # Re-raise HTTP exceptions (like 401) without modification
         raise
     except Exception as e:
-        import traceback
-        error_details = {
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'traceback': traceback.format_exc()
-        }
-        print(f"Login error details: {error_details}")
+        logger.exception(
+            "login_unexpected_error phone=%s error_type=%s",
+            _mask_phone(user_data.phone),
+            type(e).__name__,
+        )
+        log_lifecycle_event(
+            "login_error",
+            level=logging.ERROR,
+            phone=_mask_phone(user_data.phone),
+            error_type=type(e).__name__,
+            error=str(e)[:240],
+        )
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
 
 @app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):

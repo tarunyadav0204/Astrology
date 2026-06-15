@@ -7,6 +7,7 @@ Host CPU/RAM/disk are attached to events at report time (not continuous infra mo
 from __future__ import annotations
 
 import os
+import socket
 from typing import Any, Dict, Optional
 
 _initialized = False
@@ -116,6 +117,18 @@ def init_sentry() -> bool:
             before_send=_before_send,
         )
         sentry_sdk.set_tag("service", "astroroshni-api")
+        sentry_sdk.set_tag(
+            "instance",
+            os.getenv("INSTANCE_NAME") or os.getenv("HOSTNAME") or socket.gethostname() or "unknown-instance",
+        )
+        sentry_sdk.set_tag(
+            "version",
+            os.getenv("APP_COMMIT_SHA")
+            or os.getenv("GIT_COMMIT")
+            or os.getenv("SOURCE_VERSION")
+            or "unknown-version",
+        )
+        sentry_sdk.set_tag("environment_name", environment)
         _initialized = True
         print(f"Sentry initialized (environment={environment})")
         return True

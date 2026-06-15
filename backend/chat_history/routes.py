@@ -12,6 +12,18 @@ from db import get_conn, execute
 
 logger = logging.getLogger(__name__)
 
+
+def _chat_log_event(event: str, level: int = logging.INFO, **fields) -> None:
+    payload = {
+        "event": event,
+        "component": "chat_history",
+        **fields,
+    }
+    try:
+        logger.log(level, json.dumps(payload, default=str, sort_keys=True))
+    except Exception:
+        logger.log(level, "chat_event=%s fields=%s", event, fields)
+
 def sanitize_text(text):
     """Remove invalid Unicode characters and surrogates to prevent encoding attacks"""
     if not isinstance(text, str):
@@ -2697,16 +2709,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             )
             force_ready = question.startswith('@All_Events') or is_whatsapp_plain_text
             
-            print(f"\n{'='*80}")
-            print(f"🔗 CLARIFICATION CONTEXT CHECK")
-            print(f"{'='*80}")
-            print(f"Current question: {question}")
-            print(f"Clarification count: {clarification_count}")
-            
             # Check if this is a clarification response and combine with original question
             combined_question = question
             if clarification_count > 0:
-                print(f"🔍 Clarification detected, looking for original question...")
                 with get_conn() as conn:
                     chain_parts = get_user_question_chain_for_clarification(session_id, message_id, conn)
                     original_question = get_original_question_for_clarification(session_id, message_id, conn)
@@ -2716,16 +2721,21 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             question,
                             max_len=500,
                         )
-                        print(f"🔗 COMBINED QUESTION:")
-                        print(f"   Chain parts: {chain_parts}")
-                        print(f"   Clarification: {question}")
-                        print(f"   Combined: {combined_question}")
+                        _chat_log_event(
+                            "clarification_context_merged",
+                            session_id=session_id,
+                            message_id=message_id,
+                            clarification_count=clarification_count,
+                            chain_parts=len(chain_parts or []),
+                        )
                     else:
-                        print(f"   ⚠️ No original question found, using current question only")
-            else:
-                print(f"✅ First question in session, no combination needed")
-            
-            print(f"{'='*80}\n")
+                        _chat_log_event(
+                            "clarification_context_missing_original",
+                            level=logging.WARNING,
+                            session_id=session_id,
+                            message_id=message_id,
+                            clarification_count=clarification_count,
+                        )
             
             query_context = (
                 cached_intent.get("query_context")
@@ -2763,7 +2773,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 any(kw in question.lower() for kw in timing_keywords)
                 and intent.get('status') == 'CLARIFY'
             ):
-                print(f"🛡️ FAIL-SAFE TRIGGERED: Forcing LIFESPAN_EVENT_TIMING for timing question")
+                _chat_log_event(
+                    "intent_failsafe_triggered",
+                    level=logging.WARNING,
+                    session_id=session_id,
+                    message_id=message_id,
+                    from_status="CLARIFY",
+                    forced_mode="LIFESPAN_EVENT_TIMING",
+                )
                 intent['status'] = 'READY'
                 intent['mode'] = 'LIFESPAN_EVENT_TIMING'
                 intent['needs_transits'] = True
@@ -2775,7 +2792,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
             if intent.get('mode') == 'LIFESPAN_EVENT_TIMING' and intent.get('status') == 'READY':
-                print(f"🎯 LIFESPAN_EVENT_TIMING detected - Setting wide transit range")
                 # Calculate age 18 to +25 years
                 birth_year = int(birth_data['date'].split('-')[0])
                 start_year = birth_year + 18
@@ -2788,17 +2804,23 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     "endYear": end_year,
                     "yearMonthMap": None # No sparse map - get all major transits for lifespan
                 }
-                print(f"🎯 Range set: {start_year} to {end_year}")
-
-            print(f"🔍 CLARIFICATION CHECK:")
-            print(f"   Intent status: {intent.get('status')}")
-            print(f"   Clarification count: {clarification_count}")
-            print(f"   Max allowed: {MAX_CLARIFICATIONS}")
-            print(f"   Will clarify: {intent.get('status') == 'CLARIFY' and clarification_count < MAX_CLARIFICATIONS}")
+                _chat_log_event(
+                    "lifespan_transit_range_set",
+                    session_id=session_id,
+                    message_id=message_id,
+                    start_year=start_year,
+                    end_year=end_year,
+                )
             
             # Check if clarification needed and under limit
             if intent.get('status') == 'CLARIFY' and clarification_count < MAX_CLARIFICATIONS:
-                print(f"✅ RETURNING CLARIFICATION QUESTION")
+                _chat_log_event(
+                    "clarification_returned",
+                    session_id=session_id,
+                    message_id=message_id,
+                    clarification_count=clarification_count,
+                    max_clarifications=MAX_CLARIFICATIONS,
+                )
                 # Return clarification question
                 with get_conn() as conn:
                     execute(
@@ -2832,7 +2854,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         (session_id, 1, json.dumps(intent.get('extracted_context', {}))),
                     )
                     conn.commit()
-                print(f"✅ CLARIFICATION SAVED TO DATABASE, EXITING EARLY")
                 return  # Exit early, no chart calculation needed
             elif intent.get('status') == 'READY':
                 # Reset clarification count when ready to answer
@@ -2850,21 +2871,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         (session_id, 0, json.dumps(intent.get('extracted_context', {}))),
                     )
                     conn.commit()
-                print(f"✅ RESET CLARIFICATION COUNT TO 0 (READY status)")
             
             routing_time = time.time() - routing_start
-            print(f"✅ ROUTING DECISION COMPLETE: {(intent.get('mode') or 'birth').upper()} mode")
-            print(f"Category: {intent.get('category', 'general')}")
-            print(f"Routing time: {routing_time:.3f}s")
-            print(f"{'='*80}\n")
+            _chat_log_event(
+                "chat_routing_complete",
+                session_id=session_id,
+                message_id=message_id,
+                mode=(intent.get('mode') or 'birth').upper(),
+                category=intent.get('category', 'general'),
+                status=intent.get('status'),
+                clarification_count=clarification_count,
+                routing_ms=round(routing_time * 1000, 1),
+                is_instant_chat=bool(is_instant_chat),
+                partnership_mode=bool(partnership_mode and partner_birth_details),
+            )
         
         # Build context based on intent
         context_start = time.time()
         
         if is_instant_chat:
-            print(f"\n{'='*80}")
-            print(f"⚡ INSTANT CHAT MODE - Skipping deep context build")
-            print(f"{'='*80}")
             context = {
                 "analysis_type": "instant_chat",
                 "instant_chat": True,
@@ -2877,18 +2902,23 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 },
             }
             context_time = time.time() - context_start
-            print(f"✅ Instant chat pseudo-context prepared in {context_time:.3f}s")
-            print(f"{'='*80}\n")
+            _chat_log_event(
+                "chat_context_built",
+                session_id=session_id,
+                message_id=message_id,
+                mode="instant_chat",
+                context_ms=round(context_time * 1000, 1),
+            )
         elif partnership_mode and partner_birth_details:
-            print(f"\n{'='*80}")
-            print(f"👥 PARTNERSHIP MODE - Building synastry context")
-            print(f"{'='*80}")
-            print(f"Native: {birth_data.get('name')}")
-            print(f"Partner: {partner_birth_details.get('name')}")
             context = context_builder.build_synastry_context(birth_data, partner_birth_details, combined_question, intent)
             context_time = time.time() - context_start
-            print(f"✅ Synastry context built in {context_time:.3f}s")
-            print(f"{'='*80}\n")
+            _chat_log_event(
+                "chat_context_built",
+                session_id=session_id,
+                message_id=message_id,
+                mode="partnership",
+                context_ms=round(context_time * 1000, 1),
+            )
             
         elif intent['mode'] == 'annual':
             # === ANNUAL MODE ===
@@ -3446,7 +3476,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 fact_extractor = FactExtractor()
                 await fact_extractor.extract_facts(question, result['response'], birth_chart_id)
             except Exception as e:
-                print(f"❌ Fact extraction error: {e}")
+                logger.warning("fact extraction failed message_id=%s user_id=%s: %s", message_id, user_id, e)
 
         # Push notification when response is ready (user may have left the app)
         if result.get('success'):
@@ -3464,7 +3494,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             data={"cta": "astroroshni://chat", "session_id": session_id},
                         )
             except Exception as push_err:
-                print(f"Push (response ready) failed: {push_err}")
+                logger.warning("response-ready push failed message_id=%s user_id=%s: %s", message_id, user_id, push_err)
         
     except Exception as e:
         # Handle any errors with user-friendly message and log to admin error list
@@ -3474,7 +3504,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             username = (birth_details or {}).get('name', 'Unknown')
             log_chat_error(user_id, username, '', e, question, birth_details, 'backend')
         except Exception as log_err:
-            print(f"⚠️ Failed to log error to chat_error_logs: {log_err}")
+            logger.warning("failed to persist chat_error_logs message_id=%s user_id=%s: %s", message_id, user_id, log_err)
         with get_conn() as conn:
             cur = execute(
                 conn,
@@ -3504,38 +3534,27 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 ("failed", user_friendly_error, datetime.now(), message_id),
             )
             conn.commit()
-        print(f"Error processing message {message_id}: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("chat message processing failed message_id=%s user_id=%s", message_id, user_id)
+        _chat_log_event(
+            "chat_processing_failed",
+            level=logging.ERROR,
+            message_id=message_id,
+            user_id=user_id,
+            error_type=type(e).__name__,
+            error=str(e)[:240],
+        )
 
 @router.delete("/message/{message_id}")
 async def delete_message(message_id: int, current_user = Depends(get_current_user)):
     """Hard delete a specific message"""
-    print(f"🗑️ DELETE STEP 1: Request received for message ID: {message_id} by user: {current_user.userid}")
+    _chat_log_event(
+        "chat_message_delete_requested",
+        message_id=message_id,
+        user_id=current_user.userid,
+    )
     
     try:
         with get_conn() as conn:
-            print(f"🗑️ DELETE STEP 2: Database connection established")
-
-            # First, let's see what messages exist for this user
-            cur = execute(
-                conn,
-                """
-                    SELECT cm.message_id, cm.sender, cm.message_type, SUBSTRING(cm.content, 1, 50)
-                    FROM chat_messages cm
-                    JOIN chat_sessions cs ON cm.session_id = cs.session_id
-                    WHERE cs.user_id = %s
-                    ORDER BY cm.message_id DESC
-                    LIMIT 10
-                """,
-                (current_user.userid,),
-            )
-            user_messages = cur.fetchall() or []
-            print(f"🔍 Recent messages for user {current_user.userid}:")
-            for msg in user_messages:
-                print(f"   ID: {msg[0]}, Sender: {msg[1]}, Type: {msg[2]}, Content: {msg[3]}...")
-
-            print(f"🗑️ DELETE STEP 3: Verifying message ownership")
             cur = execute(
                 conn,
                 """
@@ -3547,32 +3566,37 @@ async def delete_message(message_id: int, current_user = Depends(get_current_use
                 (message_id,),
             )
             result = cur.fetchone()
-            print(f"🔍 Database lookup result for ID {message_id}: {result}")
 
             if not result:
-                print(f"❌ Message {message_id} not found in database")
+                _chat_log_event(
+                    "chat_message_delete_not_found",
+                    level=logging.WARNING,
+                    message_id=message_id,
+                    user_id=current_user.userid,
+                )
                 raise HTTPException(status_code=404, detail=f"Message {message_id} not found in database")
 
             session_id, user_id, message_type, sender = result
-            print(f"🔍 Message details - User: {user_id}, Type: {message_type}, Sender: {sender}")
-            print(f"🔍 Requesting user: {current_user.userid}")
 
             if user_id != current_user.userid:
-                print(f"❌ Access denied: message belongs to user {user_id}, not {current_user.userid}")
+                _chat_log_event(
+                    "chat_message_delete_denied",
+                    level=logging.WARNING,
+                    message_id=message_id,
+                    owner_user_id=user_id,
+                    requesting_user_id=current_user.userid,
+                )
                 raise HTTPException(status_code=403, detail="Access denied")
 
-            print(f"🗑️ DELETE STEP 4: Getting message details for audit")
             cur = execute(
                 conn,
                 "SELECT content, message_type, sender FROM chat_messages WHERE message_id = %s",
                 (message_id,),
             )
             msg_details = cur.fetchone()
-            print(f"🗑️ DELETE STEP 5: Message details retrieved: {msg_details is not None}")
 
             if msg_details:
-                content, msg_type, sender = msg_details
-                print(f"🗑️ DELETE STEP 6: Inserting audit record")
+                _content, msg_type, sender = msg_details
                 # SAVEPOINT: if audit INSERT fails (e.g. audit_id not serial on DB), Postgres marks the
                 # transaction aborted; ROLLBACK TO SAVEPOINT clears that so DELETE can still run.
                 execute(conn, "SAVEPOINT sp_message_deletion_audit")
@@ -3586,34 +3610,52 @@ async def delete_message(message_id: int, current_user = Depends(get_current_use
                         """,
                         (message_id, current_user.userid, session_id, None, msg_type, sender),
                     )
-                    print(f"🗑️ DELETE STEP 7: Audit record inserted successfully")
                     execute(conn, "RELEASE SAVEPOINT sp_message_deletion_audit")
                 except Exception as audit_error:
-                    print(f"❌ DELETE STEP 7 ERROR: Audit insert failed: {audit_error}")
+                    logger.warning(
+                        "message deletion audit insert failed message_id=%s user_id=%s: %s",
+                        message_id,
+                        current_user.userid,
+                        audit_error,
+                    )
                     execute(conn, "ROLLBACK TO SAVEPOINT sp_message_deletion_audit")
 
-            print(f"🗑️ DELETE STEP 8: Performing actual deletion")
             cur = execute(conn, "DELETE FROM chat_messages WHERE message_id = %s", (message_id,))
             deleted_rows = cur.rowcount
-            print(f"🗑️ DELETE STEP 9: Deleted {deleted_rows} rows for message ID {message_id}")
-
-            print(f"🗑️ DELETE STEP 10: Committing transaction")
             conn.commit()
-            print(f"🗑️ DELETE STEP 11: Transaction committed successfully")
-
-        print(f"🗑️ DELETE STEP 12: Database connection closed")
         
-        print(f"✅ DELETE COMPLETE: Message {message_id} deleted successfully")
+        _chat_log_event(
+            "chat_message_deleted",
+            message_id=message_id,
+            user_id=current_user.userid,
+            session_id=session_id,
+            deleted_rows=deleted_rows,
+        )
         return {"message": "Message deleted successfully"}
         
     except HTTPException as he:
-        print(f"❌ DELETE HTTP ERROR: {he.detail}")
+        logger.warning(
+            "chat message delete http error message_id=%s user_id=%s status=%s detail=%s",
+            message_id,
+            current_user.userid,
+            he.status_code,
+            he.detail,
+        )
         raise he
     except Exception as e:
-        print(f"❌ DELETE UNEXPECTED ERROR: {str(e)}")
-        print(f"❌ ERROR TYPE: {type(e).__name__}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(
+            "chat message delete unexpected error message_id=%s user_id=%s",
+            message_id,
+            current_user.userid,
+        )
+        _chat_log_event(
+            "chat_message_delete_failed",
+            level=logging.ERROR,
+            message_id=message_id,
+            user_id=current_user.userid,
+            error_type=type(e).__name__,
+            error=str(e)[:240],
+        )
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.delete("/cleanup")
