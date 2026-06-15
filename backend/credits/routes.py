@@ -792,7 +792,12 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
                     product["bonus_credits"] = bonus_total
                     product["total_credits"] = credits + bonus_total
             except Exception:
-                pass
+                logger.exception(
+                    "Google Play product bonus decoration failed user=%s product_id=%s raw_product=%s",
+                    current_user.userid,
+                    product.get("product_id"),
+                    product,
+                )
         return {"products": products}
     except HTTPException as e:
         # When Play is not configured (e.g. local dev without GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), return empty list so app still works
