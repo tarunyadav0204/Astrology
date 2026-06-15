@@ -1,83 +1,10 @@
 /* ---- Layout ---- */
 .admin-credit-ledger {
   display: flex;
-  gap: 0;
+  flex-direction: column;
   height: calc(100vh - 220px);
   min-height: 480px;
   background: #f5f5f5;
-}
-
-/* ---- Sidebar: View ledger (compact) ---- */
-.users-panel {
-  width: 220px;
-  flex-shrink: 0;
-  background: white;
-  border-right: 1px solid #e8e8e8;
-  padding: 16px 12px;
-  overflow-y: auto;
-}
-
-.users-panel h3 {
-  margin: 0 0 6px 0;
-  color: #333;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.users-hint {
-  margin: 0 0 12px 0;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.35;
-}
-
-.users-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.user-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #eee;
-  border-radius: 8px;
-  background: white;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  text-align: left;
-  font-family: inherit;
-}
-
-.user-item:hover {
-  background: #fff8f3;
-  border-color: rgba(249, 115, 22, 0.4);
-}
-
-.user-item.active {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  border-color: #ea580c;
-  color: white;
-}
-
-.user-item .user-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.user-item .user-meta {
-  font-size: 12px;
-  opacity: 0.85;
-  color: inherit;
 }
 
 /* ---- Main area ---- */
@@ -86,6 +13,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: 100%;
   background: white;
   overflow: hidden;
 }
@@ -203,9 +131,10 @@
 
 .ledger-summary {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-bottom: 12px;
-  flex-wrap: wrap;
 }
 
 .ledger-summary-chip {
@@ -259,52 +188,6 @@
   background: #fafafa;
   border-radius: 8px;
   border: 1px dashed #e0e0e0;
-}
-
-.user-ledger-block {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #eee;
-}
-
-.user-ledger-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.user-ledger-title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: #333;
-}
-
-.clear-selection {
-  padding: 6px 12px;
-  background: #f5f5f5;
-  color: #555;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.clear-selection:hover {
-  background: #eee;
-}
-
-.user-ledger-header .current-balance {
-  margin-left: auto;
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  color: white;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
 }
 
 /* ---- Empty state ---- */
@@ -452,27 +335,8 @@
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
   .admin-credit-ledger {
-    flex-direction: column;
     height: auto;
     min-height: auto;
-  }
-
-  .users-panel {
-    width: 100%;
-    max-height: 220px;
-    border-right: none;
-    border-bottom: 1px solid #e8e8e8;
-  }
-
-  .users-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .user-item {
-    flex: 1 1 auto;
-    min-width: 140px;
   }
 
   .search-row {
@@ -496,15 +360,6 @@
 
   .ledger-content {
     padding: 16px;
-  }
-
-  .user-ledger-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .user-ledger-header .current-balance {
-    margin-left: 0;
   }
 }
 
@@ -553,3 +408,174 @@
 .admin-daily-activity .summary-earned { color: #2e7d32; font-weight: 600; }
 .admin-daily-activity .summary-spent { color: #c62828; font-weight: 600; }
 .admin-daily-activity .summary-count { color: #666; }
+
+/* ---- Row actions menu (credit ledger) ---- */
+.ledger-col-actions {
+  width: 44px;
+  min-width: 44px;
+}
+
+.ledger-actions-cell {
+  position: relative;
+  vertical-align: middle;
+  text-align: center;
+  padding: 4px 6px !important;
+  overflow: visible;
+}
+
+.ledger-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-start;
+}
+
+.ledger-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #444;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ledger-menu-trigger:hover {
+  background: #fff7ed;
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+.ledger-menu-icon {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+
+.ledger-action-menu {
+  position: absolute;
+  z-index: 1000;
+  top: 100%;
+  left: 0;
+  right: auto;
+  transform: none;
+  margin: 4px 0 0 0;
+  padding: 6px 0;
+  min-width: 200px;
+  max-width: min(260px, calc(100vw - 24px));
+  list-style: none;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Portaled/fixed row menu: top/left/width from JS; no extra margin (gap is in computeActionMenuPosition). */
+.ledger-action-menu.ledger-action-menu--fixed {
+  position: fixed;
+  margin: 0;
+  top: auto;
+  left: auto;
+  right: auto;
+}
+
+.ledger-action-menu li {
+  margin: 0;
+}
+
+.ledger-action-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  color: #111827;
+}
+
+.ledger-action-menu-item:hover {
+  background: #fff7ed;
+}
+
+/* ---- User breakdown modal ---- */
+.ledger-user-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+
+.ledger-user-modal {
+  width: 100%;
+  max-width: 920px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  padding: 20px 22px 24px;
+  max-height: calc(100vh - 80px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger-user-modal-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.ledger-user-modal-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  flex: 1 1 auto;
+}
+
+.ledger-user-modal-sub {
+  margin: 0;
+  width: 100%;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.ledger-user-modal-close {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ledger-user-modal-close:hover {
+  background: #e2e8f0;
+}
+
+.ledger-user-modal-meta {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.ledger-user-modal-table {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}

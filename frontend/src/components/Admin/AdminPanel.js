@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
@@ -44,6 +44,20 @@ function promoCodeIsActive(value) {
     return s === '1' || s === 'true' || s === 't' || s === 'yes';
   }
   return Boolean(value);
+}
+
+const USER_ROW_MENU_WIDTH = 220;
+
+function computeUserRowMenuPosition(triggerRect) {
+  const pad = 8;
+  const w = Math.min(USER_ROW_MENU_WIDTH, window.innerWidth - 2 * pad);
+  const left = Math.max(pad, Math.min(triggerRect.left, window.innerWidth - w - pad));
+  const top = triggerRect.bottom + 4;
+  return { top, left, width: w };
+}
+
+function userRowMenuKey(user) {
+  return `${String(user.userid ?? '')}__${String(user.phone ?? '')}`;
 }
 
 function formatDateTimeIST(value) {
@@ -214,6 +228,20 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [pendingSubscription, setPendingSubscription] = useState(null);
   /** Set when opening User profile from User Management (today’s date range + auto-load). Cleared when opening the tab manually. */
   const [profileJumpContext, setProfileJumpContext] = useState(null);
+  /** Open Users → User profile for a userid (e.g. from Credit Ledger row menu). Uses ledger date range when provided. */
+  const openUserProfileFromLedger = ({ userId, dateFrom, dateTo }) => {
+    const t = new Date().toISOString().slice(0, 10);
+    const from = dateFrom && String(dateFrom).trim() ? String(dateFrom).trim() : t;
+    const to = dateTo && String(dateTo).trim() ? String(dateTo).trim() : t;
+    setProfileJumpContext({
+      userId: String(userId),
+      dateFrom: from,
+      dateTo: to,
+      nonce: Date.now(),
+    });
+    setActiveTab('users');
+    setActiveSubTab('userProfile');
+  };
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editingPlanDiscount, setEditingPlanDiscount] = useState('');
   const [savingPlanDiscount, setSavingPlanDiscount] = useState(false);
@@ -347,6 +375,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deviceAccessStatus, setDeviceAccessStatus] = useState('pending'); // 'pending' | 'allowed' | 'blocked'
   const [blockedDeviceId, setBlockedDeviceId] = useState(null);
   const [blockedUserId, setBlockedUserId] = useState(null);
+  /** When set, Credit Ledger opens with this name/phone query (from User Management → Transactions). */
+  const [ledgerJumpContext, setLedgerJumpContext] = useState(null);
+  /** User Management row ⋮ menu (fixed overlay). */
+  const [usersRowMenu, setUsersRowMenu] = useState(null);
+  const usersMenuDropdownRef = useRef(null);
 
   const checkDeviceAccess = React.useCallback(async () => {
     setDeviceAccessStatus('pending');
@@ -370,6 +403,103 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   useEffect(() => {
     checkDeviceAccess();
   }, [checkDeviceAccess]);
+
+  const closeUsersRowMenu = useCallback(() => setUsersRowMenu(null), []);
+
+  useEffect(() => {
+    if (!usersRowMenu) return undefined;
+    const onPointerDown = (e) => {
+      if (usersMenuDropdownRef.current?.contains(e.target)) return;
+      if (e.target.closest?.('.users-menu-trigger')) return;
+      closeUsersRowMenu();
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [usersRowMenu, closeUsersRowMenu]);
+
+  useEffect(() => {
+    if (activeTab !== 'users' || activeSubTab !== 'management') closeUsersRowMenu();
+  }, [activeTab, activeSubTab, closeUsersRowMenu]);
+
+  useEffect(() => {
+    closeUsersRowMenu();
+  }, [usersPage, closeUsersRowMenu]);
+
+  useLayoutEffect(() => {
+    if (!usersRowMenu?.anchorKey) return undefined;
+    const key = usersRowMenu.anchorKey;
+    let rafId = 0;
+    const esc = (s) =>
+      typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(String(s))
+        : String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const runMeasure = () => {
+      const btn = document.querySelector(`[data-users-menu-key="${esc(key)}"]`);
+      if (!btn) return;
+      const pos = computeUserRowMenuPosition(btn.getBoundingClientRect());
+      setUsersRowMenu((m) => {
+        if (!m || m.anchorKey !== key) return m;
+        if (m.top === pos.top && m.left === pos.left && m.width === pos.width) return m;
+        return { ...m, ...pos };
+      });
+    };
+    const schedule = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        runMeasure();
+      });
+    };
+    runMeasure();
+    window.addEventListener('resize', schedule);
+    window.addEventListener('scroll', schedule, true);
+    const contentEl = document.querySelector('.admin-panel .admin-content');
+    if (contentEl) contentEl.addEventListener('scroll', schedule);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', schedule, true);
+      if (contentEl) contentEl.removeEventListener('scroll', schedule);
+    };
+  }, [usersRowMenu?.anchorKey]);
+
+  const toggleUsersRowMenu = useCallback((user, e) => {
+    e.stopPropagation();
+    const trigger = e.currentTarget;
+    if (!trigger) return;
+    const anchorKey = userRowMenuKey(user);
+    const openRect = trigger.getBoundingClientRect();
+    setUsersRowMenu((prev) => {
+      if (prev?.anchorKey === anchorKey) return null;
+      return { anchorKey, user, ...computeUserRowMenuPosition(openRect) };
+    });
+  }, []);
+
+  const handleUsersMenuProfile = useCallback(() => {
+    const rowUser = usersRowMenu?.user;
+    if (!rowUser) return;
+    closeUsersRowMenu();
+    const t = new Date().toISOString().slice(0, 10);
+    setProfileJumpContext({
+      userId: String(rowUser.userid ?? ''),
+      dateFrom: t,
+      dateTo: t,
+      nonce: Date.now(),
+    });
+    setActiveSubTab('userProfile');
+  }, [usersRowMenu, closeUsersRowMenu]);
+
+  const handleUsersMenuTransactions = useCallback(() => {
+    const rowUser = usersRowMenu?.user;
+    if (!rowUser) return;
+    closeUsersRowMenu();
+    const phone = (rowUser.phone && String(rowUser.phone).trim()) || '';
+    const name = (rowUser.name && String(rowUser.name).trim()) || '';
+    const query = phone || name;
+    setLedgerJumpContext({ query, nonce: Date.now() });
+    setActiveTab('credits');
+    setActiveSubTab('ledger');
+  }, [usersRowMenu, closeUsersRowMenu]);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -2428,6 +2558,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           className={`tab ${activeTab === 'credits' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('credits');
+            setLedgerJumpContext(null);
             setActiveSubTab('ledger');
           }}
         >
@@ -2485,7 +2616,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         <div className="admin-subtabs">
           <button 
             className={`subtab ${activeSubTab === 'ledger' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('ledger')}
+            onClick={() => {
+              setLedgerJumpContext(null);
+              setActiveSubTab('ledger');
+            }}
           >
             Ledger
           </button>
@@ -2790,6 +2924,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <table>
                   <thead>
                     <tr>
+                      <th className="ledger-col-actions" aria-label="Row menu" />
                       <th>Phone</th>
                       <th>Name</th>
                       <th>Email</th>
@@ -2810,23 +2945,27 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </thead>
                   <tbody>
                     {users.length === 0 ? (
-                      <tr><td colSpan={10} className="users-table-empty">No users match the search.</td></tr>
+                      <tr><td colSpan={11} className="users-table-empty">No users match the search.</td></tr>
                     ) : (
                       users.map(user => (
                       <tr
                         key={user.userid ?? user.phone}
-                        className="users-table-row-clickable"
-                        onClick={() => {
-                          const t = new Date().toISOString().slice(0, 10);
-                          setProfileJumpContext({
-                            userId: String(user.userid ?? ''),
-                            dateFrom: t,
-                            dateTo: t,
-                            nonce: Date.now(),
-                          });
-                          setActiveSubTab('userProfile');
-                        }}
                       >
+                        <td className="ledger-actions-cell">
+                          <div className="ledger-menu-wrap">
+                            <button
+                              type="button"
+                              className="ledger-menu-trigger users-menu-trigger"
+                              data-users-menu-key={userRowMenuKey(user)}
+                              aria-expanded={usersRowMenu?.anchorKey === userRowMenuKey(user)}
+                              aria-haspopup="menu"
+                              aria-label="User actions"
+                              onClick={(e) => toggleUsersRowMenu(user, e)}
+                            >
+                              <span className="ledger-menu-icon" aria-hidden>⋮</span>
+                            </button>
+                          </div>
+                        </td>
                         <td>{user.phone}</td>
                         <td>{user.name || user.phone || '—'}</td>
                         <td>{user.email || '—'}</td>
@@ -2960,22 +3099,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           <button
                             type="button"
                             className="edit-btn"
-                            onClick={() => {
-                              const t = new Date().toISOString().slice(0, 10);
-                              setProfileJumpContext({
-                                userId: String(user.userid ?? ''),
-                                dateFrom: t,
-                                dateTo: t,
-                                nonce: Date.now(),
-                              });
-                              setActiveSubTab('userProfile');
-                            }}
-                          >
-                            Profile
-                          </button>
-                          <button 
                             onClick={() => setEditingUser(editingUser === user.phone ? null : user.phone)}
-                            className="edit-btn"
                           >
                             {editingUser === user.phone ? 'Cancel' : 'Edit'}
                           </button>
@@ -3248,7 +3372,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'ledger' && (
-          <AdminCreditLedger />
+          <AdminCreditLedger
+            onOpenUserProfile={openUserProfileFromLedger}
+            ledgerJumpContext={ledgerJumpContext}
+          />
         )}
 
         {activeTab === 'expenses' && <AdminExpenses />}
@@ -3592,7 +3719,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'credits' && activeSubTab === 'ledger' && (
-          <AdminCreditLedger />
+          <AdminCreditLedger
+            onOpenUserProfile={openUserProfileFromLedger}
+            ledgerJumpContext={ledgerJumpContext}
+          />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'userCredits' && (
@@ -6045,6 +6175,42 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         </div>
       )}
+
+      {usersRowMenu && usersRowMenu.top != null ? (
+        <ul
+          ref={usersMenuDropdownRef}
+          className="ledger-action-menu ledger-action-menu--fixed"
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: `${usersRowMenu.top}px`,
+            left: `${usersRowMenu.left}px`,
+            width: `${usersRowMenu.width}px`,
+            zIndex: 1600,
+          }}
+        >
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              className="ledger-action-menu-item"
+              onClick={handleUsersMenuProfile}
+            >
+              Profile
+            </button>
+          </li>
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              className="ledger-action-menu-item"
+              onClick={handleUsersMenuTransactions}
+            >
+              Transactions
+            </button>
+          </li>
+        </ul>
+      ) : null}
         </div>
       </div>
       </div>

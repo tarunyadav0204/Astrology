@@ -1160,7 +1160,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                     width={playStoreBanner.width}
                     height={playStoreBanner.height}
                     decoding="async"
-                    fetchPriority="high"
+                    fetchpriority="high"
                     loading="eager"
                   />
                 </picture>

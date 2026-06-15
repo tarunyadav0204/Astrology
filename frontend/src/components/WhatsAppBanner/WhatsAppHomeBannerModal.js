@@ -17,7 +17,7 @@ function WhatsAppBannerImg({ alt }) {
         height={1280}
         loading="eager"
         decoding="async"
-        fetchPriority="high"
+        fetchpriority="high"
       />
     </picture>
   );

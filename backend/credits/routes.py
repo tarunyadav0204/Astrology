@@ -2235,11 +2235,30 @@ async def get_all_users_with_credits(
     return {"users": users, "total": total, "page": page, "limit": limit}
 
 @router.get("/admin/user-history/{userid}")
-async def get_user_transaction_history(userid: int, current_user: User = Depends(get_current_user)):
+async def get_user_transaction_history(
+    userid: int,
+    exclude_zero_amount: bool = Query(False),
+    ledger_filter: Optional[str] = Query(
+        None,
+        description="Optional: purchases (earned+refund) or spend (spent only). Omit for full history.",
+    ),
+    limit: int = Query(50, ge=1, le=2000),
+    current_user: User = Depends(get_current_user),
+):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    transactions = credit_service.get_transaction_history(userid)
+    lf = (ledger_filter or "").strip().lower() or None
+    if lf is not None and lf not in ("purchases", "spend"):
+        raise HTTPException(
+            status_code=400,
+            detail="ledger_filter must be 'purchases', 'spend', or omitted",
+        )
+    transactions = credit_service.get_transaction_history(
+        userid,
+        limit=limit,
+        exclude_zero_amount=exclude_zero_amount,
+        ledger_filter=lf,
+    )
     return {"transactions": transactions}
 
 
@@ -2268,6 +2287,7 @@ async def search_credit_transactions(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     query: Optional[str] = None,
+    exclude_zero_amount: bool = Query(False),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -2294,7 +2314,9 @@ async def search_credit_transactions(
         fd = today - timedelta(days=30)
         td = today
 
-    transactions = credit_service.search_transactions(fd.isoformat(), td.isoformat(), query)
+    transactions = credit_service.search_transactions(
+        fd.isoformat(), td.isoformat(), query, exclude_zero_amount=exclude_zero_amount
+    )
     return {"from_date": fd.isoformat(), "to_date": td.isoformat(), "transactions": transactions}
 
 

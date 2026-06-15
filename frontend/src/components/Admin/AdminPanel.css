@@ -724,10 +724,6 @@
   cursor: not-allowed;
 }
 
-.users-table tbody tr.users-table-row-clickable {
-  cursor: pointer;
-}
-
 .users-table-empty {
   text-align: center;
   padding: 24px;

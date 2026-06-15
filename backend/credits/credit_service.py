@@ -2954,27 +2954,45 @@ class CreditService:
                     pass
             return settings
     
-    def get_transaction_history(self, userid: int, limit: int = 50) -> List[Dict]:
-        """Get credit transaction history for user. reference_id is the activity/feature for spends."""
+    def get_transaction_history(
+        self,
+        userid: int,
+        limit: int = 50,
+        *,
+        exclude_zero_amount: bool = False,
+        ledger_filter: Optional[str] = None,
+    ) -> List[Dict]:
+        """
+        Get credit transaction history for user. reference_id is the activity/feature for spends.
+        ledger_filter: None (all), 'purchases' (earned + refund credits in), 'spend' (spent rows only).
+        """
         from db import get_conn, execute
+        zero_filter = " AND amount <> 0" if exclude_zero_amount else ""
+        lf = (ledger_filter or "").strip().lower()
+        type_filter = ""
+        if lf == "purchases":
+            type_filter = " AND transaction_type IN ('earned', 'refund')"
+        elif lf == "spend":
+            type_filter = " AND transaction_type = 'spent'"
         with get_conn() as conn:
-            cursor = execute(conn, """
-                SELECT transaction_type, amount, balance_after, source, reference_id, description, created_at
+            cursor = execute(conn, f"""
+                SELECT id, transaction_type, amount, balance_after, source, reference_id, description, created_at
                 FROM credit_transactions
-                WHERE userid = ?
+                WHERE userid = ?{zero_filter}{type_filter}
                 ORDER BY created_at DESC
                 LIMIT ?
             """, (userid, limit))
             transactions = []
             for row in cursor.fetchall():
                 transactions.append({
-                    "type": row[0],
-                    "amount": row[1],
-                    "balance_after": row[2],
-                    "source": row[3],
-                    "reference_id": row[4],
-                    "description": row[5],
-                    "date": row[6],
+                    "id": row[0],
+                    "type": row[1],
+                    "amount": row[2],
+                    "balance_after": row[3],
+                    "source": row[4],
+                    "reference_id": row[5],
+                    "description": row[6],
+                    "date": row[7],
                 })
             return transactions
 
@@ -3014,20 +3032,29 @@ class CreditService:
             })
         return transactions
 
-    def search_transactions(self, from_date: str, to_date: str, query: Optional[str] = None, limit: int = 500) -> List[Dict]:
+    def search_transactions(
+        self,
+        from_date: str,
+        to_date: str,
+        query: Optional[str] = None,
+        limit: int = 500,
+        *,
+        exclude_zero_amount: bool = False,
+    ) -> List[Dict]:
         """
         Search credit transactions across all users for a date range, with optional
         wildcard search on user name or phone. Dates are YYYY-MM-DD inclusive.
         """
         from db import get_conn, execute
 
-        sql = """
+        zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
+        sql = f"""
             SELECT ct.id, ct.userid, u.name, u.phone,
                    ct.transaction_type, ct.amount, ct.balance_after,
                    ct.source, ct.reference_id, ct.description, ct.created_at
             FROM credit_transactions ct
             LEFT JOIN users u ON u.userid = ct.userid
-            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?{zero_filter}
         """
         params: List[Any] = [from_date, to_date]
 
