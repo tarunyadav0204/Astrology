@@ -93,6 +93,7 @@ Do not rely on local VM files as the primary incident source.
 Recent progress:
 - login/auth failure prints converted to structured lifecycle logs in `backend/main.py`
 - chat routing/context/delete hot-path prints converted to structured logger events in `backend/chat_history/routes.py`
+- chat context builder cache-hit, context-start, navatara, and calculation failure prints converted to structured logs / warnings in `backend/chat/chat_context_builder.py`
 - deep astrology diagnostics in dasha/jaimini/context-builder are still pending and should likely be gated behind a debug flag instead of staying always-on in prod
 
 ### Phase 6: Alerting

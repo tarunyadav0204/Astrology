@@ -7,6 +7,7 @@ import uuid
 import json
 import logging
 import os
+import time
 from auth import get_current_user
 from db import get_conn, execute
 
@@ -23,6 +24,15 @@ def _chat_log_event(event: str, level: int = logging.INFO, **fields) -> None:
         logger.log(level, json.dumps(payload, default=str, sort_keys=True))
     except Exception:
         logger.log(level, "chat_event=%s fields=%s", event, fields)
+
+
+def _wait_side_enabled() -> bool:
+    try:
+        from chat.wait_conversation_agent import chat_wait_side_conversation_enabled
+
+        return bool(chat_wait_side_conversation_enabled())
+    except Exception:
+        return False
 
 def sanitize_text(text):
     """Remove invalid Unicode characters and surrogates to prevent encoding attacks"""
@@ -363,6 +373,8 @@ def _ensure_chat_messages_task_claim_cols(conn):
 
 def _ensure_wait_side_conversation_tables(conn):
     """Side conversation shown while the main answer is still processing."""
+    if not _wait_side_enabled():
+        return
     execute(conn, """
         CREATE TABLE IF NOT EXISTS chat_wait_conversations (
             conversation_id SERIAL PRIMARY KEY,
@@ -1862,7 +1874,8 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             _ensure_chat_messages_parallel_llm_usage(conn)
             _ensure_chat_messages_engagement_updates(conn)
             _ensure_chat_messages_task_claim_cols(conn)
-            _ensure_wait_side_conversation_tables(conn)
+            if _wait_side_enabled():
+                _ensure_wait_side_conversation_tables(conn)
             conn.commit()
             cur = execute(
                 conn,
@@ -2272,6 +2285,8 @@ def _store_engagement_updates_now(message_id: int, updates: list[dict]):
 
 
 def _fetch_wait_side_messages(conn, main_message_id: int) -> list[dict]:
+    if not _wait_side_enabled():
+        return []
     _ensure_wait_side_conversation_tables(conn)
     try:
         cur = execute(
@@ -2312,6 +2327,8 @@ def _fetch_wait_side_messages(conn, main_message_id: int) -> list[dict]:
 
 
 def _fetch_wait_side_payload(conn, main_message_id: int) -> dict | None:
+    if not _wait_side_enabled():
+        return None
     _ensure_wait_side_conversation_tables(conn)
     try:
         cur = execute(
@@ -2504,6 +2521,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
     from chat.instant_chat_pipeline import generate_instant_chat_response
 
+    processing_started_at = time.time()
+
     try:
         effective_chat_tier = str(chat_tier or "standard").strip().lower()
         is_instant_chat = effective_chat_tier == "instant"
@@ -2534,9 +2553,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         user_facts = {}
         if birth_chart_id and not is_instant_chat:
             fact_extractor = FactExtractor()
-            user_facts = fact_extractor.get_facts(birth_chart_id)
+            facts_start = time.time()
+            user_facts = await asyncio.to_thread(fact_extractor.get_facts, birth_chart_id)
+            _chat_log_event(
+                "chat_processing_phase",
+                message_id=message_id,
+                session_id=session_id,
+                phase="load_user_facts",
+                duration_ms=round((time.time() - facts_start) * 1000, 1),
+                fact_categories=len(user_facts or {}),
+            )
             if user_facts:
-                print(f"📚 Retrieved {len(user_facts)} fact categories for intent routing")
+                logger.info("retrieved %s fact categories for intent routing message_id=%s", len(user_facts), message_id)
         
         # Use birth data from request (required)
         if not birth_details:
@@ -2630,7 +2658,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             extracted_context = json.loads(state_row[1]) if state_row and state_row[1] else {}
         
         # === INTENT ROUTING ===
-        import time
         routing_start = time.time()
         intent_router_ms = None  # set after intent when not partnership_mode
         
@@ -2910,7 +2937,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 context_ms=round(context_time * 1000, 1),
             )
         elif partnership_mode and partner_birth_details:
-            context = context_builder.build_synastry_context(birth_data, partner_birth_details, combined_question, intent)
+            context = await asyncio.to_thread(
+                context_builder.build_synastry_context,
+                birth_data,
+                partner_birth_details,
+                combined_question,
+                intent,
+            )
             context_time = time.time() - context_start
             _chat_log_event(
                 "chat_context_built",
@@ -2921,21 +2954,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             )
             
         elif intent['mode'] == 'annual':
-            # === ANNUAL MODE ===
-            print(f"\n{'='*80}")
-            print(f"📅 ANNUAL MODE ACTIVATED")
-            print(f"{'='*80}")
             target_year = intent.get('year', datetime.now().year)
-            print(f"Target year: {target_year}")
             
             # Convert intent router transit request to old format if needed
             requested_period = _requested_period_from_intent(intent)
-            if requested_period:
-                print(f"Transit period: {requested_period['start_year']}-{requested_period['end_year']}")
             
             # Use build_complete_context with intent_result to get transit data
-            context = context_builder.build_complete_context(
-                birth_data, combined_question, None, requested_period, intent
+            context = await asyncio.to_thread(
+                context_builder.build_complete_context,
+                birth_data,
+                combined_question,
+                None,
+                requested_period,
+                intent,
             )
             
             # Add annual-specific data
@@ -2943,54 +2974,70 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             context['focus_year'] = target_year
             
             context_time = time.time() - context_start
-            print(f"✅ Annual context built in {context_time:.3f}s")
-            print(f"{'='*80}\n")
+            _chat_log_event(
+                "chat_context_built",
+                session_id=session_id,
+                message_id=message_id,
+                mode="annual",
+                context_ms=round(context_time * 1000, 1),
+                target_year=target_year,
+            )
             
         elif intent['mode'] == 'prashna':
-            # === PRASHNA MODE ===
-            print(f"\n{'='*80}")
-            print(f"🔮 PRASHNA MODE ACTIVATED")
-            print(f"{'='*80}")
-            print(f"Question: {combined_question}")
-            print(f"Category: {intent.get('category', 'general')}")
-            
             user_location = {
                 'latitude': birth_data.get('latitude'),
                 'longitude': birth_data.get('longitude'),
                 'place': birth_data.get('place', 'Query Location')
             }
             
-            context = context_builder.build_prashna_context(
+            context = await asyncio.to_thread(
+                context_builder.build_prashna_context,
                 user_location,
                 combined_question,
-                intent.get('category', 'general')
+                intent.get('category', 'general'),
             )
             
             context_time = time.time() - context_start
-            print(f"✅ PRASHNA CONTEXT READY in {context_time:.3f}s")
-            print(f"{'='*80}\n")
+            _chat_log_event(
+                "chat_context_built",
+                session_id=session_id,
+                message_id=message_id,
+                mode="prashna",
+                context_ms=round(context_time * 1000, 1),
+                category=intent.get('category', 'general'),
+            )
             
         else:
-            # === BIRTH CHART MODE (Standard) ===
-            print(f"\n{'='*80}")
-            print(f"🔮 BIRTH CHART MODE (Standard)")
-            print(f"{'='*80}")
-            
             # Convert intent router transit request to old format if needed
             requested_period = _requested_period_from_intent(intent)
-            if requested_period:
-                print(f"Transit period: {requested_period['start_year']}-{requested_period['end_year']}")
             
-            # Log divisional charts being requested
-            if intent.get('divisional_charts'):
-                print(f"Divisional charts requested: {intent['divisional_charts']}")
-            
-            context = context_builder.build_complete_context(
-                birth_data, combined_question, None, requested_period, intent
+            context = await asyncio.to_thread(
+                context_builder.build_complete_context,
+                birth_data,
+                combined_question,
+                None,
+                requested_period,
+                intent,
             )
             context_time = time.time() - context_start
-            print(f"✅ Birth chart context built in {context_time:.3f}s")
-            print(f"{'='*80}\n")
+            _chat_log_event(
+                "chat_context_built",
+                session_id=session_id,
+                message_id=message_id,
+                mode="birth",
+                context_ms=round(context_time * 1000, 1),
+                has_transit_period=bool(requested_period),
+                divisional_charts=intent.get('divisional_charts') or [],
+            )
+
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="build_context",
+            duration_ms=round((time.time() - context_start) * 1000, 1),
+            mode=intent.get('mode', 'birth'),
+        )
         
         # Get conversation history
         with get_conn() as conn:
@@ -3149,6 +3196,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             raise init_error
 
         if is_instant_chat:
+            llm_start = time.time()
             result = await generate_instant_chat_response(
                 analyzer,
                 question=combined_question,
@@ -3159,6 +3207,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 speech_mode=bool(speech_chat_billing),
             )
         else:
+            llm_start = time.time()
             result = await analyzer.generate_chat_response(
                 user_question=combined_question,
                 astrological_context=context,
@@ -3170,8 +3219,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 use_thinking_level_high=False,
                 user_id=user_id,
             )
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="llm_response",
+            duration_ms=round((time.time() - llm_start) * 1000, 1),
+            mode=intent.get('mode', 'default'),
+            success=bool(result.get('success')),
+        )
         
         # Update database with result
+        persistence_start = time.time()
         with get_conn() as conn:
             _ensure_chat_messages_parallel_llm_usage(conn)
             _ensure_chat_messages_cache_token_cols(conn)
@@ -3187,7 +3246,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 skip_instant_charge = bool(is_instant_chat and result.get("skip_instant_credit_charge"))
                 if skip_instant_charge:
                     success = True
-                    print(f"⏭️ Instant conversational ack for user {user_id} — no credits charged")
+                    logger.info("instant conversational ack; no credits charged user_id=%s message_id=%s", user_id, message_id)
                 elif using_free_question:
                     free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
                     credit_service.mark_free_chat_question_used(user_id, birth_hash=free_birth_hash)
@@ -3218,7 +3277,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         "free_question_completed": True,
                         "first_purchase_bonus": first_purchase_bonus_payload,
                     }
-                    print(f"🆓 FREE QUESTION USED for user {user_id} (no credits deducted)")
+                    logger.info("free question used user_id=%s message_id=%s", user_id, message_id)
                     success = True
                 else:
                     amount_to_deduct = effective_cost if effective_cost is not None else chat_cost
@@ -3235,7 +3294,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         f"{analysis_type}: {question[:50]}..."
                     )
                     if success:
-                        print(f"✅ CREDITS DEDUCTED: {amount_to_deduct} credits for user {user_id}")
+                        logger.info("credits deducted amount=%s user_id=%s message_id=%s", amount_to_deduct, user_id, message_id)
 
                 if success:
                     
@@ -3245,8 +3304,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         # If this turn was after a clarification, save FAQ on the original question, not the follow-up
                         original_user_msg_id = get_original_user_message_id_for_faq(session_id, message_id, conn)
                         target_message_id = original_user_msg_id if original_user_msg_id else user_message_id
-                        if original_user_msg_id:
-                            print(f"   📋 Clarification flow: saving FAQ on original user message {target_message_id} (not follow-up {user_message_id})")
                         execute(
                             conn,
                             """
@@ -3261,7 +3318,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 target_message_id,
                             ),
                         )
-                        print(f"   📋 FAQ saved on user message {target_message_id}: {faq_metadata.get('category')} / {faq_metadata.get('canonical_question', '')[:40]}...")
                     
                     # Get summary image from result if available (store as string, not JSON)
                     summary_image = result.get('summary_image', None)
@@ -3425,7 +3481,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             (prov, mod, session_id),
                         )
                 else:
-                    print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
+                    logger.warning("credit deduction failed user_id=%s message_id=%s", user_id, message_id)
                     try:
                         from utils.error_logger import log_chat_error
                         credit_err = Exception("Credit deduction failed")
@@ -3466,6 +3522,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 )
             
             conn.commit()
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="persist_result",
+            duration_ms=round((time.time() - persistence_start) * 1000, 1),
+            success=bool(result.get('success')),
+        )
 
         if result.get('success'):
             await _close_wait_side_conversation(message_id)
@@ -3495,6 +3559,17 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         )
             except Exception as push_err:
                 logger.warning("response-ready push failed message_id=%s user_id=%s: %s", message_id, user_id, push_err)
+
+        _chat_log_event(
+            "chat_processing_complete",
+            message_id=message_id,
+            session_id=session_id,
+            user_id=user_id,
+            mode=intent.get('mode', 'default'),
+            chat_tier=effective_chat_tier,
+            total_duration_ms=round((time.time() - processing_started_at) * 1000, 1),
+            success=bool(result.get('success')),
+        )
         
     except Exception as e:
         # Handle any errors with user-friendly message and log to admin error list

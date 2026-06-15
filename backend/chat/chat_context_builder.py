@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import time
+import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 
@@ -48,6 +49,17 @@ from .system_instruction_config import (
     ORIGINAL_VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION,
     build_system_instruction
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _context_log_event(event: str, level: int = logging.INFO, **fields) -> None:
+    payload = {
+        "event": event,
+        "component": "chat_context_builder",
+        **fields,
+    }
+    logger.log(level, payload)
 
 
 def _safe_year(value: Any, fallback: int) -> int:
@@ -217,7 +229,7 @@ class ChatContextBuilder:
                 self._static_cache_max_entries,
             )
         else:
-            print(f"   ✅ Using cached static context")
+            _context_log_event("static_context_cache_hit")
         static_time = time.time() - static_start_time
         # print(f"   Static context time: {static_time:.2f}s")
         
@@ -246,7 +258,7 @@ class ChatContextBuilder:
                 self._dynamic_cache_max_entries,
             )
         else:
-            print(f"   ✅ Using cached dynamic context")
+            _context_log_event("dynamic_context_cache_hit")
         dynamic_time = time.time() - dynamic_start_time
         # print(f"   Dynamic context time: {dynamic_time:.2f}s")
         
@@ -272,7 +284,7 @@ class ChatContextBuilder:
                 from ai.classical_sutra_rules import build_classical_rule_matches
                 full_context['classical_rule_matches'] = build_classical_rule_matches(full_context, intent_result)
             except Exception as e:
-                print(f"⚠️ Classical rule matcher failed: {e}")
+                logger.warning("classical rule matcher failed: %s", e)
         
         # Filter divisional charts based on intent router recommendations
         if intent_result and intent_result.get('divisional_charts'):
@@ -331,7 +343,10 @@ class ChatContextBuilder:
             full_context['divisional_charts'] = filtered_divisional_charts
             # print(f"📊 Sending {len(filtered_divisional_charts)} divisional charts to Gemini")
         else:
-            print(f"📊 No filtering - sending all {len(full_context.get('divisional_charts', {}))} divisional charts")
+            _context_log_event(
+                "divisional_chart_filtering_skipped",
+                chart_count=len(full_context.get('divisional_charts', {})),
+            )
         
         # Apply minification before returning
         return self._minify_data(full_context)
@@ -343,14 +358,14 @@ class ChatContextBuilder:
         from types import SimpleNamespace
         birth_obj = SimpleNamespace(**birth_data)
         
-        # DEBUG: Log what we're sending to calculate chart
-        print(f"\n📤 [CHART CALCULATION INPUT]")
-        print(f"Date: {birth_data.get('date')}")
-        print(f"Time: {birth_data.get('time')}")
-        print(f"Latitude: {birth_data.get('latitude')}")
-        print(f"Longitude: {birth_data.get('longitude')}")
-        print(f"Timezone: {birth_data.get('timezone', 'NOT PROVIDED')}")
-        print(f"Place: {birth_data.get('place', 'NOT PROVIDED')}")
+        _context_log_event(
+            "chart_calculation_started",
+            date=birth_data.get('date'),
+            time=birth_data.get('time'),
+            latitude=birth_data.get('latitude'),
+            longitude=birth_data.get('longitude'),
+            timezone=birth_data.get('timezone', 'NOT PROVIDED'),
+        )
         
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
@@ -538,7 +553,7 @@ class ChatContextBuilder:
             nadi_links = nadi_calc.get_nadi_links()
             # print(f"   Nadi links calculated: {len(nadi_links)} planets")
             if not nadi_links:
-                print(f"   ⚠️ Nadi links returned empty - check calculator")
+                logger.warning("nadi links returned empty for chat context")
         except Exception as e:
             # print(f"   ❌ Nadi calculation error: {e}")
             nadi_links = {}
@@ -549,7 +564,7 @@ class ChatContextBuilder:
             sudarshana_data = sudarshana_calc.get_sudarshana_view()
             # print(f"   Sudarshana calculated: {len(sudarshana_data)} perspectives")
             if not sudarshana_data:
-                print(f"   ⚠️ Sudarshana returned empty - check calculator")
+                logger.warning("sudarshana chakra returned empty for chat context")
         except Exception as e:
             # print(f"   ❌ Sudarshana calculation error: {e}")
             sudarshana_data = {}
@@ -565,7 +580,7 @@ class ChatContextBuilder:
         try:
             friendship_data = friendship_calc.calculate_friendship(birth_data)
         except Exception as e:
-            print(f"❌ Friendship calculation failed for chat context: {e}")
+            logger.warning("friendship calculation failed for chat context: %s", e)
             friendship_data = {"error": "Friendship calculation unavailable"}
         
         # Calculate KP Chart Data
@@ -586,7 +601,7 @@ class ChatContextBuilder:
                 "four_step_theory": kp_data.get('four_step_theory', {}),
             }
         except Exception as e:
-            print(f"❌ KP calculation failed for chat context: {e}")
+            logger.warning("KP calculation failed for chat context: %s", e)
             kp_analysis = {"error": "KP calculation unavailable"}
 
         context.update({
@@ -769,15 +784,12 @@ class ChatContextBuilder:
         # Always include current dashas
         dasha_calc = DashaCalculator()
         
-        # DEBUG: Log what we're sending to dasha calculator from chat context
-        print(f"\n💬 CHAT CONTEXT BUILDER DEBUG:")
-        print(f"   Calling dasha_calc.calculate_current_dashas with:")
-        print(f"   birth_data keys: {list(birth_data.keys())}")
-        print(f"   Name: {birth_data.get('name', 'N/A')}")
-        print(f"   Date: {birth_data.get('date', 'N/A')}")
-        print(f"   Time: {birth_data.get('time', 'N/A')}")
-        print(f"   Timezone: {birth_data.get('timezone', 'N/A')} (type: {type(birth_data.get('timezone'))})")
-        print(f"   Lat/Lon: {birth_data.get('latitude', 'N/A')}, {birth_data.get('longitude', 'N/A')}")
+        _context_log_event(
+            "dynamic_context_started",
+            has_target_date=bool(target_date),
+            has_requested_period=bool(requested_period),
+            intent_mode=(intent_result or {}).get("mode"),
+        )
         
         context['current_dashas'] = dasha_calc.calculate_current_dashas(birth_data)
         
@@ -797,7 +809,7 @@ class ChatContextBuilder:
                 if daily_spine:
                     context['daily_prediction_spine'] = daily_spine
             except Exception as e:
-                print(f"❌ Daily prediction spine failed: {e}")
+                logger.warning("daily prediction spine failed: %s", e)
         
         relatives = {
             "Mother": (asc_sign + 3) % 12,        # 4th
@@ -848,7 +860,7 @@ class ChatContextBuilder:
                 context['kota_chakra'] = kota_data
                 # print(f"✅ Kota Chakra calculated: {kota_data['protection_score']['status']}")
         except Exception as e:
-            print(f"❌ Kota Chakra calculation failed: {e}")
+            logger.warning("kota chakra calculation failed: %s", e)
         
         # Add Dasha Conflict Analysis
         context['dasha_conflicts'] = self._analyze_dasha_conflicts(
@@ -883,7 +895,7 @@ class ChatContextBuilder:
                 sudarshana_dasha_calc = SudarshanaDashaCalculator(chart_data, birth_data)
                 context['sudarshana_dasha'] = sudarshana_dasha_calc.calculate_precision_triggers(target_year)
             except Exception as e:
-                print(f"❌ Sudarshana Dasha calculation failed: {e}")
+                logger.warning("sudarshana dasha calculation failed for target_year=%s: %s", target_year, e)
         
         # Add Varshphal if question is about a specific year
         if intent_result and intent_result.get('transit_request'):
@@ -913,7 +925,7 @@ class ChatContextBuilder:
                     }
                     # print(f"✅ Varshphal calculated for year {year}")
                 except Exception as e:
-                    print(f"❌ Varshphal calculation failed: {e}")
+                    logger.warning("varshphal calculation failed for year=%s: %s", year, e)
         
         # Add Chara Dasha (Jaimini) with DYNAMIC TARGETING
         try:
@@ -1010,9 +1022,9 @@ class ChatContextBuilder:
                 context['jaimini_full_analysis'] = jaimini_analyzer.get_jaimini_report()
                 # print(f"✅ Jaimini Full Analysis updated with focus_date Chara Dasha")
             except Exception as e:
-                print(f"❌ Jaimini analyzer update failed: {e}")
+                logger.warning("jaimini analyzer update failed: %s", e)
         except Exception as e:
-            print(f"Chara Dasha calculation error: {e}")
+            logger.warning("chara dasha calculation error: %s", e)
         
         # Add specific date dashas if requested
         if target_date:
@@ -1044,7 +1056,11 @@ class ChatContextBuilder:
                     # print(f"  {i}. {period['start_date']} to {period['end_date']}")
                     # print(f"     Sign: {period['sign']} | House: {period['house']} | Segment: {period['segment']}{retro_flag}")
                 if len(periods) > 3:
-                    print(f"  ... and {len(periods) - 3} more periods")
+                    logger.info(
+                        "macro transit timeline truncated planet=%s extra_periods=%s",
+                        planet,
+                        len(periods) - 3,
+                    )
             # print()
             
         except Exception as e:
@@ -1061,23 +1077,18 @@ class ChatContextBuilder:
             moon_data = planetary_analysis.get('Moon', {})
             moon_nakshatra = moon_data.get('basic_info', {}).get('nakshatra')
             
-            print(f"\n🌙 NAVATARA DEBUG:")
-            print(f"   Moon nakshatra from planetary_analysis: {moon_nakshatra}")
-            
             # Get nakshatra number (0-26)
             moon_nakshatra_number = None
             if moon_nakshatra:
                 try:
                     moon_nakshatra_number = self.NAKSHATRA_NAMES.index(moon_nakshatra)
-                    print(f"   Moon nakshatra number: {moon_nakshatra_number}")
                 except ValueError:
-                    print(f"   ❌ Moon nakshatra '{moon_nakshatra}' not found in NAKSHATRA_NAMES")
+                    logger.warning("moon nakshatra not found in navatara mapping: %s", moon_nakshatra)
             else:
-                print(f"   ❌ Moon nakshatra is None or empty")
+                logger.warning("moon nakshatra missing; skipping navatara enrichment")
             
             if moon_nakshatra_number is not None and 'macro_transits_timeline' in context:
                 navatara_calc = NavataraCalculator(moon_nakshatra_number)
-                print(f"   ✅ NavataraCalculator initialized with Moon nakshatra {moon_nakshatra_number}")
                 
                 # Analyze each transit planet's nakshatra position
                 navatara_warnings = {}
@@ -1087,12 +1098,8 @@ class ChatContextBuilder:
                         current_period = periods[0]
                         transit_nakshatra_number = current_period.get('nakshatra_number')
                         transit_nakshatra_name = current_period.get('nakshatra', 'Unknown')
-                        
-                        print(f"   {planet}: transit_nakshatra_number={transit_nakshatra_number}, name={transit_nakshatra_name}")
-                        
                         if transit_nakshatra_number is not None:
                             tara_info = navatara_calc.calculate_tara(transit_nakshatra_number)
-                            print(f"      Tara: {tara_info['name']} (effect: {tara_info['effect']})")
                             
                             if tara_info['effect'] == 'bad':
                                 navatara_warnings[planet] = {
@@ -1104,15 +1111,20 @@ class ChatContextBuilder:
                                     'warning': f"Karmic Obstacle: {planet} in {tara_info['name']} Tara",
                                     'mandatory_statement': f"{planet} is transiting in {transit_nakshatra_name}, which is your {tara_info['name']} Tara from your birth Moon in {moon_nakshatra}. This creates {tara_info['description'].lower()}."
                                 }
-                                print(f"      ⚠️ MALEFIC TARA DETECTED: {planet} in {tara_info['name']}")
-                        else:
-                            print(f"      ⚠️ transit_nakshatra_number is None")
                 
                 context['navatara_warnings'] = navatara_warnings
-                print(f"   ✅ Navatara analysis complete: {len(navatara_warnings)} malefic positions detected")
-                print(f"   navatara_warnings: {navatara_warnings}")
+                _context_log_event(
+                    "navatara_analysis_complete",
+                    moon_nakshatra=moon_nakshatra,
+                    moon_nakshatra_number=moon_nakshatra_number,
+                    warning_count=len(navatara_warnings),
+                )
             else:
-                print(f"   ❌ Skipping Navatara: moon_nakshatra_number={moon_nakshatra_number}, has_macro_transits={'macro_transits_timeline' in context}")
+                logger.info(
+                    "skipping navatara analysis moon_nakshatra_number=%s has_macro_transits=%s",
+                    moon_nakshatra_number,
+                    'macro_transits_timeline' in context,
+                )
                 context['navatara_warnings'] = {}
         except Exception as e:
             print(f"❌ Navatara calculation failed: {e}")
