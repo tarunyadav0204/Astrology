@@ -771,45 +771,17 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
             try:
                 credits = int(product.get("credits") or 0)
                 product_id = str(product.get("product_id") or "").strip() or None
-                status = {
-                    **first_purchase_base_status,
-                    "bonus_credits": 0,
-                    "total_credits": credits if credits else None,
-                    "product_id": product_id,
-                }
-                bonus_credits = credit_service.calculate_first_purchase_bonus_credits(
-                    credits,
+                status = credit_service._compose_bonus_status(
                     first_purchase_base_status,
+                    purchased_credits=credits,
                     product_id=product_id,
                 )
-                status["bonus_credits"] = bonus_credits
-                status["total_credits"] = credits + bonus_credits
-                resolved_bonus_config = credit_service._build_resolved_bonus_config(first_purchase_base_status, product_id)
-                if resolved_bonus_config is not None:
-                    status["resolved_bonus_config"] = resolved_bonus_config
-                if bonus_credits <= 0 and status.get("eligible"):
-                    status["eligible"] = False
-                    status["reason"] = "zero_bonus"
                 product["first_purchase_bonus"] = status
-                discount_status = {
-                    **purchase_discount_base_status,
-                    "bonus_credits": 0,
-                    "total_credits": credits if credits else None,
-                    "product_id": product_id,
-                }
-                discount_bonus_credits = credit_service.calculate_first_purchase_bonus_credits(
-                    credits,
+                discount_status = credit_service._compose_bonus_status(
                     purchase_discount_base_status,
+                    purchased_credits=credits,
                     product_id=product_id,
                 )
-                discount_status["bonus_credits"] = discount_bonus_credits
-                discount_status["total_credits"] = credits + discount_bonus_credits
-                resolved_discount_config = credit_service._build_resolved_bonus_config(purchase_discount_base_status, product_id)
-                if resolved_discount_config is not None:
-                    discount_status["resolved_bonus_config"] = resolved_discount_config
-                if discount_bonus_credits <= 0 and discount_status.get("eligible"):
-                    discount_status["eligible"] = False
-                    discount_status["reason"] = "zero_bonus"
                 product["purchase_discount"] = discount_status
                 bonus_total = 0
                 if status.get("eligible") and int(status.get("bonus_credits") or 0) > 0:

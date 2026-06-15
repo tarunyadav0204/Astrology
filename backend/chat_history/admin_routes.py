@@ -2701,7 +2701,13 @@ async def delete_glossary_term(
 async def update_setting(key: str, setting: AdminSetting, current_user: dict = Depends(require_admin)):
     """Update admin setting"""
     try:
-        from utils.admin_settings import _ensure_admin_settings_table
+        from utils.admin_settings import (
+            _ensure_admin_settings_table,
+            bump_credits_settings_version,
+            invalidate_setting_cache,
+            invalidate_credits_settings_cache,
+            is_credits_setting_key,
+        )
         with get_conn() as conn:
             _ensure_admin_settings_table(conn)
             execute(
@@ -2717,6 +2723,10 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
                 (key, setting.value, setting.description),
             )
             conn.commit()
+        invalidate_setting_cache(key)
+        if is_credits_setting_key(key):
+            invalidate_credits_settings_cache()
+            bump_credits_settings_version()
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")

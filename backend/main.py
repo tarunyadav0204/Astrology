@@ -497,6 +497,7 @@ def ensure_users_userid_default() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
+    credits_settings_poll_task = None
     # Startup
     try:
         ensure_users_userid_default()
@@ -555,8 +556,10 @@ async def lifespan(app: FastAPI):
         print(f"Warning: Subscription tier migration skipped: {e}")
     try:
         from utils.admin_settings import migrate_deprecated_gemini_model_ids_on_startup
+        from utils.admin_settings import poll_credits_settings_version_forever
 
         migrate_deprecated_gemini_model_ids_on_startup()
+        credits_settings_poll_task = asyncio.create_task(poll_credits_settings_version_forever())
         print("Admin settings: checked deprecated Gemini 3.1 Flash Lite preview model ids")
     except Exception as e:
         print(f"Warning: Gemini admin_settings migration skipped: {e}")
@@ -571,9 +574,15 @@ async def lifespan(app: FastAPI):
         print("App testimonials table initialized")
     except Exception as e:
         print(f"Warning: Could not initialize app testimonials table: {e}")
-    yield
-    # Shutdown (if needed later)
-    pass
+    try:
+        yield
+    finally:
+        if credits_settings_poll_task is not None:
+            credits_settings_poll_task.cancel()
+            try:
+                await credits_settings_poll_task
+            except asyncio.CancelledError:
+                pass
 
 
 # Deploy/restart marker only — no runtime behavior change (2026-04-17).

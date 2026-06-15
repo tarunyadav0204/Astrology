@@ -2069,6 +2069,34 @@ class CreditService:
             "source": "default",
         }
 
+    def _compose_bonus_status(
+        self,
+        base_status: Dict[str, Any],
+        *,
+        purchased_credits: Optional[int] = None,
+        product_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        config = dict(base_status)
+        normalized_product_id = str(product_id or "").strip() or None
+        bonus = self.calculate_first_purchase_bonus_credits(
+            purchased_credits or 0,
+            config,
+            product_id=normalized_product_id,
+        ) if purchased_credits else 0
+        status = {
+            **base_status,
+            "bonus_credits": bonus,
+            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
+            "product_id": normalized_product_id,
+        }
+        resolved_bonus_config = self._build_resolved_bonus_config(config, normalized_product_id)
+        if resolved_bonus_config is not None:
+            status["resolved_bonus_config"] = resolved_bonus_config
+        if status.get("eligible") and bonus <= 0:
+            status["eligible"] = False
+            status["reason"] = "zero_bonus"
+        return status
+
     def _first_purchase_bonus_base_status(
         self,
         userid: int,
@@ -2193,21 +2221,11 @@ class CreditService:
             current_source=current_source,
             current_reference_id=current_reference_id,
         )
-        config = dict(status)
-        bonus = self.calculate_first_purchase_bonus_credits(
-            purchased_credits or 0,
-            config,
+        status = self._compose_bonus_status(
+            status,
+            purchased_credits=purchased_credits,
             product_id=product_id,
-        ) if purchased_credits else 0
-        status = {
-            **status,
-            "bonus_credits": bonus,
-            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
-            "product_id": str(product_id or "").strip() or None,
-        }
-        resolved_bonus_config = self._build_resolved_bonus_config(config, status.get("product_id"))
-        if resolved_bonus_config is not None:
-            status["resolved_bonus_config"] = resolved_bonus_config
+        )
 
         def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
             try:
@@ -2225,7 +2243,7 @@ class CreditService:
                     purchased_credits,
                     status.get("product_id"),
                     status.get("bonus_credits"),
-                    config.get("window_minutes"),
+                    status.get("window_minutes"),
                     extra or {},
                 )
             except Exception:
@@ -2329,29 +2347,11 @@ class CreditService:
             current_source=current_source,
             current_reference_id=current_reference_id,
         )
-        config = dict(status)
-        bonus = self.calculate_first_purchase_bonus_credits(
-            purchased_credits or 0,
-            config,
+        return self._compose_bonus_status(
+            status,
+            purchased_credits=purchased_credits,
             product_id=product_id,
-        ) if purchased_credits else 0
-        status = {
-            **status,
-            "bonus_credits": bonus,
-            "total_credits": (int(purchased_credits or 0) + bonus) if purchased_credits else None,
-            "product_id": str(product_id or "").strip() or None,
-        }
-        resolved_bonus_config = self._build_resolved_bonus_config(config, status.get("product_id"))
-        if resolved_bonus_config is not None:
-            status["resolved_bonus_config"] = resolved_bonus_config
-
-        if bonus <= 0:
-            status["reason"] = "zero_bonus"
-            return status
-
-        status["eligible"] = True
-        status["reason"] = "eligible"
-        return status
+        )
 
     def maybe_apply_purchase_discount(
         self,
