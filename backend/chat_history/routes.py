@@ -249,6 +249,9 @@ CHAT_QUEUED_STALE_MINUTES = _env_int("CHAT_QUEUED_STALE_MINUTES", 90)
 CHAT_PROCESSING_STALE_MESSAGE = (
     "This reading was interrupted before it could finish. Please ask again; no credits were charged."
 )
+CHAT_QUEUE_UNAVAILABLE_MESSAGE = (
+    "Chat processing is temporarily unavailable. Please try again in a moment; no credits were charged."
+)
 
 
 def _processing_started_at_age_minutes(started_at) -> float | None:
@@ -271,6 +274,26 @@ def _processing_started_at_age_minutes(started_at) -> float | None:
 def _timestamp_is_future(value) -> bool:
     if not value:
         return False
+
+
+def _mark_chat_processing_failed(message_id: int, error_message: str) -> None:
+    """Persist a terminal chat failure without charging credits."""
+    with get_conn() as conn:
+        _ensure_chat_messages_task_claim_cols(conn)
+        execute(
+            conn,
+            """
+                UPDATE chat_messages
+                SET status = %s,
+                    error_message = %s,
+                    completed_at = %s,
+                    task_claim_id = NULL,
+                    task_claimed_until = NULL
+                WHERE message_id = %s
+            """,
+            ("failed", sanitize_text(error_message), datetime.now(), message_id),
+        )
+        conn.commit()
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -1767,8 +1790,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "claim_id": str(uuid.uuid4()),
     }
     queued = False
+    queue_mode_enabled = False
     try:
-        from chat_history.task_queue import enqueue_chat_processing_task
+        from chat_history.task_queue import enqueue_chat_processing_task, chat_tasks_enabled
+        queue_mode_enabled = bool(chat_tasks_enabled())
         queued = enqueue_chat_processing_task(message_id=assistant_message_id, payload=task_payload)
     except Exception as exc:
         logger.exception("chat queue enqueue failed before fallback message_id=%s: %s", assistant_message_id, exc)
@@ -1786,10 +1811,19 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         except Exception as exc:
             logger.exception("failed to mark chat task enqueued message_id=%s: %s", assistant_message_id, exc)
     else:
-        background_tasks.add_task(
-            process_gemini_response,
-            assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
-        )
+        if queue_mode_enabled:
+            logger.error(
+                "chat queue enqueue unavailable while CHAT_TASKS_ENABLED=true message_id=%s session_id=%s user_id=%s",
+                assistant_message_id,
+                session_id,
+                current_user.userid,
+            )
+            _mark_chat_processing_failed(assistant_message_id, CHAT_QUEUE_UNAVAILABLE_MESSAGE)
+        else:
+            background_tasks.add_task(
+                process_gemini_response,
+                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
+            )
     
     print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
     print(f"🚀 Returning {len(chart_insights)} chart insights: {chart_insights[:2] if chart_insights else 'EMPTY'}")

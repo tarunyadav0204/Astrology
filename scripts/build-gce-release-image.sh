@@ -4,9 +4,9 @@ set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 PROJECT_ID="${PROJECT_ID:-tradebest-465307}"
-ZONE="${ZONE:-asia-south2-a}"
+ZONE="${ZONE:-asia-south2-b}"
 MACHINE_TYPE="${MACHINE_TYPE:-e2-standard-2}"
-BASE_IMAGE="${BASE_IMAGE:-astroroshni-bootstrap-test-20260615-180947}"
+BASE_IMAGE="${BASE_IMAGE:-astroroshni-release-backend-cad234c4eae9-855}"
 BASE_IMAGE_PROJECT="${BASE_IMAGE_PROJECT:-${PROJECT_ID}}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-800681558445-compute@developer.gserviceaccount.com}"
 SCOPES="${SCOPES:-https://www.googleapis.com/auth/cloud-platform}"

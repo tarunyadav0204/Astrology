@@ -50,6 +50,14 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      GCP_MIG_NAME: astroroshni-mig-s2b
+      GCP_MIG_ZONE: asia-south2-b
+      GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
+      GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
     
     steps:
     - name: Checkout
@@ -163,11 +171,6 @@ jobs:
     - name: Rolling app deploy on current MIG VMs
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       env:
-        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-        CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-        CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-        GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
-        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
         FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
         FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
         FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
@@ -252,11 +255,7 @@ jobs:
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       shell: bash
       env:
-        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
-        GCP_BACKEND_MACHINE_TYPE: ${{ vars.GCP_BACKEND_MACHINE_TYPE || 'e2-standard-4' }}
-        GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
-        GCP_RELEASE_BASE_IMAGE: ${{ vars.GCP_RELEASE_BASE_IMAGE || 'astroroshni-release-backend-20260615-212840' }}
+        GCP_RELEASE_BASE_IMAGE: ${{ vars.GCP_RELEASE_BASE_IMAGE || 'astroroshni-release-backend-cad234c4eae9-855' }}
       run: |
         set -euo pipefail
         SHORT_SHA="${GITHUB_SHA::12}"
@@ -282,11 +281,6 @@ jobs:
       id: baked_template
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       shell: bash
-      env:
-        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-        GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
-        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
-        GCP_BACKEND_MACHINE_TYPE: ${{ vars.GCP_BACKEND_MACHINE_TYPE || 'e2-standard-4' }}
       run: |
         set -euo pipefail
         SHORT_SHA="${GITHUB_SHA::12}"
@@ -319,12 +313,6 @@ jobs:
 
     - name: Emergency rolling VM replacement
       if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
-      env:
-        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-        CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-        CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-        GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
-        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
       run: |
         set -euo pipefail
         echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
