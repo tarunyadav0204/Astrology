@@ -276,7 +276,7 @@ jobs:
         KEEP_BUILDER_VM="false" \
         SERVE_FRONTEND_LOCALLY="false" \
         INSTALL_GCP_OPS_AGENT="false" \
-        "${GITHUB_WORKSPACE}/scripts/build-gce-release-image.sh"
+        bash "${GITHUB_WORKSPACE}/scripts/build-gce-release-image.sh"
 
     - name: Refresh MIG baked-image template for future replacements
       id: baked_template

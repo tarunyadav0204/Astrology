@@ -575,12 +575,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     return () => clearTimeout(timer);
   }, [notifBulkJob]);
 
-  useEffect(() => {
-    if (activeTab !== 'settings' || settingsSubTab !== 'operations') return;
-    fetchOpsSystemStatus();
-    fetchLatestCpuSnapshot();
-  }, [activeTab, settingsSubTab, fetchOpsSystemStatus, fetchLatestCpuSnapshot]);
-
   const fetchAllowedDevices = async () => {
     setAllowedDevicesLoading(true);
     try {
@@ -618,6 +612,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setOpsLatestSnapshotPath('');
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'settings' || settingsSubTab !== 'operations') return;
+    fetchOpsSystemStatus();
+    fetchLatestCpuSnapshot();
+  }, [activeTab, settingsSubTab, fetchOpsSystemStatus, fetchLatestCpuSnapshot]);
 
   const handleCaptureCpuSnapshot = useCallback(async () => {
     setOpsSnapshotLoading(true);
