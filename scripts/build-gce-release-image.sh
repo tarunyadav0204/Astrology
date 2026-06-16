@@ -29,6 +29,26 @@ run_gcloud() {
   fi
 }
 
+retry_gcloud() {
+  local attempts="$1"
+  local sleep_seconds="$2"
+  shift 2
+
+  local attempt=1
+  while true; do
+    if run_gcloud "$@"; then
+      return 0
+    fi
+    if [ "${attempt}" -ge "${attempts}" ]; then
+      echo "❌ Command failed after ${attempts} attempt(s): ${GCLOUD_BIN} $*"
+      return 1
+    fi
+    echo "⚠️ Command failed on attempt ${attempt}/${attempts}. Retrying in ${sleep_seconds}s..."
+    sleep "${sleep_seconds}"
+    attempt=$((attempt + 1))
+  done
+}
+
 cleanup() {
   rm -f "${WORK_BUNDLE}" 2>/dev/null || true
 }
@@ -115,7 +135,7 @@ run_gcloud compute instances stop "${INSTANCE_NAME}" \
   --project="${PROJECT_ID}"
 
 echo "🧊 Creating release image ${IMAGE_NAME}..."
-run_gcloud compute images create "${IMAGE_NAME}" \
+retry_gcloud 3 20 compute images create "${IMAGE_NAME}" \
   --project="${PROJECT_ID}" \
   --source-disk="${INSTANCE_NAME}" \
   --source-disk-zone="${ZONE}" \
