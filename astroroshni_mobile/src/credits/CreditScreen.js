@@ -19,6 +19,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
 import { useCredits } from './CreditContext';
 import { creditAPI } from './creditService';
@@ -34,6 +35,7 @@ import {
 } from './androidUserChoiceRazorpay';
 
 const { width } = Dimensions.get('window');
+const PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY = 'pendingGooglePlayCreditPurchasesV1';
 
 
 /** Map react-native-iap v14 product shapes to fields used by this screen (legacy v12-style accessors). */
@@ -98,6 +100,37 @@ function formatSubscriptionDate(isoDate, locale = 'en-US') {
   const d = new Date(isoDate);
   if (isNaN(d.getTime())) return isoDate;
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function normalizePendingCreditPurchase(entry) {
+  if (!entry) return null;
+  const purchaseToken = String(entry.purchaseToken || '').trim();
+  const productId = String(entry.productId || '').trim();
+  const orderId = String(entry.orderId || '').trim();
+  if (!purchaseToken || !productId || !orderId) return null;
+  return {
+    purchaseToken,
+    productId,
+    orderId,
+    price_amount_micros: Number.isFinite(Number(entry.price_amount_micros))
+      ? parseInt(entry.price_amount_micros, 10)
+      : null,
+    price_currency: entry.price_currency || null,
+    localized_price: entry.localized_price || null,
+    savedAt: entry.savedAt || new Date().toISOString(),
+  };
+}
+
+async function getGooglePlayObfuscatedAccountId() {
+  try {
+    const raw = await AsyncStorage.getItem('userData');
+    const parsed = raw ? JSON.parse(raw) : null;
+    const userId = parsed?.userid ?? parsed?.user_id ?? parsed?.id;
+    if (userId == null) return null;
+    return `user:${String(userId).trim()}`;
+  } catch (_) {
+    return null;
+  }
 }
 
 /** Get subscription price: prefer backend formatted_price (from Google Play), then iapSubscriptions, then plan.price. */
@@ -317,26 +350,90 @@ const CreditScreen = ({ navigation }) => {
     }
   };
 
+  const loadPendingGooglePlayCreditPurchases = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY);
+      const parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed)
+        ? parsed.map(normalizePendingCreditPurchase).filter(Boolean)
+        : [];
+    } catch (_) {
+      return [];
+    }
+  };
+
+  const savePendingGooglePlayCreditPurchase = async (entry) => {
+    const normalized = normalizePendingCreditPurchase(entry);
+    if (!normalized) return;
+    try {
+      const existing = await loadPendingGooglePlayCreditPurchases();
+      const filtered = existing.filter(
+        (item) =>
+          !(
+            item.purchaseToken === normalized.purchaseToken &&
+            item.productId === normalized.productId &&
+            item.orderId === normalized.orderId
+          )
+      );
+      filtered.unshift(normalized);
+      await AsyncStorage.setItem(
+        PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY,
+        JSON.stringify(filtered.slice(0, 50))
+      );
+    } catch (_) {
+      /* ignore */
+    }
+  };
+
+  const removePendingGooglePlayCreditPurchase = async ({ purchaseToken, productId, orderId }) => {
+    try {
+      const existing = await loadPendingGooglePlayCreditPurchases();
+      const filtered = existing.filter(
+        (item) =>
+          !(
+            item.purchaseToken === String(purchaseToken || '').trim() &&
+            item.productId === String(productId || '').trim() &&
+            item.orderId === String(orderId || '').trim()
+          )
+      );
+      await AsyncStorage.setItem(PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY, JSON.stringify(filtered));
+    } catch (_) {
+      /* ignore */
+    }
+  };
+
   /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
-  const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
+  const handleGooglePlayPurchaseSuccess = async (
+    purchaseToken,
+    productId,
+    orderId,
+    pricingOverride = null
+  ) => {
     if (!purchaseToken || !productId || !orderId) return;
     setPurchasingProductId(productId);
     try {
       const iapProduct = iapProducts.find((p) => (p.productId || p.product_id) === productId);
       const oneTimeOffer = iapProduct?.oneTimePurchaseOfferDetails || {};
       const pricingPayload = {
-        price_amount_micros: oneTimeOffer.priceAmountMicros
+        price_amount_micros: pricingOverride?.price_amount_micros ?? (oneTimeOffer.priceAmountMicros
           ? parseInt(oneTimeOffer.priceAmountMicros, 10)
-          : null,
-        price_currency: oneTimeOffer.priceCurrencyCode || null,
-        localized_price: iapProduct?.localizedPrice || iapProduct?.price || null,
+          : null),
+        price_currency: pricingOverride?.price_currency ?? oneTimeOffer.priceCurrencyCode ?? null,
+        localized_price: pricingOverride?.localized_price ?? iapProduct?.localizedPrice ?? iapProduct?.price ?? null,
       };
+      await savePendingGooglePlayCreditPurchase({
+        purchaseToken,
+        productId,
+        orderId,
+        ...pricingPayload,
+      });
       const { data } = await creditAPI.verifyGooglePlayPurchase(
         purchaseToken,
         productId,
         orderId,
         pricingPayload
       );
+      await removePendingGooglePlayCreditPurchase({ purchaseToken, productId, orderId });
       await fetchBalance();
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
@@ -1008,6 +1105,19 @@ const CreditScreen = ({ navigation }) => {
   const syncOneTimePurchasesWithPlay = async () => {
     if (Platform.OS !== 'android' || !RNIap || productIds.length === 0) return;
     try {
+      const pending = await loadPendingGooglePlayCreditPurchases();
+      for (const pendingPurchase of pending) {
+        try {
+          await handleGooglePlayPurchaseSuccess(
+            pendingPurchase.purchaseToken,
+            pendingPurchase.productId,
+            pendingPurchase.orderId,
+            pendingPurchase
+          );
+        } catch (_) {
+          // keep going; unresolved purchases stay in local retry storage
+        }
+      }
       let creditPurchases = [];
       const available = await RNIap.getAvailablePurchases().catch(() => []);
       creditPurchases = (available || []).filter(
@@ -1155,6 +1265,7 @@ const CreditScreen = ({ navigation }) => {
   const startGooglePlayPurchase = async (product) => {
     const productId = product.product_id || product.id;
     const iapProduct = iapProducts.find((p) => (p.productId || p.product_id) === productId);
+    const obfuscatedAccountIdAndroid = await getGooglePlayObfuscatedAccountId();
     trackAstrologyEvent.initiateCheckout({
       content_id: productId,
       content_type: 'credits',
@@ -1166,7 +1277,10 @@ const CreditScreen = ({ navigation }) => {
       await RNIap.requestPurchase({
         type: 'in-app',
         request: {
-          android: { skus: [productId] },
+          android: {
+            skus: [productId],
+            ...(obfuscatedAccountIdAndroid ? { obfuscatedAccountIdAndroid } : {}),
+          },
         },
       });
     } catch (e) {
@@ -1194,6 +1308,7 @@ const CreditScreen = ({ navigation }) => {
 
   const startGooglePlaySubscription = async (plan) => {
     const productId = plan.google_play_product_id;
+    const obfuscatedAccountIdAndroid = await getGooglePlayObfuscatedAccountId();
     // Google Play requires subscriptionOffers with offerToken (from getSubscriptions)
     const subscription = iapSubscriptions.find(
       (s) => (s.productId || s.product_id) === productId
@@ -1230,6 +1345,7 @@ const CreditScreen = ({ navigation }) => {
           android: {
             skus: [productId],
             subscriptionOffers: [{ sku: productId, offerToken }],
+            ...(obfuscatedAccountIdAndroid ? { obfuscatedAccountIdAndroid } : {}),
           },
         },
       });

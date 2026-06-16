@@ -308,6 +308,28 @@ class CreditService:
                 )
             ''')
 
+            # Durable backlog for one-time RTDN events whose purchase token is not yet
+            # mapped to an app user at the time Google notifies us.
+            execute(conn, '''
+                CREATE TABLE IF NOT EXISTS play_onetime_pending_event (
+                    id BIGSERIAL PRIMARY KEY,
+                    event_id TEXT NOT NULL UNIQUE,
+                    purchase_token TEXT NOT NULL,
+                    product_id TEXT,
+                    notification_type INTEGER,
+                    event_time_millis BIGINT,
+                    payload_json TEXT,
+                    userid INTEGER,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_retry_at TIMESTAMP,
+                    retry_count INTEGER NOT NULL DEFAULT 0,
+                    resolved_at TIMESTAMP,
+                    resolution_note TEXT,
+                    last_error TEXT
+                )
+            ''')
+
             # Hard guard against double-credit race conditions for Google Play credits.
             # PostgreSQL supports partial unique indexes with IF NOT EXISTS.
             try:
@@ -1580,6 +1602,196 @@ class CreditService:
                     (eid,),
                 )
                 return bool(cur.fetchone())
+        except Exception:
+            return False
+
+    def enqueue_pending_play_onetime_event(
+        self,
+        *,
+        event_id: str,
+        purchase_token: str,
+        product_id: Optional[str],
+        notification_type: Optional[int],
+        event_time_millis: Optional[int],
+        payload_json: Optional[str],
+        userid: Optional[int] = None,
+        resolution_note: Optional[str] = None,
+    ) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        token = (purchase_token or "").strip()
+        if not eid or not token:
+            return False
+        try:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    INSERT INTO play_onetime_pending_event (
+                        event_id,
+                        purchase_token,
+                        product_id,
+                        notification_type,
+                        event_time_millis,
+                        payload_json,
+                        userid,
+                        status,
+                        first_seen_at,
+                        last_retry_at,
+                        retry_count,
+                        resolution_note,
+                        last_error
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, ?, NULL)
+                    ON CONFLICT (event_id) DO UPDATE
+                      SET purchase_token = EXCLUDED.purchase_token,
+                          product_id = EXCLUDED.product_id,
+                          notification_type = EXCLUDED.notification_type,
+                          event_time_millis = EXCLUDED.event_time_millis,
+                          payload_json = COALESCE(EXCLUDED.payload_json, play_onetime_pending_event.payload_json),
+                          userid = COALESCE(EXCLUDED.userid, play_onetime_pending_event.userid),
+                          status = CASE
+                              WHEN play_onetime_pending_event.status = 'resolved' THEN play_onetime_pending_event.status
+                              ELSE 'pending'
+                          END,
+                          resolution_note = COALESCE(EXCLUDED.resolution_note, play_onetime_pending_event.resolution_note),
+                          last_retry_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        eid,
+                        token,
+                        (product_id or "").strip() or None,
+                        int(notification_type) if notification_type is not None else None,
+                        int(event_time_millis) if event_time_millis is not None else None,
+                        payload_json,
+                        int(userid) if userid is not None else None,
+                        (resolution_note or "").strip() or None,
+                    ),
+                )
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def get_pending_play_onetime_events(
+        self,
+        *,
+        purchase_token: Optional[str] = None,
+        userid: Optional[int] = None,
+        limit: int = 100,
+    ):
+        from db import get_conn, execute
+        clauses = ["status = 'pending'"]
+        params = []
+        token = (purchase_token or "").strip()
+        if token:
+            clauses.append("purchase_token = ?")
+            params.append(token)
+        if userid is not None:
+            clauses.append("(userid = ? OR userid IS NULL)")
+            params.append(int(userid))
+        lim = max(1, min(int(limit or 100), 500))
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT event_id,
+                           purchase_token,
+                           product_id,
+                           notification_type,
+                           event_time_millis,
+                           payload_json,
+                           userid,
+                           retry_count,
+                           first_seen_at,
+                           last_retry_at,
+                           resolution_note,
+                           last_error
+                    FROM play_onetime_pending_event
+                    WHERE {' AND '.join(clauses)}
+                    ORDER BY COALESCE(event_time_millis, 0) ASC, first_seen_at ASC
+                    LIMIT {lim}
+                    """,
+                    tuple(params),
+                )
+                return cur.fetchall() or []
+        except Exception:
+            return []
+
+    def mark_pending_play_onetime_event_retry(
+        self,
+        event_id: str,
+        *,
+        userid: Optional[int] = None,
+        last_error: Optional[str] = None,
+    ) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        if not eid:
+            return False
+        try:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    UPDATE play_onetime_pending_event
+                    SET retry_count = COALESCE(retry_count, 0) + 1,
+                        last_retry_at = CURRENT_TIMESTAMP,
+                        userid = COALESCE(?, userid),
+                        last_error = ?,
+                        status = 'pending'
+                    WHERE event_id = ?
+                    """,
+                    (
+                        int(userid) if userid is not None else None,
+                        (last_error or "").strip()[:500] or None,
+                        eid,
+                    ),
+                )
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def resolve_pending_play_onetime_event(
+        self,
+        event_id: str,
+        *,
+        userid: Optional[int] = None,
+        status: str = "resolved",
+        resolution_note: Optional[str] = None,
+        last_error: Optional[str] = None,
+    ) -> bool:
+        from db import get_conn, execute
+        eid = (event_id or "").strip()
+        if not eid:
+            return False
+        normalized_status = (status or "resolved").strip() or "resolved"
+        try:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    UPDATE play_onetime_pending_event
+                    SET userid = COALESCE(?, userid),
+                        status = ?,
+                        resolved_at = CURRENT_TIMESTAMP,
+                        last_retry_at = CURRENT_TIMESTAMP,
+                        resolution_note = ?,
+                        last_error = ?
+                    WHERE event_id = ?
+                    """,
+                    (
+                        int(userid) if userid is not None else None,
+                        normalized_status,
+                        (resolution_note or "").strip()[:500] or None,
+                        (last_error or "").strip()[:500] or None,
+                        eid,
+                    ),
+                )
+                conn.commit()
+                return True
         except Exception:
             return False
 

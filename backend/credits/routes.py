@@ -167,6 +167,23 @@ GOOGLE_PLAY_SOURCE = "google_play"
 PACKAGE_NAME = "com.astroroshni.mobile"
 
 
+def _userid_from_play_obfuscated_account(value: Optional[str]) -> Optional[int]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    lowered = raw.lower()
+    for prefix in ("user:", "uid:", "userid:", "u:"):
+        if lowered.startswith(prefix):
+            raw = raw[len(prefix):].strip()
+            break
+    if raw.isdigit():
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _get_play_service():
     """Build Android Publisher API service with service account credentials (file path or inline JSON)."""
     try:
@@ -760,6 +777,118 @@ def _credit_verified_google_play_purchase(
     }
 
 
+def _process_pending_google_play_onetime_events_for_token(
+    *,
+    userid: int,
+    purchase_token: str,
+    product_id_hint: Optional[str] = None,
+) -> Dict[str, Any]:
+    token = (purchase_token or "").strip()
+    if not token:
+        return {"found": 0, "resolved": 0, "failed": 0}
+
+    pending_rows = credit_service.get_pending_play_onetime_events(
+        purchase_token=token,
+        userid=userid,
+        limit=50,
+    )
+    found = len(pending_rows or [])
+    resolved = 0
+    failed = 0
+    for row in pending_rows or []:
+        event_id = str(row[0] or "").strip()
+        product_id = str(row[2] or product_id_hint or "").strip()
+        if not event_id or not product_id:
+            failed += 1
+            credit_service.resolve_pending_play_onetime_event(
+                event_id,
+                userid=userid,
+                status="failed",
+                resolution_note="missing_token_or_product",
+                last_error="Missing purchase token or product id while retrying pending one-time RTDN",
+            )
+            continue
+        try:
+            result = _credit_verified_google_play_purchase(
+                userid=userid,
+                user_phone=None,
+                user_name=None,
+                purchase_token=token,
+                product_id=product_id,
+                order_id_hint=None,
+            )
+            resolution_note = (
+                "already_credited"
+                if int(result.get("credits_added") or 0) == 0 and "already" in str(result.get("message") or "").lower()
+                else "credited"
+            )
+            credit_service.log_play_onetime_event(
+                event_id=event_id,
+                purchase_token=token,
+                product_id=product_id,
+                notification_type=row[3],
+                event_time_millis=row[4],
+                payload_json=row[5],
+            )
+            credit_service.resolve_pending_play_onetime_event(
+                event_id,
+                userid=userid,
+                status="resolved",
+                resolution_note=resolution_note,
+            )
+            resolved += 1
+        except HTTPException as exc:
+            failed += 1
+            detail = getattr(exc, "detail", None) or str(exc)
+            credit_service.mark_pending_play_onetime_event_retry(
+                event_id,
+                userid=userid,
+                last_error=str(detail),
+            )
+            logger.warning(
+                "Pending Google Play one-time retry failed event_id=%s user=%s product=%s detail=%s",
+                event_id,
+                userid,
+                product_id,
+                detail,
+            )
+        except Exception as exc:
+            failed += 1
+            credit_service.mark_pending_play_onetime_event_retry(
+                event_id,
+                userid=userid,
+                last_error=str(exc),
+            )
+            logger.exception(
+                "Pending Google Play one-time retry crashed event_id=%s user=%s product=%s",
+                event_id,
+                userid,
+                product_id,
+            )
+    return {"found": found, "resolved": resolved, "failed": failed}
+
+
+def _resolve_userid_from_google_play_onetime_purchase(
+    *,
+    purchase_token: str,
+    product_id: str,
+) -> Optional[int]:
+    try:
+        purchase = _verify_google_play_purchase(PACKAGE_NAME, product_id, purchase_token)
+    except Exception:
+        logger.exception(
+            "Google Play one-time ownership resolve failed product=%s token_prefix=%s",
+            product_id,
+            (purchase_token or "")[:12],
+        )
+        return None
+    for key in ("obfuscatedExternalAccountId", "obfuscatedAccountId", "obfuscatedExternalProfileId"):
+        userid = _userid_from_play_obfuscated_account(purchase.get(key))
+        if userid is not None:
+            return userid
+    return None
+
+
 @router.get("/google-play/products")
 async def get_google_play_products(current_user: User = Depends(get_current_user)):
     """List credit products from Google Play (active in-app products with id convention credits_N)."""
@@ -844,7 +973,7 @@ async def verify_google_play_purchase(
     current_user: User = Depends(get_current_user),
 ):
     """Verify a Google Play one-time purchase and grant credits idempotently by order_id."""
-    return _credit_verified_google_play_purchase(
+    result = _credit_verified_google_play_purchase(
         userid=current_user.userid,
         user_phone=current_user.phone,
         user_name=current_user.name,
@@ -855,6 +984,21 @@ async def verify_google_play_purchase(
         price_currency=request.price_currency,
         localized_price=request.localized_price,
     )
+    try:
+        pending_summary = _process_pending_google_play_onetime_events_for_token(
+            userid=current_user.userid,
+            purchase_token=request.purchase_token,
+            product_id_hint=(request.product_id or "").strip() or None,
+        )
+        if pending_summary.get("found"):
+            result["pending_rtdn_recovery"] = pending_summary
+    except Exception:
+        logger.exception(
+            "Google Play verify succeeded but pending RTDN recovery failed user=%s product=%s",
+            current_user.userid,
+            (request.product_id or "").strip(),
+        )
+    return result
 
 
 @router.post("/google-play/subscription/verify")
@@ -1201,12 +1345,31 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
 
         userid = credit_service.get_user_id_by_play_onetime_purchase_token(purchase_token)
         if userid is None:
+            userid = _resolve_userid_from_google_play_onetime_purchase(
+                purchase_token=purchase_token,
+                product_id=product_id,
+            )
+            if userid is not None:
+                try:
+                    credit_service.upsert_play_onetime_token(userid, purchase_token, product_id)
+                except Exception:
+                    pass
+        if userid is None:
+            credit_service.enqueue_pending_play_onetime_event(
+                event_id=event_id,
+                purchase_token=purchase_token,
+                product_id=product_id,
+                notification_type=int(notification_type) if notification_type is not None else None,
+                event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
+                payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+                resolution_note="waiting_for_token_mapping",
+            )
             logger.warning(
-                "RTDN push: unknown one-time token; ignoring (product=%s message_id=%s)",
+                "RTDN push: unknown one-time token; queued for retry (product=%s message_id=%s)",
                 product_id,
                 message_id or "n/a",
             )
-            return {"success": True, "ignored": "unknown_purchase_token"}
+            return {"success": True, "queued": "unknown_purchase_token"}
 
         _credit_verified_google_play_purchase(
             userid=userid,
@@ -1223,6 +1386,12 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             notification_type=int(notification_type) if notification_type is not None else None,
             event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
             payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+        )
+        credit_service.resolve_pending_play_onetime_event(
+            event_id,
+            userid=userid,
+            status="resolved",
+            resolution_note="processed_from_rtdn",
         )
         return {"success": True}
 
