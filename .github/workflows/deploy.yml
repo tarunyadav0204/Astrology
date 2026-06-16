@@ -292,14 +292,14 @@ jobs:
         SHORT_SHA="${GITHUB_SHA::12}"
         TEMPLATE_NAME="astro-baked-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
         SUBNET_REGION="${GCP_MIG_ZONE%-*}"
+        SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
         echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
 
         gcloud compute instance-templates create "${TEMPLATE_NAME}" \
           --project="${GCP_PROJECT_ID}" \
           --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
           --network=default \
-          --subnet=default \
-          --subnet-region="${SUBNET_REGION}" \
+          --subnet="${SUBNET_SELF_LINK}" \
           --no-address \
           --maintenance-policy=MIGRATE \
           --provisioning-model=STANDARD \
