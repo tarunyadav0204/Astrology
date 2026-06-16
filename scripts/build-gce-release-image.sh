@@ -16,7 +16,17 @@ IMAGE_FAMILY="${IMAGE_FAMILY:-astroroshni-release}"
 STORAGE_LOCATION="${STORAGE_LOCATION:-asia-south2}"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/home/tarun_yadav/AstrologyApp}"
 WORK_BUNDLE="/private/tmp/astroroshni-release-image-bundle-${IMAGE_NAME}.tgz"
-GCLOUD_BIN="${GCLOUD_BIN:-/Users/tarunydv/Downloads/google-cloud-sdk/bin/gcloud}"
+GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
+GCLOUD_CONFIG="${GCLOUD_CONFIG:-${CLOUDSDK_CONFIG:-}}"
+KEEP_BUILDER_VM="${KEEP_BUILDER_VM:-false}"
+
+run_gcloud() {
+  if [ -n "${GCLOUD_CONFIG}" ]; then
+    CLOUDSDK_CONFIG="${GCLOUD_CONFIG}" "${GCLOUD_BIN}" "$@"
+  else
+    "${GCLOUD_BIN}" "$@"
+  fi
+}
 
 cleanup() {
   rm -f "${WORK_BUNDLE}" 2>/dev/null || true
@@ -26,7 +36,7 @@ trap cleanup EXIT
 wait_for_ssh() {
   local attempt
   for attempt in $(seq 1 30); do
-    if CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute ssh tarun_yadav@"${INSTANCE_NAME}" \
+    if run_gcloud compute ssh tarun_yadav@"${INSTANCE_NAME}" \
       --zone="${ZONE}" \
       --project="${PROJECT_ID}" \
       --command='echo ssh-ready' >/dev/null 2>&1; then
@@ -60,7 +70,7 @@ tar \
   restart_server.sh
 
 echo "🖥️ Creating builder VM ${INSTANCE_NAME} from ${BASE_IMAGE}..."
-CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute instances create "${INSTANCE_NAME}" \
+run_gcloud compute instances create "${INSTANCE_NAME}" \
   --project="${PROJECT_ID}" \
   --zone="${ZONE}" \
   --machine-type="${MACHINE_TYPE}" \
@@ -75,7 +85,7 @@ echo "⏳ Waiting for SSH readiness on ${INSTANCE_NAME}..."
 wait_for_ssh
 
 echo "📤 Copying release bundle and scripts to builder VM..."
-CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute scp \
+run_gcloud compute scp \
   "${WORK_BUNDLE}" \
   "${APP_ROOT}/scripts/prepare-image-release.sh" \
   "${APP_ROOT}/scripts/bootstrap-runtime.sh" \
@@ -85,7 +95,7 @@ CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute scp \
   --project="${PROJECT_ID}"
 
 echo "🔧 Expanding current repo state onto the builder VM and preparing baked contents..."
-CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute ssh tarun_yadav@"${INSTANCE_NAME}" \
+run_gcloud compute ssh tarun_yadav@"${INSTANCE_NAME}" \
   --zone="${ZONE}" \
   --project="${PROJECT_ID}" \
   --command="set -euo pipefail
@@ -99,12 +109,12 @@ chmod +x '${REMOTE_APP_DIR}/scripts/prepare-image-release.sh' '${REMOTE_APP_DIR}
 APP_ROOT='${REMOTE_APP_DIR}' APP_COMMIT_SHA='${IMAGE_NAME}' SERVE_FRONTEND_LOCALLY='false' INSTALL_GCP_OPS_AGENT='false' '${REMOTE_APP_DIR}/scripts/prepare-image-release.sh'"
 
 echo "⏹️ Stopping builder VM before imaging..."
-CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute instances stop "${INSTANCE_NAME}" \
+run_gcloud compute instances stop "${INSTANCE_NAME}" \
   --zone="${ZONE}" \
   --project="${PROJECT_ID}"
 
 echo "🧊 Creating release image ${IMAGE_NAME}..."
-CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute images create "${IMAGE_NAME}" \
+run_gcloud compute images create "${IMAGE_NAME}" \
   --project="${PROJECT_ID}" \
   --source-disk="${INSTANCE_NAME}" \
   --source-disk-zone="${ZONE}" \
@@ -113,4 +123,17 @@ CLOUDSDK_CONFIG=/private/tmp/gcloud-config-copy "${GCLOUD_BIN}" compute images c
   --guest-os-features=UEFI_COMPATIBLE
 
 echo "✅ Release image ready: ${IMAGE_NAME}"
-echo "ℹ️ Builder VM retained for inspection: ${INSTANCE_NAME}"
+
+case "$(printf '%s' "${KEEP_BUILDER_VM}" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes)
+    echo "ℹ️ Builder VM retained for inspection: ${INSTANCE_NAME}"
+    ;;
+  *)
+    echo "🧹 Deleting builder VM ${INSTANCE_NAME}..."
+    run_gcloud compute instances delete "${INSTANCE_NAME}" \
+      --project="${PROJECT_ID}" \
+      --zone="${ZONE}" \
+      --quiet
+    echo "✅ Builder VM deleted"
+    ;;
+esac

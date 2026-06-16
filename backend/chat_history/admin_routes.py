@@ -1,10 +1,12 @@
 import re
 import os
 import logging
+import subprocess
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 import json
+from pathlib import Path
 from datetime import datetime, timezone
 from auth import get_current_user
 from db import get_conn, execute
@@ -57,6 +59,11 @@ class GlossaryTerm(BaseModel):
     aliases: Optional[List[str]] = None
 
 
+class AdminCpuSnapshotRequest(BaseModel):
+    only_if_high: bool = False
+    cpu_threshold_percent: int = 120
+
+
 def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -64,6 +71,10 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 
 router = APIRouter()
+
+APP_ROOT = Path(__file__).resolve().parents[1]
+CPU_SNAPSHOT_SCRIPT = APP_ROOT / "scripts" / "capture_cpu_snapshot.sh"
+CPU_SNAPSHOT_LOG = APP_ROOT / "logs" / "cpu-snapshots.log"
 
 
 def _table_exists(conn, table_name: str) -> bool:
@@ -2730,6 +2741,104 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")
+
+
+@router.get("/admin/ops/system-status")
+async def admin_ops_system_status(current_user: dict = Depends(require_admin)):
+    """Return lightweight runtime status for admin diagnostics."""
+    try:
+        import psutil
+        import threading
+
+        process = psutil.Process()
+        with get_conn() as conn:
+            cur = execute(conn, "SELECT COUNT(*) FROM users")
+            user_count = (cur.fetchone() or [0])[0]
+
+        return {
+            "status": "healthy",
+            "process": {
+                "pid": process.pid,
+                "memory_mb": round(process.memory_info().rss / 1024 / 1024, 2),
+                "memory_percent": round(process.memory_percent(), 2),
+                "cpu_percent": process.cpu_percent(interval=0.2),
+                "threads": threading.active_count(),
+                "connections": len(process.connections()),
+                "open_files": len(process.open_files()),
+            },
+            "system": {
+                "cpu_percent": psutil.cpu_percent(interval=0.2),
+                "memory_used_percent": psutil.virtual_memory().percent,
+                "load_avg": list(os.getloadavg()) if hasattr(os, "getloadavg") else [],
+            },
+            "users": user_count,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching system status: {str(e)}")
+
+
+@router.post("/admin/ops/cpu-snapshot")
+async def admin_capture_cpu_snapshot(
+    payload: AdminCpuSnapshotRequest,
+    current_user: dict = Depends(require_admin),
+):
+    """Trigger a CPU snapshot capture on the server."""
+    if not CPU_SNAPSHOT_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="CPU snapshot script is missing on server")
+    try:
+        env = os.environ.copy()
+        env["APP_ROOT"] = str(APP_ROOT)
+        env["ONLY_IF_HIGH"] = "true" if payload.only_if_high else "false"
+        env["CPU_THRESHOLD_PERCENT"] = str(max(1, int(payload.cpu_threshold_percent or 120)))
+        result = subprocess.run(
+            [str(CPU_SNAPSHOT_SCRIPT)],
+            cwd=str(APP_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+        return {
+            "success": result.returncode == 0,
+            "returncode": result.returncode,
+            "stdout": (result.stdout or "").strip()[-4000:],
+            "stderr": (result.stderr or "").strip()[-4000:],
+            "log_path": str(CPU_SNAPSHOT_LOG),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="CPU snapshot capture timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error capturing CPU snapshot: {str(e)}")
+
+
+@router.get("/admin/ops/cpu-snapshot/latest")
+async def admin_latest_cpu_snapshot(
+    tail_lines: int = Query(200, ge=20, le=1000),
+    current_user: dict = Depends(require_admin),
+):
+    """Return the tail of the latest CPU snapshot log for admin viewing."""
+    try:
+        if not CPU_SNAPSHOT_LOG.exists():
+            return {
+                "exists": False,
+                "log_path": str(CPU_SNAPSHOT_LOG),
+                "content": "",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        text = CPU_SNAPSHOT_LOG.read_text(encoding="utf-8", errors="replace")
+        lines = text.splitlines()
+        content = "\n".join(lines[-tail_lines:])
+        return {
+            "exists": True,
+            "log_path": str(CPU_SNAPSHOT_LOG),
+            "content": content,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading CPU snapshot log: {str(e)}")
 
 @router.get("/admin/facts")
 async def get_all_user_facts(

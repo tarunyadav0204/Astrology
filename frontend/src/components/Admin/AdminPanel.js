@@ -331,6 +331,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [newAllowedDeviceId, setNewAllowedDeviceId] = useState('');
   const [newAllowedDeviceLabel, setNewAllowedDeviceLabel] = useState('');
   const [newAllowedDeviceForUserId, setNewAllowedDeviceForUserId] = useState('');
+  const [opsSystemStatus, setOpsSystemStatus] = useState(null);
+  const [opsStatusLoading, setOpsStatusLoading] = useState(false);
+  const [opsSnapshotLoading, setOpsSnapshotLoading] = useState(false);
+  const [opsSnapshotResult, setOpsSnapshotResult] = useState(null);
+  const [opsLatestSnapshot, setOpsLatestSnapshot] = useState('');
+  const [opsLatestSnapshotPath, setOpsLatestSnapshotPath] = useState('');
+  const [opsSnapshotOnlyIfHigh, setOpsSnapshotOnlyIfHigh] = useState(false);
+  const [opsSnapshotThreshold, setOpsSnapshotThreshold] = useState('120');
   const [blogPosts, setBlogPosts] = useState([]);
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
@@ -567,6 +575,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     return () => clearTimeout(timer);
   }, [notifBulkJob]);
 
+  useEffect(() => {
+    if (activeTab !== 'settings' || settingsSubTab !== 'operations') return;
+    fetchOpsSystemStatus();
+    fetchLatestCpuSnapshot();
+  }, [activeTab, settingsSubTab, fetchOpsSystemStatus, fetchLatestCpuSnapshot]);
+
   const fetchAllowedDevices = async () => {
     setAllowedDevicesLoading(true);
     try {
@@ -579,6 +593,48 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setAllowedDevicesLoading(false);
     }
   };
+
+  const fetchOpsSystemStatus = useCallback(async () => {
+    setOpsStatusLoading(true);
+    try {
+      const data = await adminService.getOpsSystemStatus();
+      setOpsSystemStatus(data);
+    } catch (e) {
+      console.error('Failed to fetch ops system status', e);
+      setOpsSystemStatus(null);
+    } finally {
+      setOpsStatusLoading(false);
+    }
+  }, []);
+
+  const fetchLatestCpuSnapshot = useCallback(async () => {
+    try {
+      const data = await adminService.getLatestCpuSnapshot({ tail_lines: 220 });
+      setOpsLatestSnapshot(data.content || '');
+      setOpsLatestSnapshotPath(data.log_path || '');
+    } catch (e) {
+      console.error('Failed to fetch latest CPU snapshot', e);
+      setOpsLatestSnapshot('');
+      setOpsLatestSnapshotPath('');
+    }
+  }, []);
+
+  const handleCaptureCpuSnapshot = useCallback(async () => {
+    setOpsSnapshotLoading(true);
+    try {
+      const result = await adminService.captureCpuSnapshot({
+        only_if_high: opsSnapshotOnlyIfHigh,
+        cpu_threshold_percent: Number(opsSnapshotThreshold) || 120,
+      });
+      setOpsSnapshotResult(result);
+      await Promise.all([fetchOpsSystemStatus(), fetchLatestCpuSnapshot()]);
+    } catch (e) {
+      console.error('Failed to capture CPU snapshot', e);
+      setOpsSnapshotResult({ success: false, stderr: e.message || 'Failed to capture snapshot' });
+    } finally {
+      setOpsSnapshotLoading(false);
+    }
+  }, [fetchLatestCpuSnapshot, fetchOpsSystemStatus, opsSnapshotOnlyIfHigh, opsSnapshotThreshold]);
 
   const fetchAdminSettings = async () => {
     try {
@@ -5843,6 +5899,98 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   />
                   <span className="toggle-slider"></span>
                 </label>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Runtime Diagnostics</h3>
+              <p className="settings-hint">
+                Capture a server snapshot when CPU is high and inspect the latest runtime state without SSH.
+              </p>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                <div className="setting-info" style={{ minWidth: '260px' }}>
+                  <strong>Current runtime status</strong>
+                  <p>Live backend memory, CPU, thread, connection, and load data from the active API process.</p>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', flex: '1 1 420px' }}>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #d9e2f1', background: '#f8fafc' }}>
+                    <strong>Process CPU</strong>
+                    <div>{opsSystemStatus?.process?.cpu_percent ?? '—'}%</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #d9e2f1', background: '#f8fafc' }}>
+                    <strong>System CPU</strong>
+                    <div>{opsSystemStatus?.system?.cpu_percent ?? '—'}%</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #d9e2f1', background: '#f8fafc' }}>
+                    <strong>Memory</strong>
+                    <div>{opsSystemStatus?.process?.memory_mb ?? '—'} MB</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #d9e2f1', background: '#f8fafc' }}>
+                    <strong>Threads</strong>
+                    <div>{opsSystemStatus?.process?.threads ?? '—'}</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #d9e2f1', background: '#f8fafc' }}>
+                    <strong>Connections</strong>
+                    <div>{opsSystemStatus?.process?.connections ?? '—'}</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #d9e2f1', background: '#f8fafc' }}>
+                    <strong>Load Avg</strong>
+                    <div>{Array.isArray(opsSystemStatus?.system?.load_avg) && opsSystemStatus.system.load_avg.length ? opsSystemStatus.system.load_avg.map(v => Number(v).toFixed(2)).join(', ') : '—'}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <button type="button" className="create-btn" onClick={fetchOpsSystemStatus} disabled={opsStatusLoading}>
+                  {opsStatusLoading ? 'Refreshing…' : 'Refresh runtime status'}
+                </button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                  <input
+                    type="checkbox"
+                    checked={opsSnapshotOnlyIfHigh}
+                    onChange={(e) => setOpsSnapshotOnlyIfHigh(e.target.checked)}
+                  />
+                  Capture only if CPU is already above threshold
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                  Threshold
+                  <input
+                    type="number"
+                    min="1"
+                    value={opsSnapshotThreshold}
+                    onChange={(e) => setOpsSnapshotThreshold(e.target.value)}
+                    style={{ width: '90px' }}
+                  />
+                  %
+                </label>
+                <button type="button" className="create-btn" onClick={handleCaptureCpuSnapshot} disabled={opsSnapshotLoading}>
+                  {opsSnapshotLoading ? 'Capturing…' : 'Capture CPU snapshot now'}
+                </button>
+                <button type="button" className="create-btn secondary" onClick={fetchLatestCpuSnapshot}>
+                  Refresh latest snapshot
+                </button>
+              </div>
+              {opsSnapshotResult && (
+                <div style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: '#f6f8fb', border: '1px solid #d9e2f1' }}>
+                  <strong>{opsSnapshotResult.success ? 'Snapshot captured' : 'Snapshot result'}</strong>
+                  <div style={{ marginTop: '6px', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px' }}>
+                    {[opsSnapshotResult.stdout, opsSnapshotResult.stderr].filter(Boolean).join('\n')}
+                  </div>
+                </div>
+              )}
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap', marginTop: '16px' }}>
+                <div className="setting-info" style={{ flex: '1 1 220px' }}>
+                  <strong>Latest CPU snapshot</strong>
+                  <p>
+                    {opsLatestSnapshotPath ? <>Log file: <code>{opsLatestSnapshotPath}</code></> : 'No snapshot log yet.'}
+                  </p>
+                </div>
+                <textarea
+                  readOnly
+                  value={opsLatestSnapshot}
+                  rows={18}
+                  placeholder="The latest CPU snapshot will appear here."
+                  style={{ width: '100%', minHeight: '320px', padding: '10px', fontFamily: 'monospace', fontSize: '12px' }}
+                />
               </div>
             </div>
 

@@ -2,7 +2,7 @@
 Google Play RTDN worker.
 
 Consumes Pub/Sub messages from play-subscription-events subscription and applies
-subscription updates in our DB.
+Google Play RTDN updates in our DB.
 
 Run (example):
   python -m credits.play_rtdn_worker
@@ -18,7 +18,11 @@ from google.cloud import pubsub_v1
 
 from credits.credit_service import CreditService
 from credits.play_subscription_events import rtdn_kind_for_notification_type
-from credits.routes import _sync_subscription_from_play, _credit_verified_google_play_purchase
+from credits.routes import (
+    _credit_verified_google_play_purchase,
+    _resolve_userid_from_google_play_onetime_purchase,
+    _sync_subscription_from_play,
+)
 
 logger = logging.getLogger("play_rtdn_worker")
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s %(name)s: %(message)s")
@@ -122,13 +126,52 @@ def _process_one(
         else credit_service.get_user_id_by_play_onetime_purchase_token(purchase_token)
     )
     if userid is None:
-        logger.warning(
-            "No user mapped for purchase token yet. event_id=%s product_id=%s",
-            event_id,
-            product_id,
-        )
-        # Ack intentionally: avoid endless retries for unknown tokens.
-        return True
+        if not is_subscription:
+            userid = _resolve_userid_from_google_play_onetime_purchase(
+                purchase_token=purchase_token,
+                product_id=product_id,
+            )
+            if userid is not None:
+                try:
+                    credit_service.upsert_play_onetime_token(userid, purchase_token, product_id)
+                except Exception:
+                    logger.exception(
+                        "Failed to persist one-time token mapping event_id=%s user=%s product=%s",
+                        event_id,
+                        userid,
+                        product_id,
+                    )
+                    return False
+        if userid is None:
+            if is_subscription:
+                logger.warning(
+                    "No user mapped for subscription token yet. event_id=%s product_id=%s. Will retry.",
+                    event_id,
+                    product_id,
+                )
+                return False
+            queued = credit_service.enqueue_pending_play_onetime_event(
+                event_id=event_id,
+                purchase_token=purchase_token,
+                product_id=product_id,
+                notification_type=notification_type,
+                event_time_millis=event_time_millis,
+                payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+                resolution_note="waiting_for_token_mapping",
+            )
+            if not queued:
+                logger.warning(
+                    "Failed to queue unresolved one-time RTDN event_id=%s product_id=%s. Will retry.",
+                    event_id,
+                    product_id,
+                )
+                return False
+            logger.warning(
+                "Queued unresolved one-time RTDN event_id=%s product_id=%s for later recovery",
+                event_id,
+                product_id,
+            )
+            return True
 
     if is_subscription:
         # Accept any payment state for RTDN sync so cancelled/non-renewing states update end_date.
@@ -138,7 +181,7 @@ def _process_one(
             purchase_token=purchase_token,
             accept_any_payment_state=True,
         )
-        credit_service.log_play_subscription_event(
+        if not credit_service.log_play_subscription_event(
             event_id=event_id,
             purchase_token=purchase_token,
             product_id=product_id,
@@ -151,7 +194,9 @@ def _process_one(
             start_date=sync_result.get("start_date"),
             end_date=sync_result.get("end_date"),
             google_play_order_id=sync_result.get("google_play_order_id"),
-        )
+        ):
+            logger.warning("Failed to log subscription RTDN event_id=%s. Will retry.", event_id)
+            return False
     else:
         _credit_verified_google_play_purchase(
             userid=userid,
@@ -161,13 +206,21 @@ def _process_one(
             product_id=product_id,
             order_id_hint=None,
         )
-        credit_service.log_play_onetime_event(
+        if not credit_service.log_play_onetime_event(
             event_id=event_id,
             purchase_token=purchase_token,
             product_id=product_id,
             notification_type=notification_type,
             event_time_millis=event_time_millis,
             payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+        ):
+            logger.warning("Failed to log one-time RTDN event_id=%s. Will retry.", event_id)
+            return False
+        credit_service.resolve_pending_play_onetime_event(
+            event_id,
+            userid=userid,
+            status="resolved",
+            resolution_note="processed_from_pubsub_worker",
         )
     logger.info(
         "Processed RTDN event_id=%s user=%s product=%s type=%s",
@@ -222,4 +275,3 @@ def run_worker() -> None:
 
 if __name__ == "__main__":
     run_worker()
-

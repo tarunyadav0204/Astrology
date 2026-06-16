@@ -247,6 +247,74 @@ jobs:
         fi
         echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
 
+    - name: Build baked backend release image
+      id: baked_image
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
+        GCP_BACKEND_MACHINE_TYPE: ${{ vars.GCP_BACKEND_MACHINE_TYPE || 'e2-standard-4' }}
+        GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
+        GCP_RELEASE_BASE_IMAGE: ${{ vars.GCP_RELEASE_BASE_IMAGE || 'astroroshni-release-backend-20260615-212840' }}
+      run: |
+        set -euo pipefail
+        SHORT_SHA="${GITHUB_SHA::12}"
+        IMAGE_NAME="astroroshni-release-backend-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+        echo "image_name=${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
+        APP_ROOT="${GITHUB_WORKSPACE}" \
+        GCLOUD_BIN="gcloud" \
+        GCLOUD_CONFIG="${CLOUDSDK_CONFIG:-}" \
+        PROJECT_ID="${GCP_PROJECT_ID}" \
+        ZONE="${GCP_MIG_ZONE}" \
+        MACHINE_TYPE="${GCP_IMAGE_BUILDER_MACHINE_TYPE}" \
+        BASE_IMAGE="${GCP_RELEASE_BASE_IMAGE}" \
+        BASE_IMAGE_PROJECT="${GCP_PROJECT_ID}" \
+        IMAGE_NAME="${IMAGE_NAME}" \
+        IMAGE_FAMILY="astroroshni-release-backend" \
+        STORAGE_LOCATION="asia-south2" \
+        KEEP_BUILDER_VM="false" \
+        SERVE_FRONTEND_LOCALLY="false" \
+        INSTALL_GCP_OPS_AGENT="false" \
+        "${GITHUB_WORKSPACE}/scripts/build-gce-release-image.sh"
+
+    - name: Refresh MIG baked-image template for future replacements
+      id: baked_template
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        GCP_MIG_NAME: ${{ vars.GCP_MIG_NAME }}
+        GCP_MIG_ZONE: ${{ vars.GCP_MIG_ZONE }}
+        GCP_BACKEND_MACHINE_TYPE: ${{ vars.GCP_BACKEND_MACHINE_TYPE || 'e2-standard-4' }}
+      run: |
+        set -euo pipefail
+        SHORT_SHA="${GITHUB_SHA::12}"
+        TEMPLATE_NAME="astro-baked-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+        echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
+
+        gcloud compute instance-templates create "${TEMPLATE_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
+          --network=default \
+          --subnet=default \
+          --no-address \
+          --maintenance-policy=MIGRATE \
+          --provisioning-model=STANDARD \
+          --service-account="800681558445-compute@developer.gserviceaccount.com" \
+          --scopes="https://www.googleapis.com/auth/cloud-platform" \
+          --tags="web-server" \
+          --image="${{ steps.baked_image.outputs.image_name }}" \
+          --image-project="${GCP_PROJECT_ID}" \
+          --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
+
+        gcloud compute instance-groups managed set-instance-template "${GCP_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_MIG_ZONE}" \
+          --template="${TEMPLATE_NAME}"
+
+        echo "Updated future replacement template to ${TEMPLATE_NAME}"
+
     - name: Emergency rolling VM replacement
       if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
       env:

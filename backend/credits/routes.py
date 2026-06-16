@@ -1246,7 +1246,9 @@ async def sync_google_play_subscription(
 async def google_play_rtdn_push(body: Dict[str, Any]):
     """
     Pub/Sub push endpoint for Google Play RTDN events.
-    Returns 200 for handled/ignored events so Pub/Sub can ack and move on.
+    Returns 200 only after we have either processed the event or recorded it
+    durably enough to retry later. If we cannot make durable progress, return a
+    non-2xx so Pub/Sub retries delivery.
     """
     msg = body.get("message") if isinstance(body, dict) else None
     message_id = str((msg or {}).get("messageId") or (msg or {}).get("message_id") or "").strip()
@@ -1300,7 +1302,7 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             purchase_token=purchase_token,
             accept_any_payment_state=True,
         )
-        credit_service.log_play_subscription_event(
+        if not credit_service.log_play_subscription_event(
             event_id=event_id,
             purchase_token=purchase_token,
             product_id=product_id,
@@ -1313,7 +1315,8 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             start_date=sync_result.get("start_date"),
             end_date=sync_result.get("end_date"),
             google_play_order_id=sync_result.get("google_play_order_id"),
-        )
+        ):
+            raise HTTPException(status_code=503, detail="Failed to log subscription RTDN event")
         return {"success": True}
 
     onetime_notif = payload.get("oneTimeProductNotification")
@@ -1355,7 +1358,7 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
                 except Exception:
                     pass
         if userid is None:
-            credit_service.enqueue_pending_play_onetime_event(
+            queued = credit_service.enqueue_pending_play_onetime_event(
                 event_id=event_id,
                 purchase_token=purchase_token,
                 product_id=product_id,
@@ -1364,6 +1367,8 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
                 payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
                 resolution_note="waiting_for_token_mapping",
             )
+            if not queued:
+                raise HTTPException(status_code=503, detail="Failed to queue unresolved one-time RTDN event")
             logger.warning(
                 "RTDN push: unknown one-time token; queued for retry (product=%s message_id=%s)",
                 product_id,
@@ -1379,14 +1384,15 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             product_id=product_id,
             order_id_hint=None,
         )
-        credit_service.log_play_onetime_event(
+        if not credit_service.log_play_onetime_event(
             event_id=event_id,
             purchase_token=purchase_token,
             product_id=product_id,
             notification_type=int(notification_type) if notification_type is not None else None,
             event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
             payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
-        )
+        ):
+            raise HTTPException(status_code=503, detail="Failed to log one-time RTDN event")
         credit_service.resolve_pending_play_onetime_event(
             event_id,
             userid=userid,

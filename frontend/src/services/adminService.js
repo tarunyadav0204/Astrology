@@ -608,4 +608,42 @@ export const adminService = {
   getAdminIssueScreenshotUrl(issueId) {
     return getEndpoint(`/admin/issues/${issueId}/screenshot`);
   },
+
+  async getOpsSystemStatus() {
+    const response = await fetch(getEndpoint('/admin/ops/system-status'), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch runtime status');
+    }
+    return response.json();
+  },
+
+  async captureCpuSnapshot(payload = {}) {
+    const response = await fetch(getEndpoint('/admin/ops/cpu-snapshot'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to capture CPU snapshot');
+    }
+    return response.json();
+  },
+
+  async getLatestCpuSnapshot(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.tail_lines != null) sp.set('tail_lines', String(params.tail_lines));
+    const qs = sp.toString();
+    const response = await fetch(getEndpoint('/admin/ops/cpu-snapshot/latest') + (qs ? `?${qs}` : ''), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch latest CPU snapshot');
+    }
+    return response.json();
+  },
 };
