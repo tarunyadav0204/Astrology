@@ -72,7 +72,7 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 router = APIRouter()
 
-APP_ROOT = Path(__file__).resolve().parents[1]
+APP_ROOT = Path(__file__).resolve().parents[2]
 CPU_SNAPSHOT_SCRIPT = APP_ROOT / "scripts" / "capture_cpu_snapshot.sh"
 CPU_SNAPSHOT_LOG = APP_ROOT / "logs" / "cpu-snapshots.log"
 
