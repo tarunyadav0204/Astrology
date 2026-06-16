@@ -54,8 +54,10 @@ jobs:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
       CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      GCP_MIG_NAME: astroroshni-mig-s2b
-      GCP_MIG_ZONE: asia-south2-b
+      GCP_API_MIG_NAME: astroroshni-mig-s2b
+      GCP_API_MIG_ZONE: asia-south2-b
+      GCP_CHAT_WORKER_MIG_NAME: astroroshni-chat-worker-mig
+      GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
       GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
       GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
     
@@ -182,66 +184,77 @@ jobs:
         echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
         gcloud config set project "${GCP_PROJECT_ID}"
 
-        mapfile -t INSTANCES < <(
-          gcloud compute instance-groups managed list-instances "${GCP_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_MIG_ZONE}" \
-            --filter="instanceStatus=RUNNING" \
-            --format="value(instance.basename())" \
-          | sort
-        )
+        deploy_mig_instances() {
+          local mig_name="$1"
+          local mig_zone="$2"
+          local serve_frontend_locally="$3"
+          local mig_label="$4"
+          local frontend_required="${FRONTEND_ARTIFACT_REQUIRED:-false}"
 
-        if [ "${#INSTANCES[@]}" -eq 0 ]; then
-          echo "❌ No RUNNING instances found in MIG ${GCP_MIG_NAME}"
-          exit 1
-        fi
-
-        echo "📋 Deploying to ${#INSTANCES[@]} current MIG instance(s): ${INSTANCES[*]}"
-        for INSTANCE in "${INSTANCES[@]}"; do
-          echo "========== Deploying ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-          gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_MIG_ZONE}" \
-            --tunnel-through-iap \
-            --quiet \
-            --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"
-
-          FRONTEND_REMOTE_ARCHIVE=""
-          if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ] && [ "${FRONTEND_ARTIFACT_REQUIRED}" = "true" ]; then
-            FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
-            gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
+          mapfile -t INSTANCES < <(
+            gcloud compute instance-groups managed list-instances "${mig_name}" \
               --project "${GCP_PROJECT_ID}" \
-              --zone "${GCP_MIG_ZONE}" \
-              --tunnel-through-iap \
-              --quiet
+              --zone "${mig_zone}" \
+              --filter="instanceStatus=RUNNING" \
+              --format="value(instance.basename())" \
+            | sort
+          )
+
+          if [ "${#INSTANCES[@]}" -eq 0 ]; then
+            echo "❌ No RUNNING instances found in ${mig_label} MIG ${mig_name}"
+            exit 1
           fi
 
-          gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_MIG_ZONE}" \
-            --tunnel-through-iap \
-            --quiet \
-            --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${SERVE_FRONTEND_LOCALLY}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
-
-          echo "🔎 Waiting for ${INSTANCE} local app health"
-          if [ "${SERVE_FRONTEND_LOCALLY}" = "true" ]; then
+          echo "📋 Deploying to ${#INSTANCES[@]} ${mig_label} instance(s): ${INSTANCES[*]}"
+          for INSTANCE in "${INSTANCES[@]}"; do
+            echo "========== Deploying ${mig_label} instance ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
             gcloud compute ssh "tarun_yadav@${INSTANCE}" \
               --project "${GCP_PROJECT_ID}" \
-              --zone "${GCP_MIG_ZONE}" \
+              --zone "${mig_zone}" \
               --tunnel-through-iap \
               --quiet \
-              --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 5; done; echo 'health check failed on ${INSTANCE}'; exit 1"
-          else
+              --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"
+
+            FRONTEND_REMOTE_ARCHIVE=""
+            if [ "${serve_frontend_locally}" = "true" ] && [ "${frontend_required}" = "true" ]; then
+              FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
+              gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
+                --project "${GCP_PROJECT_ID}" \
+                --zone "${mig_zone}" \
+                --tunnel-through-iap \
+                --quiet
+            fi
+
             gcloud compute ssh "tarun_yadav@${INSTANCE}" \
               --project "${GCP_PROJECT_ID}" \
-              --zone "${GCP_MIG_ZONE}" \
+              --zone "${mig_zone}" \
               --tunnel-through-iap \
               --quiet \
-              --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"
-          fi
+              --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
 
-          echo "✅ ${INSTANCE} deployed and healthy"
-        done
+            echo "🔎 Waiting for ${mig_label} instance ${INSTANCE} local app health"
+            if [ "${serve_frontend_locally}" = "true" ]; then
+              gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+                --project "${GCP_PROJECT_ID}" \
+                --zone "${mig_zone}" \
+                --tunnel-through-iap \
+                --quiet \
+                --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 5; done; echo 'health check failed on ${INSTANCE}'; exit 1"
+            else
+              gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+                --project "${GCP_PROJECT_ID}" \
+                --zone "${mig_zone}" \
+                --tunnel-through-iap \
+                --quiet \
+                --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"
+            fi
+
+            echo "✅ ${mig_label} instance ${INSTANCE} deployed and healthy"
+          done
+        }
+
+        deploy_mig_instances "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}" "${SERVE_FRONTEND_LOCALLY}" "api"
+        deploy_mig_instances "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}" "false" "chat-worker"
 
         echo "🔎 Final public health check"
         curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
@@ -265,7 +278,7 @@ jobs:
         GCLOUD_BIN="gcloud" \
         GCLOUD_CONFIG="${CLOUDSDK_CONFIG:-}" \
         PROJECT_ID="${GCP_PROJECT_ID}" \
-        ZONE="${GCP_MIG_ZONE}" \
+        ZONE="${GCP_API_MIG_ZONE}" \
         MACHINE_TYPE="${GCP_IMAGE_BUILDER_MACHINE_TYPE}" \
         BASE_IMAGE="${GCP_RELEASE_BASE_IMAGE}" \
         BASE_IMAGE_PROJECT="${GCP_PROJECT_ID}" \
@@ -277,15 +290,15 @@ jobs:
         INSTALL_GCP_OPS_AGENT="false" \
         bash "${GITHUB_WORKSPACE}/scripts/build-gce-release-image.sh"
 
-    - name: Refresh MIG baked-image template for future replacements
-      id: baked_template
+    - name: Refresh API MIG baked-image template for future replacements
+      id: baked_template_api
       if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
       shell: bash
       run: |
         set -euo pipefail
         SHORT_SHA="${GITHUB_SHA::12}"
         TEMPLATE_NAME="astro-baked-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-        SUBNET_REGION="${GCP_MIG_ZONE%-*}"
+        SUBNET_REGION="${GCP_API_MIG_ZONE%-*}"
         SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
         echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
 
@@ -304,12 +317,46 @@ jobs:
           --image-project="${GCP_PROJECT_ID}" \
           --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
 
-        gcloud compute instance-groups managed set-instance-template "${GCP_MIG_NAME}" \
+        gcloud compute instance-groups managed set-instance-template "${GCP_API_MIG_NAME}" \
           --project="${GCP_PROJECT_ID}" \
-          --zone="${GCP_MIG_ZONE}" \
+          --zone="${GCP_API_MIG_ZONE}" \
           --template="${TEMPLATE_NAME}"
 
-        echo "Updated future replacement template to ${TEMPLATE_NAME}"
+        echo "Updated API future replacement template to ${TEMPLATE_NAME}"
+
+    - name: Refresh chat worker MIG baked-image template for future replacements
+      id: baked_template_chat_worker
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        SHORT_SHA="${GITHUB_SHA::12}"
+        TEMPLATE_NAME="astro-chat-worker-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+        SUBNET_REGION="${GCP_CHAT_WORKER_MIG_ZONE%-*}"
+        SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
+        echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
+
+        gcloud compute instance-templates create "${TEMPLATE_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
+          --network=default \
+          --subnet="${SUBNET_SELF_LINK}" \
+          --no-address \
+          --maintenance-policy=MIGRATE \
+          --provisioning-model=STANDARD \
+          --service-account="800681558445-compute@developer.gserviceaccount.com" \
+          --scopes="https://www.googleapis.com/auth/cloud-platform" \
+          --tags="web-server" \
+          --image="${{ steps.baked_image.outputs.image_name }}" \
+          --image-project="${GCP_PROJECT_ID}" \
+          --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
+
+        gcloud compute instance-groups managed set-instance-template "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --template="${TEMPLATE_NAME}"
+
+        echo "Updated chat-worker future replacement template to ${TEMPLATE_NAME}"
 
     - name: Emergency rolling VM replacement
       if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
@@ -317,17 +364,30 @@ jobs:
         set -euo pipefail
         echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
         gcloud config set project "${GCP_PROJECT_ID}"
-        gcloud compute instance-groups managed rolling-action replace "${GCP_MIG_NAME}" \
+        gcloud compute instance-groups managed rolling-action replace "${GCP_API_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_MIG_ZONE}" \
+          --zone "${GCP_API_MIG_ZONE}" \
           --max-unavailable 1 \
           --max-surge 1
-        gcloud compute instance-groups managed wait-until "${GCP_MIG_NAME}" \
+        gcloud compute instance-groups managed wait-until "${GCP_API_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
           --stable \
-          --zone "${GCP_MIG_ZONE}" \
+          --zone "${GCP_API_MIG_ZONE}" \
           --timeout 3600
-        gcloud compute instance-groups managed list-instances "${GCP_MIG_NAME}" \
+        gcloud compute instance-groups managed list-instances "${GCP_API_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_MIG_ZONE}"
+          --zone "${GCP_API_MIG_ZONE}"
+        gcloud compute instance-groups managed rolling-action replace "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --max-unavailable 1 \
+          --max-surge 1
+        gcloud compute instance-groups managed wait-until "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --stable \
+          --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --timeout 3600
+        gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --zone "${GCP_CHAT_WORKER_MIG_ZONE}"
         echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
