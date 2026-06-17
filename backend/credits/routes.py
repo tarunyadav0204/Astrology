@@ -739,6 +739,23 @@ def _proxy_to_play_payment_service(
     return data
 
 
+def _mark_main_backend_fallback(
+    response: Dict[str, Any],
+    *,
+    path: str,
+    current_user: User,
+    order_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    response["served_by"] = "main-backend-fallback"
+    logger.info(
+        "Play payment served_by=main-backend-fallback user=%s path=%s order_id=%s",
+        getattr(current_user, "userid", None),
+        path,
+        (order_id or "").strip() or "n/a",
+    )
+    return response
+
+
 def _credit_verified_google_play_purchase(
     *,
     userid: int,
@@ -1095,7 +1112,12 @@ async def verify_google_play_purchase(
             current_user.userid,
             (request.product_id or "").strip(),
         )
-    return result
+    return _mark_main_backend_fallback(
+        result,
+        path="/google-play/verify",
+        current_user=current_user,
+        order_id=(request.order_id or "").strip(),
+    )
 
 
 @router.post("/google-play/subscription/verify")
@@ -1126,16 +1148,21 @@ async def verify_google_play_subscription(
             event_source="verify",
             order_id_hint=(request.order_id or "").strip() or None,
         )
-        return {
+        return _mark_main_backend_fallback({
             "success": True,
             "message": "Subscription active",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
-        }
+        },
+            path="/google-play/subscription/verify",
+            current_user=current_user,
+            order_id=(request.order_id or "").strip(),
+        )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid or expired subscription: {str(e)}")
+    # unreachable
 
 
 def _subscription_order_id_from_purchase(purchase: dict, order_id_hint: Optional[str] = None) -> Optional[str]:
@@ -1343,12 +1370,16 @@ async def sync_google_play_subscription(
             event_source="sync",
             order_id_hint=(request.order_id or "").strip() or None,
         )
-        return {
+        return _mark_main_backend_fallback({
             "success": True,
             "message": "Subscription synced",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
-        }
+        },
+            path="/google-play/subscription/sync",
+            current_user=current_user,
+            order_id=(request.order_id or "").strip(),
+        )
     except HTTPException:
         raise
     except Exception as e:

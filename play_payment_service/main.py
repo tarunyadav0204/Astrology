@@ -60,6 +60,11 @@ def _require_internal_secret(secret_header: Optional[str]) -> None:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
+def _mark_payment_service_response(response: Dict[str, Any]) -> Dict[str, Any]:
+    response["served_by"] = "play-payment-service"
+    return response
+
+
 @app.get("/")
 def health() -> Dict[str, Any]:
     return {"status": "ok", "service": "play-payment-service"}
@@ -93,7 +98,7 @@ def internal_verify_google_play_purchase(
     except Exception:
         # Keep main success path intact even if RTDN backlog recovery has an issue.
         pass
-    return result
+    return _mark_payment_service_response(result)
 
 
 @app.post("/internal/google-play/subscription/verify")
@@ -116,12 +121,12 @@ def internal_verify_google_play_subscription(
             event_source="verify",
             order_id_hint=(request.order_id or "").strip() or None,
         )
-        return {
+        return _mark_payment_service_response({
             "success": True,
             "message": "Subscription active",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
-        }
+        })
     except HTTPException:
         raise
     except Exception as exc:
@@ -148,12 +153,12 @@ def internal_sync_google_play_subscription(
             event_source="sync",
             order_id_hint=(request.order_id or "").strip() or None,
         )
-        return {
+        return _mark_payment_service_response({
             "success": True,
             "message": "Subscription synced",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
-        }
+        })
     except HTTPException:
         raise
     except Exception as exc:
