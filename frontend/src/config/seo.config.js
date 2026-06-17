@@ -38,7 +38,7 @@ export const SEO_CONFIG = {
       "https://play.google.com/store/apps/details?id=com.astroroshni.mobile&pcampaignid=web_share",
     homeBanner: {
       width: 1200,
-      height: 657,
+      height: 485,
       alt:
         "Discover Your Life Path -AstroRoshni Vedic Astrology",
       title:
