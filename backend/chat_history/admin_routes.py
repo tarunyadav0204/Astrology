@@ -2469,6 +2469,9 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_instant_chat_user_allowlist,
             is_speech_chat_enabled,
             get_speech_chat_user_allowlist,
+            is_play_payment_service_enabled,
+            get_play_payment_service_user_allowlist,
+            get_play_payment_service_base_url,
             is_first_purchase_bonus_enabled,
             is_purchase_discount_enabled,
             is_parallel_branch_planner_enabled,
@@ -2553,6 +2556,11 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "speech_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_speech_chat_user_allowlist())
             ),
+            "play_payment_service_enabled": is_play_payment_service_enabled(),
+            "play_payment_service_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_play_payment_service_user_allowlist())
+            ),
+            "play_payment_service_base_url": get_play_payment_service_base_url() or "",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")

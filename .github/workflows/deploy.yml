@@ -63,6 +63,8 @@ jobs:
       GCP_API_MIG_ZONE: asia-south2-b
       GCP_CHAT_WORKER_MIG_NAME: astroroshni-chat-worker-mig
       GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
+      GCP_PLAY_PAYMENT_SERVICE_NAME: astroroshni-play-payment-service
+      GCP_PLAY_PAYMENT_SERVICE_REGION: asia-south2
       GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
       GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
     
@@ -83,6 +85,59 @@ jobs:
       uses: google-github-actions/setup-gcloud@v2
       with:
         project_id: ${{ vars.GCP_PROJECT_ID }}
+
+    - name: Build play payment service image
+      id: play_payment_image
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      env:
+        GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+      run: |
+        set -euo pipefail
+        IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/play-payment-service:${GITHUB_SHA}"
+        echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+        PAYMENT_BUILD_DIR="${RUNNER_TEMP}/play-payment-build-context"
+        bash "${GITHUB_WORKSPACE}/scripts/prepare-play-payment-build-context.sh" "${PAYMENT_BUILD_DIR}"
+        du -sh "${PAYMENT_BUILD_DIR}" || true
+        gcloud builds submit "${PAYMENT_BUILD_DIR}" \
+          --project "${GCP_PROJECT_ID}" \
+          --config play_payment_service/cloudbuild.yaml \
+          --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+    - name: Deploy play payment service to Cloud Run
+      id: deploy_play_payment_service
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        gcloud run deploy "${GCP_PLAY_PAYMENT_SERVICE_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --region "${GCP_PLAY_PAYMENT_SERVICE_REGION}" \
+          --image "${{ steps.play_payment_image.outputs.image_uri }}" \
+          --platform managed \
+          --allow-unauthenticated \
+          --ingress all \
+          --service-account "800681558445-compute@developer.gserviceaccount.com" \
+          --execution-environment gen2 \
+          --network default \
+          --subnet default \
+          --vpc-egress private-ranges-only \
+          --cpu 1 \
+          --memory 1Gi \
+          --concurrency 8 \
+          --timeout 60 \
+          --min-instances 1 \
+          --max-instances 10 \
+          --port 8080 \
+          --set-env-vars "PLAY_PAYMENT_SERVICE_ENV=production,PLAY_PAYMENT_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
+          --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,PLAY_PAYMENT_SERVICE_SHARED_SECRET=PLAY_PAYMENT_SERVICE_SHARED_SECRET:latest"
+
+        SERVICE_URL="$(gcloud run services describe "${GCP_PLAY_PAYMENT_SERVICE_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --region "${GCP_PLAY_PAYMENT_SERVICE_REGION}" \
+          --format='value(status.url)')"
+        echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
+        echo "Deployed play payment service at ${SERVICE_URL}"
 
     - name: Detect frontend artifact need
       id: frontend_artifact

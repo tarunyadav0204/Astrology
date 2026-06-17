@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import time
+import requests
 from collections import OrderedDict
 from threading import Lock
 from auth import get_current_user, User
@@ -30,6 +31,7 @@ GOOGLE_PLAY_PRODUCTS_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_PRODUCTS_CAC
 GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS", "86400"))
 GOOGLE_PLAY_PRODUCTS_CACHE_MAX = 8
 GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX = 32
+PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS = float(os.getenv("PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS", "8.0"))
 
 # Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback.
 # Keep trying fallback values if the preferred env points at a missing file.
@@ -650,6 +652,93 @@ class GooglePlaySubscriptionVerifyRequest(BaseModel):
     order_id: Optional[str] = None  # GPA order id from client (Play verify response is authoritative when present)
 
 
+def _play_payment_service_shared_secret() -> str:
+    return (os.getenv("PLAY_PAYMENT_SERVICE_SHARED_SECRET") or "").strip()
+
+
+def _payment_service_headers() -> Dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    secret = _play_payment_service_shared_secret()
+    if secret:
+        headers["X-Play-Payment-Service-Secret"] = secret
+    return headers
+
+
+def _proxy_to_play_payment_service(
+    *,
+    path: str,
+    payload: Dict[str, Any],
+    current_user: User,
+) -> Optional[Dict[str, Any]]:
+    from utils.admin_settings import (
+        get_play_payment_service_base_url,
+        play_payment_service_enabled_for_user,
+    )
+
+    if not play_payment_service_enabled_for_user(getattr(current_user, "userid", None)):
+        return None
+
+    base_url = get_play_payment_service_base_url()
+    if not base_url:
+        logger.warning(
+            "Play payment service flag is enabled for user=%s but base URL is not configured; using legacy local flow",
+            getattr(current_user, "userid", None),
+        )
+        return None
+
+    request_body = {
+        **payload,
+        "userid": current_user.userid,
+        "user_phone": getattr(current_user, "phone", None),
+        "user_name": getattr(current_user, "name", None),
+    }
+    target_url = f"{base_url}{path}"
+
+    try:
+        response = requests.post(
+            target_url,
+            json=request_body,
+            headers=_payment_service_headers(),
+            timeout=PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as exc:
+        logger.warning(
+            "Play payment service proxy failed for user=%s path=%s error=%s; using legacy local flow",
+            current_user.userid,
+            path,
+            exc,
+        )
+        return None
+
+    if response.status_code < 200 or response.status_code >= 300:
+        logger.warning(
+            "Play payment service returned %s for user=%s path=%s; using legacy local flow",
+            response.status_code,
+            current_user.userid,
+            path,
+        )
+        return None
+
+    try:
+        data = response.json() if response.content else {}
+    except ValueError:
+        logger.warning(
+            "Play payment service returned non-JSON response for user=%s path=%s; using legacy local flow",
+            current_user.userid,
+            path,
+        )
+        return None
+
+    if not isinstance(data, dict):
+        logger.warning(
+            "Play payment service returned unexpected JSON shape for user=%s path=%s; using legacy local flow",
+            current_user.userid,
+            path,
+        )
+        return None
+    return data
+
+
 def _credit_verified_google_play_purchase(
     *,
     userid: int,
@@ -973,6 +1062,14 @@ async def verify_google_play_purchase(
     current_user: User = Depends(get_current_user),
 ):
     """Verify a Google Play one-time purchase and grant credits idempotently by order_id."""
+    proxied = _proxy_to_play_payment_service(
+        path="/internal/google-play/verify",
+        payload=request.model_dump(),
+        current_user=current_user,
+    )
+    if proxied is not None:
+        return proxied
+
     result = _credit_verified_google_play_purchase(
         userid=current_user.userid,
         user_phone=current_user.phone,
@@ -1007,6 +1104,14 @@ async def verify_google_play_subscription(
     current_user: User = Depends(get_current_user),
 ):
     """Verify a Google Play subscription and set user's tier (VIP Silver/Gold/Platinum). Idempotent: re-calling extends/updates end_date."""
+    proxied = _proxy_to_play_payment_service(
+        path="/internal/google-play/subscription/verify",
+        payload=request.model_dump(),
+        current_user=current_user,
+    )
+    if proxied is not None:
+        return proxied
+
     if not (request.purchase_token or "").strip():
         raise HTTPException(status_code=400, detail="purchase_token is required")
     product_id = (request.product_id or "").strip()
@@ -1216,6 +1321,14 @@ async def sync_google_play_subscription(
 ):
     """Re-verify subscription with Google Play and update our DB. Call this when the app opens or user visits Credits
     so we stay in sync if they changed/cancelled/renewed on Play. Accepts any payment state so we can update end_date."""
+    proxied = _proxy_to_play_payment_service(
+        path="/internal/google-play/subscription/sync",
+        payload=request.model_dump(),
+        current_user=current_user,
+    )
+    if proxied is not None:
+        return proxied
+
     if not (request.purchase_token or "").strip():
         raise HTTPException(status_code=400, detail="purchase_token is required")
     product_id = (request.product_id or "").strip()

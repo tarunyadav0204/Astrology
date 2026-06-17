@@ -166,6 +166,8 @@ SYNC_GCP_SECRETS="${SYNC_GCP_SECRETS:-true}"
 APP_ENV_SECRET_NAME="${APP_ENV_SECRET_NAME:-APP_ENV_FILE}"
 WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME="${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME:-WHATSAPP_FLOW_PRIVATE_KEY_FILE}"
 WHATSAPP_FLOW_PRIVATE_KEY_PATH="${WHATSAPP_FLOW_PRIVATE_KEY_PATH:-/home/tarun_yadav/AstrologyApp/backend/flow_endpoint_private.pem}"
+PLAY_PAYMENT_SERVICE_SHARED_SECRET_NAME="${PLAY_PAYMENT_SERVICE_SHARED_SECRET_NAME:-PLAY_PAYMENT_SERVICE_SHARED_SECRET}"
+PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH="${PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH:-/home/tarun_yadav/AstrologyApp/secrets/play_payment_service_shared_secret}"
 INSTALL_GCP_OPS_AGENT="${INSTALL_GCP_OPS_AGENT:-true}"
 
 case "$(printf '%s' "${SYNC_GCP_SECRETS}" | tr '[:upper:]' '[:lower:]')" in
@@ -213,6 +215,7 @@ if [ "${SYNC_GCP_SECRETS}" = "true" ]; then
   echo "🔑 Pulling runtime secrets from Google Secret Manager..."
   sync_gcp_secret_to_file "${APP_ENV_SECRET_NAME}" "${APP_ROOT}/backend/.env" 600
   sync_gcp_secret_to_file "${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME}" "${WHATSAPP_FLOW_PRIVATE_KEY_PATH}" 600
+  sync_gcp_secret_to_file "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_NAME}" "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH}" 600
   if ! grep -q "BEGIN .*PRIVATE KEY" "${WHATSAPP_FLOW_PRIVATE_KEY_PATH}"; then
     echo "❌ WhatsApp Flow private key file does not look like a PEM private key: ${WHATSAPP_FLOW_PRIVATE_KEY_PATH}"
     exit 1
@@ -316,6 +319,9 @@ if [ "${restart_backend}" = "true" ]; then
   DEFAULT_PLAY_BILLING_KEY="/home/tarun_yadav/play-billing-key.json"
   if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}" ] && [ -f "${DEFAULT_PLAY_BILLING_KEY}" ]; then
     export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${DEFAULT_PLAY_BILLING_KEY}"
+  fi
+  if [ -z "${PLAY_PAYMENT_SERVICE_SHARED_SECRET:-}" ] && [ -f "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH}" ]; then
+    export PLAY_PAYMENT_SERVICE_SHARED_SECRET="$(tr -d '\r\n' < "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH}")"
   fi
   export APP_COMMIT_SHA="${NEW_HEAD}"
   export PYTHONUNBUFFERED=1

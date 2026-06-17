@@ -778,6 +778,51 @@ def speech_chat_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def is_play_payment_service_enabled() -> bool:
+    """Global feature flag for routing Play purchase verification through the payment service."""
+    return _parse_bool_setting(get_setting("play_payment_service_enabled"), default=False)
+
+
+def get_play_payment_service_user_allowlist() -> Set[int]:
+    """Optional CSV user id allowlist for the Play payment service. Empty set means all users when enabled."""
+    raw = (get_setting("play_payment_service_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            user_ids.add(int(cleaned))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def play_payment_service_enabled_for_user(user_id: Optional[int]) -> bool:
+    """
+    Global OFF disables the payment service for everyone.
+    Global ON + empty allowlist enables for all users.
+    Global ON + allowlist enables only listed users.
+    """
+    if not is_play_payment_service_enabled():
+        return False
+    allowlist = get_play_payment_service_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
+def get_play_payment_service_base_url() -> Optional[str]:
+    """Base URL for the Play payment service Cloud Run app."""
+    value = (get_setting("play_payment_service_base_url") or os.getenv("PLAY_PAYMENT_SERVICE_BASE_URL") or "").strip()
+    return value.rstrip("/") if value else None
+
+
 def get_chat_static_suggestions() -> list[str]:
     """Admin-defined static suggestion chips for mobile chat."""
     raw = (get_setting("chat_static_suggestions") or "").strip()
