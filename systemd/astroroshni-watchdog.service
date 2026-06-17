@@ -1,0 +1,18 @@
+[Unit]
+Description=AstroRoshni API watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__
+Environment=APP_DIR=__APP_DIR__
+Environment=APP_USER=__APP_USER__
+Environment=SERVE_FRONTEND_LOCALLY=false
+ExecStart=/bin/bash __APP_DIR__/restart_server.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

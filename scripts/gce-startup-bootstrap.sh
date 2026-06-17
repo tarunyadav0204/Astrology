@@ -7,6 +7,7 @@ APP_USER="${APP_USER:-tarun_yadav}"
 APP_DIR="${APP_DIR:-/home/${APP_USER}/AstrologyApp}"
 LOG_FILE="${LOG_FILE:-/var/log/astroroshni-startup.log}"
 BOOTSTRAP_SCRIPT="${BOOTSTRAP_SCRIPT:-${APP_DIR}/scripts/bootstrap-runtime.sh}"
+WATCHDOG_INSTALLER="${WATCHDOG_INSTALLER:-${APP_DIR}/scripts/install_runtime_watchdog.sh}"
 
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
@@ -25,6 +26,12 @@ fi
 if [ ! -x "${BOOTSTRAP_SCRIPT}" ]; then
   echo "❌ Bootstrap script missing or not executable: ${BOOTSTRAP_SCRIPT}"
   exit 1
+fi
+
+if [ -x "${WATCHDOG_INSTALLER}" ]; then
+  APP_USER="${APP_USER}" APP_DIR="${APP_DIR}" "${WATCHDOG_INSTALLER}"
+else
+  echo "⚠️ Watchdog installer missing or not executable: ${WATCHDOG_INSTALLER}"
 fi
 
 PROJECT_ID="$(curl -fsH 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/project/project-id)"

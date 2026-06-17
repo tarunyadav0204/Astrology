@@ -58,6 +58,7 @@ export default function AdminSupportInbox() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [sortBy, setSortBy] = useState('updated_at');
   const [q, setQ] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -87,6 +88,7 @@ export default function AdminSupportInbox() {
       sp.set('offset', '0');
       if (statusFilter) sp.set('status', statusFilter);
       if (q.trim()) sp.set('q', q.trim());
+      sp.set('sort_by', sortBy);
       const res = await fetch(`/api/admin/support/tickets?${sp.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
@@ -100,13 +102,13 @@ export default function AdminSupportInbox() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, q]);
+  }, [statusFilter, sortBy, q]);
 
   useEffect(() => {
     const delay = q.trim() ? 400 : 0;
     const t = setTimeout(() => loadList(), delay);
     return () => clearTimeout(t);
-  }, [statusFilter, q, loadList]);
+  }, [statusFilter, sortBy, q, loadList]);
 
   const loadDetail = async (id) => {
     setDetailLoading(true);
@@ -283,6 +285,23 @@ export default function AdminSupportInbox() {
                     {s}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className="form-field" style={{ width: compact ? '100%' : 'auto', minWidth: compact ? 0 : 180 }}>
+              <label>Sort by</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{
+                  padding: compact ? '10px 12px' : '8px 12px',
+                  minWidth: compact ? '100%' : 180,
+                  width: compact ? '100%' : 'auto',
+                  fontSize: 16,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="updated_at">Last updated</option>
+                <option value="created_at">Created (newest first)</option>
               </select>
             </div>
             <div

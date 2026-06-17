@@ -706,10 +706,18 @@ admin_router = APIRouter(prefix="/admin/support", tags=["support_admin"])
 async def admin_list_tickets(
     status: Optional[str] = Query(None),
     q: Optional[str] = Query(None, description="Search subject"),
+    sort_by: str = Query(
+        "updated_at",
+        description="Sort order: updated_at (last activity) or created_at (newest ticket first)",
+    ),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(_require_admin),
 ):
+    sort_col = (sort_by or "updated_at").strip().lower()
+    if sort_col not in ("updated_at", "created_at"):
+        raise HTTPException(status_code=400, detail="sort_by must be updated_at or created_at")
+
     with get_conn() as conn:
         _ensure_tables(conn)
         where = ["1=1"]
@@ -729,7 +737,7 @@ async def admin_list_tickets(
             FROM support_tickets st
             LEFT JOIN users u ON u.userid = st.userid
             WHERE {w}
-            ORDER BY st.updated_at DESC
+            ORDER BY st.{sort_col} DESC
             LIMIT %s OFFSET %s
             """,
             tuple(params) + (limit, offset),
@@ -759,7 +767,7 @@ async def admin_list_tickets(
                 "user_email": (r[10] or "").strip(),
             }
         )
-    return {"tickets": tickets, "total": int(total)}
+    return {"tickets": tickets, "total": int(total), "sort_by": sort_col}
 
 
 @admin_router.get("/tickets/{ticket_id}")
