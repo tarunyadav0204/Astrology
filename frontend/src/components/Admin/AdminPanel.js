@@ -294,6 +294,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [purchaseDiscountWindowMinutes, setPurchaseDiscountWindowMinutes] = useState('0');
   const [purchaseDiscountPackOverrides, setPurchaseDiscountPackOverrides] = useState(createDefaultPackOverrides);
   const [purchaseDiscountSaving, setPurchaseDiscountSaving] = useState(false);
+  const [playPaymentServiceEnabled, setPlayPaymentServiceEnabled] = useState(false);
+  const [playPaymentServiceUserAllowlist, setPlayPaymentServiceUserAllowlist] = useState('');
+  const [playPaymentServiceBaseUrl, setPlayPaymentServiceBaseUrl] = useState('');
+  const [playPaymentServiceSaving, setPlayPaymentServiceSaving] = useState(false);
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
@@ -698,6 +702,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setPurchaseDiscountPackOverrides(
         normalizePackOverrides(purchaseDiscountConfig.pack_overrides || {})
       );
+      setPlayPaymentServiceEnabled(Boolean(data.play_payment_service_enabled));
+      setPlayPaymentServiceUserAllowlist(data.play_payment_service_user_allowlist || '');
+      setPlayPaymentServiceBaseUrl(data.play_payment_service_base_url || '');
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
@@ -1328,6 +1335,55 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     purchaseDiscountFixedCredits,
     purchaseDiscountMaxCredits,
   );
+
+  const handleSavePlayPaymentServiceSettings = async () => {
+    setPlayPaymentServiceSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const responses = await Promise.all([
+        fetch('/api/admin/settings/play_payment_service_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'play_payment_service_enabled',
+            value: playPaymentServiceEnabled ? 'true' : 'false',
+            description: 'Feature flag for routing Google Play credit verification to the dedicated payment service',
+          }),
+        }),
+        fetch('/api/admin/settings/play_payment_service_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'play_payment_service_user_allowlist',
+            value: playPaymentServiceUserAllowlist,
+            description: 'Optional CSV user allowlist for the dedicated Google Play payment service. Empty = all users when enabled.',
+          }),
+        }),
+        fetch('/api/admin/settings/play_payment_service_base_url', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'play_payment_service_base_url',
+            value: playPaymentServiceBaseUrl.trim(),
+            description: 'Base URL for the dedicated Google Play payment service.',
+          }),
+        }),
+      ]);
+      const failed = responses.find((res) => !res.ok);
+      if (failed) {
+        const err = await failed.json().catch(() => ({}));
+        alert('Failed to save Google Play payment service settings: ' + (err.detail || 'check console'));
+        return;
+      }
+      alert('Google Play payment service settings saved. New purchase checks use them immediately.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving Google Play payment service settings:', error);
+      alert('Failed to save Google Play payment service settings.');
+    } finally {
+      setPlayPaymentServiceSaving(false);
+    }
+  };
 
   const handleSaveDeathQueryUnlockKeyword = async () => {
     setDeathQueryUnlockSaving(true);
@@ -5494,6 +5550,63 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={deathQueryUnlockSaving}
                 >
                   {deathQueryUnlockSaving ? 'Saving…' : 'Save death unlock keyword'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Google Play payment service</h3>
+              <p className="settings-hint">
+                Routes Google Play credit verification to the separate Cloud Run payment service. Use the allowlist first for safe prod testing, then open it wider once you are comfortable.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable payment service routing</strong>
+                  <p>Master switch for sending Google Play verification and sync requests to the dedicated payment service.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={playPaymentServiceEnabled}
+                    onChange={(e) => setPlayPaymentServiceEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={playPaymentServiceUserAllowlist}
+                  onChange={(e) => setPlayPaymentServiceUserAllowlist(e.target.value)}
+                  placeholder="e.g. 1755, 5483"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Service base URL</strong>
+                  <p>Cloud Run base URL for the dedicated payment service.</p>
+                </div>
+                <input
+                  type="text"
+                  value={playPaymentServiceBaseUrl}
+                  onChange={(e) => setPlayPaymentServiceBaseUrl(e.target.value)}
+                  placeholder="https://astroroshni-play-payment-service-...run.app"
+                  style={{ width: '100%', maxWidth: '520px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSavePlayPaymentServiceSettings}
+                  disabled={playPaymentServiceSaving}
+                >
+                  {playPaymentServiceSaving ? 'Saving…' : 'Save Google Play payment service'}
                 </button>
               </div>
             </div>
