@@ -7,6 +7,7 @@ LOG_DIR="${LOG_DIR:-${APP_ROOT}/logs}"
 OUTPUT_FILE="${OUTPUT_FILE:-${LOG_DIR}/cpu-snapshots.log}"
 BACKEND_LOG_FILE="${BACKEND_LOG_FILE:-${LOG_DIR}/backend.log}"
 BACKEND_PORT="${BACKEND_PORT:-8001}"
+BACKEND_LOG_TAG="${BACKEND_LOG_TAG:-astroroshni-backend}"
 CPU_THRESHOLD_PERCENT="${CPU_THRESHOLD_PERCENT:-120}"
 THREAD_LINES="${THREAD_LINES:-25}"
 PROCESS_LINES="${PROCESS_LINES:-20}"
@@ -101,11 +102,7 @@ fi
   echo "--- backend listeners ---"
   ss -ltnp | grep ":${BACKEND_PORT}" || true
   echo "--- recent slow_request/chat timing logs ---"
-  if [ -f "${BACKEND_LOG_FILE}" ]; then
-    tail -n 400 "${BACKEND_LOG_FILE}" | rg "slow_request|chat_processing_phase|chat_processing_complete|request_exception" | tail -n "${SLOW_REQUEST_LINES}" || true
-  else
-    echo "backend log not found: ${BACKEND_LOG_FILE}"
-  fi
+  journalctl -t "${BACKEND_LOG_TAG}" -n 400 --no-pager 2>/dev/null | rg "slow_request|chat_processing_phase|chat_processing_complete|request_exception" | tail -n "${SLOW_REQUEST_LINES}" || true
   echo "========== END CPU SNAPSHOT $(timestamp_utc) =========="
 } >> "${OUTPUT_FILE}" 2>&1
 

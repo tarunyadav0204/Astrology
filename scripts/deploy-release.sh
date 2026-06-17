@@ -9,6 +9,7 @@
 set -e
 
 APP_ROOT="${APP_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+BACKEND_MONITOR_SCRIPT="${APP_ROOT}/scripts/run_backend_with_monitor.sh"
 cd "${APP_ROOT}"
 
 # Timestamps: wall clock, seconds since deploy start, seconds since previous timing line.
@@ -319,12 +320,13 @@ if [ "${restart_backend}" = "true" ]; then
   export APP_COMMIT_SHA="${NEW_HEAD}"
   export PYTHONUNBUFFERED=1
 
-  echo "Starting backend (appending to logs/backend.log)..."
-  {
-    echo ""
-    echo "========== Deploy backend start $(date -u '+%Y-%m-%d %H:%M:%S UTC') commit=${NEW_HEAD} =========="
-  } >> "${APP_ROOT}/logs/backend.log"
-  nohup python main.py >> "${APP_ROOT}/logs/backend.log" 2>&1 &
+  echo "Starting backend (logs go to journald / Cloud Logging)..."
+  if [ ! -f "${BACKEND_MONITOR_SCRIPT}" ]; then
+      echo "❌ Backend monitor script missing: ${BACKEND_MONITOR_SCRIPT}"
+      exit 1
+  fi
+  logger -t astroroshni-backend-monitor -- "deploy_backend_start commit=${NEW_HEAD}"
+  nohup bash "${BACKEND_MONITOR_SCRIPT}" >/dev/null 2>&1 &
   BACKEND_PID=$!
   echo "Backend PID: $BACKEND_PID"
   sleep 2
@@ -339,22 +341,19 @@ if [ "${restart_backend}" = "true" ]; then
           break
         fi
         if ! ps -p $BACKEND_PID > /dev/null; then
-          echo "❌ Backend process exited before health check passed"
-          tail -80 "${APP_ROOT}/logs/backend.log"
+          echo "❌ Backend process exited before health check passed. Check Cloud Logging / journalctl tags astroroshni-backend and astroroshni-backend-monitor"
           exit 1
         fi
         sleep 2
       done
 
       if [ "$backend_ready" != "true" ]; then
-        echo "❌ Health check did not pass in time"
-        tail -80 "${APP_ROOT}/logs/backend.log"
+        echo "❌ Health check did not pass in time. Check Cloud Logging / journalctl tag astroroshni-backend"
         exit 1
       fi
       deploy_timing "backend up and /api/health OK"
   else
-      echo "❌ Backend failed to start. Check logs:"
-      tail -20 "${APP_ROOT}/logs/backend.log"
+      echo "❌ Backend failed to start. Check Cloud Logging / journalctl tag astroroshni-backend"
       exit 1
   fi
 else
