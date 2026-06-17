@@ -230,12 +230,12 @@ else
   echo "⏭️ Skipping Ops Agent install/apply (INSTALL_GCP_OPS_AGENT=false)"
 fi
 
-if [ -x "${WATCHDOG_INSTALLER}" ]; then
+if [ -f "${WATCHDOG_INSTALLER}" ]; then
   echo "🛟 Ensuring runtime watchdog service is installed..."
-  sudo APP_USER="${APP_USER}" APP_DIR="${APP_ROOT}" "${WATCHDOG_INSTALLER}"
+  sudo APP_USER="${APP_USER}" APP_DIR="${APP_ROOT}" bash "${WATCHDOG_INSTALLER}"
   deploy_timing "runtime watchdog install/apply finished"
 else
-  echo "⚠️ Runtime watchdog installer missing or not executable: ${WATCHDOG_INSTALLER}"
+  echo "⚠️ Runtime watchdog installer missing: ${WATCHDOG_INSTALLER}"
 fi
 
 # --- Phase 1: backend dependencies (venv, pip, encryption) ---

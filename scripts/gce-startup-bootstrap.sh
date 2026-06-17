@@ -28,10 +28,10 @@ if [ ! -x "${BOOTSTRAP_SCRIPT}" ]; then
   exit 1
 fi
 
-if [ -x "${WATCHDOG_INSTALLER}" ]; then
-  APP_USER="${APP_USER}" APP_DIR="${APP_DIR}" "${WATCHDOG_INSTALLER}"
+if [ -f "${WATCHDOG_INSTALLER}" ]; then
+  APP_USER="${APP_USER}" APP_DIR="${APP_DIR}" bash "${WATCHDOG_INSTALLER}"
 else
-  echo "⚠️ Watchdog installer missing or not executable: ${WATCHDOG_INSTALLER}"
+  echo "⚠️ Watchdog installer missing: ${WATCHDOG_INSTALLER}"
 fi
 
 PROJECT_ID="$(curl -fsH 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/project/project-id)"

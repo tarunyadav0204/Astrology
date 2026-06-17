@@ -86,6 +86,7 @@ tar \
   frontend \
   frontend-next \
   scripts \
+  systemd \
   ops-agent \
   deploy.sh \
   restart_server.sh
@@ -126,7 +127,7 @@ mkdir -p '${REMOTE_APP_DIR}/scripts'
 cp /tmp/prepare-image-release.sh '${REMOTE_APP_DIR}/scripts/prepare-image-release.sh'
 cp /tmp/bootstrap-runtime.sh '${REMOTE_APP_DIR}/scripts/bootstrap-runtime.sh'
 cp /tmp/gce-startup-bootstrap.sh '${REMOTE_APP_DIR}/scripts/gce-startup-bootstrap.sh'
-chmod +x '${REMOTE_APP_DIR}/scripts/prepare-image-release.sh' '${REMOTE_APP_DIR}/scripts/bootstrap-runtime.sh' '${REMOTE_APP_DIR}/scripts/gce-startup-bootstrap.sh'
+chmod +x '${REMOTE_APP_DIR}/scripts/prepare-image-release.sh' '${REMOTE_APP_DIR}/scripts/bootstrap-runtime.sh' '${REMOTE_APP_DIR}/scripts/gce-startup-bootstrap.sh' '${REMOTE_APP_DIR}/scripts/install_runtime_watchdog.sh'
 APP_ROOT='${REMOTE_APP_DIR}' APP_COMMIT_SHA='${IMAGE_NAME}' SERVE_FRONTEND_LOCALLY='false' INSTALL_GCP_OPS_AGENT='false' '${REMOTE_APP_DIR}/scripts/prepare-image-release.sh'"
 
 echo "⏹️ Stopping builder VM before imaging..."
