@@ -156,6 +156,8 @@ echo "📋 needs_backend_pip=${needs_backend_pip} FORCE_BACKEND_PIP=${FORCE_BACK
 
 # Repo root
 APP_ROOT="$(pwd)"
+APP_USER="${APP_USER:-$(id -un)}"
+WATCHDOG_INSTALLER="${APP_ROOT}/scripts/install_runtime_watchdog.sh"
 
 # --- Secret Manager sync: materialize runtime-only secrets before backend imports .env ---
 # Keep secret names configurable so staging/prod can use different Secret Manager entries.
@@ -226,6 +228,14 @@ if [ "${INSTALL_GCP_OPS_AGENT}" = "true" ]; then
   deploy_timing "ops agent install/apply finished"
 else
   echo "⏭️ Skipping Ops Agent install/apply (INSTALL_GCP_OPS_AGENT=false)"
+fi
+
+if [ -x "${WATCHDOG_INSTALLER}" ]; then
+  echo "🛟 Ensuring runtime watchdog service is installed..."
+  sudo APP_USER="${APP_USER}" APP_DIR="${APP_ROOT}" "${WATCHDOG_INSTALLER}"
+  deploy_timing "runtime watchdog install/apply finished"
+else
+  echo "⚠️ Runtime watchdog installer missing or not executable: ${WATCHDOG_INSTALLER}"
 fi
 
 # --- Phase 1: backend dependencies (venv, pip, encryption) ---
