@@ -1,0 +1,141 @@
+name: Rollback to Old MIG Templates
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_template:
+        description: "Known-good instance template for the main API MIG"
+        required: true
+        type: string
+      chat_worker_template:
+        description: "Known-good instance template for the chat-worker MIG"
+        required: true
+        type: string
+      replace_vms:
+        description: "Roll the MIG instances immediately after updating templates"
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: rollback-prod-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      GCP_API_MIG_NAME: astroroshni-mig-s2b
+      GCP_API_MIG_ZONE: asia-south2-b
+      GCP_CHAT_WORKER_MIG_NAME: astroroshni-chat-worker-mig
+      GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
+
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+    - name: Set up gcloud
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+
+    - name: Validate requested templates exist
+      shell: bash
+      run: |
+        set -euo pipefail
+        gcloud compute instance-templates describe "${{ inputs.api_template }}" \
+          --project="${GCP_PROJECT_ID}" >/dev/null
+        gcloud compute instance-templates describe "${{ inputs.chat_worker_template }}" \
+          --project="${GCP_PROJECT_ID}" >/dev/null
+        echo "✅ Requested templates exist"
+
+    - name: Show current MIG templates
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Current API MIG template:"
+        gcloud compute instance-groups managed describe "${GCP_API_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_API_MIG_ZONE}" \
+          --format="value(instanceTemplate)"
+        echo "Current chat-worker MIG template:"
+        gcloud compute instance-groups managed describe "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --format="value(instanceTemplate)"
+
+    - name: Repoint MIGs to rollback templates
+      shell: bash
+      run: |
+        set -euo pipefail
+        gcloud compute instance-groups managed set-instance-template "${GCP_API_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_API_MIG_ZONE}" \
+          --template="${{ inputs.api_template }}"
+
+        gcloud compute instance-groups managed set-instance-template "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --template="${{ inputs.chat_worker_template }}"
+
+        echo "✅ Updated rollback templates"
+
+    - name: Roll API and chat-worker MIG instances
+      if: ${{ inputs.replace_vms }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        gcloud compute instance-groups managed rolling-action replace "${GCP_API_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_API_MIG_ZONE}" \
+          --max-unavailable=1 \
+          --max-surge=1
+        gcloud compute instance-groups managed wait-until "${GCP_API_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_API_MIG_ZONE}" \
+          --stable \
+          --timeout=3600
+
+        gcloud compute instance-groups managed rolling-action replace "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --max-unavailable=1 \
+          --max-surge=1
+        gcloud compute instance-groups managed wait-until "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --stable \
+          --timeout=3600
+
+    - name: Show resulting MIG templates and instances
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "API MIG now points to:"
+        gcloud compute instance-groups managed describe "${GCP_API_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_API_MIG_ZONE}" \
+          --format="value(instanceTemplate)"
+        gcloud compute instance-groups managed list-instances "${GCP_API_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_API_MIG_ZONE}"
+
+        echo "Chat-worker MIG now points to:"
+        gcloud compute instance-groups managed describe "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+          --format="value(instanceTemplate)"
+        gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_CHAT_WORKER_MIG_ZONE}"

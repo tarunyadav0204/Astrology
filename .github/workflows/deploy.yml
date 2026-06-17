@@ -15,6 +15,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
     inputs:
+      source_ref:
+        description: "Optional commit SHA, tag, or branch to deploy instead of the latest main"
+        required: false
+        default: ""
+        type: string
       deployment_mode:
         description: "app = run deploy.sh on existing VMs; replace_vms = recreate MIG VMs"
         required: true
@@ -65,7 +70,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        fetch-depth: 2
+        fetch-depth: 0
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
 
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2

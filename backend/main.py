@@ -5171,12 +5171,15 @@ async def get_admin_user_analytics_timeseries(
     date_from: str = Query(..., description="Start date YYYY-MM-DD (inclusive)"),
     date_to: str = Query(..., description="End date YYYY-MM-DD (inclusive)"),
     bucket: str = Query("day", description="Aggregation: day, week, or month"),
-    gender: str = Query("all", description="all, male, female, or unknown"),
+    gender: str = Query("all", description="all, male, female, or unknown (only when include_gender=true)"),
+    include_gender: bool = Query(
+        False,
+        description="When false, count signups only (fast). When true, split by birth-chart gender.",
+    ),
 ):
     """
-    Time series for admin dashboards: new signups (users.created_at) and active users
-    (distinct users who sent at least one chat message). Gender: if the user has exactly one
-    birth chart, use that chart's gender; otherwise use the latest chart with relation self.
+    Time series for admin dashboards: new signups (users.created_at) per period.
+    Optional gender split (birth chart rules) when include_gender=true.
     """
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -5202,121 +5205,98 @@ async def get_admin_user_analytics_timeseries(
     start_ts = datetime(d0.year, d0.month, d0.day)
     end_ts_excl = datetime(d1.year, d1.month, d1.day) + timedelta(days=1)
 
-    gender_case = """
-        CASE
-            WHEN LOWER(TRIM(COALESCE(lat.gender, ''))) IN ('male', 'm', 'man') THEN 'male'
-            WHEN LOWER(TRIM(COALESCE(lat.gender, ''))) IN ('female', 'f', 'woman') THEN 'female'
-            ELSE 'unknown'
-        END
-    """
-
-    sql_new = f"""
-        WITH gendered AS (
-            SELECT
-                u.userid,
-                u.created_at,
-                {gender_case} AS g
-            FROM users u
-            LEFT JOIN LATERAL (
-                SELECT bc.gender
-                FROM birth_charts bc
-                WHERE bc.userid = u.userid
-                  AND (
-                    (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = u.userid) = 1
-                    OR LOWER(TRIM(COALESCE(bc.relation, ''))) = 'self'
-                  )
-                ORDER BY bc.created_at DESC NULLS LAST
-                LIMIT 1
-            ) lat ON true
-        )
-        SELECT date_trunc('{b}', created_at) AS period, g, COUNT(*)::int AS cnt
-        FROM gendered
-        WHERE created_at >= ? AND created_at < ?
-          AND (? = 'all' OR g = ?)
-        GROUP BY 1, 2
-        ORDER BY 1, 2
-    """
-
-    sql_active = f"""
-        WITH gendered AS (
-            SELECT
-                u.userid,
-                {gender_case} AS g
-            FROM users u
-            LEFT JOIN LATERAL (
-                SELECT bc.gender
-                FROM birth_charts bc
-                WHERE bc.userid = u.userid
-                  AND (
-                    (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = u.userid) = 1
-                    OR LOWER(TRIM(COALESCE(bc.relation, ''))) = 'self'
-                  )
-                ORDER BY bc.created_at DESC NULLS LAST
-                LIMIT 1
-            ) lat ON true
-        )
-        SELECT date_trunc('{b}', cm.timestamp) AS period, ug.g, COUNT(DISTINCT cs.user_id)::int AS cnt
-        FROM chat_messages cm
-        INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
-        INNER JOIN gendered ug ON ug.userid = cs.user_id
-        WHERE cm.sender = 'user'
-          AND cm.timestamp >= ? AND cm.timestamp < ?
-          AND (? = 'all' OR ug.g = ?)
-        GROUP BY 1, 2
-        ORDER BY 1, 2
-    """
-
-    params_range = (start_ts, end_ts_excl, g_filter, g_filter)
-
     period_keys = _collect_period_keys(d0, d1, b)
     new_map: Dict[date_type, Dict[str, int]] = defaultdict(lambda: {"male": 0, "female": 0, "unknown": 0})
-    active_map: Dict[date_type, Dict[str, int]] = defaultdict(lambda: {"male": 0, "female": 0, "unknown": 0})
 
     try:
         with get_conn() as conn:
-            cur = execute(conn, sql_new, params_range)
-            for row in cur.fetchall() or []:
-                period_raw, gx, cnt = row[0], row[1], int(row[2] or 0)
-                pk = _bucket_start(_normalize_ts_to_date(period_raw), b)
-                key = gx if gx in ("male", "female", "unknown") else "unknown"
-                new_map[pk][key] += cnt
-
-            cur = execute(conn, sql_active, params_range)
-            for row in cur.fetchall() or []:
-                period_raw, gx, cnt = row[0], row[1], int(row[2] or 0)
-                pk = _bucket_start(_normalize_ts_to_date(period_raw), b)
-                key = gx if gx in ("male", "female", "unknown") else "unknown"
-                active_map[pk][key] += cnt
+            if include_gender:
+                gender_case = """
+                    CASE
+                        WHEN LOWER(TRIM(COALESCE(lat.gender, ''))) IN ('male', 'm', 'man') THEN 'male'
+                        WHEN LOWER(TRIM(COALESCE(lat.gender, ''))) IN ('female', 'f', 'woman') THEN 'female'
+                        ELSE 'unknown'
+                    END
+                """
+                sql_new = f"""
+                    WITH gendered AS (
+                        SELECT
+                            u.userid,
+                            u.created_at,
+                            {gender_case} AS g
+                        FROM users u
+                        LEFT JOIN LATERAL (
+                            SELECT bc.gender
+                            FROM birth_charts bc
+                            WHERE bc.userid = u.userid
+                              AND (
+                                (SELECT COUNT(*) FROM birth_charts b2 WHERE b2.userid = u.userid) = 1
+                                OR LOWER(TRIM(COALESCE(bc.relation, ''))) = 'self'
+                              )
+                            ORDER BY bc.created_at DESC NULLS LAST
+                            LIMIT 1
+                        ) lat ON true
+                    )
+                    SELECT date_trunc('{b}', created_at) AS period, g, COUNT(*)::int AS cnt
+                    FROM gendered
+                    WHERE created_at >= ? AND created_at < ?
+                      AND (? = 'all' OR g = ?)
+                    GROUP BY 1, 2
+                    ORDER BY 1, 2
+                """
+                params_range = (start_ts, end_ts_excl, g_filter, g_filter)
+                cur = execute(conn, sql_new, params_range)
+                for row in cur.fetchall() or []:
+                    period_raw, gx, cnt = row[0], row[1], int(row[2] or 0)
+                    pk = _bucket_start(_normalize_ts_to_date(period_raw), b)
+                    key = gx if gx in ("male", "female", "unknown") else "unknown"
+                    new_map[pk][key] += cnt
+            else:
+                sql_new = f"""
+                    SELECT date_trunc('{b}', created_at) AS period, COUNT(*)::int AS cnt
+                    FROM users
+                    WHERE created_at >= ? AND created_at < ?
+                    GROUP BY 1
+                    ORDER BY 1
+                """
+                cur = execute(conn, sql_new, (start_ts, end_ts_excl))
+                for row in cur.fetchall() or []:
+                    period_raw, cnt = row[0], int(row[1] or 0)
+                    pk = _bucket_start(_normalize_ts_to_date(period_raw), b)
+                    new_map[pk]["unknown"] += cnt
     except Exception as e:
         logging.getLogger(__name__).exception("user analytics timeseries failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to load user analytics") from e
 
-    all_keys = sorted(set(period_keys) | set(new_map.keys()) | set(active_map.keys()))
+    all_keys = sorted(set(period_keys) | set(new_map.keys()))
     series: List[Dict[str, Any]] = []
     for pk in all_keys:
         nm = new_map[pk]
-        am = active_map[pk]
         series.append(
             {
                 "period": pk.isoformat(),
                 "new_male": nm["male"],
                 "new_female": nm["female"],
                 "new_unknown": nm["unknown"],
-                "active_male": am["male"],
-                "active_female": am["female"],
-                "active_unknown": am["unknown"],
             }
         )
 
     return {
         "bucket": b,
         "gender": g_filter,
+        "include_gender": include_gender,
         "date_from": date_from,
         "date_to": date_to,
         "series": series,
         "definitions": {
-            "new_users": "Count of user accounts created in each period (gender: sole birth chart if count is 1, else latest self chart).",
-            "active_users": "Distinct users who sent at least one chat message in the period.",
+            "new_users": (
+                "Count of user accounts created in each period."
+                + (
+                    " Gender: sole birth chart if count is 1, else latest self chart."
+                    if include_gender
+                    else ""
+                )
+            ),
         },
     }
 
