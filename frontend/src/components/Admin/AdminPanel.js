@@ -278,6 +278,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
   const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
   const [chatSubjectGateSaving, setChatSubjectGateSaving] = useState(false);
+  const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
+  const [chatWorkerUserAllowlist, setChatWorkerUserAllowlist] = useState('');
+  const [chatWorkerModeSaving, setChatWorkerModeSaving] = useState(false);
   const [firstPurchaseBonusEnabled, setFirstPurchaseBonusEnabled] = useState(false);
   const [firstPurchaseBonusUserAllowlist, setFirstPurchaseBonusUserAllowlist] = useState('');
   const [firstPurchaseBonusPercent, setFirstPurchaseBonusPercent] = useState('20');
@@ -682,6 +685,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
+      setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
+      setChatWorkerUserAllowlist(data.chat_worker_user_allowlist || '');
       const firstBonusConfig = data.first_purchase_bonus_config || {};
       setFirstPurchaseBonusEnabled(Boolean(data.first_purchase_bonus_enabled));
       setFirstPurchaseBonusUserAllowlist(data.first_purchase_bonus_user_allowlist || '');
@@ -1192,6 +1197,46 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save pre-question gate setting.');
     } finally {
       setChatSubjectGateSaving(false);
+    }
+  };
+
+  const handleSaveChatWorkerModeSettings = async () => {
+    setChatWorkerModeSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes] = await Promise.all([
+        fetch('/api/admin/settings/chat_worker_mode_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_worker_mode_enabled',
+            value: chatWorkerModeEnabled ? 'true' : 'false',
+            description: 'Feature flag for routing chat-v2 processing through the dedicated worker path',
+          }),
+        }),
+        fetch('/api/admin/settings/chat_worker_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'chat_worker_user_allowlist',
+            value: chatWorkerUserAllowlist,
+            description: 'Optional CSV user allowlist for chat worker mode. Empty = all users when enabled.',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok) {
+        const enabledErr = await enabledRes.json().catch(() => ({}));
+        const allowlistErr = await allowlistRes.json().catch(() => ({}));
+        alert('Failed to save chat worker settings: ' + (enabledErr.detail || allowlistErr.detail || 'check console'));
+        return;
+      }
+      alert(`Chat worker routing ${chatWorkerModeEnabled ? 'enabled' : 'disabled'}. New chat requests use it immediately for eligible users.`);
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving chat worker settings:', error);
+      alert('Failed to save chat worker settings.');
+    } finally {
+      setChatWorkerModeSaving(false);
     }
   };
 
@@ -5607,6 +5652,50 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={playPaymentServiceSaving}
                 >
                   {playPaymentServiceSaving ? 'Saving…' : 'Save Google Play payment service'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Chat worker routing</h3>
+              <p className="settings-hint">
+                Routes chat processing to the dedicated chat worker fleet. Keep the allowlist narrow first so only selected internal users use the worker path.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable chat worker routing</strong>
+                  <p>Master switch for sending eligible chat requests to the worker queue instead of processing on the main API fleet.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={chatWorkerModeEnabled}
+                    onChange={(e) => setChatWorkerModeEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Eligible user IDs</strong>
+                  <p>Comma or space separated. Leave blank to allow all users when the switch is on.</p>
+                </div>
+                <textarea
+                  value={chatWorkerUserAllowlist}
+                  onChange={(e) => setChatWorkerUserAllowlist(e.target.value)}
+                  placeholder="e.g. 1755"
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveChatWorkerModeSettings}
+                  disabled={chatWorkerModeSaving}
+                >
+                  {chatWorkerModeSaving ? 'Saving…' : 'Save chat worker settings'}
                 </button>
               </div>
             </div>
