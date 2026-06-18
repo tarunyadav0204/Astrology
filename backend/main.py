@@ -3005,7 +3005,6 @@ async def api_health():
 async def system_status():
     try:
         import psutil
-        import gc
         import threading
         
         process = psutil.Process()
@@ -3016,20 +3015,17 @@ async def system_status():
         memory_percent = process.memory_percent()
         
         # CPU info
-        cpu_percent = process.cpu_percent(interval=1)
+        cpu_percent = process.cpu_percent(interval=0.0)
         
         # System info
         system_memory = psutil.virtual_memory()
-        system_cpu = psutil.cpu_percent(interval=1)
+        system_cpu = psutil.cpu_percent(interval=0.0)
         
         # Thread info
         thread_count = threading.active_count()
         
         # Connection info
         connections = len(process.connections())
-        
-        # Force garbage collection
-        gc.collect()
         
         return {
             "process": {
@@ -3643,6 +3639,7 @@ async def calculate_accurate_dasha(birth_data: BirthData):
 @app.post("/api/calculate-cascading-dashas")
 async def calculate_cascading_dashas(request: dict):
     """Calculate complete cascading dasha hierarchy for a given date"""
+    started_at = time.time()
     try:
         from shared.dasha_calculator import DashaCalculator
         
@@ -3691,7 +3688,11 @@ async def calculate_cascading_dashas(request: dict):
     # Get current dashas for target date
     print(f"\n🔄 CALLING DASHA CALCULATOR")
     print(f"  Target date: {target_date}")
-    current_dashas = calculator.calculate_current_dashas(birth_dict, target_date)
+    current_dashas = await asyncio.to_thread(
+        calculator.calculate_current_dashas,
+        birth_dict,
+        target_date,
+    )
     print(f"\n📊 CALCULATOR RESPONSE:")
     print(f"  Result keys: {list(current_dashas.keys())}")
     print(f"  Moon Nakshatra: {current_dashas.get('moon_nakshatra', 'N/A')}")
@@ -3832,6 +3833,16 @@ async def calculate_cascading_dashas(request: dict):
     print(f"Prana dashas: {len(result['prana_dashas'])}")
     print(f"\nRETURNING RESULT TO CLIENT")
     print(f"{'='*60}\n")
+    log_lifecycle_event(
+        "cascading_dashas_complete",
+        level=logging.INFO,
+        duration_ms=round((time.time() - started_at) * 1000, 1),
+        maha_count=len(result["maha_dashas"]),
+        antar_count=len(result["antar_dashas"]),
+        pratyantar_count=len(result["pratyantar_dashas"]),
+        sookshma_count=len(result["sookshma_dashas"]),
+        prana_count=len(result["prana_dashas"]),
+    )
     return result
 
 @app.post("/api/calculate-sub-dashas")

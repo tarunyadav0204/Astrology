@@ -1857,6 +1857,14 @@ async def process_chat_task(request: dict, x_chat_task_secret: str | None = Head
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="message_id is required")
 
+    _chat_log_event(
+        "chat_task_worker_received",
+        message_id=message_id,
+        session_id=request.get("session_id"),
+        user_id=request.get("user_id"),
+        chat_tier=request.get("chat_tier", "standard"),
+    )
+
     claim_id = str(request.get("claim_id") or uuid.uuid4())
     claim_minutes = int(os.getenv("CHAT_TASK_CLAIM_MINUTES", "35") or "35")
     claim_state = _claim_chat_processing_message(message_id, claim_id, claim_minutes=claim_minutes)
@@ -1867,6 +1875,14 @@ async def process_chat_task(request: dict, x_chat_task_secret: str | None = Head
     if claim_state == "busy":
         logger.info("chat Cloud Task skipped busy message_id=%s claim_id=%s", message_id, claim_id)
         raise HTTPException(status_code=409, detail="Message is already being processed")
+
+    _chat_log_event(
+        "chat_task_worker_claimed",
+        message_id=message_id,
+        session_id=request.get("session_id"),
+        claim_id=claim_id,
+        claim_minutes=claim_minutes,
+    )
 
     try:
         await process_gemini_response(
@@ -2560,6 +2576,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     try:
         effective_chat_tier = str(chat_tier or "standard").strip().lower()
         is_instant_chat = effective_chat_tier == "instant"
+        _chat_log_event(
+            "chat_processing_started",
+            message_id=message_id,
+            session_id=session_id,
+            user_id=user_id,
+            chat_tier=effective_chat_tier,
+            premium_analysis=bool(premium_analysis),
+            partnership_mode=bool(partnership_mode and partner_birth_details),
+            question_chars=len(question or ""),
+        )
         death_analysis_unlocked = is_death_override_unlocked(question)
         # Refuse death-related questions without calling the model
         if is_death_related(question):
