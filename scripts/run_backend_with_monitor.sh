@@ -9,6 +9,7 @@ CPU_SNAPSHOT_SCRIPT="${CPU_SNAPSHOT_SCRIPT:-${APP_ROOT}/scripts/capture_cpu_snap
 BACKEND_LOG_TAG="${BACKEND_LOG_TAG:-astroroshni-backend}"
 MONITOR_LOG_TAG="${MONITOR_LOG_TAG:-astroroshni-backend-monitor}"
 EXIT_SNAPSHOT_TAIL_LINES="${EXIT_SNAPSHOT_TAIL_LINES:-120}"
+UVICORN_WORKERS="${UVICORN_WORKERS:-1}"
 
 timestamp_utc() {
   date -u '+%Y-%m-%dT%H:%M:%SZ'
@@ -58,7 +59,7 @@ capture_exit_snapshot() {
 
 cd "${BACKEND_DIR}"
 
-log_monitor "backend_monitor_start cwd=${BACKEND_DIR}"
+log_monitor "backend_monitor_start cwd=${BACKEND_DIR} uvicorn_workers=${UVICORN_WORKERS} backend_port=${BACKEND_PORT}"
 set +e
 set -o pipefail
 python main.py 2>&1 | emit_block_to_logger "${BACKEND_LOG_TAG}"

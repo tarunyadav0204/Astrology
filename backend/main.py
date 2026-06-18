@@ -7069,7 +7069,7 @@ if __name__ == "__main__":
     try:
         # Get port from environment for GCP deployment
         port = int(os.getenv('PORT', 8001))
-        workers = max(1, int(os.getenv("UVICORN_WORKERS", "2")))
+        workers = max(1, int(os.getenv("UVICORN_WORKERS", "1")))
         limit_concurrency = max(1, int(os.getenv("UVICORN_LIMIT_CONCURRENCY", "500")))
         
         # No limit_max_requests: recycling every N requests caused ~3h watchdog restarts

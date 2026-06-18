@@ -43,6 +43,7 @@ FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-http://127.0.0.1:${FRONTEND_PORT}/}"
 FRONTEND_HEALTH_ATTEMPTS="${FRONTEND_HEALTH_ATTEMPTS:-20}"
 FRONTEND_HEALTH_SLEEP_SECONDS="${FRONTEND_HEALTH_SLEEP_SECONDS:-1}"
 APP_COMMIT_SHA="${APP_COMMIT_SHA:-unknown-version}"
+UVICORN_WORKERS="${UVICORN_WORKERS:-1}"
 
 case "$(printf '%s' "${SYNC_GCP_SECRETS}" | tr '[:upper:]' '[:lower:]')" in
   true|1|yes) SYNC_GCP_SECRETS=true ;;
@@ -155,6 +156,7 @@ if [ -z "${PLAY_PAYMENT_SERVICE_SHARED_SECRET:-}" ] && [ -f "${PLAY_PAYMENT_SERV
   export PLAY_PAYMENT_SERVICE_SHARED_SECRET="$(tr -d '\r\n' < "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH}")"
 fi
 export APP_COMMIT_SHA
+export UVICORN_WORKERS
 export PYTHONUNBUFFERED=1
 
 if [ "${SKIP_BACKEND_RESTART}" = "true" ]; then
@@ -163,9 +165,13 @@ if [ "${SKIP_BACKEND_RESTART}" = "true" ]; then
 fi
 
 echo "🧹 Clearing backend port ${BACKEND_PORT} before start..."
+echo "Backend listeners before cleanup:"
+ss -ltnp 2>/dev/null | grep ":${BACKEND_PORT}\\b" || true
+echo "Backend processes before cleanup:"
+ps -ef | grep -E "python main.py|uvicorn" | grep -v grep || true
 fuser -k "${BACKEND_PORT}"/tcp 2>/dev/null || true
-pkill -f "python main.py" 2>/dev/null || true
-pkill -f "uvicorn.*${BACKEND_PORT}" 2>/dev/null || true
+pkill -TERM -f "python main.py" 2>/dev/null || true
+pkill -TERM -f "uvicorn.*${BACKEND_PORT}" 2>/dev/null || true
 
 for i in 1 2 3 4 5 6 7 8 9 10; do
   if ! ss -ltn 2>/dev/null | grep -qE ":${BACKEND_PORT}\\s"; then
@@ -173,6 +179,19 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
   fi
   sleep 1
 done
+
+if ss -ltn 2>/dev/null | grep -qE ":${BACKEND_PORT}\\s"; then
+  echo "⚠️ Backend port still busy after TERM cleanup, forcing kill..."
+  fuser -k -9 "${BACKEND_PORT}"/tcp 2>/dev/null || true
+  pkill -KILL -f "python main.py" 2>/dev/null || true
+  pkill -KILL -f "uvicorn.*${BACKEND_PORT}" 2>/dev/null || true
+  sleep 2
+fi
+
+echo "Backend listeners after cleanup:"
+ss -ltnp 2>/dev/null | grep ":${BACKEND_PORT}\\b" || true
+echo "Backend processes after cleanup:"
+ps -ef | grep -E "python main.py|uvicorn" | grep -v grep || true
 bootstrap_timing "backend port cleared"
 
 echo "Starting backend (logs go to journald / Cloud Logging)..."
@@ -181,6 +200,7 @@ if [ ! -f "${BACKEND_MONITOR_SCRIPT}" ]; then
   exit 1
 fi
 logger -t astroroshni-backend-monitor -- "bootstrap_backend_start commit=${APP_COMMIT_SHA}"
+logger -t astroroshni-backend-monitor -- "bootstrap_backend_env uvicorn_workers=${UVICORN_WORKERS} backend_port=${BACKEND_PORT}"
 nohup bash "${BACKEND_MONITOR_SCRIPT}" >/dev/null 2>&1 &
 BACKEND_PID=$!
 echo "Backend PID: ${BACKEND_PID}"
