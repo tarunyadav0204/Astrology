@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse, Response
 import base64
@@ -11,6 +13,7 @@ import logging
 import asyncio
 from functools import partial
 from pydantic import BaseModel
+from typing import Optional, Union
 
 from auth import get_current_user, User
 from db import get_conn, execute
@@ -47,7 +50,7 @@ def _ensure_podcast_history_table():
         conn.commit()
 
 
-def _add_podcast_history(userid: int, message_id: str, session_id: str | None, lang: str, preview: str | None):
+def _add_podcast_history(userid: int, message_id: str, session_id: Optional[str], lang: str, preview: Optional[str]):
     if not message_id or not str(message_id).strip():
         return
     _ensure_podcast_history_table()
@@ -78,7 +81,7 @@ router = APIRouter(prefix="/tts", tags=["tts"])
 _SPOKEN_TTS_CACHE: dict[str, str] = {}
 
 
-def _build_voice_and_config(lang: str, voice_name: str | None = None):
+def _build_voice_and_config(lang: str, voice_name: Optional[str] = None):
   lang = (lang or "en").lower()
   resolved_voice_name = voice_name or get_speech_tts_voice(lang)
   if resolved_voice_name:
@@ -92,7 +95,7 @@ def _build_voice_and_config(lang: str, voice_name: str | None = None):
   return voice, audio_config
 
 
-def _build_beta_voice_and_config(lang: str, voice_name: str | None = None):
+def _build_beta_voice_and_config(lang: str, voice_name: Optional[str] = None):
   lang = (lang or "en").lower()
   resolved_voice_name = voice_name or get_speech_tts_voice(lang)
   if resolved_voice_name:
@@ -106,7 +109,7 @@ def _build_beta_voice_and_config(lang: str, voice_name: str | None = None):
   return voice, audio_config
 
 
-def _voice_supports_word_mark_timepoints(voice_name: str | None) -> bool:
+def _voice_supports_word_mark_timepoints(voice_name: Optional[str]) -> bool:
   name = str(voice_name or "").lower().strip()
   if not name:
     return True
@@ -796,7 +799,7 @@ async def list_voices():
 async def synthesize(
   text: str,
   lang: str = "en",
-  voice_name: str | None = None,
+  voice_name: Optional[str] = None,
   include_timepoints: bool = Query(default=False),
 ):
   """
@@ -898,10 +901,10 @@ async def synthesize(
 class PodcastRequest(BaseModel):
   message_content: str
   language: str = "en"
-  message_id: str | int | None = None  # optional: if provided, use GCS cache; client may send int (e.g. 2329)
-  session_id: str | None = None  # optional: for podcast history and opening conversation
-  preview: str | None = None  # optional: first ~150 chars for history list
-  native_name: str | None = None  # optional: birth chart / native name for personalized intro
+  message_id: Optional[Union[str, int]] = None  # optional: if provided, use GCS cache; client may send int (e.g. 2329)
+  session_id: Optional[str] = None  # optional: for podcast history and opening conversation
+  preview: Optional[str] = None  # optional: first ~150 chars for history list
+  native_name: Optional[str] = None  # optional: birth chart / native name for personalized intro
 
 
 def _podcast_cache_lang(lang: str) -> str:
@@ -948,7 +951,7 @@ def _normalize_hindi_ordinals(script: str, lang: str) -> str:
 
 @router.get("/podcast/check-cache")
 async def podcast_check_cache(
-  message_id: str | int,
+  message_id: Union[str, int],
   lang: str = "en",
   current_user: User = Depends(get_current_user),
 ):

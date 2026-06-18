@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Unified Output Schema - Single Source of Truth for Response Formatting
 import json
 from datetime import datetime

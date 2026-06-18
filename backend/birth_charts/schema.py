@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Schema helpers for birth chart family metadata."""
 
 from db import execute

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import json
@@ -7,6 +9,7 @@ import hashlib
 import google.generativeai as genai
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+from typing import List, Optional
 
 from auth import get_current_user, User
 from utils.admin_settings import speech_chat_enabled_for_user
@@ -38,7 +41,7 @@ def _response_text(response) -> str:
         return "\n".join(parts).strip()
 
 
-def _extract_json_object(text: str) -> dict | None:
+def _extract_json_object(text: str) -> Optional[dict]:
     raw = (text or "").strip()
     if not raw:
         return None
@@ -57,7 +60,7 @@ def _extract_json_object(text: str) -> dict | None:
         return None
 
 
-def _normalize_guide_lines(value, max_items: int = 4) -> list[str]:
+def _normalize_guide_lines(value, max_items: int = 4) -> List[str]:
     if isinstance(value, str):
         items = [value]
     elif isinstance(value, list):
@@ -74,7 +77,7 @@ def _normalize_guide_lines(value, max_items: int = 4) -> list[str]:
     return cleaned
 
 
-def _fallback_voice_guide(scene: str, *, language: str, user_name: str = "", chart_name: str = "", question: str = "", follow_ups: list[str] | None = None) -> dict:
+def _fallback_voice_guide(scene: str, *, language: str, user_name: str = "", chart_name: str = "", question: str = "", follow_ups: Optional[List[str]] = None) -> dict:
     lang = "hi" if (language or "").lower().startswith("hi") else "en"
     follow_ups = [str(item or "").strip() for item in (follow_ups or []) if str(item or "").strip()]
 
@@ -131,10 +134,10 @@ def _fallback_voice_guide(scene: str, *, language: str, user_name: str = "", cha
 class VoiceGuideRequest(BaseModel):
     scene: str
     language: str = "english"
-    user_name: str | None = None
-    chart_name: str | None = None
-    question: str | None = None
-    follow_ups: list[str] | None = None
+    user_name: Optional[str] = None
+    chart_name: Optional[str] = None
+    question: Optional[str] = None
+    follow_ups: Optional[List[str]] = None
     hands_free: bool = True
 
 
@@ -145,7 +148,7 @@ async def _generate_voice_guide_lines(
     user_name: str = "",
     chart_name: str = "",
     question: str = "",
-    follow_ups: list[str] | None = None,
+    follow_ups: Optional[List[str]] = None,
     hands_free: bool = True,
 ) -> dict:
     follow_ups = [str(item or "").strip() for item in (follow_ups or []) if str(item or "").strip()]
@@ -300,7 +303,7 @@ Context:
         )
 
 
-def _audio_suffix(filename: str | None, content_type: str | None) -> str:
+def _audio_suffix(filename: Optional[str], content_type: Optional[str]) -> str:
     name = (filename or "").lower()
     if name.endswith(".m4a"):
         return ".m4a"
@@ -322,7 +325,7 @@ def _audio_suffix(filename: str | None, content_type: str | None) -> str:
     return ".m4a"
 
 
-def _normalized_mime_type(suffix: str, content_type: str | None) -> str:
+def _normalized_mime_type(suffix: str, content_type: Optional[str]) -> str:
     """MIME type Gemini expects for inline audio (m4a from iOS is usually audio/mp4)."""
     ct = (content_type or "").strip().lower()
     if "mp4" in ct or "m4a" in ct:
@@ -376,7 +379,7 @@ def _clean_transcript(text: str) -> str:
     return strip_matching_quotes(transcript)
 
 
-def _normalized_transcription_language(language: str | None) -> str | None:
+def _normalized_transcription_language(language: Optional[str]) -> Optional[str]:
     raw = (language or "").strip().lower()
     if not raw:
         return None
@@ -409,7 +412,7 @@ def _looks_like_instruction_following_failure(text: str) -> bool:
     return any(phrase in transcript for phrase in suspicious_phrases)
 
 
-def _transcription_prompt(language: str | None) -> str:
+def _transcription_prompt(language: Optional[str]) -> str:
     return (
         "Listen to the attached audio. Task: verbatim speech-to-text only.\n"
         "The audio is the only source of truth. Do not invent speech you do not hear.\n"
@@ -429,7 +432,7 @@ async def _transcribe_with_gemini(
     *,
     data: bytes,
     mime: str,
-    language: str | None,
+    language: Optional[str],
 ) -> tuple[str, str]:
     api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
     if not api_key:

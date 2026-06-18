@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # System Instruction Configuration - Modular Breakdown
 # Gemini's optimized approach: Rule IDs instead of verbose explanations
 

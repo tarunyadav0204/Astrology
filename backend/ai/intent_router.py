@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import google.generativeai as genai
 import json
 import os

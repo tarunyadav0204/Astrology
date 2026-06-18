@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from typing import Dict, List, Any
