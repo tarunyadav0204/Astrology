@@ -46,10 +46,7 @@ class JaiminiChartCalculator(BaseCalculator):
             raise ValueError(f"Atmakaraka {self.atmakaraka_planet} not found in D9")
         
         karkamsa_sign = d9_chart['planets'][self.atmakaraka_planet]['sign']
-        
-        print(f"[KARKAMSA] AK {self.atmakaraka_planet} in D9 sign {karkamsa_sign}")
-        print(f"[KARKAMSA] Using D1 planet positions:")
-        
+
         # Step 2: Map D1 planets to houses relative to Karkamsa lagna
         karkamsa_chart = self._recast_with_d1_planets(karkamsa_sign)
         
@@ -79,10 +76,7 @@ class JaiminiChartCalculator(BaseCalculator):
             raise ValueError(f"Atmakaraka {self.atmakaraka_planet} not found in D9")
         
         swamsa_sign = d9_chart['planets'][self.atmakaraka_planet]['sign']
-        
-        print(f"[SWAMSA] AK {self.atmakaraka_planet} in D9 sign {swamsa_sign}")
-        print(f"[SWAMSA] Using D9 planet positions:")
-        
+
         # Step 2: Map D9 planets to houses relative to Swamsa lagna
         swamsa_chart = self._recast_with_d9_planets(d9_chart, swamsa_sign)
         
@@ -119,7 +113,6 @@ class JaiminiChartCalculator(BaseCalculator):
                 'house': house,
                 'retrograde': data.get('retrograde', False)
             }
-            print(f"  {planet}: D1 sign {planet_sign} → House {house}")
         
         return chart
     
@@ -148,7 +141,6 @@ class JaiminiChartCalculator(BaseCalculator):
                 'house': house,
                 'retrograde': data.get('retrograde', False)
             }
-            print(f"  {planet}: D9 sign {planet_sign} → House {house}")
         
         return chart
     

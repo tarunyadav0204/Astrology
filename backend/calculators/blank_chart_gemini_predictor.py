@@ -16,7 +16,6 @@ env_paths = [
 for env_path in env_paths:
     if os.path.exists(env_path):
         load_dotenv(env_path)
-        print(f"✅ Loaded environment from: {env_path}")
         break
 
 # Set up logging
@@ -36,8 +35,6 @@ class BlankChartGeminiPredictor:
                 raise ValueError("DEEPSEEK_API_KEY not found in environment variables")
         else:
             self.api_key = os.getenv('GEMINI_API_KEY')
-            print(f"🔑 GEMINI_API_KEY present: {bool(self.api_key)}")
-            print(f"🔑 GEMINI_API_KEY length: {len(self.api_key) if self.api_key else 0}")
             if not self.api_key:
                 logger.error("GEMINI_API_KEY not found in environment variables")
                 raise ValueError("GEMINI_API_KEY not found in environment variables")
@@ -59,10 +56,6 @@ class BlankChartGeminiPredictor:
                 self._analysis_vendor,
                 self._resolved_analysis_model_name,
             )
-            print(
-                f"✅ Blank chart predictor using ({self._analysis_vendor}): "
-                f"{self._resolved_analysis_model_name}"
-            )
         except ImportError as e:
             logger.error(f"Failed to import analysis LLM backend: {e}")
             raise ValueError(f"Analysis LLM backend not available: {e}") from e
@@ -76,7 +69,6 @@ class BlankChartGeminiPredictor:
         
         try:
             logger.info(f"🚀 Starting blank chart prediction generation at {timestamp}")
-            print(f"🚀 Starting blank chart prediction generation at {timestamp}")
             
             # Log context structure
             logger.info(f"📊 Context keys: {list(context.keys())}")

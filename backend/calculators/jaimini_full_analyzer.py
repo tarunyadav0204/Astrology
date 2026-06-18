@@ -33,24 +33,17 @@ class JaiminiFullAnalyzer:
             periods = self.chara_dasha.get('periods', [])
             current_md = next((p for p in periods if p.get('is_current')), {})
             current_md_sign = current_md.get('sign_id')
-            
-            # Debug logging
-            print(f"\n🔍 JAIMINI ANALYZER DEBUG:")
-            print(f"   Current MD: {current_md.get('sign_name')} (ID: {current_md_sign})")
-            
+
             # Get current antardasha
             antardashas = current_md.get('antardashas', [])
             current_ad = next((a for a in antardashas if a.get('is_current')), {})
             current_ad_sign = current_ad.get('sign_id')
-            print(f"   Current AD: {current_ad.get('sign_name')} (ID: {current_ad_sign})")
-            print(f"   Total ADs available: {len(antardashas)}")
         
         # Get Karaka signs from the karaka data structure
         ak_data = self.karakas.get('Atmakaraka', {})
         amk_data = self.karakas.get('Amatyakaraka', {})
         ak_sign = ak_data.get('sign')
         amk_sign = amk_data.get('sign')
-        print(f"   AK Sign: {ak_sign}, AmK Sign: {amk_sign}")
         
         return {
             "relative_views": {

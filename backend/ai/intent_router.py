@@ -4,12 +4,15 @@ import os
 import re
 import asyncio
 import random
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from ai.output_schema import resolve_output_language_policy
 from daily.daily_micro_intents import classify_daily_micro_intent
 from utils.query_context import normalize_query_context, resolve_query_now
+
+logger = logging.getLogger(__name__)
 
 _MONTH_NAME_TO_NUM = {
     "january": 1,
@@ -770,10 +773,9 @@ class IntentRouter:
             model_name = "models/gemini-2.5-flash-lite"
         try:
             self.model = genai.GenerativeModel(model_name, generation_config=self._gen_config)
-            print(f"✅ Intent router fallback model: {model_name}")
         except Exception as e:
             fallback_fast = "models/gemini-2.0-flash-lite-001"
-            print(f"⚠️ Intent router model {model_name} not available ({e}), trying default")
+            logger.warning("intent router model %s not available (%s), trying default", model_name, e)
             self.model = genai.GenerativeModel(fallback_fast, generation_config=self._gen_config)
 
     def _get_model(self):
@@ -788,7 +790,7 @@ class IntentRouter:
             self._model_cache[name] = genai.GenerativeModel(name, generation_config=self._gen_config)
             return self._model_cache[name]
         except Exception as e:
-            print(f"⚠️ Intent router model {name} not available ({e}), using fallback")
+            logger.warning("intent router model %s not available (%s), using fallback", name, e)
             return self.model
 
     def _finalize_router_result(
@@ -954,10 +956,6 @@ class IntentRouter:
         import time
 
         intent_start = time.time()
-        print(f"\n{'='*80}")
-        print("⚡ INSTANT INTENT CLASSIFICATION STARTED")
-        print(f"{'='*80}")
-        print(f"Question: {user_question}")
 
         resolved_now = resolve_query_now(query_context)
         normalized_query_context = normalize_query_context(query_context)
@@ -1100,9 +1098,11 @@ Return ONLY this JSON shape:
 
         model = self._get_model()
         model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
-        print("\n📤 INSTANT INTENT ROUTER REQUEST:")
-        print(f"Model: {model_name}")
-        print(f"Prompt length: {len(prompt)} characters")
+        logger.debug(
+            "instant_intent_router_request model=%s prompt_chars=%s",
+            model_name,
+            len(prompt),
+        )
         token_usage: Dict[str, Any] = {}
         response_chars = 0
 
@@ -1149,10 +1149,16 @@ Return ONLY this JSON shape:
                     )
             except Exception:
                 pass
-            print(f"🔍 RAW INSTANT INTENT RESPONSE: {cleaned}")
             result = json.loads(cleaned)
             total_time = time.time() - intent_start
-            print(f"✅ Instant intent: {result.get('status')} | Mode: {result.get('mode')} | Category: {result.get('category')} | Gemini: {gemini_time:.2f}s | Total: {total_time:.2f}s")
+            logger.debug(
+                "instant_intent_router_response status=%s mode=%s category=%s llm_s=%.2f total_s=%.2f",
+                result.get("status"),
+                result.get("mode"),
+                result.get("category"),
+                gemini_time,
+                total_time,
+            )
             final = self._finalize_router_result(
                 result,
                 user_question=user_question,
@@ -1174,9 +1180,11 @@ Return ONLY this JSON shape:
             return final
         except Exception as e:
             total_time = time.time() - intent_start
-            print("\n❌ INSTANT INTENT CLASSIFICATION FAILED")
-            print(f"Error: {e}")
-            print(f"Total time: {total_time:.3f}s")
+            logger.exception(
+                "instant_intent_classification_failed total_s=%.3f error=%s",
+                total_time,
+                e,
+            )
             fallback = self._build_fallback_intent_result(
                 user_question=user_question,
                 current_year=current_year,
@@ -1205,11 +1213,6 @@ Return ONLY this JSON shape:
         from datetime import datetime
         
         intent_start = time.time()
-        print(f"\n{'='*80}")
-        print(f"🧠 INTENT CLASSIFICATION STARTED")
-        print(f"{'='*80}")
-        print(f"Question: {user_question}")
-        
         resolved_now = resolve_query_now(query_context)
         normalized_query_context = normalize_query_context(query_context)
         current_year = resolved_now.year
@@ -1573,9 +1576,6 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         
         model = self._get_model()
         model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
-        print(f"\n📤 INTENT ROUTER REQUEST:")
-        print(f"Model: {model_name}")
-        print(f"Prompt length: {len(prompt)} characters")
         
         try:
             gemini_start = time.time()
@@ -1590,11 +1590,17 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             gemini_time = time.time() - gemini_start
             
             cleaned = response.text.replace('```json', '').replace('```', '').strip()
-            print(f"🔍 RAW INTENT RESPONSE: {cleaned}")
             result = json.loads(cleaned)
             
             total_time = time.time() - intent_start
-            print(f"✅ Intent: {result.get('status')} | Mode: {result.get('mode')} | Category: {result.get('category')} | Time: {total_time:.2f}s")
+            logger.info(
+                "intent router complete status=%s mode=%s category=%s model=%s duration_ms=%.1f",
+                result.get('status'),
+                result.get('mode'),
+                result.get('category'),
+                model_name,
+                total_time * 1000.0,
+            )
             
             return self._finalize_router_result(
                 result,
@@ -1607,9 +1613,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             )
         except Exception as e:
             total_time = time.time() - intent_start
-            print(f"\n❌ INTENT CLASSIFICATION FAILED")
-            print(f"Error: {e}")
-            print(f"Total time: {total_time:.3f}s")
+            logger.warning("intent classification failed after %.3fs: %s", total_time, e)
             return self._build_fallback_intent_result(
                 user_question=user_question,
                 current_year=current_year,

@@ -2,8 +2,11 @@
 import swisseph as swe
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Tuple
+import logging
 from .base_calculator import BaseCalculator
 from .jaimini_rashi_strength import JaiminiRashiStrength
+
+logger = logging.getLogger(__name__)
 
 class JaiminiKalachakraCalculator(BaseCalculator):
     """
@@ -150,9 +153,7 @@ class JaiminiKalachakraCalculator(BaseCalculator):
                 # Track skipped rashi with reasons
                 strength_calc = JaiminiRashiStrength(self.chart_data)
                 skip_reasons = strength_calc.get_skip_reasons(current_sign - 1)
-                
-                print(f"DEBUG: Skipping {self.SIGN_NAMES[current_sign - 1]} in cycle {cycle_num} (strength: {skip_reasons.get('total_strength', 0)})")
-                
+
                 skipped_rashis.append({
                     "sign": current_sign - 1,
                     "sign_name": self.SIGN_NAMES[current_sign - 1],
@@ -191,8 +192,7 @@ class JaiminiKalachakraCalculator(BaseCalculator):
             if current_sign == janma_rashi:
                 cycle_num += 1
                 forward = not forward  # Reverse direction for next cycle
-        
-        print(f"DEBUG: Total skipped rashis: {len(skipped_rashis)}")
+
         return mahadashas, skipped_rashis
     
     def _should_skip_rashi(self, sign: int, cycle_num: int) -> bool:
@@ -277,7 +277,7 @@ class JaiminiKalachakraCalculator(BaseCalculator):
             jd = swe.julday(year, month, day, decimal_hour)
             return jd
         except Exception as e:
-            print(f"Birth JD parsing error: {e}, birth_data: {birth_data}")
+            logger.warning("birth JD parsing error in jaimini kalachakra calculator: %s", e)
             # Fallback to current date if parsing fails
             now = datetime.utcnow()
             return swe.julday(now.year, now.month, now.day, now.hour + now.minute/60.0)

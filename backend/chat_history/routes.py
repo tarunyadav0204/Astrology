@@ -1340,16 +1340,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
     effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
 
-    print(f"💳 CREDIT CHECK (chat-v2):")
-    print(f"   User ID: {current_user.userid}")
-    print(f"   Requested chat tier: {requested_chat_tier}")
-    print(f"   Effective chat tier: {effective_chat_tier}")
-    print(f"   Partnership Mode: {partnership_mode}")
-    print(f"   Premium Analysis: {premium_analysis}")
-    print(f"   Speech chat billing: {speech_chat_billing}")
-    print(f"   Chat cost: {chat_cost} credits, effective: {effective_cost} (free_question: {using_free_question})")
-    print(f"   User balance: {user_balance} credits")
-
     if user_balance < effective_cost:
         if partnership_mode:
             analysis_type = "Partnership Analysis"
@@ -1359,7 +1349,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             analysis_type = "Speech chat" if speech_chat_billing else "Instant Chat"
         else:
             analysis_type = "Standard Analysis"
-        print(f"❌ INSUFFICIENT CREDITS: Need {effective_cost}, have {user_balance}")
         raise HTTPException(
             status_code=402,
             detail=f"Insufficient credits for {analysis_type}. You need {effective_cost} credits but have {user_balance}."
@@ -1456,7 +1445,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             (session_id, "user", sanitize_text(question), "completed", datetime.now()),
         )
         user_message_id = cur.fetchone()[0]
-        print(f"💾 User message saved with ID: {user_message_id}")
         _record_nudge_conversion_safe(
             conn,
             nudge_id=nudge_id,
@@ -1475,14 +1463,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             (session_id, "assistant", "", "processing", datetime.now(), client_request_id),
         )
         assistant_message_id = cur.fetchone()[0]
-        print(f"💾 Assistant message saved with ID: {assistant_message_id}")
-
         conn.commit()
     
     # Refuse death-related questions without calling Gemini
     from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
     if is_death_related(sanitize_text(question)):
-        print(f"🚫 Death-related question detected - returning refusal without analysis")
         with get_conn() as conn:
             execute(
                 conn,
@@ -1511,7 +1496,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             question=sanitize_text(question),
             language=str(language or "english"),
         ):
-            print("🚫 Fetal sex determination question detected (LLM gate) - returning refusal without analysis")
             with get_conn() as conn:
                 execute(
                     conn,
@@ -1697,8 +1681,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 query_context=query_context,
             )
         chart_insights = intent.get('chart_insights', [])
-        print(f"📊 Got {len(chart_insights)} chart insights from intent router")
-        
         # Mark Lab / educational mode explicitly on intent so downstream
         # prompt builder can switch to teaching-focused instructions.
         if mode == 'lab':
@@ -1712,7 +1694,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         
         # Handle clarification immediately - do NOT start background task
         if intent.get('status') == 'CLARIFY' and clarification_count < max_clarifications:
-            print(f"❓ CLARIFICATION NEEDED - Returning immediately without background task")
             clarification_question = intent.get('clarification_question', 'Could you provide more details?')
             
             # Update assistant message with clarification
@@ -1741,7 +1722,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 )
 
                 conn.commit()
-            print(f"✅ CLARIFICATION SAVED - Returning to user")
             return {
                 "user_message_id": user_message_id,
                 "message_id": assistant_message_id,
@@ -1752,12 +1732,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 "chart_insights": chart_insights
             }
         elif intent.get('status') == 'CLARIFY':
-            print("⚠️ Clarification requested but limit reached - falling back to READY handling")
-            
+            logger.info("clarification requested but limit reached; falling back to READY handling session_id=%s message_id=%s", session_id, assistant_message_id)
+
     except Exception as e:
-        print(f"⚠️ Failed to get chart insights: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.warning("failed to precompute chart insights for session_id=%s: %s", session_id, e, exc_info=True)
         intent = None
         chart_insights = []
     
@@ -1825,8 +1803,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
             )
     
-    print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
-    print(f"🚀 Returning {len(chart_insights)} chart insights: {chart_insights[:2] if chart_insights else 'EMPTY'}")
     return {
         "user_message_id": user_message_id,
         "message_id": assistant_message_id,
@@ -1945,14 +1921,12 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         # print(f"📊 [DB QUERY] took {db_time:.3f}s for messageId: {message_id}")
         
         if not result:
-            print(f"❌ [STATUS] Message {message_id} not found")
             raise HTTPException(status_code=404, detail="Message not found")
         
         status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, engagement_updates, task_claimed_until, task_enqueued_at = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
-            print(f"❌ [STATUS] Access denied for messageId: {message_id}, user: {current_user.userid}")
             raise HTTPException(status_code=403, detail="Access denied")
         
         response = {"status": status, "message_type": message_type or "answer"}
@@ -2049,9 +2023,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         raise
     except Exception as e:
         total_time = time.time() - start_time
-        print(f"❌ [STATUS ERROR] messageId: {message_id}, error: {str(e)}, total_time: {total_time:.3f}s")
-        import traceback
-        traceback.print_exc()
+        logger.warning("status check failed message_id=%s user_id=%s total_time=%.3fs error=%s", message_id, getattr(current_user, 'userid', None), total_time, e, exc_info=True)
         # Log to admin so status-check failures (DB/500) are visible
         try:
             from utils.error_logger import log_chat_error
@@ -2088,7 +2060,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 err = Exception(f"Status check failed for message_id {message_id}: {e}")
                 log_chat_error(None, 'Unknown', '', err, f"message_id: {message_id}", None, 'backend')
         except Exception as log_err:
-            print(f"⚠️ Failed to log status error: {log_err}")
+            logger.warning("failed to log status error message_id=%s: %s", message_id, log_err)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -2187,10 +2159,6 @@ def get_original_question_for_clarification(session_id, current_message_id, conn
     """
     cursor = conn.cursor()
     
-    print(f"\n🔍 ORIGINAL QUESTION LOOKUP:")
-    print(f"   Session: {session_id}")
-    print(f"   Current message ID: {current_message_id}")
-    
     # Find the last assistant message with message_type='clarification' before current
     cursor = execute(
         conn,
@@ -2208,11 +2176,8 @@ def get_original_question_for_clarification(session_id, current_message_id, conn
     
     clarification_msg = cursor.fetchone()
     if not clarification_msg:
-        print(f"   ❌ No clarification message found before ID {current_message_id}")
         return None
-    
-    print(f"   ✅ Found clarification message ID: {clarification_msg[0]}")
-    
+
     # Find the user message immediately before that clarification
     cursor = execute(
         conn,
@@ -2228,11 +2193,6 @@ def get_original_question_for_clarification(session_id, current_message_id, conn
     )
     
     result = cursor.fetchone()
-    if result:
-        print(f"   ✅ Found original question: {result[0][:100]}...")
-    else:
-        print(f"   ❌ No user message found before clarification")
-    
     return result[0] if result else None
 
 
@@ -2589,7 +2549,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         death_analysis_unlocked = is_death_override_unlocked(question)
         # Refuse death-related questions without calling the model
         if is_death_related(question):
-            print(f"🚫 Death-related question detected in background task - saving refusal")
             with get_conn() as conn:
                 execute(
                     conn,
@@ -2656,10 +2615,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         }
         
         # DEBUG: Log birth data being used in chat
-        print(f"🔍 CHAT BIRTH DATA DEBUG:")
-        print(f"   Raw birth_details: {birth_details}")
-        print(f"   Formatted birth_data: {birth_data}")
-        
         # Validate partnership mode data
         if partnership_mode and partner_birth_details:
             required_fields = ['name', 'date', 'time', 'latitude', 'longitude']
@@ -2727,10 +2682,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         if not partnership_mode:
             # Use AI to classify (Fast)
-            print(f"\n{'='*80}")
-            print(f"🛣️ ROUTING DECISION STARTED")
-            print(f"{'='*80}")
-            
             # Get conversation history
             with get_conn() as conn:
                 cur = execute(
@@ -3164,9 +3115,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 allowed_cats = relevant_categories.get(intent_category, ['career', 'family', 'health', 'location', 'preferences', 'education', 'relationships', 'major_events', 'temporary_events'])
                 user_facts = {cat: items for cat, items in all_facts.items() if cat in allowed_cats}
                 
-                if user_facts:
-                    print(f"📚 Filtered user facts for category '{intent_category}': {list(user_facts.keys())}")
-        
         # Inject user facts into context
         if user_facts and not is_instant_chat:
             context['user_facts'] = user_facts
@@ -3181,7 +3129,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Override intent mode for @All_Events to force event prediction
         is_all_events_question = question.startswith('@All_Events')
         if is_all_events_question:
-            print(f"🎯 @All_Events DETECTED - Overriding intent mode to PREDICT_EVENTS_FOR_PERIOD")
             intent['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
             context['intent']['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
             question = question.replace('@All_Events', '').strip()

@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import json
+import logging
 
 from db import get_conn, execute
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class HouseSpecification(BaseModel):
@@ -149,14 +151,6 @@ def init_house_combinations_db():
             )
 
         conn.commit()
-
-
-# Initialize database on module load (after function is defined)
-try:
-    init_house_combinations_db()
-except Exception as e:
-    print(f"Warning: Could not initialize house combinations database: {e}")
-
 
 @router.get("/house-specifications")
 async def get_house_specifications():

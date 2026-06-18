@@ -355,20 +355,13 @@ def get_divisional_sign(sign, degree_in_sign, division):
 @router.post("/calculate-chart-only")
 async def calculate_chart_only(request: dict, current_user: User = Depends(get_current_user)):
     """Calculate basic chart data only"""
-    print(f"[BACKEND] Starting calculate_chart_only for user {current_user.userid}")
-    start_time = time.time()
-    
     try:
-        print(f"🔍 Raw request: {request}")
-        
         # Mobile app sends data directly, not wrapped in birth_data
         if 'birth_data' in request:
             birth_data = request.get('birth_data', {})
         else:
             birth_data = request  # Data is at root level
-        
-        print(f"📊 Birth data received: {birth_data}")
-        
+
         # Create birth data object - simple class like in main.py backup
         class BirthDataSimple:
             def __init__(self, data):
@@ -385,46 +378,27 @@ async def calculate_chart_only(request: dict, current_user: User = Depends(get_c
             @property
             def timezone_offset(self):
                 """Auto-detect timezone from coordinates and return as offset string"""
-                tz_start = time.time()
                 try:
                     from utils.timezone_service import get_timezone_from_coordinates
-                    detected_tz = get_timezone_from_coordinates(self.latitude, self.longitude)
-                    tz_end = time.time()
-                    print(f"🌍 Timezone detection took {tz_end - tz_start:.3f}s: {detected_tz}")
-                    return detected_tz
+                    return get_timezone_from_coordinates(self.latitude, self.longitude)
                 except Exception as e:
-                    tz_end = time.time()
-                    print(f"❌ Timezone detection failed in {tz_end - tz_start:.3f}s: {e}")
+                    logger.warning("timezone detection failed in calculate-chart-only: %s", e)
                     return "UTC+0"  # UTC default instead of IST
-        
-        obj_start = time.time()
+
         birth_obj = BirthDataSimple(birth_data)
-        obj_end = time.time()
-        print(f"📋 Birth object created in {obj_end - obj_start:.3f}s - Date: {birth_obj.date}, Time: {birth_obj.time}")
-        
+
         # Calculate chart
-        calc_start = time.time()
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj)
-        calc_end = time.time()
-        
-        print(f"📊 Chart calculation took {calc_end - calc_start:.3f}s")
-        
-        if 'houses' in chart_data and len(chart_data['houses']) > 0:
-            asc_sign = chart_data['houses'][0].get('sign', 'N/A')
-            print(f"📊 Ascendant sign: {asc_sign}")
-        
-        end_time = time.time()
-        print(f"[BACKEND] Total calculate_chart_only completed in {end_time - start_time:.3f}s")
-        
+
         # Return chart data directly (not wrapped in success/chart_data)
         return chart_data
-        
+
     except Exception as e:
-        end_time = time.time()
-        print(f"❌ Chart calculation error after {end_time - start_time:.3f}s: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(
+            "calculate-chart-only failed for user_id=%s",
+            getattr(current_user, "userid", None),
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -514,11 +488,6 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
 @router.post("/calculate-divisional-chart")
 async def calculate_divisional_chart(request: dict, current_user: User = Depends(get_current_user)):
     """Calculate accurate divisional charts using proper Vedic formulas"""
-    import time
-    
-    print(f"[BACKEND] Starting calculate_divisional_chart for user {current_user.userid}")
-    start_time = time.time()
-    
     def get_divisional_sign(sign, degree_in_sign, division):
         """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
         EPS = 1e-9  # Prevent 10.0 becoming 9.999
@@ -657,10 +626,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         birth_data = request.get('birth_data', {})
         # Support both 'division' and 'division_number' for backward compatibility
         division_number = request.get('division', request.get('division_number', 9))
-        
-        print(f"[BACKEND] Processing D{division_number} chart for {birth_data.get('name', 'Unknown')}")
-        print(f"[BACKEND] Birth data: {birth_data.get('date')} {birth_data.get('time')} at {birth_data.get('latitude')},{birth_data.get('longitude')}")
-        
+
         # Create birth data object - simple class like in main.py backup
         class BirthDataSimple:
             def __init__(self, data):
@@ -677,15 +643,10 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         birth_obj = BirthDataSimple(birth_data)
         
         # Calculate main chart first
-        calc_start = time.time()
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj)
-        calc_end = time.time()
-        
-        print(f"[BACKEND] Base chart calculation completed in {calc_end - calc_start:.3f}s")
-        
+
         # Calculate divisional chart
-        div_start = time.time()
         divisional_data = {
             'planets': {},
             'houses': [],
@@ -704,12 +665,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         degree_within_part = (asc_degree + EPS) - (part_index * part_size)
         scaled_asc_degree = (degree_within_part / part_size) * 30.0
         divisional_data['ascendant'] = divisional_asc_sign * 30 + scaled_asc_degree
-        
-        if division_number == 60:
-            print(f"🏠🏠🏠 D60_ASC D1={asc_degree:.6f}° part={part_index} within={degree_within_part:.6f}° scaled={scaled_asc_degree:.6f}° in sign {divisional_asc_sign}")
-        
-        print(f"[BACKEND] D{division_number}: Original ASC={chart_data['ascendant']:.2f} (Sign {asc_sign}, {asc_degree:.2f}°) -> Divisional ASC Sign={divisional_asc_sign}")
-        
+
         # Calculate divisional houses
         for i in range(12):
             house_sign = (divisional_asc_sign + i) % 12
@@ -746,10 +702,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
                     part_index = int((planet_degree + EPS) / part_size)
                     degree_within_part = (planet_degree + EPS) - (part_index * part_size)
                     actual_degree = (degree_within_part / part_size) * 30.0
-                    
-                    if division_number == 60:
-                        print(f"🪐🪐🪐 D60_CALC [{planet}] D1={planet_degree:.6f}° part={part_index} within={degree_within_part:.6f}° scaled={actual_degree:.6f}° in sign {divisional_sign}")
-                    
+
                     divisional_longitude = divisional_sign * 30 + actual_degree
                     
                     divisional_data['planets'][planet] = {
@@ -758,15 +711,9 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
                         'degree': actual_degree,
                         'retrograde': planet_data.get('retrograde', False)
                     }
-        
-        div_end = time.time()
-        print(f"[BACKEND] D{division_number} divisional calculation completed in {div_end - div_start:.3f}s")
 
         attach_graha_drishti_to_chart(divisional_data)
-        
-        end_time = time.time()
-        print(f"[BACKEND] Total divisional chart request completed in {end_time - start_time:.3f}s")
-        
+
         return {
             'divisional_chart': divisional_data,
             'division_number': division_number,
@@ -774,22 +721,19 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         }
         
     except Exception as e:
-        end_time = time.time()
-        print(f"[BACKEND] ERROR: Divisional chart calculation failed after {end_time - start_time:.3f}s: {str(e)}")
-        import traceback
-        print(f"[BACKEND] Traceback: {traceback.format_exc()}")
+        logger.exception(
+            "divisional chart calculation failed for user_id=%s division=%s",
+            getattr(current_user, "userid", None),
+            request.get('division', request.get('division_number', 9)) if isinstance(request, dict) else None,
+        )
         return {"success": False, "error": str(e)}
 
 @router.post("/calculate-chart")
 async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     try:
-        print(f"🔍 Chart calculation request for: {birth_data.name}")
-        print(f"📊 Birth data: {birth_data.model_dump()}")
-
         new_chart_id, persist_err = persist_birth_chart_for_user(current_user.userid, birth_data)
         if persist_err or new_chart_id is None:
             detail = persist_err or "Could not save birth chart."
-            print(f"❌ Persist failed: {detail}")
             low = detail.lower()
             if any(
                 x in low
@@ -806,8 +750,6 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
                 raise HTTPException(status_code=422, detail=detail)
             raise HTTPException(status_code=500, detail=detail)
 
-        print(f"✅ Birth chart row ready (id={new_chart_id}), proceeding with calculation")
-
         # Calculate and return chart data using new calculators
         from calculators.chart_calculator import ChartCalculator
         from calculators.divisional_chart_calculator import DivisionalChartCalculator
@@ -823,25 +765,18 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
         
         # Add birth_chart_id to response (may be None if insert failed)
         chart_data['birth_chart_id'] = new_chart_id
-        
-        print(f"✅ Chart calculation completed successfully with birth_chart_id: {new_chart_id}")
-        print(f"📦 Returning chart_data keys: {list(chart_data.keys())}")
-        print(f"🎯 birth_chart_id in response: {chart_data.get('birth_chart_id')}")
-        
+
         return chart_data
         
     except HTTPException:
         # Re-raise HTTP exceptions without modification
         raise
     except Exception as e:
-        import traceback
-        error_details = {
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'traceback': traceback.format_exc(),
-            'birth_data': birth_data.model_dump() if birth_data else None
-        }
-        print(f"❌ Chart calculation error: {error_details}")
+        logger.exception(
+            "calculate-chart failed for user_id=%s birth_name=%s",
+            getattr(current_user, "userid", None),
+            getattr(birth_data, "name", None),
+        )
         raise HTTPException(status_code=500, detail=f"Chart calculation failed: {str(e)}")
 
 @router.post("/jaimini-special-lagnas")
@@ -874,9 +809,7 @@ async def calculate_jaimini_special_lagnas(request: dict, current_user: User = D
             "jaimini_lagnas": jaimini_points
         }
     except Exception as e:
-        print(f"Error calculating Jaimini lagnas: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("error calculating jaimini lagnas")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sniper-points")

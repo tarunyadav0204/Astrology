@@ -34,12 +34,6 @@ from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 from daily_predictions import DailyPredictionEngine
 from house_combinations import router as house_combinations_router
-try:
-    from house_combinations import init_house_combinations_db
-except ImportError:
-    def init_house_combinations_db():
-        print("House combinations database initialization skipped")
-        pass
 from marriage_analysis.marriage_analyzer import MarriageAnalyzer
 from nadi.services.nadi_service import router as nadi_router
 from vedic_transit_aspects import router as vedic_transit_router
@@ -172,6 +166,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+STARTUP_DB_LOCK_KEY = 4653078001
+
 
 def _instance_identity() -> str:
     return (
@@ -211,6 +207,40 @@ def log_lifecycle_event(event: str, level: int = logging.INFO, **fields):
         logger.log(level, json.dumps(payload, default=str, sort_keys=True))
     except Exception:
         logger.log(level, "lifecycle_event=%s fields=%s", event, fields)
+
+
+class _StartupDbLock:
+    def __init__(self):
+        self.conn_ctx = None
+        self.conn = None
+
+    def __enter__(self):
+        try:
+            self.conn_ctx = get_conn()
+            self.conn = self.conn_ctx.__enter__()
+            execute(self.conn, "SELECT pg_advisory_lock(%s)", (STARTUP_DB_LOCK_KEY,))
+            return self.conn
+        except Exception:
+            if self.conn_ctx is not None:
+                try:
+                    self.conn_ctx.__exit__(None, None, None)
+                except Exception:
+                    pass
+                self.conn_ctx = None
+                self.conn = None
+            raise
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if self.conn is not None:
+                try:
+                    execute(self.conn, "SELECT pg_advisory_unlock(%s)", (STARTUP_DB_LOCK_KEY,))
+                except Exception:
+                    pass
+        finally:
+            if self.conn_ctx is not None:
+                return self.conn_ctx.__exit__(exc_type, exc, tb)
+        return False
 
 
 def _is_us_number(phone: str) -> bool:
@@ -456,7 +486,7 @@ def signal_handler(signum, frame):
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
-atexit.register(lambda: log_lifecycle_event("shutdown_complete", level=logging.CRITICAL))
+atexit.register(lambda: logger.debug("shutdown_complete"))
 
 
 # Load environment variables explicitly (CWD first, then backend/.env so it works when run from repo root)
@@ -467,9 +497,9 @@ try:
     _env_path = os.path.join(_backend_dir, ".env")
     if os.path.isfile(_env_path):
         load_dotenv(_env_path)
-        logger.info("Loaded environment variables from .env file")
+        logger.debug("Loaded environment variables from .env file")
     else:
-        logger.info("python-dotenv loaded; backend/.env file not found, using current environment")
+        logger.debug("python-dotenv loaded; backend/.env file not found, using current environment")
 except ImportError:
     logger.warning("python-dotenv not installed, using system environment variables")
 except Exception as e:
@@ -547,95 +577,86 @@ def ensure_users_userid_default() -> None:
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
     credits_settings_poll_task = None
-    log_lifecycle_event("startup_begin")
+    logger.debug("startup_begin")
 
     def _startup_step(name: str, fn, success_message: str):
         try:
             fn()
-            log_lifecycle_event("startup_step_ok", step=name, message=success_message)
+            logger.debug("startup_step_ok step=%s message=%s", name, success_message)
         except Exception as e:
             log_lifecycle_event("startup_step_failed", level=logging.WARNING, step=name, error=str(e))
 
-    # Startup
-    _startup_step("ensure_users_userid_default", ensure_users_userid_default, "users.userid default sequence ensured")
-    _startup_step("ensure_users_signup_client_column", ensure_users_signup_client_column, "users.signup_client ensured")
-    _startup_step("ensure_users_gender_column", ensure_users_gender_column, "users.gender ensured")
-    _startup_step(
-        "ensure_app_installations_schema",
-        lambda: __import__("acquisition_schema", fromlist=["ensure_app_installations_schema"]).ensure_app_installations_schema(),
-        "app_installations schema ready",
-    )
-    _startup_step(
-        "ensure_admin_company_expenses_schema",
-        lambda: __import__("admin_expense_schema", fromlist=["ensure_admin_company_expenses_schema"]).ensure_admin_company_expenses_schema(),
-        "admin_company_expenses schema ready",
-    )
-    _startup_step(
-        "ensure_admin_issues_schema",
-        lambda: __import__("admin_issue_schema", fromlist=["ensure_admin_issues_schema"]).ensure_admin_issues_schema(),
-        "admin_issues schema ready",
-    )
-    _startup_step(
-        "daily_prediction_engine_init",
-        lambda: DailyPredictionEngine().reset_prediction_rules(),
-        "daily prediction engine initialized",
-    )
-    _startup_step("init_house_combinations_db", init_house_combinations_db, "house combinations database initialized")
-    _startup_step("init_chat_tables", init_chat_tables, "chat history database initialized")
-    _startup_step(
-        "ensure_subscription_tier_schema",
-        lambda: __import__("subscription_tier_migration", fromlist=["ensure_subscription_tier_schema"]).ensure_subscription_tier_schema(),
-        "subscription tier schema ready",
-    )
+    # Startup: serialize shared DB/schema initialization so multi-worker boot does not race.
     try:
-        from utils.admin_settings import migrate_deprecated_gemini_model_ids_on_startup
-        from utils.admin_settings import poll_credits_settings_version_forever
-
-        migrate_deprecated_gemini_model_ids_on_startup()
-        credits_settings_poll_task = asyncio.create_task(poll_credits_settings_version_forever())
-        log_lifecycle_event(
-            "startup_step_ok",
-            step="admin_settings_migration_and_poll",
-            message="admin settings migrations complete",
-        )
-    except Exception as e:
-        log_lifecycle_event(
-            "startup_step_failed",
-            level=logging.WARNING,
-            step="admin_settings_migration_and_poll",
-            error=str(e),
-        )
-    try:
-        with nudge_db.get_conn() as conn:
-            nudge_db.init_nudge_tables(conn)
-            log_lifecycle_event(
-                "startup_step_ok",
-                step="init_nudge_tables",
-                message="nudge engine tables initialized",
+        with _StartupDbLock():
+            _startup_step("ensure_users_userid_default", ensure_users_userid_default, "users.userid default sequence ensured")
+            _startup_step("ensure_users_signup_client_column", ensure_users_signup_client_column, "users.signup_client ensured")
+            _startup_step("ensure_users_gender_column", ensure_users_gender_column, "users.gender ensured")
+            _startup_step(
+                "ensure_app_installations_schema",
+                lambda: __import__("acquisition_schema", fromlist=["ensure_app_installations_schema"]).ensure_app_installations_schema(),
+                "app_installations schema ready",
             )
+            _startup_step(
+                "ensure_admin_company_expenses_schema",
+                lambda: __import__("admin_expense_schema", fromlist=["ensure_admin_company_expenses_schema"]).ensure_admin_company_expenses_schema(),
+                "admin_company_expenses schema ready",
+            )
+            _startup_step(
+                "ensure_admin_issues_schema",
+                lambda: __import__("admin_issue_schema", fromlist=["ensure_admin_issues_schema"]).ensure_admin_issues_schema(),
+                "admin_issues schema ready",
+            )
+            _startup_step(
+                "daily_prediction_engine_init",
+                lambda: DailyPredictionEngine().reset_prediction_rules(),
+                "daily prediction engine initialized",
+            )
+            _startup_step("init_chat_tables", init_chat_tables, "chat history database initialized")
+            _startup_step(
+                "ensure_subscription_tier_schema",
+                lambda: __import__("subscription_tier_migration", fromlist=["ensure_subscription_tier_schema"]).ensure_subscription_tier_schema(),
+                "subscription tier schema ready",
+            )
+            try:
+                from utils.admin_settings import migrate_deprecated_gemini_model_ids_on_startup
+                from utils.admin_settings import poll_credits_settings_version_forever
+
+                migrate_deprecated_gemini_model_ids_on_startup()
+                credits_settings_poll_task = asyncio.create_task(poll_credits_settings_version_forever())
+                logger.debug("startup_step_ok step=admin_settings_migration_and_poll message=admin settings migrations complete")
+            except Exception as e:
+                log_lifecycle_event(
+                    "startup_step_failed",
+                    level=logging.WARNING,
+                    step="admin_settings_migration_and_poll",
+                    error=str(e),
+                )
+            try:
+                with nudge_db.get_conn() as conn:
+                    nudge_db.init_nudge_tables(conn)
+                    logger.debug("startup_step_ok step=init_nudge_tables message=nudge engine tables initialized")
+            except Exception as e:
+                log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="init_nudge_tables", error=str(e))
+            try:
+                ensure_testimonials_table()
+                logger.debug("startup_step_ok step=ensure_testimonials_table message=app testimonials table initialized")
+            except Exception as e:
+                log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="ensure_testimonials_table", error=str(e))
     except Exception as e:
-        log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="init_nudge_tables", error=str(e))
+        log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="startup_db_lock", error=str(e))
     try:
-        ensure_testimonials_table()
-        log_lifecycle_event(
-            "startup_step_ok",
-            step="ensure_testimonials_table",
-            message="app testimonials table initialized",
-        )
-    except Exception as e:
-        log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="ensure_testimonials_table", error=str(e))
-    try:
-        log_lifecycle_event("startup_complete")
+        logger.info("startup_complete")
         yield
     finally:
-        log_lifecycle_event("shutdown_lifespan_begin")
+        logger.debug("shutdown_lifespan_begin")
         if credits_settings_poll_task is not None:
             credits_settings_poll_task.cancel()
             try:
                 await credits_settings_poll_task
             except asyncio.CancelledError:
                 pass
-        log_lifecycle_event("shutdown_lifespan_complete")
+        logger.debug("shutdown_lifespan_complete")
 
 
 # Deploy/restart marker only — no runtime behavior change (2026-04-17).
@@ -2799,25 +2820,6 @@ async def reset_password(request: ResetPassword):
 @app.get("/api/user/self-birth-chart")
 async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     """Get user's self birth chart"""
-    print(f"🔍 [AUTH_DEBUG] get_self_birth_chart called by user: {current_user.userid} ({current_user.name}) - Phone: {current_user.phone}")
-    
-    with get_conn() as conn:
-        # Debug: Check all charts for this user
-        cur = execute(
-            conn,
-            """
-                SELECT id, name, date, time, relation, created_at
-                FROM birth_charts
-                WHERE userid = %s
-                ORDER BY created_at DESC
-            """,
-            (current_user.userid,),
-        )
-        all_charts = cur.fetchall() or []
-    print(f"DEBUG: User {current_user.userid} has {len(all_charts)} total charts:")
-    for chart in all_charts:
-        print(f"  Chart ID: {chart[0]}, Name: {chart[1]}, Relation: {chart[4]}, Created: {chart[5]}")
-    
     with get_conn() as conn:
         # Look for chart with relation = 'self'
         cur = execute(
@@ -2832,8 +2834,7 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
             (current_user.userid,),
         )
         result = cur.fetchone()
-    print(f"DEBUG: Self chart query result: {result}")
-    
+
     if not result:
         return {"has_self_chart": False}
 
@@ -2867,9 +2868,6 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
 @app.put("/api/user/self-birth-chart")
 async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, clear_existing: bool = True, current_user: User = Depends(get_current_user)):
     """Update user's self birth chart"""
-    print(f"DEBUG: update_self_birth_chart called for user {current_user.userid}, chart_id={chart_id}, clear_existing={clear_existing}")
-    print(f"DEBUG: Birth data - name: {birth_data.name}, date: {birth_data.date}")
-    
     try:
         with get_conn() as conn:
             from birth_charts.schema import ensure_birth_chart_family_columns
@@ -2936,8 +2934,6 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                         current_user.userid,
                     ),
                 )
-
-                print(f"DEBUG: Updated chart {chart_id} to relation='self'")
                 birth_chart_id = chart_id
             else:
                 # No chart_id provided - create new chart
@@ -2972,14 +2968,16 @@ async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, c
                     ),
                 )
                 birth_chart_id = cur.fetchone()[0]
-                print(f"DEBUG: Inserted new chart as relation='self' with id={birth_chart_id}")
 
             conn.commit()
-            print(f"DEBUG: Successfully updated self birth chart for user {current_user.userid}, id={birth_chart_id}")
             return {"message": "Self birth chart updated successfully", "birth_chart_id": birth_chart_id}
         
     except Exception as e:
-        print(f"ERROR: Exception in update_self_birth_chart: {str(e)}")
+        logger.exception(
+            "update self birth chart failed for user_id=%s chart_id=%s",
+            getattr(current_user, "userid", None),
+            chart_id,
+        )
         try:
             with get_conn() as conn:
                 conn.rollback()
@@ -3587,9 +3585,6 @@ async def calculate_accurate_dasha(birth_data: BirthData):
     try:
         from shared.dasha_calculator import DashaCalculator
         
-        print(f"🔍 [DASHA_DEBUG] Dasha calculation for: {birth_data.name}, timezone: {birth_data.timezone}")
-        print(f"🕐 [DASHA_DEBUG] Time received: '{birth_data.time}' (type: {type(birth_data.time)})")
-        
         # Convert BirthData to dict with proper time normalization
         birth_dict = {
             'name': birth_data.name,
@@ -3602,8 +3597,6 @@ async def calculate_accurate_dasha(birth_data: BirthData):
         
         calculator = DashaCalculator()
         dasha_data = calculator.calculate_current_dashas(birth_dict)
-        
-        print(f"✅ [DASHA_DEBUG] Dasha calculation successful, got {len(dasha_data.get('maha_dashas', []))} maha dashas")
         
         # Format maha_dashas for API response
         maha_dashas = []
@@ -3628,13 +3621,10 @@ async def calculate_accurate_dasha(birth_data: BirthData):
             "moon_lord": dasha_data.get('moon_lord', 'Sun')
         }
         
-        print(f"📤 [DASHA_DEBUG] Returning dasha result with {len(result['maha_dashas'])} periods")
         return result
-        
+
     except Exception as e:
-        print(f"❌ [DASHA_DEBUG] Dasha calculation error: {str(e)}")
-        import traceback
-        print(f"📍 [DASHA_DEBUG] Traceback: {traceback.format_exc()}")
+        logger.exception("accurate dasha calculation failed for birth_name=%s", getattr(birth_data, "name", None))
         raise HTTPException(status_code=500, detail=f"Dasha calculation failed: {str(e)}")
 
 @app.post("/api/calculate-cascading-dashas")
@@ -3644,26 +3634,10 @@ async def calculate_cascading_dashas(request: dict):
     try:
         from shared.dasha_calculator import DashaCalculator
         
-        print(f"\n{'='*60}")
-        print(f"🔍 API ENDPOINT: calculate-cascading-dashas called")
-        print(f"{'='*60}")
-        print(f"Request keys: {request.keys()}")
-        print(f"Birth data keys: {request.get('birth_data', {}).keys()}")
-        print(f"Target date: {request.get('target_date', 'Not provided')}")
-        
         birth_data = BirthData(**request['birth_data'])
         target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
-        
-        print(f"\n📊 API BIRTH DATA PARSED:")
-        print(f"  Name: {birth_data.name}")
-        print(f"  Date: {birth_data.date}")
-        print(f"  Time: {birth_data.time}")
-        print(f"  Timezone: {birth_data.timezone}")
-        print(f"  Lat/Lon: {birth_data.latitude}, {birth_data.longitude}")
-        print(f"  Target Date: {target_date}")
-        
     except Exception as e:
-        print(f"❌ Input validation error: {str(e)}")
+        logger.warning("cascading dasha input validation failed: %s", e)
         return {
             'maha_dashas': [],
             'antar_dashas': [],
@@ -3686,28 +3660,11 @@ async def calculate_cascading_dashas(request: dict):
     
     calculator = DashaCalculator()
     
-    # Get current dashas for target date
-    print(f"\n🔄 CALLING DASHA CALCULATOR")
-    print(f"  Target date: {target_date}")
     current_dashas = await asyncio.to_thread(
         calculator.calculate_current_dashas,
         birth_dict,
         target_date,
     )
-    print(f"\n📊 CALCULATOR RESPONSE:")
-    print(f"  Result keys: {list(current_dashas.keys())}")
-    print(f"  Moon Nakshatra: {current_dashas.get('moon_nakshatra', 'N/A')}")
-    print(f"  Moon Lord (Birth Mahadasha): {current_dashas.get('moon_lord', 'N/A')}")
-    print(f"  Maha dashas count: {len(current_dashas.get('maha_dashas', []))}")
-    
-    if current_dashas.get('maha_dashas'):
-        first_maha = current_dashas['maha_dashas'][0]
-        print(f"  First maha dasha: {first_maha.get('planet')} ({first_maha.get('start')} to {first_maha.get('end')})")
-        print(f"\n📋 ALL MAHA DASHAS:")
-        for i, maha in enumerate(current_dashas['maha_dashas']):
-            is_current = maha['start'] <= target_date <= maha['end']
-            marker = "👉 CURRENT" if is_current else ""
-            print(f"  {i+1}. {maha['planet']}: {maha['start']} to {maha['end']} {marker}")
     
     # Get all maha dashas
     maha_dashas = []
@@ -3727,12 +3684,6 @@ async def calculate_cascading_dashas(request: dict):
             current_maha = maha
             break
     
-    print(f"\n📈 MAHA DASHAS PROCESSED: {len(maha_dashas)}")
-    print(f"Current date being checked: {target_date}")
-    for i, maha in enumerate(maha_dashas):
-        marker = "👉 CURRENT" if maha['current'] else ""
-        print(f"  {i+1}. {maha['planet']}: {maha['start']} to {maha['end']} (current: {maha['current']}) {marker}")
-    
     result = {
         'maha_dashas': maha_dashas,
         'antar_dashas': [],
@@ -3741,10 +3692,6 @@ async def calculate_cascading_dashas(request: dict):
         'prana_dashas': [],
         'current_dashas': current_dashas.get('current_dashas', {})
     }
-    
-    print(f"\n🎯 CURRENT MAHA: {current_maha['planet'] if current_maha else 'None'}")
-    if current_maha:
-        print(f"  Period: {current_maha['start']} to {current_maha['end']}")
     
     if current_maha:
         # Calculate all antar dashas for current maha
@@ -3758,10 +3705,8 @@ async def calculate_cascading_dashas(request: dict):
             'dasha_type': 'antar',
             'target_date': target_date.strftime('%Y-%m-%d')
         }
-        print(f"🔄 Calculating antar dashas for {current_maha['planet']}")
         antar_result = await calculate_sub_dashas(antar_request)
         result['antar_dashas'] = antar_result['sub_dashas']
-        print(f"📊 Got {len(result['antar_dashas'])} antar dashas")
         
         # Find current antar
         current_antar = None
@@ -3822,18 +3767,6 @@ async def calculate_cascading_dashas(request: dict):
                     }
                     prana_result = await calculate_sub_dashas(prana_request)
                     result['prana_dashas'] = prana_result['sub_dashas']
-                    print(f"🎪 Got {len(result['prana_dashas'])} prana dashas")
-    
-    print(f"\n{'='*60}")
-    print(f"✅ DASHA CALCULATION COMPLETE")
-    print(f"{'='*60}")
-    print(f"Maha dashas: {len(result['maha_dashas'])}")
-    print(f"Antar dashas: {len(result['antar_dashas'])}")
-    print(f"Pratyantar dashas: {len(result['pratyantar_dashas'])}")
-    print(f"Sookshma dashas: {len(result['sookshma_dashas'])}")
-    print(f"Prana dashas: {len(result['prana_dashas'])}")
-    print(f"\nRETURNING RESULT TO CLIENT")
-    print(f"{'='*60}\n")
     log_lifecycle_event(
         "cascading_dashas_complete",
         level=logging.INFO,
@@ -5885,9 +5818,7 @@ async def calculate_kalchakra_dasha(request: dict):
     except ImportError as e:
         return {"system": "Kalchakra", "error": f"Calculator import failed: {str(e)}"}
     except Exception as e:
-        import traceback
-        print(f"Kalchakra calculation error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.exception("kalchakra dasha calculation failed")
         return {"system": "Kalchakra", "error": f"Calculation failed: {str(e)}"}
 
 @app.post("/api/jaimini-antardashas")
@@ -5984,19 +5915,14 @@ async def calculate_jaimini_kalchakra_dasha(request: dict):
         current_date = datetime.now(timezone.utc)
         
         jaimini_data = calculator.calculate_jaimini_kalachakra_dasha(birth_dict, current_date)
-        
-        print(f"DEBUG: Jaimini calculation result keys: {list(jaimini_data.keys()) if jaimini_data else 'None'}")
-        
+
         if 'error' in jaimini_data:
-            print(f"ERROR: Jaimini calculation failed: {jaimini_data['error']}")
             return jaimini_data
         
         if not jaimini_data.get('mahadashas'):
-            print("ERROR: No mahadashas returned from Jaimini calculation")
+            logger.warning("jaimini kalchakra returned no mahadashas")
             return {"system": "Jaimini Kalchakra", "error": "No mahadashas calculated"}
-        
-        print(f"DEBUG: Found {len(jaimini_data.get('mahadashas', []))} mahadashas")
-        
+
         periods = []
         current_period_found = False
         
@@ -6010,8 +5936,7 @@ async def calculate_jaimini_kalchakra_dasha(request: dict):
                 is_current = not current_period_found and start_date <= current_date < end_date
                 if is_current:
                     current_period_found = True
-            except Exception as e:
-                print(f"Date parsing error: {e}")
+            except Exception:
                 is_current = False
             
             period_data = {
@@ -6029,16 +5954,13 @@ async def calculate_jaimini_kalchakra_dasha(request: dict):
                 'current': is_current
             }
             periods.append(period_data)
-            if is_current:
-                print(f"DEBUG: Current Jaimini period found: {maha['sign_name']} ({maha['start_iso']} to {maha['end_iso']})")
-        
+
         current_count = len([p for p in periods if p['current']])
-        print(f"DEBUG: Total Jaimini periods: {len(periods)}, Current periods: {current_count}")
-        
+
         if current_count == 0:
-            print("WARNING: No current period found in Jaimini Kalchakra")
+            logger.warning("no current period found in jaimini kalchakra")
         elif current_count > 1:
-            print(f"WARNING: Multiple current periods found: {current_count}")
+            logger.warning("multiple current periods found in jaimini kalchakra: %s", current_count)
         
         return {
             "system": jaimini_data.get('system', 'Jaimini Kalchakra'),
@@ -6065,9 +5987,7 @@ async def calculate_jaimini_kalchakra_dasha(request: dict):
     except ImportError as e:
         return {"system": "Jaimini Kalchakra", "error": f"Calculator import failed: {str(e)}"}
     except Exception as e:
-        import traceback
-        print(f"Jaimini Kalchakra calculation error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.exception("jaimini kalchakra calculation failed")
         return {"system": "Jaimini Kalchakra", "error": f"Calculation failed: {str(e)}"}
 
 @app.post("/api/calculate-jaimini-kalchakra-cascading")
@@ -6183,15 +6103,13 @@ async def calculate_jaimini_kalchakra_cascading(request: dict):
                             'years': antar['years']
                         })
                     result['antar_dashas'] = antar_dashas
-            except Exception as e:
-                print(f"Antardasha calculation error: {e}")
+            except Exception:
+                logger.exception("jaimini cascading antardasha calculation failed")
         
         return result
         
     except Exception as e:
-        import traceback
-        print(f"Jaimini cascading calculation error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.exception("jaimini cascading calculation failed")
         return {
             'maha_dashas': [],
             'antar_dashas': [],
@@ -6320,9 +6238,7 @@ async def calculate_jaimini_kalchakra_antardasha(request: dict):
         }
         
     except Exception as e:
-        import traceback
-        print(f"Jaimini antardasha calculation error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.exception("jaimini antardasha calculation failed")
         return {"error": f"Calculation failed: {str(e)}"}
 
 @app.post("/api/calculate-kalchakra-antardasha")
@@ -6544,9 +6460,7 @@ async def calculate_jaimini_kalchakra_antardasha_frontend(request: dict):
         }
         
     except Exception as e:
-        import traceback
-        print(f"Jaimini antardasha calculation error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.exception("jaimini frontend antardasha calculation failed")
         return {"error": f"Calculation failed: {str(e)}"}
 
 @app.post("/api/jaimini-rashi-skip-reasons")
@@ -6856,7 +6770,7 @@ async def process_ashtakavarga_life_prediction_job(
                     response_body,
                 )
                 conn.commit()
-            print("❌ Life predictions job: spend_credits failed after generation")
+            logger.error("life predictions job spend_credits failed after generation")
             return
 
         response_body["credits_charged"] = prediction_cost
@@ -6873,16 +6787,13 @@ async def process_ashtakavarga_life_prediction_job(
                 update_job_completed(conn, job_id, response_body)
                 conn.commit()
         except Exception as cache_err:
-            print(f"⚠️ Life predictions job cache save failed: {cache_err}")
+            logger.warning("life predictions job cache save failed: %s", cache_err)
             with get_conn() as conn:
                 update_job_completed(conn, job_id, response_body)
                 conn.commit()
 
     except Exception as e:
-        print(f"Life predictions job error: {str(e)}")
-        import traceback
-
-        print(traceback.format_exc())
+        logger.exception("life predictions job failed for job_id=%s user_id=%s", job_id, userid)
         try:
             with get_conn() as conn:
                 update_job_failed(
@@ -6898,7 +6809,7 @@ async def process_ashtakavarga_life_prediction_job(
                 )
                 conn.commit()
         except Exception as mark_err:
-            print(f"Failed to mark life prediction job failed: {mark_err}")
+            logger.warning("failed to mark life prediction job failed: %s", mark_err)
 
 
 @app.get("/api/ashtakavarga/life-predictions/status/{job_id}")
@@ -7063,10 +6974,10 @@ async def generate_ashtakavarga_life_predictions(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Life predictions error: {str(e)}")
-        import traceback
-
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.exception(
+            "life predictions request failed for user_id=%s",
+            getattr(current_user, "userid", None),
+        )
         return {
             "error": f"Life predictions generation failed: {str(e)}",
             "methodology": methodology_note,
@@ -7076,12 +6987,12 @@ async def generate_ashtakavarga_life_predictions(
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Starting Astrology API server on port 8001...")
+    logger.debug("Starting Astrology API server on port 8001...")
     
     try:
         # Get port from environment for GCP deployment
         port = int(os.getenv('PORT', 8001))
-        workers = max(1, int(os.getenv("UVICORN_WORKERS", "1")))
+        workers = max(1, int(os.getenv("UVICORN_WORKERS", "2")))
         limit_concurrency = max(1, int(os.getenv("UVICORN_LIMIT_CONCURRENCY", "500")))
         
         # No limit_max_requests: recycling every N requests caused ~3h watchdog restarts
@@ -7099,7 +7010,7 @@ if __name__ == "__main__":
         if _max_req:
             uvicorn_kwargs["limit_max_requests"] = int(_max_req)
         # Use import-string mode so uvicorn can manage multiple worker processes.
-        logger.info("Uvicorn config: workers=%s port=%s limit_concurrency=%s", workers, port, uvicorn_kwargs["limit_concurrency"])
+        logger.debug("Uvicorn config: workers=%s port=%s limit_concurrency=%s", workers, port, uvicorn_kwargs["limit_concurrency"])
         uvicorn.run("main:app", **uvicorn_kwargs)
     except Exception as e:
         log_shutdown(f"Exception: {str(e)}")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import socket
+import logging
 from typing import Any, Dict, Optional
 
 _initialized = False
@@ -130,10 +131,13 @@ def init_sentry() -> bool:
         )
         sentry_sdk.set_tag("environment_name", environment)
         _initialized = True
-        print(f"Sentry initialized (environment={environment})")
+        logging.getLogger(__name__).info("Sentry initialized (environment=%s)", environment)
         return True
     except Exception as e:
-        print(f"WARNING: Sentry init failed; API continues without crash reporting: {e}")
+        logging.getLogger(__name__).warning(
+            "Sentry init failed; API continues without crash reporting: %s",
+            e,
+        )
         return False
 
 

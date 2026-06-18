@@ -215,8 +215,6 @@ def calculate_ojha_yugma_bala(planet: str, longitude: float, chart_data: Dict) -
     """
     total_points = 0.0
     
-    print(f"\n--- Ojha Yugma Bala for {planet} ---")
-    
     # Check D1 (Rashi)
     d1_sign = int(longitude / 30)
     is_d1_odd = (d1_sign % 2 == 0)  # Aries(0), Gemini(2), Leo(4), etc. are odd signs
@@ -225,37 +223,24 @@ def calculate_ojha_yugma_bala(planet: str, longitude: float, chart_data: Dict) -
     
     if planet in ['Moon', 'Venus']:
         d1_points = 15.0 if not is_d1_odd else 0.0
-        print(f"D1: {sign_names[d1_sign]} ({'Even' if not is_d1_odd else 'Odd'}) → {d1_points} (needs Even)")
         total_points += d1_points
     else:
         d1_points = 15.0 if is_d1_odd else 0.0
-        print(f"D1: {sign_names[d1_sign]} ({'Odd' if is_d1_odd else 'Even'}) → {d1_points} (needs Odd)")
         total_points += d1_points
     
     # Check D9 (Navamsa)
     divisions = chart_data.get('divisions', {})
-    print(f"🔍 DEBUG divisions keys: {list(divisions.keys())}")
     d9_data = divisions.get('D9', {})
-    print(f"🔍 DEBUG D9 data: {d9_data}")
-    print(f"🔍 DEBUG planet '{planet}' in D9: {planet in d9_data}")
     if d9_data and planet in d9_data:
         d9_sign = d9_data[planet].get('sign', 0)
         is_d9_odd = (d9_sign % 2 == 0)
         
         if planet in ['Moon', 'Venus']:
             d9_points = 15.0 if not is_d9_odd else 0.0
-            print(f"D9: {sign_names[d9_sign]} ({'Even' if not is_d9_odd else 'Odd'}) → {d9_points} (needs Even)")
             total_points += d9_points
         else:
             d9_points = 15.0 if is_d9_odd else 0.0
-            print(f"D9: {sign_names[d9_sign]} ({'Odd' if is_d9_odd else 'Even'}) → {d9_points} (needs Odd)")
             total_points += d9_points
-    else:
-        print(f"D9: No data available → 0.0")
-    
-    print(f"Total Ojha Yugma Bala: {total_points}\n")
-    print(f"🔍 RETURNING Ojha Yugma Bala: {total_points} (type: {type(total_points)})")
-    print(f"🔍 BACKEND FINAL VALUE BEFORE RETURN: ojha_yugma_bala={total_points}")
     return total_points
 
 def calculate_uccha_bala(planet: str, longitude: float) -> float:
@@ -338,68 +323,49 @@ def calculate_saptavargaja_bala(planet: str, chart_data: Dict) -> float:
     divisions = chart_data.get('divisions', {})
     total_sthana_points = 0
     
-    print(f"\n{'='*60}")
-    print(f"SAPTAVARGAJA BALA FOR {planet} (Cumulative Sripati Scale)")
-    print(f"{'='*60}")
-    print(f"Available divisions: {list(divisions.keys())}")
-    
     for varga_name in varga_list:
-        print(f"\n--- {varga_name} ---")
         v_data = divisions.get(varga_name, {})
         if not v_data:
-            print(f"❌ NO VARGA DATA - default 5.625")
             total_sthana_points += 5.625
             continue
-        
-        print(f"Planets: {list(v_data.keys())}")
         p_data = v_data.get(planet, {})
         if not p_data:
-            print(f"❌ NO {planet} DATA - default 5.625")
             total_sthana_points += 5.625
             continue
             
         v_sign = p_data.get('sign', 0)
         p_v_house = p_data.get('house', 1)
         v_lord = SIGN_LORDS.get(v_sign, 'Sun')
-        print(f"{planet}: sign={v_sign}, house={p_v_house}, lord={v_lord}")
         
         # 1. Check for Exaltation/Debilitation First
         if planet in EXALTATION_DATA and EXALTATION_DATA[planet]['sign'] == v_sign:
-            print(f"✓ EXALTED → 45.0")
             total_sthana_points += COMPOUND_DIGNITY_POINTS['exalted']
             continue
         if planet in DEBILITATION_DATA and DEBILITATION_DATA[planet]['sign'] == v_sign:
-            print(f"✓ DEBILITATED → 0.703125")
             total_sthana_points += COMPOUND_DIGNITY_POINTS['debilitated']
             continue
             
         # 2. Check for Moolatrikona (Only in D1)
         if varga_name == 'D1' and planet in OWN_SIGNS and v_sign in OWN_SIGNS[planet]:
             if v_sign == OWN_SIGNS[planet][0]:
-                print(f"✓ MOOLATRIKONA → 33.75")
                 total_sthana_points += COMPOUND_DIGNITY_POINTS['moolatrikona']
                 continue
         
         # 3. Check for Own Sign
         if v_lord == planet:
-            print(f"✓ OWN SIGN → 22.5")
             total_sthana_points += COMPOUND_DIGNITY_POINTS['own_sign']
             continue
         
         # 4. Calculate Compound Relationship with the Varga Lord
         lord_v_data = v_data.get(v_lord, {})
         if not lord_v_data:
-            print(f"❌ NO {v_lord} DATA - default 5.625")
             total_sthana_points += 5.625
             continue
             
         lord_v_house = lord_v_data.get('house')
         if lord_v_house is None:
-            print(f"❌ NO {v_lord} HOUSE - default 5.625")
             total_sthana_points += 5.625
             continue
-        
-        print(f"{v_lord}: house={lord_v_house}")
         house_diff = (lord_v_house - p_v_house) % 12
         is_temp_friend = house_diff in [1, 2, 3, 9, 10, 11]
         is_nat_friend = v_lord in NATURAL_FRIENDS.get(planet, [])
@@ -407,12 +373,7 @@ def calculate_saptavargaja_bala(planet: str, chart_data: Dict) -> float:
         
         dignity = _get_panchadha_dignity(planet, v_lord, p_v_house, lord_v_house)
         points = COMPOUND_DIGNITY_POINTS.get(dignity, 5.625)
-        print(f"Natural={'F' if is_nat_friend else 'E' if is_nat_enemy else 'N'}, Temporal={'F' if is_temp_friend else 'E'} (diff={house_diff}) → {dignity.upper()} → {points}")
         total_sthana_points += points
-    
-    print(f"\n{'='*60}")
-    print(f"TOTAL: {round(total_sthana_points, 2)} ({round(total_sthana_points/60, 2)} Rupas)")
-    print(f"{'='*60}\n")
     
     return round(total_sthana_points, 2)
 
@@ -468,22 +429,11 @@ def calculate_drik_bala(target_planet: str, target_long: float, all_planets: Dic
             # Moon is waning - treat as malefic for Sun's Drik Bala
             benefics = ['Jupiter', 'Venus', 'Mercury']
             malefics = ['Sun', 'Mars', 'Saturn', 'Moon']
-            print(f"\n{'='*60}")
-            print(f"DRIK BALA (ASPECTUAL STRENGTH) FOR {target_planet}")
-            print(f"{'='*60}")
-            print(f"Target {target_planet} longitude: {target_long:.2f}°")
-            print(f"Moon phase: WANING (Krishna Paksha, arc={arc:.2f}°) - treated as MALEFIC")
+            pass
         else:
-            print(f"\n{'='*60}")
-            print(f"DRIK BALA (ASPECTUAL STRENGTH) FOR {target_planet}")
-            print(f"{'='*60}")
-            print(f"Target {target_planet} longitude: {target_long:.2f}°")
-            print(f"Moon phase: WAXING (Shukla Paksha, arc={arc:.2f}°) - treated as BENEFIC")
+            pass
     else:
-        print(f"\n{'='*60}")
-        print(f"DRIK BALA (ASPECTUAL STRENGTH) FOR {target_planet}")
-        print(f"{'='*60}")
-        print(f"Target {target_planet} longitude: {target_long:.2f}°")
+        pass
     
     total_drik = 0
     
@@ -498,26 +448,16 @@ def calculate_drik_bala(target_planet: str, target_long: float, all_planets: Dic
         if diff > 180:
             diff = 360 - diff
         
-        print(f"\n{p_name}: {p_long:.2f}° (arc distance: {diff:.2f}°)")
-        
         # Calculate aspect value with special aspects
         aspect_value = get_aspect_value(p_name, p_long, target_long, house_cusps, diff)
         
         # CRITICAL FIX: Subtract for malefics, add for benefics
         if p_name in malefics:
             contribution = -aspect_value / 4.0
-            print(f"  → MALEFIC aspect value: {aspect_value:.2f} / 4 = {contribution:.2f} (SUBTRACT)")
             total_drik += contribution
         elif p_name in benefics:
             contribution = aspect_value / 4.0
-            print(f"  → BENEFIC aspect value: {aspect_value:.2f} / 4 = {contribution:.2f} (ADD)")
             total_drik += contribution
-        else:
-            print(f"  → Neutral planet, skipped")
-    
-    print(f"\n{'='*60}")
-    print(f"TOTAL DRIK BALA: {round(total_drik, 2)}")
-    print(f"{'='*60}\n")
     
     return round(total_drik, 2)
 
@@ -544,41 +484,32 @@ def get_aspect_value(aspecting_planet: str, aspecting_long: float, target_long: 
     elif diff <= 180:
         aspect_type = "Opposition (150-180°)"
     
-    print(f"  Aspect type: {aspect_type}")
-    
     # Sripati Viyoga curve: Maximum strength at 0°, 90°, and 180°
     # This creates strong malefic impacts at square and opposition
     if diff <= 30:
         # Conjunction zone: linear increase 0° to 30°
         aspect_val = diff * 2.0  # 0 → 60
-        print(f"  Viyoga strength: {aspect_val:.2f} points")
         return aspect_val
     elif diff <= 60:
         # Declining from conjunction
         aspect_val = 60.0 - (diff - 30) * 1.5  # 60 → 15
-        print(f"  Viyoga strength: {aspect_val:.2f} points")
         return aspect_val
     elif diff <= 90:
         # Building toward square: increases to maximum
         aspect_val = 15.0 + (diff - 60) * 1.5  # 15 → 60
-        print(f"  Viyoga strength: {aspect_val:.2f} points")
         return aspect_val
     elif diff <= 120:
         # Declining from square
         aspect_val = 60.0 - (diff - 90) * 1.5  # 60 → 15
-        print(f"  Viyoga strength: {aspect_val:.2f} points")
         return aspect_val
     elif diff <= 150:
         # Building toward opposition
         aspect_val = 15.0 + (diff - 120) * 1.5  # 15 → 60
-        print(f"  Viyoga strength: {aspect_val:.2f} points")
         return aspect_val
     elif diff <= 180:
         # Opposition zone: maximum strength
-        print(f"  Viyoga strength: 60.0 points")
         return 60.0
-    
-    print(f"  No aspect: 0.0 points")
+
     return 0
 
 def _get_house_from_longitude(longitude: float, house_cusps: List[float]) -> int:
@@ -1058,7 +989,6 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
                         'kala_components': kala_components
                     }
                 }
-                print(f"🔍 BACKEND: Storing {planet_name} ojha_yugma_bala={ojha_yugma_bala} in results")
             except Exception as e:
                 print(f"Error calculating Shadbala for {planet_name}: {e}")
                 # Return default values for this planet

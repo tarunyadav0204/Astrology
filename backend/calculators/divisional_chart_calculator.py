@@ -1,15 +1,15 @@
 """Divisional chart calculator extracted from main.py"""
 
 from .base_calculator import BaseCalculator
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DivisionalChartCalculator(BaseCalculator):
     """Calculate divisional charts using proper Vedic formulas"""
     
     def calculate_divisional_chart(self, division_number=9):
         """Calculate divisional chart - extracted from main.py"""
-        
-        print(f"\n🔮 [BACKEND] Starting divisional chart calculation for D{division_number}")
-        print(f"📍 [BACKEND] Input ascendant: {self.chart_data.get('ascendant')}")
         
         def get_divisional_sign(sign, degree_in_sign, division):
             """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
@@ -134,9 +134,6 @@ class DivisionalChartCalculator(BaseCalculator):
         asc_degree = self.chart_data['ascendant'] % 30
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
         
-        print(f"⚙️⚙️⚙️ D60_INPUT [BACKEND] D1 Ascendant: sign={asc_sign}, degree={asc_degree:.2f}")
-        print(f"✅✅✅ D60_OUTPUT [BACKEND] D{division_number} Ascendant sign: {divisional_asc_sign}")
-        
         # Scaled degree calculation - Keep standard 0-30° format
         EPS = 1e-9
         part_size = 30.0 / division_number
@@ -180,16 +177,8 @@ class DivisionalChartCalculator(BaseCalculator):
                 # FIXED: Calculate degree within part correctly (not using modulo)
                 degree_within_part = (planet_degree + EPS) - (part_index * part_size)
                 
-                # LOG: D60 degree calculation
-                if division_number == 60:
-                    print(f"🪐🪐🪐 D60_CALC [{planet}] D1: {planet_degree:.6f}° | part_index: {part_index} | part_size: {part_size:.6f}° | degree_within_part: {degree_within_part:.6f}°")
-                
                 # Scale the degree within part to full sign (0-30 degrees)
                 actual_degree = (degree_within_part / part_size) * 30.0
-                
-                # LOG: Final scaled degree
-                if division_number == 60:
-                    print(f"   ➡️➡️➡️ D60_SCALED: {actual_degree:.6f}° in sign {divisional_sign}")
                 
                 # For D60: Also store the raw arc position for deity analysis
                 varga_arc_position = degree_within_part if division_number == 60 else None
@@ -216,18 +205,6 @@ class DivisionalChartCalculator(BaseCalculator):
                     'house': house_number,
                     **dignity_info
                 }
-        
-        if division_number == 60:
-            print(f"\n📊📊📊 D60_SUMMARY [BACKEND] D60 Summary:")
-            print(f"  - Ascendant: {divisional_data['ascendant']:.2f}° (sign {divisional_asc_sign})")
-            for p in ['Sun', 'Moon', 'Mars']:
-                if p in divisional_data['planets']:
-                    pd = divisional_data['planets'][p]
-                    print(f"  - {p}: {pd['degree']:.2f}° in {pd['sign_name']}")
-        else:
-            print(f"📊 [BACKEND] D{division_number} Result:")
-            print(f"  - Ascendant: {divisional_data['ascendant']:.2f} (sign {divisional_asc_sign})")
-            print(f"  - Houses: {[{'house': h['house_number'], 'sign': h['sign']} for h in divisional_data['houses'][:3]]}...")
         
         return {
             'divisional_chart': divisional_data,

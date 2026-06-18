@@ -4,12 +4,15 @@ import os
 import html
 import asyncio
 import re
+import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 from ai.response_parser import ResponseParser
 # from ai.flux_image_service import FluxImageService  # Re-enable when Flux/Replicate summary images return.
 from utils.query_context import resolve_query_now
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 env_paths = [
@@ -149,18 +152,16 @@ class GeminiChatAnalyzer:
         for model_name in fallback_standard:
             try:
                 self.model = genai.GenerativeModel(model_name, generation_config=config_gen_config)
-                print(f"✅ Initialized fallback standard model: {model_name}")
                 break
             except Exception as e:
-                print(f"⚠️ Model {model_name} not available: {e}")
+                logger.warning("Gemini standard model %s not available: %s", model_name, e)
                 continue
         
         preferred_premium = get_gemini_premium_model()
         try:
             self.premium_model = genai.GenerativeModel(preferred_premium, generation_config=config_gen_config)
-            print(f"✅ Initialized fallback premium model: {preferred_premium}")
         except Exception as e:
-            print(f"⚠️ Premium model {preferred_premium} not available, using standard: {e}")
+            logger.warning("Gemini premium model %s not available, using standard: %s", preferred_premium, e)
             self.premium_model = self.model
         
         if not self.model:
@@ -183,7 +184,7 @@ class GeminiChatAnalyzer:
             self._model_cache[name] = genai.GenerativeModel(name, generation_config=self._gen_config)
             return self._model_cache[name]
         except Exception as e:
-            print(f"⚠️ Model {name} not available ({e}), using fallback")
+            logger.warning("Gemini model %s not available (%s), using fallback", name, e)
             return self.premium_model if premium_analysis and self.premium_model else self.model
 
     @staticmethod
@@ -393,6 +394,7 @@ class GeminiChatAnalyzer:
         def _finish(out: Dict[str, Any]) -> Dict[str, Any]:
             if llm_log_tag:
                 from ai.llm_roundtrip_log import log_llm_roundtrip
+                is_parallel_tag = str(llm_log_tag).startswith("parallel_")
 
                 log_llm_roundtrip(
                     tag=llm_log_tag,
@@ -404,6 +406,8 @@ class GeminiChatAnalyzer:
                     error=out.get("error"),
                     usage=dict(out.get("token_usage") or {}),
                     elapsed_s=float(out.get("elapsed_s") or (time.time() - t0)),
+                    allow_body_logging=not is_parallel_tag,
+                    allow_dump_file=not is_parallel_tag,
                 )
             return out
 
@@ -591,8 +595,12 @@ class GeminiChatAnalyzer:
 
         total_request_start = time.time()
         if debug_logging:
-            print(f"\n🚀 GEMINI CHAT REQUEST STARTED")
-            print(f"🔍 REQUEST TYPE: {'SECOND (with transit data)' if 'transit_activations' in astrological_context else 'FIRST (requesting transit data)'}")
+            logger.debug(
+                "chat_request_started type=%s",
+                "SECOND_WITH_TRANSIT"
+                if "transit_activations" in astrological_context
+                else "FIRST_REQUEST",
+            )
         
         # Add current date context and calculate native's age
         enhanced_context = astrological_context.copy()
@@ -633,7 +641,7 @@ class GeminiChatAnalyzer:
         if intent_mode == "PREDICT_DAILY":
             from daily.daily_orchestrator import run_daily_chat_pipeline
 
-            print("📅 DAILY_CHAT_PIPELINE: dedicated exact-day pipeline enabled")
+            logger.info("daily chat pipeline enabled for exact-day request")
             return await run_daily_chat_pipeline(
                 self,
                 user_question=user_question,
@@ -650,7 +658,7 @@ class GeminiChatAnalyzer:
         if should_use_parallel_relational_chat(enhanced_context, user_id=user_id):
             from ai.parallel_chat.relational_orchestrator import run_parallel_relational_chat_pipeline
 
-            print("🧵 RELATIONAL_PARALLEL_CHAT: enabled — using two-person method branches + merge")
+            logger.info("relational_parallel_chat enabled")
             return await run_parallel_relational_chat_pipeline(
                 self,
                 user_question=user_question,
@@ -667,7 +675,7 @@ class GeminiChatAnalyzer:
         if should_use_parallel_chat(enhanced_context, user_id=user_id):
             from ai.parallel_chat.orchestrator import run_parallel_chat_pipeline
 
-            print("🧵 PARALLEL_CHAT_PIPELINE: ASTRO_PARALLEL_CHAT enabled — using multi-branch + merge")
+            logger.info("parallel_chat_pipeline enabled")
             return await run_parallel_chat_pipeline(
                 self,
                 user_question=user_question,
@@ -718,23 +726,23 @@ class GeminiChatAnalyzer:
         moon_data = planetary_analysis.get('Moon', {})
         moon_nakshatra = moon_data.get('nakshatra', {}) if isinstance(moon_data, dict) else {}
         # print(f"Moon nakshatra available: {bool(moon_nakshatra)}")
-        if moon_nakshatra:
-            print(f"🌙 MOON NAKSHATRA: {moon_nakshatra.get('name', 'Unknown')} (cached for future requests)")
+        if moon_nakshatra and debug_logging:
+            logger.debug(
+                "moon_nakshatra_cached name=%s",
+                moon_nakshatra.get("name", "Unknown"),
+            )
 
         if debug_logging:
             model_type_dbg = "Premium" if premium_analysis else "Standard"
-            print(f"\n=== CHAT LLM REQUEST ({llm_provider}, {call_type}) ===")
-            print(f"Analysis type: {model_type_dbg}")
-            print(f"Prompt length: {len(prompt)} characters")
-            print(f"\n{'='*80}")
-            print(f"📤 FULL CHAT REQUEST PROMPT")
-            print(f"{'='*80}")
-            print(prompt)
-            print(f"\n{'='*80}")
-            print(f"📝 END OF REQUEST PROMPT")
-            print(f"{'='*80}\n")
             _psz = len(prompt)
-            print(f"\n📏 CHAT REQUEST SIZE: {_psz:,} characters ({_psz / 1024:.1f} KB)")
+            logger.debug(
+                "chat_llm_request provider=%s call_type=%s analysis_type=%s prompt_chars=%s prompt_kb=%.1f",
+                llm_provider,
+                call_type,
+                model_type_dbg,
+                _psz,
+                _psz / 1024,
+            )
 
         gemini_start_time = time.time()
         try:
@@ -746,7 +754,12 @@ class GeminiChatAnalyzer:
 
             if llm_provider == CHAT_LLM_OPENAI:
                 model_name = get_openai_premium_model() if premium_analysis else get_openai_chat_model()
-                print(f"🧠 OpenAI chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
+                logger.debug(
+                    "openai_chat_model model=%s type=%s premium=%s",
+                    model_name,
+                    model_type,
+                    premium_analysis,
+                )
 
                 oa = await asyncio.wait_for(
                     self._openai_chat_completion(prompt, model_name, premium_analysis),
@@ -756,7 +769,12 @@ class GeminiChatAnalyzer:
                 token_usage = (oa or {}).get("usage") or token_usage
             elif llm_provider == CHAT_LLM_DEEPSEEK:
                 model_name = get_deepseek_premium_model() if premium_analysis else get_deepseek_chat_model()
-                print(f"🧠 DeepSeek chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
+                logger.debug(
+                    "deepseek_chat_model model=%s type=%s premium=%s",
+                    model_name,
+                    model_type,
+                    premium_analysis,
+                )
                 ds = await asyncio.wait_for(
                     self._deepseek_chat_completion(prompt, model_name),
                     timeout=600.0,
@@ -768,7 +786,12 @@ class GeminiChatAnalyzer:
 
                 model_name = "gemma-http"
                 gem_url = get_gemma_chat_generate_url()
-                print(f"🧠 Gemma HTTP chat: {gem_url} ({model_type}, premium_analysis={premium_analysis})")
+                logger.debug(
+                    "gemma_http_chat url=%s type=%s premium=%s",
+                    gem_url,
+                    model_type,
+                    premium_analysis,
+                )
                 payload = {
                     "question": user_question,
                     "language": language,
@@ -806,14 +829,20 @@ class GeminiChatAnalyzer:
                 # Resolve Gemini model from admin settings (no server restart needed)
                 model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
                 selected_model = self._get_model(premium_analysis)
-                print(f"🧠 Gemini chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
+                logger.debug(
+                    "gemini_chat_model model=%s type=%s premium=%s",
+                    model_name,
+                    model_type,
+                    premium_analysis,
+                )
 
                 api_key = os.getenv("GEMINI_API_KEY") or ""
                 try_high_thinking = False
                 if try_high_thinking:
                     try:
-                        print(
-                            f"🧩 Gemini chat: using REST thinkingLevel=high (model={model_name})"
+                        logger.debug(
+                            "gemini_chat_rest_thinking_high model=%s",
+                            model_name,
                         )
                         raw = await asyncio.wait_for(
                             asyncio.to_thread(
@@ -827,9 +856,10 @@ class GeminiChatAnalyzer:
                         )
                         response = _SimpleTextResponse(raw)
                     except Exception as rest_err:
-                        print(
-                            f"⚠️ REST thinkingLevel path failed ({type(rest_err).__name__}: {rest_err}); "
-                            f"falling back to google-generativeai SDK"
+                        logger.warning(
+                            "gemini_chat_rest_thinking_failed error_type=%s error=%s",
+                            type(rest_err).__name__,
+                            rest_err,
                         )
                 if response is None:
                     response = await asyncio.wait_for(
@@ -868,38 +898,22 @@ class GeminiChatAnalyzer:
                 )
 
             if debug_logging:
-                if llm_provider == CHAT_LLM_OPENAI:
-                    tag = "OPENAI"
-                elif llm_provider == CHAT_LLM_DEEPSEEK:
-                    tag = "DEEPSEEK"
-                elif llm_provider == CHAT_LLM_GEMMA:
-                    tag = "GEMMA"
-                else:
-                    tag = "GEMINI"
-                print(f"\n{'='*80}")
-                print(f"📥 {tag} RESPONSE #{call_type}")
-                print(f"{'='*80}")
                 preview = (response_text or "") if response_text is not None else (
                     (response.text or "") if response and hasattr(response, "text") else ""
                 )
-                if preview:
-                    print(f"\n📝 COMPLETE {tag} RESPONSE (ALL {len(preview)} CHARACTERS):")
-                    print(preview)
-                    print(f"\n{'='*80}")
-                    print(f"📄 END OF {tag} RESPONSE")
-                    print(f"{'='*80}")
-                    divisional_mentions = []
-                    for d_chart in ['D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60']:
-                        if d_chart in preview:
-                            divisional_mentions.append(d_chart)
-                    if divisional_mentions:
-                        print(f"\n📊 DIVISIONAL CHARTS MENTIONED: {', '.join(divisional_mentions)}")
-                    else:
-                        print(f"\n📊 NO DIVISIONAL CHARTS MENTIONED in response")
-                else:
-                    print("No response or empty response")
-                print(f"{'='*80}\n")
-                print(f"⏱️ {tag} API call time: {gemini_total_time:.2f}s")
+                divisional_mentions = [
+                    d_chart
+                    for d_chart in ['D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60']
+                    if preview and d_chart in preview
+                ]
+                logger.debug(
+                    "chat_llm_response provider=%s call_type=%s response_chars=%s divisional_mentions=%s api_time_s=%.2f",
+                    llm_provider,
+                    call_type,
+                    len(preview or ""),
+                    ",".join(divisional_mentions) if divisional_mentions else "none",
+                    gemini_total_time,
+                )
 
             if not response_text:
                 return {
@@ -941,8 +955,12 @@ class GeminiChatAnalyzer:
             
             # Parse and strip FAQ_META line (category + canonical_question for dashboard/FAQs)
             cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
-            if faq_metadata:
-                print(f"   📋 FAQ_META: category={faq_metadata.get('category')}, canonical_question={faq_metadata.get('canonical_question', '')[:50]}...")
+            if faq_metadata and debug_logging:
+                logger.debug(
+                    "faq_meta_detected category=%s canonical_question_preview=%s",
+                    faq_metadata.get("category"),
+                    (faq_metadata.get("canonical_question", "")[:50]),
+                )
             
             # Ensure response doesn't end abruptly (minimum length check)
             if len(cleaned_text) < 50:
@@ -973,10 +991,10 @@ class GeminiChatAnalyzer:
                         end_year = transit_request.get('endYear')
                         months = transit_request.get('specificMonths', [])
                         # print(f"🎯 FINAL: GEMINI REQUESTED TRANSIT DATA: {start_year}-{end_year} ({', '.join(months)})")
-                    except:
-                        print(f"🎯 FINAL: GEMINI MADE TRANSIT REQUEST (JSON parse failed)")
+                    except Exception:
+                        logger.debug("chat_transit_request_json_parse_failed")
                 else:
-                    print(f"🎯 FINAL: GEMINI MENTIONED TRANSIT REQUEST (no valid JSON)")
+                    logger.debug("chat_transit_request_mentioned_without_valid_json")
             
             # Check for specific sections to debug missing content
             has_nakshatra = 'nakshatra' in cleaned_text.lower() or 'नक्षत्र' in cleaned_text
@@ -989,14 +1007,22 @@ class GeminiChatAnalyzer:
             has_transit_request = "transitRequest" in cleaned_text and '"requestType"' in cleaned_text
             
             total_request_time = time.time() - total_request_start
-            print(f"🚀 TOTAL GEMINI CHAT REQUEST TIME: {total_request_time:.2f}s")
+            logger.info("chat_total_request_time_s=%.2f", total_request_time)
             
             # Log performance summary for caching analysis
             is_transit_call = 'transit_activations' in cleaned_text or 'transit_activations' in str(enhanced_context)
             if is_transit_call:
-                print(f"📊 PERFORMANCE SUMMARY - SECOND CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
+                logger.info(
+                    "chat_performance_summary call=SECOND total_s=%.1f llm_s=%.1f",
+                    total_request_time,
+                    gemini_total_time,
+                )
             else:
-                print(f"📊 PERFORMANCE SUMMARY - FIRST CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
+                logger.info(
+                    "chat_performance_summary call=FIRST total_s=%.1f llm_s=%.1f",
+                    total_request_time,
+                    gemini_total_time,
+                )
             
             # Parse response for images / follow-ups / analysis steps
             parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
@@ -1005,12 +1031,13 @@ class GeminiChatAnalyzer:
             from ai.term_matcher import find_terms_in_text
             matched_term_ids, matched_glossary = find_terms_in_text(parsed_response['content'], language=language)
 
-            print(f"\n🔍 RESPONSE PARSER DEBUG:")
-            print(f"   Matched terms from glossary_terms: {matched_term_ids}")
-            print(f"   Summary image prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
-            if parsed_response.get('summary_image_prompt'):
-                print(f"   Summary image prompt preview: {parsed_response.get('summary_image_prompt', '')[:100]}...")
-            print(f"   Content preview: {parsed_response['content'][:200]}...")
+            if debug_logging:
+                logger.debug(
+                    "response_parser_debug matched_terms=%s summary_image_prompt=%s content_preview=%s",
+                    matched_term_ids,
+                    bool(parsed_response.get("summary_image_prompt")),
+                    (parsed_response["content"][:200] if parsed_response.get("content") else ""),
+                )
 
             # Generate summary image if prompt exists (Replicate/Flux disabled — see __init__).
             summary_image_url = None
@@ -1044,10 +1071,12 @@ class GeminiChatAnalyzer:
             #         import traceback
             #         print(f"      Stack trace: {traceback.format_exc()}")
             # else:
-            print(f"\n🎨 SUMMARY IMAGE SKIPPED:")
-            print(f"   Premium analysis: {premium_analysis}")
-            print(f"   Flux service available: {bool(self.flux_service)}")
-            print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
+            logger.debug(
+                "summary_image_skipped premium=%s flux_available=%s prompt_exists=%s",
+                premium_analysis,
+                bool(self.flux_service),
+                bool(parsed_response.get("summary_image_prompt")),
+            )
             response_char_count = len(parsed_response.get("content") or "")
             return {
                 'success': True,
@@ -1074,7 +1103,7 @@ class GeminiChatAnalyzer:
             }
         except asyncio.TimeoutError:
             total_request_time = time.time() - total_request_start
-            print(f"⏰ Chat LLM API timeout after {total_request_time:.2f}s")
+            logger.warning("chat_llm_timeout total_s=%.2f", total_request_time)
             _mn = model_name if "model_name" in locals() else None
             return {
                 'success': False,
@@ -1091,11 +1120,13 @@ class GeminiChatAnalyzer:
             }
         except Exception as e:
             total_request_time = time.time() - total_request_start
-            print(f"❌ Error in generate_chat_response: {type(e).__name__}: {str(e)}")
-            print(f"❌ Full error details: {repr(e)}")
             import traceback
             stack_trace = traceback.format_exc()
-            print(f"❌ Stack trace: {stack_trace}")
+            logger.exception(
+                "generate_chat_response_failed error_type=%s error=%s",
+                type(e).__name__,
+                e,
+            )
             
             # Log error to database
             try:
@@ -1107,7 +1138,7 @@ class GeminiChatAnalyzer:
                     user_context=user_context
                 )
             except Exception as log_error:
-                print(f"⚠️ Failed to log error to database: {log_error}")
+                logger.warning("failed_to_log_chat_error_to_db error=%s", log_error)
             
             # More specific error handling (never expose raw provider payloads to end users)
             err_l = str(e).lower()

@@ -2441,7 +2441,7 @@ class CreditService:
 
         def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
             try:
-                logger.info(
+                logger.debug(
                     "first_purchase_bonus_status userid=%s eligible=%s reason=%s "
                     "enabled=%s user_allowed=%s free_used=%s prior_purchase=%s "
                     "purchased_credits=%s product_id=%s bonus_credits=%s window_minutes=%s extra=%s",

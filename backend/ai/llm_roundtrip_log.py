@@ -101,6 +101,8 @@ def log_llm_roundtrip(
     error: Optional[str],
     usage: Dict[str, Any],
     elapsed_s: float,
+    allow_body_logging: bool = True,
+    allow_dump_file: bool = True,
 ) -> None:
     """
     One line: chars + token breakdown. Optional full bodies via ASTRO_LLM_LOG_BODIES=1.
@@ -133,9 +135,10 @@ def log_llm_roundtrip(
             f"error={err_s!r}"
         )
 
-    _maybe_write_dump_file(tag=tag, prompt=prompt, response_text=response_text)
+    if allow_dump_file:
+        _maybe_write_dump_file(tag=tag, prompt=prompt, response_text=response_text)
 
-    if _env_bool("ASTRO_LLM_LOG_BODIES"):
+    if allow_body_logging and _env_bool("ASTRO_LLM_LOG_BODIES"):
         if _env_bool("ASTRO_LLM_LOG_FULL"):
             chunk: Optional[int] = None
         else:

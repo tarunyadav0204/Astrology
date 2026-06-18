@@ -1,7 +1,10 @@
 import swisseph as swe
+import logging
 from .base_calculator import BaseCalculator
 from .vedic_graha_drishti import attach_graha_drishti_to_chart
 from utils.timezone_service import parse_timezone_offset
+
+logger = logging.getLogger(__name__)
 
 class ChartCalculator(BaseCalculator):
     """Extract chart calculation logic from main.py"""
@@ -34,9 +37,11 @@ class ChartCalculator(BaseCalculator):
                 se1_files = [f for f in os.listdir(ephe_path) if f.endswith('.se1')]
                 if se1_files:
                     swe.set_ephe_path(ephe_path)
-                    print(f"📁 EPHEMERIS: Using {len(se1_files)} .se1 files from {ephe_path}")
                 else:
-                    print(f"⚠️  EPHEMERIS: Directory {ephe_path} exists but no .se1 files found - using Moshier model")
+                    logger.warning(
+                        "ephemeris directory exists but no .se1 files found; using Moshier model path=%s",
+                        ephe_path,
+                    )
             else:
                 # Try common system paths
                 for path in ['/usr/share/swisseph', '/opt/swisseph', './ephe']:
@@ -44,12 +49,11 @@ class ChartCalculator(BaseCalculator):
                         se1_files = [f for f in os.listdir(path) if f.endswith('.se1')]
                         if se1_files:
                             swe.set_ephe_path(path)
-                            print(f"📁 EPHEMERIS: Using {len(se1_files)} .se1 files from system path {path}")
                             break
                 else:
-                    print(f"⚠️  EPHEMERIS: No .se1 files found anywhere - using Moshier model")
+                    logger.warning("no .se1 files found anywhere; using Moshier model")
         except Exception as e:
-            print(f"⚠️  EPHEMERIS: Path setting failed - {e}")
+            logger.warning("ephemeris path setting failed: %s", e)
         ephe_end = time.time()
         # print(f"[CALC] Ephemeris setup took {ephe_end - ephe_start:.3f}s")
         
@@ -60,7 +64,6 @@ class ChartCalculator(BaseCalculator):
         jd_start = time.time()
         time_parts = birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60.0
-        print(f"DEBUG: Birth data - Date: {birth_data.date}, Time: {birth_data.time}, Timezone: {getattr(birth_data, 'timezone', 'None')}")
         
         # Get timezone offset using centralized service
         tz_start = time.time()
@@ -68,13 +71,9 @@ class ChartCalculator(BaseCalculator):
         latitude_input = getattr(birth_data, 'latitude', None)
         longitude_input = getattr(birth_data, 'longitude', None)
         
-        print(f"🌍 TIMEZONE DEBUG: Input timezone='{timezone_input}', lat={latitude_input}, lon={longitude_input}")
-        
         tz_offset = parse_timezone_offset(timezone_input, latitude_input, longitude_input)
         tz_end = time.time()
         # print(f"[CALC] Timezone calculation took {tz_end - tz_start:.3f}s")
-        
-        print(f"🌍 TIMEZONE DEBUG: Final offset={tz_offset} hours")
         
         # Convert local time to UTC with high precision
         utc_hour = float(hour) - float(tz_offset)
@@ -89,9 +88,6 @@ class ChartCalculator(BaseCalculator):
         year = int(date_str.split('-')[0])
         month = int(date_str.split('-')[1])
         day = int(date_str.split('-')[2])
-        
-        print(f"DEBUG: Local time: {hour}, UTC time: {utc_hour}, Timezone offset: {tz_offset}, Coordinates: ({birth_data.latitude}, {birth_data.longitude})")
-        print(f"DEBUG: Using date: {year}-{month:02d}-{day:02d} with UTC hour: {utc_hour}")
         
         # High-precision Julian Day calculation - julday handles negative/overflow hours
         jd = swe.julday(year, month, day, float(utc_hour))
@@ -135,25 +131,8 @@ class ChartCalculator(BaseCalculator):
                 'retrograde': is_retrograde
             }
             
-            # Log Moon position for dasha debugging
-            if planet_names[i] == 'Moon':
-                print(f"\n🌙 CHART CALCULATOR - MOON POSITION:")
-                print(f"  Calculating for: {year}-{month:02d}-{day:02d} {utc_hour:.4f} UTC")
-                print(f"  Original birth: {birth_data.date} {birth_data.time} IST")
-                print(f"  Moon Sidereal Longitude: {longitude:.6f}°")
-                print(f"  JD: {jd:.6f}")
-                print(f"  Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°\n")
         planets_end = time.time()
         # print(f"[CALC] Planetary calculations took {planets_end - planets_start:.3f}s")
-
-        # LOG: All planetary positions from Swiss Ephemeris
-        # print(f"\n🌟 SWISS EPHEMERIS PLANETARY POSITIONS (Mode 27 - True Chitra):")
-        # print(f"📅 JD: {jd:.6f}, Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°")
-        for planet_name in planet_names:
-            planet_data = planets[planet_name]
-            sign_name = self.SIGN_NAMES[planet_data['sign']]
-            print(f"  {planet_name:8}: {planet_data['longitude']:8.4f}° = {planet_data['degree']:6.2f}° {sign_name} (Sign {planet_data['sign']}) {'R' if planet_data['retrograde'] else 'D'}")
-        # print(f"🔚 End Swiss Ephemeris Data\n")
 
         # Calculate ascendant and houses  
         houses_start = time.time()
@@ -207,7 +186,6 @@ class ChartCalculator(BaseCalculator):
         indu_data = indu_calc.get_indu_lagna_data()
         planets['InduLagna'] = indu_data
         indu_end = time.time()
-        print(f"[CALC] InduLagna calculation took {indu_end - indu_start:.3f}s")
         
         # Calculate house positions for all planets
         house_pos_start = time.time()

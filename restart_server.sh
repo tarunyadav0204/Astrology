@@ -17,6 +17,7 @@ FAILURE_THRESHOLD="${FAILURE_THRESHOLD:-3}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-5}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-10}"
 STARTUP_WAIT="${STARTUP_WAIT:-10}"
+PORT_CLEAR_WAIT_SECONDS="${PORT_CLEAR_WAIT_SECONDS:-10}"
 
 timestamp_utc() {
   date -u '+%Y-%m-%dT%H:%M:%SZ'
@@ -26,6 +27,33 @@ log_watchdog() {
   local event="$1"
   shift || true
   logger -t "${WATCHDOG_LOG_TAG}" -- "$(timestamp_utc) event=${event} $*"
+}
+
+clear_backend_processes() {
+  log_watchdog "port_cleanup_begin" "backend_port=${BACKEND_PORT}"
+
+  fuser -k "${BACKEND_PORT}"/tcp 2>/dev/null || true
+  pkill -TERM -f "python main.py" 2>/dev/null || true
+  pkill -TERM -f "uvicorn.*${BACKEND_PORT}" 2>/dev/null || true
+  pkill -TERM -f "uvicorn.*main:app" 2>/dev/null || true
+
+  for _ in $(seq 1 "${PORT_CLEAR_WAIT_SECONDS}"); do
+    if ! ss -ltn 2>/dev/null | grep -qE ":${BACKEND_PORT}\\s"; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ss -ltn 2>/dev/null | grep -qE ":${BACKEND_PORT}\\s"; then
+    log_watchdog "port_cleanup_force_kill" "backend_port=${BACKEND_PORT}"
+    fuser -k -9 "${BACKEND_PORT}"/tcp 2>/dev/null || true
+    pkill -KILL -f "python main.py" 2>/dev/null || true
+    pkill -KILL -f "uvicorn.*${BACKEND_PORT}" 2>/dev/null || true
+    pkill -KILL -f "uvicorn.*main:app" 2>/dev/null || true
+    sleep 2
+  fi
+
+  log_watchdog "port_cleanup_done" "backend_port=${BACKEND_PORT}"
 }
 
 emit_snapshot_block() {
@@ -83,9 +111,7 @@ while true; do
   log_watchdog "restart_begin" "failure_count=${FAILURE_COUNT} probe_url=${PROBE_URL}"
   snapshot_before_restart
 
-  fuser -k "${BACKEND_PORT}"/tcp 2>/dev/null || true
-  pkill -f "python main.py" 2>/dev/null || true
-  sleep 3
+  clear_backend_processes
 
   log_watchdog "bootstrap_runtime_begin" "script=${BOOTSTRAP_SCRIPT}"
   sudo -u "$APP_USER" bash -lc "

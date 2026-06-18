@@ -9,7 +9,7 @@ CPU_SNAPSHOT_SCRIPT="${CPU_SNAPSHOT_SCRIPT:-${APP_ROOT}/scripts/capture_cpu_snap
 BACKEND_LOG_TAG="${BACKEND_LOG_TAG:-astroroshni-backend}"
 MONITOR_LOG_TAG="${MONITOR_LOG_TAG:-astroroshni-backend-monitor}"
 EXIT_SNAPSHOT_TAIL_LINES="${EXIT_SNAPSHOT_TAIL_LINES:-120}"
-UVICORN_WORKERS="${UVICORN_WORKERS:-1}"
+UVICORN_WORKERS="${UVICORN_WORKERS:-2}"
 
 timestamp_utc() {
   date -u '+%Y-%m-%dT%H:%M:%SZ'
