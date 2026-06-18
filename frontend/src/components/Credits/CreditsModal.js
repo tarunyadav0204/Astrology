@@ -3,6 +3,8 @@ import { useCredits } from '../../context/CreditContext';
 import './CreditsModal.css';
 
 const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
+const PAYMENT_SERVICE_BASE_URL = 'https://astroroshni-play-payment-service-800681558445.asia-south2.run.app';
+const DIRECT_PAYMENT_FLAG_DISABLED_STATUSES = new Set([401, 403, 404, 409]);
 
 function loadRazorpayScript() {
     return new Promise((resolve, reject) => {
@@ -53,9 +55,65 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
     const authHeaders = useCallback(() => {
         const token = localStorage.getItem('token');
         const h = { 'Content-Type': 'application/json' };
-        if (token) h.Authorization = `Bearer ${token}`;
+        if (token) {
+            h.Authorization = `Bearer ${token}`;
+            h['X-AstroRoshni-Authorization'] = `Bearer ${token}`;
+        }
         return h;
     }, []);
+
+    const directPaymentFetch = useCallback(
+        async (path, body) => {
+            return fetch(`${PAYMENT_SERVICE_BASE_URL}${path}`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify(body),
+            });
+        },
+        [authHeaders]
+    );
+
+    const directPaymentGet = useCallback(
+        async (path) => {
+            return fetch(`${PAYMENT_SERVICE_BASE_URL}${path}`, {
+                method: 'GET',
+                headers: authHeaders(),
+            });
+        },
+        [authHeaders]
+    );
+
+    const directPaymentThenFallback = useCallback(
+        async (path, body, fallbackFetch) => {
+            try {
+                const response = await directPaymentFetch(path, body);
+                if (response.ok) return response;
+                if (DIRECT_PAYMENT_FLAG_DISABLED_STATUSES.has(response.status) || response.status >= 500) {
+                    return fallbackFetch();
+                }
+                return response;
+            } catch (_) {
+                return fallbackFetch();
+            }
+        },
+        [directPaymentFetch]
+    );
+
+    const directPaymentGetThenFallback = useCallback(
+        async (path, fallbackFetch) => {
+            try {
+                const response = await directPaymentGet(path);
+                if (response.ok) return response;
+                if (DIRECT_PAYMENT_FLAG_DISABLED_STATUSES.has(response.status) || response.status >= 500) {
+                    return fallbackFetch();
+                }
+                return response;
+            } catch (_) {
+                return fallbackFetch();
+            }
+        },
+        [directPaymentGet]
+    );
 
     const isLoggedIn =
         typeof window !== 'undefined' && typeof localStorage !== 'undefined' && !!localStorage.getItem('token');
@@ -82,7 +140,10 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
         let cancelled = false;
         setRazorpayCatalogLoading(true);
         setRazorpayCatalogError('');
-        fetch('/api/credits/razorpay/catalog', { headers: authHeaders() })
+        directPaymentGetThenFallback(
+            '/razorpay/catalog',
+            () => fetch('/api/credits/razorpay/catalog', { headers: authHeaders() })
+        )
             .then((res) => {
                 if (!res.ok) {
                     return res.json().then((d) => {
@@ -106,7 +167,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
         return () => {
             cancelled = true;
         };
-    }, [isOpen, isLoggedIn, authHeaders]);
+    }, [isOpen, isLoggedIn, authHeaders, directPaymentGetThenFallback]);
 
     const formatCredits = (n) => {
         const x = Number(n);
@@ -170,11 +231,17 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
         }
         setPurchasingCredits(creditsAmount);
         try {
-            const orderRes = await fetch('/api/credits/razorpay/create-order', {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({ credits: creditsAmount }),
-            });
+            const orderBody = { credits: creditsAmount };
+            const orderRes = await directPaymentThenFallback(
+                '/razorpay/create-order',
+                orderBody,
+                () =>
+                    fetch('/api/credits/razorpay/create-order', {
+                        method: 'POST',
+                        headers: authHeaders(),
+                        body: JSON.stringify(orderBody),
+                    })
+            );
             const orderData = await orderRes.json().catch(() => ({}));
             if (!orderRes.ok) {
                 throw new Error(orderData.detail || orderData.message || 'Could not start payment');
@@ -195,15 +262,21 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
                 },
                 handler: async (response) => {
                     try {
-                        const verifyRes = await fetch('/api/credits/razorpay/verify', {
-                            method: 'POST',
-                            headers: authHeaders(),
-                            body: JSON.stringify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
-                        });
+                        const verifyBody = {
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                        };
+                        const verifyRes = await directPaymentThenFallback(
+                            '/razorpay/verify',
+                            verifyBody,
+                            () =>
+                                fetch('/api/credits/razorpay/verify', {
+                                    method: 'POST',
+                                    headers: authHeaders(),
+                                    body: JSON.stringify(verifyBody),
+                                })
+                        );
                         const verifyData = await verifyRes.json().catch(() => ({}));
                         if (!verifyRes.ok) {
                             throw new Error(verifyData.detail || verifyData.message || 'Verification failed');

@@ -494,6 +494,16 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
 
 @router.post("/razorpay/verify")
 async def razorpay_verify(body: VerifyPaymentBody, current_user: User = Depends(get_current_user)):
+    from .routes import _proxy_to_play_payment_service
+
+    proxied = _proxy_to_play_payment_service(
+        path="/internal/razorpay/verify",
+        payload=body.model_dump(),
+        current_user=current_user,
+    )
+    if proxied is not None:
+        return proxied
+
     if not _verify_payment_signature(
         body.razorpay_order_id.strip(),
         body.razorpay_payment_id.strip(),

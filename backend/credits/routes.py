@@ -693,6 +693,7 @@ def _proxy_to_play_payment_service(
         "user_name": getattr(current_user, "name", None),
     }
     target_url = f"{base_url}{path}"
+    order_id = str(payload.get("order_id") or "").strip() or "n/a"
 
     try:
         response = requests.post(
@@ -736,6 +737,13 @@ def _proxy_to_play_payment_service(
             path,
         )
         return None
+    logger.info(
+        "Play payment served_by=play-payment-service user=%s path=%s order_id=%s status=%s",
+        current_user.userid,
+        path,
+        order_id,
+        response.status_code,
+    )
     return data
 
 

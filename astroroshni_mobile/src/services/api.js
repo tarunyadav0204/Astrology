@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as Sentry from '@sentry/react-native';
-import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS } from '../utils/constants';
+import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS, PAYMENT_SERVICE_BASE_URL } from '../utils/constants';
 import { buildQueryContext } from '../utils/queryContext';
 import { Alert } from 'react-native';
 
@@ -104,6 +104,64 @@ const shouldShowGlobalError = (error) => (
 const GLOBAL_ERROR_CONFIG = { showGlobalError: true };
 const AUTH_LOCAL_ERROR_CONFIG = { suppressGlobalError: true };
 const BACKGROUND_REQUEST_CONFIG = { suppressGlobalError: true };
+const DIRECT_PAYMENT_FLAG_DISABLED_STATUSES = new Set([401, 403, 404, 409]);
+
+async function buildDirectAuthHeaders() {
+  const raw = await AsyncStorage.getItem('authToken');
+  const token = raw && String(raw).trim();
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (token) {
+    const value = `Bearer ${token}`;
+    headers.Authorization = value;
+    headers[AUTH_FALLBACK_HEADER] = value;
+  }
+  return headers;
+}
+
+async function postToDirectPaymentService(path, body) {
+  const headers = await buildDirectAuthHeaders();
+  return axios.post(`${PAYMENT_SERVICE_BASE_URL}${path}`, body, {
+    headers,
+    timeout: 30000,
+    ...AUTH_LOCAL_ERROR_CONFIG,
+  });
+}
+
+async function tryDirectPaymentThenFallback(path, body, fallbackFn) {
+  try {
+    return await postToDirectPaymentService(path, body);
+  } catch (error) {
+    const status = error?.response?.status;
+    if (DIRECT_PAYMENT_FLAG_DISABLED_STATUSES.has(status) || !status || status >= 500) {
+      return fallbackFn();
+    }
+    throw error;
+  }
+}
+
+async function getFromDirectPaymentService(path) {
+  const headers = await buildDirectAuthHeaders();
+  return axios.get(`${PAYMENT_SERVICE_BASE_URL}${path}`, {
+    headers,
+    timeout: 30000,
+    ...AUTH_LOCAL_ERROR_CONFIG,
+  });
+}
+
+async function tryDirectPaymentGetThenFallback(path, fallbackFn) {
+  try {
+    return await getFromDirectPaymentService(path);
+  } catch (error) {
+    const status = error?.response?.status;
+    if (DIRECT_PAYMENT_FLAG_DISABLED_STATUSES.has(status) || !status || status >= 500) {
+      return fallbackFn();
+    }
+    throw error;
+  }
+}
 
 // ---- Transparent client-side caching (charts) ----
 const CHART_ONLY_CACHE_VERSION = 3;
@@ -663,13 +721,19 @@ export const creditAPI = {
   spendCredits: (amount, feature, description) => 
     api.post(getEndpoint('/credits/spend'), { amount, feature, description }, GLOBAL_ERROR_CONFIG),
   getEventTimelineCost: () => api.get(getEndpoint('/credits/settings/event-timeline-cost')),
-  verifyGooglePlayPurchase: (purchaseToken, productId, orderId, pricing = null) =>
-    api.post(getEndpoint('/credits/google-play/verify'), {
+  verifyGooglePlayPurchase: (purchaseToken, productId, orderId, pricing = null) => {
+    const body = {
       purchase_token: purchaseToken,
       product_id: productId,
       order_id: orderId,
       ...(pricing || {}),
-    }, GLOBAL_ERROR_CONFIG),
+    };
+    return tryDirectPaymentThenFallback(
+      '/google-play/verify',
+      body,
+      () => api.post(getEndpoint('/credits/google-play/verify'), body, GLOBAL_ERROR_CONFIG),
+    );
+  },
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
   getFirstPurchaseBonusStatus: (purchasedCredits = null) => {
     const qs = purchasedCredits != null ? `?purchased_credits=${encodeURIComponent(purchasedCredits)}` : '';
@@ -691,27 +755,39 @@ export const creditAPI = {
       order_id: orderId,
     }, GLOBAL_ERROR_CONFIG),
   /** INR credit packs via Razorpay (same packs as web/backend, including 24-credit starter pack). Requires checkout UI (e.g. WebView or react-native-razorpay). */
-  getRazorpayCatalog: () => api.get(getEndpoint('/credits/razorpay/catalog')),
-  createRazorpayOrder: (credits, extra = {}) =>
-    api.post(getEndpoint('/credits/razorpay/create-order'), { credits, ...extra }, GLOBAL_ERROR_CONFIG),
+  getRazorpayCatalog: () =>
+    tryDirectPaymentGetThenFallback(
+      '/razorpay/catalog',
+      () => api.get(getEndpoint('/credits/razorpay/catalog'))
+    ),
+  createRazorpayOrder: (credits, extra = {}) => {
+    const body = { credits, ...extra };
+    return tryDirectPaymentThenFallback(
+      '/razorpay/create-order',
+      body,
+      () => api.post(getEndpoint('/credits/razorpay/create-order'), body, GLOBAL_ERROR_CONFIG),
+    );
+  },
   verifyRazorpayPayment: ({
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
     google_play_external_transaction_token,
-  }) =>
-    api.post(
-      getEndpoint('/credits/razorpay/verify'),
-      {
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        ...(google_play_external_transaction_token
-          ? { google_play_external_transaction_token }
-          : {}),
-      },
-      GLOBAL_ERROR_CONFIG
-    ),
+  }) => {
+    const body = {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      ...(google_play_external_transaction_token
+        ? { google_play_external_transaction_token }
+        : {}),
+    };
+    return tryDirectPaymentThenFallback(
+      '/razorpay/verify',
+      body,
+      () => api.post(getEndpoint('/credits/razorpay/verify'), body, GLOBAL_ERROR_CONFIG),
+    );
+  },
   /** Razorpay VIP subscription (web parity); used for Play User Choice alternative billing on Android. */
   createRazorpaySubscription: (planId, extra = {}) =>
     api.post(

@@ -44,6 +44,7 @@ const DEV_API_HOST = '';
 const TEST_API_URL = 'https://test.astroroshni.com';
 // Production backend
 const PROD_API_URL = 'https://astroroshni.com';
+export const PAYMENT_SERVICE_BASE_URL = 'https://astroroshni-play-payment-service-800681558445.asia-south2.run.app';
 
 const getApiUrl = () => {
   if (__DEV__ && USE_DEV_API) {
