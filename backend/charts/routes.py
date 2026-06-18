@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
+import logging
 import traceback
 import time
 from pydantic import BaseModel
@@ -23,8 +24,16 @@ from birth_charts.schema import (
     normalize_chart_relation,
     relation_defaults,
 )
+from charts.chart_cache import (
+    build_chart_cache_key,
+    fetch_cached_chart_payload,
+    store_chart_payload,
+)
 from encryption_utils import EncryptionManager
 from db import get_conn, execute
+from utils.birth_hash import birth_hash_from_parts
+
+logger = logging.getLogger(__name__)
 
 try:
     encryptor = EncryptionManager()
@@ -237,6 +246,21 @@ class HouseInsightRequest(BaseModel):
     chart_id: str = "lagna"
     transit_date: Optional[str] = None
 
+
+def _birth_hash_from_dict(birth_data: Dict[str, Any]) -> Optional[str]:
+    return birth_hash_from_parts(
+        birth_data.get("date"),
+        birth_data.get("time"),
+        birth_data.get("latitude"),
+        birth_data.get("longitude"),
+    )
+
+
+def _clone_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    import json
+
+    return json.loads(json.dumps(payload))
+
 def get_divisional_sign(sign, degree_in_sign, division):
     """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
     EPS = 1e-9  # Prevent 10.0 becoming 9.999
@@ -386,10 +410,23 @@ async def calculate_chart_only(request: dict, current_user: User = Depends(get_c
                     return "UTC+0"  # UTC default instead of IST
 
         birth_obj = BirthDataSimple(birth_data)
+        birth_hash = _birth_hash_from_dict(birth_data)
+
+        if birth_hash:
+            cache_key = build_chart_cache_key("calculate-chart-only", birth_hash)
+            with get_conn() as conn:
+                cached_payload = fetch_cached_chart_payload(conn, cache_key)
+            if cached_payload:
+                return cached_payload
 
         # Calculate chart
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj)
+
+        if birth_hash:
+            with get_conn() as conn:
+                store_chart_payload(conn, cache_key, birth_hash, chart_data)
+                conn.commit()
 
         # Return chart data directly (not wrapped in success/chart_data)
         return chart_data
@@ -427,6 +464,14 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
     """Calculate all charts including divisional charts"""
     try:
         birth_data = request.get('birth_data', {})
+        birth_hash = _birth_hash_from_dict(birth_data)
+        cache_key = build_chart_cache_key("calculate-all-charts", birth_hash) if birth_hash else None
+
+        if cache_key:
+            with get_conn() as conn:
+                cached_payload = fetch_cached_chart_payload(conn, cache_key)
+            if cached_payload:
+                return cached_payload
         
         # Create birth data object - simple class like in main.py backup
         class BirthDataSimple:
@@ -476,11 +521,18 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
         except Exception as e:
             print(f"Error calculating transit chart: {e}")
         
-        return {
+        response_payload = {
             "success": True,
             "chart_data": chart_data,
             "divisional_charts": divisional_charts,
         }
+
+        if cache_key and birth_hash:
+            with get_conn() as conn:
+                store_chart_payload(conn, cache_key, birth_hash, response_payload)
+                conn.commit()
+
+        return response_payload
         
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -626,6 +678,18 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         birth_data = request.get('birth_data', {})
         # Support both 'division' and 'division_number' for backward compatibility
         division_number = request.get('division', request.get('division_number', 9))
+        birth_hash = _birth_hash_from_dict(birth_data)
+        cache_key = (
+            build_chart_cache_key("calculate-divisional-chart", birth_hash, division=division_number)
+            if birth_hash
+            else None
+        )
+
+        if cache_key:
+            with get_conn() as conn:
+                cached_payload = fetch_cached_chart_payload(conn, cache_key)
+            if cached_payload:
+                return cached_payload
 
         # Create birth data object - simple class like in main.py backup
         class BirthDataSimple:
@@ -714,11 +778,18 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
 
         attach_graha_drishti_to_chart(divisional_data)
 
-        return {
+        response_payload = {
             'divisional_chart': divisional_data,
             'division_number': division_number,
             'chart_name': f'D{division_number}'
         }
+
+        if cache_key and birth_hash:
+            with get_conn() as conn:
+                store_chart_payload(conn, cache_key, birth_hash, response_payload)
+                conn.commit()
+
+        return response_payload
         
     except Exception as e:
         logger.exception(
@@ -751,21 +822,43 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             raise HTTPException(status_code=500, detail=detail)
 
         # Calculate and return chart data using new calculators
-        from calculators.chart_calculator import ChartCalculator
-        from calculators.divisional_chart_calculator import DivisionalChartCalculator
-        
-        calculator = ChartCalculator({})
-        chart_data = calculator.calculate_chart(birth_data, node_type)
-        
-        # Add divisional charts
-        div_calculator = DivisionalChartCalculator(chart_data)
-        chart_data['d3_chart'] = div_calculator.calculate_divisional_chart(3)
-        chart_data['d9_chart'] = div_calculator.calculate_divisional_chart(9)
-        chart_data['d10_chart'] = div_calculator.calculate_divisional_chart(10)
-        
-        # Add birth_chart_id to response (may be None if insert failed)
-        chart_data['birth_chart_id'] = new_chart_id
+        chart_birth_hash = birth_hash_from_parts(
+            birth_data.date,
+            birth_data.time,
+            birth_data.latitude,
+            birth_data.longitude,
+        )
+        cache_key = (
+            build_chart_cache_key("calculate-chart", chart_birth_hash, node_type=node_type)
+            if chart_birth_hash
+            else None
+        )
 
+        cached_chart_data = None
+        if cache_key:
+            with get_conn() as conn:
+                cached_chart_data = fetch_cached_chart_payload(conn, cache_key)
+
+        if cached_chart_data:
+            chart_data = _clone_payload(cached_chart_data)
+        else:
+            from calculators.chart_calculator import ChartCalculator
+            from calculators.divisional_chart_calculator import DivisionalChartCalculator
+
+            calculator = ChartCalculator({})
+            chart_data = calculator.calculate_chart(birth_data, node_type)
+
+            div_calculator = DivisionalChartCalculator(chart_data)
+            chart_data['d3_chart'] = div_calculator.calculate_divisional_chart(3)
+            chart_data['d9_chart'] = div_calculator.calculate_divisional_chart(9)
+            chart_data['d10_chart'] = div_calculator.calculate_divisional_chart(10)
+
+            if cache_key and chart_birth_hash:
+                with get_conn() as conn:
+                    store_chart_payload(conn, cache_key, chart_birth_hash, chart_data)
+                    conn.commit()
+
+        chart_data['birth_chart_id'] = new_chart_id
         return chart_data
         
     except HTTPException:

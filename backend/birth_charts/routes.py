@@ -10,6 +10,7 @@ from birth_charts.schema import (
     normalize_chart_relation,
     relation_defaults,
 )
+from charts.chart_cache import delete_chart_cache_for_birth_hashes
 from types import SimpleNamespace
 
 try:
@@ -401,7 +402,7 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
         # Verify chart belongs to user
         cursor.execute(
             """
-            SELECT id, relation, relation_order, relation_side, relation_label, is_family_member
+            SELECT id, relation, relation_order, relation_side, relation_label, is_family_member, birth_hash
             FROM birth_charts
             WHERE id=%s AND userid=%s
             """,
@@ -458,6 +459,7 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
             relation,
             birth_data.get("is_family_member") if "is_family_member" in birth_data else existing_chart[5],
         )
+        old_birth_hash = existing_chart[6]
 
         if relation == "self":
             cursor.execute(
@@ -496,6 +498,8 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
                 current_user.userid,
             ),
         )
+
+        delete_chart_cache_for_birth_hashes(conn, [old_birth_hash, chart_birth_hash])
 
         conn.commit()
         return {"message": "Chart updated successfully"}

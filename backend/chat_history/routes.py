@@ -1,8 +1,11 @@
 """
 Chat History API Routes
 """
+from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header
 from datetime import datetime, timedelta
+from typing import Optional
 import uuid
 import json
 import logging
@@ -226,6 +229,57 @@ def _compact_stage_totals(stages):
     }
 
 
+def _build_answer_history_from_rows(history_rows):
+    history = []
+    rows = history_rows or []
+    i = 0
+    while i < len(rows) - 1:
+        if rows[i][0] == "user" and rows[i + 1][0] == "assistant":
+            if len(rows[i + 1]) > 2 and rows[i + 1][2] == "answer":
+                history.append({
+                    "question": rows[i][1],
+                    "response": rows[i + 1][1],
+                })
+            i += 2
+        else:
+            i += 1
+    return history[-3:] if len(history) > 3 else history
+
+
+def _load_chat_history_and_state(session_id: str):
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+                SELECT sender, content, message_type
+                FROM chat_messages
+                WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
+                  AND content != ''
+                ORDER BY timestamp ASC
+            """,
+            (session_id,),
+        )
+        history_rows = cur.fetchall() or []
+        cur = execute(
+            conn,
+            "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
+            (session_id,),
+        )
+        state_row = cur.fetchone()
+    extracted_context = {}
+    if state_row and state_row[1]:
+        try:
+            extracted_context = json.loads(state_row[1])
+        except Exception:
+            extracted_context = {}
+    return {
+        "history_rows": history_rows,
+        "history": _build_answer_history_from_rows(history_rows),
+        "clarification_count": state_row[0] if state_row else 0,
+        "extracted_context": extracted_context,
+    }
+
+
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
 STANDARD_MAX_CLARIFICATIONS = 1
@@ -380,6 +434,11 @@ def _ensure_chat_messages_gate_metadata(conn):
 def _ensure_chat_messages_parallel_llm_usage(conn):
     """JSON blob: per-branch + merge LLM metrics (parallel chat)."""
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parallel_llm_usage TEXT")
+
+
+def _ensure_chat_messages_chart_insights(conn):
+    """JSON array of chart insights shown in the loading bubble while processing."""
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS chart_insights TEXT")
 
 
 def _ensure_chat_messages_engagement_updates(conn):
@@ -580,6 +639,7 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_parallel_llm_usage(conn)
+        _ensure_chat_messages_chart_insights(conn)
         _ensure_chat_messages_engagement_updates(conn)
         _ensure_chat_messages_task_claim_cols(conn)
         _ensure_wait_side_conversation_tables(conn)
@@ -1048,8 +1108,6 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 async def ask_question_async(request: dict, background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
     """Start async chat processing - returns immediately with message_id for polling"""
     from credits.credit_service import CreditService
-    from ai.intent_router import IntentRouter
-    from chat.fact_extractor import FactExtractor
     
     # Validate required fields
     session_id = request.get("session_id")
@@ -1107,6 +1165,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         )
     
     from utils.admin_settings import (
+        chat_worker_mode_enabled_for_user,
         chat_subject_gate_enabled_for_user,
         instant_chat_enabled_for_user,
         speech_chat_enabled_for_user,
@@ -1131,6 +1190,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         raise HTTPException(status_code=403, detail="Speech chat is not enabled for your account.")
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active)
     effective_chat_tier = "instant" if instant_chat_active else "standard"
+    chat_worker_mode_active = chat_worker_mode_enabled_for_user(current_user.userid)
 
     with get_conn() as conn:
         # Verify the session before any no-charge gates or credit checks.
@@ -1525,225 +1585,18 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     except Exception as exc:
         logger.warning("fetal sex gate skipped after error: %s", exc)
 
-    # Get chart insights from intent router BEFORE starting background task
     chart_insights = []
-    try:
-        user_facts = {}
-        d1_chart = None
-        if not instant_chat_active:
-            with get_conn() as conn:
-                cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
-                session_data = cur.fetchone()
-                birth_chart_id = session_data[0] if session_data else None
-                
-                if birth_chart_id:
-                    fact_extractor = FactExtractor()
-                    user_facts = fact_extractor.get_facts(birth_chart_id)
-            
-            # Build minimal D1 chart for intent router
-            from calculators.chart_calculator import ChartCalculator
-            from types import SimpleNamespace
-            birth_obj = SimpleNamespace(**birth_details)
-            chart_calc = ChartCalculator({})
-            chart_data = chart_calc.calculate_chart(birth_obj)
-            
-            # Extract D1 chart with houses and planets
-            d1_chart = {
-                'ascendant': chart_data.get('ascendant', 0),
-                'houses': [],
-                'planets': {}
-            }
-            
-            # Add houses with signs
-            asc_sign = int(chart_data['ascendant'] / 30)
-            sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
-                         'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
-            for i in range(12):
-                house_sign = (asc_sign + i) % 12
-                d1_chart['houses'].append({
-                    'house_number': i + 1,
-                    'sign': sign_names[house_sign],
-                    'planets': []
-                })
-            
-            # Add planets to houses
-            for planet_name, planet_data in chart_data.get('planets', {}).items():
-                house_num = planet_data.get('house', 1)
-                sign_num = planet_data.get('sign', 0)
-                d1_chart['planets'][planet_name] = {
-                    'house': house_num,
-                    'sign': sign_names[sign_num]
-                }
-                d1_chart['houses'][house_num - 1]['planets'].append(planet_name)
-        
-        # Get clarification count from conversation state
-        clarification_count = 0
-        history = []
-        with get_conn() as conn:
-            cur = execute(conn, "SELECT clarification_count FROM conversation_state WHERE session_id = %s", (session_id,))
-            state_row = cur.fetchone()
-            clarification_count = state_row[0] if state_row else 0
-
-            # Build last answered exchanges so instant router can understand follow-ups.
-            cur = execute(
-                conn,
-                """
-                    SELECT sender, content, message_type
-                    FROM chat_messages
-                    WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
-                      AND content != ''
-                    ORDER BY timestamp ASC
-                """,
-                (session_id,),
-            )
-            history_rows = cur.fetchall() or []
-            i = 0
-            while i < len(history_rows) - 1:
-                if history_rows[i][0] == 'user' and history_rows[i+1][0] == 'assistant':
-                    if history_rows[i+1][2] == 'answer':
-                        history.append({
-                            "question": history_rows[i][1],
-                            "response": history_rows[i+1][1],
-                        })
-                    i += 2
-                else:
-                    i += 1
-            history = history[-3:] if len(history) > 3 else history
-        
-        # Detect notification-originated questions to avoid clarification loops
-        q_lower = (question or "").strip().lower()
-        is_notification_question = False
-        if q_lower:
-            # Planet transit nudges (e.g. "How will Mars's transit into Aquarius on 2026-03-15 affect me...")
-            if "transit into" in q_lower and "affect me" in q_lower:
-                is_notification_question = True
-            # Planet retrograde / direct nudges
-            if "retrograde" in q_lower and "affect me" in q_lower:
-                is_notification_question = True
-            if "turning direct" in q_lower and "affect me" in q_lower:
-                is_notification_question = True
-            # Lunar phase nudges
-            if "new moon" in q_lower and "affect me" in q_lower:
-                is_notification_question = True
-            if "full moon" in q_lower and "affect me" in q_lower:
-                is_notification_question = True
-            # Festival nudges
-            if "festival" in q_lower and "remedies" in q_lower:
-                is_notification_question = True
-        
-        is_whatsapp_plain_text = delivery_channel == "whatsapp" or render_target == "plain_text"
-        max_clarifications = 0 if is_whatsapp_plain_text else (
-            INSTANT_MAX_CLARIFICATIONS if instant_chat_active else STANDARD_MAX_CLARIFICATIONS
-        )
-
-        # If user is replying to a prior clarification, merge with original question so topic survives
-        # (e.g., "car battery failure" + "last week of April").
-        combined_question = question
-        if clarification_count > 0:
-            with get_conn() as conn:
-                chain_parts = get_user_question_chain_for_clarification(session_id, assistant_message_id, conn)
-                original_question = get_original_question_for_clarification(session_id, assistant_message_id, conn)
-            combined_question = _merge_clarification_chain_parts(
-                chain_parts or ([original_question] if original_question else []),
-                question,
-                max_len=600,
-            )
-
-        # Force READY if clarification limit reached, partnership mode, or notification-originated question
-        force_ready_for_limit = (
-            partnership_mode
-            or clarification_count >= max_clarifications
-            or is_notification_question
-            or is_whatsapp_plain_text
-        )
-        
-        intent_router = IntentRouter()
-        query_context = request.get("query_context") or request.get("queryContext")
-        if instant_chat_active:
-            intent = await intent_router.classify_instant_intent(
-                combined_question,
-                history,
-                clarification_count=clarification_count,
-                max_clarifications=max_clarifications,
-                language=language,
-                force_ready=force_ready_for_limit,
-                query_context=query_context,
-            )
-        else:
-            intent = await intent_router.classify_intent(
-                combined_question,
-                [],
-                user_facts,
-                clarification_count=clarification_count,
-                language=language,
-                force_ready=force_ready_for_limit,
-                d1_chart=d1_chart,
-                query_context=query_context,
-            )
-        chart_insights = intent.get('chart_insights', [])
-        # Mark Lab / educational mode explicitly on intent so downstream
-        # prompt builder can switch to teaching-focused instructions.
-        if mode == 'lab':
-            intent['lab_mode'] = True
-        if delivery_channel:
-            intent['delivery_channel'] = delivery_channel
-        if render_target:
-            intent['render_target'] = render_target
-        if delivery_channel == "whatsapp" or render_target == "plain_text":
-            intent['plain_text_output'] = True
-        
-        # Handle clarification immediately - do NOT start background task
-        if intent.get('status') == 'CLARIFY' and clarification_count < max_clarifications:
-            clarification_question = intent.get('clarification_question', 'Could you provide more details?')
-            
-            # Update assistant message with clarification
-            with get_conn() as conn:
-                execute(
-                    conn,
-                    """
-                        UPDATE chat_messages
-                        SET content = %s, status = %s, message_type = %s, completed_at = %s
-                        WHERE message_id = %s
-                    """,
-                    (sanitize_text(clarification_question), "completed", "clarification", datetime.now(), assistant_message_id),
-                )
-
-                execute(
-                    conn,
-                    """
-                        INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (session_id) DO UPDATE SET
-                            clarification_count = conversation_state.clarification_count + 1,
-                            extracted_context = EXCLUDED.extracted_context,
-                            last_updated = CURRENT_TIMESTAMP
-                    """,
-                    (session_id, 1, json.dumps(intent.get('extracted_context', {}))),
-                )
-
-                conn.commit()
-            return {
-                "user_message_id": user_message_id,
-                "message_id": assistant_message_id,
-                "status": "completed",
-                "message_type": "clarification",
-                "chat_tier": effective_chat_tier,
-                "content": clarification_question,
-                "chart_insights": chart_insights
-            }
-        elif intent.get('status') == 'CLARIFY':
-            logger.info("clarification requested but limit reached; falling back to READY handling session_id=%s message_id=%s", session_id, assistant_message_id)
-
-    except Exception as e:
-        logger.warning("failed to precompute chart insights for session_id=%s: %s", session_id, e, exc_info=True)
-        intent = None
-        chart_insights = []
-    
-    # Normalize: ensure chart_insights is a list of valid objects only; no placeholders
-    if not isinstance(chart_insights, list):
-        chart_insights = []
-    else:
-        chart_insights = [x for x in chart_insights if isinstance(x, dict) and x.get("house_number") and x.get("message")]
+    worker_intent_metadata = {
+        "query_context": request.get("query_context") or request.get("queryContext"),
+    }
+    if mode == "lab":
+        worker_intent_metadata["lab_mode"] = True
+    if delivery_channel:
+        worker_intent_metadata["delivery_channel"] = delivery_channel
+    if render_target:
+        worker_intent_metadata["render_target"] = render_target
+    if delivery_channel == "whatsapp" or render_target == "plain_text":
+        worker_intent_metadata["plain_text_output"] = True
     
     # Start processing. Cloud Tasks gives us durable retry across VM restarts; BackgroundTasks remains
     # the local/dev fallback and keeps the rollout safe until queue env is enabled.
@@ -1759,7 +1612,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "chat_cost": chat_cost,
         "partnership_mode": partnership_mode,
         "partner_birth_details": partner_birth_details,
-        "cached_intent": intent,
+        "cached_intent": worker_intent_metadata,
         "user_message_id": user_message_id,
         "using_free_question": using_free_question,
         "effective_cost": effective_cost,
@@ -1769,12 +1622,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     }
     queued = False
     queue_mode_enabled = False
-    try:
-        from chat_history.task_queue import enqueue_chat_processing_task, chat_tasks_enabled
-        queue_mode_enabled = bool(chat_tasks_enabled())
-        queued = enqueue_chat_processing_task(message_id=assistant_message_id, payload=task_payload)
-    except Exception as exc:
-        logger.exception("chat queue enqueue failed before fallback message_id=%s: %s", assistant_message_id, exc)
+    if chat_worker_mode_active:
+        try:
+            from chat_history.task_queue import enqueue_chat_processing_task, chat_tasks_enabled
+            queue_mode_enabled = bool(chat_tasks_enabled())
+            queued = enqueue_chat_processing_task(message_id=assistant_message_id, payload=task_payload)
+        except Exception as exc:
+            logger.exception("chat queue enqueue failed before fallback message_id=%s: %s", assistant_message_id, exc)
 
     if queued:
         try:
@@ -1789,7 +1643,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         except Exception as exc:
             logger.exception("failed to mark chat task enqueued message_id=%s: %s", assistant_message_id, exc)
     else:
-        if queue_mode_enabled:
+        if chat_worker_mode_active and queue_mode_enabled:
             logger.error(
                 "chat queue enqueue unavailable while CHAT_TASKS_ENABLED=true message_id=%s session_id=%s user_id=%s",
                 assistant_message_id,
@@ -1800,7 +1654,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         else:
             background_tasks.add_task(
                 process_gemini_response,
-                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
+                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, worker_intent_metadata, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
             )
     
     return {
@@ -1810,12 +1664,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "message": "Analyzing your chart...",
         "chat_tier": effective_chat_tier,
         "chart_insights": chart_insights,
-        "d1_chart": d1_chart
     }
 
 
 @router.post("/internal/process")
-async def process_chat_task(request: dict, x_chat_task_secret: str | None = Header(None, alias="X-Chat-Task-Secret")):
+async def process_chat_task(request: dict, x_chat_task_secret: Optional[str] = Header(None, alias="X-Chat-Task-Secret")):
     """Internal Cloud Tasks worker endpoint for durable chat-v2 processing."""
     from chat_history.task_queue import chat_task_secret
 
@@ -1898,6 +1751,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         with get_conn() as conn:
             _ensure_chat_messages_gate_metadata(conn)
             _ensure_chat_messages_parallel_llm_usage(conn)
+            _ensure_chat_messages_chart_insights(conn)
             _ensure_chat_messages_engagement_updates(conn)
             _ensure_chat_messages_task_claim_cols(conn)
             if _wait_side_enabled():
@@ -1908,7 +1762,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 """
                     SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
                            cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
-                           cm.gate_metadata, cm.parallel_llm_usage, cm.engagement_updates,
+                           cm.gate_metadata, cm.parallel_llm_usage, cm.chart_insights, cm.engagement_updates,
                            cm.task_claimed_until, cm.task_enqueued_at
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
@@ -1923,7 +1777,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         if not result:
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, engagement_updates, task_claimed_until, task_enqueued_at = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, chart_insights_json, engagement_updates, task_claimed_until, task_enqueued_at = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -1968,6 +1822,13 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
         elif status == "processing":
+            if chart_insights_json:
+                try:
+                    response["chart_insights"] = json.loads(chart_insights_json)
+                except Exception:
+                    response["chart_insights"] = []
+            else:
+                response["chart_insights"] = []
             active_claim = _timestamp_is_future(task_claimed_until)
             stale_reference = task_enqueued_at or started_at
             stale_threshold_minutes = CHAT_QUEUED_STALE_MINUTES if task_enqueued_at else CHAT_PROCESSING_STALE_MINUTES
@@ -2562,33 +2423,43 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 conn.commit()
             return
         
+        session_lookup_start = time.time()
         # Get birth_chart_id from session
         with get_conn() as conn:
             cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
             session_data = cur.fetchone()
             birth_chart_id = session_data[0] if session_data else None
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="load_session_binding",
+            duration_ms=round((time.time() - session_lookup_start) * 1000, 1),
+            has_birth_chart_id=bool(birth_chart_id),
+        )
         
         # Get user facts for intent routing
-        user_facts = {}
+        all_user_facts = {}
         if birth_chart_id and not is_instant_chat:
             fact_extractor = FactExtractor()
             facts_start = time.time()
-            user_facts = await asyncio.to_thread(fact_extractor.get_facts, birth_chart_id)
+            all_user_facts = await asyncio.to_thread(fact_extractor.get_facts, birth_chart_id)
             _chat_log_event(
                 "chat_processing_phase",
                 message_id=message_id,
                 session_id=session_id,
                 phase="load_user_facts",
                 duration_ms=round((time.time() - facts_start) * 1000, 1),
-                fact_categories=len(user_facts or {}),
+                fact_categories=len(all_user_facts or {}),
             )
-            if user_facts:
-                logger.info("retrieved %s fact categories for intent routing message_id=%s", len(user_facts), message_id)
+            if all_user_facts:
+                logger.info("retrieved %s fact categories for intent routing message_id=%s", len(all_user_facts), message_id)
         
         # Use birth data from request (required)
         if not birth_details:
             raise Exception("Birth details are required for chat analysis")
         
+        birth_normalize_start = time.time()
         # Format birth data same as mobile app to ensure consistent calculations
         # Use BirthData validator to get proper timezone calculation from lat/lon
         from main import BirthData
@@ -2613,6 +2484,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             'place': birth_data_obj.place,
             'timezone': birth_data_obj.timezone  # This is auto-calculated from lat/lon
         }
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="normalize_birth_data",
+            duration_ms=round((time.time() - birth_normalize_start) * 1000, 1),
+            has_timezone=bool(birth_data.get("timezone")),
+        )
         
         # DEBUG: Log birth data being used in chat
         # Validate partnership mode data
@@ -2629,48 +2508,21 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Build context
         context_builder = ChatContextBuilder()
         
-        # Get conversation history for intent routing
-        with get_conn() as conn:
-            cur = execute(
-                conn,
-                """
-                    SELECT sender, content, message_type
-                    FROM chat_messages
-                    WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
-                      AND content != ''
-                    ORDER BY timestamp ASC
-                """,
-                (session_id,),
-            )
-            history_rows = cur.fetchall() or []
-            history = []
-            
-            # Pair up user questions with assistant responses
-            i = 0
-            while i < len(history_rows) - 1:
-                if history_rows[i][0] == 'user' and history_rows[i+1][0] == 'assistant':
-                    # Only include full answers, not clarifications
-                    if history_rows[i+1][2] == 'answer':
-                        history.append({
-                            "question": history_rows[i][1],
-                            "response": history_rows[i+1][1]
-                        })
-                    i += 2
-                else:
-                    i += 1
-            
-            # Keep only last 3 exchanges
-            history = history[-3:] if len(history) > 3 else history
-            
-            # Get conversation state
-            cur = execute(
-                conn,
-                "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
-                (session_id,),
-            )
-            state_row = cur.fetchone()
-            clarification_count = state_row[0] if state_row else 0
-            extracted_context = json.loads(state_row[1]) if state_row and state_row[1] else {}
+        history_state_start = time.time()
+        chat_state = _load_chat_history_and_state(session_id)
+        history = chat_state["history"]
+        clarification_count = chat_state["clarification_count"]
+        extracted_context = chat_state["extracted_context"]
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="load_history_state",
+            duration_ms=round((time.time() - history_state_start) * 1000, 1),
+            history_pairs=len(history or []),
+            clarification_count=int(clarification_count or 0),
+            has_extracted_context=bool(extracted_context),
+        )
         
         # === INTENT ROUTING ===
         routing_start = time.time()
@@ -2681,49 +2533,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         combined_question = question
 
         if not partnership_mode:
-            # Use AI to classify (Fast)
-            # Get conversation history
-            with get_conn() as conn:
-                cur = execute(
-                    conn,
-                    """
-                        SELECT sender, content, message_type
-                        FROM chat_messages
-                        WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
-                          AND content != ''
-                        ORDER BY timestamp ASC
-                    """,
-                    (session_id,),
-                )
-                history_rows = cur.fetchall() or []
-                history = []
-                
-                # Pair up user questions with assistant responses
-                i = 0
-                while i < len(history_rows) - 1:
-                    if history_rows[i][0] == 'user' and history_rows[i+1][0] == 'assistant':
-                        # Only include full answers, not clarifications
-                        if history_rows[i+1][2] == 'answer':
-                            history.append({
-                                "question": history_rows[i][1],
-                                "response": history_rows[i+1][1]
-                            })
-                        i += 2
-                    else:
-                        i += 1
-                
-                # Keep only last 3 exchanges
-                history = history[-3:] if len(history) > 3 else history
-                
-                # Get conversation state
-                cur = execute(
-                    conn,
-                    "SELECT clarification_count FROM conversation_state WHERE session_id = %s",
-                    (session_id,),
-                )
-                state_row = cur.fetchone()
-                clarification_count = state_row[0] if state_row else 0
-            
             intent_router = IntentRouter()
             cached_delivery_channel = (
                 str(cached_intent.get("delivery_channel") or "").strip().lower()
@@ -2797,7 +2606,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent = await intent_router.classify_intent(
                     combined_question,
                     history,
-                    user_facts,
+                    all_user_facts,
                     language=language,
                     force_ready=force_ready,
                     query_context=query_context,
@@ -2827,6 +2636,28 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 for channel_key in ("delivery_channel", "render_target", "plain_text_output"):
                     if cached_intent.get(channel_key) is not None:
                         intent[channel_key] = cached_intent.get(channel_key)
+
+            raw_chart_insights = intent.get("chart_insights")
+            if isinstance(raw_chart_insights, list):
+                persisted_chart_insights = [
+                    item
+                    for item in raw_chart_insights
+                    if isinstance(item, dict) and item.get("house_number") and item.get("message")
+                ]
+            else:
+                persisted_chart_insights = []
+            if persisted_chart_insights:
+                try:
+                    with get_conn() as conn:
+                        _ensure_chat_messages_chart_insights(conn)
+                        execute(
+                            conn,
+                            "UPDATE chat_messages SET chart_insights = %s WHERE message_id = %s",
+                            (json.dumps(persisted_chart_insights, ensure_ascii=False), message_id),
+                        )
+                        conn.commit()
+                except Exception:
+                    logger.exception("failed to persist chart insights message_id=%s", message_id)
 
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
             if intent.get('mode') == 'LIFESPAN_EVENT_TIMING' and intent.get('status') == 'READY':
@@ -3051,69 +2882,54 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         )
         
         # Get conversation history
-        with get_conn() as conn:
-            cur = execute(
-                conn,
-                """
-                    SELECT sender, content
-                    FROM chat_messages
-                    WHERE session_id = %s AND status = 'completed' AND content IS NOT NULL
-                      AND (sender = 'user' OR message_type = 'answer')
-                    ORDER BY timestamp DESC
-                    LIMIT 6
-                """,
-                (session_id,),
-            )
-            history_rows = cur.fetchall() or []
-            history = []
-            for i in range(0, len(history_rows), 2):
-                if i + 1 < len(history_rows):
-                    history.append({
-                        "question": history_rows[i+1][1],
-                        "response": history_rows[i][1]
-                    })
-            
-            # Get user facts if birth_chart_id exists
-            user_facts = {}
-            if birth_chart_id:
-                fact_extractor = FactExtractor()
-                all_facts = fact_extractor.get_facts(birth_chart_id)
-                
-                # Filter facts based on intent category for relevance
-                intent_category = intent.get('category', 'general')
-                relevant_categories = {
-                    'career': ['career', 'education', 'major_events'],
-                    'job': ['career', 'education', 'major_events'],
-                    'promotion': ['career', 'major_events'],
-                    'business': ['career', 'wealth', 'major_events'],
-                    'wealth': ['career', 'wealth', 'major_events'],
-                    'money': ['career', 'wealth', 'major_events'],
-                    'finance': ['career', 'wealth', 'major_events'],
-                    'love': ['family', 'relationships', 'major_events'],
-                    'relationship': ['family', 'relationships', 'major_events'],
-                    'marriage': ['family', 'relationships', 'major_events', 'marriage'],
-                    'partner': ['family', 'relationships', 'major_events'],
-                    'spouse': ['family', 'relationships', 'major_events'],
-                    'health': ['health', 'temporary_events', 'major_events'],
-                    'disease': ['health', 'temporary_events', 'major_events'],
-                    'child': ['family', 'major_events'],
-                    'children': ['family', 'major_events'],
-                    'pregnancy': ['family', 'health', 'major_events'],
-                    'son': ['family', 'major_events'],
-                    'daughter': ['family', 'major_events'],
-                    'mother': ['family', 'major_events'],
-                    'father': ['family', 'major_events'],
-                    'siblings': ['family', 'major_events'],
-                    'education': ['education', 'career', 'major_events'],
-                    'property': ['wealth', 'major_events'],
-                    'home': ['family', 'major_events'],
-                    'travel': ['location', 'temporary_events', 'major_events'],
-                    'visa': ['location', 'temporary_events', 'major_events'],
-                    'foreign': ['location', 'temporary_events', 'major_events']
-                }
-                
-                allowed_cats = relevant_categories.get(intent_category, ['career', 'family', 'health', 'location', 'preferences', 'education', 'relationships', 'major_events', 'temporary_events'])
-                user_facts = {cat: items for cat, items in all_facts.items() if cat in allowed_cats}
+        history = chat_state["history"]
+
+        facts_filter_start = time.time()
+        # Get user facts if birth_chart_id exists
+        user_facts = {}
+        if birth_chart_id:
+            intent_category = intent.get('category', 'general')
+            relevant_categories = {
+                'career': ['career', 'education', 'major_events'],
+                'job': ['career', 'education', 'major_events'],
+                'promotion': ['career', 'major_events'],
+                'business': ['career', 'wealth', 'major_events'],
+                'wealth': ['career', 'wealth', 'major_events'],
+                'money': ['career', 'wealth', 'major_events'],
+                'finance': ['career', 'wealth', 'major_events'],
+                'love': ['family', 'relationships', 'major_events'],
+                'relationship': ['family', 'relationships', 'major_events'],
+                'marriage': ['family', 'relationships', 'major_events', 'marriage'],
+                'partner': ['family', 'relationships', 'major_events'],
+                'spouse': ['family', 'relationships', 'major_events'],
+                'health': ['health', 'temporary_events', 'major_events'],
+                'disease': ['health', 'temporary_events', 'major_events'],
+                'child': ['family', 'major_events'],
+                'children': ['family', 'major_events'],
+                'pregnancy': ['family', 'health', 'major_events'],
+                'son': ['family', 'major_events'],
+                'daughter': ['family', 'major_events'],
+                'mother': ['family', 'major_events'],
+                'father': ['family', 'major_events'],
+                'siblings': ['family', 'major_events'],
+                'education': ['education', 'career', 'major_events'],
+                'property': ['wealth', 'major_events'],
+                'home': ['family', 'major_events'],
+                'travel': ['location', 'temporary_events', 'major_events'],
+                'visa': ['location', 'temporary_events', 'major_events'],
+                'foreign': ['location', 'temporary_events', 'major_events']
+            }
+            allowed_cats = relevant_categories.get(intent_category, ['career', 'family', 'health', 'location', 'preferences', 'education', 'relationships', 'major_events', 'temporary_events'])
+            user_facts = {cat: items for cat, items in (all_user_facts or {}).items() if cat in allowed_cats}
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="filter_user_facts",
+            duration_ms=round((time.time() - facts_filter_start) * 1000, 1),
+            fact_categories=len(user_facts or {}),
+            source_fact_categories=len(all_user_facts or {}),
+        )
                 
         # Inject user facts into context
         if user_facts and not is_instant_chat:
@@ -3133,6 +2949,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             context['intent']['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
             question = question.replace('@All_Events', '').strip()
 
+        pre_llm_prep_start = time.time()
         # Fire-and-forget wait-time engagement snippets. This must never delay or affect final answers.
         try:
             from chat.engagement_agent import (
@@ -3193,6 +3010,15 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 )
         except Exception as wait_side_start_err:
             logger.info("wait side conversation task not started for message_id=%s: %s", message_id, str(wait_side_start_err)[:200])
+        _chat_log_event(
+            "chat_processing_phase",
+            message_id=message_id,
+            session_id=session_id,
+            phase="pre_llm_async_setup",
+            duration_ms=round((time.time() - pre_llm_prep_start) * 1000, 1),
+            is_all_events=bool(is_all_events_question),
+            has_user_facts=bool(user_facts),
+        )
         
         # Generate response
         try:

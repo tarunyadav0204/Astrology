@@ -14,6 +14,10 @@ def chat_tasks_enabled() -> bool:
     return (os.getenv("CHAT_TASKS_ENABLED") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def local_chat_tasks_enabled() -> bool:
+    return (os.getenv("CHAT_TASKS_LOCAL_MODE") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _project_id() -> str:
     return (
         os.getenv("CHAT_TASKS_PROJECT")
@@ -52,6 +56,15 @@ def enqueue_chat_processing_task(*, message_id: int, payload: Dict[str, Any]) ->
     """
     if not chat_tasks_enabled():
         return False
+
+    if local_chat_tasks_enabled():
+        try:
+            from chat_history.local_task_queue import enqueue_local_chat_task
+
+            return enqueue_local_chat_task(message_id=message_id, payload=payload)
+        except Exception as exc:
+            logger.exception("failed to enqueue local dev chat task message_id=%s: %s", message_id, exc)
+            return False
 
     project = _project_id()
     location = _location()

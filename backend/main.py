@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import secrets
 import uuid
@@ -115,6 +117,8 @@ from numerology_routes import router as numerology_router
 from transits.routes import router as transits_router
 from Dashas.routes.chara_dasha_routes import router as chara_dasha_router
 from charts.routes import router as charts_router
+from charts.chart_cache import ensure_chart_response_cache_table
+from chat_history.local_task_queue import ensure_local_chat_task_queue_table
 from birth_charts.routes import router as birth_charts_router
 from karma_analysis.routes import router as karma_router
 from astrovastu.routes import router as astrovastu_router
@@ -167,6 +171,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 STARTUP_DB_LOCK_KEY = 4653078001
+
+
+def ensure_chart_response_cache_schema() -> None:
+    with get_conn() as conn:
+        ensure_chart_response_cache_table(conn)
+        conn.commit()
+
+
+def ensure_local_chat_task_queue_schema() -> None:
+    with get_conn() as conn:
+        ensure_local_chat_task_queue_table(conn)
+        conn.commit()
 
 
 def _instance_identity() -> str:
@@ -613,6 +629,16 @@ async def lifespan(app: FastAPI):
                 "daily prediction engine initialized",
             )
             _startup_step("init_chat_tables", init_chat_tables, "chat history database initialized")
+            _startup_step(
+                "ensure_chart_response_cache_schema",
+                ensure_chart_response_cache_schema,
+                "chart response cache schema ready",
+            )
+            _startup_step(
+                "ensure_local_chat_task_queue_schema",
+                ensure_local_chat_task_queue_schema,
+                "local chat task queue schema ready",
+            )
             _startup_step(
                 "ensure_subscription_tier_schema",
                 lambda: __import__("subscription_tier_migration", fromlist=["ensure_subscription_tier_schema"]).ensure_subscription_tier_schema(),

@@ -3439,6 +3439,7 @@ export default function ChatScreen({ navigation, route }) {
         if (status.status === 'processing') {
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
           updateEffectiveStartedAt(status.started_at);
+          const polledChartInsights = Array.isArray(status.chart_insights) ? status.chart_insights : [];
           setMessagesWithStorage(prev => prev.map(msg =>
             msg.messageId === messageId || msg.id === processingMessageId
               ? {
@@ -3448,6 +3449,7 @@ export default function ChatScreen({ navigation, route }) {
                     msg.processingStartedAt || msg.timestamp,
                     status.started_at
                   ),
+                  chartInsights: polledChartInsights.length > 0 ? polledChartInsights : (Array.isArray(msg.chartInsights) ? msg.chartInsights : []),
                 }
               : msg
           ));
