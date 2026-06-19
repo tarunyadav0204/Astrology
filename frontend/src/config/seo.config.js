@@ -50,39 +50,39 @@ export const SEO_CONFIG = {
   
   pages: {
     home: {
-      title: "AstroRoshni - Best Vedic Astrology & Horoscope Predictions Online",
-      description: "Get accurate Vedic astrology predictions, free Kundli, horoscope matching, daily horoscopes & expert astrologer consultations. Trusted by 50,000+ users worldwide.",
-      keywords: "vedic astrology, horoscope, kundli, birth chart, astrology predictions, marriage matching, daily horoscope, astrologer consultation, panchang, muhurat"
+      title: "AI Powered Vedic Astrology & Daily Horoscope Prediction | AstroRoshni",
+      description: "Get personalized Vedic astrology insights with AI-powered horoscope analysis, daily predictions, and accurate astrology guidance tailored to your birth details.",
+      keywords: "daily horoscope prediction, personalized vedic astrology, AI powered horoscope, personalized astrology guidance, vedic horoscope analysis, AI astrology assistant, AI powered astrology, AI based vedic astrology"
     },
     
     marriageAnalysis: {
-      title: "Marriage Analysis by Date of Birth | D9 Navamsa & Marriage Timing | AstroRoshni",
-      description: "Get Vedic marriage analysis by date of birth with 7th house, D9 Navamsa, Darakaraka, Upapada Lagna, spouse nature, marriage timing, harmony, and delay guidance.",
-      keywords: "marriage analysis by date of birth, marriage astrology, marriage prediction by date of birth, D9 Navamsa marriage, 7th house marriage astrology, Darakaraka spouse prediction, Upapada Lagna marriage, spouse prediction astrology, marriage timing astrology, relationship astrology, vedic marriage analysis"
+      title: "AI Powered Marriage Astrology | Marriage Prediction by date of birth",
+      description: "Get AI-powered marriage astrology insights and marriage prediction by date of birth with personalized horoscope analysis and Vedic guidance.",
+      keywords: "AI marriage prediction, AI powered marriage astrology, marriage horoscope analysis, marriage prediction by date of birth, marriage prediction astrology"
     },
     
     careerGuidance: {
-      title: "Career Analysis by Date of Birth | D10 Dashamsha & Job Predictions | AstroRoshni", 
-      description: "Get Vedic career analysis by date of birth with D10 Dashamsha, 10th house, Amatyakaraka, suitable profession, job vs business guidance, and career timing.",
-      keywords: "career analysis by date of birth, career astrology, job prediction by date of birth, D10 chart career analysis, Dashamsha career chart, suitable profession astrology, business astrology, Amatyakaraka career, 10th house career astrology, career timing astrology, vedic career guidance"
+      title: "AI Career Astrology & Career Prediction by Date of Birth | AstroRoshni",
+      description: "Explore AI-powered career guidance astrology with personalized birth chart analysis to understand your career path, growth opportunities, and professional potential.",
+      keywords: "AI career astrology, career guidance astrology, career prediction by date of birth"
     },
     
     healthAnalysis: {
-      title: "Health Analysis by Date of Birth | D30 Trimsamsa & Wellness Astrology | AstroRoshni",
-      description: "Get Vedic health analysis by date of birth with Lagna vitality, 6th/8th/12th houses, D30 Trimsamsa, stress and sleep patterns, health timing, and preventive wellness guidance.",
-      keywords: "health analysis by date of birth, health astrology, medical astrology, wellness astrology, D30 Trimsamsa health, Vedic health analysis, health prediction by date of birth, Lagna vitality, 6th house health astrology, stress sleep astrology, preventive wellness astrology"
+      title: "AI Powered Health Astrology | Health Prediction by Date of Birth",
+      description: "Get AI-powered health astrology insights and health horoscope predictions based on your date of birth with personalized Vedic astrology analysis.",
+      keywords: "AI powered health astrology, health astrology by date of birth, health horoscope prediction, health prediction by date of birth"
     },
     
     wealthAnalysis: {
-      title: "Wealth Analysis by Date of Birth | Dhana Yoga, Income & Money Timing | AstroRoshni",
-      description: "Get Vedic wealth analysis by date of birth with 2nd and 11th house wealth, Dhana yogas, income source, savings pattern, assets, risk, career-to-money links, and wealth timing.",
-      keywords: "wealth analysis by date of birth, wealth astrology, money prediction by date of birth, Dhana yoga analysis, income source astrology, 2nd house wealth, 11th house gains, savings astrology, asset building astrology, wealth timing astrology, finance astrology, vedic wealth analysis"
+      title: "AI Powered Wealth Astrology & Wealth Analysis by Kundli | AstroRoshni",
+      description: "Explore AI wealth analysis with detailed Kundli insights to understand your wealth potential, financial opportunities, and prosperity patterns.",
+      keywords: "wealth astrology, AI powered wealth astrology, wealth analysis by kundli, AI wealth analysis"
     },
 
     educationAnalysis: {
-      title: "Education Analysis by Date of Birth | D24 Chart, Subject Fit & Exam Timing | AstroRoshni",
-      description: "Get Vedic education analysis by date of birth with 4th, 5th and 9th houses, D24 education chart, learning style, subject fit, higher studies, exam timing, and study guidance.",
-      keywords: "education analysis by date of birth, education astrology, D24 education chart, Siddhamsa chart, subject selection astrology, exam timing astrology, study guidance astrology, higher education astrology, academic success astrology, learning style astrology, vedic education analysis"
+      title: "AI Powered Education Astrology & Education Prediction by Date of Birth",
+      description: "Get AI-powered education astrology insights and education predictions by date of birth. Discover your learning strengths, academic path, and Vedic guidance.",
+      keywords: "education astrology, AI powered education astrology, AI education prediction, education astrology by date of birth, Vedic education astrology"
     },
 
     lifeEvents: {
@@ -98,9 +98,9 @@ export const SEO_CONFIG = {
     },
     
     muhuratFinder: {
-      title: "Muhurat Finder | Marriage, Property, Vehicle & Griha Pravesh Timings | AstroRoshni", 
-      description: "Find auspicious muhurat timings by date and location for marriage, property purchase, vehicle purchase, and griha pravesh using Vedic Panchang calculations.",
-      keywords: "muhurat finder, auspicious muhurat, marriage muhurat, vivah muhurat, property purchase muhurat, vehicle purchase muhurat, griha pravesh muhurat, today muhurat, vedic panchang muhurat, auspicious timings"
+      title: "Shubh Muhurat Finder for Important Events | AstroRoshni", 
+      description: "Find the right Shubh Muhurat for marriage, griha pravesh, vehicle, travel, property, and special occasions with personalized Vedic astrology guidance and auspicious timings.",
+      keywords: "shubh muhurat finder"
     },
     
     dailyHoroscope: {
@@ -110,9 +110,9 @@ export const SEO_CONFIG = {
     },
 
     kundliMatching: {
-      title: "Kundli Matching (Ashtakoot Guna Milan) — Free Horoscope Match | AstroRoshni",
-      description: "Traditional 36-point Ashtakoot compatibility (Guna Milan) for marriage. Compare two birth charts with detailed Vedic matching scores.",
-      keywords: "kundli matching, ashtakoot, guna milan, horoscope matching, marriage compatibility, vedic matching"
+      title: "Smart Kundli Matching for Marriage | Kundli Matching by Name",
+      description: "Get smart Kundli matching for marriage with AI-powered analysis, Guna Milan insights, and personalized compatibility reports based on birth details.",
+      keywords: "kundli matching for marriage, marriage kundli analysis, smart kundli matching, kundli matching by name"
     },
 
     monthlyPanchang: {
@@ -236,9 +236,9 @@ export const SEO_CONFIG = {
     },
 
     progenyAnalysis: {
-      title: "Progeny Analysis by Date of Birth | D7 Saptamsa & Children Timing | AstroRoshni",
-      description: "Vedic progeny analysis using D1 5th house, D7 Saptamsa, Jupiter, fertility sphuta, timing windows, remedies, and parenting guidance. Spiritual guidance only, not medical advice.",
-      keywords: "progeny analysis by date of birth, children prediction astrology, D7 Saptamsa, Saptamsa chart, fertility astrology, child birth timing astrology, family expansion astrology, 5th house children, Jupiter progeny astrology, parenting astrology, vedic progeny analysis"
+      title: "AI Powered Progeny Astrology & Children Prediction Analysis | AstroRoshni",
+      description: "Get AI-powered progeny astrology insights and children prediction analysis based on Vedic astrology, birth details, and personalized horoscope guidance.",
+      keywords: "progeny astrology, AI powered progeny astrology, AI progeny analysis, children prediction astrology"
     }
   },
   
