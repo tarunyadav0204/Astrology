@@ -22,20 +22,8 @@
   <meta name="apple-mobile-web-app-title" content="AstroClick" />
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="manifest" href="/manifest.json" />
-  <!-- Default SEO for crawlers before React hydrates; canonical + OG per route come from react-helmet-async -->
-  <title>AstroRoshni — Vedic Astrology, Kundli, Panchang & Horoscope</title>
-  <meta name="description" content="Accurate Vedic astrology: free Kundli, daily Panchang, Kundli matching, horoscopes, muhurat finder, and expert guidance. Trusted by thousands across India." />
-  <meta name="robots" content="index, follow" />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://astroroshni.com/" />
-  <meta property="og:title" content="AstroRoshni — Vedic Astrology, Kundli & Panchang" />
-  <meta property="og:description" content="Free Kundli, Panchang, horoscope matching, and Vedic predictions — authentic Jyotish online." />
-  <meta property="og:image" content="https://astroroshni.com/images/astroroshni-og-image.jpg" />
-  <meta property="og:site_name" content="AstroRoshni" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="AstroRoshni — Vedic Astrology Online" />
-  <meta name="twitter:description" content="Kundli, Panchang, matching, and daily horoscopes with traditional Vedic methods." />
-  <meta name="twitter:image" content="https://astroroshni.com/images/astroroshni-twitter-image.jpg" />
+  <!-- Route-level SEO is managed by react-helmet-async and prerender output. Keep the shell head minimal to avoid stale duplicate tags. -->
+  <title>AstroRoshni</title>
   <!-- Google tag (gtag.js): load after first paint / idle to reduce main-thread contention with React -->
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -57,17 +45,6 @@
     }
   </script>
   
-  <script>
-    // Set dynamic title based on domain
-    const hostname = window.location.hostname;
-    if (hostname.includes('astrovishnu')) {
-      document.title = 'AstroVishnu - Vedic Astrology';
-    } else if (hostname.includes('astroroshni')) {
-      document.title = 'AstroRoshni - Vedic Astrology';
-    } else if (hostname.includes('astroclick')) {
-      document.title = 'AstroClick - Vedic Astrology';
-    }
-  </script>
 </head>
 <body>
   <div id="root"></div>
