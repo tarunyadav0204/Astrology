@@ -1645,7 +1645,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <button
                 type="button"
                 className="astro-tools-hub-card astro-tools-hub-card--ashtakavarga"
-                onClick={() => navigate('/tools/ashtakavarga')}
+                onClick={() => navigate('/ashtakavarga')}
               >
                 <span className="astro-tools-hub-card__icon" aria-hidden>
                   ⊞

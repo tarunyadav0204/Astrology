@@ -148,6 +148,7 @@ const Calendar2026 = lazy(() => import('./components/Calendar2026/Calendar2026')
 const AstroVastuTool = lazy(() => import('./components/AstroVastu/AstroVastuTool'));
 const KundliMatchingPage = lazy(() => import('./components/MarriageAnalysis/KundliMatchingPage'));
 const EventsTimelinePage = lazy(() => import('./components/Events/EventsTimelinePage'));
+const AshtakavargaSeoPage = lazy(() => import('./components/Ashtakavarga/AshtakavargaSeoPage'));
 const AshtakavargaToolPage = lazy(() => import('./components/Ashtakavarga/AshtakavargaToolPage'));
 const BlogList = lazy(() => import('./components/Blog/BlogList'));
 const BlogPost = lazy(() => import('./components/Blog/BlogPost'));
@@ -953,6 +954,21 @@ function App() {
                 onLogout={user ? handleLogout : undefined}
                 onAdminClick={user ? handleAdminClick : undefined}
                 onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              />
+            }
+          />
+          <Route
+            path="/ashtakavarga"
+            element={
+              <AshtakavargaSeoPage
+                user={user}
+                onLogout={user ? handleLogout : () => {}}
+                onAdminClick={user ? handleAdminClick : () => {}}
+                onLogin={() => setShowLoginModal(true)}
+                onOpenRegister={() => {
+                  setAuthView('register');
+                  setShowLoginModal(true);
+                }}
               />
             }
           />

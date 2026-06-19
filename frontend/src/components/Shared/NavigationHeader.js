@@ -76,7 +76,7 @@ function FullHamburgerMenuItems({
     >
       ✨ Astrology
     </button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/tools/ashtakavarga'); onClose(); }}>⊞ Ashtakavarga</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/ashtakavarga'); onClose(); }}>⊞ Ashtakavarga</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } }); onClose(); }}>💕 Kundli matching</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/#numerology'); onClose(); }}>🔢 Numerology</button>
 
@@ -232,7 +232,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               ) : (
                 <a href="/#astrology" className="compact-menu__item compact-menu__item--optional">Astrology</a>
               )}
-              <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => navigate('/tools/ashtakavarga')}>Ashtakavarga</button>
+              <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => navigate('/ashtakavarga')}>Ashtakavarga</button>
               <button type="button" className="compact-menu__item compact-menu__item--optional compact-menu__item--low" onClick={() => navigate('/#numerology')}>Numerology</button>
               <button className="compact-menu__item compact-menu__item--optional compact-menu__item--low" onClick={() => navigate('/blog')}>Blogs</button>
             </nav>
@@ -476,7 +476,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 <a href="/#astrology">Astrology</a>
               )}
             </li>
-            <li><button type="button" onClick={() => navigate('/tools/ashtakavarga')}>Ashtakavarga</button></li>
+            <li><button type="button" onClick={() => navigate('/ashtakavarga')}>Ashtakavarga</button></li>
             <li><button type="button" onClick={() => navigate('/#numerology')}>Numerology</button></li>
             <li><button onClick={() => navigate('/blog')}>Blogs</button></li>
             <li><button onClick={() => navigate('/contact')}>Contact us</button></li>

@@ -230,9 +230,9 @@ export const SEO_CONFIG = {
     },
 
     ashtakavarga: {
-      title: "Ashtakavarga Calculator — Vedic Strength Points | AstroRoshni",
-      description: "Calculate Ashtakavarga bindus for planets and houses to assess chart strength in Vedic astrology.",
-      keywords: "ashtakavarga, bindu, vedic chart strength, shadbala"
+      title: "Ashtakavarga Calculator | Sarvashtakavarga & Bhinna Ashtakavarga Analysis | AstroRoshni",
+      description: "Use AstroRoshni's Ashtakavarga Calculator to study Sarvashtakavarga totals, Bhinna Ashtakavarga bindus, house strength, and transit support from your Vedic birth chart.",
+      keywords: "Ashtakavarga Calculator, Sarvashtakavarga, Bhinna Ashtakavarga, Ashtakavarga bindus, house strength astrology, Vedic chart strength, transit support astrology, bindu analysis, Ashtakavarga in Vedic astrology, Sarvashtakavarga calculator"
     },
 
     astroVastu: {
