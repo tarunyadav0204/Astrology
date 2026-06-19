@@ -960,16 +960,77 @@ function App() {
           <Route
             path="/ashtakavarga"
             element={
-              <AshtakavargaSeoPage
-                user={user}
-                onLogout={user ? handleLogout : () => {}}
-                onAdminClick={user ? handleAdminClick : () => {}}
-                onLogin={() => setShowLoginModal(true)}
-                onOpenRegister={() => {
-                  setAuthView('register');
-                  setShowLoginModal(true);
-                }}
-              />
+              <>
+                <AshtakavargaSeoPage
+                  user={user}
+                  onLogout={user ? handleLogout : () => {}}
+                  onAdminClick={user ? handleAdminClick : () => {}}
+                  onLogin={() => setShowLoginModal(true)}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
+                  <div style={{ maxWidth: 420, margin: '0 auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+                      <div style={{
+                        display: 'flex',
+                        background: '#f8f9fa',
+                        borderRadius: 25,
+                        padding: 4,
+                        width: 'fit-content'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setAuthView('login')}
+                          style={{
+                            padding: '10px 20px',
+                            border: 'none',
+                            background: authView === 'login' ? '#e91e63' : 'transparent',
+                            color: authView === 'login' ? 'white' : '#e91e63',
+                            borderRadius: '25px 0 0 25px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Login
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAuthView('register')}
+                          style={{
+                            padding: '10px 20px',
+                            border: 'none',
+                            background: authView === 'register' ? '#e91e63' : 'transparent',
+                            color: authView === 'register' ? 'white' : '#e91e63',
+                            borderRadius: '0 25px 25px 0',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Sign Up
+                        </button>
+                      </div>
+                    </div>
+                    {authView === 'login' ? (
+                      <LoginForm
+                        onLogin={(userData) => {
+                          handleLogin(userData);
+                          setShowLoginModal(false);
+                        }}
+                        onSwitchToRegister={() => setAuthView('register')}
+                      />
+                    ) : (
+                      <RegisterForm
+                        onRegister={(userData) => {
+                          handleLogin(userData);
+                          setShowLoginModal(false);
+                        }}
+                        onSwitchToLogin={() => setAuthView('login')}
+                      />
+                    )}
+                  </div>
+                </AuthModalShell>
+              </>
             }
           />
           <Route

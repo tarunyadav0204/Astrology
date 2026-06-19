@@ -113,14 +113,14 @@ function AshtakavargaProgressState({ title, description, hint, compact = false, 
   );
 }
 
-const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate, variant = 'modal', onLogin }) => {
+const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate, variant = 'modal', onLogin, initialActiveTab = 'sarva' }) => {
   const { credits, fetchBalance } = useCredits();
   const [ashtakavargaData, setAshtakavargaData] = useState(null);
   const [transitData, setTransitData] = useState(null);
   const [ashtakLoading, setAshtakLoading] = useState(false);
   const [transitLoading, setTransitLoading] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('sarva');
+  const [activeTab, setActiveTab] = useState(initialActiveTab);
   const [viewMode, setViewMode] = useState('birth'); // 'birth', 'transit', 'comparison'
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [eventPredictions, setEventPredictions] = useState(null);
@@ -190,6 +190,11 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       setLifePredictionsCreditModalMode(null);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab(initialActiveTab || 'sarva');
+  }, [initialActiveTab, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;

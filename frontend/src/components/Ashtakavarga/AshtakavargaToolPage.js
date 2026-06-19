@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAstrology } from '../../context/AstrologyContext';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
@@ -11,11 +11,13 @@ import './AshtakavargaModal.css';
  * Full-page Ashtakavarga (same UI as chart modal) for mobile web parity and future “tools hub” routes.
  */
 function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
+  const location = useLocation();
   const navigate = useNavigate();
   const { birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const transitDate = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const initialActiveTab = location.state?.initialActiveTab || 'sarva';
 
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -49,6 +51,7 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
           chartType="lagna"
           transitDate={transitDate}
           onLogin={onLogin}
+          initialActiveTab={initialActiveTab}
         />
       ) : (
         <div className="ashtakavarga-tool-empty">

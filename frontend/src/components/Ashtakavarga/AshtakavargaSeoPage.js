@@ -40,6 +40,61 @@ const FAQ_ITEMS = [
     answer:
       'You can open your saved chart, view Sarvashtakavarga and planetary BAV strength, compare natal support with transit timing, and use the same chart context across the rest of AstroRoshni.',
   },
+  {
+    question: 'What are bindus in Ashtakavarga?',
+    answer:
+      'Bindus are the point-values given by planets to different signs in the Ashtakavarga system. More bindus generally indicate greater support, smoother outcomes, or better capacity for a sign or house to deliver results, while lower bindus can indicate weaker support or more effort.',
+  },
+  {
+    question: 'How should Sarvashtakavarga totals be interpreted?',
+    answer:
+      'Sarvashtakavarga totals are usually read comparatively, not in isolation. A house or sign with higher total bindus tends to show stronger support in that area of life, while lower totals suggest weaker backing. The real interpretation comes from comparing stronger and weaker houses across the chart and then checking dashas and transits.',
+  },
+  {
+    question: 'Why do astrologers compare Ashtakavarga with houses from the Ascendant?',
+    answer:
+      'Because the same zodiac sign also represents a house from the Lagna. When a sign has low or high bindus, that strength gets experienced through the life area ruled by the corresponding house from the Ascendant. This is one reason Ashtakavarga is useful for practical life interpretation.',
+  },
+  {
+    question: 'How does Bhinna Ashtakavarga differ in use from Sarvashtakavarga?',
+    answer:
+      'Bhinna Ashtakavarga is used when you want to know which specific planet is contributing strength to a sign or house. Sarvashtakavarga gives the cumulative picture. Astrologically, BAV helps with graha-specific judgment, while SAV helps with overall area-of-life strength.',
+  },
+  {
+    question: 'Is Ashtakavarga useful for transit analysis?',
+    answer:
+      'Yes. This is one of its strongest uses. When planets transit signs with higher or lower bindu support, astrologers can judge whether the transit is likely to give smoother or more strained outcomes. It does not replace standard transit reading, but it makes transit timing more nuanced.',
+  },
+  {
+    question: 'Can Ashtakavarga help in predicting career, marriage, or finance?',
+    answer:
+      'Yes, but indirectly and structurally. It helps assess the strength of the relevant houses and signs connected to career, marriage, wealth, gains, or family. It becomes most useful when combined with house lords, yogas, divisional charts, and dasha timing rather than being read alone.',
+  },
+  {
+    question: 'What is considered a strong or weak Ashtakavarga score?',
+    answer:
+      'There is no single magical cutoff that works in every chart, because interpretation is relative. In practice, astrologers look for houses that stand out as stronger or weaker compared with the rest of the chart. The distribution pattern matters more than one isolated number.',
+  },
+  {
+    question: 'Does Ashtakavarga replace Shadbala or other strength systems?',
+    answer:
+      'No. Ashtakavarga and Shadbala measure different things. Shadbala looks at planetary strength through multiple classical factors, while Ashtakavarga measures supportive point distribution across signs and houses. Together they can complement each other rather than compete.',
+  },
+  {
+    question: 'Why can a strong-looking house still give mixed results?',
+    answer:
+      'Because Ashtakavarga is only one layer. A house may have good bindu support but still be affected by difficult house lords, afflictions, weak divisional support, or an unfavorable dasha. Conversely, a weaker Ashtakavarga area may still activate meaningfully during a strong dasha or yoga period.',
+  },
+  {
+    question: 'How is Ashtakavarga used with dashas?',
+    answer:
+      'Dashas show when karma matures, while Ashtakavarga helps judge how strongly certain signs or houses are supported when those periods unfold. Used together, they can refine prediction by showing both timing and the structural strength behind the results.',
+  },
+  {
+    question: 'Can Ashtakavarga be read for remedies?',
+    answer:
+      'It can guide attention toward weaker areas of support, but remedies should not be prescribed from Ashtakavarga alone. A serious remedy decision should also consider the natal chart, house lords, divisional charts, dasha, and the condition of the relevant planets.',
+  },
 ];
 
 const FEATURE_CARDS = [
@@ -58,6 +113,15 @@ const USE_CASES = [
   'Use bindu logic alongside dasha and divisional chart reading',
   'Keep one saved chart for repeated timing and strength checks',
   'Move from SEO explainer page into the live calculator without changing tools',
+];
+
+const LIFE_PREDICTION_ITEMS = [
+  'A detailed multi-section life reading, not just a bindu table',
+  'Domain-wise interpretation for personality, wealth, home, career, marriage, gains, and more',
+  'Transit-linked prediction context layered onto Ashtakavarga strength',
+  'Saved reading workflow so users can reopen the prediction later',
+  'A stronger narrative report for people who want meaning, not only numbers',
+  'Useful bridge between raw Ashtakavarga analysis and practical life guidance',
 ];
 
 const AshtakavargaSeoPage = ({
@@ -114,6 +178,18 @@ const AshtakavargaSeoPage = ({
       return;
     }
     navigate('/tools/ashtakavarga');
+  };
+
+  const openPredictionsReport = () => {
+    if (!user) {
+      onLogin?.();
+      return;
+    }
+    if (!birthData) {
+      setShowBirthModal(true);
+      return;
+    }
+    navigate('/tools/ashtakavarga', { state: { initialActiveTab: 'analysis' } });
   };
 
   return (
@@ -292,6 +368,28 @@ const AshtakavargaSeoPage = ({
             </div>
             <ul>
               {USE_CASES.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="ashtakavarga-report-highlight" aria-label="Ashtakavarga life predictions report">
+            <div className="ashtakavarga-report-highlight__intro">
+              <p className="career-detail-eyebrow">Detailed report</p>
+              <h2>There is also a full Ashtakavarga life predictions report inside the tool</h2>
+              <p>
+                The Ashtakavarga page is not limited to colored bindu boxes. Inside the tool there is a much deeper
+                life predictions section that turns the strength analysis into an actual written reading across major
+                areas of life.
+              </p>
+              <div className="analysis-detail-empty__actions">
+                <button type="button" className="analysis-detail-empty__cta" onClick={openPredictionsReport}>
+                  {user ? (birthData ? 'Open Ashtakavarga report' : 'Add birth details first') : 'Sign in to view report'}
+                </button>
+              </div>
+            </div>
+            <ul className="ashtakavarga-report-highlight__list">
+              {LIFE_PREDICTION_ITEMS.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
