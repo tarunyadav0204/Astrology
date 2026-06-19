@@ -5,7 +5,13 @@ import { apiService } from '../../services/apiService';
 import HouseContextMenu from './HouseContextMenu';
 import HouseAnalysisModal from './HouseAnalysisModal';
 
-const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, chartRefHighlight = null }) => {
+const SouthIndianChart = ({
+  chartData,
+  birthData,
+  showDegreeNakshatra = true,
+  chartRefHighlight = null,
+  showFooterHint = true,
+}) => {
   const { signs, planets } = CHART_CONFIG;
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
@@ -493,9 +499,11 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
       <line x1="255" y1="0" x2="255" y2="340" stroke="#ff6f00" strokeWidth="3"/>
 
       {/* Instruction text */}
-      <text x="170" y="350" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
-        Hover or touch planets to see Nakshatra and degree
-      </text>
+      {showFooterHint ? (
+        <text x="170" y="350" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
+          Hover or touch planets to see Nakshatra and degree
+        </text>
+      ) : null}
       
       {/* Grid cells */}
       {gridPositions.map((pos, index) => {

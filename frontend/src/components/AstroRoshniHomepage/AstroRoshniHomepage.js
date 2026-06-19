@@ -1626,16 +1626,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 type="button"
                 className="astro-tools-hub-card astro-tools-hub-card--charts-dashas"
                 onClick={() => {
-                  if (!user) {
-                    if (onLogin) onLogin();
-                    return;
-                  }
-                  if (birthData && chartData && setCurrentView) {
-                    setCurrentView('dashboard');
-                    return;
-                  }
-                  setBirthFormContext('changeNative');
-                  setShowBirthFormModal(true);
+                  navigate('/charts-dashas');
                 }}
               >
                 <span className="astro-tools-hub-card__icon" aria-hidden>

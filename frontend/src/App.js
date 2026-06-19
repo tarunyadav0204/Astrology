@@ -115,6 +115,8 @@ const AstroRoshniHomepage = lazy(() => import('./components/AstroRoshniHomepage/
 const AdminPanel = lazy(() => import('./components/Admin/AdminPanel'));
 const ChartSelector = lazy(() => import('./components/ChartSelector/ChartSelector'));
 const BirthFormModal = lazy(() => import('./components/BirthForm/BirthFormModal'));
+const BirthChartCreationPage = lazy(() => import('./components/BirthChart/BirthChartCreationPage'));
+const ChartsDashasWorkspacePage = lazy(() => import('./components/BirthChart/ChartsDashasWorkspacePage'));
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'));
 const PredictionsPage = lazy(() => import('./components/PredictionsPage/PredictionsPage'));
 const PanchangPage = lazy(() => import('./components/Panchang/PanchangPage'));
@@ -615,6 +617,57 @@ function App() {
             } />
             <Route path="/horoscope/:period" element={<HoroscopePage />} />
             <Route path="/horoscope" element={<HoroscopePage />} />
+            <Route path="/birth-chart" element={<Navigate to="/ai-kundli-generator" replace />} />
+            <Route path="/ai-kundli-generator" element={
+              <>
+                <BirthChartCreationPage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to create and save your birth chart so you can use it across AstroRoshni reports, matching, and AI chat."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
+            <Route path="/charts-dashas" element={
+              <>
+                <ChartsDashasWorkspacePage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                  onOpenRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to open your chart workspace and use your saved birth chart across charts and dasha timelines."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
             <Route path="/marriage-analysis" element={
               <>
                 <AnalysisDetailPage

@@ -121,6 +121,11 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const applyBirthChartIntent = (mode) => {
+    if (mode === 'create') {
+      navigate('/ai-kundli-generator');
+      return;
+    }
+
     const cb = mode === 'create' ? onCreateBirthChart : onSelectBirthChart;
     if (cb) {
       cb();

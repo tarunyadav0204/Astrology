@@ -52,7 +52,13 @@ import HouseAnalysisModal from './HouseAnalysisModal';
  * See: docs/NORTH_INDIAN_CHART_POSITIONING.md for complete reference
  */
 
-const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, chartRefHighlight = null }) => {
+const NorthIndianChart = ({
+  chartData,
+  birthData,
+  showDegreeNakshatra = true,
+  chartRefHighlight = null,
+  showFooterHint = true,
+}) => {
   const { signs, planets } = CHART_CONFIG;
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
@@ -414,6 +420,13 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
     return `${deg}°${min}'${sec}"`;
   };
 
+  const formatDegreeCompact = (degree) => {
+    const deg = Math.floor(degree);
+    const minFloat = (degree - deg) * 60;
+    const min = Math.floor(minFloat);
+    return `${deg}°${min}'`;
+  };
+
   const getPlanetsInHouse = (houseIndex) => {
     if (!chartData.planets) return [];
     
@@ -555,12 +568,16 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
 
       
       {/* Instruction text */}
-      <text x="200" y="405" fontSize="12" fill="#666" textAnchor="middle" fontStyle="italic">
-        {aspectsHighlight.show ? 'Pink: Selected House | Green Circles: Benefic Aspects | Red Circles: Malefic Aspects' : 'Hover or touch planets to see Nakshatra and degree'}
-      </text>
-      <text x="200" y="420" fontSize="12" fill="#666" textAnchor="middle" fontStyle="italic">
-        {aspectsHighlight.show ? '' : 'Right click any sign to see more options'}
-      </text>
+      {showFooterHint ? (
+        <>
+          <text x="200" y="405" fontSize="12" fill="#666" textAnchor="middle" fontStyle="italic">
+            {aspectsHighlight.show ? 'Pink: Selected House | Green Circles: Benefic Aspects | Red Circles: Malefic Aspects' : 'Hover or touch planets to see Nakshatra and degree'}
+          </text>
+          <text x="200" y="420" fontSize="12" fill="#666" textAnchor="middle" fontStyle="italic">
+            {aspectsHighlight.show ? '' : 'Right click any sign to see more options'}
+          </text>
+        </>
+      ) : null}
       
       {/* Houses */}
       {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
@@ -620,9 +637,10 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                      houseNumber === 8 ? houseData.center.y - 10 :
                      houseNumber === 12 ? houseData.center.y + 20 : 
                      houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
-                  fontSize="18" 
+                  fontSize="15" 
                   fill={customAscendant === rashiIndex ? "#e91e63" : "#333"} 
                   fontWeight={customAscendant === rashiIndex ? "900" : "bold"}
+                  opacity="0.85"
                   style={{ cursor: 'pointer' }}
                   onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
                   onClick={(e) => {
@@ -636,14 +654,20 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
             {/* Ascendant marker for house 1 */}
             {houseNumber === 1 && (
               <g>
-                <text x={houseData.center.x + 25} y={houseData.center.y + 45} 
-                      fontSize="12" fill="#e91e63" fontWeight="900" textAnchor="middle">
+                <text x={houseData.center.x + 38} y={houseData.center.y + 24} 
+                      fontSize="10" fill="#e91e63" fontWeight="900" textAnchor="middle">
                   ASC
                 </text>
                 {chartData.ascendant && (
-                  <text x={houseData.center.x + 25} y={houseData.center.y + 60} 
-                        fontSize="8" fill="#666" fontWeight="500" textAnchor="middle">
-                    {formatDegreeDMS(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                  <text x={houseData.center.x + 38} y={houseData.center.y + 35} 
+                        fontSize="7" fill="#666" fontWeight="500" textAnchor="middle">
+                    {formatDegreeCompact(chartData.ascendant % 30)}
+                  </text>
+                )}
+                {chartData.ascendant && (
+                  <text x={houseData.center.x + 38} y={houseData.center.y + 44} 
+                        fontSize="7" fill="#666" fontWeight="500" textAnchor="middle">
+                    {getShortNakshatra(chartData.ascendant)}
                   </text>
                 )}
               </g>
@@ -653,6 +677,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
             {/* Planets */}
             {planetsInHouse.map((planet, pIndex) => {
               const totalPlanets = planetsInHouse.length;
+              const isDenseHouse = totalPlanets >= 2;
+              const isVeryDenseHouse = totalPlanets >= 3;
               let planetX, planetY;
               
               if (totalPlanets === 1) {
@@ -687,7 +713,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
               } else if (totalPlanets <= 4) {
                 // Houses 3, 5, 9, 11: Vertical arrangement (single column)
                 if ([3, 5, 9, 11].includes(houseNumber)) {
-                  const rowSpacing = 35;
+                  const rowSpacing = 40;
                   if (houseNumber === 3) {
                     planetX = houseData.center.x - 35;
                     planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
@@ -706,7 +732,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                   const row = Math.floor(pIndex / 2);
                   const col = pIndex % 2;
                   const spacing = 25;
-                  const rowSpacing = 32;
+                  const rowSpacing = 38;
                   
                   if (houseNumber === 1) {
                     planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
@@ -733,7 +759,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                 }
               } else {
                 // For 5+ planets - arrange in single column
-                const rowSpacing = 26;
+                const rowSpacing = 32;
                 
                 if (houseNumber === 1) {
                   planetX = houseData.center.x;
@@ -765,6 +791,12 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                 }
               }
               const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
+              const symbolFontSize = isVeryDenseHouse ? '10' : isDenseHouse ? '12' : '15';
+              const detailFontSize = isVeryDenseHouse ? '6.5' : isDenseHouse ? '8' : '10';
+              const detailLine1Y = planetY + (isDenseHouse ? 3 : 8);
+              const detailLine2Y = planetY + (isDenseHouse ? 11 : 19);
+              const compactDegree = formatDegreeCompact(parseFloat(planet.degree));
+              const compactNakshatra = planet.shortNakshatra;
               const aspectingPlanet = aspectsHighlight.show && aspectsHighlight.aspectingPlanets?.find(p => p.name === planet.name);
               
               return (
@@ -792,7 +824,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                   {/* Planet symbol */}
                   <text x={planetX} 
                         y={planetY - 8} 
-                        fontSize={totalPlanets >= 4 ? "10" : totalPlanets > 2 ? "13" : "15"} 
+                        fontSize={symbolFontSize} 
                         fill={getPlanetColor(planet)}
                         fontWeight="900"
                         textAnchor="middle"
@@ -821,16 +853,28 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                   </text>
                   {/* Degree and Nakshatra combined */}
                   {showDegreeNakshatra && (
-                    <text x={planetX} 
-                          y={planetY + 8} 
-                          fontSize={totalPlanets >= 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
-                          fill="#666"
-                          fontWeight="500"
-                          textAnchor="middle"
-                          style={{ cursor: 'pointer' }}
-                        onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
-                      {planet.formattedDegree} {planet.shortNakshatra}
-                    </text>
+                    <>
+                      <text x={planetX} 
+                            y={detailLine1Y} 
+                            fontSize={detailFontSize} 
+                            fill="#666"
+                            fontWeight="500"
+                            textAnchor="middle"
+                            style={{ cursor: 'pointer' }}
+                          onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
+                        {compactDegree}
+                      </text>
+                      <text x={planetX} 
+                            y={detailLine2Y} 
+                            fontSize={detailFontSize} 
+                            fill="#666"
+                            fontWeight="500"
+                            textAnchor="middle"
+                            style={{ cursor: 'pointer' }}
+                          onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
+                        {compactNakshatra}
+                      </text>
+                    </>
                   )}
                 </g>
               );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ControlsContainer, DateDisplay, ButtonGroup, NavButton } from './TransitControls.styles';
 
-const TransitControls = ({ date, onChange, onResetToToday }) => {
+const TransitControls = ({ date, onChange, onResetToToday, variant = 'default' }) => {
   const handleDateChange = (operation, unit) => {
     const newDate = new Date(date);
     
@@ -41,32 +41,32 @@ const TransitControls = ({ date, onChange, onResetToToday }) => {
 
   return (
     <ControlsContainer>
-      <DateDisplay>{window.innerWidth <= 768 ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) : date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</DateDisplay>
+      <DateDisplay $variant={variant}>{window.innerWidth <= 768 ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) : date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</DateDisplay>
       
       <ButtonGroup>
         {window.innerWidth <= 768 ? (
           // Mobile - Only essential controls
           <>
-            <NavButton onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
-            <NavButton onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
-            <NavButton onClick={resetToToday} primary>Now</NavButton>
-            <NavButton onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
-            <NavButton onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
+            <NavButton $variant={variant} onClick={resetToToday} primary>Now</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
           </>
         ) : (
           // Desktop - Full controls
           <>
-            <NavButton onClick={() => handleDateChange('sub', 'year')}>‹‹Y</NavButton>
-            <NavButton onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
-            <NavButton onClick={() => handleDateChange('sub', 'week')}>‹W</NavButton>
-            <NavButton onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'year')}>‹‹Y</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'week')}>‹W</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
             
-            <NavButton onClick={resetToToday} primary>Now</NavButton>
+            <NavButton $variant={variant} onClick={resetToToday} primary>Now</NavButton>
             
-            <NavButton onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
-            <NavButton onClick={() => handleDateChange('add', 'week')}>W›</NavButton>
-            <NavButton onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
-            <NavButton onClick={() => handleDateChange('add', 'year')}>Y››</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'week')}>W›</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
+            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'year')}>Y››</NavButton>
           </>
         )}
       </ButtonGroup>

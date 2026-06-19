@@ -19,6 +19,7 @@ const ChartWidget = ({
   chartRefHighlight = null,
   /** Flat toolbar + square corners when embedded in Parashara dashboard (avoids stacked “headers”) */
   embedInDashboard = false,
+  showFooterHint = true,
 }) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
@@ -39,6 +40,7 @@ const ChartWidget = ({
     }
   }, [defaultStyle]);
   const [divisionalData, setDivisionalData] = useState(null);
+  const [transitChartData, setTransitChartData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const toggleStyle = () => {
@@ -66,6 +68,29 @@ const ChartWidget = ({
     }
   }, [chartType, birthData, division, chartData]);
 
+  useEffect(() => {
+    if (chartType === 'transit' && birthData && transitDate) {
+      setLoading(true);
+      apiService.calculateTransits({
+        birth_data: birthData,
+        transit_date:
+          transitDate instanceof Date
+            ? transitDate.toISOString().split('T')[0]
+            : String(transitDate).split('T')[0],
+      })
+        .then((response) => {
+          setTransitChartData(response);
+        })
+        .catch((error) => {
+          console.error('Failed to calculate transit chart:', error);
+          setTransitChartData(null);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [chartType, birthData, transitDate]);
+
   const getChartData = () => {
     switch (chartType) {
       case 'lagna':
@@ -74,7 +99,7 @@ const ChartWidget = ({
       case 'divisional':
         return divisionalData || chartData;
       case 'transit':
-        return chartData;
+        return transitChartData || chartData;
       default:
         return chartData;
     }
@@ -302,6 +327,7 @@ const ChartWidget = ({
             chartType={chartType}
             birthData={birthData}
             showDegreeNakshatra={showDegreeNakshatra}
+            showFooterHint={showFooterHint}
           />
         ) : (
           <SouthIndianChart 
@@ -309,6 +335,7 @@ const ChartWidget = ({
             chartType={chartType}
             birthData={birthData}
             showDegreeNakshatra={showDegreeNakshatra}
+            showFooterHint={showFooterHint}
           />
         )}
       </ChartContainer>
@@ -972,6 +999,7 @@ const ChartWidget = ({
                     birthData={birthData}
                     showDegreeNakshatra={showDegreeNakshatra}
                     chartRefHighlight={chartRefHighlight}
+                    showFooterHint={showFooterHint}
                   />
                 </div>
               ) : (
@@ -982,6 +1010,7 @@ const ChartWidget = ({
                     birthData={birthData}
                     showDegreeNakshatra={showDegreeNakshatra}
                     chartRefHighlight={chartRefHighlight}
+                    showFooterHint={showFooterHint}
                   />
                 </div>
               )}

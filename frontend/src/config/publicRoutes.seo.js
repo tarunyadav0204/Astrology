@@ -21,6 +21,8 @@ const HOROSCOPE_PERIODS = ['daily', 'weekly', 'monthly'];
 export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs = [] } = {}) {
   const paths = [
     '/',
+    '/ai-kundli-generator',
+    '/charts-dashas',
     '/panchang',
     '/muhurat-finder',
     '/monthly-panchang',
@@ -65,6 +67,9 @@ export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs =
  */
 export const PUBLIC_ROUTE_SEO_RULES = [
   { path: '/', pageKey: 'home' },
+  { path: '/ai-kundli-generator', pageKey: 'birthChartCreation' },
+  { path: '/birth-chart', pageKey: 'birthChartCreation' },
+  { path: '/charts-dashas', pageKey: 'chartsDashasWorkspace' },
   { path: '/panchang', pageKey: 'panchang' },
   { path: '/muhurat-finder', pageKey: 'muhuratFinder' },
   { path: '/monthly-panchang', pageKey: 'monthlyPanchang' },

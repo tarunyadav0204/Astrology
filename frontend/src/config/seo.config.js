@@ -115,6 +115,18 @@ export const SEO_CONFIG = {
       keywords: "kundli matching for marriage, marriage kundli analysis, smart kundli matching, kundli matching by name"
     },
 
+    birthChartCreation: {
+      title: "AI Kundli Generator | Free Janam Kundli Online & Accurate Kundli Prediction | AstroRoshni",
+      description: "Use AstroRoshni's AI Kundli Generator to create your free Janam Kundli online with date, time, and place of birth. Get instant Vedic Kundli analysis, horoscope and Kundli insights, dosha analysis, and accurate AI-backed Kundli prediction.",
+      keywords: "Free Janam Kundli Generator, Instant Kundli Report Generator, Free Horoscope and Kundli, Online Kundli by Date of Birth, Horoscope and kundli, Free Janam Kundli online, AI Kundli Prediction, Accurate kundli prediction, Kundli maker, Instant Kundli Report, Vedic Kundli Analysis, AI Janam Kundli, Kundli Dosha Analysis",
+    },
+
+    chartsDashasWorkspace: {
+      title: "Charts & Dashas Workspace | Lagna, Divisional Charts and Dasha Timeline | AstroRoshni",
+      description: "Open your AstroRoshni charts and dashas workspace to explore Lagna, divisional charts, transit chart views, and major dasha systems from one saved birth chart.",
+      keywords: "charts and dashas, lagna chart, divisional charts, vimshottari dasha, transit chart, navamsa chart, dasha timeline, vedic astrology dashboard, kundli charts workspace, astrology charts online",
+    },
+
     monthlyPanchang: {
       title: "Monthly Panchang — Hindu Calendar by Month | AstroRoshni",
       description: "View monthly Panchang with tithi, nakshatra, festivals, and auspicious days for any month and location.",
