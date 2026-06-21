@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -44,6 +44,53 @@ def _verify_cron_secret(x_cron_secret: Optional[str]) -> None:
         )
     if not received or not hmac.compare_digest(received, expected):
         raise HTTPException(status_code=401, detail="Invalid cron secret")
+
+
+def _load_nudge_task_queue():
+    try:
+        from .task_queue import (
+            enqueue_nudge_task,
+            nudge_tasks_are_isolated,
+            nudge_tasks_enabled,
+            nudge_tasks_target_base_url,
+        )
+        return enqueue_nudge_task, nudge_tasks_enabled, nudge_tasks_are_isolated, nudge_tasks_target_base_url
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Nudge worker task queue is unavailable: {exc}",
+        ) from exc
+
+
+def _require_isolated_nudge_tasks(operation: str):
+    enqueue_nudge_task, nudge_tasks_enabled, nudge_tasks_are_isolated, nudge_tasks_target_base_url = _load_nudge_task_queue()
+    if not nudge_tasks_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=f"{operation} requires NUDGE_TASKS_ENABLED=true with a separate worker target.",
+        )
+    target = nudge_tasks_target_base_url()
+    if not nudge_tasks_are_isolated():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"{operation} is blocked because NUDGE_TASKS_TARGET_BASE_URL still points at the public API host. "
+                f"Current target: {target or '<unset>'}"
+            ),
+        )
+    return enqueue_nudge_task
+
+
+def _enqueue_worker_job(*, operation: str, task_kind: str, task_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    enqueue_nudge_task = _require_isolated_nudge_tasks(operation)
+    ok = enqueue_nudge_task(
+        task_kind=task_kind,
+        task_id=task_id,
+        payload=payload,
+    )
+    if not ok:
+        raise HTTPException(status_code=503, detail=f"Failed to queue {operation}.")
+    return {"ok": True, "queued": True, "task_kind": task_kind, "task_id": task_id}
 
 
 class DeviceTokenRequest(BaseModel):
@@ -246,8 +293,8 @@ async def trigger_nudge_scan(
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
 ):
     """
-    Cron-safe daily nudge scan. Heavy work runs in a thread pool so the API
-    event loop stays responsive (keepalive / user traffic).
+    Cron-safe daily nudge scan.
+    The public API only enqueues the scan onto the isolated nudge worker.
     Requires header: X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
     _verify_cron_secret(x_cron_secret)
@@ -258,12 +305,17 @@ async def trigger_nudge_scan(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid date: {e}") from e
 
-    try:
-        summary = await run_in_threadpool(run_nudge_scan, target)
-        return summary
-    except Exception as e:
-        logger.exception("Nudge scan endpoint failed: %s", e)
-        raise HTTPException(status_code=500, detail="Nudge scan failed") from e
+    task_id = f"daily-{target.isoformat()}"
+    return {
+        **_enqueue_worker_job(
+            operation="daily nudge scan",
+            task_kind="daily-scan",
+            task_id=task_id,
+            payload={"scan_date": target.isoformat()},
+        ),
+        "scan_date": target.isoformat(),
+        "message": "Daily nudge scan queued on isolated worker",
+    }
 
 
 @router.post("/device-token")
@@ -572,10 +624,9 @@ def _run_admin_bulk_notification_job(
 @router.post("/admin/send-bulk", status_code=202)
 async def admin_send_bulk_notification(
     body: AdminSendBulkNotificationRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
-    """Create a non-blocking bulk custom notification job."""
+    """Create a scalable bulk custom notification job on the isolated nudge worker."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     title = (body.title or "").strip()[:100]
@@ -602,24 +653,28 @@ async def admin_send_bulk_notification(
                 body=body_text,
             )
             conn.commit()
-        background_tasks.add_task(
-            _run_admin_bulk_notification_job,
-            job_id=job_id,
-            admin_userid=current_user.userid,
-            audience=audience,
-            user_ids=user_ids,
-            name=body.name,
-            require_device_token=bool(body.require_device_token),
-            title=title,
-            body_text=body_text,
-            landing_screen=landing_screen,
-            question=body.question,
+        _enqueue_worker_job(
+            operation="bulk notification send",
+            task_kind="admin-bulk-send",
+            task_id=job_id,
+            payload={
+                "job_id": job_id,
+                "admin_userid": int(current_user.userid),
+                "audience": audience,
+                "user_ids": user_ids,
+                "name": body.name,
+                "require_device_token": bool(body.require_device_token),
+                "title": title,
+                "body_text": body_text,
+                "landing_screen": landing_screen,
+                "question": body.question,
+            },
         )
         return {
             "ok": True,
             "job_id": job_id,
             "status": "queued",
-            "message": "Bulk notification job started. You can leave this screen.",
+            "message": "Bulk notification job queued on isolated worker.",
         }
     except HTTPException:
         raise
@@ -1363,12 +1418,24 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
             n_users = len(all_user_ids)
 
             try:
-                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
+                from .task_queue import enqueue_nudge_task, nudge_tasks_are_isolated, nudge_tasks_enabled, nudge_tasks_target_base_url
                 tasks_enabled = nudge_tasks_enabled()
             except Exception as e:
-                logger.warning("nudge task queue unavailable; falling back inline broadcast: %s", e)
+                logger.warning("nudge task queue unavailable for broadcast dispatch: %s", e)
                 enqueue_nudge_task = None
                 tasks_enabled = False
+                nudge_tasks_are_isolated = lambda: False
+                nudge_tasks_target_base_url = lambda: ""
+
+            if not tasks_enabled or not enqueue_nudge_task:
+                raise RuntimeError(
+                    "Broadcast dispatch requires Cloud Tasks and an isolated worker target."
+                )
+            if not nudge_tasks_are_isolated():
+                raise RuntimeError(
+                    "Broadcast dispatch is blocked because NUDGE_TASKS_TARGET_BASE_URL "
+                    f"still points at the public API host. Current target: {nudge_tasks_target_base_url() or '<unset>'}"
+                )
 
             if tasks_enabled and enqueue_nudge_task:
                 batch_size = max(1, min(int(os.getenv("NUDGE_BROADCAST_BATCH_SIZE", "500")), 2000))
@@ -1423,127 +1490,7 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                 conn.commit()
                 logger.info("broadcast dispatch-due queued summary: %s", summary)
                 return summary
-
-            total_push_sent = 0
-            total_delivery_rows = 0
-            marked = 0
-
-            for row in due_rows:
-                schedule_id = int(row[0])
-                title = (row[2] or "").strip()[:100]
-                body_text = (row[3] or "").strip()[:200]
-                category = (row[4] or "general").strip()
-
-                if not title or not body_text:
-                    db.mark_broadcast_schedule_dispatched(conn, schedule_id, 0)
-                    marked += 1
-                    continue
-
-                # Include question so tap → chat pre-fills input (same contract as delivery.py / admin send).
-                payload = {
-                    "trigger_id": "broadcast_schedule",
-                    "cta": "astroroshni://chat",
-                    "schedule_id": str(schedule_id),
-                    "category": category,
-                    "question": body_text[:500],
-                }
-                event_params = json.dumps(
-                    {"schedule_id": schedule_id, "category": category},
-                    ensure_ascii=False,
-                )
-                data_json = ""
-                try:
-                    data_json = json.dumps(payload, ensure_ascii=False)[:8000]
-                except Exception:
-                    data_json = ""
-
-                from .delivery import new_delivery_group_id
-
-                group_id_by_user: Dict[int, str] = {
-                    int(uid): new_delivery_group_id() for uid in all_user_ids
-                }
-
-                # One Expo HTTP request per 100 devices (avoids gateway timeouts on large user bases).
-                expo_messages: List[Dict[str, Any]] = []
-                message_uid: List[int] = []
-                for uid in all_user_ids:
-                    uid_int = int(uid)
-                    for token, _platform in tokens_by_user.get(uid_int, []):
-                        t = (token or "").strip()
-                        if not t.startswith("ExponentPushToken["):
-                            continue
-                        expo_messages.append(
-                            {
-                                "to": t,
-                                "title": title[:100],
-                                "body": body_text[:200],
-                                "sound": "default",
-                                "data": {**payload, "nudge_id": group_id_by_user[uid_int]},
-                            }
-                        )
-                        message_uid.append(uid_int)
-
-                push_ok_by_uid: Dict[int, bool] = defaultdict(bool)
-                if expo_messages:
-                    results = push_module.send_expo_push_messages(expo_messages)
-                    for ok, uid_m in zip(results, message_uid):
-                        if ok:
-                            push_ok_by_uid[uid_m] = True
-                            total_push_sent += 1
-
-                sent_at_iso = now.date().isoformat()
-                batch_rows: List[tuple] = []
-                for uid in all_user_ids:
-                    uid_int = int(uid)
-                    ch = "push" if push_ok_by_uid.get(uid_int) else "stored"
-                    gid = group_id_by_user[uid_int]
-                    user_data_json = json.dumps(
-                        {**payload, "nudge_id": gid}, ensure_ascii=False
-                    )[:8000]
-                    batch_rows.append(
-                        (
-                            uid_int,
-                            "broadcast_schedule",
-                            title,
-                            body_text,
-                            event_params,
-                            sent_at_iso,
-                            ch,
-                            user_data_json,
-                            gid,
-                            "sent" if ch == "push" else "stored",
-                        )
-                    )
-                db.insert_deliveries_batch(conn, batch_rows)
-                total_delivery_rows += len(batch_rows)
-
-                db.mark_broadcast_schedule_dispatched(conn, schedule_id, n_users)
-                marked += 1
-
-            summary = {
-                "ok": True,
-                "due_items": len(due_rows),
-                "schedule_items_marked": marked,
-                "delivery_rows_created": total_delivery_rows,
-                "push_sent": total_push_sent,
-                "users_targeted": n_users,
-            }
-            db.insert_cron_run(
-                conn,
-                job_key="broadcast_dispatch_due",
-                status="success",
-                summary_json=json.dumps(summary, ensure_ascii=False),
-            )
-            conn.commit()
-
-        logger.info(
-            "broadcast dispatch-due: due_rows=%s users=%s deliveries=%s push_tickets_ok=%s",
-            len(due_rows),
-            n_users,
-            total_delivery_rows,
-            total_push_sent,
-        )
-        return summary
+            raise RuntimeError("Broadcast dispatch unexpectedly reached inline fallback path.")
     except Exception as e:
         logger.exception("_dispatch_due_broadcast failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
@@ -1904,12 +1851,24 @@ def _dispatch_recent_chat_followups(
             today = date.today()
 
             try:
-                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
+                from .task_queue import enqueue_nudge_task, nudge_tasks_are_isolated, nudge_tasks_enabled, nudge_tasks_target_base_url
                 tasks_enabled = nudge_tasks_enabled()
             except Exception as e:
-                logger.warning("nudge task queue unavailable; falling back inline: %s", e)
+                logger.warning("nudge task queue unavailable for chat follow-up dispatch: %s", e)
                 enqueue_nudge_task = None
                 tasks_enabled = False
+                nudge_tasks_are_isolated = lambda: False
+                nudge_tasks_target_base_url = lambda: ""
+
+            if not tasks_enabled or not enqueue_nudge_task:
+                raise RuntimeError(
+                    "Recent chat follow-up dispatch requires Cloud Tasks and an isolated worker target."
+                )
+            if not nudge_tasks_are_isolated():
+                raise RuntimeError(
+                    "Recent chat follow-up dispatch is blocked because NUDGE_TASKS_TARGET_BASE_URL "
+                    f"still points at the public API host. Current target: {nudge_tasks_target_base_url() or '<unset>'}"
+                )
 
             if tasks_enabled and enqueue_nudge_task:
                 enqueued = 0
@@ -1956,69 +1915,7 @@ def _dispatch_recent_chat_followups(
                 conn.commit()
                 logger.info("chat_hourly_followup queued summary: %s", summary)
                 return summary
-
-            for item in candidates:
-                uid = int(item["user_id"])
-                message_id = int(item["message_id"])
-                targeted += 1
-
-                if (uid, message_id) in sent_keys:
-                    skipped_dedupe += 1
-                    continue
-
-                try:
-                    result = _process_recent_chat_followup_user(
-                        conn,
-                        uid=uid,
-                        message_id=message_id,
-                        lookback_minutes=lookback_minutes,
-                        max_turns=max_turns,
-                    )
-                    if result.get("skipped") == "no_turns":
-                        skipped_no_turns += 1
-                        continue
-                    if result.get("skipped") == "dedupe":
-                        skipped_dedupe += 1
-                        continue
-                    if not result.get("ok"):
-                        failed += 1
-                        continue
-                    generated += 1
-                    push_sent += int(result.get("push_sent") or 0)
-                    whatsapp_sent += int(result.get("whatsapp_sent") or 0)
-                    whatsapp_template_sent += int(result.get("whatsapp_template_sent") or 0)
-                    deliveries_created += 1
-                except Exception as e:
-                    failed += 1
-                    logger.warning(
-                        "chat_hourly_followup failed for user_id=%s message_id=%s: %s",
-                        uid,
-                        message_id,
-                        e,
-                    )
-                    continue
-
-            summary = {
-                "ok": True,
-                "targeted_users": targeted,
-                "generated": generated,
-                "deliveries_created": deliveries_created,
-                "push_sent": push_sent,
-                "whatsapp_sent": whatsapp_sent,
-                "whatsapp_template_sent": whatsapp_template_sent,
-                "skipped_dedupe": skipped_dedupe,
-                "skipped_no_turns": skipped_no_turns,
-                "failed": failed,
-                "lookback_minutes": lookback_minutes,
-                "limit_users": limit_users,
-            }
-            db.insert_cron_run(
-                conn,
-                job_key="chat_followup_dispatch_recent",
-                status="success",
-                summary_json=json.dumps(summary, ensure_ascii=False),
-            )
-            conn.commit()
+            raise RuntimeError("Recent chat follow-up dispatch unexpectedly reached inline fallback path.")
     except Exception as e:
         summary = {
             "ok": False,
@@ -2064,7 +1961,16 @@ async def admin_dispatch_due_broadcast(
     """
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
-    return await run_in_threadpool(_dispatch_due_broadcast, limit)
+    task_id = f"admin-{uuid.uuid4().hex}"
+    return {
+        **_enqueue_worker_job(
+            operation="broadcast schedule dispatch",
+            task_kind="broadcast-dispatch-due",
+            task_id=task_id,
+            payload={"limit": int(limit), "requested_by": int(current_user.userid)},
+        ),
+        "message": "Broadcast schedule dispatch queued on isolated worker",
+    }
 
 
 @router.post("/cron/broadcast/dispatch-due")
@@ -2077,33 +1983,40 @@ async def cron_dispatch_due_broadcast(
       X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
     _verify_cron_secret(x_cron_secret)
-    return await run_in_threadpool(_dispatch_due_broadcast, limit)
+    task_id = f"cron-{date.today().isoformat()}-{uuid.uuid4().hex[:8]}"
+    return {
+        **_enqueue_worker_job(
+            operation="broadcast schedule dispatch",
+            task_kind="broadcast-dispatch-due",
+            task_id=task_id,
+            payload={"limit": int(limit)},
+        ),
+        "message": "Broadcast schedule dispatch queued on isolated worker",
+    }
 
 
 @router.post("/cron/chat-followup/dispatch-recent")
 async def cron_dispatch_recent_chat_followups(
-    background_tasks: BackgroundTasks,
     limit_users: int = Query(200, ge=1, le=500),
     lookback_minutes: int = Query(60, ge=1, le=1440),
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
 ):
     """
-    Cron-safe, non-blocking endpoint:
-    - Finds users who asked >=1 question in the last lookback window.
-    - Generates title/body/question from their recent completed chat exchanges.
-    - Sends push (and stores delivery row) with dedupe by latest user message id.
+    Cron-safe endpoint that only queues recent-chat follow-up generation onto the isolated worker.
     """
     _verify_cron_secret(x_cron_secret)
-    background_tasks.add_task(
-        _dispatch_recent_chat_followups,
-        limit_users=int(limit_users),
-        lookback_minutes=int(lookback_minutes),
-        max_turns=2,
-    )
     return {
-        "ok": True,
-        "queued": True,
-        "message": "Recent chat follow-up dispatch queued in background",
+        **_enqueue_worker_job(
+            operation="recent chat follow-up dispatch",
+            task_kind="chat-followup-dispatch",
+            task_id=f"{date.today().isoformat()}-{uuid.uuid4().hex[:8]}",
+            payload={
+                "limit_users": int(limit_users),
+                "lookback_minutes": int(lookback_minutes),
+                "max_turns": 2,
+            },
+        ),
+        "message": "Recent chat follow-up dispatch queued on isolated worker",
         "limit_users": int(limit_users),
         "lookback_minutes": int(lookback_minutes),
     }
@@ -2120,6 +2033,69 @@ def _verify_nudge_task_secret(x_nudge_task_secret: Optional[str]) -> None:
         raise HTTPException(status_code=503, detail="NUDGE_TASKS_SECRET is not configured on server.")
     if not received or not hmac.compare_digest(received, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@router.post("/internal/tasks/daily-scan")
+async def internal_daily_scan_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: run the daily nudge scan on the isolated worker."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    scan_date_raw = str(body.get("scan_date") or "").strip()
+    try:
+        target = date.fromisoformat(scan_date_raw) if scan_date_raw else date.today()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="scan_date must be YYYY-MM-DD") from exc
+    try:
+        return await run_in_threadpool(run_nudge_scan, target)
+    except Exception as exc:
+        logger.exception("daily nudge scan task failed scan_date=%s: %s", target, exc)
+        raise HTTPException(status_code=500, detail="daily nudge scan task failed") from exc
+
+
+@router.post("/internal/tasks/broadcast-dispatch-due")
+async def internal_broadcast_dispatch_due_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: fan out due broadcast schedules from the isolated worker."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    limit = max(1, min(int(body.get("limit") or 100), 500))
+    try:
+        return await run_in_threadpool(_dispatch_due_broadcast, limit)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("broadcast dispatch-due task failed limit=%s: %s", limit, exc)
+        raise HTTPException(status_code=500, detail="broadcast dispatch-due task failed") from exc
+
+
+@router.post("/internal/tasks/chat-followup-dispatch")
+async def internal_chat_followup_dispatch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: generate recent-chat follow-up batches on the isolated worker."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    limit_users = max(1, min(int(body.get("limit_users") or 200), 500))
+    lookback_minutes = max(1, min(int(body.get("lookback_minutes") or 60), 24 * 60))
+    max_turns = max(1, min(int(body.get("max_turns") or 2), 2))
+    try:
+        return await run_in_threadpool(
+            _dispatch_recent_chat_followups,
+            limit_users=limit_users,
+            lookback_minutes=lookback_minutes,
+            max_turns=max_turns,
+        )
+    except Exception as exc:
+        logger.exception(
+            "chat follow-up dispatch task failed limit_users=%s lookback_minutes=%s: %s",
+            limit_users,
+            lookback_minutes,
+            exc,
+        )
+        raise HTTPException(status_code=500, detail="chat follow-up dispatch task failed") from exc
 
 
 @router.post("/internal/tasks/chat-followup-user")
@@ -2155,6 +2131,47 @@ async def internal_chat_followup_user_task(
     except Exception as e:
         logger.exception("chat follow-up task failed user_id=%s message_id=%s: %s", uid, message_id, e)
         raise HTTPException(status_code=500, detail="chat follow-up task failed") from e
+
+
+@router.post("/internal/tasks/admin-bulk-send")
+async def internal_admin_bulk_send_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: run the admin bulk-notification job on the isolated worker."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    try:
+        job_id = str(body.get("job_id") or "").strip()
+        admin_userid = int(body.get("admin_userid"))
+        audience = str(body.get("audience") or "selected").strip().lower()
+        user_ids = [int(uid) for uid in (body.get("user_ids") or []) if str(uid).strip()]
+        title = str(body.get("title") or "").strip()[:100]
+        body_text = str(body.get("body_text") or "").strip()[:200]
+        landing_screen = _normalize_landing_screen(body.get("landing_screen"))
+        question = body.get("question")
+        require_device_token = bool(body.get("require_device_token"))
+        name = body.get("name")
+        if not job_id or not title or not body_text:
+            raise HTTPException(status_code=400, detail="job_id, title, and body_text are required")
+        await run_in_threadpool(
+            _run_admin_bulk_notification_job,
+            job_id=job_id,
+            admin_userid=admin_userid,
+            audience=audience,
+            user_ids=user_ids,
+            name=name,
+            require_device_token=require_device_token,
+            title=title,
+            body_text=body_text,
+            landing_screen=landing_screen,
+            question=question,
+        )
+        return {"ok": True, "job_id": job_id, "status": "completed_or_running"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("admin bulk send task failed: %s", exc)
+        raise HTTPException(status_code=500, detail="admin bulk send task failed") from exc
 
 
 @router.post("/internal/tasks/broadcast-schedule-batch")
@@ -2684,18 +2701,16 @@ async def admin_send_campaign_now(
     current_user: User = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    from .campaigns import dispatch_campaign_now
-
-    try:
-        result = await run_in_threadpool(dispatch_campaign_now, int(campaign_id))
-        if not result.get("ok"):
-            raise HTTPException(status_code=409, detail=result.get("error") or "Dispatch failed")
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("admin_send_campaign_now failed: %s", e)
-        raise HTTPException(status_code=500, detail="Failed to dispatch campaign") from e
+    return {
+        **_enqueue_worker_job(
+            operation="campaign send-now dispatch",
+            task_kind="campaign-dispatch-now",
+            task_id=f"{int(campaign_id)}-{uuid.uuid4().hex[:8]}",
+            payload={"campaign_id": int(campaign_id), "requested_by": int(current_user.userid)},
+        ),
+        "campaign_id": int(campaign_id),
+        "message": "Campaign send-now queued on isolated worker",
+    }
 
 
 @router.post("/admin/campaigns/dispatch-due")
@@ -2704,9 +2719,15 @@ async def admin_dispatch_due_campaigns(
     current_user: User = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    from .campaigns import dispatch_due_campaigns
-
-    return await run_in_threadpool(dispatch_due_campaigns, limit)
+    return {
+        **_enqueue_worker_job(
+            operation="campaign due dispatch",
+            task_kind="campaign-dispatch-due",
+            task_id=f"admin-{uuid.uuid4().hex}",
+            payload={"limit": int(limit), "requested_by": int(current_user.userid)},
+        ),
+        "message": "Due campaigns queued on isolated worker",
+    }
 
 
 @router.post("/cron/campaign/dispatch-due")
@@ -2719,9 +2740,57 @@ async def cron_dispatch_due_campaigns(
       X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
     _verify_cron_secret(x_cron_secret)
+    return {
+        **_enqueue_worker_job(
+            operation="campaign due dispatch",
+            task_kind="campaign-dispatch-due",
+            task_id=f"cron-{date.today().isoformat()}-{uuid.uuid4().hex[:8]}",
+            payload={"limit": int(limit)},
+        ),
+        "message": "Due campaigns queued on isolated worker",
+    }
+
+
+@router.post("/internal/tasks/campaign-dispatch-now")
+async def internal_campaign_dispatch_now_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: resolve and dispatch one campaign from the isolated worker."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    from .campaigns import dispatch_campaign_now
+
+    try:
+        campaign_id = int(body.get("campaign_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="campaign_id is required")
+    try:
+        result = await run_in_threadpool(dispatch_campaign_now, campaign_id)
+        if not result.get("ok"):
+            raise HTTPException(status_code=409, detail=result.get("error") or "Dispatch failed")
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("campaign dispatch-now task failed campaign_id=%s: %s", campaign_id, exc)
+        raise HTTPException(status_code=500, detail="campaign dispatch-now task failed") from exc
+
+
+@router.post("/internal/tasks/campaign-dispatch-due")
+async def internal_campaign_dispatch_due_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Cloud Tasks worker: dispatch due campaigns from the isolated worker."""
+    _verify_nudge_task_secret(x_nudge_task_secret)
     from .campaigns import dispatch_due_campaigns
 
-    return await run_in_threadpool(dispatch_due_campaigns, limit)
+    limit = max(1, min(int(body.get("limit") or 20), 100))
+    try:
+        return await run_in_threadpool(dispatch_due_campaigns, limit)
+    except Exception as exc:
+        logger.exception("campaign dispatch-due task failed limit=%s: %s", limit, exc)
+        raise HTTPException(status_code=500, detail="campaign dispatch-due task failed") from exc
 
 
 @router.post("/internal/tasks/campaign-batch")

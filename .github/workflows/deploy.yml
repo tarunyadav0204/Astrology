@@ -63,6 +63,8 @@ jobs:
       GCP_API_MIG_ZONE: asia-south2-b
       GCP_CHAT_WORKER_MIG_NAME: astroroshni-chat-worker-mig
       GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
+      GCP_NUDGE_WORKER_MIG_NAME: astroroshni-nudge-worker-mig
+      GCP_NUDGE_WORKER_MIG_ZONE: asia-south2-a
       GCP_PLAY_PAYMENT_SERVICE_NAME: astroroshni-play-payment-service
       GCP_PLAY_PAYMENT_SERVICE_REGION: asia-south2
       GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
@@ -339,6 +341,7 @@ jobs:
 
         deploy_mig_instances "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}" "${SERVE_FRONTEND_LOCALLY}" "api"
         deploy_mig_instances "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}" "false" "chat-worker"
+        deploy_mig_instances "${GCP_NUDGE_WORKER_MIG_NAME}" "${GCP_NUDGE_WORKER_MIG_ZONE}" "false" "nudge-worker"
 
         echo "🔎 Final public health check"
         curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
@@ -442,6 +445,40 @@ jobs:
 
         echo "Updated chat-worker future replacement template to ${TEMPLATE_NAME}"
 
+    - name: Refresh nudge worker MIG baked-image template for future replacements
+      id: baked_template_nudge_worker
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        SHORT_SHA="${GITHUB_SHA::12}"
+        TEMPLATE_NAME="astro-nudge-worker-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+        SUBNET_REGION="${GCP_NUDGE_WORKER_MIG_ZONE%-*}"
+        SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
+        echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
+
+        gcloud compute instance-templates create "${TEMPLATE_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --machine-type="e2-standard-2" \
+          --network=default \
+          --subnet="${SUBNET_SELF_LINK}" \
+          --address="" \
+          --maintenance-policy=MIGRATE \
+          --provisioning-model=STANDARD \
+          --service-account="800681558445-compute@developer.gserviceaccount.com" \
+          --scopes="https://www.googleapis.com/auth/cloud-platform" \
+          --tags="web-server" \
+          --image="${{ steps.baked_image.outputs.image_name }}" \
+          --image-project="${GCP_PROJECT_ID}" \
+          --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/infra/gcp/astroroshni-nudge-worker-startup.sh"
+
+        gcloud compute instance-groups managed set-instance-template "${GCP_NUDGE_WORKER_MIG_NAME}" \
+          --project="${GCP_PROJECT_ID}" \
+          --zone="${GCP_NUDGE_WORKER_MIG_ZONE}" \
+          --template="${TEMPLATE_NAME}"
+
+        echo "Updated nudge-worker future replacement template to ${TEMPLATE_NAME}"
+
     - name: Emergency rolling VM replacement
       if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
       run: |
@@ -474,4 +511,17 @@ jobs:
         gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
           --project "${GCP_PROJECT_ID}" \
           --zone "${GCP_CHAT_WORKER_MIG_ZONE}"
+        gcloud compute instance-groups managed rolling-action replace "${GCP_NUDGE_WORKER_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --zone "${GCP_NUDGE_WORKER_MIG_ZONE}" \
+          --max-unavailable 1 \
+          --max-surge 1
+        gcloud compute instance-groups managed wait-until "${GCP_NUDGE_WORKER_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --stable \
+          --zone "${GCP_NUDGE_WORKER_MIG_ZONE}" \
+          --timeout 3600
+        gcloud compute instance-groups managed list-instances "${GCP_NUDGE_WORKER_MIG_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --zone "${GCP_NUDGE_WORKER_MIG_ZONE}"
         echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
