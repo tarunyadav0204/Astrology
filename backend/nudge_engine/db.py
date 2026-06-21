@@ -322,6 +322,16 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
+        for _ddl in (
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS campaign_id INTEGER",
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS userid INTEGER",
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS trigger_id TEXT",
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS question TEXT",
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS seconds_since_sent INTEGER",
+            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS attribution TEXT NOT NULL DEFAULT 'tap'",
+        ):
+            _safe_execute_nudge_ddl(conn, _ddl)
         _safe_execute_nudge_ddl(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_conversions_campaign "
@@ -1565,12 +1575,12 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
                COUNT(*) FILTER (WHERE channel = 'push' AND COALESCE(send_status, 'sent') = 'sent') AS push,
                COUNT(*) FILTER (WHERE channel IN ('whatsapp', 'whatsapp_template') AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp,
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
-                                AND COALESCE(data_json, '') NOT LIKE '%"from_template_continue": true%') AS whatsapp_direct,
+                                AND COALESCE(data_json, '') NOT LIKE '%%"from_template_continue": true%%') AS whatsapp_direct,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp_template,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND clicked_at IS NOT NULL) AS whatsapp_template_clicked,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_message_sent,
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
-                                AND COALESCE(data_json, '') LIKE '%"from_template_continue": true%') AS whatsapp_after_continue,
+                                AND COALESCE(data_json, '') LIKE '%%"from_template_continue": true%%') AS whatsapp_after_continue,
                COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
