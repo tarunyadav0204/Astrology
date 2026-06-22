@@ -34,6 +34,23 @@ IST_TZ = ZoneInfo("Asia/Kolkata")
 router = APIRouter(prefix="/nudge", tags=["nudge"])
 
 
+def _nudge_service_role() -> str:
+    return (os.getenv("NUDGE_SERVICE_ROLE") or "api").strip().lower()
+
+
+def _require_nudge_service_role(*allowed_roles: str) -> None:
+    current_role = _nudge_service_role()
+    allowed = {str(role or "").strip().lower() for role in allowed_roles if str(role or "").strip()}
+    if allowed and current_role not in allowed:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "This nudge endpoint is disabled on the current service role. "
+                f"Current role: {current_role or 'unknown'}, allowed: {sorted(allowed)}"
+            ),
+        )
+
+
 def _verify_cron_secret(x_cron_secret: Optional[str]) -> None:
     expected = (os.getenv("NUDGE_CRON_SECRET") or "").strip()
     received = (x_cron_secret or "").strip()
@@ -250,6 +267,7 @@ async def trigger_nudge_scan(
     event loop stays responsive (keepalive / user traffic).
     Requires header: X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
+    _require_nudge_service_role("dispatch")
     _verify_cron_secret(x_cron_secret)
     try:
         target = date.today()
@@ -2076,6 +2094,7 @@ async def cron_dispatch_due_broadcast(
     Cron-safe endpoint secured by static secret header:
       X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
+    _require_nudge_service_role("dispatch")
     _verify_cron_secret(x_cron_secret)
     return await run_in_threadpool(_dispatch_due_broadcast, limit)
 
@@ -2093,6 +2112,7 @@ async def cron_dispatch_recent_chat_followups(
     - Generates title/body/question from their recent completed chat exchanges.
     - Sends push (and stores delivery row) with dedupe by latest user message id.
     """
+    _require_nudge_service_role("dispatch")
     _verify_cron_secret(x_cron_secret)
     background_tasks.add_task(
         _dispatch_recent_chat_followups,
@@ -2128,6 +2148,7 @@ async def internal_chat_followup_user_task(
     x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
 ):
     """Cloud Tasks worker: generate and deliver one recent-chat follow-up."""
+    _require_nudge_service_role("worker")
     _verify_nudge_task_secret(x_nudge_task_secret)
     try:
         uid = int(body.get("user_id"))
@@ -2163,6 +2184,7 @@ async def internal_broadcast_schedule_batch_task(
     x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
 ):
     """Cloud Tasks worker: send/store one broadcast schedule recipient batch."""
+    _require_nudge_service_role("worker")
     _verify_nudge_task_secret(x_nudge_task_secret)
     try:
         schedule_id = int(body.get("schedule_id"))
@@ -2718,6 +2740,7 @@ async def cron_dispatch_due_campaigns(
     Cron-safe campaign dispatch secured by static secret header:
       X-Cron-Secret: <NUDGE_CRON_SECRET>
     """
+    _require_nudge_service_role("dispatch")
     _verify_cron_secret(x_cron_secret)
     from .campaigns import dispatch_due_campaigns
 
@@ -2730,6 +2753,7 @@ async def internal_campaign_batch_task(
     x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
 ):
     """Cloud Tasks worker: render + deliver one campaign recipient batch."""
+    _require_nudge_service_role("worker")
     _verify_nudge_task_secret(x_nudge_task_secret)
     from .campaigns import process_campaign_batch
 

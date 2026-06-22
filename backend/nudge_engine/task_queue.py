@@ -43,8 +43,7 @@ def _target_base_url() -> str:
     return (
         os.getenv("NUDGE_TASKS_TARGET_BASE_URL")
         or os.getenv("CHAT_TASKS_TARGET_BASE_URL")
-        or os.getenv("PUBLIC_API_BASE_URL")
-        or "https://astroroshni.com"
+        or ""
     ).strip().rstrip("/")
 
 

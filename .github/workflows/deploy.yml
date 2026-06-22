@@ -65,6 +65,9 @@ jobs:
       GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
       GCP_PLAY_PAYMENT_SERVICE_NAME: astroroshni-play-payment-service
       GCP_PLAY_PAYMENT_SERVICE_REGION: asia-south2
+      GCP_NUDGE_DISPATCH_SERVICE_NAME: astroroshni-nudge-dispatch
+      GCP_NUDGE_WORKER_SERVICE_NAME: astroroshni-nudge-worker
+      GCP_NUDGE_SERVICE_REGION: asia-south1
       GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
       GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
     
@@ -138,6 +141,142 @@ jobs:
           --format='value(status.url)')"
         echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
         echo "Deployed play payment service at ${SERVICE_URL}"
+
+    - name: Build nudge worker service image
+      id: nudge_worker_image
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      env:
+        GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+      run: |
+        set -euo pipefail
+        IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/nudge-worker:${GITHUB_SHA}"
+        echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+        BUILD_DIR="${RUNNER_TEMP}/nudge-worker-build-context"
+        bash "${GITHUB_WORKSPACE}/scripts/prepare-nudge-service-build-context.sh" "nudge_worker_service" "${BUILD_DIR}"
+        gcloud builds submit "${BUILD_DIR}" \
+          --project "${GCP_PROJECT_ID}" \
+          --config nudge_worker_service/cloudbuild.yaml \
+          --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+    - name: Deploy nudge worker service to Cloud Run
+      id: deploy_nudge_worker_service
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        gcloud run deploy "${GCP_NUDGE_WORKER_SERVICE_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --region "${GCP_NUDGE_SERVICE_REGION}" \
+          --image "${{ steps.nudge_worker_image.outputs.image_uri }}" \
+          --platform managed \
+          --allow-unauthenticated \
+          --ingress all \
+          --service-account "800681558445-compute@developer.gserviceaccount.com" \
+          --execution-environment gen2 \
+          --network default \
+          --subnet default \
+          --vpc-egress private-ranges-only \
+          --cpu 2 \
+          --memory 2Gi \
+          --concurrency 8 \
+          --timeout 900 \
+          --min-instances 0 \
+          --max-instances 20 \
+          --port 8080 \
+          --set-env-vars "NUDGE_SERVICE_ROLE=worker,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com" \
+          --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
+
+        SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_WORKER_SERVICE_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --region "${GCP_NUDGE_SERVICE_REGION}" \
+          --format='value(status.url)')"
+        echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
+        echo "Deployed nudge worker service at ${SERVICE_URL}"
+
+    - name: Build nudge dispatch service image
+      id: nudge_dispatch_image
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      env:
+        GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+      run: |
+        set -euo pipefail
+        IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/nudge-dispatch:${GITHUB_SHA}"
+        echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+        BUILD_DIR="${RUNNER_TEMP}/nudge-dispatch-build-context"
+        bash "${GITHUB_WORKSPACE}/scripts/prepare-nudge-service-build-context.sh" "nudge_dispatch_service" "${BUILD_DIR}"
+        gcloud builds submit "${BUILD_DIR}" \
+          --project "${GCP_PROJECT_ID}" \
+          --config nudge_dispatch_service/cloudbuild.yaml \
+          --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+    - name: Deploy nudge dispatch service to Cloud Run
+      id: deploy_nudge_dispatch_service
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        gcloud run deploy "${GCP_NUDGE_DISPATCH_SERVICE_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --region "${GCP_NUDGE_SERVICE_REGION}" \
+          --image "${{ steps.nudge_dispatch_image.outputs.image_uri }}" \
+          --platform managed \
+          --allow-unauthenticated \
+          --ingress all \
+          --service-account "800681558445-compute@developer.gserviceaccount.com" \
+          --execution-environment gen2 \
+          --network default \
+          --subnet default \
+          --vpc-egress private-ranges-only \
+          --cpu 1 \
+          --memory 1Gi \
+          --concurrency 4 \
+          --timeout 300 \
+          --min-instances 0 \
+          --max-instances 5 \
+          --port 8080 \
+          --set-env-vars "NUDGE_SERVICE_ROLE=dispatch,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com,NUDGE_TASKS_TARGET_BASE_URL=${{ steps.deploy_nudge_worker_service.outputs.service_url }}" \
+          --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
+
+        SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_DISPATCH_SERVICE_NAME}" \
+          --project "${GCP_PROJECT_ID}" \
+          --region "${GCP_NUDGE_SERVICE_REGION}" \
+          --format='value(status.url)')"
+        echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
+        echo "Deployed nudge dispatch service at ${SERVICE_URL}"
+
+    - name: Repoint nudge scheduler jobs to nudge dispatch service
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        DISPATCH_URL="${{ steps.deploy_nudge_dispatch_service.outputs.service_url }}"
+        CRON_SECRET="$(gcloud secrets versions access latest --secret=NUDGE_CRON_SECRET --project "${GCP_PROJECT_ID}" | tr -d '\r\n')"
+        gcloud scheduler jobs update http nudge-campaign-dispatch \
+          --project "${GCP_PROJECT_ID}" \
+          --location asia-south1 \
+          --uri "${DISPATCH_URL}/api/nudge/cron/campaign/dispatch-due?limit=20" \
+          --http-method POST \
+          --update-headers "X-Cron-Secret=${CRON_SECRET}"
+        gcloud scheduler jobs update http astroroshni-broadcast-dispatch-due \
+          --project "${GCP_PROJECT_ID}" \
+          --location asia-south1 \
+          --uri "${DISPATCH_URL}/api/nudge/cron/broadcast/dispatch-due?limit=100" \
+          --http-method POST \
+          --update-headers "X-Cron-Secret=${CRON_SECRET}"
+        gcloud scheduler jobs update http astroroshni-chat-followup-hourly \
+          --project "${GCP_PROJECT_ID}" \
+          --location asia-south1 \
+          --uri "${DISPATCH_URL}/api/nudge/cron/chat-followup/dispatch-recent?limit_users=200&lookback_minutes=60" \
+          --http-method POST \
+          --update-headers "X-Cron-Secret=${CRON_SECRET}"
+        gcloud scheduler jobs update http astroroshni-nudge-scan-daily \
+          --project "${GCP_PROJECT_ID}" \
+          --location asia-south1 \
+          --uri "${DISPATCH_URL}/api/nudge/scan" \
+          --http-method POST \
+          --update-headers "X-Cron-Secret=${CRON_SECRET}"
 
     - name: Detect frontend artifact need
       id: frontend_artifact
