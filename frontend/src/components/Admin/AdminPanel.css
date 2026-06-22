@@ -110,6 +110,17 @@
   background: #fafbfc;
 }
 
+.credits-intelligence__mini-row--interactive {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.credits-intelligence__mini-row--interactive:hover {
+  border-color: #cfd8e3;
+  background: #f5f8fb;
+}
+
 .credits-intelligence__mini-row > div {
   display: flex;
   flex-direction: column;
@@ -130,6 +141,61 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.credits-intelligence__row-clickable {
+  cursor: pointer;
+}
+
+.credits-intelligence__row-clickable:hover td {
+  background: #f7fafc;
+}
+
+.credits-intelligence-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 2000;
+}
+
+.credits-intelligence-modal {
+  width: min(1100px, 100%);
+  max-height: min(84vh, 900px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.credits-intelligence-modal__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.credits-intelligence-modal__header h3 {
+  margin: 0 0 4px 0;
+}
+
+.credits-intelligence-modal__header p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 13px;
+}
+
+.credits-intelligence-modal__close {
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: #495057;
 }
 
 .admin-table-wrapper {

@@ -113,6 +113,9 @@ export default function AdminCreditsIntelligence() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [drilldown, setDrilldown] = useState(null);
+  const [drilldownLoading, setDrilldownLoading] = useState(false);
+  const [drilldownError, setDrilldownError] = useState('');
 
   useEffect(() => {
     if (preset === 'custom' && !fromDate) {
@@ -170,6 +173,38 @@ export default function AdminCreditsIntelligence() {
       ),
     [timeSeries],
   );
+
+  const activeRange = useMemo(
+    () => (preset === 'custom' ? { from_date: fromDate, to_date: toDate } : getDateRange(preset)),
+    [preset, fromDate, toDate],
+  );
+
+  async function openDrilldown(drilldownType, key, title) {
+    setDrilldown({ title, rows: [] });
+    setDrilldownLoading(true);
+    setDrilldownError('');
+    try {
+      const params = new URLSearchParams({
+        drilldown_type: drilldownType,
+        key: String(key),
+        from_date: activeRange.from_date,
+        to_date: activeRange.to_date,
+      });
+      const res = await fetch(`/api/credits/admin/intelligence/drilldown?${params.toString()}`, {
+        headers: getAdminAuthHeaders(),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || 'Failed to load users');
+      setDrilldown({
+        title: body.title || title,
+        rows: body.rows || [],
+      });
+    } catch (err) {
+      setDrilldownError(err.message || 'Failed to load users');
+    } finally {
+      setDrilldownLoading(false);
+    }
+  }
 
   if (loading && !data) return <div className="credits-dashboard-loading">Loading credits intelligence…</div>;
   if (error) return <div className="credits-dashboard-error">{error}</div>;
@@ -240,7 +275,12 @@ export default function AdminCreditsIntelligence() {
           </div>
           <div className="credits-intelligence__mini-table">
             {purchaseSources.map((row) => (
-              <div key={row.source} className="credits-intelligence__mini-row">
+              <button
+                key={row.source}
+                type="button"
+                className="credits-intelligence__mini-row credits-intelligence__mini-row--interactive"
+                onClick={() => openDrilldown('purchase_source', row.source, `Users from ${row.source}`)}
+              >
                 <div>
                   <strong>{SOURCE_LABELS[row.source] || row.source || 'Unknown'}</strong>
                   <span>{formatInt(row.unique_users)} users</span>
@@ -249,7 +289,7 @@ export default function AdminCreditsIntelligence() {
                   <strong>{formatInt(row.credits)}</strong>
                   <span>{formatInt(row.purchase_count)} purchases</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
@@ -261,7 +301,12 @@ export default function AdminCreditsIntelligence() {
           </div>
           <div className="credits-intelligence__mini-table">
             {walletBuckets.map((row) => (
-              <div key={row.bucket} className="credits-intelligence__mini-row">
+              <button
+                key={row.bucket}
+                type="button"
+                className="credits-intelligence__mini-row credits-intelligence__mini-row--interactive"
+                onClick={() => openDrilldown('wallet_bucket', row.bucket, `Users in wallet bucket ${row.bucket}`)}
+              >
                 <div>
                   <strong>{row.bucket} credits</strong>
                   <span>{formatInt(row.user_count)} users</span>
@@ -270,7 +315,7 @@ export default function AdminCreditsIntelligence() {
                   <strong>{formatInt(row.total_credits)}</strong>
                   <span>credits parked</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
@@ -294,7 +339,11 @@ export default function AdminCreditsIntelligence() {
             </thead>
             <tbody>
               {spendByFeature.map((row) => (
-                <tr key={row.feature}>
+                <tr
+                  key={row.feature}
+                  className="credits-intelligence__row-clickable"
+                  onClick={() => openDrilldown('feature_spend', row.feature, `Users who spent on ${row.feature}`)}
+                >
                   <td>{FEATURE_LABELS[row.feature] || row.feature || 'Other'}</td>
                   <td>{formatInt(row.spent_credits)}</td>
                   <td>{formatInt(row.spend_count)}</td>
@@ -376,7 +425,12 @@ export default function AdminCreditsIntelligence() {
           </div>
           <div className="credits-intelligence__mini-table">
             {dormantBalances.map((row) => (
-              <div key={row.userid} className="credits-intelligence__mini-row">
+              <button
+                key={row.userid}
+                type="button"
+                className="credits-intelligence__mini-row credits-intelligence__mini-row--interactive"
+                onClick={() => openDrilldown('dormant_balance', row.userid, 'Watchlist user details')}
+              >
                 <div>
                   <strong>{row.user_name || `User ${row.userid}`}</strong>
                   <span>{row.user_phone || `ID ${row.userid}`}</span>
@@ -385,11 +439,61 @@ export default function AdminCreditsIntelligence() {
                   <strong>{formatInt(row.current_balance)} bal</strong>
                   <span>{formatDateTime(row.last_purchase_at)}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
       </div>
+
+      {drilldown && (
+        <div className="credits-intelligence-modal-backdrop" onClick={() => setDrilldown(null)}>
+          <div className="credits-intelligence-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="credits-intelligence-modal__header">
+              <div>
+                <h3>{drilldown.title}</h3>
+                <p>{drilldown.rows?.length || 0} users shown</p>
+              </div>
+              <button type="button" className="credits-intelligence-modal__close" onClick={() => setDrilldown(null)}>
+                ×
+              </button>
+            </div>
+            {drilldownLoading ? (
+              <div className="credits-dashboard-loading">Loading users…</div>
+            ) : drilldownError ? (
+              <div className="credits-dashboard-error">{drilldownError}</div>
+            ) : (
+              <div className="admin-table-wrapper">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Phone</th>
+                      <th>Purchased</th>
+                      <th>Spent</th>
+                      <th>Balance</th>
+                      <th>Count</th>
+                      <th>Last event</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(drilldown.rows || []).map((row) => (
+                      <tr key={`${row.userid}-${row.user_phone || ''}`}>
+                        <td>{row.user_name || `User ${row.userid}`}</td>
+                        <td>{row.user_phone || '—'}</td>
+                        <td>{formatInt(row.purchased_credits)}</td>
+                        <td>{formatInt(row.spent_credits)}</td>
+                        <td>{formatInt(row.current_balance)}</td>
+                        <td>{formatInt(row.purchase_count || row.spend_count)}</td>
+                        <td>{formatDateTime(row.last_event_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

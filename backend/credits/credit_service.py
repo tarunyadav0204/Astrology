@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 class CreditService:
     def __init__(self):
-        self.init_tables()
+        # Import-time callers instantiate this service in many modules.
+        # Keep construction side-effect free so worker boot cannot hang on DDL.
+        pass
 
     def _date_today_expr(self) -> str:
         return "CURRENT_DATE"
@@ -3951,3 +3953,185 @@ class CreditService:
             "dormant_balances": dormant_balances,
             "time_series": time_series,
         }
+
+    def get_admin_intelligence_drilldown(
+        self,
+        from_date: str,
+        to_date: str,
+        drilldown_type: str,
+        key: str,
+        limit: int = 200,
+    ) -> Dict:
+        from db import get_conn, execute
+
+        limit = max(1, min(int(limit or 200), 500))
+        with get_conn() as conn:
+            if drilldown_type == "purchase_source":
+                cur = execute(
+                    conn,
+                    """
+                    SELECT
+                        ct.userid,
+                        COALESCE(u.name, '') AS user_name,
+                        COALESCE(u.phone, '') AS user_phone,
+                        COUNT(*) AS purchase_count,
+                        COALESCE(SUM(ct.amount), 0) AS purchased_credits,
+                        COALESCE(uc.credits, 0) AS current_balance,
+                        MAX(ct.created_at) AS last_event_at
+                    FROM credit_transactions ct
+                    LEFT JOIN users u ON u.userid = ct.userid
+                    LEFT JOIN user_credits uc ON uc.userid = ct.userid
+                    WHERE ct.transaction_type = 'earned'
+                      AND ct.source = ?
+                      AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+                    GROUP BY ct.userid, u.name, u.phone, uc.credits
+                    ORDER BY purchased_credits DESC, purchase_count DESC, last_event_at DESC
+                    LIMIT ?
+                    """,
+                    (key, from_date, to_date, limit),
+                )
+                rows = [
+                    {
+                        "userid": r[0],
+                        "user_name": r[1],
+                        "user_phone": r[2],
+                        "purchase_count": r[3] or 0,
+                        "purchased_credits": r[4] or 0,
+                        "current_balance": r[5] or 0,
+                        "last_event_at": r[6].isoformat() if r[6] else None,
+                    }
+                    for r in cur.fetchall()
+                ]
+                return {"title": f"Users from {key}", "rows": rows}
+
+            if drilldown_type == "feature_spend":
+                cur = execute(
+                    conn,
+                    """
+                    SELECT
+                        ct.userid,
+                        COALESCE(u.name, '') AS user_name,
+                        COALESCE(u.phone, '') AS user_phone,
+                        COUNT(*) AS spend_count,
+                        COALESCE(SUM(-ct.amount), 0) AS spent_credits,
+                        COALESCE(uc.credits, 0) AS current_balance,
+                        MAX(ct.created_at) AS last_event_at
+                    FROM credit_transactions ct
+                    LEFT JOIN users u ON u.userid = ct.userid
+                    LEFT JOIN user_credits uc ON uc.userid = ct.userid
+                    WHERE ct.transaction_type = 'spent'
+                      AND COALESCE(ct.reference_id, 'other') = ?
+                      AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+                    GROUP BY ct.userid, u.name, u.phone, uc.credits
+                    ORDER BY spent_credits DESC, spend_count DESC, last_event_at DESC
+                    LIMIT ?
+                    """,
+                    (key, from_date, to_date, limit),
+                )
+                rows = [
+                    {
+                        "userid": r[0],
+                        "user_name": r[1],
+                        "user_phone": r[2],
+                        "spend_count": r[3] or 0,
+                        "spent_credits": r[4] or 0,
+                        "current_balance": r[5] or 0,
+                        "last_event_at": r[6].isoformat() if r[6] else None,
+                    }
+                    for r in cur.fetchall()
+                ]
+                return {"title": f"Users who spent on {key}", "rows": rows}
+
+            if drilldown_type == "wallet_bucket":
+                bucket_sql = {
+                    "0": "COALESCE(uc.credits, 0) <= 0",
+                    "1-49": "COALESCE(uc.credits, 0) BETWEEN 1 AND 49",
+                    "50-199": "COALESCE(uc.credits, 0) BETWEEN 50 AND 199",
+                    "200-499": "COALESCE(uc.credits, 0) BETWEEN 200 AND 499",
+                    "500-999": "COALESCE(uc.credits, 0) BETWEEN 500 AND 999",
+                    "1000+": "COALESCE(uc.credits, 0) >= 1000",
+                }.get(key)
+                if not bucket_sql:
+                    return {"title": "Users", "rows": []}
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT
+                        u.userid,
+                        COALESCE(u.name, '') AS user_name,
+                        COALESCE(u.phone, '') AS user_phone,
+                        COALESCE(uc.credits, 0) AS current_balance
+                    FROM users u
+                    LEFT JOIN user_credits uc ON uc.userid = u.userid
+                    WHERE {bucket_sql}
+                    ORDER BY current_balance DESC, u.userid DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+                rows = [
+                    {
+                        "userid": r[0],
+                        "user_name": r[1],
+                        "user_phone": r[2],
+                        "current_balance": r[3] or 0,
+                    }
+                    for r in cur.fetchall()
+                ]
+                return {"title": f"Users in wallet bucket {key}", "rows": rows}
+
+            if drilldown_type == "dormant_balance":
+                cur = execute(
+                    conn,
+                    """
+                    WITH paid_range AS (
+                        SELECT userid, SUM(amount) AS purchased_credits, MAX(created_at) AS last_purchase_at
+                        FROM credit_transactions
+                        WHERE transaction_type = 'earned'
+                          AND source IN ('google_play', 'razorpay')
+                          AND date(created_at) >= ? AND date(created_at) <= ?
+                        GROUP BY userid
+                    ),
+                    spent_range AS (
+                        SELECT userid, SUM(-amount) AS spent_credits
+                        FROM credit_transactions
+                        WHERE transaction_type = 'spent'
+                          AND date(created_at) >= ? AND date(created_at) <= ?
+                        GROUP BY userid
+                    )
+                    SELECT
+                        p.userid,
+                        COALESCE(u.name, '') AS user_name,
+                        COALESCE(u.phone, '') AS user_phone,
+                        p.purchased_credits,
+                        COALESCE(s.spent_credits, 0) AS spent_credits,
+                        COALESCE(uc.credits, 0) AS current_balance,
+                        p.last_purchase_at
+                    FROM paid_range p
+                    LEFT JOIN spent_range s ON s.userid = p.userid
+                    LEFT JOIN users u ON u.userid = p.userid
+                    LEFT JOIN user_credits uc ON uc.userid = p.userid
+                    WHERE p.userid = ?
+                    LIMIT 1
+                    """,
+                    (from_date, to_date, from_date, to_date, int(key)),
+                )
+                r = cur.fetchone()
+                if not r:
+                    return {"title": "User", "rows": []}
+                return {
+                    "title": "Watchlist user details",
+                    "rows": [
+                        {
+                            "userid": r[0],
+                            "user_name": r[1],
+                            "user_phone": r[2],
+                            "purchased_credits": r[3] or 0,
+                            "spent_credits": r[4] or 0,
+                            "current_balance": r[5] or 0,
+                            "last_event_at": r[6].isoformat() if r[6] else None,
+                        }
+                    ],
+                }
+
+        return {"title": "Users", "rows": []}
