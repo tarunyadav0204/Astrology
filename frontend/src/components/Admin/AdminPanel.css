@@ -132,6 +132,17 @@
   gap: 4px;
 }
 
+.admin-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table-wrapper .admin-table {
+  min-width: 720px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1288,6 +1299,16 @@ select {
 
   .credits-intelligence__layout {
     grid-template-columns: 1fr;
+  }
+
+  .admin-table-wrapper {
+    margin-left: -2px;
+    margin-right: -2px;
+    padding-bottom: 4px;
+  }
+
+  .admin-table-wrapper .admin-table {
+    min-width: 760px;
   }
 
   .users-filters-toggle {
