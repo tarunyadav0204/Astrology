@@ -185,12 +185,6 @@ def ensure_local_chat_task_queue_schema() -> None:
         conn.commit()
 
 
-def ensure_credit_service_schema() -> None:
-    from credits.credit_service import CreditService
-
-    CreditService().init_tables()
-
-
 def _instance_identity() -> str:
     return (
         os.getenv("INSTANCE_NAME")
@@ -635,11 +629,6 @@ async def lifespan(app: FastAPI):
                 "daily prediction engine initialized",
             )
             _startup_step("init_chat_tables", init_chat_tables, "chat history database initialized")
-            _startup_step(
-                "ensure_credit_service_schema",
-                ensure_credit_service_schema,
-                "credit service schema ready",
-            )
             _startup_step(
                 "ensure_chart_response_cache_schema",
                 ensure_chart_response_cache_schema,

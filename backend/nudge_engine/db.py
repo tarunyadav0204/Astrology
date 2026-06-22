@@ -285,7 +285,6 @@ def init_nudge_tables(conn) -> None:
                 title_template TEXT NOT NULL,
                 body_template TEXT NOT NULL,
                 question_template TEXT,
-                image_url TEXT,
                 channel_policy TEXT NOT NULL DEFAULT 'waterfall',
                 channels_json TEXT NOT NULL DEFAULT '["push","whatsapp","email"]',
                 ai_personalize BOOLEAN NOT NULL DEFAULT FALSE,
@@ -300,10 +299,6 @@ def init_nudge_tables(conn) -> None:
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )
             """,
-        )
-        _safe_execute_nudge_ddl(
-            conn,
-            "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS image_url TEXT",
         )
         _safe_execute_nudge_ddl(
             conn,
@@ -327,16 +322,6 @@ def init_nudge_tables(conn) -> None:
             )
             """,
         )
-        for _ddl in (
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS campaign_id INTEGER",
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS userid INTEGER",
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS trigger_id TEXT",
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS question TEXT",
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP",
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS seconds_since_sent INTEGER",
-            "ALTER TABLE nudge_conversions ADD COLUMN IF NOT EXISTS attribution TEXT NOT NULL DEFAULT 'tap'",
-        ):
-            _safe_execute_nudge_ddl(conn, _ddl)
         _safe_execute_nudge_ddl(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_conversions_campaign "
@@ -1325,7 +1310,7 @@ def insert_cron_run(conn, job_key: str, status: str, summary_json: str) -> Optio
 # ---------------------------------------------------------------------------
 
 _CAMPAIGN_COLUMNS = (
-    "id", "name", "status", "title_template", "body_template", "question_template", "image_url",
+    "id", "name", "status", "title_template", "body_template", "question_template",
     "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
     "audience_filter_json", "landing_screen", "scheduled_at", "dispatched_at",
     "total_targeted", "created_by", "created_at", "updated_at",
@@ -1356,7 +1341,6 @@ def create_campaign(
     title_template: str,
     body_template: str,
     question_template: str,
-    image_url: Optional[str],
     channel_policy: str,
     channels_json: str,
     ai_personalize: bool,
@@ -1371,14 +1355,14 @@ def create_campaign(
         conn,
         """
         INSERT INTO nudge_campaigns
-            (name, status, title_template, body_template, question_template, image_url,
+            (name, status, title_template, body_template, question_template,
              channel_policy, channels_json, ai_personalize, ai_base_prompt,
              audience_filter_json, landing_screen, scheduled_at, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
-            name, status, title_template, body_template, question_template or None, image_url or None,
+            name, status, title_template, body_template, question_template or None,
             channel_policy, channels_json, bool(ai_personalize), ai_base_prompt or None,
             audience_filter_json, landing_screen, scheduled_at, created_by,
         ),
@@ -1389,7 +1373,7 @@ def create_campaign(
 
 def update_campaign(conn, campaign_id: int, **fields: Any) -> int:
     allowed = {
-        "name", "status", "title_template", "body_template", "question_template", "image_url",
+        "name", "status", "title_template", "body_template", "question_template",
         "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
         "audience_filter_json", "landing_screen", "scheduled_at", "dispatched_at",
         "total_targeted",
@@ -1581,12 +1565,12 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
                COUNT(*) FILTER (WHERE channel = 'push' AND COALESCE(send_status, 'sent') = 'sent') AS push,
                COUNT(*) FILTER (WHERE channel IN ('whatsapp', 'whatsapp_template') AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp,
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
-                                AND COALESCE(data_json, '') NOT LIKE '%%"from_template_continue": true%%') AS whatsapp_direct,
+                                AND COALESCE(data_json, '') NOT LIKE '%"from_template_continue": true%') AS whatsapp_direct,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp_template,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND clicked_at IS NOT NULL) AS whatsapp_template_clicked,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_message_sent,
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
-                                AND COALESCE(data_json, '') LIKE '%%"from_template_continue": true%%') AS whatsapp_after_continue,
+                                AND COALESCE(data_json, '') LIKE '%"from_template_continue": true%') AS whatsapp_after_continue,
                COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)

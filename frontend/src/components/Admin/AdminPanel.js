@@ -8,7 +8,6 @@ import AdminDailyActivity from './AdminDailyActivity';
 import AdminActivity from './AdminActivity';
 import AdminUserProfile from './AdminUserProfile';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
-import AdminCreditsIntelligence from './AdminCreditsIntelligence';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
@@ -2787,12 +2786,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Dashboard
           </button>
-          <button
-            className={`subtab ${activeSubTab === 'intelligence' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('intelligence')}
-          >
-            Intelligence
-          </button>
           <button 
             className={`subtab ${activeSubTab === 'management' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('management')}
@@ -3880,10 +3873,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'dashboard' && (
           <AdminCreditsDashboard />
-        )}
-
-        {activeTab === 'credits' && activeSubTab === 'intelligence' && (
-          <AdminCreditsIntelligence />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'ledger' && (

@@ -495,7 +495,6 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
         cta = LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat")
         event_params = json.dumps({"campaign_id": int(campaign_id)}, ensure_ascii=False)
         data_extra: Dict[str, Any] = {"landing_screen": landing, "campaign_id": str(int(campaign_id))}
-        image_url = str(campaign.get("image_url") or "").strip() or None
         if landing in {"career", "marriage", "health", "wealth", "progeny", "education"}:
             data_extra["analysis_type"] = landing
 
@@ -518,7 +517,6 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                     event_params=event_params,
                     data_extra=data_extra,
                     cta_deep_link=cta,
-                    image_url=image_url,
                 )
                 summary["delivered"] += 1
                 ch = result.get("channel") or "stored"
@@ -735,7 +733,6 @@ def send_campaign_test(conn, campaign: Dict[str, Any], target_userid: int) -> Di
     ).get(int(target_userid)) or default_params()
     copy = render_campaign_for_user(campaign, params)
     landing = str(campaign.get("landing_screen") or "chat")
-    image_url = str(campaign.get("image_url") or "").strip() or None
     channels = [c for c in (campaign.get("channels") or []) if c in ALLOWED_CHANNELS] or list(
         ALLOWED_CHANNELS
     )
@@ -753,6 +750,5 @@ def send_campaign_test(conn, campaign: Dict[str, Any], target_userid: int) -> Di
         ),
         data_extra={"landing_screen": landing},
         cta_deep_link=LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat"),
-        image_url=image_url,
     )
     return {"copy": copy, "delivery": result}
