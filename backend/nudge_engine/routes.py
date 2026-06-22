@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File, Form
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -27,6 +27,13 @@ from .template_render import TemplateRenderError, validate_templates
 from .trigger_defaults import get_spec, list_registered_trigger_keys
 from .trigger_def_loader import load_merged_definition
 from utils.smtp_mail import send_plain_text_email
+try:
+    from blog.storage import storage_manager as blog_storage_manager
+except Exception:
+    try:
+        from blog.local_storage import storage_manager as blog_storage_manager
+    except Exception:
+        blog_storage_manager = None
 
 logger = logging.getLogger(__name__)
 IST_TZ = ZoneInfo("Asia/Kolkata")
@@ -213,6 +220,7 @@ class CampaignUpsertRequest(BaseModel):
     title_template: str
     body_template: str
     question_template: str = ""
+    image_url: str = ""
     channel_policy: str = "waterfall"  # "waterfall" or "blast"
     channels: List[str] = Field(default_factory=lambda: ["push", "whatsapp", "email"])
     ai_personalize: bool = False
@@ -227,6 +235,7 @@ class CampaignPreviewRequest(BaseModel):
     title_template: str
     body_template: str
     question_template: str = ""
+    image_url: str = ""
     ai_personalize: bool = False
     ai_base_prompt: str = ""
     user_id: Optional[int] = None  # sample user; defaults to current admin
@@ -2333,6 +2342,7 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
     title_t = (body.title_template or "").strip()
     body_t = (body.body_template or "").strip()
     question_t = (body.question_template or "").strip()
+    image_url = (body.image_url or "").strip()[:2000]
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
     if not title_t or not body_t:
@@ -2408,6 +2418,7 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         "title_template": title_t,
         "body_template": body_t,
         "question_template": question_t,
+        "image_url": image_url if image_url.startswith("http") else "",
         "channel_policy": policy,
         "channels_json": json.dumps(channels, ensure_ascii=False),
         "ai_personalize": bool(body.ai_personalize),
@@ -2596,6 +2607,7 @@ async def admin_preview_campaign(
     title_t = (body.title_template or "").strip()
     body_t = (body.body_template or "").strip()
     question_t = (body.question_template or "").strip()
+    image_url = (body.image_url or "").strip()[:2000]
     if not title_t or not body_t:
         raise HTTPException(status_code=400, detail="title_template and body_template are required")
     try:
@@ -2608,6 +2620,7 @@ async def admin_preview_campaign(
         "title_template": title_t,
         "body_template": body_t,
         "question_template": question_t,
+        "image_url": image_url if image_url.startswith("http") else "",
         "ai_personalize": bool(body.ai_personalize),
         "ai_base_prompt": (body.ai_base_prompt or "").strip(),
     }
@@ -2628,6 +2641,38 @@ async def admin_preview_campaign(
     except Exception as e:
         logger.exception("admin_preview_campaign failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to preview campaign") from e
+
+
+@router.post("/admin/campaigns/upload-image")
+async def admin_upload_campaign_image(
+    file: UploadFile = File(...),
+    alt_text: str = Form("Campaign image"),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a campaign image using the same public blog image bucket path."""
+    _require_admin(current_user)
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    if blog_storage_manager is None:
+        raise HTTPException(status_code=503, detail="Image storage is not configured")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Image file is empty")
+    try:
+        upload_result = blog_storage_manager.upload_image(
+            content,
+            file.filename or f"campaign-{uuid.uuid4().hex}.jpg",
+            file.content_type,
+        )
+        return {
+            "ok": True,
+            "url": upload_result["public_url"],
+            "filename": upload_result["filename"],
+            "alt_text": (alt_text or "").strip()[:200],
+        }
+    except Exception as e:
+        logger.exception("admin_upload_campaign_image failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to upload campaign image") from e
 
 
 @router.post("/admin/campaigns/audience-estimate")

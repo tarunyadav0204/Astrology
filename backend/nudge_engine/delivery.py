@@ -27,10 +27,17 @@ def new_delivery_group_id() -> str:
     return uuid.uuid4().hex
 
 
-def _attempt_push(conn, userid: int, title: str, body: str, push_data: Dict[str, Any]) -> bool:
+def _attempt_push(
+    conn,
+    userid: int,
+    title: str,
+    body: str,
+    push_data: Dict[str, Any],
+    image_url: Optional[str] = None,
+) -> bool:
     tokens = db.get_device_tokens_for_user(conn, userid)
     for token, _platform in tokens or []:
-        if push_module.send_expo_push(token, title, body, data=push_data):
+        if push_module.send_expo_push(token, title, body, data=push_data, image_url=image_url):
             return True
     return False
 
@@ -75,6 +82,7 @@ def deliver_nudge(
     event_params: str = "",
     data_extra: Optional[Dict[str, Any]] = None,
     cta_deep_link: str = "astroroshni://chat",
+    image_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Deliver one logical nudge to one user:
@@ -109,7 +117,7 @@ def deliver_nudge(
     attempts: List[Tuple[str, bool]] = []
     for channel in requested:
         if channel == "push":
-            ok = _attempt_push(conn, userid, title, body, push_data)
+            ok = _attempt_push(conn, userid, title, body, push_data, image_url=image_url)
             actual_channel = "push"
         elif channel == "whatsapp":
             actual_channel = _attempt_whatsapp(conn, userid, title, body, q or None) or "whatsapp"

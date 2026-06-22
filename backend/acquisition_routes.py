@@ -37,7 +37,7 @@ _UUID_RE = re.compile(
 
 _FUNNEL_STEPS = [
     ("first_open", "First open"),
-    ("auth_welcome_viewed", "Welcome viewed"),
+    ("auth_phone_screen_viewed", "Phone screen viewed"),
     ("auth_mode_selected", "Mode selected"),
     ("auth_phone_submitted", "Phone submitted"),
     ("registration_otp_requested", "OTP requested"),
@@ -51,6 +51,16 @@ _FUNNEL_STEPS = [
     ("registration_completed", "Registration completed"),
 ]
 
+# Keep analytics backward-safe: old builds/paths may still emit auth_welcome_viewed,
+# but in the current app this is the phone entry step.
+_FUNNEL_EVENT_ALIASES: dict[str, list[str]] = {
+    "auth_phone_screen_viewed": ["auth_phone_screen_viewed", "auth_welcome_viewed"],
+}
+
+
+def _funnel_step_events(step_name: str) -> list[str]:
+    return _FUNNEL_EVENT_ALIASES.get(step_name, [step_name])
+
 
 def _reached_funnel_events(event_name: str) -> list[str]:
     """Events that prove an install reached this funnel step or a later one."""
@@ -58,7 +68,12 @@ def _reached_funnel_events(event_name: str) -> list[str]:
     if event_name == "first_open" or event_name not in names:
         return []
     idx = names.index(event_name)
-    return [name for name in names[idx:] if name != "first_open"]
+    reached: list[str] = []
+    for name in names[idx:]:
+        if name == "first_open":
+            continue
+        reached.extend(_funnel_step_events(name))
+    return reached
 
 
 def _query_from_candidate(value: str) -> Optional[str]:
@@ -703,7 +718,11 @@ async def admin_acquisition_installations_export(
         app_build=app_build,
         alias="ai",
     )
-    funnel_event_names = [name for name, _label in _FUNNEL_STEPS if name != "first_open"]
+    funnel_event_names: list[str] = []
+    for name, _label in _FUNNEL_STEPS:
+        if name == "first_open":
+            continue
+        funnel_event_names.extend(_funnel_step_events(name))
     funnel_placeholders = ", ".join(["?"] * len(funnel_event_names))
 
     try:
@@ -785,9 +804,16 @@ async def admin_acquisition_installations_export(
                     """,
                     params + funnel_event_names,
                 )
+                event_to_step = {}
+                for step_name, _label in _FUNNEL_STEPS:
+                    if step_name == "first_open":
+                        continue
+                    for event_name in _funnel_step_events(step_name):
+                        event_to_step[event_name] = step_name
                 for iid, event_name in cur.fetchall() or []:
-                    if iid and event_name:
-                        reached_by_install.setdefault(str(iid), set()).add(str(event_name))
+                    canonical_step = event_to_step.get(str(event_name))
+                    if iid and canonical_step:
+                        reached_by_install.setdefault(str(iid), set()).add(canonical_step)
 
         install_rows = []
         for r in rows:
@@ -1316,4 +1342,3 @@ def _build_acquisition_export_zip(
         zf.writestr("03_dropoff.csv", dropoff_csv)
         zf.writestr("04_installs.csv", installs_csv)
     return zip_buf.getvalue()
-

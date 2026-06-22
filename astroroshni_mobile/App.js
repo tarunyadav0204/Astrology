@@ -212,7 +212,7 @@ export default function App() {
     }
   };
 
-  const SPLASH_MIN_MS = 3000;
+  const SPLASH_MIN_MS = 1200;
 
   const checkForceUpdate = async () => {
     let timeoutId = null;

@@ -42,6 +42,7 @@ const emptyForm = {
   title_template: '',
   body_template: '',
   question_template: '',
+  image_url: '',
   channel_policy: 'waterfall',
   channels: ['push', 'whatsapp', 'email'],
   ai_personalize: false,
@@ -94,6 +95,7 @@ export default function AdminNudgeCampaigns() {
   const [resultOk, setResultOk] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [previewUserId, setPreviewUserId] = useState('');
   const [audienceEstimate, setAudienceEstimate] = useState(null);
@@ -184,6 +186,7 @@ export default function AdminNudgeCampaigns() {
       title_template: form.title_template.trim(),
       body_template: form.body_template.trim(),
       question_template: form.question_template.trim(),
+      image_url: String(form.image_url || '').trim(),
       channel_policy: form.channel_policy,
       channels: form.channels,
       ai_personalize: !!form.ai_personalize,
@@ -263,6 +266,7 @@ export default function AdminNudgeCampaigns() {
           title_template: form.title_template.trim(),
           body_template: form.body_template.trim(),
           question_template: form.question_template.trim(),
+          image_url: String(form.image_url || '').trim(),
           ai_personalize: !!form.ai_personalize,
           ai_base_prompt: form.ai_base_prompt.trim(),
           ...(previewUserId ? { user_id: Number(previewUserId) } : {}),
@@ -287,6 +291,7 @@ export default function AdminNudgeCampaigns() {
       title_template: campaign.title_template || '',
       body_template: campaign.body_template || '',
       question_template: campaign.question_template || '',
+      image_url: campaign.image_url || '',
       channel_policy: campaign.channel_policy || 'waterfall',
       channels: (campaign.channels || []).length ? campaign.channels : ['push'],
       ai_personalize: !!campaign.ai_personalize,
@@ -321,6 +326,34 @@ export default function AdminNudgeCampaigns() {
       scheduled_at: campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCampaignImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    showResult(true, '');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('alt_text', form.name?.trim() || 'Campaign image');
+      const res = await fetch('/api/nudge/admin/campaigns/upload-image', {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+        body: formData,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.detail || 'Failed to upload image');
+      }
+      setField('image_url', body.url || '');
+      showResult(true, 'Campaign image uploaded.');
+    } catch (err) {
+      showResult(false, err.message || 'Failed to upload image');
+    } finally {
+      setImageUploading(false);
+      e.target.value = '';
+    }
   };
 
   const handleAction = async (campaignId, action, confirmText) => {
@@ -771,6 +804,42 @@ export default function AdminNudgeCampaigns() {
               value={form.question_template}
               onChange={(e) => setField('question_template', e.target.value)}
             />
+          </div>
+
+          <div className="form-field">
+            <label>Campaign image for Android push (optional)</label>
+            <input
+              type="text"
+              placeholder="https://... or upload below"
+              value={form.image_url}
+              onChange={(e) => setField('image_url', e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+              <label className="notif-search-btn" style={{ cursor: imageUploading ? 'wait' : 'pointer' }}>
+                {imageUploading ? 'Uploading...' : 'Upload image'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCampaignImageUpload}
+                  style={{ display: 'none' }}
+                  disabled={imageUploading}
+                />
+              </label>
+              {form.image_url ? (
+                <button type="button" className="delete-btn" onClick={() => setField('image_url', '')}>
+                  Remove image
+                </button>
+              ) : null}
+            </div>
+            {form.image_url ? (
+              <div style={{ marginTop: 12 }}>
+                <img
+                  src={form.image_url}
+                  alt="Campaign preview"
+                  style={{ width: 180, maxWidth: '100%', borderRadius: 10, border: '1px solid #e8d7dd' }}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="form-field">

@@ -198,7 +198,11 @@ const AdminAcquisition = () => {
   const dropoffSeverity = (eventName, status) => {
     if (status === 'failed') return '#fee2e2';
     if (String(eventName || '').includes('otp')) return '#ffedd5';
-    if (eventName === 'first_open_only' || eventName === 'auth_welcome_viewed') return '#fef9c3';
+    if (
+      eventName === 'first_open_only' ||
+      eventName === 'auth_welcome_viewed' ||
+      eventName === 'auth_phone_screen_viewed'
+    ) return '#fef9c3';
     return '#f8fafc';
   };
 
