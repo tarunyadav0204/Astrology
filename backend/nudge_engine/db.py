@@ -527,6 +527,39 @@ def get_delivery_fingerprints_on_date(
         return set()
 
 
+def get_delivery_fingerprints_for_users_on_date(
+    conn, target_date: date, user_ids: List[int]
+) -> Set[Tuple[int, str, str]]:
+    """
+    Same as get_delivery_fingerprints_on_date, but scoped to a concrete user batch
+    so worker fan-out does not need to scan every delivery for the day.
+    """
+    ids = [int(uid) for uid in (user_ids or []) if str(uid).isdigit()]
+    if not ids:
+        return set()
+    try:
+        cur = execute(
+            conn,
+            """
+            SELECT userid, trigger_id, title
+            FROM nudge_deliveries
+            WHERE sent_at = %s
+              AND userid = ANY(%s)
+            """,
+            (target_date.isoformat(), ids),
+        )
+        rows = cur.fetchall()
+        return {(int(r[0]), str(r[1]), str(r[2])) for r in rows} if rows else set()
+    except Exception as e:
+        logger.warning(
+            "Could not fetch delivery fingerprints for %s scoped to %s users: %s",
+            target_date,
+            len(ids),
+            e,
+        )
+        return set()
+
+
 def get_planet_window_dedupe_keys(
     conn, trigger_id: str, since_date: date
 ) -> Set[Tuple[int, str, str]]:

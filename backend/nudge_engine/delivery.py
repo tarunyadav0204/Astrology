@@ -216,3 +216,71 @@ def deliver(
         except Exception:
             pass
     return count
+
+
+def deliver_for_user_batch(
+    target_date: date,
+    event: NudgeEvent,
+    user_ids: List[int],
+) -> Dict[str, Any]:
+    """
+    Deliver one event to a concrete user batch with per-batch dedupe.
+    Used by Cloud Tasks workers so the daily scan no longer does full fan-out inline.
+    """
+    ids = [int(uid) for uid in (user_ids or []) if str(uid).isdigit()]
+    if not ids:
+        return {
+            "targeted": 0,
+            "deduped": 0,
+            "delivered": 0,
+        }
+
+    with db.get_conn() as conn:
+        existing = db.get_delivery_fingerprints_for_users_on_date(conn, target_date, ids)
+        pending: List[int] = []
+        for uid in ids:
+            key = (uid, event.trigger_id, event.title)
+            if key in existing:
+                continue
+            pending.append(uid)
+
+        delivered = 0
+        params_json = json.dumps(event.params) if event.params else ""
+        for uid in pending:
+            try:
+                data_extra: Dict[str, Any] = {}
+                bcid = event.params.get("birth_chart_id") if event.params else None
+                if bcid is not None and str(bcid).strip():
+                    data_extra["native_id"] = str(bcid).strip()
+                deliver_nudge(
+                    conn,
+                    userid=uid,
+                    trigger_id=event.trigger_id,
+                    title=event.title,
+                    body=event.body,
+                    question=event.question,
+                    policy="waterfall",
+                    channels=DEFAULT_WATERFALL_CHANNELS,
+                    sent_at=target_date,
+                    event_params=params_json,
+                    data_extra=data_extra,
+                    cta_deep_link=event.cta_deep_link or "astroroshni://chat",
+                )
+                delivered += 1
+            except Exception as exc:
+                logger.exception(
+                    "Batch delivery failed for user %s, trigger %s: %s",
+                    uid,
+                    event.trigger_id,
+                    exc,
+                )
+        try:
+            conn.commit()
+        except Exception:
+            pass
+
+    return {
+        "targeted": len(ids),
+        "deduped": len(ids) - len(pending),
+        "delivered": delivered,
+    }

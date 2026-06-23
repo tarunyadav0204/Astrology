@@ -7016,9 +7016,17 @@ if __name__ == "__main__":
     logger.debug("Starting Astrology API server on port 8001...")
     
     try:
+        def _default_uvicorn_workers() -> int:
+            host = (socket.gethostname() or "").strip().lower()
+            if host.startswith("astroroshni-chat-worker"):
+                return 1
+            if host.startswith("astroroshni-nudge-worker"):
+                return 1
+            return 2
+
         # Get port from environment for GCP deployment
         port = int(os.getenv('PORT', 8001))
-        workers = max(1, int(os.getenv("UVICORN_WORKERS", "2")))
+        workers = max(1, int(os.getenv("UVICORN_WORKERS", str(_default_uvicorn_workers()))))
         limit_concurrency = max(1, int(os.getenv("UVICORN_LIMIT_CONCURRENCY", "500")))
         
         # No limit_max_requests: recycling every N requests caused ~3h watchdog restarts

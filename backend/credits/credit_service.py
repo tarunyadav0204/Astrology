@@ -11,7 +11,17 @@ logger = logging.getLogger(__name__)
 
 class CreditService:
     def __init__(self):
-        self.init_tables()
+        if self._should_init_tables_on_startup():
+            self.init_tables()
+
+    @staticmethod
+    def _should_init_tables_on_startup() -> bool:
+        return (os.getenv("CREDIT_SERVICE_INIT_ON_STARTUP") or "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     def _date_today_expr(self) -> str:
         return "CURRENT_DATE"
