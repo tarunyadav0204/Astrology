@@ -8,9 +8,13 @@ from typing import Any, Dict, Optional
 from db import execute, get_conn
 
 logger = logging.getLogger(__name__)
+_LOCAL_CHAT_TASK_QUEUE_SCHEMA_READY = False
 
 
 def ensure_local_chat_task_queue_table(conn) -> None:
+    global _LOCAL_CHAT_TASK_QUEUE_SCHEMA_READY
+    if _LOCAL_CHAT_TASK_QUEUE_SCHEMA_READY:
+        return
     execute(
         conn,
         """
@@ -33,6 +37,7 @@ def ensure_local_chat_task_queue_table(conn) -> None:
         conn,
         "CREATE INDEX IF NOT EXISTS idx_local_chat_task_queue_status_created ON local_chat_task_queue (status, created_at)",
     )
+    _LOCAL_CHAT_TASK_QUEUE_SCHEMA_READY = True
 
 
 def enqueue_local_chat_task(*, message_id: int, payload: Dict[str, Any]) -> bool:

@@ -10,6 +10,7 @@ from .default_broadcast_nudges import DEFAULT_BROADCAST_NUDGES, DEFAULT_DAILY_SL
 
 logger = logging.getLogger(__name__)
 IST_TZ = ZoneInfo("Asia/Kolkata")
+_NUDGE_SCHEMA_READY = False
 
 try:
     from encryption_utils import EncryptionManager
@@ -185,6 +186,9 @@ def _seed_default_broadcast_schedule(conn, days: int = 30) -> None:
 
 def init_nudge_tables(conn) -> None:
     """Create device_tokens and nudge_deliveries if they do not exist."""
+    global _NUDGE_SCHEMA_READY
+    if _NUDGE_SCHEMA_READY:
+        return
     # Important:
     # Postgres marks the whole transaction as aborted if any statement fails.
     # This nudge init runs during mobile app flows, so we must not let a
@@ -446,6 +450,7 @@ def init_nudge_tables(conn) -> None:
         _seed_nudge_trigger_definitions(conn)
         _seed_broadcast_templates(conn)
         _seed_default_broadcast_schedule(conn)
+        _NUDGE_SCHEMA_READY = True
     except Exception as e:
         # With autocommit enabled, the exception raised here should be the
         # real failing statement error (not a follow-on InFailedSqlTransaction).

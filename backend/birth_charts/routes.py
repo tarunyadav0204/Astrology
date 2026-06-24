@@ -209,81 +209,65 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
     Set a birth chart as 'self' and clear all other 'self' relations for the user.
     This ensures only one chart can be marked as 'self' at a time.
     """
-    conn = None
     try:
-        conn_ctx = get_conn()
-        conn = conn_ctx.__enter__()
-        ensure_birth_chart_family_columns(conn)
-        cursor = conn.cursor()
+        with get_conn() as conn:
+            ensure_birth_chart_family_columns(conn)
+            cursor = conn.cursor()
 
-        print(f"🔍 [SET_SELF_DEBUG] Setting chart {chart_id} as self for user {current_user.userid}")
-        
-        # Verify the chart belongs to the current user
-        cursor.execute(
-            "SELECT id, name FROM birth_charts WHERE id=%s AND userid=%s",
-            (chart_id, current_user.userid),
-        )
-        result = cursor.fetchone()
-        print(f"🔍 [SET_SELF_DEBUG] Chart verification result: {result}")
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Chart not found or access denied")
-        
-        # Check current self charts before clearing
-        cursor.execute(
-            'SELECT id, name FROM birth_charts WHERE userid=%s AND relation=%s',
-            (current_user.userid, "self"),
-        )
-        current_self_charts = cursor.fetchall()
-        print(f"🔍 [SET_SELF_DEBUG] Current self charts before clearing: {current_self_charts}")
-        
-        # 1. Clear all existing 'self' relations for this user
-        cursor.execute(
-            """
-            UPDATE birth_charts
-            SET relation='other', is_family_member=FALSE
-            WHERE userid=%s AND relation='self'
-            """,
-            (current_user.userid,),
-        )
-        print(f"🔍 [SET_SELF_DEBUG] Cleared {cursor.rowcount} existing self relations")
-        
-        # 2. Set the specified chart as 'self'
-        cursor.execute(
-            """
-            UPDATE birth_charts
-            SET relation='self', is_family_member=TRUE, relation_order=NULL, relation_side=NULL
-            WHERE id=%s AND userid=%s
-            """,
-            (chart_id, current_user.userid),
-        )
-        print(f"🔍 [SET_SELF_DEBUG] Set chart {chart_id} as self, rows affected: {cursor.rowcount}")
-        
-        # Verify the final state
-        cursor.execute(
-            'SELECT id, name, relation FROM birth_charts WHERE userid=%s AND relation=%s',
-            (current_user.userid, "self"),
-        )
-        final_self_charts = cursor.fetchall()
-        print(f"✅ [SET_SELF_DEBUG] Final self charts after update: {final_self_charts}")
-        
-        # Commit transaction
-        conn.commit()
+            print(f"🔍 [SET_SELF_DEBUG] Setting chart {chart_id} as self for user {current_user.userid}")
+
+            cursor.execute(
+                "SELECT id, name FROM birth_charts WHERE id=%s AND userid=%s",
+                (chart_id, current_user.userid),
+            )
+            result = cursor.fetchone()
+            print(f"🔍 [SET_SELF_DEBUG] Chart verification result: {result}")
+
+            if not result:
+                raise HTTPException(status_code=404, detail="Chart not found or access denied")
+
+            cursor.execute(
+                'SELECT id, name FROM birth_charts WHERE userid=%s AND relation=%s',
+                (current_user.userid, "self"),
+            )
+            current_self_charts = cursor.fetchall()
+            print(f"🔍 [SET_SELF_DEBUG] Current self charts before clearing: {current_self_charts}")
+
+            cursor.execute(
+                """
+                UPDATE birth_charts
+                SET relation='other', is_family_member=FALSE
+                WHERE userid=%s AND relation='self'
+                """,
+                (current_user.userid,),
+            )
+            print(f"🔍 [SET_SELF_DEBUG] Cleared {cursor.rowcount} existing self relations")
+
+            cursor.execute(
+                """
+                UPDATE birth_charts
+                SET relation='self', is_family_member=TRUE, relation_order=NULL, relation_side=NULL
+                WHERE id=%s AND userid=%s
+                """,
+                (chart_id, current_user.userid),
+            )
+            print(f"🔍 [SET_SELF_DEBUG] Set chart {chart_id} as self, rows affected: {cursor.rowcount}")
+
+            cursor.execute(
+                'SELECT id, name, relation FROM birth_charts WHERE userid=%s AND relation=%s',
+                (current_user.userid, "self"),
+            )
+            final_self_charts = cursor.fetchall()
+            print(f"✅ [SET_SELF_DEBUG] Final self charts after update: {final_self_charts}")
+
+            conn.commit()
         return {"message": "Chart set as self successfully", "chart_id": chart_id}
-    
     except HTTPException:
-        if conn:
-            conn.rollback()
         raise
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"Error in set_chart_as_self: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to update chart: {str(e)}")
-    finally:
-        if conn:
-            conn_ctx.__exit__(None, None, None)
 
 @router.get("/users/search")
 async def search_users(query: str, current_user: User = Depends(get_current_user)):
@@ -334,218 +318,181 @@ async def search_users(query: str, current_user: User = Depends(get_current_user
 @router.post("/charts/share")
 async def share_chart(request: ShareChartRequest, current_user: User = Depends(get_current_user)):
     """Share a birth chart with another user by creating a copy"""
-    conn = None
     try:
-        conn_ctx = get_conn()
-        conn = conn_ctx.__enter__()
-        ensure_birth_chart_family_columns(conn)
-        cursor = conn.cursor()
+        with get_conn() as conn:
+            ensure_birth_chart_family_columns(conn)
+            cursor = conn.cursor()
 
-        # Verify the chart belongs to current user
-        cursor.execute(
-            "SELECT id FROM birth_charts WHERE id=%s AND userid=%s",
-            (request.chart_id, current_user.userid),
-        )
-        
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Chart not found or access denied")
-        
-        # Verify target user exists
-        cursor.execute(
-            "SELECT userid FROM users WHERE userid=%s", (request.target_user_id,)
-        )
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Target user not found")
-        
-        # Copy encrypted data as-is to target user
-        cursor.execute(
-            """
-            INSERT INTO birth_charts
-                (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash,
-                 relation_order, relation_side, relation_label, is_family_member)
-            SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared', birth_hash,
-                   relation_order, relation_side, relation_label, FALSE
-            FROM birth_charts WHERE id=%s
-            RETURNING id
-            """,
-            (request.target_user_id, request.chart_id),
-        )
-        new_row = cursor.fetchone()
-        conn.commit()
+            cursor.execute(
+                "SELECT id FROM birth_charts WHERE id=%s AND userid=%s",
+                (request.chart_id, current_user.userid),
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Chart not found or access denied")
+
+            cursor.execute(
+                "SELECT userid FROM users WHERE userid=%s", (request.target_user_id,)
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Target user not found")
+
+            cursor.execute(
+                """
+                INSERT INTO birth_charts
+                    (userid, name, date, time, latitude, longitude, timezone, place, gender, relation, birth_hash,
+                     relation_order, relation_side, relation_label, is_family_member)
+                SELECT %s, name, date, time, latitude, longitude, timezone, place, gender, 'shared', birth_hash,
+                       relation_order, relation_side, relation_label, FALSE
+                FROM birth_charts WHERE id=%s
+                RETURNING id
+                """,
+                (request.target_user_id, request.chart_id),
+            )
+            new_row = cursor.fetchone()
+            conn.commit()
         new_chart_id = new_row[0] if new_row else None
-        
         return {
             "message": "Chart shared successfully",
             "shared_chart_id": new_chart_id
         }
-    
     except HTTPException:
-        if conn:
-            conn.rollback()
         raise
     except Exception as e:
-        if conn:
-            conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to share chart: {str(e)}")
-    finally:
-        if conn:
-            conn_ctx.__exit__(None, None, None)
 @router.put("/birth-charts/{chart_id}")
 async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User = Depends(get_current_user)):
-    conn = None
     try:
-        conn_ctx = get_conn()
-        conn = conn_ctx.__enter__()
-        ensure_birth_chart_family_columns(conn)
-        cursor = conn.cursor()
+        with get_conn() as conn:
+            ensure_birth_chart_family_columns(conn)
+            cursor = conn.cursor()
 
-        # Verify chart belongs to user
-        cursor.execute(
-            """
-            SELECT id, relation, relation_order, relation_side, relation_label, is_family_member, birth_hash
-            FROM birth_charts
-            WHERE id=%s AND userid=%s
-            """,
-            (chart_id, current_user.userid),
-        )
-        existing_chart = cursor.fetchone()
-        if not existing_chart:
-            raise HTTPException(status_code=404, detail="Chart not found or access denied")
-        
-        if encryptor:
-            enc_name = encryptor.encrypt(birth_data['name'])
-            enc_date = encryptor.encrypt(birth_data['date'])
-            enc_time = encryptor.encrypt(birth_data['time'])
-            enc_lat = encryptor.encrypt(str(birth_data['latitude']))
-            enc_lon = encryptor.encrypt(str(birth_data['longitude']))
-            enc_place = encryptor.encrypt(birth_data.get('place', ''))
-        else:
-            enc_name, enc_date, enc_time = birth_data['name'], birth_data['date'], birth_data['time']
-            enc_lat, enc_lon, enc_place = str(birth_data['latitude']), str(birth_data['longitude']), birth_data.get('place', '')
+            cursor.execute(
+                """
+                SELECT id, relation, relation_order, relation_side, relation_label, is_family_member, birth_hash
+                FROM birth_charts
+                WHERE id=%s AND userid=%s
+                """,
+                (chart_id, current_user.userid),
+            )
+            existing_chart = cursor.fetchone()
+            if not existing_chart:
+                raise HTTPException(status_code=404, detail="Chart not found or access denied")
 
-        from utils.birth_hash import birth_hash_from_parts
+            if encryptor:
+                enc_name = encryptor.encrypt(birth_data['name'])
+                enc_date = encryptor.encrypt(birth_data['date'])
+                enc_time = encryptor.encrypt(birth_data['time'])
+                enc_lat = encryptor.encrypt(str(birth_data['latitude']))
+                enc_lon = encryptor.encrypt(str(birth_data['longitude']))
+                enc_place = encryptor.encrypt(birth_data.get('place', ''))
+            else:
+                enc_name, enc_date, enc_time = birth_data['name'], birth_data['date'], birth_data['time']
+                enc_lat, enc_lon, enc_place = str(birth_data['latitude']), str(birth_data['longitude']), birth_data.get('place', '')
 
-        chart_birth_hash = birth_hash_from_parts(
-            birth_data.get("date"),
-            birth_data.get("time"),
-            birth_data.get("latitude"),
-            birth_data.get("longitude"),
-        )
+            from utils.birth_hash import birth_hash_from_parts
 
-        # Keep timezone behavior consistent with chart creation:
-        # if client doesn't send timezone, derive it from coordinates.
-        timezone_value = birth_data.get("timezone")
-        if not timezone_value:
-            try:
-                from utils.timezone_service import get_timezone_from_coordinates
-                timezone_value = get_timezone_from_coordinates(
-                    float(birth_data["latitude"]),
-                    float(birth_data["longitude"]),
+            chart_birth_hash = birth_hash_from_parts(
+                birth_data.get("date"),
+                birth_data.get("time"),
+                birth_data.get("latitude"),
+                birth_data.get("longitude"),
+            )
+
+            timezone_value = birth_data.get("timezone")
+            if not timezone_value:
+                try:
+                    from utils.timezone_service import get_timezone_from_coordinates
+                    timezone_value = get_timezone_from_coordinates(
+                        float(birth_data["latitude"]),
+                        float(birth_data["longitude"]),
+                    )
+                except Exception:
+                    timezone_value = "UTC+0"
+
+            relation = normalize_chart_relation(
+                birth_data.get("relation") if "relation" in birth_data else existing_chart[1]
+            )
+            relation_order = birth_data.get("relation_order") if "relation_order" in birth_data else existing_chart[2]
+            if relation_order in ("", None):
+                relation_order = None
+            relation_side_raw = birth_data.get("relation_side") if "relation_side" in birth_data else existing_chart[3]
+            relation_label_raw = birth_data.get("relation_label") if "relation_label" in birth_data else existing_chart[4]
+            relation_side = str(relation_side_raw or "").strip().lower() or None
+            relation_label = str(relation_label_raw or "").strip() or None
+            relation, is_family_member = relation_defaults(
+                relation,
+                birth_data.get("is_family_member") if "is_family_member" in birth_data else existing_chart[5],
+            )
+            old_birth_hash = existing_chart[6]
+
+            if relation == "self":
+                cursor.execute(
+                    """
+                    UPDATE birth_charts
+                    SET relation='other', is_family_member=FALSE
+                    WHERE userid=%s AND relation='self' AND id != %s
+                    """,
+                    (current_user.userid, chart_id),
                 )
-            except Exception:
-                timezone_value = "UTC+0"
 
-        relation = normalize_chart_relation(
-            birth_data.get("relation") if "relation" in birth_data else existing_chart[1]
-        )
-        relation_order = birth_data.get("relation_order") if "relation_order" in birth_data else existing_chart[2]
-        if relation_order in ("", None):
-            relation_order = None
-        relation_side_raw = birth_data.get("relation_side") if "relation_side" in birth_data else existing_chart[3]
-        relation_label_raw = birth_data.get("relation_label") if "relation_label" in birth_data else existing_chart[4]
-        relation_side = str(relation_side_raw or "").strip().lower() or None
-        relation_label = str(relation_label_raw or "").strip() or None
-        relation, is_family_member = relation_defaults(
-            relation,
-            birth_data.get("is_family_member") if "is_family_member" in birth_data else existing_chart[5],
-        )
-        old_birth_hash = existing_chart[6]
-
-        if relation == "self":
             cursor.execute(
                 """
                 UPDATE birth_charts
-                SET relation='other', is_family_member=FALSE
-                WHERE userid=%s AND relation='self' AND id != %s
+                SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s,
+                    relation=%s, relation_order=%s, relation_side=%s, relation_label=%s, is_family_member=%s,
+                    birth_hash=%s
+                WHERE id=%s AND userid=%s
                 """,
-                (current_user.userid, chart_id),
+                (
+                    enc_name,
+                    enc_date,
+                    enc_time,
+                    enc_lat,
+                    enc_lon,
+                    timezone_value,
+                    enc_place,
+                    birth_data.get("gender", ""),
+                    relation,
+                    relation_order,
+                    relation_side,
+                    relation_label,
+                    is_family_member,
+                    chart_birth_hash,
+                    chart_id,
+                    current_user.userid,
+                ),
             )
 
-        cursor.execute(
-            """
-            UPDATE birth_charts
-            SET name=%s, date=%s, time=%s, latitude=%s, longitude=%s, timezone=%s, place=%s, gender=%s,
-                relation=%s, relation_order=%s, relation_side=%s, relation_label=%s, is_family_member=%s,
-                birth_hash=%s
-            WHERE id=%s AND userid=%s
-            """,
-            (
-                enc_name,
-                enc_date,
-                enc_time,
-                enc_lat,
-                enc_lon,
-                timezone_value,
-                enc_place,
-                birth_data.get("gender", ""),
-                relation,
-                relation_order,
-                relation_side,
-                relation_label,
-                is_family_member,
-                chart_birth_hash,
-                chart_id,
-                current_user.userid,
-            ),
-        )
+            delete_chart_cache_for_birth_hashes(conn, [old_birth_hash, chart_birth_hash])
 
-        delete_chart_cache_for_birth_hashes(conn, [old_birth_hash, chart_birth_hash])
-
-        conn.commit()
+            conn.commit()
         return {"message": "Chart updated successfully"}
     except HTTPException:
-        if conn:
-            conn.rollback()
         raise
     except Exception as e:
-        if conn:
-            conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update chart: {str(e)}")
-    finally:
-        if conn:
-            conn_ctx.__exit__(None, None, None)
 
 @router.delete("/birth-charts/{chart_id}")
 async def delete_birth_chart(chart_id: int, current_user: User = Depends(get_current_user)):
-    conn = None
     try:
-        conn_ctx = get_conn()
-        conn = conn_ctx.__enter__()
-        cursor = conn.cursor()
+        with get_conn() as conn:
+            cursor = conn.cursor()
 
-        # Verify chart belongs to user
-        cursor.execute(
-            "SELECT id FROM birth_charts WHERE id=%s AND userid=%s",
-            (chart_id, current_user.userid),
-        )
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Chart not found or access denied")
+            cursor.execute(
+                "SELECT id FROM birth_charts WHERE id=%s AND userid=%s",
+                (chart_id, current_user.userid),
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Chart not found or access denied")
 
-        delete_birth_chart_dependencies(conn, chart_id, current_user.userid)
-        cursor.execute(
-            "DELETE FROM birth_charts WHERE id=%s AND userid=%s",
-            (chart_id, current_user.userid),
-        )
-        conn.commit()
+            delete_birth_chart_dependencies(conn, chart_id, current_user.userid)
+            cursor.execute(
+                "DELETE FROM birth_charts WHERE id=%s AND userid=%s",
+                (chart_id, current_user.userid),
+            )
+            conn.commit()
         return {"message": "Chart deleted successfully"}
     except HTTPException:
-        if conn:
-            conn.rollback()
         raise
     except Exception as e:
-        if conn:
-            conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete chart: {str(e)}")
-    finally:
-        if conn:
-            conn_ctx.__exit__(None, None, None)

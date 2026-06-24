@@ -5,8 +5,14 @@ from __future__ import annotations
 from db import execute
 
 
+_BIRTH_CHART_FAMILY_SCHEMA_READY = False
+
+
 def ensure_birth_chart_family_columns(conn) -> None:
     """Add optional family-tree metadata columns without disturbing old clients."""
+    global _BIRTH_CHART_FAMILY_SCHEMA_READY
+    if _BIRTH_CHART_FAMILY_SCHEMA_READY:
+        return
     statements = [
         "ALTER TABLE birth_charts ADD COLUMN IF NOT EXISTS relation_order INTEGER",
         "ALTER TABLE birth_charts ADD COLUMN IF NOT EXISTS relation_side TEXT",
@@ -15,6 +21,7 @@ def ensure_birth_chart_family_columns(conn) -> None:
     ]
     for stmt in statements:
         execute(conn, stmt)
+    _BIRTH_CHART_FAMILY_SCHEMA_READY = True
 
 
 def normalize_chart_relation(value: str | None) -> str:

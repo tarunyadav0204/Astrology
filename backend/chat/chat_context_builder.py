@@ -784,13 +784,6 @@ class ChatContextBuilder:
         # Always include current dashas
         dasha_calc = DashaCalculator()
         
-        _context_log_event(
-            "dynamic_context_started",
-            has_target_date=bool(target_date),
-            has_requested_period=bool(requested_period),
-            intent_mode=(intent_result or {}).get("mode"),
-        )
-        
         context['current_dashas'] = dasha_calc.calculate_current_dashas(birth_data)
         
         # Add Maraka analysis for relatives (both Mahadasha and Antardasha)
@@ -1055,12 +1048,6 @@ class ChatContextBuilder:
                     retro_flag = " [RETROGRADE RETURN]" if period.get('retrograde_return') else ""
                     # print(f"  {i}. {period['start_date']} to {period['end_date']}")
                     # print(f"     Sign: {period['sign']} | House: {period['house']} | Segment: {period['segment']}{retro_flag}")
-                if len(periods) > 3:
-                    logger.info(
-                        "macro transit timeline truncated planet=%s extra_periods=%s",
-                        planet,
-                        len(periods) - 3,
-                    )
             # print()
             
         except Exception as e:
@@ -1113,12 +1100,6 @@ class ChatContextBuilder:
                                 }
                 
                 context['navatara_warnings'] = navatara_warnings
-                _context_log_event(
-                    "navatara_analysis_complete",
-                    moon_nakshatra=moon_nakshatra,
-                    moon_nakshatra_number=moon_nakshatra_number,
-                    warning_count=len(navatara_warnings),
-                )
             else:
                 logger.info(
                     "skipping navatara analysis moon_nakshatra_number=%s has_macro_transits=%s",
@@ -1313,10 +1294,7 @@ class ChatContextBuilder:
         # print(f"   intent_result exists: {intent_result is not None}")
         # print(f"   intent_result value: {intent_result}")
         if intent_result:
-            # print(f"   needs_transits: {intent_result.get('needs_transits')}")
-            # print(f"   transit_request exists: {'transit_request' in intent_result}")
-            if 'transit_request' in intent_result:
-                print(f"   transit_request: {intent_result['transit_request']}")
+            pass
         # print(f"   requested_period: {requested_period}")
         
         if intent_result and intent_result.get('needs_transits') and intent_result.get('transit_request'):
@@ -1326,7 +1304,7 @@ class ChatContextBuilder:
             transit_request = requested_period
             # print(f"\n🎯 GEMINI REQUESTED TRANSITS: {requested_period}")
         else:
-            print(f"\n❌ NO TRANSIT REQUEST DETECTED - intent_result: {intent_result}, requested_period: {requested_period}")
+            pass
         
         
         # print(f"\n🎯 FINAL TRANSIT REQUEST: {transit_request}")

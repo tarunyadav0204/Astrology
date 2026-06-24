@@ -15,6 +15,15 @@ from auth import get_current_user
 from db import get_conn, execute
 
 logger = logging.getLogger(__name__)
+_CHAT_SCHEMA_FLAGS: set[str] = set()
+
+
+def _schema_already_ready(flag: str) -> bool:
+    return flag in _CHAT_SCHEMA_FLAGS
+
+
+def _mark_schema_ready(flag: str) -> None:
+    _CHAT_SCHEMA_FLAGS.add(flag)
 
 
 def _chat_log_event(event: str, level: int = logging.INFO, **fields) -> None:
@@ -428,33 +437,50 @@ def _clear_chat_processing_claim(message_id: int, claim_id: str) -> None:
 
 def _ensure_chat_messages_gate_metadata(conn):
     """Idempotent DDL — older DBs or skipped startup init may lack this column."""
+    if _schema_already_ready("chat_messages_gate_metadata"):
+        return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS gate_metadata TEXT")
+    _mark_schema_ready("chat_messages_gate_metadata")
 
 
 def _ensure_chat_messages_parallel_llm_usage(conn):
     """JSON blob: per-branch + merge LLM metrics (parallel chat)."""
+    if _schema_already_ready("chat_messages_parallel_llm_usage"):
+        return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parallel_llm_usage TEXT")
+    _mark_schema_ready("chat_messages_parallel_llm_usage")
 
 
 def _ensure_chat_messages_chart_insights(conn):
     """JSON array of chart insights shown in the loading bubble while processing."""
+    if _schema_already_ready("chat_messages_chart_insights"):
+        return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS chart_insights TEXT")
+    _mark_schema_ready("chat_messages_chart_insights")
 
 
 def _ensure_chat_messages_engagement_updates(conn):
     """JSON array of non-final wait-time engagement snippets."""
+    if _schema_already_ready("chat_messages_engagement_updates"):
+        return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS engagement_updates TEXT")
+    _mark_schema_ready("chat_messages_engagement_updates")
 
 
 def _ensure_chat_messages_task_claim_cols(conn):
     """Durable queue claim metadata for chat workers."""
+    if _schema_already_ready("chat_messages_task_claim_cols"):
+        return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS task_claim_id TEXT")
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS task_claimed_until TIMESTAMP")
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS task_enqueued_at TIMESTAMP")
+    _mark_schema_ready("chat_messages_task_claim_cols")
 
 
 def _ensure_wait_side_conversation_tables(conn):
     """Side conversation shown while the main answer is still processing."""
+    if _schema_already_ready("wait_side_conversation_tables"):
+        return
     if not _wait_side_enabled():
         return
     execute(conn, """
@@ -510,12 +536,16 @@ def _ensure_wait_side_conversation_tables(conn):
     _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_conv_main_message ON chat_wait_conversations (main_message_id)")
     _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_conv_user ON chat_wait_conversations (user_id)")
     _try_create_index("CREATE INDEX IF NOT EXISTS idx_wait_msgs_conv ON chat_wait_conversation_messages (conversation_id, id)")
+    _mark_schema_ready("wait_side_conversation_tables")
 
 
 def _ensure_chat_messages_cache_token_cols(conn):
     """Token split columns for cache-aware billing visibility."""
+    if _schema_already_ready("chat_messages_cache_token_cols"):
+        return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_cached_input_tokens INTEGER")
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_non_cached_input_tokens INTEGER")
+    _mark_schema_ready("chat_messages_cache_token_cols")
 
 
 def _attach_completed_status_payload(
@@ -583,6 +613,8 @@ def _should_preserve_completed_message(existing_status, existing_content) -> boo
 
 def init_chat_tables():
     """Initialize chat history tables with polling support"""
+    if _schema_already_ready("chat_tables_core"):
+        return
     with get_conn() as conn:
         # Sessions
         execute(conn, """
@@ -665,6 +697,7 @@ def init_chat_tables():
         """)
 
         conn.commit()
+    _mark_schema_ready("chat_tables_core")
 
 @router.post("/session")
 async def create_chat_session(request: dict, current_user = Depends(get_current_user)):
