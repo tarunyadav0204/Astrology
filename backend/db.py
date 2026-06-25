@@ -43,6 +43,9 @@ def _default_pool_max_conn() -> int:
         return 4
     if app_name in {
         "astroroshni-chat-worker",
+    }:
+        return 10
+    if app_name in {
         "astroroshni-nudge-worker",
         "astroroshni-nudge-worker-vm",
         "astroroshni-nudge-dispatch",

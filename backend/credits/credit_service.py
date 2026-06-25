@@ -450,9 +450,19 @@ class CreditService:
             conn.commit()
             return
     
-    def get_user_credits(self, userid: int) -> int:
-        """Get current credit balance for user"""
+    def get_user_credits(self, userid: int, conn=None) -> int:
+        """Get current credit balance for user.
+
+        When a connection is already open for a credit mutation, callers should pass it
+        through so we don't grab extra pooled connections inside the same request.
+        """
         from db import get_conn, execute
+
+        if conn is not None:
+            cursor = execute(conn, "SELECT credits FROM user_credits WHERE userid = ?", (userid,))
+            result = cursor.fetchone()
+            return int(result[0]) if result and result[0] is not None else 0
+
         with get_conn() as conn:
             cursor = execute(conn, "SELECT credits FROM user_credits WHERE userid = ?", (userid,))
             result = cursor.fetchone()
@@ -2149,7 +2159,7 @@ class CreditService:
         from db import get_conn, execute
         try:
             with get_conn() as conn:
-                current_balance = self.get_user_credits(userid)
+                current_balance = self.get_user_credits(userid, conn=conn)
                 execute(
                     conn,
                     """
@@ -2690,7 +2700,7 @@ class CreditService:
         log = logging.getLogger(__name__)
         try:
             with get_conn() as conn:
-                current_balance = self.get_user_credits(userid)
+                current_balance = self.get_user_credits(userid, conn=conn)
                 new_balance = current_balance + amount
                 self._upsert_user_credits(conn, userid, new_balance)
                 execute(
@@ -2785,7 +2795,7 @@ class CreditService:
         from db import get_conn, execute
         try:
             with get_conn() as conn:
-                current_balance = self.get_user_credits(userid)
+                current_balance = self.get_user_credits(userid, conn=conn)
                 new_balance = current_balance + amount
                 execute(
                     conn,
@@ -2853,7 +2863,7 @@ class CreditService:
             if cur.fetchone():
                 return False, "This order was already reversed", None
 
-            current_balance = self.get_user_credits(userid)
+            current_balance = self.get_user_credits(userid, conn=conn)
             # Only take back up to what the user has left
             deduct = min(deduct, current_balance)
             if deduct <= 0:
@@ -2975,7 +2985,7 @@ class CreditService:
             if cur.fetchone():
                 return False, "This payment was already reversed", None
 
-            current_balance = self.get_user_credits(userid)
+            current_balance = self.get_user_credits(userid, conn=conn)
             deduct = min(deduct, current_balance)
             if deduct <= 0:
                 return False, "User has no credits left to take back", None
@@ -3051,7 +3061,7 @@ class CreditService:
                 """, (promo_id, userid, credits))
             
                 # Update user credits directly in this transaction
-                current_balance = self.get_user_credits(userid)
+                current_balance = self.get_user_credits(userid, conn=conn)
                 new_balance = current_balance + credits
             
                 self._upsert_user_credits(conn, userid, new_balance)
