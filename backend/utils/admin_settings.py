@@ -856,6 +856,11 @@ def chat_worker_mode_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def is_free_question_parashari_only_enabled() -> bool:
+    """Global feature flag for answering free chat questions through a Parashari-only final lane."""
+    return _parse_bool_setting(get_setting("free_question_parashari_only_enabled"), default=False)
+
+
 def get_play_payment_service_base_url() -> Optional[str]:
     """Base URL for the Play payment service Cloud Run app."""
     value = (get_setting("play_payment_service_base_url") or os.getenv("PLAY_PAYMENT_SERVICE_BASE_URL") or "").strip()

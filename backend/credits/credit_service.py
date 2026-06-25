@@ -2083,7 +2083,7 @@ class CreditService:
                 (val, userid),
             )
             if getattr(cur, "rowcount", 0) == 0:
-                bal = self.get_user_credits(userid)
+                bal = self.get_user_credits(userid, conn=conn)
                 self._upsert_user_credits(conn, userid, bal)
                 execute(
                     conn,
@@ -2726,14 +2726,12 @@ class CreditService:
     
     def spend_credits(self, userid: int, amount: int, feature: str, description: str = None) -> bool:
         """Spend credits for a feature"""
-        current_balance = self.get_user_credits(userid)
-        
-        if current_balance < amount:
-            return False
-        
         from db import get_conn, execute
         try:
             with get_conn() as conn:
+                current_balance = self.get_user_credits(userid, conn=conn)
+                if current_balance < amount:
+                    return False
                 new_balance = current_balance - amount
                 execute(
                     conn,
@@ -2762,19 +2760,19 @@ class CreditService:
             return self.add_credits(userid, amount, 'admin_adjustment', None, description or "Admin adjustment")
         # amount < 0: deduct
         abs_amount = -amount
-        current_balance = self.get_user_credits(userid)
-        if current_balance < abs_amount:
-            return False
         from db import get_conn, execute
         try:
             with get_conn() as conn:
+                current_balance = self.get_user_credits(userid, conn=conn)
+                if current_balance < abs_amount:
+                    return False
                 new_balance = current_balance - abs_amount
-                execute(
+                cur = execute(
                     conn,
                     "UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
                     (new_balance, userid),
                 )
-                if getattr(conn.cursor(), "rowcount", 0) == 0:
+                if getattr(cur, "rowcount", 0) == 0:
                     self._upsert_user_credits(conn, userid, new_balance)
                 execute(
                     conn,

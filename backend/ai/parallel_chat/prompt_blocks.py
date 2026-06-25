@@ -185,6 +185,76 @@ def build_parashari_branch_static(intent_category: str, death_analysis_unlocked:
     return "\n\n".join(p for p in parts if p)
 
 
+def build_parashari_final_answer_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
+    health_prompt_line = (
+        "For health questions, separate **Constitution/Vitality -> Disease Pattern -> Body-System Focus -> Current Activation -> Preventive Guidance**. Do not name diseases or give treatment instructions; stay at the level of astrological susceptibility, timing pressure, and preventive/recovery logic."
+        if _is_health_category(intent_category)
+        else ""
+    )
+    parts = [
+        CORE_PERSONA,
+        death_ethics_block(death_analysis_unlocked),
+        SYNTHESIS_RULES,
+        PARASHARI_PILLAR,
+        _domain_sutras(intent_category),
+        DIVISIONAL_ANALYSIS,
+        KOTA_LOGIC,
+        CLASSICAL_CITATIONS,
+        USER_MEMORY,
+        COMPLIANCE_RULES,
+        DASHA_DATES_SOVEREIGNTY,
+        HOUSE_SIGNIFICATIONS,
+        BHAVAM_BHAVESH_RULES,
+        CLASSICAL_RULE_MATCH_INSTRUCTION,
+        DATA_SOVEREIGNTY,
+        PERSONAL_CONSULTATION_RULES,
+        "\n# TASK (PARASHARI FINAL ANSWER)\n",
+        "You are the only branch running for this request. Produce the final user-facing answer directly from Parashari + divisional + dasha + transit logic.",
+        "Do NOT return JSON. Do NOT write branch labels, internal notes, or mention other schools being skipped.",
+        "Use `planetary_analysis` / `d1_graha`-style graha rows for **`av` (avastha)** and strength (`sc`) on planets that matter for the question—especially Yogakaraka and house lords. Treat **Mrit** as a weakening modifier, not an automatic denial; foreground it only when dignity / `sc` / combustion / affliction also support a weak-delivery reading per [P-7].",
+        "When `dispositor_evidence` is present, use it as the Parashari delivery layer for active dasha lords and topic house lords: state how the sign dispositor supports, weakens, redirects, or filters the planet's result. Do not invent chains that are not in the JSON.",
+        "If **D7 / Saptamsa** appears in `divisional_charts` (or equivalent), marriage/partnership/children answers MUST include a real D7 interpretation—see [P-8].",
+        "For marriage/spouse timing questions, explicitly separate **Promise -> Timing -> Manifestation -> Continuity**. Do not treat attraction, proposal, legal marriage, and stable married life as the same thing.",
+        "For career/profession/field questions, explicitly separate **Aptitude -> Field Selection -> Work Function -> Status/Visibility -> Timing of Entry/Change**. Do not answer 'what career will I pick?' with a vague basket of unrelated professions unless the chart is genuinely mixed.",
+        health_prompt_line,
+        "When `special_points` is present, use `gandanta_analysis` if flagged. If `special_points.yogi_points` is present, include a distinct subsection titled exactly `#### Yogi & Avayogi Karma` and explicitly cover **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** in relation to the user's question. If `special_points.yogi_points.avayogi_tithi_shunya_overlap.is_active=true`, state that this modifies the obstruction and can give good results.",
+        "Be strictly technical and evidence-based. Do not use motivational filler. If dasha period labels or windows are present, explicitly cite them.",
+    ]
+    return "\n\n".join(p for p in parts if p)
+
+
+def build_parashari_only_response_format() -> str:
+    return """
+### RESPONSE FORMAT (PARASHARI-ONLY, MANDATORY)
+Use this exact structure for the final user-facing answer:
+
+1. <div class="quick-answer-card">**Quick Answer**: [Give the direct answer in plain language. Include the main verdict, the most important timing window if relevant, the core opportunity or challenge, and the main caution. This must be a real answer, not a teaser.]</div>
+
+2. ### Key Insights
+[3-4 crisp bullets with the strongest chart findings that matter for this question.]
+
+3. ### Astrological Analysis
+- #### Promise
+[What the chart fundamentally promises on this topic from Lagna, houses, lords, karakas, and key yogas.]
+- #### Timing
+[Explain the active Mahadasha / Antardasha / Pratyantardasha or transit triggers that open, delay, improve, or pressure this topic.]
+- #### Divisional Chart Support
+[Use the relevant divisional chart when present and explain whether it confirms, modifies, or weakens the promise.]
+- #### Supporting Factors
+[Include avastha, dignity, dispositors, yogi/avayogi, gandanta, or other Parashari-side supporting evidence only when present and relevant.]
+
+4. ### Timing & Guidance
+[Practical roadmap: what phase the native is in, what to do now, what to avoid, and how to use the stronger period.]
+
+5. <div class="final-thoughts-card">**Final Verdict**: [One concise closing judgment.]</div>
+
+### ABSOLUTE RESTRICTIONS
+- Do NOT mention or imply other schools or branches such as Jaimini, KP, Nadi, Ashtakavarga, Nakshatra branch, Sudarshana, or "other methods."
+- Do NOT create sections titled "The Jaimini View", "KP Stellar Perspective", "Nadi Interpretation", "Ashtakavarga", or similar.
+- Do NOT say "other branches confirm" or "other systems support this." This answer must read as one self-contained Parashari reading.
+"""
+
+
 def build_kp_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,

@@ -564,6 +564,7 @@ class GeminiChatAnalyzer:
         *,
         use_thinking_level_high: bool = False,
         user_id: Optional[int] = None,
+        using_free_question: bool = False,
     ) -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION.
 
@@ -576,6 +577,7 @@ class GeminiChatAnalyzer:
             is_debug_logging_enabled,
             get_chat_llm_provider,
             get_chat_llm_provider_premium,
+            is_free_question_parashari_only_enabled,
             CHAT_LLM_OPENAI,
             CHAT_LLM_DEEPSEEK,
             CHAT_LLM_GEMMA,
@@ -654,6 +656,9 @@ class GeminiChatAnalyzer:
 
         # Optional parallel pipelines. Relational/partnership is gated separately so legacy stays default.
         from ai.parallel_chat.config import should_use_parallel_chat, should_use_parallel_relational_chat
+        force_free_question_parashari_only = bool(
+            using_free_question and is_free_question_parashari_only_enabled()
+        )
 
         if should_use_parallel_relational_chat(enhanced_context, user_id=user_id):
             from ai.parallel_chat.relational_orchestrator import run_parallel_relational_chat_pipeline
@@ -672,10 +677,13 @@ class GeminiChatAnalyzer:
                 total_request_start=total_request_start,
             )
 
-        if should_use_parallel_chat(enhanced_context, user_id=user_id):
+        if force_free_question_parashari_only or should_use_parallel_chat(enhanced_context, user_id=user_id):
             from ai.parallel_chat.orchestrator import run_parallel_chat_pipeline
 
-            logger.info("parallel_chat_pipeline enabled")
+            if force_free_question_parashari_only:
+                logger.info("parallel_chat_pipeline enabled via free-question Parashari override")
+            else:
+                logger.info("parallel_chat_pipeline enabled")
             return await run_parallel_chat_pipeline(
                 self,
                 user_question=user_question,
@@ -687,6 +695,7 @@ class GeminiChatAnalyzer:
                 premium_analysis=premium_analysis,
                 mode=mode,
                 total_request_start=total_request_start,
+                using_free_question=bool(using_free_question),
             )
         
         # Prune context to reduce token load

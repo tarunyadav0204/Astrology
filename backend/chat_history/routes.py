@@ -3084,6 +3084,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 mode=intent.get('mode', 'default'),
                 use_thinking_level_high=False,
                 user_id=user_id,
+                using_free_question=using_free_question,
             )
         _chat_log_event(
             "chat_processing_phase",

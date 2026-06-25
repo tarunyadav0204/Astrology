@@ -2474,6 +2474,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_play_payment_service_base_url,
             is_chat_worker_mode_enabled,
             get_chat_worker_user_allowlist,
+            is_free_question_parashari_only_enabled,
             is_first_purchase_bonus_enabled,
             is_purchase_discount_enabled,
             is_parallel_branch_planner_enabled,
@@ -2567,6 +2568,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "chat_worker_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_worker_user_allowlist())
             ),
+            "free_question_parashari_only_enabled": is_free_question_parashari_only_enabled(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")

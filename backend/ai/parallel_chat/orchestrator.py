@@ -201,6 +201,8 @@ from ai.parallel_chat.prompt_blocks import (
     build_nakshatra_branch_static,
     build_nakshatra_branch_static_agent,
     build_parashari_branch_static,
+    build_parashari_final_answer_static,
+    build_parashari_only_response_format,
     build_parashari_branch_static_agent,
     build_sudarshan_branch_static,
     build_sudarshan_branch_static_agent,
@@ -211,6 +213,7 @@ from chat.system_instruction_config import build_merge_synthesis_instruction
 from utils.admin_settings import (
     get_parallel_branch_gemini_model,
     get_parallel_branch_planner_model,
+    is_free_question_parashari_only_enabled,
     is_parallel_branch_planner_enabled,
 )
 
@@ -624,6 +627,7 @@ async def run_parallel_chat_pipeline(
     premium_analysis: bool,
     mode: str,
     total_request_start: float,
+    using_free_question: bool = False,
 ) -> Dict[str, Any]:
     from utils.admin_settings import (
         get_chat_llm_provider,
@@ -636,9 +640,15 @@ async def run_parallel_chat_pipeline(
     intent = ctx.get("intent") or {}
     category = intent.get("category", "general")
     death_analysis_unlocked = bool(ctx.get("death_analysis_unlocked"))
+    free_question_parashari_only = bool(
+        using_free_question and is_free_question_parashari_only_enabled()
+    )
     enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
+    if free_question_parashari_only:
+        enabled_branches = ["parashari"]
+        branch_scope_reason = "free_question:parashari_only"
     planner_result: Optional[Dict[str, Any]] = None
-    if is_parallel_branch_planner_enabled():
+    if not free_question_parashari_only and is_parallel_branch_planner_enabled():
         try:
             planner_result = await plan_parallel_branches(
                 analyzer,
@@ -997,6 +1007,191 @@ async def run_parallel_chat_pipeline(
         raise
 
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
+
+    if free_question_parashari_only:
+        intent_mode = _intent_mode(ctx, mode)
+        (
+            language_instruction,
+            delivery_format_instruction,
+            elaborate_instruction,
+            response_format_instruction,
+            user_context_instruction,
+            final_check,
+            _,
+        ) = _merge_instruction_blocks(
+            user_question, ctx, language, response_style, user_context, premium_analysis, mode
+        )
+        current_date = datetime.now()
+        ascendant_info = ctx.get("ascendant_info", {})
+        ascendant_summary = (
+            f"ASCENDANT: {ascendant_info.get('sign_name', 'Unknown')} at "
+            f"{ascendant_info.get('exact_degree_in_sign', 0):.2f}°"
+        )
+        time_context = (
+            f"IMPORTANT CURRENT DATE INFORMATION:\n- Today's Date: {current_date.strftime('%B %d, %Y')}\n"
+            f"- Current Time: {current_date.strftime('%H:%M UTC')}\n"
+            f"- Current Year: {current_date.year}\n\n{_timing_label_guard_text(current_date)}\nCRITICAL CHART INFORMATION:\n{ascendant_summary}"
+        )
+        final_static = "\n\n".join(
+            [
+                build_parashari_final_answer_static(
+                    category,
+                    death_analysis_unlocked=death_analysis_unlocked,
+                ),
+                language_instruction,
+                delivery_format_instruction,
+                elaborate_instruction,
+                build_parashari_only_response_format(),
+                user_context_instruction,
+                CLASSICAL_RULE_MATCH_INSTRUCTION,
+            ]
+        )
+        parashari_branch_bundle = {
+            "parashari": par_out,
+            "scope": {
+                "enabled_branches": enabled_branches,
+                "reason": branch_scope_reason,
+                "intent_mode": intent_mode,
+                "classical_rule_matches": copy.deepcopy(classical_rule_matches) if isinstance(classical_rule_matches, dict) else None,
+            },
+        }
+        final_user = (
+            f"{time_context}\n\n"
+            f"{hist_text}"
+            f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
+            f"CURRENT QUESTION: {user_question}\n"
+            f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
+        )
+        final_prompt = f"{final_static}\n\n{final_user}"
+        t_final = time.time()
+        final_runtime = _runtime_for("parashari")
+        syn = await analyzer.generate_text_from_prompt(
+            final_prompt,
+            premium_analysis=premium_analysis,
+            llm_log_tag="parallel_parashari_final",
+        )
+        synthesis_ms = round((time.time() - t_final) * 1000, 1)
+        merge_raw = (syn.get("response") or "") if isinstance(syn, dict) else ""
+        merge_ok = bool(syn.get("success") and merge_raw)
+        merge_metrics = _llm_call_metrics(
+            "parallel_parashari_final",
+            final_prompt,
+            merge_raw,
+            syn if isinstance(syn, dict) else None,
+            success=merge_ok,
+            elapsed_ms=synthesis_ms,
+            static_chars=len(final_static),
+            dynamic_chars=len(final_prompt) - len(final_static),
+        )
+        merge_metrics["llm_provider"] = (
+            str((syn or {}).get("chat_llm_provider") or final_runtime["provider"] or "").strip() or None
+        )
+        merge_metrics["llm_model"] = (
+            str((syn or {}).get("chat_llm_model") or final_runtime["model_name"] or "").strip() or None
+        )
+        _parallel_usage_rows = branch_llm_rows + [merge_metrics]
+        _parallel_totals = _totals_from_rows(_parallel_usage_rows)
+        if cache_setup_input_tokens > 0:
+            _parallel_totals["cache_setup_input_chars"] = int(cache_setup_input_chars)
+            _parallel_totals["cache_setup_input_tokens"] = int(cache_setup_input_tokens)
+        _parallel_usage_payload = {
+            "stages": _parallel_usage_rows,
+            "totals": _parallel_totals,
+            "branch_plan": {
+                "enabled": False,
+                "selected_branches": ["parashari"],
+                "planner": None,
+                "free_question_parashari_only": True,
+            },
+            "specialist_branch_outputs": parashari_branch_bundle,
+        }
+        if not syn.get("success") or not syn.get("response"):
+            _log_parallel_llm_summary(_parallel_usage_rows)
+            for cache_key, cache_resource in cache_resources_by_key.items():
+                await _delete_parallel_cache(cache_resource, cache_label=f"parallel_chat_{cache_key[0]}_{cache_key[1]}")
+            return {
+                "success": False,
+                "response": "I apologize, but I couldn't generate the free-question response. Please try again.",
+                "error": syn.get("error") or "parashari_final_empty",
+                "chat_llm_model": syn.get("chat_llm_model"),
+                "timing": {
+                    "parallel_chat_ms": parallel_ms,
+                    "synthesis_ms": synthesis_ms,
+                    "total_request_time": time.time() - total_request_start,
+                    "chat_llm_provider": final_runtime["provider"],
+                    "chat_llm_model": syn.get("chat_llm_model") or final_runtime["model_name"],
+                    "parallel_llm_usage": _parallel_usage_payload,
+                    "parallel_agent_context": use_agent_ctx,
+                },
+            }
+        response_text = syn["response"]
+        allowed_chars = "\n\r\t"
+        cleaned_text = "".join(
+            char for char in response_text if ord(char) >= 32 or char in allowed_chars
+        )
+        cleaned_text = analyzer._fix_response_formatting(cleaned_text)
+        if user_context and user_context.get("user_relationship") != "self":
+            native_name = ctx.get("birth_details", {}).get("name", "the native")
+            if native_name and native_name != "the native":
+                cleaned_text = analyzer._fix_pronoun_usage(cleaned_text, native_name)
+        cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
+        if len(cleaned_text) < 50:
+            _log_parallel_llm_summary(_parallel_usage_rows)
+            for cache_key, cache_resource in cache_resources_by_key.items():
+                await _delete_parallel_cache(cache_resource, cache_label=f"parallel_chat_{cache_key[0]}_{cache_key[1]}")
+            return {
+                "success": False,
+                "response": "I received a partial free-question response. Please try again.",
+                "error": "parashari_response_too_short",
+                "chat_llm_model": syn.get("chat_llm_model"),
+                "timing": {
+                    "parallel_chat_ms": parallel_ms,
+                    "synthesis_ms": synthesis_ms,
+                    "total_request_time": time.time() - total_request_start,
+                    "parallel_llm_usage": _parallel_usage_payload,
+                    "parallel_agent_context": use_agent_ctx,
+                },
+            }
+        parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
+        matched_term_ids, matched_glossary = find_terms_in_text(parsed_response["content"], language=language)
+        model_name = syn.get("chat_llm_model")
+        token_usage = {
+            "input_tokens": int(_parallel_totals["input_tokens"]),
+            "output_tokens": int(_parallel_totals["output_tokens"]),
+            "cached_tokens": int(_parallel_totals.get("cached_tokens") or 0),
+            "non_cached_input_tokens": int(_parallel_totals.get("non_cached_input_tokens") or 0),
+            "cache_setup_input_tokens": int(_parallel_totals.get("cache_setup_input_tokens") or 0),
+        }
+        total_time = time.time() - total_request_start
+        _log_parallel_llm_summary(_parallel_usage_rows)
+        for cache_key, cache_resource in cache_resources_by_key.items():
+            await _delete_parallel_cache(cache_resource, cache_label=f"parallel_chat_{cache_key[0]}_{cache_key[1]}")
+        return {
+            "success": True,
+            "response": parsed_response["content"],
+            "terms": matched_term_ids,
+            "glossary": matched_glossary,
+            "summary_image": None,
+            "follow_up_questions": parsed_response.get("follow_up_questions", []),
+            "analysis_steps": parsed_response.get("analysis_steps", []),
+            "faq_metadata": faq_metadata,
+            "raw_response": response_text,
+            "has_transit_request": "transitRequest" in response_text and '"requestType"' in response_text,
+            "chat_llm_model": model_name,
+            "token_usage": token_usage,
+            "llm_prompt_chars": int(_parallel_totals["input_chars"]),
+            "llm_response_chars": int(len(parsed_response.get("content") or "")),
+            "timing": {
+                "total_request_time": total_time,
+                "parallel_chat_ms": parallel_ms,
+                "synthesis_ms": synthesis_ms,
+                "chat_llm_provider": final_runtime["provider"],
+                "chat_llm_model": model_name,
+                "parallel_pipeline": True,
+                "parallel_agent_context": use_agent_ctx,
+                "parallel_llm_usage": _parallel_usage_payload,
+            },
+        }
 
     intent_mode = _intent_mode(ctx, mode)
     merge_system_instruction = build_merge_synthesis_instruction(

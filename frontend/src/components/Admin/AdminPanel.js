@@ -291,6 +291,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
   const [chatWorkerUserAllowlist, setChatWorkerUserAllowlist] = useState('');
   const [chatWorkerModeSaving, setChatWorkerModeSaving] = useState(false);
+  const [freeQuestionParashariOnlyEnabled, setFreeQuestionParashariOnlyEnabled] = useState(false);
+  const [freeQuestionParashariOnlySaving, setFreeQuestionParashariOnlySaving] = useState(false);
   const [firstPurchaseBonusEnabled, setFirstPurchaseBonusEnabled] = useState(false);
   const [firstPurchaseBonusUserAllowlist, setFirstPurchaseBonusUserAllowlist] = useState('');
   const [firstPurchaseBonusPercent, setFirstPurchaseBonusPercent] = useState('20');
@@ -697,6 +699,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
       setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
       setChatWorkerUserAllowlist(data.chat_worker_user_allowlist || '');
+      setFreeQuestionParashariOnlyEnabled(Boolean(data.free_question_parashari_only_enabled));
       const firstBonusConfig = data.first_purchase_bonus_config || {};
       setFirstPurchaseBonusEnabled(Boolean(data.first_purchase_bonus_enabled));
       setFirstPurchaseBonusUserAllowlist(data.first_purchase_bonus_user_allowlist || '');
@@ -1247,6 +1250,36 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save chat worker settings.');
     } finally {
       setChatWorkerModeSaving(false);
+    }
+  };
+
+  const handleSaveFreeQuestionParashariOnlySettings = async () => {
+    setFreeQuestionParashariOnlySaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/free_question_parashari_only_enabled', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({
+          key: 'free_question_parashari_only_enabled',
+          value: freeQuestionParashariOnlyEnabled ? 'true' : 'false',
+          description: 'When enabled, free chat questions use only the Parashari lane and Parashari returns the final answer directly.',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save free-question Parashari mode: ' + (err.detail || 'check console'));
+        return;
+      }
+      alert(`Free-question Parashari-only mode ${freeQuestionParashariOnlyEnabled ? 'enabled' : 'disabled'}. New free questions use it immediately.`);
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving free-question Parashari mode:', error);
+      alert('Failed to save free-question Parashari mode.');
+    } finally {
+      setFreeQuestionParashariOnlySaving(false);
     }
   };
 
@@ -5721,6 +5754,37 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={chatWorkerModeSaving}
                 >
                   {chatWorkerModeSaving ? 'Saving…' : 'Save chat worker settings'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Free-question Parashari mode</h3>
+              <p className="settings-hint">
+                Uses only the Parashari lane for free questions and makes that lane write the final user-facing answer directly. Paid chats stay on the current full path.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable Parashari-only free questions</strong>
+                  <p>Applies only when a user is consuming the free-question entitlement.</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={freeQuestionParashariOnlyEnabled}
+                    onChange={(e) => setFreeQuestionParashariOnlyEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveFreeQuestionParashariOnlySettings}
+                  disabled={freeQuestionParashariOnlySaving}
+                >
+                  {freeQuestionParashariOnlySaving ? 'Saving…' : 'Save free-question Parashari mode'}
                 </button>
               </div>
             </div>

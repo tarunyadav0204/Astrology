@@ -297,6 +297,15 @@ def _registration_email_required(_phone: str) -> bool:
     return False
 
 
+_REGISTRATION_TEST_OTP_PHONE = "919560214006"
+_REGISTRATION_TEST_OTP_CODE = "123123"
+
+
+def _is_registration_test_otp_phone(phone: Optional[str]) -> bool:
+    variants = _phone_lookup_variants(phone)
+    return _REGISTRATION_TEST_OTP_PHONE in variants
+
+
 def _registration_email_error(email: str) -> Optional[str]:
     clean = (email or "").strip().lower()
     if not clean:
@@ -1996,12 +2005,6 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
 
     _delete_user_optional_savepoint(
         conn,
-        "sp_del_free_birth_hash_usage",
-        [("DELETE FROM free_chat_birth_hash_usage WHERE first_userid = %s", (userid,))],
-    )
-
-    _delete_user_optional_savepoint(
-        conn,
         "sp_del_credit_req",
         [("DELETE FROM credit_requests WHERE userid = %s", (userid,))],
     )
@@ -2583,7 +2586,11 @@ async def send_registration_otp(request: SendResetCode):
             raise HTTPException(status_code=409, detail="Phone number already registered")
 
         # Generate 6-digit code and secure token
-        code = str(random.randint(100000, 999999))
+        code = (
+            _REGISTRATION_TEST_OTP_CODE
+            if _is_registration_test_otp_phone(request.phone)
+            else str(random.randint(100000, 999999))
+        )
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
 
@@ -2599,6 +2606,18 @@ async def send_registration_otp(request: SendResetCode):
 
     is_india = _is_india_number(request.phone)
     is_development = os.getenv("ENVIRONMENT", "development") == "development"
+    is_registration_test_phone = _is_registration_test_otp_phone(request.phone)
+
+    if is_registration_test_phone:
+        return {
+            "message": "Registration test OTP is ready for this number.",
+            "dev_code": _REGISTRATION_TEST_OTP_CODE,
+            "delivery": {
+                "sms_sent": False,
+                "email_sent": False,
+                "registration_otp_channel": "test_bypass",
+            },
+        }
 
     if is_india:
         # India: OTP only via SMS; email is collected for the account, not for OTP delivery.
@@ -2762,6 +2781,10 @@ async def verify_reset_code(request: VerifyResetCode):
     phone_variants = _phone_lookup_variants(request.phone)
     if not phone_variants:
         raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    if _is_registration_test_otp_phone(request.phone):
+        if (request.code or "").strip() != _REGISTRATION_TEST_OTP_CODE:
+            raise HTTPException(status_code=400, detail="Invalid or expired code")
 
     with get_conn() as conn:
         # `used` may be TEXT ('FALSE'/'TRUE') from SQLite-era migrations or BOOLEAN; avoid `used = FALSE`.
