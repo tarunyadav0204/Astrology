@@ -2641,10 +2641,18 @@ async def search_credit_transactions(
         fd = today - timedelta(days=30)
         td = today
 
+    summary = credit_service.get_search_transaction_summary(
+        fd.isoformat(), td.isoformat(), query, exclude_zero_amount=exclude_zero_amount
+    )
     transactions = credit_service.search_transactions(
         fd.isoformat(), td.isoformat(), query, exclude_zero_amount=exclude_zero_amount
     )
-    return {"from_date": fd.isoformat(), "to_date": td.isoformat(), "transactions": transactions}
+    return {
+        "from_date": fd.isoformat(),
+        "to_date": td.isoformat(),
+        "summary": summary,
+        "transactions": transactions,
+    }
 
 
 @router.get("/admin/google-play-transactions")
@@ -3174,6 +3182,33 @@ async def get_credits_dashboard(
         fd = today.replace(day=1)
         td = today
     return credit_service.get_dashboard_stats(fd.isoformat(), td.isoformat())
+
+
+@router.get("/admin/intelligence")
+async def get_credits_intelligence(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Aggregated payer/spend intelligence for admin. Default range: this month."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from datetime import date as date_type
+
+    today = date_type.today()
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today.replace(day=1)
+            td = today
+    else:
+        fd = today.replace(day=1)
+        td = today
+    return credit_service.get_admin_intelligence_stats(fd.isoformat(), td.isoformat())
 
 
 def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: int) -> Dict[str, Any]:

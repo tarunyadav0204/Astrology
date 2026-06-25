@@ -24,6 +24,14 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const [searchToDate, setSearchToDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [searchSummary, setSearchSummary] = useState({
+    purchased_credits: 0,
+    user_spend_credits: 0,
+    admin_added_credits: 0,
+    admin_deducted_credits: 0,
+    refund_reversal_credits: 0,
+    free_questions_count: 0,
+  });
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchRange, setSearchRange] = useState({ from_date: null, to_date: null });
@@ -43,21 +51,6 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     () => (buyOnly ? searchResults.filter(isBuyTransaction) : searchResults),
     [searchResults, buyOnly]
   );
-  const summary = useMemo(
-    () =>
-      searchResults.reduce(
-        (acc, tx) => {
-          const amt = Number(tx?.amount) || 0;
-          const isCredit = tx?.type === 'earned' || tx?.type === 'refund';
-          if (isCredit) acc.totalBought += Math.abs(amt);
-          else acc.totalSpent += Math.abs(amt);
-          return acc;
-        },
-        { totalBought: 0, totalSpent: 0 }
-      ),
-    [searchResults]
-  );
-
   const loadTransactions = async (fromDate = '', toDate = '', query = '', excludeZero = excludeZeroAmount) => {
     setSearchLoading(true);
     setSearchError(null);
@@ -73,11 +66,27 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       if (!response.ok) throw new Error(`Search failed with status ${response.status}`);
       const data = await response.json();
       setSearchResults(data.transactions || []);
+      setSearchSummary(data.summary || {
+        purchased_credits: 0,
+        user_spend_credits: 0,
+        admin_added_credits: 0,
+        admin_deducted_credits: 0,
+        refund_reversal_credits: 0,
+        free_questions_count: 0,
+      });
       setSearchRange({ from_date: data.from_date || null, to_date: data.to_date || null });
     } catch (err) {
       console.error('Error loading transactions:', err);
       setSearchError('Failed to load transactions. Please try again.');
       setSearchResults([]);
+      setSearchSummary({
+        purchased_credits: 0,
+        user_spend_credits: 0,
+        admin_added_credits: 0,
+        admin_deducted_credits: 0,
+        refund_reversal_credits: 0,
+        free_questions_count: 0,
+      });
     } finally {
       setSearchLoading(false);
     }
@@ -348,10 +357,19 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
               </h2>
               <div className="ledger-summary">
                 <span className="ledger-summary-chip ledger-summary-chip--bought">
-                  Total Bought: {summary.totalBought}
+                  Purchased Credits: {searchSummary.purchased_credits}
                 </span>
                 <span className="ledger-summary-chip ledger-summary-chip--spent">
-                  Total Spent: {summary.totalSpent}
+                  User Spend: {searchSummary.user_spend_credits}
+                </span>
+                <span className="ledger-summary-chip ledger-summary-chip--admin">
+                  Admin Adjustments: +{searchSummary.admin_added_credits} / -{searchSummary.admin_deducted_credits}
+                </span>
+                <span className="ledger-summary-chip ledger-summary-chip--refund">
+                  Refund / Reversals: {searchSummary.refund_reversal_credits}
+                </span>
+                <span className="ledger-summary-chip ledger-summary-chip--free">
+                  Free Questions: {searchSummary.free_questions_count}
                 </span>
                 <label className="ledger-buy-only-toggle">
                   <input

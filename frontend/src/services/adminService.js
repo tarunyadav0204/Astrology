@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
 
 const DEVICE_ID_KEY = 'admin_device_id';
 
-const getEndpoint = (path) => {
+export const getAdminEndpoint = (path) => {
   if (API_BASE_URL.includes('localhost')) {
     return `${API_BASE_URL}/api${path}`;
   }
@@ -54,7 +54,7 @@ export const adminService = {
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
-    const url = getEndpoint('/admin/users') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/users') + (qs ? `?${qs}` : '');
     const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
@@ -73,7 +73,7 @@ export const adminService = {
     if (params.role != null && params.role !== '' && params.role !== 'all') sp.set('role', params.role);
     if (params.subscription != null && params.subscription !== '' && params.subscription !== 'all') sp.set('subscription', params.subscription);
     const qs = sp.toString();
-    const url = getEndpoint('/admin/users/summary') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/users/summary') + (qs ? `?${qs}` : '');
     const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
@@ -84,7 +84,7 @@ export const adminService = {
   },
 
   async updateUser(phone, updates) {
-    const response = await fetch(getEndpoint(`/admin/users/${phone}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/users/${phone}`), {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(updates),
@@ -104,7 +104,7 @@ export const adminService = {
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
-    const url = getEndpoint('/admin/charts') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/charts') + (qs ? `?${qs}` : '');
     const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
@@ -117,7 +117,7 @@ export const adminService = {
   },
 
   async deleteChart(chartId) {
-    const response = await fetch(getEndpoint(`/admin/charts/${chartId}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/charts/${chartId}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -130,7 +130,7 @@ export const adminService = {
   },
 
   async shareChartForInvestigation(chartId) {
-    const response = await fetch(getEndpoint(`/admin/charts/${chartId}/share-for-investigation`), {
+    const response = await fetch(getAdminEndpoint(`/admin/charts/${chartId}/share-for-investigation`), {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -144,7 +144,7 @@ export const adminService = {
   },
 
   async updateUserSubscription(userId, subscriptionData) {
-    const response = await fetch(getEndpoint(`/admin/users/${userId}/subscription`), {
+    const response = await fetch(getAdminEndpoint(`/admin/users/${userId}/subscription`), {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(subscriptionData),
@@ -158,7 +158,7 @@ export const adminService = {
   },
 
   async getSubscriptionPlans() {
-    const response = await fetch(getEndpoint('/admin/subscription-plans'), {
+    const response = await fetch(getAdminEndpoint('/admin/subscription-plans'), {
       headers: getAuthHeaders(),
     });
 
@@ -170,7 +170,7 @@ export const adminService = {
   },
 
   async seedVipSubscriptionPlans() {
-    const response = await fetch(getEndpoint('/admin/seed-vip-subscription-plans'), {
+    const response = await fetch(getAdminEndpoint('/admin/seed-vip-subscription-plans'), {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -184,7 +184,7 @@ export const adminService = {
   },
 
   async updateSubscriptionPlan(planId, payload) {
-    const response = await fetch(getEndpoint(`/admin/subscription-plans/${planId}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/subscription-plans/${planId}`), {
       method: 'PUT',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -199,7 +199,7 @@ export const adminService = {
   },
 
   async getAllowedDevices() {
-    const response = await fetch(getEndpoint('/admin/allowed-devices'), {
+    const response = await fetch(getAdminEndpoint('/admin/allowed-devices'), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -211,7 +211,7 @@ export const adminService = {
 
   /** One-click register current device for this admin (exempt from device check). */
   async registerThisDevice() {
-    const response = await fetch(getEndpoint('/admin/register-this-device'), {
+    const response = await fetch(getAdminEndpoint('/admin/register-this-device'), {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -225,7 +225,7 @@ export const adminService = {
   async addAllowedDevice(deviceId, label, forUserId = null) {
     const body = { device_id: deviceId, label: label || '' };
     if (forUserId != null && forUserId !== '') body.for_user_id = Number(forUserId);
-    const response = await fetch(getEndpoint('/admin/allowed-devices'), {
+    const response = await fetch(getAdminEndpoint('/admin/allowed-devices'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -238,7 +238,7 @@ export const adminService = {
   },
 
   async removeAllowedDevice(deviceId) {
-    const response = await fetch(getEndpoint(`/admin/allowed-devices/${encodeURIComponent(deviceId)}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/allowed-devices/${encodeURIComponent(deviceId)}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -250,7 +250,7 @@ export const adminService = {
   },
 
   async removeAllowedDeviceById(rowId) {
-    const response = await fetch(getEndpoint(`/admin/allowed-devices-by-id/${rowId}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/allowed-devices-by-id/${rowId}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -262,7 +262,7 @@ export const adminService = {
   },
 
   async generateNudgeFromChat(userId) {
-    const response = await fetch(getEndpoint('/nudge/admin/generate-nudge-from-chat'), {
+    const response = await fetch(getAdminEndpoint('/nudge/admin/generate-nudge-from-chat'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ user_id: Number(userId) }),
@@ -297,7 +297,7 @@ export const adminService = {
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
-    const url = getEndpoint('/admin/acquisition-installations') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/acquisition-installations') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Failed to fetch mobile install funnel');
@@ -314,7 +314,7 @@ export const adminService = {
     if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
     if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
     const qs = sp.toString();
-    const url = getEndpoint('/admin/acquisition-installations/summary') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/acquisition-installations/summary') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Failed to fetch install funnel summary');
@@ -331,7 +331,7 @@ export const adminService = {
     if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
     if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
     const qs = sp.toString();
-    const url = getEndpoint('/admin/acquisition-installations/analytics') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/acquisition-installations/analytics') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Failed to fetch install funnel analytics');
@@ -340,7 +340,7 @@ export const adminService = {
   },
 
   async getAcquisitionInstallationEvents(installationId) {
-    const url = getEndpoint(`/admin/acquisition-installations/${encodeURIComponent(installationId)}/events`);
+    const url = getAdminEndpoint(`/admin/acquisition-installations/${encodeURIComponent(installationId)}/events`);
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Failed to fetch install timeline');
@@ -360,7 +360,7 @@ export const adminService = {
     if (params.utm_medium != null && params.utm_medium !== '') sp.set('utm_medium', params.utm_medium);
     if (params.app_build != null && params.app_build !== '') sp.set('app_build', params.app_build);
     const qs = sp.toString();
-    const url = getEndpoint('/admin/acquisition-installations/export') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/acquisition-installations/export') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAdminAuthHeaders() });
     if (!response.ok) {
       let detail = 'Failed to export install funnel';
@@ -395,7 +395,7 @@ export const adminService = {
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
-    const url = getEndpoint('/admin/expenses') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/expenses') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Failed to fetch expenses');
@@ -405,7 +405,7 @@ export const adminService = {
 
   async createAdminExpense(formData) {
     const token = localStorage.getItem('token');
-    const response = await fetch(getEndpoint('/admin/expenses'), {
+    const response = await fetch(getAdminEndpoint('/admin/expenses'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -423,7 +423,7 @@ export const adminService = {
   },
 
   async deleteAdminExpense(expenseId) {
-    const response = await fetch(getEndpoint(`/admin/expenses/${expenseId}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/expenses/${expenseId}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -435,21 +435,21 @@ export const adminService = {
   },
 
   getAdminExpenseInvoiceUrl(expenseId) {
-    return getEndpoint(`/admin/expenses/${expenseId}/invoice`);
+    return getAdminEndpoint(`/admin/expenses/${expenseId}/invoice`);
   },
 
   async getExpenseMasterVendors(params = {}) {
     const sp = new URLSearchParams();
     if (params.include_inactive) sp.set('include_inactive', 'true');
     const qs = sp.toString();
-    const url = getEndpoint('/admin/expense-masters/vendors') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/expense-masters/vendors') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Failed to load vendors');
     return response.json();
   },
 
   async createExpenseMasterVendor(body) {
-    const response = await fetch(getEndpoint('/admin/expense-masters/vendors'), {
+    const response = await fetch(getAdminEndpoint('/admin/expense-masters/vendors'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -462,7 +462,7 @@ export const adminService = {
   },
 
   async patchExpenseMasterVendor(id, body) {
-    const response = await fetch(getEndpoint(`/admin/expense-masters/vendors/${id}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/expense-masters/vendors/${id}`), {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -475,7 +475,7 @@ export const adminService = {
   },
 
   async deleteExpenseMasterVendor(id) {
-    const response = await fetch(getEndpoint(`/admin/expense-masters/vendors/${id}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/expense-masters/vendors/${id}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -490,14 +490,14 @@ export const adminService = {
     const sp = new URLSearchParams();
     if (params.include_inactive) sp.set('include_inactive', 'true');
     const qs = sp.toString();
-    const url = getEndpoint('/admin/expense-masters/paid-by') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/expense-masters/paid-by') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Failed to load paid-by list');
     return response.json();
   },
 
   async createExpenseMasterPaidBy(body) {
-    const response = await fetch(getEndpoint('/admin/expense-masters/paid-by'), {
+    const response = await fetch(getAdminEndpoint('/admin/expense-masters/paid-by'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -510,7 +510,7 @@ export const adminService = {
   },
 
   async patchExpenseMasterPaidBy(id, body) {
-    const response = await fetch(getEndpoint(`/admin/expense-masters/paid-by/${id}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/expense-masters/paid-by/${id}`), {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -523,7 +523,7 @@ export const adminService = {
   },
 
   async deleteExpenseMasterPaidBy(id) {
-    const response = await fetch(getEndpoint(`/admin/expense-masters/paid-by/${id}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/expense-masters/paid-by/${id}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -540,7 +540,7 @@ export const adminService = {
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
-    const url = getEndpoint('/admin/issues') + (qs ? `?${qs}` : '');
+    const url = getAdminEndpoint('/admin/issues') + (qs ? `?${qs}` : '');
     const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -550,7 +550,7 @@ export const adminService = {
   },
 
   async getAdminIssue(issueId) {
-    const response = await fetch(getEndpoint(`/admin/issues/${issueId}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/issues/${issueId}`), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -562,7 +562,7 @@ export const adminService = {
 
   async createAdminIssue(formData) {
     const token = localStorage.getItem('token');
-    const response = await fetch(getEndpoint('/admin/issues'), {
+    const response = await fetch(getAdminEndpoint('/admin/issues'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -580,7 +580,7 @@ export const adminService = {
   },
 
   async updateAdminIssue(issueId, body) {
-    const response = await fetch(getEndpoint(`/admin/issues/${issueId}`), {
+    const response = await fetch(getAdminEndpoint(`/admin/issues/${issueId}`), {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -593,7 +593,7 @@ export const adminService = {
   },
 
   async addAdminIssueComment(issueId, body) {
-    const response = await fetch(getEndpoint(`/admin/issues/${issueId}/comments`), {
+    const response = await fetch(getAdminEndpoint(`/admin/issues/${issueId}/comments`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ body }),
@@ -606,11 +606,11 @@ export const adminService = {
   },
 
   getAdminIssueScreenshotUrl(issueId) {
-    return getEndpoint(`/admin/issues/${issueId}/screenshot`);
+    return getAdminEndpoint(`/admin/issues/${issueId}/screenshot`);
   },
 
   async getOpsSystemStatus() {
-    const response = await fetch(getEndpoint('/admin/ops/system-status'), {
+    const response = await fetch(getAdminEndpoint('/admin/ops/system-status'), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -621,7 +621,7 @@ export const adminService = {
   },
 
   async captureCpuSnapshot(payload = {}) {
-    const response = await fetch(getEndpoint('/admin/ops/cpu-snapshot'), {
+    const response = await fetch(getAdminEndpoint('/admin/ops/cpu-snapshot'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
@@ -637,7 +637,7 @@ export const adminService = {
     const sp = new URLSearchParams();
     if (params.tail_lines != null) sp.set('tail_lines', String(params.tail_lines));
     const qs = sp.toString();
-    const response = await fetch(getEndpoint('/admin/ops/cpu-snapshot/latest') + (qs ? `?${qs}` : ''), {
+    const response = await fetch(getAdminEndpoint('/admin/ops/cpu-snapshot/latest') + (qs ? `?${qs}` : ''), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {

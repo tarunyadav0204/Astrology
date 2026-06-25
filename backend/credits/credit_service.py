@@ -375,6 +375,28 @@ class CreditService:
                 except Exception:
                     pass
 
+            try:
+                execute(
+                    conn,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_credit_tx_created_at
+                    ON credit_transactions(created_at DESC)
+                    """,
+                )
+                execute(
+                    conn,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_credit_tx_source_type_created
+                    ON credit_transactions(source, transaction_type, created_at DESC)
+                    """,
+                )
+                conn.commit()
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
             # Backfill: users who have ever paid for a chat question should not get "first question free"
             try:
                 execute(conn, """
@@ -3310,6 +3332,79 @@ class CreditService:
             })
         return transactions
 
+    def get_search_transaction_summary(
+        self,
+        from_date: str,
+        to_date: str,
+        query: Optional[str] = None,
+        *,
+        exclude_zero_amount: bool = False,
+    ) -> Dict[str, int]:
+        """
+        Backend summary for admin credit ledger over the exact same filter as search_transactions.
+        Keeps admin UI totals accurate without relying on whatever row limit is shown in the page.
+        """
+        from db import get_conn, execute
+
+        range_start = f"{from_date} 00:00:00"
+        range_end_exclusive_sql = f"CAST(? AS DATE) + INTERVAL '1 day'"
+        zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
+        query_filter = ""
+        params: List[Any] = [range_start, to_date]
+        if query and query.strip():
+            like = f"%{query.strip()}%"
+            query_filter = " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
+            params.extend([like, like])
+
+        sql = f"""
+            SELECT
+                COALESCE(SUM(CASE
+                    WHEN ct.source IN ('google_play', 'razorpay')
+                     AND ct.transaction_type IN ('earned', 'refund')
+                    THEN ABS(ct.amount) ELSE 0 END), 0) AS purchased_credits,
+                COALESCE(SUM(CASE
+                    WHEN ct.transaction_type = 'spent'
+                     AND ct.source NOT IN ('admin_adjustment', 'google_play_refund', 'razorpay_refund', 'refund')
+                    THEN ABS(ct.amount) ELSE 0 END), 0) AS user_spend_credits,
+                COALESCE(SUM(CASE
+                    WHEN ct.source = 'admin_adjustment'
+                     AND ct.transaction_type IN ('earned', 'refund')
+                    THEN ABS(ct.amount) ELSE 0 END), 0) AS admin_added_credits,
+                COALESCE(SUM(CASE
+                    WHEN ct.source = 'admin_adjustment'
+                     AND ct.transaction_type = 'spent'
+                    THEN ABS(ct.amount) ELSE 0 END), 0) AS admin_deducted_credits,
+                COALESCE(SUM(CASE
+                    WHEN ct.transaction_type = 'refund'
+                      OR ct.source IN ('google_play_refund', 'razorpay_refund', 'refund')
+                    THEN ABS(ct.amount) ELSE 0 END), 0) AS refund_reversal_credits,
+                COALESCE(SUM(CASE
+                    WHEN ct.transaction_type = 'spent'
+                     AND ct.source = 'feature_usage'
+                     AND ct.reference_id = 'chat_question'
+                     AND ct.amount = 0
+                    THEN 1 ELSE 0 END), 0) AS free_questions_count
+            FROM credit_transactions ct
+            LEFT JOIN users u ON u.userid = ct.userid
+            WHERE ct.created_at >= ?
+              AND ct.created_at < {range_end_exclusive_sql}
+              {zero_filter}
+              {query_filter}
+        """
+
+        with get_conn() as conn:
+            cur = execute(conn, sql, params)
+            row = cur.fetchone() or (0, 0, 0, 0, 0, 0)
+
+        return {
+            "purchased_credits": int(row[0] or 0),
+            "user_spend_credits": int(row[1] or 0),
+            "admin_added_credits": int(row[2] or 0),
+            "admin_deducted_credits": int(row[3] or 0),
+            "refund_reversal_credits": int(row[4] or 0),
+            "free_questions_count": int(row[5] or 0),
+        }
+
     def get_google_play_transactions(
         self,
         from_date: str,
@@ -3612,5 +3707,331 @@ class CreditService:
             },
             "top_users_by_activity": top_users,
             "distribution_by_activity": distribution,
+            "time_series": time_series,
+        }
+
+    def get_admin_intelligence_stats(self, from_date: str, to_date: str) -> Dict:
+        from db import get_conn, execute
+
+        paid_sources = ("google_play", "razorpay")
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                WITH range_tx AS (
+                    SELECT userid, transaction_type, amount, source, reference_id, created_at
+                    FROM credit_transactions
+                    WHERE date(created_at) >= ? AND date(created_at) <= ?
+                ),
+                paid_tx AS (
+                    SELECT *
+                    FROM range_tx
+                    WHERE transaction_type = 'earned'
+                      AND source IN (?, ?)
+                ),
+                spent_tx AS (
+                    SELECT *
+                    FROM range_tx
+                    WHERE transaction_type = 'spent'
+                ),
+                prior_payers AS (
+                    SELECT DISTINCT userid
+                    FROM credit_transactions
+                    WHERE transaction_type = 'earned'
+                      AND source IN (?, ?)
+                      AND date(created_at) < ?
+                )
+                SELECT
+                    COALESCE((SELECT SUM(amount) FROM paid_tx), 0) AS paid_credits,
+                    COALESCE((SELECT SUM(-amount) FROM spent_tx), 0) AS spent_credits,
+                    COALESCE((SELECT COUNT(*) FROM paid_tx), 0) AS purchase_count,
+                    COALESCE((SELECT COUNT(DISTINCT userid) FROM paid_tx), 0) AS unique_payers,
+                    COALESCE((SELECT COUNT(*) FROM (SELECT userid FROM paid_tx GROUP BY userid HAVING COUNT(*) >= 2) t), 0) AS repeat_payers,
+                    COALESCE((SELECT COUNT(*) FROM (SELECT p.userid FROM paid_tx p LEFT JOIN prior_payers pp ON pp.userid = p.userid WHERE pp.userid IS NULL GROUP BY p.userid) t), 0) AS first_time_payers,
+                    COALESCE((SELECT SUM(credits) FROM user_credits), 0) AS current_wallet_credits,
+                    COALESCE((SELECT COUNT(*) FROM user_credits WHERE credits > 0), 0) AS users_with_balance
+                """,
+                (from_date, to_date, *paid_sources, *paid_sources, from_date),
+            )
+            row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0)
+            summary = {
+                "paid_credits": row[0] or 0,
+                "spent_credits": row[1] or 0,
+                "purchase_count": row[2] or 0,
+                "unique_payers": row[3] or 0,
+                "repeat_payers": row[4] or 0,
+                "first_time_payers": row[5] or 0,
+                "current_wallet_credits": row[6] or 0,
+                "users_with_balance": row[7] or 0,
+            }
+
+            cur = execute(
+                conn,
+                """
+                SELECT
+                    source,
+                    COUNT(*) AS purchase_count,
+                    COUNT(DISTINCT userid) AS unique_users,
+                    COALESCE(SUM(amount), 0) AS credits
+                FROM credit_transactions
+                WHERE transaction_type = 'earned'
+                  AND source IN (?, ?)
+                  AND date(created_at) >= ? AND date(created_at) <= ?
+                GROUP BY source
+                ORDER BY credits DESC, purchase_count DESC
+                """,
+                (*paid_sources, from_date, to_date),
+            )
+            purchase_sources = [
+                {
+                    "source": r[0],
+                    "purchase_count": r[1] or 0,
+                    "unique_users": r[2] or 0,
+                    "credits": r[3] or 0,
+                }
+                for r in cur.fetchall()
+            ]
+
+            cur = execute(
+                conn,
+                """
+                SELECT
+                    COALESCE(reference_id, 'other') AS feature,
+                    COUNT(*) AS spend_count,
+                    COUNT(DISTINCT userid) AS unique_users,
+                    COALESCE(SUM(-amount), 0) AS spent_credits,
+                    ROUND(AVG(-amount)::numeric, 2) AS avg_credits
+                FROM credit_transactions
+                WHERE transaction_type = 'spent'
+                  AND date(created_at) >= ? AND date(created_at) <= ?
+                GROUP BY COALESCE(reference_id, 'other')
+                ORDER BY spent_credits DESC, spend_count DESC
+                LIMIT 15
+                """,
+                (from_date, to_date),
+            )
+            spend_by_feature = [
+                {
+                    "feature": r[0],
+                    "spend_count": r[1] or 0,
+                    "unique_users": r[2] or 0,
+                    "spent_credits": r[3] or 0,
+                    "avg_credits": float(r[4] or 0),
+                }
+                for r in cur.fetchall()
+            ]
+
+            cur = execute(
+                conn,
+                """
+                WITH paid_range AS (
+                    SELECT userid, amount, source, created_at
+                    FROM credit_transactions
+                    WHERE transaction_type = 'earned'
+                      AND source IN (?, ?)
+                      AND date(created_at) >= ? AND date(created_at) <= ?
+                ),
+                spent_range AS (
+                    SELECT userid, COUNT(*) AS spend_count, COALESCE(SUM(-amount), 0) AS spent_credits
+                    FROM credit_transactions
+                    WHERE transaction_type = 'spent'
+                      AND date(created_at) >= ? AND date(created_at) <= ?
+                    GROUP BY userid
+                ),
+                payer_rollup AS (
+                    SELECT
+                        p.userid,
+                        COUNT(*) AS purchase_count,
+                        COALESCE(SUM(p.amount), 0) AS purchased_credits,
+                        MIN(p.created_at) AS first_purchase_at,
+                        MAX(p.created_at) AS last_purchase_at,
+                        (
+                            SELECT p2.source
+                            FROM paid_range p2
+                            WHERE p2.userid = p.userid
+                            GROUP BY p2.source
+                            ORDER BY SUM(p2.amount) DESC, COUNT(*) DESC, p2.source
+                            LIMIT 1
+                        ) AS primary_source
+                    FROM paid_range p
+                    GROUP BY p.userid
+                )
+                SELECT
+                    pr.userid,
+                    COALESCE(u.name, '') AS user_name,
+                    COALESCE(u.phone, '') AS user_phone,
+                    pr.purchase_count,
+                    pr.purchased_credits,
+                    COALESCE(sr.spent_credits, 0) AS spent_credits,
+                    COALESCE(sr.spend_count, 0) AS spend_count,
+                    COALESCE(uc.credits, 0) AS current_balance,
+                    pr.primary_source,
+                    pr.first_purchase_at,
+                    pr.last_purchase_at
+                FROM payer_rollup pr
+                LEFT JOIN spent_range sr ON sr.userid = pr.userid
+                LEFT JOIN users u ON u.userid = pr.userid
+                LEFT JOIN user_credits uc ON uc.userid = pr.userid
+                ORDER BY pr.purchased_credits DESC, pr.purchase_count DESC, pr.last_purchase_at DESC
+                LIMIT 50
+                """,
+                (*paid_sources, from_date, to_date, from_date, to_date),
+            )
+            top_payers = [
+                {
+                    "userid": r[0],
+                    "user_name": r[1],
+                    "user_phone": r[2],
+                    "purchase_count": r[3] or 0,
+                    "purchased_credits": r[4] or 0,
+                    "spent_credits": r[5] or 0,
+                    "spend_count": r[6] or 0,
+                    "current_balance": r[7] or 0,
+                    "primary_source": r[8] or "",
+                    "first_purchase_at": r[9].isoformat() if r[9] else None,
+                    "last_purchase_at": r[10].isoformat() if r[10] else None,
+                }
+                for r in cur.fetchall()
+            ]
+
+            cur = execute(
+                conn,
+                """
+                SELECT bucket, user_count, total_credits
+                FROM (
+                    SELECT
+                        CASE
+                            WHEN credits <= 0 THEN '0'
+                            WHEN credits BETWEEN 1 AND 49 THEN '1-49'
+                            WHEN credits BETWEEN 50 AND 199 THEN '50-199'
+                            WHEN credits BETWEEN 200 AND 499 THEN '200-499'
+                            WHEN credits BETWEEN 500 AND 999 THEN '500-999'
+                            ELSE '1000+'
+                        END AS bucket,
+                        COUNT(*) AS user_count,
+                        SUM(credits) AS total_credits,
+                        CASE
+                            WHEN credits <= 0 THEN 0
+                            WHEN credits BETWEEN 1 AND 49 THEN 1
+                            WHEN credits BETWEEN 50 AND 199 THEN 2
+                            WHEN credits BETWEEN 200 AND 499 THEN 3
+                            WHEN credits BETWEEN 500 AND 999 THEN 4
+                            ELSE 5
+                        END AS bucket_order
+                    FROM user_credits
+                    GROUP BY bucket, bucket_order
+                ) buckets
+                ORDER BY bucket_order
+                """,
+            )
+            wallet_buckets = [
+                {"bucket": r[0], "user_count": r[1] or 0, "total_credits": r[2] or 0}
+                for r in cur.fetchall()
+            ]
+
+            cur = execute(
+                conn,
+                """
+                WITH paid_range AS (
+                    SELECT userid, SUM(amount) AS purchased_credits, MAX(created_at) AS last_purchase_at
+                    FROM credit_transactions
+                    WHERE transaction_type = 'earned'
+                      AND source IN (?, ?)
+                      AND date(created_at) >= ? AND date(created_at) <= ?
+                    GROUP BY userid
+                ),
+                spent_range AS (
+                    SELECT userid, SUM(-amount) AS spent_credits
+                    FROM credit_transactions
+                    WHERE transaction_type = 'spent'
+                      AND date(created_at) >= ? AND date(created_at) <= ?
+                    GROUP BY userid
+                )
+                SELECT
+                    p.userid,
+                    COALESCE(u.name, '') AS user_name,
+                    COALESCE(u.phone, '') AS user_phone,
+                    p.purchased_credits,
+                    COALESCE(s.spent_credits, 0) AS spent_credits,
+                    COALESCE(uc.credits, 0) AS current_balance,
+                    p.last_purchase_at
+                FROM paid_range p
+                LEFT JOIN spent_range s ON s.userid = p.userid
+                LEFT JOIN users u ON u.userid = p.userid
+                LEFT JOIN user_credits uc ON uc.userid = p.userid
+                WHERE COALESCE(s.spent_credits, 0) = 0
+                   OR COALESCE(uc.credits, 0) >= 200
+                ORDER BY current_balance DESC, p.purchased_credits DESC, p.last_purchase_at DESC
+                LIMIT 25
+                """,
+                (*paid_sources, from_date, to_date, from_date, to_date),
+            )
+            dormant_balances = [
+                {
+                    "userid": r[0],
+                    "user_name": r[1],
+                    "user_phone": r[2],
+                    "purchased_credits": r[3] or 0,
+                    "spent_credits": r[4] or 0,
+                    "current_balance": r[5] or 0,
+                    "last_purchase_at": r[6].isoformat() if r[6] else None,
+                }
+                for r in cur.fetchall()
+            ]
+
+            cur = execute(
+                conn,
+                """
+                WITH daily_paid AS (
+                    SELECT
+                        date(created_at) AS day,
+                        source,
+                        SUM(amount) AS credits
+                    FROM credit_transactions
+                    WHERE transaction_type = 'earned'
+                      AND source IN (?, ?)
+                      AND date(created_at) >= ? AND date(created_at) <= ?
+                    GROUP BY date(created_at), source
+                ),
+                daily_spent AS (
+                    SELECT
+                        date(created_at) AS day,
+                        SUM(-amount) AS spent_credits
+                    FROM credit_transactions
+                    WHERE transaction_type = 'spent'
+                      AND date(created_at) >= ? AND date(created_at) <= ?
+                    GROUP BY date(created_at)
+                )
+                SELECT
+                    COALESCE(p.day, s.day) AS day,
+                    COALESCE(SUM(CASE WHEN p.source = 'google_play' THEN p.credits ELSE 0 END), 0) AS google_play_credits,
+                    COALESCE(SUM(CASE WHEN p.source = 'razorpay' THEN p.credits ELSE 0 END), 0) AS razorpay_credits,
+                    COALESCE(MAX(s.spent_credits), 0) AS spent_credits
+                FROM daily_paid p
+                FULL OUTER JOIN daily_spent s ON s.day = p.day
+                GROUP BY COALESCE(p.day, s.day)
+                ORDER BY day
+                """,
+                (*paid_sources, from_date, to_date, from_date, to_date),
+            )
+            time_series = [
+                {
+                    "date": r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]),
+                    "google_play_credits": r[1] or 0,
+                    "razorpay_credits": r[2] or 0,
+                    "spent_credits": r[3] or 0,
+                }
+                for r in cur.fetchall()
+            ]
+
+        return {
+            "from_date": from_date,
+            "to_date": to_date,
+            "summary": summary,
+            "purchase_sources": purchase_sources,
+            "spend_by_feature": spend_by_feature,
+            "top_payers": top_payers,
+            "wallet_buckets": wallet_buckets,
+            "dormant_balances": dormant_balances,
             "time_series": time_series,
         }

@@ -159,6 +159,24 @@
   border-color: #ef9a9a;
 }
 
+.ledger-summary-chip--admin {
+  color: #6a1b9a;
+  background: #f3e5f5;
+  border-color: #ce93d8;
+}
+
+.ledger-summary-chip--refund {
+  color: #0d47a1;
+  background: #e3f2fd;
+  border-color: #90caf9;
+}
+
+.ledger-summary-chip--free {
+  color: #8a3b12;
+  background: #fff3e0;
+  border-color: #ffcc80;
+}
+
 .ledger-buy-only-toggle {
   display: inline-flex;
   align-items: center;
