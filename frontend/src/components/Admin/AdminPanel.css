@@ -132,6 +132,46 @@
   gap: 4px;
 }
 
+.credits-intelligence__segment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.credits-intelligence__segment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  background: #fafbfc;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.credits-intelligence__segment-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.credits-intelligence__segment-card strong {
+  color: #212529;
+  font-size: 15px;
+}
+
+.credits-intelligence__segment-card span {
+  color: #6c757d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.credits-intelligence__segment-modal {
+  max-width: min(1100px, calc(100vw - 32px));
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

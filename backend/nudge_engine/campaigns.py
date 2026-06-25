@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Set
 from zoneinfo import ZoneInfo
 
 from db import execute
+from credits.credit_service import CreditService
 
 from . import db
 from .delivery import deliver_nudge
@@ -31,6 +32,7 @@ ALLOWED_AUDIENCE_TYPES = (
     "active_chat_days",
     "inactive_chat_days",
     "user_ids",
+    "credit_intelligence_segment",
 )
 
 REACHABILITY_CHANNELS = ("push", "whatsapp", "email")
@@ -88,6 +90,26 @@ def _coerce_int(value: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
+def _users_has_column(conn, column_name: str) -> bool:
+    cur = execute(
+        conn,
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = %s
+        LIMIT 1
+        """,
+        (column_name,),
+    )
+    return bool(cur.fetchone())
+
+
+def _whatsapp_presence_sql(conn) -> str:
+    if _users_has_column(conn, "whatsapp_wa_id"):
+        return "COALESCE(NULLIF(TRIM(whatsapp_wa_id), ''), '') <> ''"
+    return "FALSE"
+
+
 # ---------------------------------------------------------------------------
 # Audience
 # ---------------------------------------------------------------------------
@@ -102,6 +124,17 @@ def resolve_campaign_audience(conn, audience_filter: Dict[str, Any]) -> List[int
             for u in (audience_filter.get("user_ids") or [])
             if isinstance(u, int) or str(u).isdigit()
         ]
+    elif ftype == "credit_intelligence_segment":
+        segment_key = str(audience_filter.get("segment_key") or "").strip().lower()
+        from_date = str(audience_filter.get("from_date") or "").strip()
+        to_date = str(audience_filter.get("to_date") or "").strip()
+        if not segment_key or not from_date or not to_date:
+            raise ValueError("credit intelligence segment audience requires segment_key, from_date, and to_date")
+        base_ids = CreditService().get_admin_campaign_segment_user_ids(
+            segment_key,
+            from_date=from_date,
+            to_date=to_date,
+        )
     elif ftype == "has_device_token":
         cur = execute(conn, "SELECT DISTINCT userid FROM device_tokens ORDER BY userid")
         base_ids = [int(r[0]) for r in (cur.fetchall() or [])]
@@ -201,6 +234,8 @@ def filter_campaign_audience(conn, user_ids: List[int], audience_filter: Dict[st
             (clean_ids,),
         )
 
+    whatsapp_presence_sql = _whatsapp_presence_sql(conn)
+
     for flag_key, sql in (
         (
             "has_email",
@@ -213,11 +248,11 @@ def filter_campaign_audience(conn, user_ids: List[int], audience_filter: Dict[st
         ),
         (
             "has_whatsapp",
-            """
+            f"""
             SELECT userid
             FROM users
             WHERE userid = ANY(%s)
-              AND COALESCE(NULLIF(TRIM(whatsapp_wa_id), ''), '') <> ''
+              AND {whatsapp_presence_sql}
             """,
         ),
         (
@@ -363,9 +398,10 @@ def estimate_campaign_audience(conn, audience_filter: Dict[str, Any]) -> Dict[st
         }
     ids = sorted(set(user_ids))
     reach = {"push": 0, "whatsapp": 0, "email": 0}
+    whatsapp_presence_sql = _whatsapp_presence_sql(conn)
     queries = {
         "push": "SELECT COUNT(DISTINCT userid) FROM device_tokens WHERE userid = ANY(%s)",
-        "whatsapp": "SELECT COUNT(*) FROM users WHERE userid = ANY(%s) AND COALESCE(NULLIF(TRIM(whatsapp_wa_id), ''), '') <> ''",
+        "whatsapp": f"SELECT COUNT(*) FROM users WHERE userid = ANY(%s) AND {whatsapp_presence_sql}",
         "email": "SELECT COUNT(*) FROM users WHERE userid = ANY(%s) AND COALESCE(NULLIF(TRIM(email), ''), '') <> ''",
     }
     for channel, sql in queries.items():

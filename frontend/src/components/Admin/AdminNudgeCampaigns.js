@@ -9,6 +9,7 @@ const AUDIENCE_OPTIONS = [
   { value: 'active_chat_days', label: 'Asked a question in last N days' },
   { value: 'inactive_chat_days', label: 'No question in last N days' },
   { value: 'user_ids', label: 'Specific user IDs' },
+  { value: 'credit_intelligence_segment', label: 'Credits intelligence segment' },
 ];
 const LANDING_OPTIONS = [
   'chat', 'information', 'event_screen', 'past_life_karma',
@@ -49,6 +50,9 @@ const emptyForm = {
   audience_type: 'all',
   audience_days: 7,
   audience_user_ids: '',
+  audience_segment_key: '',
+  audience_from_date: '',
+  audience_to_date: '',
   require_self_chart: true,
   has_email: '',
   has_whatsapp: '',
@@ -85,7 +89,7 @@ async function apiFetch(url, options = {}) {
   return body;
 }
 
-export default function AdminNudgeCampaigns() {
+export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillConsumed = null }) {
   const [campaigns, setCampaigns] = useState([]);
   const [placeholders, setPlaceholders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +102,8 @@ export default function AdminNudgeCampaigns() {
   const [previewUserId, setPreviewUserId] = useState('');
   const [audienceEstimate, setAudienceEstimate] = useState(null);
   const [estimatingAudience, setEstimatingAudience] = useState(false);
+  const [audiencePreview, setAudiencePreview] = useState(null);
+  const [previewingAudience, setPreviewingAudience] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busyCampaignId, setBusyCampaignId] = useState(null);
@@ -113,6 +119,7 @@ export default function AdminNudgeCampaigns() {
     setForm(emptyForm);
     setPreview(null);
     setAudienceEstimate(null);
+    setAudiencePreview(null);
   };
 
   const load = useCallback(async () => {
@@ -133,6 +140,28 @@ export default function AdminNudgeCampaigns() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!prefillDraft) return;
+    setEditingId(null);
+    setPreview(null);
+    setAudienceEstimate(null);
+    setAudiencePreview(null);
+    setForm({
+      ...emptyForm,
+      name: prefillDraft.name || '',
+      title_template: prefillDraft.title_template || '',
+      body_template: prefillDraft.body_template || '',
+      question_template: prefillDraft.question_template || '',
+      landing_screen: prefillDraft.landing_screen || 'chat',
+      audience_type: prefillDraft.audience_type || 'credit_intelligence_segment',
+      audience_segment_key: prefillDraft.audience_segment_key || '',
+      audience_from_date: prefillDraft.audience_from_date || '',
+      audience_to_date: prefillDraft.audience_to_date || '',
+    });
+    if (typeof onPrefillConsumed === 'function') onPrefillConsumed();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [prefillDraft, onPrefillConsumed]);
+
   const buildPayload = () => {
     const audience = { type: form.audience_type };
     if (form.audience_type === 'active_chat_days' || form.audience_type === 'inactive_chat_days') {
@@ -143,6 +172,11 @@ export default function AdminNudgeCampaigns() {
         .split(/[\s,]+/)
         .map((x) => Number(x))
         .filter((n) => Number.isInteger(n) && n > 0);
+    }
+    if (form.audience_type === 'credit_intelligence_segment') {
+      audience.segment_key = String(form.audience_segment_key || '').trim();
+      audience.from_date = String(form.audience_from_date || '').trim();
+      audience.to_date = String(form.audience_to_date || '').trim();
     }
 
     const splitCsv = (value) =>
@@ -210,6 +244,60 @@ export default function AdminNudgeCampaigns() {
       showResult(false, e.message || 'Audience estimate failed');
     } finally {
       setEstimatingAudience(false);
+    }
+  };
+
+  const loadAudiencePreview = async (page = 1) => {
+    const payload = buildPayload();
+    const audience = payload.audience_filter || {};
+    if (audience.type !== 'credit_intelligence_segment') {
+      showResult(false, 'Audience preview is currently available for Credits Intelligence segments only.');
+      return;
+    }
+
+    setPreviewingAudience(true);
+    setAudiencePreview((prev) => ({
+      key: audience.segment_key,
+      title: prev?.title || 'Campaign audience preview',
+      description: prev?.description || '',
+      users: prev?.key === audience.segment_key ? (prev.users || []) : [],
+      page,
+      limit: 25,
+      total: 0,
+      loading: true,
+      error: '',
+    }));
+    showResult(true, '');
+    try {
+      const params = new URLSearchParams({
+        segment_key: audience.segment_key,
+        from_date: audience.from_date,
+        to_date: audience.to_date,
+        page: String(page),
+        limit: '25',
+      });
+      const body = await apiFetch(`/api/credits/admin/intelligence-segment?${params.toString()}`);
+      setAudiencePreview({
+        key: body.segment_key,
+        title: body.segment_label || 'Campaign audience preview',
+        description: body.description || '',
+        users: body.users || [],
+        page: body.page || page,
+        limit: body.limit || 25,
+        total: body.total || 0,
+        loading: false,
+        error: '',
+      });
+    } catch (e) {
+      setAudiencePreview((prev) => ({
+        ...(prev || {}),
+        loading: false,
+        error: e.message || 'Failed to load audience preview',
+        users: [],
+      }));
+      showResult(false, e.message || 'Audience preview failed');
+    } finally {
+      setPreviewingAudience(false);
     }
   };
 
@@ -294,6 +382,9 @@ export default function AdminNudgeCampaigns() {
       audience_type: audience.type || 'all',
       audience_days: audience.days || 7,
       audience_user_ids: (audience.user_ids || []).join(', '),
+      audience_segment_key: audience.segment_key || '',
+      audience_from_date: audience.from_date || '',
+      audience_to_date: audience.to_date || '',
       require_self_chart: criteria.require_self_chart !== false,
       has_email: criteria.has_email === true ? 'yes' : criteria.has_email === false ? 'no' : '',
       has_whatsapp:
@@ -585,6 +676,36 @@ export default function AdminNudgeCampaigns() {
             </div>
           )}
 
+          {form.audience_type === 'credit_intelligence_segment' && (
+            <div className="nudge-scheduler-row nudge-scheduler-row--3">
+              <div className="form-field">
+                <label>Segment key</label>
+                <input
+                  type="text"
+                  value={form.audience_segment_key}
+                  onChange={(e) => setField('audience_segment_key', e.target.value)}
+                  placeholder="e.g. active_but_slipping"
+                />
+              </div>
+              <div className="form-field">
+                <label>From date</label>
+                <input
+                  type="date"
+                  value={form.audience_from_date}
+                  onChange={(e) => setField('audience_from_date', e.target.value)}
+                />
+              </div>
+              <div className="form-field">
+                <label>To date</label>
+                <input
+                  type="date"
+                  value={form.audience_to_date}
+                  onChange={(e) => setField('audience_to_date', e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <label className="notif-inline-checkbox">
             <input
               type="checkbox"
@@ -693,6 +814,21 @@ export default function AdminNudgeCampaigns() {
             <button type="button" className="notif-search-btn" onClick={handleEstimateAudience} disabled={estimatingAudience}>
               {estimatingAudience ? 'Estimating...' : 'Estimate audience'}
             </button>
+            {form.audience_type === 'credit_intelligence_segment' && (
+              <button
+                type="button"
+                className="notif-search-btn"
+                onClick={() => loadAudiencePreview(1)}
+                disabled={
+                  previewingAudience ||
+                  !String(form.audience_segment_key || '').trim() ||
+                  !String(form.audience_from_date || '').trim() ||
+                  !String(form.audience_to_date || '').trim()
+                }
+              >
+                {previewingAudience ? 'Loading users...' : 'Preview audience'}
+              </button>
+            )}
             <span className="nudge-toolbar-hint">
               Run this before scheduling or sending so you understand scale and channel reach.
             </span>

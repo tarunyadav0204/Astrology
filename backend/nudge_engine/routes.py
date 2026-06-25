@@ -2374,6 +2374,18 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Invalid audience type: {atype}")
     if atype == "user_ids" and not (audience.get("user_ids") or []):
         raise HTTPException(status_code=400, detail="audience user_ids must be non-empty")
+    if atype == "credit_intelligence_segment":
+        segment_key = str(audience.get("segment_key") or "").strip().lower()
+        from_date = str(audience.get("from_date") or "").strip()
+        to_date = str(audience.get("to_date") or "").strip()
+        if not segment_key or not from_date or not to_date:
+            raise HTTPException(
+                status_code=400,
+                detail="credit intelligence segment audience requires segment_key, from_date, and to_date",
+            )
+        audience["segment_key"] = segment_key
+        audience["from_date"] = from_date
+        audience["to_date"] = to_date
     criteria = dict(audience.get("criteria") or {})
     if not isinstance(criteria, dict):
         raise HTTPException(status_code=400, detail="audience criteria must be an object")

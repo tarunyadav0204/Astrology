@@ -177,6 +177,17 @@
   border-color: #ffcc80;
 }
 
+.ledger-summary-chip--newusers {
+  color: #0f766e;
+  background: #ecfeff;
+  border-color: #99f6e4;
+  cursor: pointer;
+}
+
+.ledger-summary-chip--newusers.is-active {
+  box-shadow: inset 0 0 0 1px #0f766e;
+}
+
 .ledger-buy-only-toggle {
   display: inline-flex;
   align-items: center;

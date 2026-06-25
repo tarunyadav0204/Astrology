@@ -106,13 +106,37 @@ const PRESET_LABELS = {
   custom: 'Custom',
 };
 
-export default function AdminCreditsIntelligence() {
+const CAMPAIGN_SEGMENTS = [
+  {
+    key: 'active_but_slipping',
+    title: 'Active but slipping',
+    description: 'Users active before, but quiet in the last 7 days.',
+  },
+  {
+    key: 'recent_payers_no_spend',
+    title: 'Paid but did not consume',
+    description: 'Bought credits in range, but has not spent them yet.',
+  },
+  {
+    key: 'high_balance_inactive',
+    title: 'High balance inactive',
+    description: 'Large parked wallet and no recent credit activity.',
+  },
+  {
+    key: 'first_time_payers_no_repeat',
+    title: 'First-time payer not repeated',
+    description: 'First purchase done, but no second purchase yet.',
+  },
+];
+
+export default function AdminCreditsIntelligence({ onCreateCampaignFromSegment = null }) {
   const [preset, setPreset] = useState('this_month');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [segmentModal, setSegmentModal] = useState(null);
 
   useEffect(() => {
     if (preset === 'custom' && !fromDate) {
@@ -170,6 +194,74 @@ export default function AdminCreditsIntelligence() {
       ),
     [timeSeries],
   );
+
+  const openSegment = async (segmentKey, page = 1) => {
+    const range = preset === 'custom'
+      ? { from_date: fromDate, to_date: toDate }
+      : getDateRange(preset);
+    setSegmentModal((prev) => ({
+      key: segmentKey,
+      title: CAMPAIGN_SEGMENTS.find((s) => s.key === segmentKey)?.title || 'Campaign segment',
+      description: CAMPAIGN_SEGMENTS.find((s) => s.key === segmentKey)?.description || '',
+      loading: true,
+      error: '',
+      users: prev?.key === segmentKey ? (prev.users || []) : [],
+      page,
+      limit: 25,
+      total: 0,
+    }));
+    try {
+      const params = new URLSearchParams({
+        segment_key: segmentKey,
+        from_date: range.from_date,
+        to_date: range.to_date,
+        page: String(page),
+        limit: '25',
+      });
+      const res = await fetch(`${getAdminEndpoint('/credits/admin/intelligence-segment')}?${params.toString()}`, {
+        headers: getAdminAuthHeaders(),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || 'Failed to load campaign segment');
+      setSegmentModal({
+        key: segmentKey,
+        title: body.segment_label || CAMPAIGN_SEGMENTS.find((s) => s.key === segmentKey)?.title || 'Campaign segment',
+        description: body.description || '',
+        loading: false,
+        error: '',
+        users: body.users || [],
+        page: body.page || page,
+        limit: body.limit || 25,
+        total: body.total || 0,
+      });
+    } catch (err) {
+      setSegmentModal((prev) => ({
+        ...(prev || {}),
+        key: segmentKey,
+        loading: false,
+        error: err.message || 'Failed to load campaign segment',
+        users: [],
+      }));
+    }
+  };
+
+  const createCampaignFromSegment = () => {
+    if (!segmentModal || typeof onCreateCampaignFromSegment !== 'function') return;
+    const range = preset === 'custom'
+      ? { from_date: fromDate, to_date: toDate }
+      : getDateRange(preset);
+    onCreateCampaignFromSegment({
+      name: `${segmentModal.title} campaign`,
+      title_template: '',
+      body_template: '',
+      question_template: '',
+      landing_screen: 'chat',
+      audience_type: 'credit_intelligence_segment',
+      audience_segment_key: segmentModal.key,
+      audience_from_date: range.from_date,
+      audience_to_date: range.to_date,
+    });
+  };
 
   if (loading && !data) return <div className="credits-dashboard-loading">Loading credits intelligence…</div>;
   if (error) return <div className="credits-dashboard-error">{error}</div>;
@@ -347,6 +439,26 @@ export default function AdminCreditsIntelligence() {
         </div>
       </section>
 
+      <section className="credits-intelligence__panel">
+        <div className="credits-intelligence__panel-header">
+          <h3>Campaign segments</h3>
+          <span>Load on demand to keep this page light</span>
+        </div>
+        <div className="credits-intelligence__segment-grid">
+          {CAMPAIGN_SEGMENTS.map((segment) => (
+            <button
+              key={segment.key}
+              type="button"
+              className="credits-intelligence__segment-card"
+              onClick={() => openSegment(segment.key, 1)}
+            >
+              <strong>{segment.title}</strong>
+              <span>{segment.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="credits-intelligence__layout">
         <section className="credits-intelligence__panel">
           <div className="credits-intelligence__panel-header">
@@ -390,6 +502,90 @@ export default function AdminCreditsIntelligence() {
           </div>
         </section>
       </div>
+
+      {segmentModal ? (
+        <div className="ledger-user-modal-backdrop" onClick={() => setSegmentModal(null)} role="presentation">
+          <div className="ledger-user-modal credits-intelligence__segment-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="ledger-user-modal-header">
+              <h2>{segmentModal.title}</h2>
+              <p className="ledger-user-modal-sub">{segmentModal.description}</p>
+              <button type="button" className="ledger-user-modal-close" onClick={() => setSegmentModal(null)}>
+                Close
+              </button>
+            </div>
+            {segmentModal.loading ? (
+              <div className="loading">Loading users…</div>
+            ) : segmentModal.error ? (
+              <div className="search-error">{segmentModal.error}</div>
+            ) : (
+              <>
+                <div className="form-buttons" style={{ marginBottom: '12px' }}>
+                  <button type="button" className="create-btn" onClick={createCampaignFromSegment}>
+                    Create campaign from this segment
+                  </button>
+                </div>
+                <div className="admin-table-wrapper">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Purchased</th>
+                        <th>Spent</th>
+                        <th>Balance</th>
+                        <th>Last activity</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {segmentModal.users.length ? segmentModal.users.map((row) => (
+                        <tr key={`${segmentModal.key}-${row.userid}`}>
+                          <td>
+                            <div className="credits-intelligence__user-cell">
+                              <strong>{row.user_name || `User ${row.userid}`}</strong>
+                              <span>{row.user_phone || `ID ${row.userid}`}</span>
+                            </div>
+                          </td>
+                          <td>{formatInt(row.purchased_credits)}</td>
+                          <td>{formatInt(row.spent_credits)}</td>
+                          <td>{formatInt(row.current_balance)}</td>
+                          <td>{formatDateTime(row.last_activity_at || row.last_purchase_at)}</td>
+                          <td>{row.campaign_reason || '—'}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={6} className="users-table-empty">No users in this segment for the selected range.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="users-pagination">
+                  <span className="users-pagination-info">
+                    Showing {segmentModal.users.length ? ((segmentModal.page - 1) * segmentModal.limit) + 1 : 0}
+                    {' '}to {Math.min(segmentModal.page * segmentModal.limit, segmentModal.total)} of {segmentModal.total}
+                  </span>
+                  <button
+                    type="button"
+                    className="users-pagination-btn"
+                    disabled={segmentModal.page <= 1}
+                    onClick={() => openSegment(segmentModal.key, segmentModal.page - 1)}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="users-pagination-btn"
+                    disabled={segmentModal.page * segmentModal.limit >= segmentModal.total}
+                    onClick={() => openSegment(segmentModal.key, segmentModal.page + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -243,6 +243,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setActiveTab('users');
     setActiveSubTab('userProfile');
   };
+  const openNudgeCampaignFromCreditsSegment = useCallback((draft) => {
+    setActiveTab('notifications');
+    setNotifSubTab('nudge_campaigns');
+    setCampaignDraftPrefill({
+      ...draft,
+      nonce: Date.now(),
+    });
+  }, []);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editingPlanDiscount, setEditingPlanDiscount] = useState('');
   const [savingPlanDiscount, setSavingPlanDiscount] = useState(false);
@@ -254,6 +262,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [creditSettings, setCreditSettings] = useState([]);
   const [editingPromoCode, setEditingPromoCode] = useState(null);
   const [editFormData, setEditFormData] = useState({});
+  const [campaignDraftPrefill, setCampaignDraftPrefill] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
   const [creditRequests, setCreditRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -3883,7 +3892,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'credits' && activeSubTab === 'intelligence' && (
-          <AdminCreditsIntelligence />
+          <AdminCreditsIntelligence onCreateCampaignFromSegment={openNudgeCampaignFromCreditsSegment} />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'ledger' && (
@@ -4765,7 +4774,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
             {notifSubTab === 'nudge_triggers' && <AdminNudgeTriggerDefinitions />}
             {notifSubTab === 'nudge_schedule' && <AdminNudgeScheduler />}
-            {notifSubTab === 'nudge_campaigns' && <AdminNudgeCampaigns />}
+            {notifSubTab === 'nudge_campaigns' && (
+              <AdminNudgeCampaigns
+                prefillDraft={campaignDraftPrefill}
+                onPrefillConsumed={() => setCampaignDraftPrefill(null)}
+              />
+            )}
             {notifSubTab === 'nudge_analytics' && <AdminNudgeAnalytics />}
             {notifSubTab === 'sent_today' && (
               <div className="notifications-form notifications-form--wide">

@@ -31,10 +31,12 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     admin_deducted_credits: 0,
     refund_reversal_credits: 0,
     free_questions_count: 0,
+    new_users_bought_count: 0,
   });
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchRange, setSearchRange] = useState({ from_date: null, to_date: null });
+  const [cohortFilter, setCohortFilter] = useState('');
   const [buyOnly, setBuyOnly] = useState(false);
   /** Server-side filter: hides free / zero-credit ledger rows (no extra rows fetched). */
   const [excludeZeroAmount, setExcludeZeroAmount] = useState(false);
@@ -51,7 +53,13 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     () => (buyOnly ? searchResults.filter(isBuyTransaction) : searchResults),
     [searchResults, buyOnly]
   );
-  const loadTransactions = async (fromDate = '', toDate = '', query = '', excludeZero = excludeZeroAmount) => {
+  const loadTransactions = async (
+    fromDate = '',
+    toDate = '',
+    query = '',
+    excludeZero = excludeZeroAmount,
+    cohort = cohortFilter,
+  ) => {
     setSearchLoading(true);
     setSearchError(null);
     try {
@@ -60,6 +68,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       if (toDate) params.append('to_date', toDate);
       if (query.trim()) params.append('query', query.trim());
       if (excludeZero) params.append('exclude_zero_amount', 'true');
+      if (cohort) params.append('cohort_filter', cohort);
       const response = await fetch(`/api/credits/admin/search?${params.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
@@ -73,8 +82,10 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
         admin_deducted_credits: 0,
         refund_reversal_credits: 0,
         free_questions_count: 0,
+        new_users_bought_count: 0,
       });
       setSearchRange({ from_date: data.from_date || null, to_date: data.to_date || null });
+      setCohortFilter(data.cohort_filter || cohort || '');
     } catch (err) {
       console.error('Error loading transactions:', err);
       setSearchError('Failed to load transactions. Please try again.');
@@ -86,6 +97,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
         admin_deducted_credits: 0,
         refund_reversal_credits: 0,
         free_questions_count: 0,
+        new_users_bought_count: 0,
       });
     } finally {
       setSearchLoading(false);
@@ -101,11 +113,12 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     const hasJump = ledgerJumpContext != null && ledgerJumpNonce != null;
     const q = hasJump ? String(ledgerJumpContext.query ?? '').trim() : '';
     setSearchQuery(q);
+    setCohortFilter('');
     loadTransactions(today, today, q, false);
   }, [ledgerJumpNonce]);
 
   const handleSearch = () => {
-    loadTransactions(searchFromDate, searchToDate, searchQuery, excludeZeroAmount);
+    loadTransactions(searchFromDate, searchToDate, searchQuery, excludeZeroAmount, cohortFilter);
   };
 
   const closeActionMenu = useCallback(() => setActionMenu(null), []);
@@ -354,6 +367,9 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                 {searchQuery.trim() && (
                   <span className="results-filter"> · matching &quot;{searchQuery.trim()}&quot;</span>
                 )}
+                {cohortFilter === 'new_users_bought_in_range' && (
+                  <span className="results-filter"> · new users who bought in this range</span>
+                )}
               </h2>
               <div className="ledger-summary">
                 <span className="ledger-summary-chip ledger-summary-chip--bought">
@@ -371,6 +387,17 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                 <span className="ledger-summary-chip ledger-summary-chip--free">
                   Free Questions: {searchSummary.free_questions_count}
                 </span>
+                <button
+                  type="button"
+                  className={`ledger-summary-chip ledger-summary-chip--newusers ${cohortFilter === 'new_users_bought_in_range' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    const next = cohortFilter === 'new_users_bought_in_range' ? '' : 'new_users_bought_in_range';
+                    setCohortFilter(next);
+                    loadTransactions(searchFromDate, searchToDate, searchQuery, excludeZeroAmount, next);
+                  }}
+                >
+                  New users bought: {searchSummary.new_users_bought_count}
+                </button>
                 <label className="ledger-buy-only-toggle">
                   <input
                     type="checkbox"
@@ -386,7 +413,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                     onChange={(e) => {
                       const v = e.target.checked;
                       setExcludeZeroAmount(v);
-                      loadTransactions(searchFromDate, searchToDate, searchQuery, v);
+                      loadTransactions(searchFromDate, searchToDate, searchQuery, v, cohortFilter);
                     }}
                   />
                   <span>Hide zero-credit rows</span>

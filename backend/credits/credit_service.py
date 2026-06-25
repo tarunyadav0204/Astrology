@@ -3284,6 +3284,7 @@ class CreditService:
         limit: int = 500,
         *,
         exclude_zero_amount: bool = False,
+        cohort_filter: Optional[str] = None,
     ) -> List[Dict]:
         """
         Search credit transactions across all users for a date range, with optional
@@ -3292,6 +3293,7 @@ class CreditService:
         from db import get_conn, execute
 
         zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
+        cohort = (cohort_filter or "").strip().lower()
         sql = f"""
             SELECT ct.id, ct.userid, u.name, u.phone,
                    ct.transaction_type, ct.amount, ct.balance_after,
@@ -3301,6 +3303,22 @@ class CreditService:
             WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?{zero_filter}
         """
         params: List[Any] = [from_date, to_date]
+
+        if cohort == "new_users_bought_in_range":
+            sql += """
+                AND ct.userid IN (
+                    SELECT DISTINCT ct2.userid
+                    FROM credit_transactions ct2
+                    JOIN users u2 ON u2.userid = ct2.userid
+                    WHERE date(ct2.created_at) >= ? AND date(ct2.created_at) <= ?
+                      AND date(u2.created_at) >= ? AND date(u2.created_at) <= ?
+                      AND ct2.source IN ('google_play', 'razorpay')
+                      AND ct2.transaction_type IN ('earned', 'refund')
+                )
+                AND ct.source IN ('google_play', 'razorpay')
+                AND ct.transaction_type IN ('earned', 'refund')
+            """
+            params.extend([from_date, to_date, from_date, to_date])
 
         if query and query.strip():
             like = f"%{query.strip()}%"
@@ -3339,6 +3357,7 @@ class CreditService:
         query: Optional[str] = None,
         *,
         exclude_zero_amount: bool = False,
+        cohort_filter: Optional[str] = None,
     ) -> Dict[str, int]:
         """
         Backend summary for admin credit ledger over the exact same filter as search_transactions.
@@ -3349,12 +3368,30 @@ class CreditService:
         range_start = f"{from_date} 00:00:00"
         range_end_exclusive_sql = f"CAST(? AS DATE) + INTERVAL '1 day'"
         zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
+        cohort = (cohort_filter or "").strip().lower()
         query_filter = ""
-        params: List[Any] = [range_start, to_date]
+        params: List[Any] = [from_date, to_date, range_start, to_date]
         if query and query.strip():
             like = f"%{query.strip()}%"
             query_filter = " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
             params.extend([like, like])
+
+        cohort_filter_sql = ""
+        if cohort == "new_users_bought_in_range":
+            cohort_filter_sql = """
+              AND ct.userid IN (
+                  SELECT DISTINCT ct2.userid
+                  FROM credit_transactions ct2
+                  JOIN users u2 ON u2.userid = ct2.userid
+                  WHERE date(ct2.created_at) >= ? AND date(ct2.created_at) <= ?
+                    AND date(u2.created_at) >= ? AND date(u2.created_at) <= ?
+                    AND ct2.source IN ('google_play', 'razorpay')
+                    AND ct2.transaction_type IN ('earned', 'refund')
+              )
+              AND ct.source IN ('google_play', 'razorpay')
+              AND ct.transaction_type IN ('earned', 'refund')
+            """
+            params.extend([from_date, to_date, from_date, to_date])
 
         sql = f"""
             SELECT
@@ -3383,18 +3420,25 @@ class CreditService:
                      AND ct.source = 'feature_usage'
                      AND ct.reference_id = 'chat_question'
                      AND ct.amount = 0
-                    THEN 1 ELSE 0 END), 0) AS free_questions_count
+                    THEN 1 ELSE 0 END), 0) AS free_questions_count,
+                COALESCE(COUNT(DISTINCT CASE
+                    WHEN ct.source IN ('google_play', 'razorpay')
+                     AND ct.transaction_type IN ('earned', 'refund')
+                     AND date(u.created_at) >= CAST(? AS DATE)
+                     AND date(u.created_at) <= CAST(? AS DATE)
+                    THEN ct.userid ELSE NULL END), 0) AS new_users_bought_count
             FROM credit_transactions ct
             LEFT JOIN users u ON u.userid = ct.userid
             WHERE ct.created_at >= ?
               AND ct.created_at < {range_end_exclusive_sql}
               {zero_filter}
+              {cohort_filter_sql}
               {query_filter}
         """
 
         with get_conn() as conn:
             cur = execute(conn, sql, params)
-            row = cur.fetchone() or (0, 0, 0, 0, 0, 0)
+            row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0)
 
         return {
             "purchased_credits": int(row[0] or 0),
@@ -3403,6 +3447,7 @@ class CreditService:
             "admin_deducted_credits": int(row[3] or 0),
             "refund_reversal_credits": int(row[4] or 0),
             "free_questions_count": int(row[5] or 0),
+            "new_users_bought_count": int(row[6] or 0),
         }
 
     def get_google_play_transactions(
@@ -4034,4 +4079,298 @@ class CreditService:
             "wallet_buckets": wallet_buckets,
             "dormant_balances": dormant_balances,
             "time_series": time_series,
+        }
+
+    def get_admin_campaign_segment(
+        self,
+        segment_key: str,
+        *,
+        from_date: str,
+        to_date: str,
+        page: int = 1,
+        limit: int = 25,
+    ) -> Dict[str, Any]:
+        from db import get_conn, execute
+
+        segment = (segment_key or "").strip().lower()
+        page = max(1, int(page or 1))
+        limit = max(1, min(100, int(limit or 25)))
+        offset = (page - 1) * limit
+
+        range_start = f"{from_date} 00:00:00"
+        analysis_end_exclusive = f"{to_date} 23:59:59"
+
+        definitions = self._admin_campaign_segment_definitions(
+            range_start=range_start,
+            analysis_end_exclusive=analysis_end_exclusive,
+        )
+        config = definitions.get(segment)
+        if not config:
+            raise ValueError(f"Unknown campaign segment: {segment}")
+
+        with get_conn() as conn:
+            count_sql = f"SELECT COUNT(*) FROM ({config['sql']} SELECT * FROM base) seg"
+            count_cur = execute(conn, count_sql, config["params"])
+            total = int((count_cur.fetchone() or [0])[0] or 0)
+
+            rows_sql = f"""
+                {config['sql']}
+                SELECT *
+                FROM base
+                ORDER BY {config['order_by']}
+                LIMIT ? OFFSET ?
+            """
+            rows_cur = execute(conn, rows_sql, tuple(config["params"]) + (limit, offset))
+            rows = rows_cur.fetchall() or []
+
+        users = [
+            {
+                "userid": r[0],
+                "user_name": r[1],
+                "user_phone": r[2],
+                "purchased_credits": int(r[3] or 0),
+                "purchase_count": int(r[4] or 0),
+                "spent_credits": int(r[5] or 0),
+                "spend_count": int(r[6] or 0),
+                "current_balance": int(r[7] or 0),
+                "last_activity_at": r[8].isoformat() if r[8] else None,
+                "last_purchase_at": r[9].isoformat() if r[9] else None,
+                "campaign_reason": r[10] or "",
+            }
+            for r in rows
+        ]
+
+        return {
+            "segment_key": segment,
+            "segment_label": config["label"],
+            "description": config["description"],
+            "from_date": from_date,
+            "to_date": to_date,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "users": users,
+        }
+
+    def get_admin_campaign_segment_user_ids(
+        self,
+        segment_key: str,
+        *,
+        from_date: str,
+        to_date: str,
+    ) -> List[int]:
+        from db import get_conn, execute
+
+        segment = (segment_key or "").strip().lower()
+        range_start = f"{from_date} 00:00:00"
+        analysis_end_exclusive = f"{to_date} 23:59:59"
+        definitions = self._admin_campaign_segment_definitions(
+            range_start=range_start,
+            analysis_end_exclusive=analysis_end_exclusive,
+        )
+        config = definitions.get(segment)
+        if not config:
+            raise ValueError(f"Unknown campaign segment: {segment}")
+
+        with get_conn() as conn:
+            ids_sql = f"""
+                {config['sql']}
+                SELECT userid
+                FROM base
+                ORDER BY {config['order_by']}
+            """
+            cur = execute(conn, ids_sql, config["params"])
+            rows = cur.fetchall() or []
+        return [int(r[0]) for r in rows if r and r[0] is not None]
+
+    def _admin_campaign_segment_definitions(
+        self,
+        *,
+        range_start: str,
+        analysis_end_exclusive: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        return {
+            "recent_payers_no_spend": {
+                "label": "Recent payers with no spend",
+                "description": "Users who bought credits in the selected range but did not spend any credits in the same range.",
+                "sql": """
+                    WITH paid_range AS (
+                        SELECT
+                            ct.userid,
+                            SUM(ct.amount) AS purchased_credits,
+                            COUNT(*) AS purchase_count,
+                            MAX(ct.created_at) AS last_purchase_at
+                        FROM credit_transactions ct
+                        WHERE ct.transaction_type = 'earned'
+                          AND ct.source IN ('google_play', 'razorpay')
+                          AND ct.created_at >= ?
+                          AND ct.created_at <= ?
+                        GROUP BY ct.userid
+                    ),
+                    spent_range AS (
+                        SELECT
+                            ct.userid,
+                            SUM(ABS(ct.amount)) AS spent_credits,
+                            COUNT(*) AS spend_count
+                        FROM credit_transactions ct
+                        WHERE ct.transaction_type = 'spent'
+                          AND ct.source NOT IN ('admin_adjustment', 'google_play_refund', 'razorpay_refund', 'refund')
+                          AND ct.created_at >= ?
+                          AND ct.created_at <= ?
+                        GROUP BY ct.userid
+                    ),
+                    base AS (
+                        SELECT
+                            pr.userid,
+                            COALESCE(u.name, '') AS user_name,
+                            COALESCE(u.phone, '') AS user_phone,
+                            pr.purchased_credits,
+                            pr.purchase_count,
+                            COALESCE(sr.spent_credits, 0) AS spent_credits,
+                            COALESCE(sr.spend_count, 0) AS spend_count,
+                            COALESCE(uc.credits, 0) AS current_balance,
+                            pr.last_purchase_at AS last_activity_at,
+                            pr.last_purchase_at,
+                            'Bought in range but has not spent yet' AS campaign_reason
+                        FROM paid_range pr
+                        LEFT JOIN spent_range sr ON sr.userid = pr.userid
+                        LEFT JOIN users u ON u.userid = pr.userid
+                        LEFT JOIN user_credits uc ON uc.userid = pr.userid
+                        WHERE COALESCE(sr.spent_count, 0) = 0
+                    )
+                """,
+                "params": (range_start, analysis_end_exclusive, range_start, analysis_end_exclusive),
+                "order_by": "last_purchase_at DESC NULLS LAST, purchased_credits DESC, userid DESC",
+            },
+            "high_balance_inactive": {
+                "label": "High balance inactive",
+                "description": "Users holding at least 200 credits with no credit activity in the last 14 days.",
+                "sql": """
+                    WITH last_activity AS (
+                        SELECT userid, MAX(created_at) AS last_activity_at
+                        FROM credit_transactions
+                        GROUP BY userid
+                    ),
+                    base AS (
+                        SELECT
+                            uc.userid,
+                            COALESCE(u.name, '') AS user_name,
+                            COALESCE(u.phone, '') AS user_phone,
+                            0::bigint AS purchased_credits,
+                            0::bigint AS purchase_count,
+                            0::bigint AS spent_credits,
+                            0::bigint AS spend_count,
+                            uc.credits AS current_balance,
+                            la.last_activity_at,
+                            NULL::timestamp AS last_purchase_at,
+                            'Balance parked and no recent credit activity' AS campaign_reason
+                        FROM user_credits uc
+                        LEFT JOIN users u ON u.userid = uc.userid
+                        LEFT JOIN last_activity la ON la.userid = uc.userid
+                        WHERE uc.credits >= 200
+                          AND (la.last_activity_at IS NULL OR la.last_activity_at < NOW() - INTERVAL '14 days')
+                    )
+                """,
+                "params": (),
+                "order_by": "current_balance DESC, last_activity_at ASC NULLS FIRST, userid DESC",
+            },
+            "first_time_payers_no_repeat": {
+                "label": "First-time payers with no repeat purchase",
+                "description": "Users whose first ever purchase happened in the selected range and who still have only one paid purchase overall.",
+                "sql": """
+                    WITH lifetime_paid AS (
+                        SELECT
+                            ct.userid,
+                            MIN(ct.created_at) AS first_purchase_at,
+                            MAX(ct.created_at) AS last_purchase_at,
+                            COUNT(*) AS lifetime_purchase_count,
+                            SUM(ct.amount) AS lifetime_purchased_credits
+                        FROM credit_transactions ct
+                        WHERE ct.transaction_type = 'earned'
+                          AND ct.source IN ('google_play', 'razorpay')
+                        GROUP BY ct.userid
+                    ),
+                    spent_range AS (
+                        SELECT
+                            ct.userid,
+                            SUM(ABS(ct.amount)) AS spent_credits,
+                            COUNT(*) AS spend_count
+                        FROM credit_transactions ct
+                        WHERE ct.transaction_type = 'spent'
+                          AND ct.source NOT IN ('admin_adjustment', 'google_play_refund', 'razorpay_refund', 'refund')
+                          AND ct.created_at >= ?
+                          AND ct.created_at <= ?
+                        GROUP BY ct.userid
+                    ),
+                    base AS (
+                        SELECT
+                            lp.userid,
+                            COALESCE(u.name, '') AS user_name,
+                            COALESCE(u.phone, '') AS user_phone,
+                            lp.lifetime_purchased_credits AS purchased_credits,
+                            lp.lifetime_purchase_count AS purchase_count,
+                            COALESCE(sr.spent_credits, 0) AS spent_credits,
+                            COALESCE(sr.spend_count, 0) AS spend_count,
+                            COALESCE(uc.credits, 0) AS current_balance,
+                            lp.last_purchase_at AS last_activity_at,
+                            lp.last_purchase_at,
+                            'First payer who has not returned for a second purchase' AS campaign_reason
+                        FROM lifetime_paid lp
+                        LEFT JOIN spent_range sr ON sr.userid = lp.userid
+                        LEFT JOIN users u ON u.userid = lp.userid
+                        LEFT JOIN user_credits uc ON uc.userid = lp.userid
+                        WHERE lp.first_purchase_at >= ?
+                          AND lp.first_purchase_at <= ?
+                          AND lp.lifetime_purchase_count = 1
+                    )
+                """,
+                "params": (range_start, analysis_end_exclusive, range_start, analysis_end_exclusive),
+                "order_by": "last_purchase_at DESC NULLS LAST, purchased_credits DESC, userid DESC",
+            },
+            "active_but_slipping": {
+                "label": "Active but slipping",
+                "description": "Users who were active before but have had no credit activity in the last 7 days.",
+                "sql": """
+                    WITH recent_window AS (
+                        SELECT userid, MAX(created_at) AS last_activity_at
+                        FROM credit_transactions
+                        GROUP BY userid
+                    ),
+                    prior_range AS (
+                        SELECT
+                            ct.userid,
+                            MAX(ct.created_at) AS range_last_activity_at,
+                            SUM(CASE WHEN ct.transaction_type = 'earned' AND ct.source IN ('google_play', 'razorpay') THEN ct.amount ELSE 0 END) AS purchased_credits,
+                            COUNT(CASE WHEN ct.transaction_type = 'earned' AND ct.source IN ('google_play', 'razorpay') THEN 1 END) AS purchase_count,
+                            SUM(CASE WHEN ct.transaction_type = 'spent' AND ct.source NOT IN ('admin_adjustment', 'google_play_refund', 'razorpay_refund', 'refund') THEN ABS(ct.amount) ELSE 0 END) AS spent_credits,
+                            COUNT(CASE WHEN ct.transaction_type = 'spent' AND ct.source NOT IN ('admin_adjustment', 'google_play_refund', 'razorpay_refund', 'refund') THEN 1 END) AS spend_count
+                        FROM credit_transactions ct
+                        WHERE ct.created_at >= ?
+                          AND ct.created_at <= ?
+                        GROUP BY ct.userid
+                    ),
+                    base AS (
+                        SELECT
+                            pr.userid,
+                            COALESCE(u.name, '') AS user_name,
+                            COALESCE(u.phone, '') AS user_phone,
+                            COALESCE(pr.purchased_credits, 0) AS purchased_credits,
+                            COALESCE(pr.purchase_count, 0) AS purchase_count,
+                            COALESCE(pr.spent_credits, 0) AS spent_credits,
+                            COALESCE(pr.spend_count, 0) AS spend_count,
+                            COALESCE(uc.credits, 0) AS current_balance,
+                            rw.last_activity_at,
+                            NULL::timestamp AS last_purchase_at,
+                            'Was active earlier but quiet in the last 7 days' AS campaign_reason
+                        FROM prior_range pr
+                        LEFT JOIN recent_window rw ON rw.userid = pr.userid
+                        LEFT JOIN users u ON u.userid = pr.userid
+                        LEFT JOIN user_credits uc ON uc.userid = pr.userid
+                        WHERE rw.last_activity_at < NOW() - INTERVAL '7 days'
+                          AND rw.last_activity_at >= NOW() - INTERVAL '30 days'
+                    )
+                """,
+                "params": (range_start, analysis_end_exclusive),
+                "order_by": "last_activity_at DESC NULLS LAST, spent_credits DESC, userid DESC",
+            },
         }
